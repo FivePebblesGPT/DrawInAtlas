@@ -74,7 +74,7 @@ func _draw() -> void:
         _stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom)
     if _drawing_battlemap:
         _draw_draft()
-    draw_set_transform()
+    draw_set_transform(Vector2.ZERO)
 
 
 func _draw_parent_reference() -> void:
@@ -257,6 +257,6 @@ func _gui_input(event: InputEvent) -> void:
             _draft_end = local_to_document(motion.position)
             queue_redraw()
             accept_event()
-        elif tool == Tool.PAINT and motion.button_mask & MOUSE_BUTTON_MASK_LEFT != 0:
+        elif tool == Tool.PAINT and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
             paint_requested.emit(map.grid.document_to_cell(local_to_document(motion.position)))
             accept_event()
