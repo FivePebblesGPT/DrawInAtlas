@@ -1,6 +1,6 @@
 # Implementation Plan and Decision Log
 
-**Status:** proposal for future development, based on current minimal Godot 4.8 project. No milestone is claimed complete.
+**Status:** roadmap. The Godot 4.7.2 GDScript scaffold now implements a subset of milestones 0–2; full milestone acceptance criteria remain open. See [implementation notes](IMPLEMENTATION_NOTES.md) for what runs today.
 
 ## 1. Principle: vertical slices before feature breadth
 
