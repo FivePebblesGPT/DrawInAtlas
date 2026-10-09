@@ -10,6 +10,7 @@ func _initialize() -> void:
     _test_zoom_gate()
     _test_campaign_roundtrip()
     _test_webp()
+    _test_editor_workflow()
     if failures == 0:
         print("ATLAS_TESTS_PASSED")
     else:
@@ -96,3 +97,49 @@ func _test_webp() -> void:
         _check(restored.get_pixel(3, 3).is_equal_approx(image.get_pixel(3, 3)),
             "lossless WebP pixel match")
     DirAccess.remove_absolute(ProjectSettings.globalize_path(file_path))
+
+
+func _test_editor_workflow() -> void:
+    var editor: Variant = load("res://main.tscn").instantiate()
+    root.add_child(editor)
+
+    # At max zoom: exactly three *additional* logical steps enter the city.
+    var canvas: AtlasCanvas = editor.canvas
+    var world: AtlasMapDocument = editor.campaign.get_map("world")
+    canvas.camera_center = world.grid.cell_to_document(Vector2i(2, 0))
+    canvas.camera_zoom = 3.0
+    var pointer := canvas.size * 0.5
+    editor._on_wheel_step(1, pointer)
+    editor._on_wheel_step(1, pointer)
+    _check(canvas.map.id == "world", "two blocked inward steps stay on parent map")
+    editor._on_wheel_step(1, pointer)
+    _check(canvas.map.id == "greyhaven", "third blocked inward step enters city")
+
+    var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
+    var parent_before := JSON.stringify(city.floors[0].terrain)
+    editor._on_create_battlemap(Vector2(-100, -70), Vector2(150, 125), deg_to_rad(37))
+    _check(canvas.map.kind == "BATTLEMAP", "drag creation opens a child battlemap workspace")
+    _check(editor.campaign.placements.size() == 1, "child has a placement")
+    if not editor.campaign.placements.is_empty():
+        var placement: AtlasPlacement = editor.campaign.placements[0]
+        _check(not placement.symbolic, "city placement uses spatial reference")
+        _check(is_equal_approx(rad_to_deg(placement.rotation), 37.0), "battlemap angle persists")
+
+    editor._on_select(Vector2i(0, 0))
+    editor.locked_to_cell = true
+    editor._on_paint(Vector2i(1, 0))
+    _check(canvas.floor.get_terrain(Vector2i(1, 0)) == 0, "cell lock blocks neighbor edit")
+    editor._on_paint(Vector2i(0, 0))
+    _check(canvas.floor.get_terrain(Vector2i(0, 0)) == editor.palette_id, "cell lock permits selected cell")
+    _check(JSON.stringify(city.floors[0].terrain) == parent_before,
+        "painting child does not change parent")
+
+    canvas.camera_zoom = 0.5
+    pointer = canvas.size * 0.5
+    editor._on_wheel_step(-1, pointer)
+    editor._on_wheel_step(-1, pointer)
+    _check(canvas.map.kind == "BATTLEMAP", "two blocked outward steps stay in battlemap")
+    editor._on_wheel_step(-1, pointer)
+    _check(canvas.map.id == "greyhaven", "third blocked outward step returns to city")
+    root.remove_child(editor)
+    editor.free()
