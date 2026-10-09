@@ -16,13 +16,29 @@ jobs:
           use-dotnet: false
           include-templates: true
       - name: Import resources and parse scripts
-        run: godot --headless --path . --editor --import --quit
-      - name: Run domain smoke tests
-        run: godot --headless --path . --script res://tests/smoke.gd
-      - name: Launch main scene headlessly
-        run: godot --headless --path . --quit-after 5
-      - name: Export Web (single-thread, Compatibility)
+        shell: bash
         run: |
+          set -euo pipefail
+          godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Run domain smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/smoke.gd 2>&1 | tee /tmp/godot-test.log
+          grep -q 'ATLAS_TESTS_PASSED' /tmp/godot-test.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-test.log; then exit 1; fi
+      - name: Launch main scene headlessly
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --quit-after 5 2>&1 | tee /tmp/godot-launch.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-launch.log; then exit 1; fi
+      - name: Export Web (single-thread, Compatibility)
+        shell: bash
+        run: |
+          set -euo pipefail
           mkdir -p build/web
-          godot --headless --path . --export-release "Web" build/web/index.html
+          godot --headless --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-export.log
           test -s build/web/index.html
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-export.log; then exit 1; fi
