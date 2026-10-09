@@ -29,6 +29,7 @@ var _drawing_battlemap: bool = false
 var _draft_start: Vector2 = Vector2.ZERO
 var _draft_end: Vector2 = Vector2.ZERO
 var _wheel_fraction: float = 0.0
+var _wheel_direction: int = 0
 
 const EMPTY_COLOR := Color("#212c34")
 const TERRAIN_COLORS := [
@@ -89,6 +90,12 @@ func _draw_parent_reference() -> void:
         var parent_floor := parent.floor_by_id(parent.default_floor_id)
         if parent_floor == null:
             continue
+        var clipping := PackedVector2Array([
+            Vector2.ZERO,
+            Vector2(placement.columns * placement.child_units_per_cell, 0.0),
+            Vector2(placement.columns, placement.rows) * placement.child_units_per_cell,
+            Vector2(0.0, placement.rows * placement.child_units_per_cell)
+        ])
         for key: String in parent_floor.terrain.keys():
             var xy := key.split(",")
             if xy.size() != 2:
@@ -101,7 +108,9 @@ func _draw_parent_reference() -> void:
             var color := _terrain_color(parent_floor.get_terrain(cell))
             color.a = reference_opacity
             if transformed.size() >= 3:
-                draw_colored_polygon(transformed, color)
+                for clipped in Geometry2D.intersect_polygons(transformed, clipping):
+                    if clipped.size() >= 3:
+                        draw_colored_polygon(clipped, color)
 
 
 func _draw_terrain_and_grid() -> void:
@@ -210,11 +219,15 @@ func _gui_input(event: InputEvent) -> void:
         if mouse.button_index == MOUSE_BUTTON_WHEEL_UP or mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN:
             if mouse.pressed:
                 var delta := mouse.factor if mouse.factor > 0.0 else 1.0
-                _wheel_fraction += delta
+                var wheel_direction := 1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1
+                if _wheel_direction != wheel_direction:
+                    _wheel_fraction = 0.0
+                    _wheel_direction = wheel_direction
+                _wheel_fraction += minf(delta, 1.0)
                 if _wheel_fraction >= 1.0:
-                    _wheel_fraction -= 1.0
-                    # At most one boundary step per event; avoid one touchpad burst skipping maps.
-                    wheel_step.emit(1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1, mouse.position)
+                    _wheel_fraction = 0.0
+                    # Never carry a burst's overscroll into later wheel events.
+                    wheel_step.emit(wheel_direction, mouse.position)
             accept_event()
             return
         if mouse.button_index == MOUSE_BUTTON_MIDDLE or mouse.button_index == MOUSE_BUTTON_RIGHT:
