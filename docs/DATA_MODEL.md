@@ -43,7 +43,7 @@ campaign/
       tile_chunks/
         <floor-id>/<layer-id>/<chunk-coordinate>.bin
       raster_chunks/
-        <floor-id>/<layer-id>/<chunk-coordinate>.png
+        <floor-id>/<layer-id>/<chunk-coordinate>.webp
       objects/
         <floor-id>/<layer-id>.json
       previews/
@@ -55,7 +55,7 @@ campaign/
     operations.log
 ```
 
-Metadata JSON should be human-inspectable; large painting payloads should be chunked. The illustration does not lock down chunk serialization or whether a final project is a directory, ZIP-like package or application bundle.
+Metadata JSON should be human-inspectable; raster painting payloads should be **lossless .webp** chunks, with derived thumbnails optionally stored as lossy .webp. JSON and non-image binary formats still store structured data; PNG/JPEG is not the persisted raster format. The illustration does not lock down chunk serialization or whether a final project is a directory, ZIP-like package or application bundle.
 
 ## 3. Manifest example
 
@@ -216,7 +216,7 @@ Store deliberate persistent document metadata separately: actual layers, floors,
 ## 10. Unresolved schema details
 
 - Best chunk size (initial trial: 256 or 512 pixels/cells depending on layer type).
-- Format for sparse tiles, vector geometry and large clipboard payloads.
+- Format for sparse tiles, vector geometry and large clipboard payloads (raster chunks are WebP).
 - Whether battlemap reference is live by default or a frozen snapshot.
 - Which authorization metadata belongs to campaign files versus hosted-session policy.
 - How to package/share assets without violating their licenses.

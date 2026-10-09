@@ -1,10 +1,10 @@
 # DrawInAtlas
 
-**Status: concept and architecture design; no editor features implemented yet.**
+**Status: early GDScript editor scaffold, not a full-featured VTT.**
 
 DrawInAtlas is a proposed Godot-based, map-first tabletop editor for West Marches / hexcrawl D&D campaigns. It aims to combine the flexible drawing and collaboration of a whiteboard with the coordinate grids, linked locations, encounter maps, floors, and player presentation needed for a virtual tabletop.
 
-The repository currently contains a minimal Godot 4.8 project. The documents below describe **planned behavior and recommended architecture**, not completed application functionality.
+The repository now contains a **Godot 4.7.2 (standard) GDScript-only** editor vertical slice. See [Implementation Notes](docs/IMPLEMENTATION_NOTES.md) for running it and for the features still missing. All persisted raster map artwork and previews must use **WebP** (lossless for editable data, optionally lossy for derived thumbnails). Web export compatibility is a hard requirement.
 
 ## Product principles
 
@@ -25,11 +25,14 @@ The repository currently contains a minimal Godot 4.8 project. The documents bel
 | [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Navigation, exact three-step buffer, cross-map references and discovery |
 | [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized shapes, stable IDs, indexing and migrations |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Vertical slices, priorities, risks and test plan |
+| [Implementation notes](docs/IMPLEMENTATION_NOTES.md) | GDScript scaffold, WebP policy, run/test steps and limits |
 
-## Development state
+## Run and test
 
-- Existing Godot project: `project.godot`
-- Existing minimal scene: `main.tscn`
-- No editing, campaign-file, or networking implementation is asserted by these documents.
+- Open in the **Godot 4.7.2 standard** build (not .NET) and run `main.tscn`.
+- Paint cells, select a hex, restrict painting to a cell, create rotated battlemaps and enter linked maps from the sample project.
+- Save/load uses a provisional `user://drawinatlas_campaign.json` slot. Canonical raster and derived preview image files must be `.webp`.
+- Smoke test: `godot --headless --path . --script res://tests/smoke.gd`.
+- Project/web-export checks are described in `.github/workflows/godot-check.yml`.
 
-All JSON examples, API shapes, and module names are **proposals** to evolve through implementation. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the first testable slice.
+Networking, full layers/floors editing, raster tools, projector multiwindow, rich preview search and Web browser storage UX remain future work.
