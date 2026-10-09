@@ -1,0 +1,28 @@
+name: Godot GDScript checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke-and-web-export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.2 (standard, non-.NET)
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+      - name: Import resources and parse scripts
+        run: godot --headless --path . --editor --import --quit
+      - name: Run domain smoke tests
+        run: godot --headless --path . --script res://tests/smoke.gd
+      - name: Launch main scene headlessly
+        run: godot --headless --path . --quit-after 5
+      - name: Export Web (single-thread, Compatibility)
+        run: |
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html
+          test -s build/web/index.html
