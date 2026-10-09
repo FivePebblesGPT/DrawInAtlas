@@ -5,6 +5,11 @@ var failures: int = 0
 
 
 func _initialize() -> void:
+    # The SceneTree root is not ready during _initialize; defer UI integration checks.
+    call_deferred("_run_suite")
+
+
+func _run_suite() -> void:
     _test_grids()
     _test_placements()
     _test_zoom_gate()
