@@ -5,7 +5,6 @@
 ## 1. Architectural goals
 
 - Local-first and projector-first: a campaign must function without hosting a server.
-- Document-oriented: a campaign map is data, not a Godot scene authored ahead of time.
 - Map content, navigation links, renderers, and editor state are separate concerns.
 - Preserve independently editable maps at every semantic scale and elevation.
 - Support sparse, chunked storage for large canvases.
@@ -14,22 +13,62 @@
 
 ## 2. Responsibility boundaries
 
-```text
-Godot UI / presentation
-  EditorShell, tool panels, MapOverview, GMViewport, PlayerViewport
-                 |
-Application services (use-cases)
-  DocumentSession / MapNavigator / MapPreviewManager
-  EditCommandBus / EditScopeController / AssetCatalog
-                 |
-Domain model (no Node dependence)
-  Campaign, MapDocument, MapLink, BattlemapPlacement
-  MapFloor, MapLayer, GridDefinition, MapObject
-  EditCommand, NavigationSnapshot, AccessPolicy
-                 |
-Infrastructure adapters
-  GodotCanvasRenderer, GridAdapter, ThumbnailRenderer
-  ProjectStore, ChunkStore, ImportExport, HostTransport
+```mermaid
+flowchart LR
+    subgraph UI["Godot UI / Presentation"]
+        direction TB
+        EditorShell
+        ToolPanels["Tool Panels"]
+        MapOverview
+        GMViewport
+        PlayerViewport
+    end
+
+    subgraph Application["Application Services (Use Cases)"]
+        direction TB
+        DocumentSession
+        MapNavigator
+        MapPreviewManager
+        EditCommandBus
+        EditScopeController
+        AssetCatalog
+    end
+
+    subgraph Domain["Domain Model (No Node Dependence)"]
+        direction TB
+        Campaign
+        MapDocument
+        MapLink
+        BattlemapPlacement
+        MapFloor
+        MapLayer
+        GridDefinition
+        MapObject
+        EditCommand
+        NavigationSnapshot
+        AccessPolicy
+    end
+
+    subgraph Infrastructure["Infrastructure Adapters"]
+        direction TB
+        GodotCanvasRenderer
+        GridAdapter
+        ThumbnailRenderer
+        ProjectStore
+        ChunkStore
+        ImportExport
+        HostTransport
+    end
+
+    UI --> Application
+    Application --> Domain
+    Application -.-> Infrastructure
+    Infrastructure --> Domain
+
+    style UI fill:#dbeafe,stroke:#3b82f6,color:#1e40af
+    style Application fill:#dcfce7,stroke:#22c55e,color:#166534
+    style Domain fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    style Infrastructure fill:#f3e8ff,stroke:#a855f7,color:#6b21a8
 ```
 
 **Dependency rule:** core domain objects must not require a live `Node`, `Camera2D`, or `TileMapLayer` to be valid. A Godot scene is a reusable view/tool implementation over runtime data. Tool implementations request edits through application services, not by directly modifying arbitrary scene nodes.
@@ -78,7 +117,7 @@ Each workspace/viewer has its own active map, floor, camera, selected cell, edit
 
 Every persistent modification should be a typed command with immutable intent, for example:
 
-```text
+```gdscript
 PaintTileCells(mapId, floorId, layerId, cells, brushAssetId)
 ApplyRasterStroke(mapId, floorId, layerId, stroke, affectedChunkIds)
 PasteObjects(mapId, floorId, layerId, serializedObjects, transform)
