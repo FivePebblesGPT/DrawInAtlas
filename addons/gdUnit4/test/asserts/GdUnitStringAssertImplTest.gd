@@ -1,0 +1,549 @@
+# GdUnit generated TestSuite
+class_name GdUnitStringAssertImplTest
+extends GdUnitTestSuite
+
+
+func test_is_null() -> void:
+	assert_str(null).is_null()
+
+	assert_failure(func() -> void: assert_str("abc").is_null()) \
+		.is_failed() \
+		.starts_with_message("Expecting: '<null>' but was 'abc'")
+
+
+func test_is_not_null() -> void:
+	assert_str("abc").is_not_null()
+	assert_str(&"abc").is_not_null()
+
+	assert_failure(func() -> void: assert_str(null).is_not_null()) \
+		.is_failed() \
+		.has_message("Expecting: not to be '<null>'")
+
+
+func test_is_equal() -> void:
+	assert_str("This is a test message").is_equal("This is a test message")
+	assert_str("abc").is_equal("abc")
+	assert_str("abc").is_equal(&"abc")
+	assert_str(&"abc").is_equal("abc")
+	assert_str(&"abc").is_equal(&"abc")
+
+	assert_failure(func() -> void: assert_str("This is a test message").is_equal("This is a test Message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test Message'
+			 but was
+			 'This is a test Mmessage'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).is_equal("This is a test Message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test Message'
+			 but was
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_is_equal_pipe_character() -> void:
+	assert_failure(func() -> void: assert_str("AAA|BBB|CCC").is_equal("AAA|BBB.CCC")) \
+		.is_failed()
+
+
+func test_is_equal_ignoring_case() -> void:
+	assert_str("This is a test message").is_equal_ignoring_case("This is a test Message")
+	assert_str("This is a test message").is_equal_ignoring_case(&"This is a test Message")
+	assert_str(&"This is a test message").is_equal_ignoring_case("This is a test Message")
+	assert_str(&"This is a test message").is_equal_ignoring_case(&"This is a test Message")
+
+	assert_failure(func() -> void: assert_str("This is a test message").is_equal_ignoring_case("This is a Message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a Message'
+			 but was
+			 'This is a Mtest message' (ignoring case)""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).is_equal_ignoring_case("This is a Message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a Message'
+			 but was
+			 '<null>' (ignoring case)""".dedent().trim_prefix("\n"))
+
+
+func test_is_not_equal() -> void:
+	assert_str(null).is_not_equal("This is a test Message")
+	assert_str("This is a test message").is_not_equal("This is a test Message")
+	assert_str("This is a test message").is_not_equal(&"This is a test Message")
+	assert_str(&"This is a test message").is_not_equal("This is a test Message")
+	assert_str(&"This is a test message").is_not_equal(&"This is a test Message")
+
+	assert_failure(func() -> void: assert_str("This is a test message").is_not_equal("This is a test message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 not equal to
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+
+
+func test_is_not_equal_ignoring_case() -> void:
+	assert_str(null).is_not_equal_ignoring_case("This is a Message")
+	assert_str("This is a test message").is_not_equal_ignoring_case("This is a Message")
+	assert_str("This is a test message").is_not_equal_ignoring_case(&"This is a Message")
+	assert_str(&"This is a test message").is_not_equal_ignoring_case("This is a Message")
+	assert_str(&"This is a test message").is_not_equal_ignoring_case(&"This is a Message")
+
+	assert_failure(func() -> void: assert_str("This is a test message").is_not_equal_ignoring_case("This is a test Message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test Message'
+			 not equal to
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+
+
+func test_is_empty() -> void:
+	assert_str("").is_empty()
+	assert_str(&"").is_empty()
+
+	assert_failure(func() -> void: assert_str(" ").is_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must be empty but was
+			 ' '""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str("abc").is_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must be empty but was
+			 'abc'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(&"abc").is_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must be empty but was
+			 'abc'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).is_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must be empty but was
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_is_not_empty() -> void:
+	assert_str(" ").is_not_empty()
+	assert_str("	").is_not_empty()
+	assert_str("abc").is_not_empty()
+	assert_str(&"abc").is_not_empty()
+
+	assert_failure(func() -> void: assert_str("").is_not_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must not be empty""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).is_not_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must not be empty""".dedent().trim_prefix("\n"))
+
+
+func test_contains() -> void:
+	assert_str("This is a test message").contains("a test")
+	assert_str("This is a test message").contains(&"a test")
+	assert_str(&"This is a test message").contains("a test")
+	assert_str(&"This is a test message").contains(&"a test")
+	# must fail because of camel case difference
+	assert_failure(func() -> void: assert_str("This is a test message").contains("a Test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 do contains
+			 'a Test'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).contains("a Test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 '<null>'
+			 do contains
+			 'a Test'""".dedent().trim_prefix("\n"))
+
+
+func test_not_contains() -> void:
+	assert_str(null).not_contains("a tezt")
+	assert_str("This is a test message").not_contains("a tezt")
+	assert_str("This is a test message").not_contains(&"a tezt")
+	assert_str(&"This is a test message").not_contains("a tezt")
+	assert_str(&"This is a test message").not_contains(&"a tezt")
+
+	assert_failure(func() -> void: assert_str("This is a test message").not_contains("a test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 not do contain
+			 'a test'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(&"This is a test message").not_contains("a test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 not do contain
+			 'a test'""".dedent().trim_prefix("\n"))
+
+
+func test_contains_ignoring_case() -> void:
+	assert_str("This is a test message").contains_ignoring_case("a Test")
+	assert_str("This is a test message").contains_ignoring_case(&"a Test")
+	assert_str(&"This is a test message").contains_ignoring_case("a Test")
+	assert_str(&"This is a test message").contains_ignoring_case(&"a Test")
+
+	assert_failure(func() -> void: assert_str("This is a test message").contains_ignoring_case("a Tesd")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 contains
+			 'a Tesd'
+			 (ignoring case)""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).contains_ignoring_case("a Tesd")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 '<null>'
+			 contains
+			 'a Tesd'
+			 (ignoring case)""".dedent().trim_prefix("\n"))
+
+
+func test_not_contains_ignoring_case() -> void:
+	assert_str(null).not_contains_ignoring_case("a Test")
+	assert_str("This is a test message").not_contains_ignoring_case("a Tezt")
+	assert_str("This is a test message").not_contains_ignoring_case(&"a Tezt")
+	assert_str(&"This is a test message").not_contains_ignoring_case("a Tezt")
+	assert_str(&"This is a test message").not_contains_ignoring_case(&"a Tezt")
+
+	assert_failure(func() -> void: assert_str("This is a test message").not_contains_ignoring_case("a Test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 not do contains
+			 'a Test'
+			 (ignoring case)""".dedent().trim_prefix("\n"))
+
+
+func test_starts_with() -> void:
+	assert_str("This is a test message").starts_with("This is")
+	assert_str("This is a test message").starts_with(&"This is")
+	assert_str(&"This is a test message").starts_with("This is")
+	assert_str(&"This is a test message").starts_with(&"This is")
+
+	assert_failure(func() -> void: assert_str("This is a test message").starts_with("This iss")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 to start with
+			 'This iss'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str("This is a test message").starts_with("this is")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 to start with
+			 'this is'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str("This is a test message").starts_with("test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 to start with
+			 'test'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).starts_with("test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 '<null>'
+			 to start with
+			 'test'""".dedent().trim_prefix("\n"))
+
+
+func test_ends_with() -> void:
+	assert_str("This is a test message").ends_with("test message")
+	assert_str("This is a test message").ends_with(&"test message")
+	assert_str(&"This is a test message").ends_with("test message")
+	assert_str(&"This is a test message").ends_with(&"test message")
+
+	assert_failure(func() -> void: assert_str("This is a test message").ends_with("tes message")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 to end with
+			 'tes message'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str("This is a test message").ends_with("a test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'This is a test message'
+			 to end with
+			 'a test'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).ends_with("a test")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 '<null>'
+			 to end with
+			 'a test'""".dedent().trim_prefix("\n"))
+
+
+func test_has_length() -> void:
+	assert_str("This is a test message").has_length(22)
+	assert_str(&"This is a test message").has_length(22)
+	assert_str("").has_length(0)
+	assert_str(&"").has_length(0)
+
+	assert_failure(func() -> void: assert_str("This is a test message").has_length(23)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size:
+			 23 but was 22 in
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).has_length(23)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size:
+			 23 but was <null> in
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_has_length_less_than() -> void:
+	assert_str("This is a test message").has_length(23, Comparator.LESS_THAN)
+	assert_str("This is a test message").has_length(42, Comparator.LESS_THAN)
+	assert_str(&"This is a test message").has_length(42, Comparator.LESS_THAN)
+
+	assert_failure(func() -> void: assert_str("This is a test message").has_length(22, Comparator.LESS_THAN)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be less than:
+			 22 but was 22 in
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).has_length(22, Comparator.LESS_THAN)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be less than:
+			 22 but was <null> in
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_has_length_less_equal() -> void:
+	assert_str("This is a test message").has_length(22, Comparator.LESS_EQUAL)
+	assert_str("This is a test message").has_length(23, Comparator.LESS_EQUAL)
+	assert_str(&"This is a test message").has_length(23, Comparator.LESS_EQUAL)
+
+	assert_failure(func() -> void: assert_str("This is a test message").has_length(21, Comparator.LESS_EQUAL)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be less than or equal:
+			 21 but was 22 in
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).has_length(21, Comparator.LESS_EQUAL)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be less than or equal:
+			 21 but was <null> in
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_has_length_greater_than() -> void:
+	assert_str("This is a test message").has_length(21, Comparator.GREATER_THAN)
+	assert_str(&"This is a test message").has_length(21, Comparator.GREATER_THAN)
+
+	assert_failure(func() -> void: assert_str("This is a test message").has_length(22, Comparator.GREATER_THAN)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be greater than:
+			 22 but was 22 in
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).has_length(22, Comparator.GREATER_THAN)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be greater than:
+			 22 but was <null> in
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_has_length_greater_equal() -> void:
+	assert_str("This is a test message").has_length(21, Comparator.GREATER_EQUAL)
+	assert_str("This is a test message").has_length(22, Comparator.GREATER_EQUAL)
+	assert_str(&"This is a test message").has_length(22, Comparator.GREATER_EQUAL)
+
+	assert_failure(func() -> void: assert_str("This is a test message").has_length(23, Comparator.GREATER_EQUAL)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be greater than or equal:
+			 23 but was 22 in
+			 'This is a test message'""".dedent().trim_prefix("\n"))
+	assert_failure(func() -> void: assert_str(null).has_length(23, Comparator.GREATER_EQUAL)) \
+		.is_failed() \
+		.has_message("""
+			Expecting size to be greater than or equal:
+			 23 but was <null> in
+			 '<null>'""".dedent().trim_prefix("\n"))
+
+
+func test_fluentable() -> void:
+	assert_str("value a").is_not_equal("a") \
+		.is_equal("value a") \
+		.has_length(7) \
+		.is_equal("value a")
+
+
+func test_must_fail_has_invlalid_type() -> void:
+	assert_failure(func() -> void: assert_str(1)) \
+		.is_failed() \
+		.has_message("GdUnitStringAssert inital error, unexpected type <int>")
+	assert_failure(func() -> void: assert_str(1.3)) \
+		.is_failed() \
+		.has_message("GdUnitStringAssert inital error, unexpected type <float>")
+	assert_failure(func() -> void: assert_str(true)) \
+		.is_failed() \
+		.has_message("GdUnitStringAssert inital error, unexpected type <bool>")
+	assert_failure(func() -> void: assert_str(Resource.new())) \
+		.is_failed() \
+		.has_message("GdUnitStringAssert inital error, unexpected type <Object>")
+
+
+func test_override_failure_message() -> void:
+	assert_object(assert_str("").override_failure_message("error")).is_instanceof(GdUnitStringAssert)
+	@warning_ignore("unsafe_method_access")
+	assert_failure(func() -> void: assert_str("") \
+			.override_failure_message("Custom failure message") \
+			.is_null()) \
+		.is_failed() \
+		.has_message("Custom failure message")
+
+
+func test_append_failure_message() -> void:
+	assert_object(assert_str("").append_failure_message("error")).is_instanceof(GdUnitStringAssert)
+	@warning_ignore("unsafe_method_access")
+	assert_failure(func() -> void: assert_str("") \
+			.append_failure_message("custom failure data") \
+			.is_not_empty()) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 must not be empty
+			Additional info:
+			 custom failure data""".dedent().trim_prefix("\n"))
+
+
+# tests if an assert fails the 'is_failure' reflects the failure status
+func test_is_failure() -> void:
+	# initial is false
+	assert_bool(is_failure()).is_false()
+
+	# checked success assert
+	assert_str(null).is_null()
+	assert_bool(is_failure()).is_false()
+
+	# checked failed assert
+	assert_failure(func() -> void: assert_str(RefCounted.new()).is_null()) \
+		.is_failed()
+	assert_bool(is_failure()).is_true()
+
+	# checked next success assert
+	assert_str(null).is_null()
+	# is true because we have an already failed assert
+	assert_bool(is_failure()).is_true()
+
+
+func test_日本語() -> void:  # gdstyle:ignore=naming/function-name-snake-case
+	assert_str("test_日本語").is_equal("test_日本語")
+	assert_failure(func() -> void: assert_str("test_日本語").is_equal("test_本語")) \
+		.is_failed() \
+		.has_message("""
+			Expecting:
+			 'test_本語'
+			 but was
+			 'test_日本語'""".dedent().trim_prefix("\n"))
+
+
+func test_is_equal_on_rich_text() -> void:
+	# We expect for text containing bbcode tags is rendered with masked tags
+	assert_failure(func() -> void:
+		assert_str("[color=ff00ff]test[/color]").is_equal("[color=ffff00]test[/color]")
+	).is_failed() \
+		.has_message("""
+			Expecting:
+			 '[lb]color=ffff00]test[lb]/color]'
+			 but was
+			 '[lb]color=ff00ff]test[lb]/color]'""".dedent().trim_prefix("\n"))
+
+
+#region large values GD-1327
+func _random_text(length: int, seed_value: int) -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var text := PackedStringArray()
+	for i in length:
+		text.append(char(97 + rng.randi_range(0, 3)))
+	return "".join(text)
+
+
+func test_is_equal_large_different_values() -> void:
+	# a failing assertion on large values must report a failure and not run out of memory
+	var current := _random_text(131_072, 1)
+	var expected := _random_text(131_072, 2)
+
+	assert_failure(func() -> void: assert_str(current).is_equal(expected)) \
+		.is_failed() \
+		.starts_with_message("Expecting:")
+
+
+func test_is_equal_large_similar_values() -> void:
+	var current := _random_text(131_072, 1)
+
+	assert_failure(func() -> void: assert_str(current).is_equal(current + "x")) \
+		.is_failed() \
+		.starts_with_message("Expecting:")
+
+
+func _large_text() -> String:
+	var lines := PackedStringArray()
+	for i in 2000:
+		lines.append("line %d: the quick brown fox jumps over the lazy dog" % i)
+	return "\n".join(lines)
+
+
+func test_is_equal_large_text_with_two_inserted_values() -> void:
+	var current := _large_text()
+	# insert two values of 5-10 characters at different lines, the later position first to keep the earlier one valid
+	var expected := current \
+		.insert(current.find("line 1500:") + 10, "#PATCH#") \
+		.insert(current.find("line 500:") + 9, "ERROR_042")
+
+	# the message is compared as plain text, the values missing in the current value are shown inline (highlighted)
+	# in the 'but was' part, so without the markup both parts contain the inserted values
+	assert_failure(func() -> void: assert_str(current).is_equal(expected)) \
+		.is_failed() \
+		.has_message("Expecting:\n '%s'\n but was\n '%s'" % [expected, expected])
+
+
+func test_is_equal_large_text_highlights_two_inserted_values() -> void:
+	var current := _large_text()
+	var pos1 := current.find("line 500:") + 9
+	var pos2 := current.find("line 1500:") + 10
+	var expected := current.insert(pos2, "#PATCH#").insert(pos1, "ERROR_042")
+
+	var colored := GdAssertMessages.colored_diff(current, expected, GdDiffTool.diff(current, expected))
+
+	# the inserted values are missing in the current value, shown as separate marked blocks at the insert positions
+	var missing := "[bgcolor=#ff000026][color=white]%s[/color][/bgcolor]"
+	assert_str(colored).is_equal(
+		current.substr(0, pos1) + missing % "ERROR_042" + current.substr(pos1, pos2 - pos1) + missing % "#PATCH#" + current.substr(pos2))
+#endregion
