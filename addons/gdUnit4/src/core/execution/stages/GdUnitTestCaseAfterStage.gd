@@ -1,0 +1,25 @@
+class_name GdUnitTestCaseAfterStage
+extends IGdUnitExecutionStage
+## The test case shutdown hook implementation.[br]
+## It executes the 'test_after()' block from the test-suite.
+
+var _call_stage: bool
+
+
+func _init(call_stage := true) -> void:
+	_call_stage = call_stage
+
+
+func _execute(context: GdUnitExecutionContext) -> void:
+	var test_suite := context.test_suite
+
+	if _call_stage:
+		@warning_ignore("redundant_await")
+		await test_suite.after_test()
+
+	var test_case_context := context.last_sub_context()
+	if test_case_context != null:
+		await test_case_context.gc(GdUnitExecutionContext.GcOrphansCheck.TEST_CASE)
+
+	await context.gc(GdUnitExecutionContext.GcOrphansCheck.TEST_HOOK_AFTER)
+	context.error_monitor_stop()
