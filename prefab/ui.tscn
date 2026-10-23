@@ -27,24 +27,47 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.094, 0.094, 0.094, 1)
 
-[node name="MenuBar" type="MenuBar" parent="." unique_id=1127104920]
+[node name="Chrome" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
+offset_bottom = 32.0
 grow_horizontal = 2
+theme_type_variation = &"Chrome"
 
-[node name="File" type="MenuButton" parent="MenuBar" unique_id=28461329]
-layout_mode = 0
-offset_right = 8.0
-offset_bottom = 8.0
-text = "File"
-item_count = 3
-popup/item_0/text = "Reset sample campaign"
-popup/item_0/id = 0
-popup/item_1/text = "Save campaign"
-popup/item_1/id = 1
-popup/item_2/text = "Load campaign"
-popup/item_2/id = 2
+[node name="Layout" type="HBoxContainer" parent="Chrome"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="MenuBar" type="MenuBar" parent="Chrome/Layout" unique_id=1127104920]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 2
+flat = true
+prefer_global_menu = false
+
+[node name="File" type="PopupMenu" parent="Chrome/Layout/MenuBar" unique_id=28461329]
+unique_name_in_owner = true
+title = "File"
+
+[node name="Edit" type="PopupMenu" parent="Chrome/Layout/MenuBar"]
+unique_name_in_owner = true
+title = "Edit"
+
+[node name="View" type="PopupMenu" parent="Chrome/Layout/MenuBar"]
+unique_name_in_owner = true
+title = "View"
+
+[node name="DocumentTitle" type="Label" parent="Chrome/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 12
+text = "DrawInAtlas"
+horizontal_alignment = 2
+text_overrun_behavior = 3
+clip_text = true
 
 [node name="WorkspaceSplit" type="HSplitContainer" parent="."]
 unique_name_in_owner = true
@@ -62,10 +85,11 @@ dragger_visibility = 1
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="Workspace" type="Control" parent="WorkspaceSplit" node_paths=PackedStringArray("sidebar")]
+[node name="Workspace" type="Control" parent="WorkspaceSplit" node_paths=PackedStringArray("sidebar", "title_label")]
 custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 clip_contents = true
 script = ExtResource("4")
 sidebar = NodePath("../Sidebar")
+title_label = NodePath("../../Chrome/Layout/DocumentTitle")

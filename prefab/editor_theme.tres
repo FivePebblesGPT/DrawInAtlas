@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=12 format=3]
+[gd_resource type="Theme" load_steps=18 format=3]
 
 [sub_resource type="StyleBoxFlat" id="Rail"]
 bg_color = Color(0.094, 0.094, 0.094, 1)
@@ -54,8 +54,102 @@ gradient = SubResource("Transparent")
 width = 1
 height = 1
 
+[sub_resource type="StyleBoxFlat" id="Chrome"]
+content_margin_left = 4.0
+content_margin_right = 12.0
+content_margin_top = 0.0
+content_margin_bottom = 1.0
+bg_color = Color(0.094, 0.094, 0.094, 1)
+border_width_bottom = 1
+border_color = Color(0.18, 0.18, 0.18, 1)
+
+[sub_resource type="StyleBoxFlat" id="ControlHover"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0.21, 0.21, 0.21, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.36, 0.36, 0.36, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="ControlDisabled"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0.14, 0.14, 0.14, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxEmpty" id="MenuNormal"]
+content_margin_left = 10.0
+content_margin_right = 10.0
+content_margin_top = 6.0
+content_margin_bottom = 6.0
+
+[sub_resource type="StyleBoxFlat" id="MenuHover"]
+content_margin_left = 10.0
+content_margin_right = 10.0
+content_margin_top = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.19, 0.19, 0.19, 1)
+
+[sub_resource type="StyleBoxFlat" id="Popup"]
+content_margin_left = 4.0
+content_margin_top = 4.0
+content_margin_right = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.125, 0.125, 0.125, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.27, 0.27, 0.27, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_left = 4
+corner_radius_bottom_right = 4
+
+[sub_resource type="StyleBoxEmpty" id="Bare"]
+
 [resource]
 default_font_size = 13
+Chrome/base_type = &"PanelContainer"
+Chrome/styles/panel = SubResource("Chrome")
+Button/styles/normal = SubResource("Input")
+Button/styles/hover = SubResource("ControlHover")
+Button/styles/pressed = SubResource("ControlHover")
+Button/styles/disabled = SubResource("ControlDisabled")
+Button/styles/focus = SubResource("Focus")
+Button/colors/font_color = Color(0.84, 0.84, 0.84, 1)
+OptionButton/styles/normal = SubResource("Input")
+OptionButton/styles/hover = SubResource("ControlHover")
+OptionButton/styles/pressed = SubResource("ControlHover")
+OptionButton/styles/disabled = SubResource("ControlDisabled")
+OptionButton/styles/focus = SubResource("Focus")
+CheckBox/styles/normal = SubResource("Bare")
+CheckBox/styles/hover = SubResource("Bare")
+CheckBox/styles/pressed = SubResource("Bare")
+CheckBox/styles/hover_pressed = SubResource("Bare")
+CheckBox/styles/disabled = SubResource("Bare")
+MenuBar/styles/normal = SubResource("MenuNormal")
+MenuBar/styles/hover = SubResource("MenuHover")
+MenuBar/styles/pressed = SubResource("MenuHover")
+MenuBar/styles/hover_pressed = SubResource("MenuHover")
+MenuBar/styles/focus = SubResource("Focus")
+MenuBar/colors/font_color = Color(0.78, 0.78, 0.78, 1)
+PopupMenu/styles/panel = SubResource("Popup")
+PopupMenu/styles/hover = SubResource("ControlHover")
+PopupMenu/constants/v_separation = 8
 ActivityButton/base_type = &"Button"
 ActivityButton/colors/icon_normal_color = Color(0.57, 0.57, 0.57, 1)
 ActivityButton/colors/icon_hover_color = Color(0.95, 0.95, 0.95, 1)

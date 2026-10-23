@@ -80,11 +80,25 @@ func _run_suite() -> void:
     var restored_ink: bool = undo_image.get_pixelv(center).is_equal_approx(ink)
     passed = passed and restored_ink
     passed = passed and undo_image.save_png(directory.path_join("undo-erase.png")) == OK
+    root.content_scale_size = Vector2i(800, 600)
+    root.size = Vector2i(800, 600)
+    for frame: int in range(6):
+        await process_frame
+    await RenderingServer.frame_post_draw
+    var compact: Image = root.get_texture().get_image()
+    var compact_layout: bool = (
+        is_equal_approx(canvas.global_position.y, editor.sidebar.global_position.y)
+        and editor.title_label.get_global_rect().end.x <= 800.0
+        and canvas.get_global_rect().end.x <= 800.0
+    )
+    passed = passed and compact_layout
+    passed = passed and compact.save_png(directory.path_join("compact-editor.png")) == OK
     print("ATLAS_VISUAL_%s outside=%d inside=%d screenshot=%s" % [
         "PASSED" if passed else "FAILED", changed_outside, changed_inside,
         ProjectSettings.globalize_path(directory.path_join("integrated-editor.png"))
     ])
     print("ATLAS_INK_PIXELS gap=%s surviving_ink=%s undo=%s" % [real_gap, surviving_ink, restored_ink])
+    print("ATLAS_COMPACT_LAYOUT %s" % compact_layout)
     root.remove_child(scene)
     scene.free()
     quit(0 if passed else 1)

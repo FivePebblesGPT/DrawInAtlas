@@ -18,6 +18,7 @@ var edits: AtlasEditHistory = AtlasEditHistory.new()
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
 @export var save_path: String = AtlasCampaignStore.DEFAULT_PATH
+@export var title_label: Label
 
 var map_list: ItemList
 var map_list_ids: Array[String] = []
@@ -28,16 +29,16 @@ var lock_checkbox: CheckBox
 var reference_checkbox: CheckBox
 var opacity_slider: HSlider
 var status_label: Label
-var title_label: Label
 var search_list: ItemList
 var search_map_ids: Array[String] = []
 var grid_label: Label
 var distance_spinner: SpinBox
 var unit_picker: OptionButton
-var undo_button: Button
-var redo_button: Button
 var brush_color_picker: ColorPickerButton
 var brush_width_spinner: SpinBox
+var _ink_section: VBoxContainer
+var _terrain_section: VBoxContainer
+var _placement_section: VBoxContainer
 
 const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 
@@ -60,57 +61,9 @@ func _build_ui() -> void:
     shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     add_child(shell)
 
-    var toolbar := HBoxContainer.new()
-    shell.add_child(toolbar)
-    toolbar.add_child(_make_button("Save", _on_save))
-    toolbar.add_child(_make_button("Load", _on_load))
-    toolbar.add_child(_make_button("Back", _on_back))
-    undo_button = _make_button("Undo", _on_undo)
-    undo_button.tooltip_text = "Undo drawing (Ctrl+Z)"
-    toolbar.add_child(undo_button)
-    redo_button = _make_button("Redo", _on_redo)
-    redo_button.tooltip_text = "Redo drawing (Ctrl+Shift+Z / Ctrl+Y)"
-    toolbar.add_child(redo_button)
-    title_label = Label.new()
-    title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-    title_label.clip_text = true
-    toolbar.add_child(title_label)
-
-    var ink_bar: HBoxContainer = HBoxContainer.new()
-    shell.add_child(ink_bar)
-    var ink_caption: Label = Label.new()
-    ink_caption.text = "Ink"
-    ink_bar.add_child(ink_caption)
-    brush_color_picker = ColorPickerButton.new()
-    brush_color_picker.custom_minimum_size = Vector2(40, 28)
-    brush_color_picker.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-    brush_color_picker.color = Color("#f5b545")
-    brush_color_picker.edit_alpha = false
-    brush_color_picker.color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
-    ink_bar.add_child(brush_color_picker)
-    var width_caption: Label = Label.new()
-    width_caption.text = "Width (board units)"
-    ink_bar.add_child(width_caption)
-    brush_width_spinner = SpinBox.new()
-    brush_width_spinner.min_value = 0.5
-    brush_width_spinner.max_value = 256.0
-    brush_width_spinner.step = 0.5
-    brush_width_spinner.value = 8.0
-    brush_width_spinner.custom_minimum_size = Vector2(96, 0)
-    brush_width_spinner.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-    brush_width_spinner.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
-    ink_bar.add_child(brush_width_spinner)
-    var grid_toggle: CheckBox = CheckBox.new()
-    grid_toggle.text = "Grid overlay"
-    grid_toggle.button_pressed = true
-    grid_toggle.toggled.connect(func(enabled: bool) -> void:
-        canvas.show_grid = enabled
-        canvas.queue_redraw()
-    )
-    ink_bar.add_child(grid_toggle)
-
     var content := HBoxContainer.new()
+    content.name = "CanvasAndInspector"
+    content.add_theme_constant_override("separation", 1)
     content.size_flags_vertical = Control.SIZE_EXPAND_FILL
     shell.add_child(content)
 
@@ -149,28 +102,54 @@ func _build_ui() -> void:
     canvas.stroke_requested.connect(_on_stroke)
     content.add_child(canvas)
 
+    var panel: PanelContainer = PanelContainer.new()
+    panel.custom_minimum_size = Vector2(252, 0)
+    content.add_child(panel)
     var inspector: ScrollContainer = ScrollContainer.new()
-    inspector.custom_minimum_size = Vector2(220, 0)
     inspector.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    content.add_child(inspector)
+    panel.add_child(inspector)
+    var margin: MarginContainer = MarginContainer.new()
+    margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    for edge: String in ["left", "top", "right", "bottom"]:
+        margin.add_theme_constant_override("margin_" + edge, 14)
+    inspector.add_child(margin)
     var right: VBoxContainer = VBoxContainer.new()
     right.custom_minimum_size = Vector2(204, 0)
     right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    inspector.add_child(right)
-    right.add_child(_label("Tool"))
+    right.add_theme_constant_override("separation", 20)
+    margin.add_child(right)
+    var tools: VBoxContainer = _section(right, "TOOLS")
     tool_picker = OptionButton.new()
     for caption: String in ["Pen", "Eraser", "Paint cells (prototype)", "Select cell", "Drag battlemap"]:
         tool_picker.add_item(caption)
     tool_picker.item_selected.connect(_on_tool_changed)
-    right.add_child(tool_picker)
+    tools.add_child(tool_picker)
 
-    right.add_child(_label("Terrain palette"))
+    _ink_section = _section(right, "INK")
+    _ink_section.add_child(_label("Color"))
+    brush_color_picker = ColorPickerButton.new()
+    brush_color_picker.custom_minimum_size = Vector2(0, 32)
+    brush_color_picker.color = canvas.brush_color
+    brush_color_picker.edit_alpha = false
+    brush_color_picker.color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
+    _ink_section.add_child(brush_color_picker)
+    _ink_section.add_child(_label("Width (board units)"))
+    brush_width_spinner = SpinBox.new()
+    brush_width_spinner.min_value = 0.5
+    brush_width_spinner.max_value = 256.0
+    brush_width_spinner.step = 0.5
+    brush_width_spinner.value = canvas.brush_width
+    brush_width_spinner.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
+    _ink_section.add_child(brush_width_spinner)
+
+    _terrain_section = _section(right, "TERRAIN")
+    _terrain_section.add_child(_label("Palette"))
     var palette_picker := OptionButton.new()
     for caption in ["Erase", "Grass", "Forest", "Road", "Water", "Stone"]:
         palette_picker.add_item(caption)
     palette_picker.select(2)
     palette_picker.item_selected.connect(func(index: int) -> void: palette_id = index)
-    right.add_child(palette_picker)
+    _terrain_section.add_child(palette_picker)
 
     lock_checkbox = CheckBox.new()
     lock_checkbox.text = "Cell lock (terrain only)"
@@ -179,25 +158,29 @@ func _build_ui() -> void:
         locked_to_cell = on
         _message("Cell lock %s" % ("ON" if on else "OFF"))
     )
-    right.add_child(lock_checkbox)
+    _terrain_section.add_child(lock_checkbox)
 
+    var map_section: VBoxContainer = _section(right, "MAP")
     grid_label = _label("")
-    right.add_child(grid_label)
-    right.add_child(_label("Native distance per cell (labels only)"))
+    map_section.add_child(grid_label)
+    map_section.add_child(_label("Native distance per cell"))
     distance_spinner = SpinBox.new()
     distance_spinner.min_value = 0.001
     distance_spinner.max_value = 1000000.0
     distance_spinner.step = 0.001
     distance_spinner.value_changed.connect(_on_distance_changed)
-    right.add_child(distance_spinner)
+    map_section.add_child(distance_spinner)
     unit_picker = OptionButton.new()
     for unit: String in NATIVE_UNITS:
         unit_picker.add_item(unit)
     unit_picker.item_selected.connect(_on_unit_changed)
-    right.add_child(unit_picker)
-    right.add_child(_label("Units belong to this map. Changing this value does not resize artwork or convert linked maps."))
+    map_section.add_child(unit_picker)
+    var unit_hint: Label = _label("Measurement labels only; artwork and linked maps are not rescaled.")
+    unit_hint.theme_type_variation = &"MutedLabel"
+    map_section.add_child(unit_hint)
 
-    right.add_child(_label("Battlemap rotation (degrees)"))
+    _placement_section = _section(right, "PLACEMENT")
+    _placement_section.add_child(_label("Rotation (degrees)"))
     angle_spinner = SpinBox.new()
     angle_spinner.min_value = -180.0
     angle_spinner.max_value = 180.0
@@ -205,9 +188,10 @@ func _build_ui() -> void:
     angle_spinner.value_changed.connect(func(value: float) -> void:
         canvas.battle_rotation = deg_to_rad(value)
     )
-    right.add_child(angle_spinner)
+    _placement_section.add_child(angle_spinner)
 
-    right.add_child(_label("Child map previews"))
+    var reference_section: VBoxContainer = _section(right, "LINKS & REFERENCES")
+    reference_section.add_child(_label("Child map previews"))
     preview_picker = OptionButton.new()
     for caption in ["Off", "Markers", "Thumbnails"]:
         preview_picker.add_item(caption)
@@ -216,7 +200,7 @@ func _build_ui() -> void:
         canvas.preview = index as AtlasCanvas.Preview
         canvas.queue_redraw()
     )
-    right.add_child(preview_picker)
+    reference_section.add_child(preview_picker)
 
     reference_checkbox = CheckBox.new()
     reference_checkbox.text = "Read-only parent reference"
@@ -225,8 +209,8 @@ func _build_ui() -> void:
         canvas.show_reference = on
         canvas.queue_redraw()
     )
-    right.add_child(reference_checkbox)
-    right.add_child(_label("Parent reference opacity"))
+    reference_section.add_child(reference_checkbox)
+    reference_section.add_child(_label("Parent reference opacity"))
     opacity_slider = HSlider.new()
     opacity_slider.min_value = 0.0
     opacity_slider.max_value = 1.0
@@ -236,7 +220,7 @@ func _build_ui() -> void:
         canvas.reference_opacity = value
         canvas.queue_redraw()
     )
-    right.add_child(opacity_slider)
+    reference_section.add_child(opacity_slider)
     var navigation_toggle: CheckBox = CheckBox.new()
     navigation_toggle.text = "Automatic linked-map zoom"
     navigation_toggle.button_pressed = false
@@ -244,12 +228,14 @@ func _build_ui() -> void:
         automatic_navigation = enabled
         zoom_gate.reset()
     )
-    right.add_child(navigation_toggle)
-    right.add_child(_label("Scroll stays on this board by default. Double-click a marker or use Maps to navigate. Automatic navigation requires 3 extra steps at the zoom limit."))
+    reference_section.add_child(navigation_toggle)
 
     status_label = Label.new()
     status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    status_label.theme_type_variation = &"MutedLabel"
+    status_label.add_theme_font_size_override("font_size", 12)
     shell.add_child(status_label)
+    _on_tool_changed(tool_picker.selected)
 
 
 func _on_distance_changed(value: float) -> void:
@@ -266,11 +252,15 @@ func _on_unit_changed(index: int) -> void:
             edits.mark_external_change()
 
 
-func _make_button(caption: String, callback: Callable) -> Button:
-    var button := Button.new()
-    button.text = caption
-    button.pressed.connect(callback)
-    return button
+func _section(parent: VBoxContainer, caption: String) -> VBoxContainer:
+    var section: VBoxContainer = VBoxContainer.new()
+    section.add_theme_constant_override("separation", 8)
+    parent.add_child(section)
+    var heading: Label = _label(caption)
+    heading.theme_type_variation = &"MutedLabel"
+    heading.add_theme_font_size_override("font_size", 11)
+    section.add_child(heading)
+    return section
 
 
 func _label(caption: String) -> Label:
@@ -304,7 +294,8 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
     unit_picker.select(unit_index)
     distance_spinner.editable = map.grid.kind != AtlasGrid.Kind.GRIDLESS
     unit_picker.disabled = map.grid.kind == AtlasGrid.Kind.GRIDLESS
-    grid_label.text = "Grid: %s" % AtlasGrid.Kind.keys()[map.grid.kind]
+    const GRID_LABELS: Array[String] = ["None", "Square", "Pointy hex", "Flat hex"]
+    grid_label.text = "Grid: %s" % GRID_LABELS[map.grid.kind]
     zoom_gate.reset()
     locked_to_cell = false
     lock_checkbox.button_pressed = false
@@ -314,8 +305,6 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
 
 
 func _refresh_edit_state() -> void:
-    undo_button.disabled = not edits.can_undo()
-    redo_button.disabled = not edits.can_redo()
     if canvas.map != null and campaign != null:
         title_label.text = "%s%s — %s (%s)" % [
             "* " if edits.is_dirty() else "", campaign.display_name, canvas.map.display_name, canvas.map.kind
@@ -434,6 +423,10 @@ func _on_tool_changed(index: int) -> void:
     if lock_checkbox.disabled:
         locked_to_cell = false
         lock_checkbox.set_pressed_no_signal(false)
+    _ink_section.visible = canvas.tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER]
+    brush_color_picker.disabled = canvas.tool == AtlasCanvas.Tool.ERASER
+    _terrain_section.visible = canvas.tool == AtlasCanvas.Tool.PAINT
+    _placement_section.visible = canvas.tool == AtlasCanvas.Tool.BATTLEMAP
     zoom_gate.reset()
 
 

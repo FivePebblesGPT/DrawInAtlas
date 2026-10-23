@@ -128,6 +128,11 @@ func _test_editor_workflow() -> void:
     for frame: int in range(6):
         await process_frame
     _check(editor.canvas.clip_contents, "canvas drawing is clipped away from editor chrome")
+    _check(is_equal_approx(editor.canvas.global_position.y, editor.sidebar.global_position.y),
+        "canvas begins below the single menubar without duplicate workspace bars")
+    var menu_bars: Array[Node] = scene.find_children("*", "MenuBar", true, false)
+    _check(menu_bars.size() == 1 and (menu_bars[0] as MenuBar).get_menu_count() == 3,
+        "one native MenuBar owns File, Edit and View menus")
     _check(not editor.automatic_navigation, "ordinary board zoom never navigates by default")
     _check(editor.map_list.item_count == 2, "sidebar maps are populated")
     editor._refresh_search_list("grey")
@@ -220,6 +225,25 @@ func _test_drawing_input() -> void:
     canvas.camera_zoom = 2.0
     editor.edits.reset(editor.campaign, true)
     editor.edits.active_map_id = canvas.map.id
+    var ui: Control = scene.get_node("Interface/UI")
+    var edit_menu: PopupMenu = ui.get_node("%Edit")
+    var file_menu: PopupMenu = ui.get_node("%File")
+    var view_menu: PopupMenu = ui.get_node("%View")
+    _check(edit_menu.is_item_disabled(0) and edit_menu.is_item_disabled(1),
+        "Edit menu disables undo and redo for a fresh history")
+    view_menu.id_pressed.emit(1)
+    _check(not canvas.show_grid and not view_menu.is_item_checked(1),
+        "View menu changes the real grid setting and checked state together")
+    view_menu.id_pressed.emit(1)
+    (ui.get_node("%MenuBar") as MenuBar).grab_focus()
+    _key(KEY_B, true)
+    for frame: int in range(3):
+        await process_frame
+    _check(not editor.sidebar.is_panel_expanded(), "Ctrl+B toggles once when the menubar has focus")
+    _key(KEY_B, true)
+    for frame: int in range(3):
+        await process_frame
+    _check(editor.sidebar.is_panel_expanded(), "Ctrl+B restores the sidebar before another action")
     var start: Vector2 = Vector2(40, 100)
     var middle: Vector2 = Vector2(140, 100)
     var finish: Vector2 = Vector2(240, 100)
@@ -240,6 +264,14 @@ func _test_drawing_input() -> void:
     _check(canvas.floor.terrain.is_empty(), "gridless drawing never fabricates a terrain cell")
     var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
     _check(editor.edits.is_dirty(), "drawing marks unsaved work")
+    _check(not edit_menu.is_item_disabled(0) and edit_menu.is_item_disabled(1),
+        "Edit menu reflects current drawing history")
+    _check(editor.title_label.text.begins_with("* "), "single menubar title shows unsaved work")
+    editor.brush_width_spinner.get_line_edit().grab_focus()
+    _key(KEY_Z, true)
+    _check(AtlasStroke.same_artwork(original, canvas.floor.strokes),
+        "menu accelerator hints do not steal undo from a focused numeric input")
+    canvas.grab_focus()
     _key(KEY_Z, true)
     _check(canvas.floor.strokes.is_empty() and not editor.edits.is_dirty(),
         "Ctrl+Z undoes entire gesture back to clean state")
@@ -256,11 +288,12 @@ func _test_drawing_input() -> void:
     _pointer_motion(canvas, Vector2(140, 140))
     _pointer_button(canvas, Vector2(140, 140), false)
     _check(canvas.floor.strokes.size() == 2, "eraser gesture cuts a real gap into ink")
-    editor._on_undo()
+    edit_menu.id_pressed.emit(0)
     _check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "eraser undo restores unsplit ink")
-    editor._on_redo()
-    editor._on_save()
+    edit_menu.id_pressed.emit(1)
+    file_menu.id_pressed.emit(0)
     _check(not editor.edits.is_dirty(), "successful Save establishes a clean checkpoint")
+    _check(not editor.title_label.text.begins_with("* "), "File Save clears the global dirty marker")
     var saved: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
     editor._on_undo()
     _check(editor.edits.is_dirty(), "undo away from saved state is dirty")
@@ -268,7 +301,7 @@ func _test_drawing_input() -> void:
     editor._on_save()
     _check(editor.edits.is_dirty(), "failed Save cannot clear dirty state")
     editor.save_path = "user://atlas_input_smoke.json"
-    editor._on_load()
+    file_menu.id_pressed.emit(1)
     _check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "Load starts a fresh clean history")
     _check(AtlasStroke.same_artwork(saved, canvas.floor.strokes), "Save/Load preserves erased vector geometry")
     _key(KEY_B)

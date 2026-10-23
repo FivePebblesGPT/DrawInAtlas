@@ -40,7 +40,8 @@ def save_snapshot(page: Page) -> dict[str, Any]:
     """Save through the UI and wait for a newly flushed IndexedDB file."""
     previous: list[dict[str, Any]] = page.evaluate(READ_CAMPAIGN_JS)
     timestamp: str | None = previous[0]["timestamp"] if previous else None
-    page.mouse.click(326, 45)
+    page.mouse.click(24, 16)  # File
+    page.mouse.click(100, 48)  # Save campaign
     page.wait_for_function(
         f"async (previous) => {{ const entries = await ({READ_CAMPAIGN_JS})(); "
         "return entries.length === 1 && entries[0].timestamp !== previous; }",
@@ -79,6 +80,9 @@ def main() -> None:
         page.goto(args.url)
         page.wait_for_function("document.querySelector('#status') === null", timeout=60000)
         page.screenshot(path=str(output / "expanded.png"))
+        # Exercise View early and keep the drawing loop light on software WebGL.
+        page.mouse.click(124, 16)
+        page.mouse.click(150, 72)
         page.mouse.move(460, 330)
         page.mouse.down()
         for x, y in [(520, 280), (600, 330), (680, 280), (760, 330)]:
@@ -88,9 +92,12 @@ def main() -> None:
         original_ink: list[dict[str, Any]] = world_floor(drawn)["strokes"]
         assert len(original_ink) == 1 and len(original_ink[0]["points"]) > 4
         page.screenshot(path=str(output / "freehand.png"))
-        page.keyboard.press("Control+z")
+        page.mouse.click(72, 16)  # Edit
+        page.screenshot(path=str(output / "edit-menu.png"))
+        page.mouse.click(110, 48)  # Undo drawing
         assert world_floor(save_snapshot(page))["strokes"] == []
-        page.keyboard.press("Control+Shift+z")
+        page.mouse.click(72, 16)
+        page.mouse.click(110, 72)  # Redo drawing
         assert world_floor(save_snapshot(page))["strokes"] == original_ink
         page.keyboard.press("e")
         page.mouse.move(600, 240)
@@ -111,6 +118,7 @@ def main() -> None:
         page.wait_for_timeout(300)
         page.screenshot(path=str(output / "collapsed.png"))
         page.keyboard.press("Control+b")
+        page.wait_for_timeout(150)  # Godot dispatches button shortcuts after the input frame.
         page.mouse.click(24, 104)
         page.keyboard.type("Greyhaven")
         page.wait_for_timeout(300)
@@ -118,12 +126,13 @@ def main() -> None:
         page.mouse.dblclick(140, 197)
         page.wait_for_timeout(300)
         page.screenshot(path=str(output / "city.png"))
-        page.mouse.click(1100, 310)
+        page.mouse.click(1100, 377)
         page.keyboard.press("Control+a")
         page.keyboard.type("7.5")
         page.keyboard.press("Enter")
-        page.mouse.click(1120, 342)
-        page.mouse.click(1100, 392)  # km in the native-unit popup
+        page.mouse.click(1120, 415)
+        page.screenshot(path=str(output / "unit-picker.png"))
+        page.mouse.click(1100, 470)  # km in the native-unit popup
         persisted: dict[str, Any] = save_snapshot(page)
         saved_maps: dict[str, Any] = {
             item["id"]: item for item in persisted["campaign"]["maps"]
@@ -137,6 +146,13 @@ def main() -> None:
         restored: dict[str, Any] = save_snapshot(page)
         assert restored["campaign"] == persisted["campaign"]
         assert world_floor(restored)["strokes"] == erased_ink
+        page.mouse.click(124, 16)  # View
+        page.screenshot(path=str(output / "view-menu.png"))
+        page.mouse.click(150, 72)  # Toggle grid overlay
+        page.screenshot(path=str(output / "grid-hidden.png"))
+        page.mouse.click(24, 16)
+        page.screenshot(path=str(output / "file-menu.png"))
+        page.keyboard.press("Escape")
         assert not errors, errors
         assert not any(
             line.startswith("error:") or "SCRIPT ERROR:" in line or "Parse Error:" in line
@@ -147,10 +163,12 @@ def main() -> None:
             "indexeddb_reload": "passed",
             "independent_native_units": "passed",
             "stroke_erase_undo_redo": "passed",
+            "file_edit_view_menus": "passed",
             "cross_origin_isolated": page.evaluate("crossOriginIsolated"),
             "console": messages,
             "screenshots": str(output),
         }, indent=2))
+        page.close()
         browser.close()
 
 

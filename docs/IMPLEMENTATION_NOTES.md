@@ -1,5 +1,13 @@
 # Implementation Notes
 
+## UI consistency follow-up
+
+There is one real Godot `MenuBar`, with `PopupMenu` children for File, Edit and View. File owns save/load/reset; Edit owns drawing undo/redo with history-aware enabled states; View owns sidebar/grid toggles and Back. Accelerator hints retain the existing context-aware keyboard handlers, so text/numeric inputs keep their own undo behavior.
+
+The duplicated workspace command row and ink strip are removed. The document title/dirty marker sits at the right of the single top bar, and the canvas starts directly beneath it. A padded inspector groups Tools, Ink, Map and Links/References; terrain/placement controls appear only for their corresponding tool. Menus, inputs and controls share the dark theme and focus styling.
+
+The integrated smoke test checks the single-bar layout, menu dispatch/state, title updates and focused-input undo. The browser smoke invokes File Save and Edit Undo/Redo through their actual menus, exercises View, captures the menu popups, and retains artwork/IndexedDB reload checks.
+
 ## Execution milestone 1 — freehand drawing
 
 Implemented on top of the integration checkpoint:

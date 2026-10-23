@@ -21,6 +21,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - B selects the pen, E the eraser; Ctrl+Z undoes drawing, Ctrl+Shift+Z / Ctrl+Y redoes it, Ctrl+S saves, and Escape cancels an unfinished gesture. Brush width is in board units. An asterisk marks unsaved work.
 - Save/load uses the provisional `user://drawinatlas_campaign.json` slot.
 - The sidebar supports Maps, Search and Layers views, draggable width, active-icon collapse, and Ctrl+B (Command+B on macOS).
+- One top menu bar provides **File** (save/load), **Edit** (drawing undo/redo), and **View** (sidebar, grid overlay, navigation). Drawing controls live in the grouped right inspector; the document title and dirty marker appear at the top right.
 - Normal zoom stays on the current board; automatic linked-map navigation is opt-in. Native distance/unit labels are independent per map and never rescale artwork.
 - Headless smoke tests: `godot --headless --path . --script res://tests/smoke.gd`.
 - Artwork/history tests: `godot --headless --path . --script res://tests/artwork_smoke.gd`.
