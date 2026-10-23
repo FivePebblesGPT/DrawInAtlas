@@ -8,6 +8,7 @@
 - **Semantic zoom:** follow a `MapLink` to a different document. Each document has its own grid, layers, floors and camera defaults.
 - **Manual navigation:** click/double-click a location, search result, breadcrumb, or explicit Enter/Back action. It bypasses the wheel buffer.
 - **Automatic navigation:** at a geometric zoom boundary, three **additional, consecutive logical wheel steps** in the same direction are required before entering/exiting.
+- **Default:** automatic navigation is **off**. Normal wheel input stays on the current drawing board, including at zoom limits. The user may explicitly enable automatic linked-map zoom; its three-step gate then applies in both directions.
 
 Inward transitions prefer the child link beneath the zoom focus/pointer. Outward transitions prefer the immediate navigation-history source, restoring the saved camera. Only one map document is editable at a time.
 

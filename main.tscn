@@ -1,9 +1,13 @@
-[gd_scene format=3 uid="uid://dcv78085hm5jl"]
+[gd_scene load_steps=3 format=3 uid="uid://dcv78085hm5jl"]
 
 [ext_resource type="PackedScene" path="res://prefab/ui.tscn" id="1"]
+[ext_resource type="Script" path="res://util/global_shortcuts.gd" id="2"]
 
 [node name="Main" type="Node2D" unique_id=1232000292]
 
 [node name="Interface" type="CanvasLayer" parent="."]
 
 [node name="UI" parent="Interface" instance=ExtResource("1")]
+
+[node name="GlobalShortcuts" type="Node" parent="."]
+script = ExtResource("2")

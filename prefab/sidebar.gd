@@ -4,6 +4,7 @@ extends HBoxContainer
 
 signal view_selected(view_id: StringName)
 signal panel_toggled(expanded: bool)
+signal search_changed(query: String)
 
 var active_view: StringName = &"Maps"
 
@@ -23,7 +24,16 @@ func _ready() -> void:
 		button.pressed.connect(_on_view_pressed.bind(StringName(button.name.trim_suffix("Button"))))
 	%ToggleButton.pressed.connect(toggle_panel)
 	%CloseButton.pressed.connect(set_panel_expanded.bind(false))
+	_search.text_changed.connect(search_changed.emit)
 	select_view(active_view)
+
+
+func get_view_content(view_id: StringName) -> Control:
+	return _views.get(view_id)
+
+
+func get_search_query() -> String:
+	return _search.text
 
 
 func select_view(view_id: StringName) -> void:

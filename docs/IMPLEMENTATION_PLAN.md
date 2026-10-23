@@ -1,15 +1,23 @@
 # Implementation Plan and Decision Log
 
-**Status:** proposal for future development, based on current minimal Godot 4.8 project. No milestone is claimed complete.
+**Status:** roadmap. The Godot **4.8-beta1** GDScript integration checkpoint implements a subset of the original milestones 0–2; their full acceptance criteria remain open. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
 ## 1. Principle: vertical slices before feature breadth
 
-The risky part is **independent maps with different coordinate systems linked by semantic navigation**. Prove that before expanding into dozens of tools. Build in increments that can be demonstrated with a wilderness hex, a symbolic city, and a 37-degree battlemap.
+The main product is a **drawing board with optional grids and map links**, not a recursively subdivided battlemap. The imported scaffold proves several geometry/navigation ideas, but must not dictate feature priority. Normal zoom stays on the current map; automatic navigation is explicitly opt-in.
+
+### Current execution order
+
+1. **Integration checkpoint (this milestone):** reconcile origin's addons/utilities/settings and the activity sidebar with the Web scaffold; fix canvas clipping; validate Godot 4.8-beta1 native rendering and Web runtime/save/reload. This does not claim all of milestone 0 below.
+2. **Next drawing-board slice:** document-space freehand artwork and stroke-level undo, with a grid overlay independent of art coordinates. Separate native exploration distance from visual grid spacing. Provide per-map grid/scale choices when creating a board. Do not add further battlemap recursion first.
+3. Strengthen command validation, typed layers and lossless WebP artwork persistence, including recoverable saves and malformed-file diagnostics, before treating the editor as safe campaign storage.
+
+Work and verify **one milestone per turn**. The original broader roadmap remains below for reference.
 
 ### Milestone 0 — Editor shell and document skeleton
 
 **Deliverables**
-- Choose implementation language: C#/.NET or GDScript (repository has a .NET assembly-name setting, but no implementation language decision yet).
+- **Use GDScript only** (mandatory). Godot 4.8-beta1 standard, Compatibility renderer, Web export baseline. Optional GDExtensions require graceful GDScript fallback.
 - Godot editor shell, central canvas with `Camera2D`, pan, geometric zoom, zoom limits, input routing.
 - Domain types: `Campaign`, `MapDocument`, `GridDefinition`, `MapLink`, `MapFloor`, `MapLayer`.
 - Open/save a minimal versioned campaign, stable IDs and schema roundtrip tests.
@@ -46,7 +54,7 @@ The risky part is **independent maps with different coordinate systems linked by
 - Linked-map marker, thumbnail and spatial overlay preview modes.
 - Map Overview with visible-area, selected-cell and whole-map filtering, name/tag search, safe recursive traversal.
 - Cached previews with invalidation; nonaligned children shown as thumbnails, not falsely transformed overlays.
-- Raster painting chunks, clipboard (cut/copy/paste), selection/move/resize, placed objects/assets.
+- Lossless WebP raster painting chunks, clipboard (cut/copy/paste), selection/move/resize, placed objects/assets.
 - Multiple vertical floors per document and floor controls, including tower use case.
 - Autosave/checkpoint, recoverable edits, import/export baseline.
 
@@ -129,7 +137,10 @@ The risky part is **independent maps with different coordinate systems linked by
 | Floors distinct from layers and map scale | Accepted design | Tower/basement support |
 | Host-authoritative networking | Proposed | Simpler permission enforcement and session consistency |
 | Canonical chunk sizes and formats | Open | Benchmark first |
-| Godot scripting language | Open | Check intended .NET usage and toolchain |
+| Godot scripting language | **Decided** | GDScript mandatory; no C#/.NET dependency |
+| Drawing-board-first editing | Accepted clarification | Continuous artwork; grids are overlays, links are optional |
+| Native measurement units per map | Accepted clarification | DM chooses distance/unit; no automatic conversion or harmonization |
+| Automatic map navigation default | Off / opt-in | Ordinary drawing-board zoom must not change maps |
 | Default reference refresh: live vs frozen | Open | UX/performance tradeoff |
 | Trackpad normalization/timeouts | Open defaults | Test with actual devices; preserve 3-step semantics |
 | Exact storage container (directory/package) | Open | Prefer first testing versioned directory |

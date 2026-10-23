@@ -1,38 +1,39 @@
 # DrawInAtlas
 
-**Status: concept and architecture design, with an initial editor UI shell.**
+**Status: early GDScript editor scaffold, not a full-featured VTT.**
 
-DrawInAtlas is a proposed Godot-based, map-first tabletop editor for West Marches / hexcrawl D&D campaigns. It aims to combine the flexible drawing and collaboration of a whiteboard with the coordinate grids, linked locations, encounter maps, floors, and player presentation needed for a virtual tabletop.
+DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
-The repository currently contains a Godot 4.8 project with a VS Code–style sidebar. The documents below describe **planned behavior and recommended architecture**, not completed application functionality.
+The development engine is **Godot 4.8-beta1**, standard build. Application code is GDScript. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
 
 ## Product principles
 
-- **One editable map at a time.** Other maps may be visible only as read-only previews or reference underlays.
-- **Independent map documents connected by links.** The campaign is a graph, not a mandatory geographic tree.
-- **Hybrid semantic zoom.** Ordinary wheel input zooms the current map; crossing a map boundary requires three additional logical wheel steps before automatic navigation.
-- **Arbitrary battlemaps.** Drag and rotate a square-grid footprint on any map, then edit the battlemap in its own workspace.
-- **Different grids, different scales.** World hexes, regional hexes, gridless city drawings, and 5-foot battle grids need not align.
-- **Projector-first, multiplayer-ready.** GM editing and player presentation are separate views over shared campaign data.
+- One editable map at a time; references remain read-only.
+- Independent documents with different grids, scales, floors and layers.
+- Pointer-centered zoom, with three additional logical wheel steps at a boundary before automatic map navigation.
+- Arbitrarily rotated battlemap footprints linked to independent encounter maps.
+- Local-first editing; player presentation and multiplayer are future milestones.
+
+## Run and test
+
+- Open `project.godot` in Godot **4.8-beta1** and run `main.tscn` / F5.
+- The sample campaign includes a world hexcrawl and linked Greyhaven city. Paint cells, select a cell, restrict painting, and create rotated battlemaps.
+- Save/load uses the provisional `user://drawinatlas_campaign.json` slot.
+- The sidebar supports Maps, Search and Layers views, draggable width, active-icon collapse, and Ctrl+B (Command+B on macOS).
+- Normal zoom stays on the current board; automatic linked-map navigation is opt-in. Native distance/unit labels are independent per map and never rescale artwork.
+- Headless smoke tests: `godot --headless --path . --script res://tests/smoke.gd`.
+- Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. Web UI/IndexedDB validation is in `tests/browser_smoke.py`; setup is documented in the implementation notes.
 
 ## Documentation
 
 | Document | Purpose |
 | --- | --- |
-| [Product design](docs/PRODUCT_DESIGN.md) | Goals, feature inventory, user experience and acceptance criteria |
-| [Architecture](docs/ARCHITECTURE.md) | Modules, runtime boundaries, commands, rendering, persistence and permissions |
-| [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics, rotated battlemaps, geometry and tile-edit lock |
-| [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Navigation, exact three-step buffer, cross-map references and discovery |
-| [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized shapes, stable IDs, indexing and migrations |
-| [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Vertical slices, priorities, risks and test plan |
+| [Implementation notes](docs/IMPLEMENTATION_NOTES.md) | Implemented behavior, validation and remaining limitations |
+| [Product design](docs/PRODUCT_DESIGN.md) | Goals, planned features and acceptance criteria |
+| [Architecture](docs/ARCHITECTURE.md) | Proposed runtime boundaries, rendering and commands |
+| [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics and geometry |
+| [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Navigation and exact three-step buffer |
+| [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized data and storage |
+| [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
 
-## Development state
-
-- Existing Godot project: `project.godot`
-- Entry scene: `main.tscn` (run with F6, or F5 as the project main scene)
-- UI shell: `prefab/ui.tscn`, with a resizable sidebar and Maps, Search, and Layers empty-state panels
-- Reusable sidebar: `prefab/sidebar.tscn`; click an activity icon to switch views, click it again to collapse, or use Ctrl+B (Command+B on macOS)
-- `Sidebar.select_view()`, `view_selected`, and `panel_toggled` provide integration points; campaign search and map/layer editing are not implemented yet
-- No editing, campaign-file, or networking implementation is asserted by these documents.
-
-All JSON examples, API shapes, and module names are **proposals** to evolve through implementation. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the first testable slice.
+Undo/redo, configurable layers/floors, raster painting, projector output, networking and browser file import/export remain future work. See the implementation notes for the tested scope.

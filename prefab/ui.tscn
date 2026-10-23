@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://prefab/ui.gd" id="1"]
 [ext_resource type="PackedScene" path="res://prefab/sidebar.tscn" id="2"]
 [ext_resource type="Theme" path="res://prefab/editor_theme.tres" id="3"]
+[ext_resource type="Script" path="res://scripts/ui/atlas_editor.gd" id="4"]
 
 [node name="UI" type="Control" unique_id=484751465]
 layout_mode = 3
@@ -37,11 +38,13 @@ layout_mode = 0
 offset_right = 8.0
 offset_bottom = 8.0
 text = "File"
-item_count = 2
-popup/item_0/text = "What"
+item_count = 3
+popup/item_0/text = "Reset sample campaign"
 popup/item_0/id = 0
-popup/item_1/text = "What2"
+popup/item_1/text = "Save campaign"
 popup/item_1/id = 1
+popup/item_2/text = "Load campaign"
+popup/item_2/id = 2
 
 [node name="WorkspaceSplit" type="HSplitContainer" parent="."]
 unique_name_in_owner = true
@@ -59,32 +62,10 @@ dragger_visibility = 1
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="Workspace" type="CenterContainer" parent="WorkspaceSplit"]
-custom_minimum_size = Vector2(240, 0)
+[node name="Workspace" type="Control" parent="WorkspaceSplit" node_paths=PackedStringArray("sidebar")]
+custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-
-[node name="Welcome" type="VBoxContainer" parent="WorkspaceSplit/Workspace"]
-layout_mode = 2
-theme_override_constants/separation = 16
-mouse_filter = 2
-
-[node name="Title" type="Label" parent="WorkspaceSplit/Workspace/Welcome"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.32, 0.32, 0.32, 1)
-theme_override_font_sizes/font_size = 32
-text = "DrawInAtlas"
-horizontal_alignment = 1
-
-[node name="Hint" type="Label" parent="WorkspaceSplit/Workspace/Welcome"]
-layout_mode = 2
-theme_type_variation = &"MutedLabel"
-text = "A place for your next adventure."
-horizontal_alignment = 1
-
-[node name="Shortcut" type="Label" parent="WorkspaceSplit/Workspace/Welcome"]
-layout_mode = 2
-theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 11
-text = "Ctrl+B   Toggle sidebar"
-horizontal_alignment = 1
+clip_contents = true
+script = ExtResource("4")
+sidebar = NodePath("../Sidebar")

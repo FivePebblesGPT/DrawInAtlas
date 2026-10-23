@@ -37,6 +37,14 @@ DistanceInCells(cellA, cellB) -> number
 
 Grid configuration should include `shape` (`GRIDLESS`, `SQUARE`, `HEX_POINTY`, `HEX_FLAT`), `cell_size`, `origin`, `rotation`, `distance_per_cell`, `distance_unit`, and visibility/snapping settings. Document units per cell are **not** the same as feet/miles per cell. Rendering at 64 document units for a five-foot square is valid; projector calibration maps display pixels to physical dimensions separately.
 
+### Native units and exploration scale
+
+The DM chooses each map's native unit and distance per cell when creating it. Linked maps retain their own values; no campaign-wide unit harmonization or exact physical conversion is required. For example, a wilderness board can use **3 mi/hex**, another region 1 mi/hex, and an encounter 5 ft/square. These are independently chosen labels, not instructions to subdivide world hexes into battle squares.
+
+The integration scaffold exposes native distance/unit metadata for existing gridded maps. Changing those labels does not change `cell_size`, move artwork, or convert linked maps. A dedicated map-creation UI and independently adjustable visual grid overlay are still pending. The sample world uses 3 mi/cell; existing saves retain their previous values.
+
+Whether a hex distance means a center-to-center travel step, across-flats width, or another campaign convention remains undecided. Do not silently impose that convention. Physical unit conversion, mismatch warnings, rounding policies and content rescaling remain deferred.
+
 ### Square grid
 
 Square cell conversion: subtract grid origin, invert grid rotation, divide by cell pitch, then floor to integer x/y. Reverse mapping uses cell center and forward transform. For spatial hit-testing, use half-open boundaries to prevent selecting two adjacent cells simultaneously.

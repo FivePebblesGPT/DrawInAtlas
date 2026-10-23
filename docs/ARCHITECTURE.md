@@ -1,10 +1,11 @@
 # Technical Architecture
 
-**Status:** proposed application architecture, not implemented code. Based on the repository's Godot 4.8 project and minimal scene. `project.godot` currently has a .NET assembly name, but this document does **not** assume C# versus GDScript has been finalized.
+**Status:** target architecture; the running integration scaffold implements only part of it. The development baseline is **Godot 4.8-beta1**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [Implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
 ## 1. Architectural goals
 
 - Local-first and projector-first: a campaign must function without hosting a server.
+- Drawing-board-first: artwork lives in continuous document coordinates; grids and optional linked maps must not dictate the drawing's scale or force navigation.
 - Map content, navigation links, renderers, and editor state are separate concerns.
 - Preserve independently editable maps at every semantic scale and elevation.
 - Support sparse, chunked storage for large canvases.
@@ -103,7 +104,7 @@ Has stable ID, metadata, bounds or infinite-canvas policy, default grid, floors,
 
 ### MapFloor vs MapLayer
 
-A floor is an elevation grouping (basement, ground, upper floors), each with an ordered set of layers. A layer is an editable/renderable data plane (sparse tile cells, raster chunks, vector geometry, props, tokens, annotations). Floors do not represent zoom levels. Layers and floors have separate visibility and locking semantics.
+A floor is an elevation grouping (basement, ground, upper floors), each with an ordered set of layers. A layer is an editable/renderable data plane (sparse tile cells, WebP raster chunks, vector geometry, props, tokens, annotations). Floors do not represent zoom levels. Layers and floors have separate visibility and locking semantics.
 
 ### MapLink and BattlemapPlacement
 
@@ -212,6 +213,6 @@ Initial collaboration can be host-sequenced commands with conflict rejection or 
 
 ## 10. Recommended implementation conventions
 
-The current project has Godot 4.8 feature metadata and a .NET assembly-name setting. The implementation language is an open decision; prefer a single primary domain-language to avoid duplicating command and document models. Whether C# or GDScript is chosen, keep runtime Nodes at the edges and use typed services/data models at the core.
+Use typed **GDScript** for the domain and all core features. GDExtensions may be optional accelerators only with WebAssembly builds and fallback paths; no mandatory native-only library, OS-specific file API or threads in the core. Godot Compatibility renderer / single-thread web export is the baseline. Canonical raster chunk and preview image files use **WebP**; derived thumbnails can be lossy, editable source must be lossless.
 
 See [Maps and grids](MAPS_AND_GRIDS.md) for geometry and editing constraints; [Semantic zoom](SEMANTIC_ZOOM.md) for navigation state; [Implementation plan](IMPLEMENTATION_PLAN.md) for staged validation.
