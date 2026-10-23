@@ -31,9 +31,10 @@ var opacity_slider: HSlider
 var status_label: Label
 var search_list: ItemList
 var search_map_ids: Array[String] = []
-var grid_label: Label
 var distance_spinner: SpinBox
 var unit_picker: OptionButton
+var grid_controls: AtlasGridControls
+var board_dialog: AtlasBoardDialog
 var brush_color_picker: ColorPickerButton
 var brush_width_spinner: SpinBox
 var _ink_section: VBoxContainer
@@ -71,6 +72,10 @@ func _build_ui() -> void:
     _build_canvas(content)
     _build_inspector(content)
     _build_status_label(shell)
+    board_dialog = AtlasBoardDialog.new()
+    board_dialog.theme = sidebar.theme
+    board_dialog.board_requested.connect(_on_board_requested)
+    add_child(board_dialog)
     _on_tool_changed(tool_picker.selected)
 
 
@@ -119,6 +124,7 @@ func _build_inspector(parent: HBoxContainer) -> void:
     parent.add_child(panel)
     var inspector: ScrollContainer = ScrollContainer.new()
     inspector.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    inspector.follow_focus = true
     panel.add_child(inspector)
     var margin: MarginContainer = MarginContainer.new()
     margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -189,23 +195,11 @@ func _build_terrain_controls(parent: VBoxContainer) -> void:
 
 func _build_map_controls(parent: VBoxContainer) -> void:
     var map_section: VBoxContainer = _create_section(parent, "MAP")
-    grid_label = _create_label("")
-    map_section.add_child(grid_label)
-    map_section.add_child(_create_label("Native distance per cell"))
-    distance_spinner = SpinBox.new()
-    distance_spinner.min_value = 0.001
-    distance_spinner.max_value = 1000000.0
-    distance_spinner.step = 0.001
-    distance_spinner.value_changed.connect(_on_distance_changed)
-    map_section.add_child(distance_spinner)
-    unit_picker = OptionButton.new()
-    for unit: String in NATIVE_UNITS:
-        unit_picker.add_item(unit)
-    unit_picker.item_selected.connect(_on_unit_changed)
-    map_section.add_child(unit_picker)
-    var unit_hint: Label = _create_label("Measurement labels only; artwork and linked maps are not rescaled.")
-    unit_hint.theme_type_variation = &"MutedLabel"
-    map_section.add_child(unit_hint)
+    grid_controls = AtlasGridControls.new()
+    grid_controls.settings_changed.connect(apply_grid)
+    map_section.add_child(grid_controls)
+    distance_spinner = grid_controls.distance_spinner
+    unit_picker = grid_controls.unit_picker
 
 
 func _build_placement_controls(parent: VBoxContainer) -> void:
@@ -273,16 +267,65 @@ func _build_status_label(parent: VBoxContainer) -> void:
 
 func _on_distance_changed(value: float) -> void:
     if canvas.map != null and is_finite(value) and value > 0.0:
-        if canvas.map.grid.distance_per_cell != value:
-            canvas.map.grid.distance_per_cell = value
-            edits.mark_external_change()
+        var candidate: AtlasGrid = canvas.map.grid.copy()
+        candidate.distance_per_cell = value
+        apply_grid(candidate)
 
 
 func _on_unit_changed(index: int) -> void:
     if canvas.map != null and index >= 0 and index < NATIVE_UNITS.size():
-        if canvas.map.grid.distance_unit != NATIVE_UNITS[index]:
-            canvas.map.grid.distance_unit = NATIVE_UNITS[index]
-            edits.mark_external_change()
+        var candidate: AtlasGrid = canvas.map.grid.copy()
+        candidate.distance_unit = NATIVE_UNITS[index]
+        apply_grid(candidate)
+
+
+func apply_grid(candidate: AtlasGrid) -> void:
+    canvas.cancel_edit()
+    var command: AtlasGridEdit = AtlasGridEdit.new(canvas.map.id, canvas.map.grid, candidate)
+    if edits.execute(command):
+        zoom_gate.reset()
+        _message("Grid settings changed. Artwork coordinates are unchanged.")
+    _refresh_grid_controls()
+    canvas.queue_redraw()
+
+
+func set_grid_visible(visible: bool) -> void:
+    var candidate: AtlasGrid = canvas.map.grid.copy()
+    candidate.visible = visible
+    apply_grid(candidate)
+
+
+func open_board_dialog() -> void:
+    canvas.cancel_edit()
+    board_dialog.open()
+
+
+func _on_board_requested(board_name: String, grid: AtlasGrid) -> void:
+    if create_board(board_name, grid):
+        board_dialog.hide()
+        canvas.grab_focus()
+
+
+func create_board(board_name: String, grid: AtlasGrid) -> bool:
+    var name: String = board_name.strip_edges()
+    if name.is_empty() or not grid.is_valid():
+        _message("Choose a board name and valid grid settings.")
+        return false
+    var id: String = "board-" + Crypto.new().generate_random_bytes(16).hex_encode()
+    var document: AtlasMapDocument = AtlasMapDocument.new(id, name)
+    document.kind = "BOARD"
+    document.grid = grid.copy()
+    document.terrain_grid = grid.copy()
+    var command: AtlasCreateMap = AtlasCreateMap.new(canvas.map.id, document)
+    if not edits.execute(command):
+        _message("Board creation failed; the campaign was not replaced.")
+        return false
+    _push_history()
+    _show_map(campaign.get_map(id))
+    tool_picker.select(AtlasCanvas.Tool.PEN)
+    _on_tool_changed(AtlasCanvas.Tool.PEN)
+    _message("Created an independent blank board. No artwork or links were copied.")
+    return true
 
 
 func _create_section(parent: VBoxContainer, caption: String) -> VBoxContainer:
@@ -316,25 +359,21 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
     edits.active_map_id = map.id
     canvas.camera_center = focus
     canvas.camera_zoom = clampf(zoom_value, MIN_ZOOM, MAX_ZOOM)
-    distance_spinner.set_value_no_signal(map.grid.distance_per_cell)
-    var unit_index: int = NATIVE_UNITS.find(map.grid.distance_unit)
-    unit_picker.clear()
-    for unit: String in NATIVE_UNITS:
-        unit_picker.add_item(unit)
-    if unit_index < 0:
-        unit_index = unit_picker.item_count
-        unit_picker.add_item(map.grid.distance_unit)
-    unit_picker.select(unit_index)
-    distance_spinner.editable = map.grid.kind != AtlasGrid.Kind.GRIDLESS
-    unit_picker.disabled = map.grid.kind == AtlasGrid.Kind.GRIDLESS
-    const GRID_LABELS: Array[String] = ["None", "Square", "Pointy hex", "Flat hex"]
-    grid_label.text = "Grid: %s" % GRID_LABELS[map.grid.kind]
+    _refresh_grid_controls()
     zoom_gate.reset()
     locked_to_cell = false
     lock_checkbox.button_pressed = false
     _refresh_edit_state()
     _refresh_map_list()
     canvas.queue_redraw()
+
+
+func _refresh_grid_controls() -> void:
+    if not grid_controls.get_grid().same_geometry(canvas.map.grid):
+        canvas.has_selected_cell = false
+        locked_to_cell = false
+        lock_checkbox.set_pressed_no_signal(false)
+    grid_controls.set_grid(canvas.map.grid)
 
 
 func _refresh_edit_state() -> void:
@@ -363,15 +402,34 @@ func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
 func _on_undo() -> void:
     canvas.cancel_edit()
     if edits.undo():
-        canvas.queue_redraw()
-        _message("Undid drawing. History retains the original map/floor target.")
+        if campaign.get_map(canvas.map.id) == null:
+            _on_back()
+            if campaign.get_map(canvas.map.id) == null:
+                _show_map(campaign.get_map(campaign.root_map_id))
+        _refresh_after_history()
+        _message("Undo applied to its original board.")
+    elif edits.can_undo():
+        _message("Undo blocked: the target changed outside this history.")
 
 
 func _on_redo() -> void:
     canvas.cancel_edit()
+    var command: AtlasEditCommand = edits.get_redo_command()
     if edits.redo():
-        canvas.queue_redraw()
-        _message("Redid drawing.")
+        if command is AtlasCreateMap:
+            _push_history()
+            _show_map(campaign.get_map(command.new_map_id))
+        _refresh_after_history()
+        _message("Redo applied.")
+    elif edits.can_redo():
+        _message("Redo blocked: the target changed outside this history.")
+
+
+func _refresh_after_history() -> void:
+    _refresh_grid_controls()
+    _refresh_map_list()
+    _refresh_edit_state()
+    canvas.queue_redraw()
 
 
 func _refresh_map_list() -> void:
@@ -464,6 +522,9 @@ func _on_tool_changed(index: int) -> void:
 
 
 func _on_select(cell: Vector2i) -> void:
+    if canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
+        _message("This board has no grid cells to select.")
+        return
     canvas.selected_cell = cell
     canvas.has_selected_cell = true
     canvas.queue_redraw()
@@ -473,6 +534,9 @@ func _on_select(cell: Vector2i) -> void:
 func _on_paint(cell: Vector2i) -> void:
     if canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
         _message("Cell paint requires a square or hex grid.")
+        return
+    if not canvas.map.grid.same_geometry(canvas.map.get_terrain_grid()):
+        _message("Legacy terrain uses its original grid. Use pen/eraser on an edited overlay.")
         return
     if locked_to_cell and (not canvas.has_selected_cell or canvas.selected_cell != cell):
         _message("Edit blocked by selected-cell lock.")
@@ -548,13 +612,14 @@ func _enter_link(link: AtlasMapLink) -> void:
 
 
 func _on_back() -> void:
-    if history.is_empty():
-        _message("No previous map.")
-        return
-    var snapshot: Dictionary = history.pop_back()
-    var map := campaign.get_map(str(snapshot["map_id"]))
-    _show_map(map, snapshot["focus"], float(snapshot["zoom"]))
-    _message("Returned to %s." % map.display_name)
+    while not history.is_empty():
+        var snapshot: Dictionary = history.pop_back()
+        var map: AtlasMapDocument = campaign.get_map(str(snapshot["map_id"]))
+        if map != null:
+            _show_map(map, snapshot["focus"], float(snapshot["zoom"]))
+            _message("Returned to %s." % map.display_name)
+            return
+    _message("No previous map.")
 
 
 func _on_wheel_step(direction: int, local_position: Vector2) -> void:
@@ -630,6 +695,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _on_redo()
             KEY_S:
                 _on_save()
+            KEY_N:
+                open_board_dialog()
             _:
                 return
         get_viewport().set_input_as_handled()

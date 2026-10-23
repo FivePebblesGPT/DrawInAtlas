@@ -1,6 +1,6 @@
 extends Control
 
-enum FileAction { SAVE, LOAD, RESET_SAMPLE }
+enum FileAction { SAVE, LOAD, RESET_SAMPLE, NEW_BOARD }
 enum EditAction { UNDO, REDO }
 enum ViewAction { SIDEBAR, GRID, BACK }
 
@@ -30,12 +30,13 @@ func _ready() -> void:
 
 func _build_menus() -> void:
 	var modifier: int = KEY_MASK_META if OS.has_feature("macos") else KEY_MASK_CTRL
+	_file_menu.add_item("New board…", FileAction.NEW_BOARD, modifier | KEY_N)
 	_file_menu.add_item("Save campaign", FileAction.SAVE, modifier | KEY_S)
 	_file_menu.add_item("Load campaign", FileAction.LOAD)
 	_file_menu.add_separator()
 	_file_menu.add_item("Reset sample campaign", FileAction.RESET_SAMPLE)
-	_edit_menu.add_item("Undo drawing", EditAction.UNDO, modifier | KEY_Z)
-	_edit_menu.add_item("Redo drawing", EditAction.REDO, modifier | KEY_MASK_SHIFT | KEY_Z)
+	_edit_menu.add_item("Undo", EditAction.UNDO, modifier | KEY_Z)
+	_edit_menu.add_item("Redo", EditAction.REDO, modifier | KEY_MASK_SHIFT | KEY_Z)
 	_view_menu.add_check_item("Sidebar", ViewAction.SIDEBAR, modifier | KEY_B)
 	_view_menu.add_check_item("Grid overlay", ViewAction.GRID)
 	_view_menu.add_separator()
@@ -60,6 +61,8 @@ func _on_sidebar_resized(offset: int) -> void:
 
 func _on_file_menu(id: int) -> void:
 	match id:
+		FileAction.NEW_BOARD:
+			_editor.open_board_dialog()
 		FileAction.SAVE:
 			_editor._on_save()
 		FileAction.LOAD:
@@ -81,8 +84,7 @@ func _on_view_menu(id: int) -> void:
 		ViewAction.SIDEBAR:
 			_sidebar.toggle_panel()
 		ViewAction.GRID:
-			_editor.canvas.show_grid = not _editor.canvas.show_grid
-			_editor.canvas.queue_redraw()
+			_editor.set_grid_visible(not _editor.canvas.show_grid)
 		ViewAction.BACK:
 			_editor._on_back()
 	_sync_menus()
@@ -93,4 +95,6 @@ func _sync_menus() -> void:
 	_edit_menu.set_item_disabled(_edit_menu.get_item_index(EditAction.REDO), not _editor.edits.can_redo())
 	_view_menu.set_item_checked(_view_menu.get_item_index(ViewAction.SIDEBAR), _sidebar.is_panel_expanded())
 	_view_menu.set_item_checked(_view_menu.get_item_index(ViewAction.GRID), _editor.canvas.show_grid)
+	_view_menu.set_item_disabled(_view_menu.get_item_index(ViewAction.GRID),
+		_editor.canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS)
 	_view_menu.set_item_disabled(_view_menu.get_item_index(ViewAction.BACK), _editor.history.is_empty())

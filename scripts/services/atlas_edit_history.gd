@@ -70,6 +70,14 @@ func can_redo() -> bool:
     return _cursor < _commands.size()
 
 
+func get_undo_command() -> AtlasEditCommand:
+    return _commands[_cursor - 1] if can_undo() else null
+
+
+func get_redo_command() -> AtlasEditCommand:
+    return _commands[_cursor] if can_redo() else null
+
+
 func is_dirty() -> bool:
     return _states[_cursor] != _saved_state or _external_revision != _saved_external_revision
 

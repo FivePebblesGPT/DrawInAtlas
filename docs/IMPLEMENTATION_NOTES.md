@@ -1,8 +1,25 @@
 # Implementation Notes
 
+## Execution milestone 2 — independent boards and grids
+
+- **File → New board** / Ctrl+N opens a scrollable creation form. Empty names are rejected; no grid is the default. Square/pointy-hex/flat-hex boards retain chosen spacing, origin, rotation, visibility and native distance/unit. Each gets a stable random ID, empty artwork and no automatically invented links.
+- A shared typed grid form drives creation and the inspector. Hex size is labeled as radius in board units, distinct from native distance per cell. Gridless boards retain unit/configuration metadata without fabricating cells. Existing custom unit labels survive editing other fields.
+- `AtlasCreateMap` and `AtlasGridEdit` use the same history as ink. Creation undo returns to a valid source board; redo restores the same ID/configuration. A changed or newly linked board cannot be silently removed by stale creation undo. Grid commands reject invalid/no-op/stale inputs and reset stale cell selection when geometry changes.
+- Overlay edits do not rewrite vectors, link positions or placement transforms. Legacy cell terrain keeps a frozen geometry basis (`terrain_grid`), even when the overlay changes shape or becomes gridless. Prototype terrain painting is blocked when its original geometry no longer matches the overlay; freehand drawing is unaffected.
+- Grid rendering uses visible bounds and hides overly dense grids rather than drawing an incomplete central patch or stalling the board. Stored geometry is unchanged.
+- Runtime schema **v3** persists visibility/terrain basis and accepts v1/v2 campaigns. Full-precision JSON preserves rotation and other numeric settings exactly through the real store. The single-slot save remains non-atomic; recoverable persistence is milestone 3.
+
+### Milestone 2 verification
+
+- `tests/board_grid_smoke.gd`: **448 checks** covering all four grid modes/five units, creation guards, stale undo, snapshots, exact artwork/terrain invariance, saved branches, invalid data, legacy defaults and real-store precision.
+- Integrated viewport tests exercise the actual creation dialog/inspector, cancellation, undo/redo, original-map isolation and save/load with unchanged ink.
+- Native framebuffer checks report **zero terrain pixels moved** after changing overlay geometry, alongside ink/erase/undo and compact 800×600 dialog/layout checks.
+- Browser checks create a configured board through the form, draw, edit its overlay, compare exact saved ink/source-board data, undo/redo, and reload/re-save through IndexedDB. No script/browser errors are accepted.
+- KWin live-session input also edited cell size to 96, created a blank board and verified its grid. The dedicated preview had a separate save path; the user's default save was not written.
+
 ## UI consistency follow-up
 
-There is one real Godot `MenuBar`, with `PopupMenu` children for File, Edit and View. File owns save/load/reset; Edit owns drawing undo/redo with history-aware enabled states; View owns sidebar/grid toggles and Back. Accelerator hints retain the existing context-aware keyboard handlers, so text/numeric inputs keep their own undo behavior.
+There is one real Godot `MenuBar`, with `PopupMenu` children for File, Edit and View. File owns new board/save/load/reset; Edit owns undo/redo with history-aware enabled states; View owns sidebar/grid toggles and Back. Accelerator hints retain the existing context-aware keyboard handlers, so text/numeric inputs keep their own undo behavior.
 
 The duplicated workspace command row and ink strip are removed. The document title/dirty marker sits at the right of the single top bar, and the canvas starts directly beneath it. A padded inspector groups Tools, Ink, Map and Links/References; terrain/placement controls appear only for their corresponding tool. Menus, inputs and controls share the dark theme and focus styling.
 
@@ -49,7 +66,7 @@ Open `project.godot` in Godot 4.8-beta1 and run the main scene (F5).
 - **Sidebar:** Maps lists campaign documents; Search filters name/type and opens results by double-click; Layers honestly reports the single-terrain-layer prototype. Clicking the active icon collapses/reopens the panel. Ctrl+B / Command+B toggles it; dragging its divider changes width.
 - **Canvas:** freehand ink plus legacy cell paint/select/lock, pointer-centered wheel zoom, and middle/right-drag pan. The canvas clips its custom drawing, so artwork/grid/preview commands cannot paint over editor chrome. The inspector scrolls when its controls exceed the available height.
 - **Navigation:** use map/search results, a double-clicked link marker or Back. Automatic linked-map zoom is **off by default**. When explicitly enabled, exactly three additional logical steps at the zoom limit enter/return; leaving the link or beginning another interaction resets pending progress.
-- **Native map scale:** the inspector exposes distance per cell and unit independently for each gridded map. This changes measurement labels only: no art rescaling, grid-pitch change or linked-map conversion. The sample world uses 3 mi/cell; loaded campaign values are preserved. A map-creation dialog and visual grid-spacing controls are pending.
+- **Native map scale:** the inspector separates native distance/unit from overlay spacing, shape, origin and rotation. Neither operation rescales artwork or converts linked maps. The sample world uses 3 mi/cell; loaded values are preserved.
 - **Inherited encounter prototype:** drag a rotated footprint to create an independent encounter map. In Select mode, double-clicking a marker navigates; Pen/Eraser clicks stay drawing actions. Spatial terrain references are read-only; symbolic placements do not render child art as a physically aligned overlay. Parent freehand-reference previews still await refinement. This is a secondary feature, not the next development priority.
 - **Persistence:** Save/Load uses `user://drawinatlas_campaign.json`; File menu actions use the same pathways. Do not use the provisional single save slot as the sole copy of valuable campaign work.
 - Existing F11 / Alt+Enter fullscreen and F5 reload actions are routed through `util/global_shortcuts.gd`.
@@ -66,6 +83,7 @@ scripts/ui/atlas_editor.gd      Workspace controls/navigation and scaffold edits
 scripts/ui/atlas_canvas.gd      Clipped canvas rendering, picking and input
 tests/smoke.gd                 Headless domain + integrated scene checks
 tests/artwork_smoke.gd         Vector artwork, eraser and drawing history checks
+tests/board_grid_smoke.gd      Board/grid commands, migration and invariance checks
 tests/visual_smoke.gd          Real framebuffer clipping regression
 tests/browser_smoke.py         Optional external Playwright UI/storage smoke
 ```
@@ -78,6 +96,7 @@ With the exact beta executable available as `godot`:
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/smoke.gd
 godot --headless --path . --script res://tests/artwork_smoke.gd
+godot --headless --path . --script res://tests/board_grid_smoke.gd
 godot --headless --path . --quit-after 10
 godot --path . --script res://tests/visual_smoke.gd
 mkdir -p build/web
@@ -106,6 +125,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Execution milestone 1 is complete. Next is blank-board creation and independently adjustable grid overlays/native scale choices (milestone 2), followed by typed layers and reliable persistence (milestone 3). Do not expand battlemap tooling first.
+Execution milestones 1 and 2 are complete. Next is typed layers and reliable persistence (milestone 3). Do not expand battlemap tooling first.
 
-Legacy terrain/metadata/placement actions are marked dirty but still await undoable commands. Floors/layers are not configurable. The JSON store is a single non-atomic slot, does not robustly validate all inherited nested data, and lacks recovery/import/export UX. Recoverable WebP chunk storage remains future work. Selected-cell lock currently protects terrain painting only and is disabled for ink; precise artwork confinement is later work. Trackpad behavior beyond the tested wheel normalization remains device-dependent.
+Legacy terrain painting/placement actions are marked dirty but still await undoable commands; grid/native-unit edits are reversible. Floors/layers are not configurable. The JSON store is a single non-atomic slot, does not robustly validate all inherited nested data, and lacks recovery/import/export UX. Recoverable WebP chunk storage remains future work. Selected-cell lock currently protects terrain painting only and is disabled for ink; precise artwork confinement is later work. Trackpad behavior beyond the tested wheel normalization remains device-dependent.

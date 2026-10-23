@@ -17,6 +17,7 @@ func _run_suite() -> void:
     _test_webp()
     await _test_editor_workflow()
     await _test_drawing_input()
+    await _test_board_workflow()
     if failures == 0:
         print("ATLAS_TESTS_PASSED")
     else:
@@ -244,6 +245,9 @@ func _test_drawing_input() -> void:
     for frame: int in range(3):
         await process_frame
     _check(editor.sidebar.is_panel_expanded(), "Ctrl+B restores the sidebar before another action")
+    # Visibility is now undoable; discard the setup edits before testing ink checkpoints.
+    editor.edits.reset(editor.campaign, true)
+    editor.edits.active_map_id = canvas.map.id
     var start: Vector2 = Vector2(40, 100)
     var middle: Vector2 = Vector2(140, 100)
     var finish: Vector2 = Vector2(240, 100)
@@ -365,3 +369,79 @@ func _key(keycode: Key, control: bool = false, shift: bool = false) -> void:
     event = event.duplicate() as InputEventKey
     event.pressed = false
     root.push_input(event, true)
+
+
+func _test_board_workflow() -> void:
+    var scene: Node = load("res://main.tscn").instantiate()
+    var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
+    editor.load_saved_on_startup = false
+    editor.save_path = "user://atlas_board_workflow.json"
+    root.add_child(scene)
+    for frame: int in range(6):
+        await process_frame
+    editor.edits.mark_saved()
+    var source_before: Dictionary = editor.canvas.map.to_dict().duplicate(true)
+    var ui: Control = scene.get_node("Interface/UI")
+    (ui.get_node("%File") as PopupMenu).id_pressed.emit(3)
+    _check(editor.board_dialog.visible and not editor.edits.is_dirty(), "New board opens without mutating the campaign")
+    editor.board_dialog.name_input.text = "  "
+    editor.board_dialog.name_input.text_changed.emit(editor.board_dialog.name_input.text)
+    _check(editor.board_dialog.get_ok_button().disabled, "blank board name disables Create")
+    editor.board_dialog._request_board()
+    _check(editor.campaign.maps.size() == 2, "invalid confirmation creates no map")
+    var grid: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.HEX_POINTY, 80.0)
+    grid.origin = Vector2(-30.25, 20.5)
+    grid.rotation = deg_to_rad(15)
+    grid.distance_per_cell = 3.0
+    grid.distance_unit = "mi"
+    editor.board_dialog.name_input.text = "  Exploration  "
+    editor.board_dialog.name_input.text_changed.emit(editor.board_dialog.name_input.text)
+    editor.board_dialog.grid_controls.set_grid(grid)
+    editor.board_dialog._request_board()
+    var id: String = editor.canvas.map.id
+    _check(editor.campaign.maps.size() == 3 and editor.canvas.map.display_name == "Exploration",
+        "dialog creates and opens a named independent board")
+    _check(editor.canvas.map.grid.same_as(grid) and editor.canvas.floor.strokes.is_empty()
+        and editor.canvas.floor.terrain.is_empty(), "new board keeps chosen grid/units without copying artwork")
+    _check(editor.campaign.links.size() == 1 and editor.campaign.placements.is_empty(),
+        "blank board creation does not invent links or placements")
+    editor._on_undo()
+    _check(editor.canvas.map.id == "world" and not editor.campaign.maps.has(id) and not editor.edits.is_dirty(),
+        "undo creation returns safely to the saved source board")
+    editor._on_redo()
+    _check(editor.canvas.map.id == id and editor.canvas.map.grid.same_as(grid),
+        "redo creation restores the same board identity and configuration")
+    editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-10.125, 3.25), Vector2(45.5, -30.75)])), false)
+    var ink_before: Array[AtlasStroke] = AtlasStroke.clone_all(editor.canvas.floor.strokes)
+    editor.grid_controls.size_spinner.value = 120.0
+    editor.grid_controls.rotation_spinner.value = 37.0
+    editor.grid_controls.origin_x_spinner.value = 50.25
+    editor.grid_controls.origin_y_spinner.value = -80.5
+    editor.grid_controls.shape_picker.select(AtlasGrid.Kind.SQUARE)
+    editor.grid_controls.shape_picker.item_selected.emit(AtlasGrid.Kind.SQUARE)
+    editor.grid_controls.distance_spinner.value = 2.5
+    editor.grid_controls.unit_picker.select(1)
+    editor.grid_controls.unit_picker.item_selected.emit(1)
+    (ui.get_node("%View") as PopupMenu).id_pressed.emit(1)
+    var updated: AtlasGrid = editor.canvas.map.grid
+    _check(updated.kind == AtlasGrid.Kind.SQUARE and updated.cell_size == 120.0
+        and updated.origin == Vector2(50.25, -80.5) and is_equal_approx(rad_to_deg(updated.rotation), 37.0),
+        "inspector edits grid shape, spacing, origin and rotation")
+    _check(updated.distance_per_cell == 2.5 and updated.distance_unit == "km" and not updated.visible,
+        "native units and visibility belong to this board")
+    _check(AtlasStroke.same_artwork(ink_before, editor.canvas.floor.strokes), "grid controls never rescale ink")
+    _check(editor.campaign.get_map("world").to_dict() == source_before, "grid editing leaves source artwork and units untouched")
+    var saved_grid: AtlasGrid = updated.copy()
+    editor._on_save()
+    editor._on_load()
+    var restored: AtlasMapDocument = editor.campaign.get_map(id)
+    _check(restored != null and restored.grid.same_as(saved_grid), "board identity and all grid settings survive Save/Load")
+    if restored != null:
+        _check(AtlasStroke.same_artwork(restored.floors[0].strokes, ink_before), "board artwork survives grid configuration roundtrip")
+    _check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "loading starts a clean board history")
+    editor.open_board_dialog()
+    editor.board_dialog.hide()
+    _check(editor.campaign.maps.size() == 3 and not editor.edits.is_dirty(), "canceling creation changes no data or history")
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.save_path))
+    root.remove_child(scene)
+    scene.free()

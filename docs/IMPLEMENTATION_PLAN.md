@@ -13,8 +13,8 @@ The integration checkpoint is complete. The following execution sequence superse
 | Milestone | Scope | State |
 | --- | --- | --- |
 | 1 | Document-space pen/eraser, stroke-level undo/redo, dirty/save checkpoints | Implemented and tested; see implementation notes |
-| 2 | Blank board creation; independent grid overlay geometry and per-map native units | Next |
-| 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Pending |
+| 2 | Blank board creation; independent grid overlay geometry and per-map native units | Implemented and tested; see implementation notes |
+| 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Next |
 | 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Pending |
 | 5 | Floors and map organization/overview/previews | Pending |
 | 6 | Linked-map workflow refinement, placement/reference/navigation controls | Pending |
@@ -22,6 +22,8 @@ The integration checkpoint is complete. The following execution sequence superse
 | 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
 
 Milestone 1 stores editable vector strokes as JSON in schema v2 and reads legacy v1 campaigns. Raster artwork/chunks are not introduced in this slice; their canonical format remains lossless WebP. Undo covers pen/eraser gestures, while legacy terrain/metadata actions are marked dirty but await command conversion.
+
+Milestone 2 upgrades the runtime schema to v3, reads v1/v2, and adds reversible board creation/grid configuration. Legacy terrain geometry is preserved separately from the editable overlay. Native/Web and live-session checks validate creation; framebuffer tests verify zero terrain pixels moved after an overlay change. Typed layers and recoverable saves are still milestone 3.
 
 ### Original feature groupings (reference)
 
@@ -173,4 +175,4 @@ Milestone 1 stores editable vector strokes as JSON in schema v2 and reads legacy
 
 ## 6. Suggested next engineering task
 
-Implement execution milestone 2: create a blank gridless, square or hex board with explicit native unit/distance choices. Make visual grid spacing/origin/rotation independently editable without modifying continuous artwork or pretending linked boards share physical coordinates. Test artwork invariance, save/load and native/Web UI behavior. Do not expand battlemap recursion first.
+Implement execution milestone 3: typed ordered layers and safe, versioned/recoverable persistence, including lossless WebP canonical raster chunks. Migrate existing ink and terrain without losing the fixed terrain geometry or per-map units from milestone 2. Validate malformed data and interrupted saves before considering the editor reliable campaign storage. Do not expand battlemap recursion first.

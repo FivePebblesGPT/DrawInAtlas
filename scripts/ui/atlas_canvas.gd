@@ -26,7 +26,13 @@ var has_selected_cell: bool = false
 var battle_rotation: float = 0.0
 var reference_opacity: float = 0.35
 var show_reference: bool = true
-var show_grid: bool = true
+var show_grid: bool:
+    get:
+        return map != null and map.grid.visible
+    set(value):
+        if map != null:
+            map.grid.visible = value
+        queue_redraw()
 var brush_color: Color = Color("#f5b545")
 var brush_width: float = 8.0
 
@@ -154,7 +160,7 @@ func _draw_parent_reference() -> void:
             if xy.size() != 2:
                 continue
             var cell := Vector2i(int(xy[0]), int(xy[1]))
-            var polygon := parent.grid.cell_polygon(cell)
+            var polygon: PackedVector2Array = parent.get_terrain_grid().cell_polygon(cell)
             var transformed := PackedVector2Array()
             for point in polygon:
                 transformed.append(placement.parent_point_to_child(point))
@@ -167,21 +173,37 @@ func _draw_parent_reference() -> void:
 
 
 func _draw_cells(grid_only: bool) -> void:
-    var grid := map.grid
+    var grid: AtlasGrid = map.grid if grid_only else map.get_terrain_grid()
     if grid.kind == AtlasGrid.Kind.GRIDLESS:
         return
-    # Bounded drawing around the camera; renderer will become chunk/viewport-driven later.
-    var cell_center := grid.document_to_cell(camera_center)
-    var cell_radius := mini(65, ceili(maxf(size.x, size.y) / camera_zoom / grid.cell_size) + 4)
-    for x in range(cell_center.x - cell_radius, cell_center.x + cell_radius + 1):
-        for y in range(cell_center.y - cell_radius, cell_center.y + cell_radius + 1):
+    if not grid_only:
+        for key: String in floor.terrain:
+            var parts: PackedStringArray = key.split(",")
+            if parts.size() != 2:
+                continue
+            var cell: Vector2i = Vector2i(int(parts[0]), int(parts[1]))
+            if floor.get_terrain(cell) != 0:
+                draw_colored_polygon(grid.cell_polygon(cell), _terrain_color(floor.get_terrain(cell)))
+        return
+    # Dense grids are hidden rather than drawing an incomplete central patch or stalling the UI.
+    if grid.cell_size * camera_zoom < 8.0:
+        return
+    var corners: Array[Vector2] = [Vector2.ZERO, Vector2(size.x, 0), size, Vector2(0, size.y)]
+    var minimum: Vector2i = grid.document_to_cell(local_to_document(corners[0]))
+    var maximum: Vector2i = minimum
+    for corner: Vector2 in corners:
+        var cell: Vector2i = grid.document_to_cell(local_to_document(corner))
+        minimum = Vector2i(mini(minimum.x, cell.x), mini(minimum.y, cell.y))
+        maximum = Vector2i(maxi(maximum.x, cell.x), maxi(maximum.y, cell.y))
+    minimum -= Vector2i(2, 2)
+    maximum += Vector2i(2, 2)
+    if (maximum.x - minimum.x + 1) * (maximum.y - minimum.y + 1) > 15000:
+        return
+    for x: int in range(minimum.x, maximum.x + 1):
+        for y: int in range(minimum.y, maximum.y + 1):
             var cell := Vector2i(x, y)
             var polygon := grid.cell_polygon(cell)
-            var color := _terrain_color(floor.get_terrain(cell))
-            if not grid_only and floor.get_terrain(cell) != 0:
-                draw_colored_polygon(polygon, color)
-            if grid_only:
-                _stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom)
+            _stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom)
 
 
 func _draw_stroke(stroke: AtlasStroke) -> void:

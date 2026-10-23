@@ -10,11 +10,41 @@ var origin: Vector2 = Vector2.ZERO
 var rotation: float = 0.0
 var distance_per_cell: float = 6.0
 var distance_unit: String = "mi"
+var visible: bool = true
 
 
 func _init(grid_kind: Kind = Kind.HEX_POINTY, size: float = 48.0) -> void:
     kind = grid_kind
     cell_size = maxf(size, 0.001)
+
+
+func copy() -> AtlasGrid:
+    var result: AtlasGrid = AtlasGrid.new(kind, cell_size)
+    result.cell_size = cell_size
+    result.origin = origin
+    result.rotation = rotation
+    result.distance_per_cell = distance_per_cell
+    result.distance_unit = distance_unit
+    result.visible = visible
+    return result
+
+
+func is_valid() -> bool:
+    return (kind in Kind.values() and is_finite(cell_size) and cell_size > 0.0
+        and origin.is_finite() and is_finite(rotation)
+        and is_finite(distance_per_cell) and distance_per_cell > 0.0
+        and not distance_unit.strip_edges().is_empty())
+
+
+func same_as(other: AtlasGrid) -> bool:
+    return (same_geometry(other)
+        and distance_per_cell == other.distance_per_cell and distance_unit == other.distance_unit
+        and visible == other.visible)
+
+
+func same_geometry(other: AtlasGrid) -> bool:
+    return (other != null and kind == other.kind and cell_size == other.cell_size
+        and origin == other.origin and rotation == other.rotation)
 
 
 func cell_to_document(cell: Vector2i) -> Vector2:
@@ -59,6 +89,8 @@ func cell_polygon(cell: Vector2i) -> PackedVector2Array:
 
 func neighbors(cell: Vector2i) -> Array[Vector2i]:
     var result: Array[Vector2i] = []
+    if kind == Kind.GRIDLESS:
+        return result
     var offsets: Array[Vector2i] = [
         Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)
     ]
@@ -74,18 +106,41 @@ func to_dict() -> Dictionary:
     return {
         "kind": kind, "cell_size": cell_size,
         "origin": [origin.x, origin.y], "rotation": rotation,
-        "distance_per_cell": distance_per_cell, "distance_unit": distance_unit
+        "distance_per_cell": distance_per_cell, "distance_unit": distance_unit, "visible": visible
     }
 
 
 static func from_dict(data: Dictionary) -> AtlasGrid:
-    var result := AtlasGrid.new(int(data.get("kind", Kind.HEX_POINTY)), float(data.get("cell_size", 48.0)))
-    var p: Array = data.get("origin", [0.0, 0.0])
+    var raw_kind: Variant = data.get("kind", Kind.HEX_POINTY)
+    var raw_size: Variant = data.get("cell_size", 48.0)
+    var p: Variant = data.get("origin", [0.0, 0.0])
+    var raw_rotation: Variant = data.get("rotation", 0.0)
+    var raw_distance: Variant = data.get("distance_per_cell", 6.0)
+    var raw_unit: Variant = data.get("distance_unit", "mi")
+    var raw_visible: Variant = data.get("visible", true)
+    if not _is_number(raw_kind) or float(raw_kind) != int(raw_kind) or int(raw_kind) not in Kind.values():
+        return null
+    if not _is_number(raw_size) or float(raw_size) <= 0.0:
+        return null
+    if not p is Array or p.size() != 2 or not _is_number(p[0]) or not _is_number(p[1]):
+        return null
+    if not _is_number(raw_rotation) or not _is_number(raw_distance):
+        return null
+    if not raw_unit is String or not raw_visible is bool:
+        return null
+    var result: AtlasGrid = AtlasGrid.new(int(raw_kind), float(raw_size))
+    # Do not clamp a loaded value: validation must preserve or reject, never silently rescale.
+    result.cell_size = float(raw_size)
     result.origin = Vector2(float(p[0]), float(p[1]))
-    result.rotation = float(data.get("rotation", 0.0))
-    result.distance_per_cell = float(data.get("distance_per_cell", 6.0))
-    result.distance_unit = str(data.get("distance_unit", "mi"))
-    return result
+    result.rotation = float(raw_rotation)
+    result.distance_per_cell = float(raw_distance)
+    result.distance_unit = raw_unit
+    result.visible = raw_visible
+    return result if result.is_valid() else null
+
+
+static func _is_number(value: Variant) -> bool:
+    return (value is int or value is float) and is_finite(float(value))
 
 
 static func _round_axial(q: float, r: float) -> Vector2i:

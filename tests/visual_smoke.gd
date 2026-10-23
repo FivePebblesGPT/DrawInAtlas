@@ -47,7 +47,31 @@ func _run_suite() -> void:
     var passed: bool = (changed_outside == 0 and changed_inside > 100
         and screenshot_error == OK and bounds.size.y >= 500.0)
     var canvas: AtlasCanvas = editor.canvas
-    canvas.map.grid.kind = AtlasGrid.Kind.GRIDLESS
+    canvas.show_grid = false
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var terrain_before: Image = root.get_texture().get_image()
+    var overlay: AtlasGrid = canvas.map.grid.copy()
+    overlay.kind = AtlasGrid.Kind.SQUARE
+    overlay.cell_size = 80.0
+    overlay.origin = Vector2(33, -27)
+    overlay.rotation = deg_to_rad(37.0)
+    editor.apply_grid(overlay)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var terrain_after: Image = root.get_texture().get_image()
+    var terrain_moved: int = 0
+    for y: int in range(int(bounds.position.y), int(bounds.end.y), 4):
+        for x: int in range(int(bounds.position.x), int(bounds.end.x), 4):
+            if not terrain_before.get_pixel(x, y).is_equal_approx(terrain_after.get_pixel(x, y)):
+                terrain_moved += 1
+    passed = passed and terrain_moved == 0
+    passed = passed and terrain_after.save_png(directory.path_join("independent-grid.png")) == OK
+    editor._on_undo()
+    var blank_grid: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.GRIDLESS, 64.0)
+    blank_grid.distance_per_cell = 1.0
+    blank_grid.distance_unit = "tiles"
+    passed = passed and editor.create_board("Blank sketch", blank_grid)
     canvas.camera_center = Vector2.ZERO
     canvas.camera_zoom = 1.0
     canvas.preview = AtlasCanvas.Preview.OFF
@@ -80,6 +104,11 @@ func _run_suite() -> void:
     var restored_ink: bool = undo_image.get_pixelv(center).is_equal_approx(ink)
     passed = passed and restored_ink
     passed = passed and undo_image.save_png(directory.path_join("undo-erase.png")) == OK
+    editor.open_board_dialog()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    passed = passed and root.get_texture().get_image().save_png(directory.path_join("new-board.png")) == OK
+    editor.board_dialog.hide()
     root.content_scale_size = Vector2i(800, 600)
     root.size = Vector2i(800, 600)
     for frame: int in range(6):
@@ -93,12 +122,21 @@ func _run_suite() -> void:
     )
     passed = passed and compact_layout
     passed = passed and compact.save_png(directory.path_join("compact-editor.png")) == OK
+    editor.open_board_dialog()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var dialog: AtlasBoardDialog = editor.board_dialog
+    var compact_dialog: bool = dialog.position.y >= 0 and dialog.position.y + dialog.size.y <= 600
+    passed = passed and compact_dialog
+    passed = passed and root.get_texture().get_image().save_png(directory.path_join("compact-new-board.png")) == OK
+    dialog.hide()
     print("ATLAS_VISUAL_%s outside=%d inside=%d screenshot=%s" % [
         "PASSED" if passed else "FAILED", changed_outside, changed_inside,
         ProjectSettings.globalize_path(directory.path_join("integrated-editor.png"))
     ])
     print("ATLAS_INK_PIXELS gap=%s surviving_ink=%s undo=%s" % [real_gap, surviving_ink, restored_ink])
     print("ATLAS_COMPACT_LAYOUT %s" % compact_layout)
+    print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [terrain_moved, compact_dialog])
     root.remove_child(scene)
     scene.free()
     quit(0 if passed else 1)
