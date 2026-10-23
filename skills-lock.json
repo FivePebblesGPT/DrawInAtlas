@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "godot-gdscript-patterns": {
+      "source": "FivePebblesGPT/godot-gdscript-patterns",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "2efbc1df5b00bbe8c5e8b79dadbbd8682f1a6a29f5fa1584f75b5090b1d6a4da"
+    }
+  }
+}
