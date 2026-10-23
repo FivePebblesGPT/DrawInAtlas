@@ -1,0 +1,83 @@
+[gd_resource type="Theme" load_steps=12 format=3]
+
+[sub_resource type="StyleBoxFlat" id="Rail"]
+bg_color = Color(0.094, 0.094, 0.094, 1)
+border_width_right = 1
+border_color = Color(0.18, 0.18, 0.18, 1)
+
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.125, 0.125, 0.125, 1)
+
+[sub_resource type="StyleBoxFlat" id="ActivityNormal"]
+bg_color = Color(0.094, 0.094, 0.094, 1)
+
+[sub_resource type="StyleBoxFlat" id="ActivityHover"]
+bg_color = Color(0.16, 0.16, 0.16, 1)
+
+[sub_resource type="StyleBoxFlat" id="ActivitySelected"]
+bg_color = Color(0.125, 0.125, 0.125, 1)
+border_width_left = 2
+border_color = Color(0.29, 0.67, 0.95, 1)
+
+[sub_resource type="StyleBoxFlat" id="Focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.29, 0.67, 0.95, 1)
+
+[sub_resource type="StyleBoxFlat" id="Input"]
+content_margin_left = 8.0
+content_margin_top = 6.0
+content_margin_right = 8.0
+content_margin_bottom = 6.0
+bg_color = Color(0.19, 0.19, 0.19, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.27, 0.27, 0.27, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_left = 3
+corner_radius_bottom_right = 3
+
+[sub_resource type="StyleBoxFlat" id="Divider"]
+bg_color = Color(0.18, 0.18, 0.18, 1)
+
+[sub_resource type="Gradient" id="Transparent"]
+colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="EmptyGrabber"]
+gradient = SubResource("Transparent")
+width = 1
+height = 1
+
+[resource]
+default_font_size = 13
+ActivityButton/base_type = &"Button"
+ActivityButton/colors/icon_normal_color = Color(0.57, 0.57, 0.57, 1)
+ActivityButton/colors/icon_hover_color = Color(0.95, 0.95, 0.95, 1)
+ActivityButton/colors/icon_pressed_color = Color(0.95, 0.95, 0.95, 1)
+ActivityButton/colors/icon_hover_pressed_color = Color(1, 1, 1, 1)
+ActivityButton/styles/normal = SubResource("ActivityNormal")
+ActivityButton/styles/hover = SubResource("ActivityHover")
+ActivityButton/styles/pressed = SubResource("ActivitySelected")
+ActivityButton/styles/hover_pressed = SubResource("ActivitySelected")
+ActivityButton/styles/focus = SubResource("Focus")
+Rail/base_type = &"PanelContainer"
+Rail/styles/panel = SubResource("Rail")
+PanelContainer/styles/panel = SubResource("Panel")
+Label/colors/font_color = Color(0.78, 0.78, 0.78, 1)
+MutedLabel/base_type = &"Label"
+MutedLabel/colors/font_color = Color(0.52, 0.52, 0.52, 1)
+LineEdit/styles/normal = SubResource("Input")
+LineEdit/styles/focus = SubResource("Focus")
+LineEdit/colors/font_color = Color(0.9, 0.9, 0.9, 1)
+LineEdit/colors/font_placeholder_color = Color(0.55, 0.55, 0.55, 1)
+HSplitContainer/constants/separation = 1
+HSplitContainer/constants/minimum_grab_thickness = 8
+HSplitContainer/icons/h_grabber = SubResource("EmptyGrabber")
+HSplitContainer/icons/grabber = SubResource("EmptyGrabber")
+HSplitContainer/styles/split_bar_background = SubResource("Divider")

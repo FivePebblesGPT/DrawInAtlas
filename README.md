@@ -1,10 +1,10 @@
 # DrawInAtlas
 
-**Status: concept and architecture design; no editor features implemented yet.**
+**Status: concept and architecture design, with an initial editor UI shell.**
 
 DrawInAtlas is a proposed Godot-based, map-first tabletop editor for West Marches / hexcrawl D&D campaigns. It aims to combine the flexible drawing and collaboration of a whiteboard with the coordinate grids, linked locations, encounter maps, floors, and player presentation needed for a virtual tabletop.
 
-The repository currently contains a minimal Godot 4.8 project. The documents below describe **planned behavior and recommended architecture**, not completed application functionality.
+The repository currently contains a Godot 4.8 project with a VS Code–style sidebar. The documents below describe **planned behavior and recommended architecture**, not completed application functionality.
 
 ## Product principles
 
@@ -29,7 +29,10 @@ The repository currently contains a minimal Godot 4.8 project. The documents bel
 ## Development state
 
 - Existing Godot project: `project.godot`
-- Existing minimal scene: `main.tscn`
+- Entry scene: `main.tscn` (run with F6, or F5 as the project main scene)
+- UI shell: `prefab/ui.tscn`, with a resizable sidebar and Maps, Search, and Layers empty-state panels
+- Reusable sidebar: `prefab/sidebar.tscn`; click an activity icon to switch views, click it again to collapse, or use Ctrl+B (Command+B on macOS)
+- `Sidebar.select_view()`, `view_selected`, and `panel_toggled` provide integration points; campaign search and map/layer editing are not implemented yet
 - No editing, campaign-file, or networking implementation is asserted by these documents.
 
 All JSON examples, API shapes, and module names are **proposals** to evolve through implementation. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md) for the first testable slice.
