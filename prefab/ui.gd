@@ -18,6 +18,17 @@ func _ready() -> void:
 	_expanded_offset = _split.split_offsets[0]
 	_sidebar.panel_toggled.connect(_on_panel_toggled)
 	_split.dragged.connect(_on_sidebar_resized)
+	_build_menus()
+	_file_menu.id_pressed.connect(_on_file_menu)
+	_edit_menu.id_pressed.connect(_on_edit_menu)
+	_view_menu.id_pressed.connect(_on_view_menu)
+	_edit_menu.about_to_popup.connect(_sync_menus)
+	_view_menu.about_to_popup.connect(_sync_menus)
+	_editor.edits.changed.connect(_sync_menus)
+	_sync_menus()
+
+
+func _build_menus() -> void:
 	var modifier: int = KEY_MASK_META if OS.has_feature("macos") else KEY_MASK_CTRL
 	_file_menu.add_item("Save campaign", FileAction.SAVE, modifier | KEY_S)
 	_file_menu.add_item("Load campaign", FileAction.LOAD)
@@ -31,13 +42,6 @@ func _ready() -> void:
 	_view_menu.add_item("Back to previous map", ViewAction.BACK)
 	# Display accelerator hints; existing context-aware handlers retain text-input undo.
 	%MenuBar.set_disable_shortcuts(true)
-	_file_menu.id_pressed.connect(_on_file_menu)
-	_edit_menu.id_pressed.connect(_on_edit_menu)
-	_view_menu.id_pressed.connect(_on_view_menu)
-	_edit_menu.about_to_popup.connect(_sync_menus)
-	_view_menu.about_to_popup.connect(_sync_menus)
-	_editor.edits.changed.connect(_sync_menus)
-	_sync_menus()
 
 
 func _on_panel_toggled(expanded: bool) -> void:

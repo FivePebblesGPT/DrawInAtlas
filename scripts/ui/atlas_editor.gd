@@ -61,12 +61,20 @@ func _build_ui() -> void:
     shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     add_child(shell)
 
-    var content := HBoxContainer.new()
+    var content: HBoxContainer = HBoxContainer.new()
     content.name = "CanvasAndInspector"
     content.add_theme_constant_override("separation", 1)
     content.size_flags_vertical = Control.SIZE_EXPAND_FILL
     shell.add_child(content)
 
+    _build_sidebar_views()
+    _build_canvas(content)
+    _build_inspector(content)
+    _build_status_label(shell)
+    _on_tool_changed(tool_picker.selected)
+
+
+func _build_sidebar_views() -> void:
     var maps_view: Control = sidebar.get_view_content(&"Maps")
     maps_view.get_node("Heading").text = "Campaign maps"
     maps_view.get_node("Description").text = "Double-click a map to open it."
@@ -87,6 +95,8 @@ func _build_ui() -> void:
     layers_view.get_node("Heading").text = "Ink + terrain (prototype)"
     layers_view.get_node("Description").text = "Freehand ink uses board coordinates. Layer visibility, locking and ordering are pending."
 
+
+func _build_canvas(parent: HBoxContainer) -> void:
     canvas = AtlasCanvas.new()
     canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -100,11 +110,13 @@ func _build_ui() -> void:
     canvas.interaction_started.connect(zoom_gate.reset)
     canvas.mouse_exited.connect(zoom_gate.reset)
     canvas.stroke_requested.connect(_on_stroke)
-    content.add_child(canvas)
+    parent.add_child(canvas)
 
+
+func _build_inspector(parent: HBoxContainer) -> void:
     var panel: PanelContainer = PanelContainer.new()
     panel.custom_minimum_size = Vector2(252, 0)
-    content.add_child(panel)
+    parent.add_child(panel)
     var inspector: ScrollContainer = ScrollContainer.new()
     inspector.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     panel.add_child(inspector)
@@ -113,27 +125,39 @@ func _build_ui() -> void:
     for edge: String in ["left", "top", "right", "bottom"]:
         margin.add_theme_constant_override("margin_" + edge, 14)
     inspector.add_child(margin)
-    var right: VBoxContainer = VBoxContainer.new()
-    right.custom_minimum_size = Vector2(204, 0)
-    right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    right.add_theme_constant_override("separation", 20)
-    margin.add_child(right)
-    var tools: VBoxContainer = _section(right, "TOOLS")
+    var sections: VBoxContainer = VBoxContainer.new()
+    sections.custom_minimum_size = Vector2(204, 0)
+    sections.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    sections.add_theme_constant_override("separation", 20)
+    margin.add_child(sections)
+
+    _build_tool_controls(sections)
+    _build_ink_controls(sections)
+    _build_terrain_controls(sections)
+    _build_map_controls(sections)
+    _build_placement_controls(sections)
+    _build_reference_controls(sections)
+
+
+func _build_tool_controls(parent: VBoxContainer) -> void:
+    var tools: VBoxContainer = _create_section(parent, "TOOLS")
     tool_picker = OptionButton.new()
     for caption: String in ["Pen", "Eraser", "Paint cells (prototype)", "Select cell", "Drag battlemap"]:
         tool_picker.add_item(caption)
     tool_picker.item_selected.connect(_on_tool_changed)
     tools.add_child(tool_picker)
 
-    _ink_section = _section(right, "INK")
-    _ink_section.add_child(_label("Color"))
+
+func _build_ink_controls(parent: VBoxContainer) -> void:
+    _ink_section = _create_section(parent, "INK")
+    _ink_section.add_child(_create_label("Color"))
     brush_color_picker = ColorPickerButton.new()
     brush_color_picker.custom_minimum_size = Vector2(0, 32)
     brush_color_picker.color = canvas.brush_color
     brush_color_picker.edit_alpha = false
     brush_color_picker.color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
     _ink_section.add_child(brush_color_picker)
-    _ink_section.add_child(_label("Width (board units)"))
+    _ink_section.add_child(_create_label("Width (board units)"))
     brush_width_spinner = SpinBox.new()
     brush_width_spinner.min_value = 0.5
     brush_width_spinner.max_value = 256.0
@@ -142,10 +166,12 @@ func _build_ui() -> void:
     brush_width_spinner.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
     _ink_section.add_child(brush_width_spinner)
 
-    _terrain_section = _section(right, "TERRAIN")
-    _terrain_section.add_child(_label("Palette"))
-    var palette_picker := OptionButton.new()
-    for caption in ["Erase", "Grass", "Forest", "Road", "Water", "Stone"]:
+
+func _build_terrain_controls(parent: VBoxContainer) -> void:
+    _terrain_section = _create_section(parent, "TERRAIN")
+    _terrain_section.add_child(_create_label("Palette"))
+    var palette_picker: OptionButton = OptionButton.new()
+    for caption: String in ["Erase", "Grass", "Forest", "Road", "Water", "Stone"]:
         palette_picker.add_item(caption)
     palette_picker.select(2)
     palette_picker.item_selected.connect(func(index: int) -> void: palette_id = index)
@@ -160,10 +186,12 @@ func _build_ui() -> void:
     )
     _terrain_section.add_child(lock_checkbox)
 
-    var map_section: VBoxContainer = _section(right, "MAP")
-    grid_label = _label("")
+
+func _build_map_controls(parent: VBoxContainer) -> void:
+    var map_section: VBoxContainer = _create_section(parent, "MAP")
+    grid_label = _create_label("")
     map_section.add_child(grid_label)
-    map_section.add_child(_label("Native distance per cell"))
+    map_section.add_child(_create_label("Native distance per cell"))
     distance_spinner = SpinBox.new()
     distance_spinner.min_value = 0.001
     distance_spinner.max_value = 1000000.0
@@ -175,12 +203,14 @@ func _build_ui() -> void:
         unit_picker.add_item(unit)
     unit_picker.item_selected.connect(_on_unit_changed)
     map_section.add_child(unit_picker)
-    var unit_hint: Label = _label("Measurement labels only; artwork and linked maps are not rescaled.")
+    var unit_hint: Label = _create_label("Measurement labels only; artwork and linked maps are not rescaled.")
     unit_hint.theme_type_variation = &"MutedLabel"
     map_section.add_child(unit_hint)
 
-    _placement_section = _section(right, "PLACEMENT")
-    _placement_section.add_child(_label("Rotation (degrees)"))
+
+func _build_placement_controls(parent: VBoxContainer) -> void:
+    _placement_section = _create_section(parent, "PLACEMENT")
+    _placement_section.add_child(_create_label("Rotation (degrees)"))
     angle_spinner = SpinBox.new()
     angle_spinner.min_value = -180.0
     angle_spinner.max_value = 180.0
@@ -190,10 +220,12 @@ func _build_ui() -> void:
     )
     _placement_section.add_child(angle_spinner)
 
-    var reference_section: VBoxContainer = _section(right, "LINKS & REFERENCES")
-    reference_section.add_child(_label("Child map previews"))
+
+func _build_reference_controls(parent: VBoxContainer) -> void:
+    var reference_section: VBoxContainer = _create_section(parent, "LINKS & REFERENCES")
+    reference_section.add_child(_create_label("Child map previews"))
     preview_picker = OptionButton.new()
-    for caption in ["Off", "Markers", "Thumbnails"]:
+    for caption: String in ["Off", "Markers", "Thumbnails"]:
         preview_picker.add_item(caption)
     preview_picker.select(2)
     preview_picker.item_selected.connect(func(index: int) -> void:
@@ -210,7 +242,7 @@ func _build_ui() -> void:
         canvas.queue_redraw()
     )
     reference_section.add_child(reference_checkbox)
-    reference_section.add_child(_label("Parent reference opacity"))
+    reference_section.add_child(_create_label("Parent reference opacity"))
     opacity_slider = HSlider.new()
     opacity_slider.min_value = 0.0
     opacity_slider.max_value = 1.0
@@ -230,12 +262,13 @@ func _build_ui() -> void:
     )
     reference_section.add_child(navigation_toggle)
 
+
+func _build_status_label(parent: VBoxContainer) -> void:
     status_label = Label.new()
     status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     status_label.theme_type_variation = &"MutedLabel"
     status_label.add_theme_font_size_override("font_size", 12)
-    shell.add_child(status_label)
-    _on_tool_changed(tool_picker.selected)
+    parent.add_child(status_label)
 
 
 func _on_distance_changed(value: float) -> void:
@@ -252,19 +285,19 @@ func _on_unit_changed(index: int) -> void:
             edits.mark_external_change()
 
 
-func _section(parent: VBoxContainer, caption: String) -> VBoxContainer:
+func _create_section(parent: VBoxContainer, caption: String) -> VBoxContainer:
     var section: VBoxContainer = VBoxContainer.new()
     section.add_theme_constant_override("separation", 8)
     parent.add_child(section)
-    var heading: Label = _label(caption)
+    var heading: Label = _create_label(caption)
     heading.theme_type_variation = &"MutedLabel"
     heading.add_theme_font_size_override("font_size", 11)
     section.add_child(heading)
     return section
 
 
-func _label(caption: String) -> Label:
-    var result := Label.new()
+func _create_label(caption: String) -> Label:
+    var result: Label = Label.new()
     result.text = caption
     result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     return result
