@@ -16,6 +16,7 @@ func _run_suite() -> void:
     _test_campaign_roundtrip()
     _test_webp()
     await _test_editor_workflow()
+    await _test_drawing_input()
     if failures == 0:
         print("ATLAS_TESTS_PASSED")
     else:
@@ -202,3 +203,132 @@ func _test_editor_workflow() -> void:
     _check(editor.sidebar.is_panel_expanded(), "active sidebar icon reopens panel")
     root.remove_child(scene)
     scene.free()
+
+
+func _test_drawing_input() -> void:
+    var scene: Node = load("res://main.tscn").instantiate()
+    var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
+    editor.load_saved_on_startup = false
+    editor.save_path = "user://atlas_input_smoke.json"
+    root.add_child(scene)
+    for frame: int in range(6):
+        await process_frame
+    var canvas: AtlasCanvas = editor.canvas
+    canvas.map.grid.kind = AtlasGrid.Kind.GRIDLESS
+    canvas.floor.terrain.clear()
+    canvas.camera_center = Vector2(-100.25, 50.125)
+    canvas.camera_zoom = 2.0
+    editor.edits.reset(editor.campaign, true)
+    editor.edits.active_map_id = canvas.map.id
+    var start: Vector2 = Vector2(40, 100)
+    var middle: Vector2 = Vector2(140, 100)
+    var finish: Vector2 = Vector2(240, 100)
+    var expected_start: Vector2 = canvas.local_to_document(start)
+    _pointer_button(canvas, start, true)
+    _pointer_motion(canvas, middle)
+    _check(canvas.floor.strokes.is_empty(), "in-flight drawing is preview only")
+    _check(not editor.edits.is_dirty(), "preview alone does not dirty the document")
+    _pointer_motion(canvas, finish)
+    _pointer_button(canvas, finish, false)
+    _check(canvas.floor.strokes.size() == 1, "one full input gesture commits one stroke")
+    if canvas.floor.strokes.is_empty():
+        root.remove_child(scene)
+        scene.free()
+        return
+    _check(canvas.floor.strokes[0].points[0].is_equal_approx(expected_start),
+        "input is transformed into continuous negative document coordinates")
+    _check(canvas.floor.terrain.is_empty(), "gridless drawing never fabricates a terrain cell")
+    var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+    _check(editor.edits.is_dirty(), "drawing marks unsaved work")
+    _key(KEY_Z, true)
+    _check(canvas.floor.strokes.is_empty() and not editor.edits.is_dirty(),
+        "Ctrl+Z undoes entire gesture back to clean state")
+    _key(KEY_Z, true, true)
+    _check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "Ctrl+Shift+Z restores exact artwork")
+    _pointer_button(canvas, Vector2(90, 80), true)
+    _pointer_button(canvas, Vector2(90, 80), false)
+    _check(canvas.floor.strokes.size() == 2 and canvas.floor.strokes[-1].points.size() == 1,
+        "a click without motion commits an undoable ink dot")
+    editor._on_undo()
+    _key(KEY_E)
+    canvas.brush_width = 20.0
+    _pointer_button(canvas, Vector2(140, 60), true)
+    _pointer_motion(canvas, Vector2(140, 140))
+    _pointer_button(canvas, Vector2(140, 140), false)
+    _check(canvas.floor.strokes.size() == 2, "eraser gesture cuts a real gap into ink")
+    editor._on_undo()
+    _check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "eraser undo restores unsplit ink")
+    editor._on_redo()
+    editor._on_save()
+    _check(not editor.edits.is_dirty(), "successful Save establishes a clean checkpoint")
+    var saved: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+    editor._on_undo()
+    _check(editor.edits.is_dirty(), "undo away from saved state is dirty")
+    editor.save_path = "user://atlas_missing_directory_582701/campaign.json"
+    editor._on_save()
+    _check(editor.edits.is_dirty(), "failed Save cannot clear dirty state")
+    editor.save_path = "user://atlas_input_smoke.json"
+    editor._on_load()
+    _check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "Load starts a fresh clean history")
+    _check(AtlasStroke.same_artwork(saved, canvas.floor.strokes), "Save/Load preserves erased vector geometry")
+    _key(KEY_B)
+    _pointer_button(canvas, start, true)
+    _pointer_motion(canvas, finish)
+    var zoom_before: float = canvas.camera_zoom
+    var wheel: InputEventMouseButton = InputEventMouseButton.new()
+    wheel.position = canvas.global_position + finish
+    wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+    wheel.pressed = true
+    root.push_input(wheel, true)
+    _check(canvas.is_editing() and canvas.camera_zoom == zoom_before,
+        "wheel zoom cannot distort an in-flight document-space stroke")
+    _key(KEY_ESCAPE)
+    _pointer_button(canvas, finish, false)
+    _check(AtlasStroke.same_artwork(saved, canvas.floor.strokes) and not editor.edits.is_dirty(),
+        "Escape cancels a preview without adding history")
+    _pointer_button(canvas, start, true)
+    _pointer_motion(canvas, Vector2(canvas.size.x + 20, 100))
+    _pointer_button(canvas, Vector2(canvas.size.x + 20, 100), false)
+    _check(canvas.floor.strokes.size() == saved.size() + 1
+        and canvas.floor.strokes[-1].points.size() == 1,
+        "dragging into editor chrome never records off-canvas points")
+    editor._on_undo()
+    _pointer_button(canvas, start, true)
+    _pointer_motion(canvas, finish)
+    var original_floor: AtlasFloor = canvas.floor
+    editor._show_map(editor.campaign.get_map("greyhaven"))
+    _pointer_button(canvas, finish, false)
+    _check(AtlasStroke.same_artwork(saved, original_floor.strokes) and canvas.floor.strokes.is_empty(),
+        "map switch cancels pending ink instead of committing into another document")
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.save_path))
+    root.remove_child(scene)
+    scene.free()
+
+
+func _pointer_button(canvas: AtlasCanvas, local_position: Vector2, pressed: bool) -> void:
+    var event: InputEventMouseButton = InputEventMouseButton.new()
+    event.position = canvas.global_position + local_position
+    event.global_position = event.position
+    event.button_index = MOUSE_BUTTON_LEFT
+    event.pressed = pressed
+    root.push_input(event, true)
+
+
+func _pointer_motion(canvas: AtlasCanvas, local_position: Vector2) -> void:
+    var event: InputEventMouseMotion = InputEventMouseMotion.new()
+    event.position = canvas.global_position + local_position
+    event.global_position = event.position
+    event.button_mask = MOUSE_BUTTON_MASK_LEFT
+    root.push_input(event, true)
+
+
+func _key(keycode: Key, control: bool = false, shift: bool = false) -> void:
+    var event: InputEventKey = InputEventKey.new()
+    event.keycode = keycode
+    event.ctrl_pressed = control
+    event.shift_pressed = shift
+    event.pressed = true
+    root.push_input(event, true)
+    event = event.duplicate() as InputEventKey
+    event.pressed = false
+    root.push_input(event, true)

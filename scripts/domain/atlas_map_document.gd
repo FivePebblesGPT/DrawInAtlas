@@ -39,7 +39,12 @@ static func from_dict(data: Dictionary) -> AtlasMapDocument:
     map.grid = AtlasGrid.from_dict(data.get("grid", {}))
     map.floors.clear()
     for saved_floor in data.get("floors", []):
-        map.floors.append(AtlasFloor.from_dict(saved_floor))
+        if not saved_floor is Dictionary:
+            return null
+        var floor: AtlasFloor = AtlasFloor.from_dict(saved_floor)
+        if floor == null:
+            return null
+        map.floors.append(floor)
     if map.floors.is_empty():
         map.floors.append(AtlasFloor.new())
     map.default_floor_id = str(data.get("default_floor_id", map.floors[0].id))

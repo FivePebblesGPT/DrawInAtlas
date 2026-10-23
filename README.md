@@ -1,6 +1,6 @@
 # DrawInAtlas
 
-**Status: early GDScript editor scaffold, not a full-featured VTT.**
+**Status: freehand drawing milestone implemented; broader editor/VTT features are in progress.**
 
 DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
@@ -17,11 +17,13 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 ## Run and test
 
 - Open `project.godot` in Godot **4.8-beta1** and run `main.tscn` / F5.
-- The sample campaign includes a world hexcrawl and linked Greyhaven city. Paint cells, select a cell, restrict painting, and create rotated battlemaps.
+- The sample campaign includes a world hexcrawl and linked Greyhaven city. Draw freely with the pen, cut ink with the eraser, and undo/redo complete gestures. Ink uses continuous board coordinates, including on gridless maps.
+- B selects the pen, E the eraser; Ctrl+Z undoes drawing, Ctrl+Shift+Z / Ctrl+Y redoes it, Ctrl+S saves, and Escape cancels an unfinished gesture. Brush width is in board units. An asterisk marks unsaved work.
 - Save/load uses the provisional `user://drawinatlas_campaign.json` slot.
 - The sidebar supports Maps, Search and Layers views, draggable width, active-icon collapse, and Ctrl+B (Command+B on macOS).
 - Normal zoom stays on the current board; automatic linked-map navigation is opt-in. Native distance/unit labels are independent per map and never rescale artwork.
 - Headless smoke tests: `godot --headless --path . --script res://tests/smoke.gd`.
+- Artwork/history tests: `godot --headless --path . --script res://tests/artwork_smoke.gd`.
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. Web UI/IndexedDB validation is in `tests/browser_smoke.py`; setup is documented in the implementation notes.
 
 ## Documentation
@@ -36,4 +38,4 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 | [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized data and storage |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
 
-Undo/redo, configurable layers/floors, raster painting, projector output, networking and browser file import/export remain future work. See the implementation notes for the tested scope.
+Board creation/grid controls, configurable layers/floors, raster painting, projector output, networking and browser file import/export remain future work. Drawing undo/redo is implemented; legacy terrain/metadata/placement actions still await reversible commands. See the implementation notes for tested scope.

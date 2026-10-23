@@ -31,6 +31,13 @@ jobs:
           godot --headless --path . --script res://tests/smoke.gd 2>&1 | tee /tmp/godot-test.log
           grep -q 'ATLAS_TESTS_PASSED' /tmp/godot-test.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-test.log; then exit 1; fi
+      - name: Run artwork and history tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/artwork_smoke.gd 2>&1 | tee /tmp/godot-artwork.log
+          grep -q 'ATLAS_ARTWORK_PASSED' /tmp/godot-artwork.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-artwork.log; then exit 1; fi
       - name: Launch main scene headlessly
         shell: bash
         run: |

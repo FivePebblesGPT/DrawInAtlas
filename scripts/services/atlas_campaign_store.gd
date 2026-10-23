@@ -8,9 +8,13 @@ static func save_campaign(campaign: AtlasCampaign, path: String = DEFAULT_PATH) 
     var file := FileAccess.open(path, FileAccess.WRITE)
     if file == null:
         return FileAccess.get_open_error()
-    file.store_string(JSON.stringify(campaign.to_dict(), "  "))
+    var written: bool = file.store_string(JSON.stringify(campaign.to_dict(), "  "))
+    file.flush()
+    var result: Error = file.get_error()
     file.close()
-    return OK
+    if not written and result == OK:
+        return ERR_FILE_CANT_WRITE
+    return result
 
 
 static func load_campaign(path: String = DEFAULT_PATH) -> AtlasCampaign:

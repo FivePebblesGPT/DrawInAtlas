@@ -6,13 +6,24 @@
 
 The main product is a **drawing board with optional grids and map links**, not a recursively subdivided battlemap. The imported scaffold proves several geometry/navigation ideas, but must not dictate feature priority. Normal zoom stays on the current map; automatic navigation is explicitly opt-in.
 
-### Current execution order
+### Current execution milestones (1–8)
 
-1. **Integration checkpoint (this milestone):** reconcile origin's addons/utilities/settings and the activity sidebar with the Web scaffold; fix canvas clipping; validate Godot 4.8-beta1 native rendering and Web runtime/save/reload. This does not claim all of milestone 0 below.
-2. **Next drawing-board slice:** document-space freehand artwork and stroke-level undo, with a grid overlay independent of art coordinates. Separate native exploration distance from visual grid spacing. Provide per-map grid/scale choices when creating a board. Do not add further battlemap recursion first.
-3. Strengthen command validation, typed layers and lossless WebP artwork persistence, including recoverable saves and malformed-file diagnostics, before treating the editor as safe campaign storage.
+The integration checkpoint is complete. The following execution sequence supersedes the priority of the original feature groupings below. Work and verify **one milestone per turn**, with native/Web checks and a local commit after verification.
 
-Work and verify **one milestone per turn**. The original broader roadmap remains below for reference.
+| Milestone | Scope | State |
+| --- | --- | --- |
+| 1 | Document-space pen/eraser, stroke-level undo/redo, dirty/save checkpoints | Implemented and tested; see implementation notes |
+| 2 | Blank board creation; independent grid overlay geometry and per-map native units | Next |
+| 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Pending |
+| 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Pending |
+| 5 | Floors and map organization/overview/previews | Pending |
+| 6 | Linked-map workflow refinement, placement/reference/navigation controls | Pending |
+| 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
+| 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
+
+Milestone 1 stores editable vector strokes as JSON in schema v2 and reads legacy v1 campaigns. Raster artwork/chunks are not introduced in this slice; their canonical format remains lossless WebP. Undo covers pen/eraser gestures, while legacy terrain/metadata actions are marked dirty but await command conversion.
+
+### Original feature groupings (reference)
 
 ### Milestone 0 — Editor shell and document skeleton
 
@@ -162,10 +173,4 @@ Work and verify **one milestone per turn**. The original broader roadmap remains
 
 ## 6. Suggested next engineering task
 
-Create a small Godot test scene that loads two independently serialized maps (world hex and city) and demonstrates:
-- pointer-centered geometric zoom with explicit min/max bounds,
-- one abstract link with manual entry,
-- navigation-history camera restoration, and
-- unit-tested three-step semantic boundary input handling.
-
-Add the rotated battlemap placement immediately afterward. This will test the hardest design assumptions before building the full painting engine.
+Implement execution milestone 2: create a blank gridless, square or hex board with explicit native unit/distance choices. Make visual grid spacing/origin/rotation independently editable without modifying continuous artwork or pretending linked boards share physical coordinates. Test artwork invariance, save/load and native/Web UI behavior. Do not expand battlemap recursion first.

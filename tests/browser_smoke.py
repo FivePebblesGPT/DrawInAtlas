@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page, sync_playwright
 
 READ_CAMPAIGN_JS = """async () => {
     const db = await new Promise((resolve, reject) => {
@@ -36,6 +36,26 @@ READ_CAMPAIGN_JS = """async () => {
 }"""
 
 
+def save_snapshot(page: Page) -> dict[str, Any]:
+    """Save through the UI and wait for a newly flushed IndexedDB file."""
+    previous: list[dict[str, Any]] = page.evaluate(READ_CAMPAIGN_JS)
+    timestamp: str | None = previous[0]["timestamp"] if previous else None
+    page.mouse.click(326, 45)
+    page.wait_for_function(
+        f"async (previous) => {{ const entries = await ({READ_CAMPAIGN_JS})(); "
+        "return entries.length === 1 && entries[0].timestamp !== previous; }",
+        arg=timestamp, timeout=15000,
+    )
+    saved: list[dict[str, Any]] = page.evaluate(READ_CAMPAIGN_JS)
+    return saved[0]
+
+
+def world_floor(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Read the source board's canonical floor from a flushed save."""
+    world: dict[str, Any] = next(item for item in snapshot["campaign"]["maps"] if item["id"] == "world")
+    return world["floors"][0]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:8765/index.html")
@@ -59,6 +79,34 @@ def main() -> None:
         page.goto(args.url)
         page.wait_for_function("document.querySelector('#status') === null", timeout=60000)
         page.screenshot(path=str(output / "expanded.png"))
+        page.mouse.move(460, 330)
+        page.mouse.down()
+        for x, y in [(520, 280), (600, 330), (680, 280), (760, 330)]:
+            page.mouse.move(x, y, steps=4)
+        page.mouse.up()
+        drawn: dict[str, Any] = save_snapshot(page)
+        original_ink: list[dict[str, Any]] = world_floor(drawn)["strokes"]
+        assert len(original_ink) == 1 and len(original_ink[0]["points"]) > 4
+        page.screenshot(path=str(output / "freehand.png"))
+        page.keyboard.press("Control+z")
+        assert world_floor(save_snapshot(page))["strokes"] == []
+        page.keyboard.press("Control+Shift+z")
+        assert world_floor(save_snapshot(page))["strokes"] == original_ink
+        page.keyboard.press("e")
+        page.mouse.move(600, 240)
+        page.mouse.down()
+        page.mouse.move(600, 380, steps=8)
+        page.mouse.up()
+        erased: dict[str, Any] = save_snapshot(page)
+        erased_ink: list[dict[str, Any]] = world_floor(erased)["strokes"]
+        assert len(erased_ink) == 2 and erased_ink != original_ink
+        assert world_floor(erased)["terrain"] == world_floor(drawn)["terrain"]
+        page.screenshot(path=str(output / "erased.png"))
+        page.keyboard.press("Control+z")
+        assert world_floor(save_snapshot(page))["strokes"] == original_ink
+        page.screenshot(path=str(output / "undo-erase.png"))
+        page.keyboard.press("Control+Shift+z")
+        assert world_floor(save_snapshot(page))["strokes"] == erased_ink
         page.mouse.click(24, 56)
         page.wait_for_timeout(300)
         page.screenshot(path=str(output / "collapsed.png"))
@@ -70,19 +118,15 @@ def main() -> None:
         page.mouse.dblclick(140, 197)
         page.wait_for_timeout(300)
         page.screenshot(path=str(output / "city.png"))
-        page.mouse.click(1100, 276)
+        page.mouse.click(1100, 310)
         page.keyboard.press("Control+a")
         page.keyboard.type("7.5")
         page.keyboard.press("Enter")
-        page.mouse.click(1120, 307)
-        page.mouse.click(1100, 358)  # km in the native-unit popup
-        page.mouse.click(326, 45)  # Save
-        page.wait_for_function(
-            f"async () => (await ({READ_CAMPAIGN_JS})()).length === 1", timeout=15000,
-        )
-        persisted: list[dict[str, Any]] = page.evaluate(READ_CAMPAIGN_JS)
+        page.mouse.click(1120, 342)
+        page.mouse.click(1100, 392)  # km in the native-unit popup
+        persisted: dict[str, Any] = save_snapshot(page)
         saved_maps: dict[str, Any] = {
-            item["id"]: item for item in persisted[0]["campaign"]["maps"]
+            item["id"]: item for item in persisted["campaign"]["maps"]
         }
         assert saved_maps["greyhaven"]["grid"]["distance_per_cell"] == 7.5
         assert saved_maps["greyhaven"]["grid"]["distance_unit"] == "km"
@@ -90,14 +134,9 @@ def main() -> None:
         assert saved_maps["world"]["grid"]["distance_unit"] == "mi"
         page.reload()
         page.wait_for_function("document.querySelector('#status') === null", timeout=60000)
-        page.mouse.click(326, 45)
-        page.wait_for_function(
-            f"async (previous) => {{ const entries = await ({READ_CAMPAIGN_JS})(); "
-            "return entries.length === 1 && entries[0].timestamp !== previous; }",
-            arg=persisted[0]["timestamp"], timeout=15000,
-        )
-        restored: list[dict[str, Any]] = page.evaluate(READ_CAMPAIGN_JS)
-        assert restored[0]["campaign"] == persisted[0]["campaign"]
+        restored: dict[str, Any] = save_snapshot(page)
+        assert restored["campaign"] == persisted["campaign"]
+        assert world_floor(restored)["strokes"] == erased_ink
         assert not errors, errors
         assert not any(
             line.startswith("error:") or "SCRIPT ERROR:" in line or "Parse Error:" in line
@@ -107,6 +146,7 @@ def main() -> None:
             "result": "ATLAS_BROWSER_PASSED",
             "indexeddb_reload": "passed",
             "independent_native_units": "passed",
+            "stroke_erase_undo_redo": "passed",
             "cross_origin_isolated": page.evaluate("crossOriginIsolated"),
             "console": messages,
             "screenshots": str(output),

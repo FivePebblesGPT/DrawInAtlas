@@ -13,9 +13,11 @@ var history: Array[Dictionary] = []
 var locked_to_cell: bool = false
 var palette_id: int = 2
 var automatic_navigation: bool = false
+var edits: AtlasEditHistory = AtlasEditHistory.new()
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
+@export var save_path: String = AtlasCampaignStore.DEFAULT_PATH
 
 var map_list: ItemList
 var map_list_ids: Array[String] = []
@@ -32,6 +34,10 @@ var search_map_ids: Array[String] = []
 var grid_label: Label
 var distance_spinner: SpinBox
 var unit_picker: OptionButton
+var undo_button: Button
+var redo_button: Button
+var brush_color_picker: ColorPickerButton
+var brush_width_spinner: SpinBox
 
 const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 
@@ -39,11 +45,14 @@ const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 func _ready() -> void:
     _build_ui()
     if load_saved_on_startup:
-        campaign = AtlasCampaignStore.load_campaign()
+        campaign = AtlasCampaignStore.load_campaign(save_path)
+    var loaded: bool = campaign != null
     if campaign == null:
         campaign = AtlasCampaign.sample()
+    edits.changed.connect(_refresh_edit_state)
+    edits.reset(campaign, loaded)
     _show_map(campaign.get_map(campaign.root_map_id))
-    _message("Paint terrain, select a cell, or drag a battle grid. Middle-drag to pan.")
+    _message("Draw freely across cells. B: pen · E: eraser · Ctrl+Z: undo · Middle-drag: pan.")
 
 
 func _build_ui() -> void:
@@ -56,11 +65,50 @@ func _build_ui() -> void:
     toolbar.add_child(_make_button("Save", _on_save))
     toolbar.add_child(_make_button("Load", _on_load))
     toolbar.add_child(_make_button("Back", _on_back))
+    undo_button = _make_button("Undo", _on_undo)
+    undo_button.tooltip_text = "Undo drawing (Ctrl+Z)"
+    toolbar.add_child(undo_button)
+    redo_button = _make_button("Redo", _on_redo)
+    redo_button.tooltip_text = "Redo drawing (Ctrl+Shift+Z / Ctrl+Y)"
+    toolbar.add_child(redo_button)
     title_label = Label.new()
     title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
     title_label.clip_text = true
     toolbar.add_child(title_label)
+
+    var ink_bar: HBoxContainer = HBoxContainer.new()
+    shell.add_child(ink_bar)
+    var ink_caption: Label = Label.new()
+    ink_caption.text = "Ink"
+    ink_bar.add_child(ink_caption)
+    brush_color_picker = ColorPickerButton.new()
+    brush_color_picker.custom_minimum_size = Vector2(40, 28)
+    brush_color_picker.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    brush_color_picker.color = Color("#f5b545")
+    brush_color_picker.edit_alpha = false
+    brush_color_picker.color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
+    ink_bar.add_child(brush_color_picker)
+    var width_caption: Label = Label.new()
+    width_caption.text = "Width (board units)"
+    ink_bar.add_child(width_caption)
+    brush_width_spinner = SpinBox.new()
+    brush_width_spinner.min_value = 0.5
+    brush_width_spinner.max_value = 256.0
+    brush_width_spinner.step = 0.5
+    brush_width_spinner.value = 8.0
+    brush_width_spinner.custom_minimum_size = Vector2(96, 0)
+    brush_width_spinner.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+    brush_width_spinner.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
+    ink_bar.add_child(brush_width_spinner)
+    var grid_toggle: CheckBox = CheckBox.new()
+    grid_toggle.text = "Grid overlay"
+    grid_toggle.button_pressed = true
+    grid_toggle.toggled.connect(func(enabled: bool) -> void:
+        canvas.show_grid = enabled
+        canvas.queue_redraw()
+    )
+    ink_bar.add_child(grid_toggle)
 
     var content := HBoxContainer.new()
     content.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -83,8 +131,8 @@ func _build_ui() -> void:
     sidebar.search_changed.connect(_refresh_search_list)
 
     var layers_view: Control = sidebar.get_view_content(&"Layers")
-    layers_view.get_node("Heading").text = "Terrain (prototype)"
-    layers_view.get_node("Description").text = "One terrain layer per floor. Freeform artwork and layer controls are the next drawing-board slice."
+    layers_view.get_node("Heading").text = "Ink + terrain (prototype)"
+    layers_view.get_node("Description").text = "Freehand ink uses board coordinates. Layer visibility, locking and ordering are pending."
 
     canvas = AtlasCanvas.new()
     canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -98,6 +146,7 @@ func _build_ui() -> void:
     canvas.pointer_moved.connect(_on_pointer_moved)
     canvas.interaction_started.connect(zoom_gate.reset)
     canvas.mouse_exited.connect(zoom_gate.reset)
+    canvas.stroke_requested.connect(_on_stroke)
     content.add_child(canvas)
 
     var inspector: ScrollContainer = ScrollContainer.new()
@@ -110,7 +159,7 @@ func _build_ui() -> void:
     inspector.add_child(right)
     right.add_child(_label("Tool"))
     tool_picker = OptionButton.new()
-    for caption in ["Paint cells", "Select cell", "Drag battlemap"]:
+    for caption: String in ["Pen", "Eraser", "Paint cells (prototype)", "Select cell", "Drag battlemap"]:
         tool_picker.add_item(caption)
     tool_picker.item_selected.connect(_on_tool_changed)
     right.add_child(tool_picker)
@@ -124,7 +173,8 @@ func _build_ui() -> void:
     right.add_child(palette_picker)
 
     lock_checkbox = CheckBox.new()
-    lock_checkbox.text = "Restrict edits to selected cell"
+    lock_checkbox.text = "Cell lock (terrain only)"
+    lock_checkbox.disabled = true
     lock_checkbox.toggled.connect(func(on: bool) -> void:
         locked_to_cell = on
         _message("Cell lock %s" % ("ON" if on else "OFF"))
@@ -204,12 +254,16 @@ func _build_ui() -> void:
 
 func _on_distance_changed(value: float) -> void:
     if canvas.map != null and is_finite(value) and value > 0.0:
-        canvas.map.grid.distance_per_cell = value
+        if canvas.map.grid.distance_per_cell != value:
+            canvas.map.grid.distance_per_cell = value
+            edits.mark_external_change()
 
 
 func _on_unit_changed(index: int) -> void:
     if canvas.map != null and index >= 0 and index < NATIVE_UNITS.size():
-        canvas.map.grid.distance_unit = NATIVE_UNITS[index]
+        if canvas.map.grid.distance_unit != NATIVE_UNITS[index]:
+            canvas.map.grid.distance_unit = NATIVE_UNITS[index]
+            edits.mark_external_change()
 
 
 func _make_button(caption: String, callback: Callable) -> Button:
@@ -236,6 +290,7 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
         _message("Map not found.")
         return
     canvas.set_document(map, campaign)
+    edits.active_map_id = map.id
     canvas.camera_center = focus
     canvas.camera_zoom = clampf(zoom_value, MIN_ZOOM, MAX_ZOOM)
     distance_spinner.set_value_no_signal(map.grid.distance_per_cell)
@@ -253,9 +308,48 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
     zoom_gate.reset()
     locked_to_cell = false
     lock_checkbox.button_pressed = false
-    title_label.text = "%s — %s (%s)" % [campaign.display_name, map.display_name, map.kind]
+    _refresh_edit_state()
     _refresh_map_list()
     canvas.queue_redraw()
+
+
+func _refresh_edit_state() -> void:
+    undo_button.disabled = not edits.can_undo()
+    redo_button.disabled = not edits.can_redo()
+    if canvas.map != null and campaign != null:
+        title_label.text = "%s%s — %s (%s)" % [
+            "* " if edits.is_dirty() else "", campaign.display_name, canvas.map.display_name, canvas.map.kind
+        ]
+
+
+func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
+    if not stroke.is_valid():
+        return
+    var before: Array[AtlasStroke] = canvas.floor.strokes
+    var after: Array[AtlasStroke]
+    if erasing:
+        after = AtlasStrokeEraser.erase(before, stroke.points, stroke.width)
+    else:
+        after = AtlasStroke.clone_all(before)
+        after.append(stroke.copy())
+    var command: AtlasStrokeEdit = AtlasStrokeEdit.new(canvas.map.id, canvas.floor.id, before, after)
+    if edits.execute(command):
+        canvas.queue_redraw()
+        _message("Erased ink. One gesture = one undo." if erasing else "Stroke added in board coordinates.")
+
+
+func _on_undo() -> void:
+    canvas.cancel_edit()
+    if edits.undo():
+        canvas.queue_redraw()
+        _message("Undid drawing. History retains the original map/floor target.")
+
+
+func _on_redo() -> void:
+    canvas.cancel_edit()
+    if edits.redo():
+        canvas.queue_redraw()
+        _message("Redid drawing.")
 
 
 func _refresh_map_list() -> void:
@@ -299,21 +393,26 @@ func _on_search_activated(index: int) -> void:
 func _on_sample() -> void:
     history.clear()
     campaign = AtlasCampaign.sample()
+    edits.reset(campaign, false)
     _show_map(campaign.get_map(campaign.root_map_id))
     _message("Sample campaign reset (not saved).")
 
 
 func _on_save() -> void:
-    var result := AtlasCampaignStore.save_campaign(campaign)
-    _message("Saved to user://drawinatlas_campaign.json" if result == OK else "Save failed: %s" % result)
+    canvas.commit_edit()
+    var result: Error = AtlasCampaignStore.save_campaign(campaign, save_path)
+    if result == OK:
+        edits.mark_saved()
+    _message("Saved to %s" % save_path if result == OK else "Save failed: %s" % result)
 
 
 func _on_load() -> void:
-    var loaded := AtlasCampaignStore.load_campaign()
+    var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(save_path)
     if loaded == null:
         _message("No compatible saved campaign found.")
         return
     campaign = loaded
+    edits.reset(campaign, true)
     history.clear()
     _show_map(campaign.get_map(campaign.root_map_id))
     _message("Campaign loaded.")
@@ -330,7 +429,11 @@ func _on_map_activated(index: int) -> void:
 
 
 func _on_tool_changed(index: int) -> void:
-    canvas.tool = index as AtlasCanvas.Tool
+    canvas.choose_tool(index as AtlasCanvas.Tool)
+    lock_checkbox.disabled = canvas.tool != AtlasCanvas.Tool.PAINT
+    if lock_checkbox.disabled:
+        locked_to_cell = false
+        lock_checkbox.set_pressed_no_signal(false)
     zoom_gate.reset()
 
 
@@ -348,7 +451,10 @@ func _on_paint(cell: Vector2i) -> void:
     if locked_to_cell and (not canvas.has_selected_cell or canvas.selected_cell != cell):
         _message("Edit blocked by selected-cell lock.")
         return
+    if canvas.floor.get_terrain(cell) == palette_id:
+        return
     canvas.floor.paint(cell, palette_id)
+    edits.mark_external_change()
     canvas.queue_redraw()
 
 
@@ -388,6 +494,7 @@ func _on_create_battlemap(start: Vector2, finish: Vector2, radians: float) -> vo
     link.anchor = placement.origin
     link.target_focus = Vector2(placement.columns, placement.rows) * placement.child_units_per_cell * 0.5
     campaign.links.append(link)
+    edits.mark_external_change()
     _enter_link(link)
 
 
@@ -486,7 +593,30 @@ func _on_pointer_moved(local_position: Vector2) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
     if not event is InputEventKey or not event.pressed or event.echo:
         return
-    if event.keycode == KEY_Q or event.keycode == KEY_E:
+    if event.is_command_or_control_pressed():
+        match event.keycode:
+            KEY_Z:
+                if event.shift_pressed:
+                    _on_redo()
+                else:
+                    _on_undo()
+            KEY_Y:
+                _on_redo()
+            KEY_S:
+                _on_save()
+            _:
+                return
+        get_viewport().set_input_as_handled()
+        return
+    if event.keycode == KEY_ESCAPE:
+        canvas.cancel_edit()
+        get_viewport().set_input_as_handled()
+    elif (event.keycode == KEY_Q or event.keycode == KEY_E) and canvas.tool == AtlasCanvas.Tool.BATTLEMAP:
         var sign := -1.0 if event.keycode == KEY_Q else 1.0
         angle_spinner.value = wrapf(angle_spinner.value + 15.0 * sign, -180.0, 180.0)
+        get_viewport().set_input_as_handled()
+    elif event.keycode == KEY_B or event.keycode == KEY_E:
+        var selected: int = AtlasCanvas.Tool.PEN if event.keycode == KEY_B else AtlasCanvas.Tool.ERASER
+        tool_picker.select(selected)
+        _on_tool_changed(selected)
         get_viewport().set_input_as_handled()

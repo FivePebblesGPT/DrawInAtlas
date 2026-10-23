@@ -8,14 +8,15 @@ signal wheel_step(direction: int, local_position: Vector2)
 signal enter_requested(link: AtlasMapLink)
 signal pointer_moved(local_position: Vector2)
 signal interaction_started
+signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 
-enum Tool { PAINT, SELECT, BATTLEMAP }
+enum Tool { PEN, ERASER, PAINT, SELECT, BATTLEMAP }
 enum Preview { OFF, MARKERS, THUMBNAILS }
 
 var campaign: AtlasCampaign
 var map: AtlasMapDocument
 var floor: AtlasFloor
-var tool: Tool = Tool.PAINT
+var tool: Tool = Tool.PEN
 var preview: Preview = Preview.THUMBNAILS
 
 var camera_center: Vector2 = Vector2.ZERO
@@ -25,6 +26,9 @@ var has_selected_cell: bool = false
 var battle_rotation: float = 0.0
 var reference_opacity: float = 0.35
 var show_reference: bool = true
+var show_grid: bool = true
+var brush_color: Color = Color("#f5b545")
+var brush_width: float = 8.0
 
 var _panning: bool = false
 var _drawing_battlemap: bool = false
@@ -32,6 +36,10 @@ var _draft_start: Vector2 = Vector2.ZERO
 var _draft_end: Vector2 = Vector2.ZERO
 var _wheel_fraction: float = 0.0
 var _wheel_direction: int = 0
+var _draft_stroke: AtlasStroke
+var _erasing: bool = false
+var _stroke_left_canvas: bool = false
+var _erase_preview: Array[AtlasStroke] = []
 
 const EMPTY_COLOR := Color("#212c34")
 const TERRAIN_COLORS := [
@@ -44,15 +52,50 @@ func _ready() -> void:
     clip_contents = true
     mouse_filter = Control.MOUSE_FILTER_STOP
     focus_mode = Control.FOCUS_ALL
-    resized.connect(queue_redraw)
+    resized.connect(_on_resized)
+    get_window().focus_exited.connect(cancel_edit)
 
 
 func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign) -> void:
+    cancel_edit()
     map = value
     campaign = current_campaign
     floor = map.floor_by_id(map.default_floor_id) if map != null else null
     has_selected_cell = false
     _drawing_battlemap = false
+    queue_redraw()
+
+
+func choose_tool(value: Tool) -> void:
+    cancel_edit()
+    tool = value
+
+
+func is_editing() -> bool:
+    return _draft_stroke != null
+
+
+func cancel_edit() -> void:
+    _draft_stroke = null
+    _erase_preview.clear()
+    _drawing_battlemap = false
+    _panning = false
+    queue_redraw()
+
+
+func commit_edit() -> void:
+    if _draft_stroke == null:
+        return
+    var stroke: AtlasStroke = _draft_stroke.copy()
+    var erasing: bool = _erasing
+    _draft_stroke = null
+    _erase_preview.clear()
+    stroke_requested.emit(stroke, erasing)
+    queue_redraw()
+
+
+func _on_resized() -> void:
+    cancel_edit()
     queue_redraw()
 
 
@@ -71,7 +114,14 @@ func _draw() -> void:
 
     draw_set_transform(size * 0.5 - camera_center * camera_zoom, 0.0, Vector2.ONE * camera_zoom)
     _draw_parent_reference()
-    _draw_terrain_and_grid()
+    _draw_cells(false)
+    var artwork: Array[AtlasStroke] = _erase_preview if is_editing() and _erasing else floor.strokes
+    for stroke: AtlasStroke in artwork:
+        _draw_stroke(stroke)
+    if is_editing() and not _erasing:
+        _draw_stroke(_draft_stroke)
+    if show_grid:
+        _draw_cells(true)
     _draw_links()
     if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
         var outline := map.grid.cell_polygon(selected_cell)
@@ -116,7 +166,7 @@ func _draw_parent_reference() -> void:
                         draw_colored_polygon(clipped, color)
 
 
-func _draw_terrain_and_grid() -> void:
+func _draw_cells(grid_only: bool) -> void:
     var grid := map.grid
     if grid.kind == AtlasGrid.Kind.GRIDLESS:
         return
@@ -128,9 +178,30 @@ func _draw_terrain_and_grid() -> void:
             var cell := Vector2i(x, y)
             var polygon := grid.cell_polygon(cell)
             var color := _terrain_color(floor.get_terrain(cell))
-            if floor.get_terrain(cell) != 0:
+            if not grid_only and floor.get_terrain(cell) != 0:
                 draw_colored_polygon(polygon, color)
-            _stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom)
+            if grid_only:
+                _stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom)
+
+
+func _draw_stroke(stroke: AtlasStroke) -> void:
+    if stroke.points.size() > 1:
+        draw_polyline(stroke.points, stroke.color, stroke.width, true)
+    for point: Vector2 in stroke.points:
+        draw_circle(point, stroke.width * 0.5, stroke.color)
+
+
+func _append_stroke_point(local_position: Vector2) -> void:
+    if not Rect2(Vector2.ZERO, size).has_point(local_position):
+        _stroke_left_canvas = true
+    if _draft_stroke == null or _stroke_left_canvas:
+        return
+    var point: Vector2 = local_to_document(local_position)
+    if _draft_stroke.points[-1].distance_squared_to(point) >= 0.01:
+        _draft_stroke.points.append(point)
+    if _erasing:
+        _erase_preview = AtlasStrokeEraser.erase(floor.strokes, _draft_stroke.points, _draft_stroke.width)
+    queue_redraw()
 
 
 func _draw_links() -> void:
@@ -220,6 +291,9 @@ func _gui_input(event: InputEvent) -> void:
     if event is InputEventMouseButton:
         var mouse := event as InputEventMouseButton
         if mouse.button_index == MOUSE_BUTTON_WHEEL_UP or mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+            if is_editing():
+                accept_event()
+                return
             if mouse.pressed:
                 var delta := mouse.factor if mouse.factor > 0.0 else 1.0
                 var wheel_direction := 1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1
@@ -235,6 +309,7 @@ func _gui_input(event: InputEvent) -> void:
             return
         if mouse.button_index == MOUSE_BUTTON_MIDDLE or mouse.button_index == MOUSE_BUTTON_RIGHT:
             if mouse.pressed:
+                cancel_edit()
                 interaction_started.emit()
             _panning = mouse.pressed
             accept_event()
@@ -244,13 +319,18 @@ func _gui_input(event: InputEvent) -> void:
                 interaction_started.emit()
                 grab_focus()
                 var position := local_to_document(mouse.position)
-                if mouse.double_click and campaign != null:
+                if mouse.double_click and campaign != null and tool == Tool.SELECT:
                     var links := campaign.find_links_at(map.id, position)
                     if links.size() == 1:
                         enter_requested.emit(links[0])
                         accept_event()
                         return
                 match tool:
+                    Tool.PEN, Tool.ERASER:
+                        _erasing = tool == Tool.ERASER
+                        _stroke_left_canvas = false
+                        _draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)
+                        _append_stroke_point(mouse.position)
                     Tool.PAINT:
                         paint_requested.emit(map.grid.document_to_cell(position))
                     Tool.SELECT:
@@ -260,6 +340,9 @@ func _gui_input(event: InputEvent) -> void:
                         _draft_start = position
                         _draft_end = position
                         queue_redraw()
+            elif is_editing():
+                _append_stroke_point(mouse.position)
+                commit_edit()
             elif _drawing_battlemap:
                 _draft_end = local_to_document(mouse.position)
                 _drawing_battlemap = false
@@ -272,6 +355,9 @@ func _gui_input(event: InputEvent) -> void:
         if _panning:
             camera_center -= motion.relative / camera_zoom
             queue_redraw()
+            accept_event()
+        elif is_editing():
+            _append_stroke_point(motion.position)
             accept_event()
         elif _drawing_battlemap:
             _draft_end = local_to_document(motion.position)

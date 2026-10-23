@@ -1,5 +1,25 @@
 # Implementation Notes
 
+## Execution milestone 1 — freehand drawing
+
+Implemented on top of the integration checkpoint:
+
+- Typed `AtlasStroke` vector artwork in continuous document coordinates. Ink crosses grid cells freely and works without a grid; changing grid geometry does not rewrite stroke data.
+- Pen color/width, grid-overlay visibility, and a geometric eraser that splits ink into surviving vector fragments. The eraser accounts for ink width and swept motion, including long/fast segments and dots; it does not paint a background-colored patch. This is a round vector centerline eraser, not raster pixel editing.
+- One press/drag/release is one drawing command. Pending strokes are previews, not persistent edits. Escape, tool changes, resize, focus loss and map switches cancel pending ink. Wheel zoom is suppressed during a drawing gesture, and leaving the canvas stops adding points so editor chrome is not drawn through.
+- Campaign-local undo/redo captures deep before/after snapshots and the original map/floor target. Saved checkpoints use unique history states, including after divergent branches. Successful Save clears the dirty asterisk; undo away from a save makes it dirty again. Failed Save cannot clear dirty state. Load/reset replaces the old history.
+- **B**: pen; **E**: eraser; **Ctrl/Cmd+Z**: drawing undo; **Ctrl/Cmd+Shift+Z** or **Ctrl/Cmd+Y**: redo; **Ctrl/Cmd+S**: save; **Escape**: cancel preview. Text inputs retain their own keyboard editing behavior. In the legacy battlemap tool Q/E still rotates the footprint.
+- Vector artwork is structured JSON, not a raster image. Campaign schema **v2** carries strokes; v1 files load with empty ink, while old v1-only readers reject v2 rather than silently discarding artwork. Invalid new stroke payloads reject loading instead of dropping ink.
+
+New code: `scripts/domain/atlas_stroke.gd`, `atlas_edit_command.gd`, `atlas_stroke_edit.gd`; `scripts/services/atlas_edit_history.gd`, `atlas_stroke_eraser.gd`. Layer ordering/locking, raster artwork, stroke selection and optimized delta/chunk histories are later milestones. Current history snapshots all ink on an edited floor, which is suitable for this initial slice rather than a large-campaign memory solution.
+
+### Milestone 1 verification
+
+- `tests/artwork_smoke.gd`: **174 checks passed**, covering vector validation/roundtrips, partial swept erasure, dots, history isolation, stale/no-op commands, deep snapshots, original targets, redo branches and saved-state tracking.
+- `tests/smoke.gd`: passes including real viewport mouse/keyboard input on a gridless board, negative/subcell coordinates, one gesture per command, erase/undo/redo, cancellation, save/load and failure dirty-state handling. Tests use a separate save path, never the user's real slot.
+- `tests/visual_smoke.gd`: passes framebuffer clipping plus actual ink pixels, an erased gap revealing original board background, surviving ink and undo restoration. Screenshots include `user://validation/freehand.png`, `erased.png` and `undo-erase.png`.
+- `tests/browser_smoke.py`: passes actual Web mouse/keyboard drawing, erasing, undo/redo, and exact vector persistence through IndexedDB → page reload → re-save, together with the independent native-unit regression.
+
 ## Integration checkpoint — 2026-10-23
 
 The `gpt/feat/gdscript-editor-scaffold` prototype has been reconciled with the current `origin/main` and the local activity sidebar on `aidev`. Origin's addons, utilities, input actions and display/render settings are retained. This is one tested integration milestone, **not** a completed drawing editor or VTT.
@@ -19,10 +39,10 @@ The `gpt/feat/gdscript-editor-scaffold` prototype has been reconciled with the c
 Open `project.godot` in Godot 4.8-beta1 and run the main scene (F5).
 
 - **Sidebar:** Maps lists campaign documents; Search filters name/type and opens results by double-click; Layers honestly reports the single-terrain-layer prototype. Clicking the active icon collapses/reopens the panel. Ctrl+B / Command+B toggles it; dragging its divider changes width.
-- **Canvas:** cell paint, select-cell/lock, pointer-centered wheel zoom, and middle/right-drag pan. The canvas now clips its custom drawing, so terrain/grid/preview commands cannot paint over editor chrome. The inspector scrolls when its controls exceed the available height.
+- **Canvas:** freehand ink plus legacy cell paint/select/lock, pointer-centered wheel zoom, and middle/right-drag pan. The canvas clips its custom drawing, so artwork/grid/preview commands cannot paint over editor chrome. The inspector scrolls when its controls exceed the available height.
 - **Navigation:** use map/search results, a double-clicked link marker or Back. Automatic linked-map zoom is **off by default**. When explicitly enabled, exactly three additional logical steps at the zoom limit enter/return; leaving the link or beginning another interaction resets pending progress.
 - **Native map scale:** the inspector exposes distance per cell and unit independently for each gridded map. This changes measurement labels only: no art rescaling, grid-pitch change or linked-map conversion. The sample world uses 3 mi/cell; loaded campaign values are preserved. A map-creation dialog and visual grid-spacing controls are pending.
-- **Inherited encounter prototype:** drag a rotated footprint to create an independent encounter map. Spatial references are read-only; symbolic placements do not render child art as a physically aligned overlay. This is a secondary feature, not the next development priority.
+- **Inherited encounter prototype:** drag a rotated footprint to create an independent encounter map. In Select mode, double-clicking a marker navigates; Pen/Eraser clicks stay drawing actions. Spatial terrain references are read-only; symbolic placements do not render child art as a physically aligned overlay. Parent freehand-reference previews still await refinement. This is a secondary feature, not the next development priority.
 - **Persistence:** Save/Load uses `user://drawinatlas_campaign.json`; File menu actions use the same pathways. Do not use the provisional single save slot as the sole copy of valuable campaign work.
 - Existing F11 / Alt+Enter fullscreen and F5 reload actions are routed through `util/global_shortcuts.gd`.
 
@@ -37,6 +57,7 @@ scripts/services/              Three-step gate, prototype JSON store, WebP utili
 scripts/ui/atlas_editor.gd      Workspace controls/navigation and scaffold edits
 scripts/ui/atlas_canvas.gd      Clipped canvas rendering, picking and input
 tests/smoke.gd                 Headless domain + integrated scene checks
+tests/artwork_smoke.gd         Vector artwork, eraser and drawing history checks
 tests/visual_smoke.gd          Real framebuffer clipping regression
 tests/browser_smoke.py         Optional external Playwright UI/storage smoke
 ```
@@ -48,6 +69,7 @@ With the exact beta executable available as `godot`:
 ```sh
 godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/smoke.gd
+godot --headless --path . --script res://tests/artwork_smoke.gd
 godot --headless --path . --quit-after 10
 godot --path . --script res://tests/visual_smoke.gd
 mkdir -p build/web
@@ -76,6 +98,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Do not expand battlemap tooling before the drawing-board slice. Freehand document-space artwork, independently adjustable grid overlays, per-map creation settings, stroke commands and undo are next.
+Execution milestone 1 is complete. Next is blank-board creation and independently adjustable grid overlays/native scale choices (milestone 2), followed by typed layers and reliable persistence (milestone 3). Do not expand battlemap tooling first.
 
-The scaffold still mutates terrain/placements directly, with no undo or dirty-state policy. Floors/layers are not configurable. The JSON store is a single non-atomic slot, does not robustly validate all nested data, and lacks recovery/import/export UX. These are known prototype boundaries; typed commands, validation and recoverable WebP chunk storage remain future work. Selected-cell lock currently protects tile painting only, not every possible command. Trackpad gesture behavior beyond the tested wheel normalization remains device-dependent.
+Legacy terrain/metadata/placement actions are marked dirty but still await undoable commands. Floors/layers are not configurable. The JSON store is a single non-atomic slot, does not robustly validate all inherited nested data, and lacks recovery/import/export UX. Recoverable WebP chunk storage remains future work. Selected-cell lock currently protects terrain painting only and is disabled for ink; precise artwork confinement is later work. Trackpad behavior beyond the tested wheel normalization remains device-dependent.

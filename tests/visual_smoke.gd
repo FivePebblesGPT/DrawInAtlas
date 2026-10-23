@@ -44,11 +44,47 @@ func _run_suite() -> void:
     var directory: String = "user://validation"
     DirAccess.make_dir_recursive_absolute(directory)
     var screenshot_error: Error = with_canvas.save_png(directory.path_join("integrated-editor.png"))
-    var passed: bool = changed_outside == 0 and changed_inside > 100 and screenshot_error == OK
+    var passed: bool = (changed_outside == 0 and changed_inside > 100
+        and screenshot_error == OK and bounds.size.y >= 500.0)
+    var canvas: AtlasCanvas = editor.canvas
+    canvas.map.grid.kind = AtlasGrid.Kind.GRIDLESS
+    canvas.camera_center = Vector2.ZERO
+    canvas.camera_zoom = 1.0
+    canvas.preview = AtlasCanvas.Preview.OFF
+    canvas.show_reference = false
+    canvas.floor.terrain.clear()
+    var ink: Color = Color("#f5b545")
+    editor._on_stroke(AtlasStroke.new(PackedVector2Array([
+        Vector2(-140, 0), Vector2(140, 0)
+    ]), ink, 20.0), false)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var drawn: Image = root.get_texture().get_image()
+    var center: Vector2i = Vector2i(canvas.global_position + canvas.size * 0.5)
+    passed = passed and drawn.get_pixelv(center).is_equal_approx(ink)
+    passed = passed and drawn.save_png(directory.path_join("freehand.png")) == OK
+    editor._on_stroke(AtlasStroke.new(PackedVector2Array([
+        Vector2(0, -40), Vector2(0, 40)
+    ]), Color.BLACK, 30.0), true)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var erased: Image = root.get_texture().get_image()
+    var real_gap: bool = erased.get_pixelv(center).is_equal_approx(AtlasCanvas.EMPTY_COLOR)
+    var surviving_ink: bool = erased.get_pixelv(center + Vector2i(-100, 0)).is_equal_approx(ink)
+    passed = passed and real_gap and surviving_ink
+    passed = passed and erased.save_png(directory.path_join("erased.png")) == OK
+    editor._on_undo()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var undo_image: Image = root.get_texture().get_image()
+    var restored_ink: bool = undo_image.get_pixelv(center).is_equal_approx(ink)
+    passed = passed and restored_ink
+    passed = passed and undo_image.save_png(directory.path_join("undo-erase.png")) == OK
     print("ATLAS_VISUAL_%s outside=%d inside=%d screenshot=%s" % [
         "PASSED" if passed else "FAILED", changed_outside, changed_inside,
         ProjectSettings.globalize_path(directory.path_join("integrated-editor.png"))
     ])
+    print("ATLAS_INK_PIXELS gap=%s surviving_ink=%s undo=%s" % [real_gap, surviving_ink, restored_ink])
     root.remove_child(scene)
     scene.free()
     quit(0 if passed else 1)

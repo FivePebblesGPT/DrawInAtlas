@@ -1,7 +1,7 @@
 class_name AtlasCampaign
 extends RefCounted
 
-const SCHEMA_VERSION: int = 1
+const SCHEMA_VERSION: int = 2
 
 var display_name: String = "West Marches"
 var root_map_id: String = "world"
@@ -66,13 +66,18 @@ func to_dict() -> Dictionary:
 
 
 static func from_dict(data: Dictionary) -> AtlasCampaign:
-    if int(data.get("schema_version", 0)) != SCHEMA_VERSION:
+    if int(data.get("schema_version", 0)) not in [1, SCHEMA_VERSION]:
         return null
     var campaign := AtlasCampaign.new()
     campaign.display_name = str(data.get("name", "West Marches"))
     campaign.root_map_id = str(data.get("root_map_id", "world"))
     for saved_map in data.get("maps", []):
-        campaign.add_map(AtlasMapDocument.from_dict(saved_map))
+        if not saved_map is Dictionary:
+            return null
+        var document: AtlasMapDocument = AtlasMapDocument.from_dict(saved_map)
+        if document == null:
+            return null
+        campaign.add_map(document)
     for saved_link in data.get("links", []):
         campaign.links.append(AtlasMapLink.from_dict(saved_link))
     for saved_placement in data.get("placements", []):
