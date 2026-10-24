@@ -196,6 +196,6 @@ Pitfalls), not a substitute for backing every `await` with a timeout node.
 
 ## Related skills
 
-- `godot-gdscript` — the language syntax and node lifecycle this pattern's
+- `godot-gdscript-patterns` — the language syntax and node lifecycle this pattern's
   runner script itself uses.
 - `godot-export` — headless CLI export/build, a different `--headless` use case.
