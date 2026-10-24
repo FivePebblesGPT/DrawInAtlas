@@ -4,6 +4,7 @@ extends RefCounted
 var id: String = ""
 var display_name: String = ""
 var kind: String = "REGION"
+var tags: Array[String] = []
 var grid: AtlasGrid = AtlasGrid.new()
 var terrain_grid: AtlasGrid
 var floors: Array[AtlasFloor] = []
@@ -23,8 +24,9 @@ func floor_by_id(floor_id: String) -> AtlasFloor:
     return null
 
 
-func get_terrain_grid() -> AtlasGrid:
-    var floor: AtlasFloor = floor_by_id(default_floor_id)
+func get_terrain_grid(floor_id: String = "") -> AtlasGrid:
+    var selected_id: String = default_floor_id if floor_id.is_empty() else floor_id
+    var floor: AtlasFloor = floor_by_id(selected_id)
     if floor != null and floor.terrain_layer() != null and floor.terrain_layer().grid != null:
         return floor.terrain_layer().grid
     return terrain_grid if terrain_grid != null else grid
@@ -36,10 +38,10 @@ func to_dict() -> Dictionary:
         var saved: Dictionary = floor.to_dict()
         for layer: Dictionary in saved.layers:
             if layer.kind == "TILES" and layer.grid == null:
-                layer.grid = get_terrain_grid().to_dict()
+                layer.grid = get_terrain_grid(floor.id).to_dict()
         saved_floors.append(saved)
     return {
-        "id": id, "name": display_name, "kind": kind,
+        "id": id, "name": display_name, "kind": kind, "tags": tags.duplicate(),
         "grid": grid.to_dict(), "terrain_grid": get_terrain_grid().to_dict(), "floors": saved_floors,
         "default_floor_id": default_floor_id
     }
@@ -53,6 +55,15 @@ static func from_dict(data: Dictionary) -> AtlasMapDocument:
         return null
     var map: AtlasMapDocument = AtlasMapDocument.new(map_id, map_name)
     map.kind = map_kind
+    var raw_tags: Variant = data.get("tags", [])
+    if not raw_tags is Array or raw_tags.size() > 128:
+        return null
+    var seen_tags: Dictionary[String, bool] = {}
+    for value: Variant in raw_tags:
+        if not AtlasData.text(value) or seen_tags.has(value.to_lower()):
+            return null
+        seen_tags[value.to_lower()] = true
+        map.tags.append(value)
     var raw_grid: Variant = data.get("grid", {})
     var raw_terrain_grid: Variant = data.get("terrain_grid", raw_grid)
     var raw_floors: Variant = data.get("floors", [{"id": "ground", "name": "Ground"}])

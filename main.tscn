@@ -1,13 +1,13 @@
-[gd_scene load_steps=3 format=3 uid="uid://dcv78085hm5jl"]
+[gd_scene format=3 uid="uid://cntshtbkys12e"]
 
-[ext_resource type="PackedScene" path="res://prefab/ui.tscn" id="1"]
-[ext_resource type="Script" path="res://util/global_shortcuts.gd" id="2"]
+[ext_resource type="PackedScene" uid="uid://cw75acw1phmtx" path="res://prefab/ui.tscn" id="1"]
+[ext_resource type="Script" uid="uid://ca3itfk8xbn4v" path="res://util/global_shortcuts.gd" id="2"]
 
 [node name="Main" type="Node2D" unique_id=1232000292]
 
-[node name="Interface" type="CanvasLayer" parent="."]
+[node name="Interface" type="CanvasLayer" parent="." unique_id=1856417317]
 
-[node name="UI" parent="Interface" instance=ExtResource("1")]
+[node name="UI" parent="Interface" unique_id=1635903651 instance=ExtResource("1")]
 
-[node name="GlobalShortcuts" type="Node" parent="."]
+[node name="GlobalShortcuts" type="Node" parent="." unique_id=1262948230]
 script = ExtResource("2")

@@ -14,6 +14,7 @@ var locked_to_cell: bool = false
 var palette_id: int = 2
 var automatic_navigation: bool = false
 var edits: AtlasEditHistory = AtlasEditHistory.new()
+var view_session: AtlasViewSession = AtlasViewSession.new()
 var store_io: AtlasStoreIO
 
 @export var sidebar: Sidebar
@@ -53,6 +54,18 @@ var move_y_spinner: SpinBox
 var scale_spinner: SpinBox
 var artwork_rotation_spinner: SpinBox
 var _transform_button: Button
+var floor_picker: OptionButton
+var floor_name_input: LineEdit
+var _floor_ids: Array[String] = []
+var _floor_up: Button
+var _floor_down: Button
+var _floor_remove: Button
+var _floor_default: Button
+var map_name_input: LineEdit
+var map_tags_input: LineEdit
+var map_preview: AtlasPreviewPanel
+var overview_panel: AtlasOverviewPanel
+var _search_entries: Array[AtlasOverviewEntry] = []
 
 const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 
@@ -67,6 +80,7 @@ func _ready() -> void:
     if campaign == null:
         campaign = AtlasCampaign.sample()
     edits.changed.connect(_refresh_edit_state)
+    edits.changed.connect(_on_documents_changed)
     edits.reset(campaign, loaded and (restored == null or not restored.recovered))
     _show_map(campaign.get_map(campaign.root_map_id))
     _message("B pen · E eraser · V select · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
@@ -109,15 +123,31 @@ func _build_sidebar_views() -> void:
     map_list = ItemList.new()
     map_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
     map_list.item_activated.connect(_on_map_activated)
+    map_list.item_selected.connect(_preview_map_index)
     maps_view.add_child(map_list)
+    map_name_input = LineEdit.new()
+    map_name_input.placeholder_text = "Current board name"
+    map_name_input.text_submitted.connect(func(_text: String) -> void: _apply_map_metadata())
+    maps_view.add_child(map_name_input)
+    map_tags_input = LineEdit.new()
+    map_tags_input.placeholder_text = "Tags, comma separated"
+    map_tags_input.text_submitted.connect(func(_text: String) -> void: _apply_map_metadata())
+    maps_view.add_child(map_tags_input)
+    maps_view.add_child(_action_button("Apply name / tags", _apply_map_metadata))
+    map_preview = AtlasPreviewPanel.new()
+    maps_view.add_child(map_preview)
 
     var search_view: Control = sidebar.get_view_content(&"Search")
-    search_view.get_node("Description").text = "Find maps by name or type. Double-click to open."
-    search_list = ItemList.new()
-    search_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    search_list.item_activated.connect(_on_search_activated)
-    search_view.add_child(search_list)
+    search_view.get_node("Description").text = "Name, floor, kind or #tag. Double-click to open."
+    overview_panel = AtlasOverviewPanel.new()
+    overview_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    overview_panel.query_changed.connect(func() -> void: _refresh_search_list(sidebar.get_search_query()))
+    overview_panel.entry_activated.connect(_open_overview_entry)
+    overview_panel.source_focus_requested.connect(_focus_overview_source)
+    search_view.add_child(overview_panel)
+    search_list = overview_panel.result_list
     sidebar.search_changed.connect(_refresh_search_list)
+    sidebar.view_selected.connect(_on_sidebar_view_selected)
 
     var layers_view: Control = sidebar.get_view_content(&"Layers")
     layers_view.get_node("Heading").hide()
@@ -170,6 +200,7 @@ func _build_inspector(parent: HBoxContainer) -> void:
     sections.add_theme_constant_override("separation", 20)
     margin.add_child(sections)
 
+    _build_floor_controls(sections)
     _build_tool_controls(sections)
     _build_ink_controls(sections)
     _build_selection_controls(sections)
@@ -187,6 +218,174 @@ func _build_tool_controls(parent: VBoxContainer) -> void:
         tool_picker.add_item(caption)
     tool_picker.item_selected.connect(_on_tool_changed)
     tools.add_child(tool_picker)
+
+
+func _build_floor_controls(parent: VBoxContainer) -> void:
+    var section: VBoxContainer = _create_section(parent, "FLOORS")
+    floor_picker = OptionButton.new()
+    floor_picker.clip_text = true
+    floor_picker.item_selected.connect(_on_floor_selected)
+    section.add_child(floor_picker)
+    floor_name_input = LineEdit.new()
+    floor_name_input.placeholder_text = "Floor name"
+    floor_name_input.text_submitted.connect(func(_text: String) -> void: rename_floor(floor_name_input.text))
+    section.add_child(floor_name_input)
+    var names: HBoxContainer = HBoxContainer.new()
+    names.add_child(_action_button("Add", func() -> void: create_floor(floor_name_input.text)))
+    names.add_child(_action_button("Rename", func() -> void: rename_floor(floor_name_input.text)))
+    section.add_child(names)
+    var order: HBoxContainer = HBoxContainer.new()
+    _floor_up = _action_button("Raise", move_floor.bind(1))
+    _floor_down = _action_button("Lower", move_floor.bind(-1))
+    order.add_child(_floor_up)
+    order.add_child(_floor_down)
+    section.add_child(order)
+    _floor_default = _action_button("Make default", make_floor_default)
+    _floor_remove = _action_button("Delete floor", remove_floor)
+    section.add_child(_floor_default)
+    section.add_child(_floor_remove)
+
+
+func _action_button(text: String, callback: Callable) -> Button:
+    var button: Button = Button.new()
+    button.text = text
+    button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    button.pressed.connect(callback)
+    return button
+
+
+func _refresh_floor_controls() -> void:
+    floor_picker.clear()
+    _floor_ids.clear()
+    var selected: int = -1
+    for index: int in range(canvas.map.floors.size()):
+        var floor: AtlasFloor = canvas.map.floors[index]
+        _floor_ids.append(floor.id)
+        var caption: String = "%d · %s" % [index + 1, floor.display_name]
+        if floor.id == canvas.map.default_floor_id:
+            caption += " (default)"
+        floor_picker.add_item(caption)
+        floor_picker.get_popup().set_item_tooltip(index, floor.display_name)
+        if floor.id == canvas.floor.id:
+            selected = index
+    floor_picker.select(selected)
+    floor_name_input.text = canvas.floor.display_name
+    _floor_up.disabled = selected == canvas.map.floors.size() - 1
+    _floor_down.disabled = selected <= 0
+    _floor_remove.disabled = canvas.map.floors.size() <= 1
+    _floor_default.disabled = canvas.floor.id == canvas.map.default_floor_id
+
+
+func _on_floor_selected(index: int) -> void:
+    if index >= 0 and index < _floor_ids.size():
+        switch_floor(_floor_ids[index])
+
+
+func _capture_view() -> AtlasViewState:
+    if canvas.map == null or canvas.floor == null:
+        return null
+    return AtlasViewState.new(canvas.map.id, canvas.floor.id, canvas.camera_center, canvas.camera_zoom, canvas.active_layer_id)
+
+
+func _remember_view() -> void:
+    var state: AtlasViewState = _capture_view()
+    if state != null:
+        view_session.remember(state)
+
+
+func switch_floor(id: String) -> bool:
+    if canvas.map.floor_by_id(id) == null:
+        _message("Floor not found; the current view was kept.")
+        return false
+    _remember_view()
+    var state: AtlasViewState = view_session.resolve(campaign, canvas.map.id, id, canvas.camera_center, canvas.camera_zoom)
+    if state == null:
+        return false
+    return _show_map(canvas.map, state.focus, state.zoom, state.floor_id, state.layer_id)
+
+
+func open_map(id: String, floor_id: String = "") -> bool:
+    _remember_view()
+    var state: AtlasViewState = view_session.resolve(campaign, id, floor_id)
+    if state == null:
+        _message("Map or floor unavailable; the current view and history were kept.")
+        return false
+    if canvas.map.id != state.map_id or canvas.floor.id != state.floor_id:
+        _push_history()
+    return _show_map(campaign.get_map(id), state.focus, state.zoom, state.floor_id, state.layer_id)
+
+
+func _clone_floors() -> Array[AtlasFloor]:
+    var result: Array[AtlasFloor] = []
+    for floor: AtlasFloor in canvas.map.floors:
+        var copy: AtlasFloor = AtlasFloor.new()
+        copy.id = floor.id
+        copy.display_name = floor.display_name
+        copy.layers = AtlasLayerCodec.clone_all(floor.layers)
+        result.append(copy)
+    return result
+
+
+func _apply_floors(after: Array[AtlasFloor], default_id: String) -> bool:
+    canvas.cancel_edit()
+    var command: AtlasFloorEdit = AtlasFloorEdit.new(canvas.map.id, canvas.map.floors, after,
+        canvas.map.default_floor_id, default_id)
+    if not edits.execute(command):
+        _message("Floor edit rejected: invalid/stale data or protected/referenced floor.")
+        return false
+    _refresh_after_history()
+    return true
+
+
+func create_floor(name: String) -> bool:
+    if name.strip_edges().is_empty():
+        _message("Choose a floor name.")
+        return false
+    var floor: AtlasFloor = AtlasFloor.new()
+    floor.id = "floor-" + Crypto.new().generate_random_bytes(16).hex_encode()
+    floor.display_name = name.strip_edges()
+    floor.terrain_layer().grid = canvas.map.grid.copy()
+    var after: Array[AtlasFloor] = _clone_floors()
+    after.append(floor)
+    if not _apply_floors(after, canvas.map.default_floor_id):
+        return false
+    return switch_floor(floor.id)
+
+
+func rename_floor(name: String) -> bool:
+    if name.strip_edges().is_empty():
+        _message("Choose a floor name.")
+        return false
+    var after: Array[AtlasFloor] = _clone_floors()
+    after[canvas.map.floors.find(canvas.floor)].display_name = name.strip_edges()
+    return _apply_floors(after, canvas.map.default_floor_id)
+
+
+func move_floor(direction: int) -> bool:
+    var index: int = canvas.map.floors.find(canvas.floor)
+    var target: int = index + direction
+    if target < 0 or target >= canvas.map.floors.size():
+        return false
+    var after: Array[AtlasFloor] = _clone_floors()
+    var floor: AtlasFloor = after[index]
+    after.remove_at(index)
+    after.insert(target, floor)
+    return _apply_floors(after, canvas.map.default_floor_id)
+
+
+func make_floor_default() -> bool:
+    return _apply_floors(_clone_floors(), canvas.floor.id)
+
+
+func remove_floor() -> bool:
+    if canvas.map.floors.size() <= 1:
+        return false
+    var after: Array[AtlasFloor] = _clone_floors()
+    after.remove_at(canvas.map.floors.find(canvas.floor))
+    var default_id: String = canvas.map.default_floor_id
+    if default_id == canvas.floor.id:
+        default_id = after[0].id
+    return _apply_floors(after, default_id)
 
 
 func _build_ink_controls(parent: VBoxContainer) -> void:
@@ -423,7 +622,7 @@ func fill_at(point: Vector2) -> bool:
             layers[canvas.floor.layers.find(layer)] = result.layer
             return apply_layers(layers, layer.id)
     elif layer is AtlasTileLayer:
-        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid(canvas.floor.id)
         result = AtlasFill.tiles(basis, layer.terrain, basis.document_to_cell(point), palette_id, _scope())
         if result.ok:
             var command: AtlasTileEdit = AtlasTileEdit.new(canvas.map.id, canvas.floor.id, layer.id, layer.terrain, result.terrain)
@@ -445,7 +644,7 @@ func can_copy_selection() -> bool:
     if layer == null or not layer.visible:
         return false
     if layer is AtlasTileLayer:
-        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid(canvas.floor.id)
         var key: String = "%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y]
         return canvas.has_selected_cell and basis.same_geometry(canvas.map.grid) and layer.terrain.has(key)
     return not canvas.selection.is_empty() and canvas.selection.matches(layer)
@@ -458,7 +657,7 @@ func can_modify_selection() -> bool:
     if not layer.is_editable():
         return false
     if layer is AtlasTileLayer:
-        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid(canvas.floor.id)
         return _scope().allows_polygon(basis.cell_polygon(canvas.selected_cell))
     return _scope().contains_rect(canvas.selection.bounds)
 
@@ -478,7 +677,7 @@ func copy_selection() -> bool:
     elif layer is AtlasRasterLayer:
         encoded = AtlasClipboard.encode_raster(layer, canvas.selection.bounds.position)
     elif layer is AtlasTileLayer:
-        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid(canvas.floor.id)
         var cells: Dictionary = {}
         cells["%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y]] = layer.terrain["%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y]]
         encoded = AtlasClipboard.encode_tiles(basis, cells, canvas.selected_cell)
@@ -586,7 +785,7 @@ func paste_payload(payload: AtlasClipboardData, anchor: Vector2) -> bool:
             return true
         return false
     if payload.kind == "TILES" and target is AtlasTileLayer and target.is_editable():
-        var basis: AtlasGrid = target.grid if target.grid != null else canvas.map.get_terrain_grid()
+        var basis: AtlasGrid = target.grid if target.grid != null else canvas.map.get_terrain_grid(canvas.floor.id)
         if basis.kind != payload.grid.kind or basis.cell_size != payload.grid.cell_size or basis.rotation != payload.grid.rotation:
             _message("Tile paste needs matching grid shape, spacing and rotation; no implicit conversion.")
             return false
@@ -682,12 +881,14 @@ func _message(value: String) -> void:
         status_label.text = value
 
 
-func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value: float = 1.0) -> void:
-    if map == null:
+func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value: float = 1.0,
+        floor_id: String = "", layer_id: String = "") -> bool:
+    if map == null or not canvas.set_document(map, campaign, floor_id):
         _message("Map not found.")
-        return
-    canvas.set_document(map, campaign)
+        return false
     edits.active_map_id = map.id
+    if not layer_id.is_empty():
+        canvas.active_layer_id = layer_id
     _refresh_layers()
     canvas.camera_center = focus
     canvas.camera_zoom = clampf(zoom_value, MIN_ZOOM, MAX_ZOOM)
@@ -695,9 +896,12 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
     zoom_gate.reset()
     locked_to_cell = false
     lock_checkbox.button_pressed = false
+    _refresh_floor_controls()
+    _refresh_map_metadata()
     _refresh_edit_state()
     _refresh_map_list()
     canvas.queue_redraw()
+    return true
 
 
 func _refresh_grid_controls() -> void:
@@ -714,7 +918,8 @@ func _refresh_grid_controls() -> void:
 func _refresh_edit_state() -> void:
     if canvas.map != null and campaign != null:
         title_label.text = "%s%s — %s (%s)" % [
-            "* " if edits.is_dirty() else "", campaign.display_name, canvas.map.display_name, canvas.map.kind
+            "* " if edits.is_dirty() else "", campaign.display_name,
+            canvas.map.display_name + " / " + canvas.floor.display_name, canvas.map.kind
         ]
 
 
@@ -778,7 +983,17 @@ func _on_redo() -> void:
 
 
 func _refresh_after_history() -> void:
+    view_session.prune(campaign)
+    var current: AtlasFloor = canvas.map.floor_by_id(canvas.floor.id)
+    if current == null:
+        var fallback: AtlasViewState = view_session.resolve(campaign, canvas.map.id, "", canvas.camera_center, canvas.camera_zoom)
+        if fallback != null:
+            _show_map(canvas.map, fallback.focus, fallback.zoom, fallback.floor_id, fallback.layer_id)
+    elif current != canvas.floor:
+        canvas.set_document(canvas.map, campaign, current.id)
     _refresh_layers()
+    _refresh_floor_controls()
+    _refresh_map_metadata()
     _refresh_grid_controls()
     _refresh_map_list()
     _refresh_edit_state()
@@ -812,7 +1027,7 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
     for layer: AtlasLayer in layers:
         if layer is AtlasTileLayer and layer.grid == null:
             if canvas.floor.layer_by_id(layer.id) != null:
-                layer.grid = canvas.map.get_terrain_grid().copy()
+                layer.grid = canvas.map.get_terrain_grid(canvas.floor.id).copy()
             elif canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
                 _message("Choose a square or hex grid before creating a terrain layer.")
                 _refresh_layers()
@@ -864,38 +1079,109 @@ func _refresh_map_list() -> void:
     for map_id: String in ids:
         var map := campaign.get_map(map_id)
         map_list_ids.append(map_id)
-        map_list.add_item("%s — %s" % [map.display_name, map.kind])
+        map_list.add_item("%s — %s · %d floors" % [map.display_name, map.kind, map.floors.size()])
         if canvas.map != null and canvas.map.id == map_id:
             map_list.select(map_list.item_count - 1)
     _refresh_search_list(sidebar.get_search_query())
+    var selected: PackedInt32Array = map_list.get_selected_items()
+    if not selected.is_empty() and sidebar.get_view_content(&"Maps").is_visible_in_tree():
+        _preview_map_index(selected[0])
 
 
 func _refresh_search_list(query: String) -> void:
-    search_list.clear()
     search_map_ids.clear()
-    if campaign == null:
+    if campaign == null or canvas.map == null or canvas.floor == null:
         return
-    var ids: Array = campaign.maps.keys()
-    ids.sort()
-    for map_id: String in ids:
-        var document: AtlasMapDocument = campaign.get_map(map_id)
-        var caption: String = "%s — %s" % [document.display_name, document.kind]
-        if query.is_empty() or caption.to_lower().contains(query.to_lower()):
-            search_map_ids.append(map_id)
-            search_list.add_item(caption)
+    var mode: AtlasOverview.Filter = overview_panel.mode_picker.selected as AtlasOverview.Filter
+    var region: PackedVector2Array = PackedVector2Array()
+    if mode == AtlasOverview.Filter.VISIBLE:
+        for corner: Vector2 in [Vector2.ZERO, Vector2(canvas.size.x, 0), canvas.size, Vector2(0, canvas.size.y)]:
+            region.append(canvas.local_to_document(corner))
+    elif mode == AtlasOverview.Filter.CELL and canvas.has_selected_cell:
+        region = canvas.map.grid.cell_polygon(canvas.selected_cell)
+    var result: AtlasOverviewResult = AtlasOverview.query(campaign, canvas.map.id, canvas.floor.id,
+        mode, query, region, overview_panel.recursive_checkbox.button_pressed)
+    _search_entries = result.entries
+    for entry: AtlasOverviewEntry in result.entries:
+        search_map_ids.append(entry.map_id)
+    overview_panel.set_results(campaign, result)
 
 
 func _on_search_activated(index: int) -> void:
-    if index < 0 or index >= search_map_ids.size():
+    if index >= 0 and index < _search_entries.size():
+        _open_overview_entry(_search_entries[index])
+
+
+func _open_overview_entry(entry: AtlasOverviewEntry) -> void:
+    if entry.broken_reason.is_empty():
+        open_map(entry.map_id, entry.floor_id)
+
+
+func _focus_overview_source(entry: AtlasOverviewEntry) -> void:
+    if entry.can_focus and open_map(entry.source_map_id, entry.source_floor_id):
+        canvas.camera_center = entry.source_focus
+        canvas.queue_redraw()
+        _remember_view()
+
+
+func _preview_map_index(index: int) -> void:
+    if index < 0 or index >= map_list_ids.size():
         return
-    var document: AtlasMapDocument = campaign.get_map(search_map_ids[index])
-    if document != null and document != canvas.map:
-        _push_history()
-        _show_map(document)
+    var state: AtlasViewState = view_session.resolve(campaign, map_list_ids[index])
+    if state != null:
+        map_preview.request_preview(campaign, state.map_id, state.floor_id)
+
+
+func _on_sidebar_view_selected(id: StringName) -> void:
+    if campaign == null or canvas.map == null:
+        return
+    if id == &"Search":
+        _refresh_search_list(sidebar.get_search_query())
+        overview_panel.refresh_preview()
+    elif id == &"Maps":
+        var selected: PackedInt32Array = map_list.get_selected_items()
+        if not selected.is_empty():
+            _preview_map_index(selected[0])
+
+
+func _on_documents_changed() -> void:
+    if campaign == null or canvas.map == null or canvas.floor == null:
+        return
+    if campaign.get_map(canvas.map.id) != canvas.map or canvas.map.floor_by_id(canvas.floor.id) == null:
+        return
+    _refresh_map_list()
+
+
+func _refresh_map_metadata() -> void:
+    map_name_input.text = canvas.map.display_name
+    map_tags_input.text = ", ".join(canvas.map.tags)
+
+
+func _apply_map_metadata() -> void:
+    var tags: Array[String] = []
+    var seen: Dictionary[String, bool] = {}
+    for part: String in map_tags_input.text.split(",", false):
+        var tag: String = part.strip_edges().trim_prefix("#")
+        if not tag.is_empty() and not seen.has(tag.to_lower()):
+            seen[tag.to_lower()] = true
+            tags.append(tag)
+    update_map_metadata(map_name_input.text, tags)
+
+
+func update_map_metadata(name: String, tags: Array[String]) -> bool:
+    var command: AtlasMapMetadataEdit = AtlasMapMetadataEdit.new(canvas.map.id, canvas.map.display_name,
+        canvas.map.tags, name.strip_edges(), tags)
+    if not edits.execute(command):
+        _message("Board metadata was unchanged or invalid.")
+        return false
+    _refresh_map_metadata()
+    _refresh_map_list()
+    return true
 
 
 func _on_sample() -> void:
     history.clear()
+    _reset_view_helpers()
     campaign = AtlasCampaign.sample()
     edits.reset(campaign, false)
     _show_map(campaign.get_map(campaign.root_map_id))
@@ -916,6 +1202,7 @@ func _on_load() -> void:
         _message(result.message)
         return
     campaign = result.campaign
+    _reset_view_helpers()
     edits.reset(campaign, not result.recovered)
     history.clear()
     _show_map(campaign.get_map(campaign.root_map_id))
@@ -925,11 +1212,15 @@ func _on_load() -> void:
 func _on_map_activated(index: int) -> void:
     if index < 0 or index >= map_list_ids.size():
         return
-    var map := campaign.get_map(map_list_ids[index])
-    if map != null and map != canvas.map:
-        _push_history()
-        _show_map(map)
-        _message("Opened %s from map index." % map.display_name)
+    open_map(map_list_ids[index])
+
+
+func _reset_view_helpers() -> void:
+    view_session.reset()
+    map_preview.clear_preview()
+    map_preview.cache.invalidate()
+    overview_panel.preview.clear_preview()
+    overview_panel.preview.cache.invalidate()
 
 
 func _on_tool_changed(index: int) -> void:
@@ -975,6 +1266,7 @@ func _on_select(cell: Vector2i) -> void:
     _refresh_scope()
     canvas.selection_changed.emit()
     canvas.queue_redraw()
+    _refresh_search_list(sidebar.get_search_query())
     _message("Selected cell %s. Lock restricts mutations, not camera movement." % cell)
 
 
@@ -983,7 +1275,7 @@ func _on_paint(cell: Vector2i) -> void:
     if layer == null or not layer.is_editable():
         _message("Select a visible, unlocked terrain layer to paint.")
         return
-    var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+    var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid(canvas.floor.id)
     if basis.kind == AtlasGrid.Kind.GRIDLESS:
         _message("This terrain layer has no content grid.")
         return
@@ -1035,6 +1327,7 @@ func _on_create_battlemap(start: Vector2, finish: Vector2, radians: float) -> vo
     var link := AtlasMapLink.new()
     link.id = "link-" + placement.id
     link.source_map_id = canvas.map.id
+    link.source_floor_id = canvas.floor.id
     link.target_map_id = child_id
     link.placement_id = placement.id
     link.anchor = placement.origin
@@ -1047,23 +1340,26 @@ func _on_create_battlemap(start: Vector2, finish: Vector2, radians: float) -> vo
 func _push_history() -> void:
     if canvas.map == null:
         return
+    _remember_view()
     history.append({
         "map_id": canvas.map.id,
-        "floor_id": canvas.map.default_floor_id,
+        "floor_id": canvas.floor.id,
+        "layer_id": canvas.active_layer_id,
         "focus": canvas.camera_center,
         "zoom": canvas.camera_zoom
     })
 
 
 func _enter_link(link: AtlasMapLink) -> void:
-    if link.source_map_id != canvas.map.id:
+    if link.source_map_id != canvas.map.id or link.source_floor_id != canvas.floor.id:
         return
     var destination := campaign.get_map(link.target_map_id)
-    if destination == null:
+    if destination == null or destination.floor_by_id(link.target_floor_id) == null:
         _message("Broken map link: %s" % link.target_map_id)
         return
     _push_history()
-    _show_map(destination, link.target_focus, link.target_zoom)
+    var arrival: AtlasViewState = view_session.resolve(campaign, destination.id, link.target_floor_id, link.target_focus, link.target_zoom)
+    _show_map(destination, link.target_focus, link.target_zoom, link.target_floor_id, arrival.layer_id)
     _message("Entered %s. Use Back or 3 extra outward wheel steps." % destination.display_name)
 
 
@@ -1071,8 +1367,10 @@ func _on_back() -> void:
     while not history.is_empty():
         var snapshot: Dictionary = history.pop_back()
         var map: AtlasMapDocument = campaign.get_map(str(snapshot["map_id"]))
-        if map != null:
-            _show_map(map, snapshot["focus"], float(snapshot["zoom"]))
+        var floor_id: String = str(snapshot.get("floor_id", map.default_floor_id if map != null else ""))
+        if map != null and map.floor_by_id(floor_id) != null:
+            _remember_view()
+            _show_map(map, snapshot["focus"], float(snapshot["zoom"]), floor_id, str(snapshot.get("layer_id", "")))
             _message("Returned to %s." % map.display_name)
             return
     _message("No previous map.")
@@ -1100,7 +1398,7 @@ func _on_wheel_step(direction: int, local_position: Vector2) -> void:
     var candidate: String = ""
     var target_link: AtlasMapLink
     if direction > 0:
-        var possible := campaign.find_links_at(canvas.map.id, canvas.local_to_document(local_position))
+        var possible := campaign.find_links_at(canvas.map.id, canvas.local_to_document(local_position), canvas.floor.id)
         if possible.size() == 1:
             target_link = possible[0]
             candidate = target_link.id
@@ -1131,7 +1429,7 @@ func _on_pointer_moved(local_position: Vector2) -> void:
     if zoom_gate.count == 0 or zoom_gate.direction < 0:
         return
     var links: Array[AtlasMapLink] = campaign.find_links_at(
-        canvas.map.id, canvas.local_to_document(local_position)
+        canvas.map.id, canvas.local_to_document(local_position), canvas.floor.id
     )
     if links.size() != 1 or links[0].id != zoom_gate.candidate_id:
         zoom_gate.reset()
@@ -1161,6 +1459,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 cut_selection()
             KEY_V:
                 paste_selection()
+            KEY_F:
+                sidebar.select_view(&"Search")
             _:
                 return
         get_viewport().set_input_as_handled()

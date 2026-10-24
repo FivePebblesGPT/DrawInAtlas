@@ -53,5 +53,5 @@ func _content(layer: AtlasLayer, document: AtlasMapDocument) -> Dictionary:
     for key: String in ["id", "name", "visible", "locked", "opacity"]:
         data.erase(key)
     if layer is AtlasTileLayer and layer.grid == null:
-        data.grid = document.get_terrain_grid().to_dict()
+        data.grid = document.get_terrain_grid(floor_id).to_dict()
     return data

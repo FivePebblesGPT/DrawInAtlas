@@ -1,7 +1,7 @@
 class_name AtlasCampaign
 extends RefCounted
 
-const SCHEMA_VERSION: int = 5
+const SCHEMA_VERSION: int = 6
 
 var display_name: String = "West Marches"
 var root_map_id: String = "world"
@@ -25,24 +25,35 @@ func placement_by_id(placement_id: String) -> AtlasPlacement:
     return null
 
 
-func find_links_at(map_id: String, point: Vector2) -> Array[AtlasMapLink]:
+func find_links_at(map_id: String, point: Vector2, floor_id: String = "") -> Array[AtlasMapLink]:
     var matches: Array[AtlasMapLink] = []
+    var source: AtlasMapDocument = get_map(map_id)
+    if source == null:
+        return matches
     for link in links:
         if link.source_map_id != map_id:
             continue
+        if not floor_id.is_empty() and link.source_floor_id != floor_id:
+            continue
+        if source.floor_by_id(link.source_floor_id) == null:
+            continue
+        var target: AtlasMapDocument = get_map(link.target_map_id)
+        if target == null or target.floor_by_id(link.target_floor_id) == null:
+            continue
         if not link.placement_id.is_empty():
             var placement := placement_by_id(link.placement_id)
-            if placement != null and placement.contains_parent_point(point):
+            if (placement != null and placement.parent_map_id == map_id
+                    and placement.child_map_id == link.target_map_id and placement.contains_parent_point(point)):
                 matches.append(link)
         elif link.anchor.distance_to(point) <= link.hit_radius:
             matches.append(link)
     return matches
 
 
-func outgoing_links(map_id: String) -> Array[AtlasMapLink]:
+func outgoing_links(map_id: String, floor_id: String = "") -> Array[AtlasMapLink]:
     var matches: Array[AtlasMapLink] = []
     for link in links:
-        if link.source_map_id == map_id:
+        if link.source_map_id == map_id and (floor_id.is_empty() or link.source_floor_id == floor_id):
             matches.append(link)
     return matches
 
@@ -67,7 +78,7 @@ func to_dict() -> Dictionary:
 
 static func from_dict(data: Dictionary) -> AtlasCampaign:
     var version: Variant = data.get("schema_version")
-    if not AtlasData.integer(version) or int(version) not in [1, 2, 3, 4, SCHEMA_VERSION]:
+    if not AtlasData.integer(version) or int(version) < 1 or int(version) > SCHEMA_VERSION:
         return null
     var raw_maps: Variant = data.get("maps")
     var raw_links: Variant = data.get("links", [])
@@ -95,6 +106,12 @@ static func from_dict(data: Dictionary) -> AtlasCampaign:
         var link: AtlasMapLink = AtlasMapLink.from_dict(saved_link)
         if link == null or link_ids.has(link.id):
             return null
+        var source_map: AtlasMapDocument = campaign.get_map(link.source_map_id)
+        var target_map: AtlasMapDocument = campaign.get_map(link.target_map_id)
+        if not saved_link.has("source_floor_id") and source_map != null:
+            link.source_floor_id = source_map.default_floor_id
+        if not saved_link.has("target_floor_id") and target_map != null:
+            link.target_floor_id = target_map.default_floor_id
         link_ids[link.id] = true
         campaign.links.append(link)
     var placement_ids: Dictionary[String, bool] = {}

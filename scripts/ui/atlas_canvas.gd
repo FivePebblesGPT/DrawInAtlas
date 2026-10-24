@@ -33,6 +33,7 @@ var has_selected_cell: bool = false
 var battle_rotation: float = 0.0
 var reference_opacity: float = 0.35
 var show_reference: bool = true
+var render_grid: bool = true
 var show_grid: bool:
     get:
         return map != null and map.grid.visible
@@ -84,16 +85,23 @@ func _ready() -> void:
     add_child(_overlay)
 
 
-func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign) -> void:
+func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floor_id: String = "") -> bool:
+    if value == null:
+        return false
+    var selected_id: String = value.default_floor_id if floor_id.is_empty() else floor_id
+    var selected_floor: AtlasFloor = value.floor_by_id(selected_id)
+    if selected_floor == null:
+        return false
     cancel_edit()
     map = value
     campaign = current_campaign
-    floor = map.floor_by_id(map.default_floor_id) if map != null else null
+    floor = selected_floor
     _raster_textures.clear()
     clear_selection()
     has_selected_cell = false
     _drawing_battlemap = false
     queue_redraw()
+    return true
 
 
 func choose_tool(value: Tool) -> void:
@@ -251,7 +259,7 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
     if id == active_layer_id and _preview_layer != null:
         layer = _preview_layer
     if layer is AtlasTileLayer:
-        var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid()
+        var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
         for key: String in layer.terrain:
             var xy: PackedStringArray = key.split(",")
             var cell: Vector2i = Vector2i(int(xy[0]), int(xy[1]))
@@ -281,7 +289,7 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 func _draw_overlays(item: Node2D) -> void:
     if map == null or floor == null:
         return
-    if show_grid:
+    if render_grid and show_grid:
         _draw_grid(item)
     _draw_links(item)
     if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
@@ -313,7 +321,14 @@ func _draw_parent_reference() -> void:
         var parent := campaign.get_map(placement.parent_map_id)
         if parent == null:
             continue
-        var parent_floor := parent.floor_by_id(parent.default_floor_id)
+        var references: Array[AtlasMapLink] = []
+        for link: AtlasMapLink in campaign.links:
+            if (link.placement_id == placement.id and link.source_map_id == parent.id
+                    and link.target_map_id == map.id and link.target_floor_id == floor.id):
+                references.append(link)
+        if references.size() != 1:
+            continue
+        var parent_floor: AtlasFloor = parent.floor_by_id(references[0].source_floor_id)
         if parent_floor == null:
             continue
         var terrain: AtlasTileLayer = parent_floor.terrain_layer()
@@ -330,7 +345,7 @@ func _draw_parent_reference() -> void:
             if xy.size() != 2:
                 continue
             var cell := Vector2i(int(xy[0]), int(xy[1]))
-            var polygon: PackedVector2Array = parent.get_terrain_grid().cell_polygon(cell)
+            var polygon: PackedVector2Array = parent.get_terrain_grid(parent_floor.id).cell_polygon(cell)
             var transformed := PackedVector2Array()
             for point in polygon:
                 transformed.append(placement.parent_point_to_child(point))
@@ -399,7 +414,7 @@ func _append_stroke_point(local_position: Vector2) -> void:
 func _draw_links(item: Node2D) -> void:
     if campaign == null or preview == Preview.OFF:
         return
-    for link in campaign.outgoing_links(map.id):
+    for link in campaign.outgoing_links(map.id, floor.id):
         var target := campaign.get_map(link.target_map_id)
         if target == null:
             continue
@@ -412,7 +427,7 @@ func _draw_links(item: Node2D) -> void:
             item.draw_colored_polygon(corners, fill)
             _stroke_polygon(corners, Color("#63d3e5"), 2.0 / camera_zoom, item)
             if preview == Preview.THUMBNAILS and not placement.symbolic:
-                _draw_placement_preview(placement, target, item)
+                _draw_placement_preview(placement, target, item, link.target_floor_id)
             item.draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
                 HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
         else:
@@ -423,8 +438,9 @@ func _draw_links(item: Node2D) -> void:
                 target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
 
-func _draw_placement_preview(placement: AtlasPlacement, target: AtlasMapDocument, item: Node2D) -> void:
-    var child_floor := target.floor_by_id(target.default_floor_id)
+func _draw_placement_preview(placement: AtlasPlacement, target: AtlasMapDocument, item: Node2D, floor_id: String = "") -> void:
+    var selected_id: String = target.default_floor_id if floor_id.is_empty() else floor_id
+    var child_floor: AtlasFloor = target.floor_by_id(selected_id)
     if child_floor == null:
         return
     var terrain: AtlasTileLayer = child_floor.terrain_layer()
@@ -515,7 +531,7 @@ func _gui_input(event: InputEvent) -> void:
                 grab_focus()
                 var position := local_to_document(mouse.position)
                 if mouse.double_click and campaign != null and tool == Tool.SELECT:
-                    var links := campaign.find_links_at(map.id, position)
+                    var links := campaign.find_links_at(map.id, position, floor.id)
                     if links.size() == 1:
                         enter_requested.emit(links[0])
                         accept_event()
@@ -599,6 +615,6 @@ func _request_cell_paint(position: Vector2) -> void:
     var layer: AtlasTileLayer = floor.layer_by_id(active_layer_id) as AtlasTileLayer
     if layer == null:
         return
-    var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid()
+    var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
     if grid.kind != AtlasGrid.Kind.GRIDLESS:
         paint_requested.emit(grid.document_to_cell(position))
