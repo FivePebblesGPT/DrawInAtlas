@@ -37,6 +37,8 @@ func _run() -> void:
     _check(editor.map_preview.texture_rect == editor.map_preview.get_node("TextureRect"),
         "map preview binds its scene texture display")
 
+    _check_wrapped_labels(scene)
+
     var floor: AtlasFloor = editor.canvas.floor
     var basis: PackedVector2Array = editor.canvas.map.get_terrain_grid().cell_polygon(Vector2i.ZERO)
     var overlay: AtlasGrid = editor.canvas.map.grid.copy()
@@ -116,6 +118,19 @@ func _run() -> void:
     if failures == 0:
         print("ATLAS_LAYER_UI_PASSED")
     quit(0 if failures == 0 else 1)
+
+
+## Godot warns if an autowrapping Label has no positive width constraint.
+## Traverse the instantiated scene, including embedded panel scenes and the
+## remaining code-built inspector labels, so new controls cannot regress.
+func _check_wrapped_labels(node: Node) -> void:
+    if node is Label:
+        var label: Label = node as Label
+        if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+            _check(label.custom_minimum_size.x > 0.0,
+                "wrapping label has explicit minimum width: " + str(label.get_path()))
+    for child: Node in node.get_children():
+        _check_wrapped_labels(child)
 
 
 func _corrupt(path: String) -> void:
