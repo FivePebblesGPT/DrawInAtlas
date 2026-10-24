@@ -9,8 +9,8 @@ var source_path: String = ""
 
 
 static func failure(code: Error, detail: String, path: String) -> AtlasStoreResult:
-    var result: AtlasStoreResult = AtlasStoreResult.new()
-    result.error = code
-    result.message = detail
-    result.source_path = path
-    return result
+	var result: AtlasStoreResult = AtlasStoreResult.new()
+	result.error = code
+	result.message = detail
+	result.source_path = path
+	return result

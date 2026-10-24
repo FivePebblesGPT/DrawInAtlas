@@ -10,8 +10,8 @@ var source: Dictionary = {}
 
 
 func is_empty() -> bool:
-    return stroke_indices.is_empty() and not raster_selected
+	return stroke_indices.is_empty() and not raster_selected
 
 
 func matches(layer: AtlasLayer) -> bool:
-    return layer != null and layer.id == layer_id and layer.to_dict() == source
+	return layer != null and layer.id == layer_id and layer.to_dict() == source

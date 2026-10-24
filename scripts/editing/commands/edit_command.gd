@@ -6,8 +6,8 @@ var floor_id: String
 
 
 func apply(_campaign: AtlasCampaign) -> bool:
-    return false
+	return false
 
 
 func revert(_campaign: AtlasCampaign) -> bool:
-    return false
+	return false

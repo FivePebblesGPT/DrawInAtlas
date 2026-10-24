@@ -1,21 +1,20 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://dqrogil6sut2l"]
 
-[ext_resource type="Script" path="res://scripts/interface/board_dialog.gd" id="1"]
+[ext_resource type="Script" uid="uid://cbathj5lvql6s" path="res://scripts/interface/board_dialog.gd" id="1"]
 [ext_resource type="PackedScene" path="res://prefab/grid_controls.tscn" id="2"]
 
-[node name="BoardDialog" type="ConfirmationDialog"]
-script = ExtResource("1")
+[node name="BoardDialog" type="ConfirmationDialog" unique_id=1579984016]
 title = "New board"
 ok_button_text = "Create"
 dialog_hide_on_ok = false
+script = ExtResource("1")
 
-[node name="Scroll" type="ScrollContainer" parent="."]
-layout_mode = 2
+[node name="Scroll" type="ScrollContainer" parent="." unique_id=8682960]
 custom_minimum_size = Vector2(400, 420)
-horizontal_scroll_mode = 0
 follow_focus = true
+horizontal_scroll_mode = 0
 
-[node name="Margin" type="MarginContainer" parent="Scroll"]
+[node name="Margin" type="MarginContainer" parent="Scroll" unique_id=1207887325]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
@@ -23,18 +22,17 @@ theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 12
 
-[node name="Form" type="VBoxContainer" parent="Scroll/Margin"]
+[node name="Form" type="VBoxContainer" parent="Scroll/Margin" unique_id=440594982]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="BoardNameLabel" type="Label" parent="Scroll/Margin/Form"]
+[node name="BoardNameLabel" type="Label" parent="Scroll/Margin/Form" unique_id=1391411738]
 layout_mode = 2
 text = "Board name"
 
-[node name="NameInput" type="LineEdit" parent="Scroll/Margin/Form"]
+[node name="NameInput" type="LineEdit" parent="Scroll/Margin/Form" unique_id=56285593]
 layout_mode = 2
 placeholder_text = "Untitled board"
 
-[node name="GridControls" parent="Scroll/Margin/Form" instance=ExtResource("2")]
+[node name="GridControls" parent="Scroll/Margin/Form" unique_id=1996222737 instance=ExtResource("2")]
 layout_mode = 2
-

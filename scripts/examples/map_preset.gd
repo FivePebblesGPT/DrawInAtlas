@@ -11,9 +11,9 @@ extends Resource
 
 
 func create_document() -> AtlasMapDocument:
-    var document: AtlasMapDocument = AtlasMapDocument.new(document_id, display_name)
-    document.kind = kind
-    # The editor may change the grid or tiles; never mutate the shared .tres.
-    document.grid = grid.copy()
-    document.floors[0].terrain = terrain_cells.duplicate()
-    return document
+	var document: AtlasMapDocument = AtlasMapDocument.new(document_id, display_name)
+	document.kind = kind
+	# The editor may change the grid or tiles; never mutate the shared .tres.
+	document.grid = grid.copy()
+	document.floors[0].terrain = terrain_cells.duplicate()
+	return document
