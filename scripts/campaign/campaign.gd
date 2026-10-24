@@ -3,7 +3,7 @@ extends RefCounted
 
 ## Mutable runtime graph of independent map documents. A link is a directed
 ## navigation edge; an optional placement describes a spatial battlemap footprint.
-## The editor saves this graph through AtlasCampaignStore (not ResourceSaver).
+## AtlasCampaignStore owns saving/loading; callers do not choose its serializer.
 
 const SCHEMA_VERSION: int = 6
 

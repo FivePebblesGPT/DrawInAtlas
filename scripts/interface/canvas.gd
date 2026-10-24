@@ -16,6 +16,7 @@ signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 signal selection_changed
 signal transform_requested(selection: AtlasSelection, transform: Transform2D)
 signal fill_requested(position: Vector2)
+signal view_region_changed
 
 enum Tool { PEN, ERASER, PAINT, SELECT, BATTLEMAP, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL }
 enum Preview { OFF, MARKERS, THUMBNAILS }
@@ -30,8 +31,18 @@ var edit_scope: AtlasEditScope = AtlasEditScope.new()
 var tool: Tool = Tool.PEN
 var preview: Preview = Preview.THUMBNAILS
 
-var camera_center: Vector2 = Vector2.ZERO
-var camera_zoom: float = 1.0
+var camera_center: Vector2 = Vector2.ZERO:
+    set(value):
+        if camera_center == value:
+            return
+        camera_center = value
+        view_region_changed.emit()
+var camera_zoom: float = 1.0:
+    set(value):
+        if camera_zoom == value:
+            return
+        camera_zoom = value
+        view_region_changed.emit()
 var selected_cell: Vector2i = Vector2i.ZERO
 var has_selected_cell: bool = false
 var battle_rotation: float = 0.0
@@ -204,6 +215,7 @@ func _finish_manipulation() -> void:
 func _on_resized() -> void:
     cancel_edit()
     queue_redraw()
+    view_region_changed.emit()
 
 
 ## Screen pixels are converted to stable document units via the editor camera.

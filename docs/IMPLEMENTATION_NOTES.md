@@ -1,5 +1,64 @@
 # Implementation Notes
 
+## Execution milestone 5 — floors, discovery and read-only previews
+
+- The Floors inspector creates, renames, raises/lowers, chooses a saved default
+  and removes floors through reversible transactions. Floors retain their own
+  layers/artwork and content-grid geometry. Changing the active/default floor
+  never changes map scale or measurement units. Deletion and undo protect
+  referenced floors and hidden/locked content.
+- A workspace remembers the camera and selected layer for each map/floor.
+  Explicit links use their source and destination floor IDs and arrival camera;
+  Back restores the exact source view. Invalid targets leave the active view
+  and navigation history intact. Startup uses the saved document default;
+  ordinary viewer floor/camera/layer choices do not dirty or serialize artwork.
+- Maps provides reversible board names/tags. Search matches name/floor/kind and
+  exact `#tags`; campaign/current-floor/visible-area/selected-cell filters keep
+  distinct entrance identities, rotated footprint geometry and source floors.
+  Optional descendants use bounded, cycle-safe traversal (256 entries, depth
+  16, 512 visited map/floor pairs). Broken targets remain visible with Open
+  disabled and usable source Focus where available.
+- Visible-area results now follow pan, zoom and resize. The regression was a
+  missing notification, not wrong geometry: querying again produced correct
+  results. Canvas region changes schedule one coalesced browser refresh, with
+  no artwork polling and no new responsibility in `AtlasEditor`.
+- Map/overview previews render the selected floor in a private, input-disabled
+  viewport/world. References, grids and nested links are suppressed. The bounded
+  LRU stores detached 192×128 captures, invalidating on source content/visibility/
+  opacity/geometry changes. Request tokens prevent older captures, cleared
+  selections or replaced documents from publishing stale images. Empty floors
+  show a neutral board. Rendering stops after capture; headless mode skips GPU
+  capture instead of waiting indefinitely.
+- Runtime checkpoint **v6** includes map tags and link source-floor IDs and
+  reads v1–v5. Native **`.res`/`.scn` saves are the intended replacement**:
+  document commands and discovery use typed objects/IDs, while the store owns
+  serialization. Packing the workspace, camera history or private preview
+  renderers into saved campaign content is explicitly outside that boundary.
+  The native-format migration itself is not part of this completion claim.
+
+### Milestone 5 verification — Godot 4.8-beta1
+
+- `tests/floors_view_smoke.gd`: **102 checks** for floor transactions, protected
+  content, stable identities, metadata and detached viewer memory.
+- `tests/overview_smoke.gd`: **67 checks** for metadata-only bounded traversal,
+  multiple entrances, spatial geometry, broken references and non-mutation.
+- `tests/preview_cache_smoke.gd`: **46 checks** for content invalidation, copied
+  images, map/floor/size/audience keys and bounded LRU behavior. Audience keys
+  partition caches; they do not implement player-output content filtering.
+- `tests/organization_ui_smoke.gd`: **84 checks**, including native mouse-driven
+  pan/zoom, viewport resize, rotated cell selection, all four query modes,
+  duplicate entrances, broken Open/Focus and floor-aware checkpoint roundtrips.
+- `tests/preview_ui_smoke.gd`: **31 real-renderer checks** for floor-specific
+  main-canvas/sidebar pixels, input isolation, synchronous cache hits, actual
+  pixel/opacity/visibility invalidation, latest-request wins, in-flight changes,
+  cancellation, document replacement and empty/missing floor behavior.
+- All **15 headless suites** and the existing native framebuffer suite pass.
+  Both framebuffer suites also pass under isolated Xvfb/Mesa software rendering;
+  CI now runs them in addition to headless tests and Web export.
+- Evidence: `user://validation/floors-and-preview.png`, plus the existing
+  clipping/grid/layer/tools/compact screenshots. Web browser smoke remains
+  deferred; no projector/privacy or collaboration completion is claimed.
+
 ## Editor-module readability follow-up — 2026-10-24
 
 Starting from merged readability PR #3 (`dace0fc`), `AtlasEditor` is reduced
@@ -182,6 +241,8 @@ tests/clipboard_smoke.gd       Typed, self-contained clipboard codec
 tests/selection_smoke.gd       Outline/selection/transform and migration checks
 tests/tools_ui_smoke.gd        Native editing gestures, clipboard and persistence
 tests/editor_modules_smoke.gd  Forms, module wiring and two-workspace isolation
+tests/organization_ui_smoke.gd Floor/overview forms, input, navigation and checkpoints
+tests/preview_ui_smoke.gd      Native preview pixels, cache invalidation and isolation
 tests/visual_smoke.gd          Real framebuffer clipping regression
 tests/browser_smoke.py         Optional external Playwright UI/storage smoke
 ```
@@ -209,6 +270,7 @@ godot --headless --path . --script res://tests/overview_smoke.gd
 godot --headless --path . --script res://tests/preview_cache_smoke.gd
 godot --headless --path . --quit-after 10
 godot --path . --script res://tests/visual_smoke.gd
+godot --path . --script res://tests/preview_ui_smoke.gd
 mkdir -p build/web
 godot --headless --path . --export-release Web build/web/index.html
 python -m http.server 8765 --bind 127.0.0.1 --directory build/web
@@ -236,6 +298,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Execution milestones 1–4 are complete for the local client. Next is floors and map organization/overview/previews (milestone 5), not additional battlemap recursion. Web smoke remains deferred rather than part of this completion claim.
+Execution milestones 1–5 are complete for the local client. Next is the linked-map workflow refinement (milestone 6), followed by local table/projector privacy and collaboration. The planned native `.res`/`.scn` save migration remains explicit future work. Web browser smoke stays deferred.
 
-Legacy linked-map placement actions still await undoable commands; floor-switching UI and campaign import/export UX are later work. See milestone 4 for conservative scope/selection semantics and raster limits. Trackpad behavior beyond the tested wheel normalization remains device-dependent. Milestone 3 storage/history scaling limits and deferred browser validation still apply.
+Legacy linked-map placement actions still await undoable commands; campaign import/export UX is later work. See milestone 4 for conservative scope/selection semantics and raster limits. Trackpad behavior beyond the tested wheel normalization remains device-dependent. Milestone 3 storage/history scaling limits and deferred browser validation still apply.

@@ -1,6 +1,6 @@
 # Implementation Plan and Decision Log
 
-**Status:** roadmap. The Godot **4.8-beta1** GDScript integration checkpoint implements a subset of the original milestones 0–2; their full acceptance criteria remain open. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
+**Status:** execution milestones **1–5** verified for the local client on Godot **4.8-beta1**. Milestones 6–8 remain open; the older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
 ## 1. Principle: vertical slices before feature breadth
 
@@ -8,7 +8,7 @@ The main product is a **drawing board with optional grids and map links**, not a
 
 ### Current execution milestones (1–8)
 
-The integration checkpoint is complete. The following execution sequence supersedes the priority of the original feature groupings below. Work and verify **one milestone per turn**, with native/Web checks and a local commit after verification.
+The integration checkpoint is complete. The following execution sequence supersedes the priority of the original feature groupings below. Work and verify **one milestone per turn**, with native checks and a local commit after verification. Keep Web export compatible; browser smoke is deferred per user direction.
 
 | Milestone | Scope | State |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ The integration checkpoint is complete. The following execution sequence superse
 | 2 | Blank board creation; independent grid overlay geometry and per-map native units | Implemented and tested; see implementation notes |
 | 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Implemented and verified for the local client; Web smoke deferred |
 | 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Implemented and verified for the local client |
-| 5 | Floors and map organization/overview/previews | Next |
+| 5 | Floors and map organization/overview/previews | Implemented and verified for the local client |
 | 6 | Linked-map workflow refinement, placement/reference/navigation controls | Pending |
 | 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
 | 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
@@ -28,6 +28,8 @@ Milestone 2 upgrades the runtime schema to v3, reads v1/v2, and adds reversible 
 Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import and lossless WebP chunks. Saves stage/verify assets and metadata, preserve a validated backup, and atomically replace the head. Native failure-injection, migration, layer/input and framebuffer checks are the gate. The user has prioritized the local client and postponed Web smoke tests; browser import/recovery validation is explicitly deferred rather than claimed complete.
 
 Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, active-layer selection with proportional transforms, typed self-contained clipboard data and central selected-cell scope. Schema v5 persists raster placement transforms and reads v1–v4. Native service/input/framebuffer and live-session checks are the gate; no new Web smoke was run.
+
+Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Runtime checkpoint v6 records tags and source/target floor identity and reads v1–v5. The intended persistence target is native Godot `.res`/`.scn`: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](DATA_MODEL.md) for current versus planned storage.
 
 ### Original feature groupings (reference)
 
@@ -155,6 +157,7 @@ Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, act
 | Host-authoritative networking | Proposed | Simpler permission enforcement and session consistency |
 | Canonical chunk sizes and formats | Open | Benchmark first |
 | Godot scripting language | **Decided** | GDScript mandatory; no C#/.NET dependency |
+| Native campaign persistence | **Decided direction** | Godot `.res`/`.scn`; format migration remains to be implemented behind the store boundary |
 | Drawing-board-first editing | Accepted clarification | Continuous artwork; grids are overlays, links are optional |
 | Native measurement units per map | Accepted clarification | DM chooses distance/unit; no automatic conversion or harmonization |
 | Automatic map navigation default | Off / opt-in | Ordinary drawing-board zoom must not change maps |
@@ -179,4 +182,4 @@ Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, act
 
 ## 6. Suggested next engineering task
 
-Implement execution milestone 5 for the local client: independent per-view floor controls and better campaign organization/search/overview/preview behavior. Retain artwork coordinates, per-map units, protected layers and recoverable saves; navigation should restore the correct floor/view. Keep browser smoke deferred and do not prioritize more battlemap recursion.
+Proceed with execution milestone 6: reversible linked-map placement/reference workflows and explicit navigation controls. Preserve the now-verified floor, overview and preview behavior. Account for the planned native `.res`/`.scn` save migration through the store boundary, retain artwork coordinates and native map units, and keep browser smoke deferred.

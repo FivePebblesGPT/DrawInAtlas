@@ -21,6 +21,7 @@ var _overview: AtlasOverviewPanel
 var _canvas: AtlasCanvas
 var _views: AtlasViewSession
 var _search_entries: Array[AtlasOverviewEntry] = []
+var _spatial_refresh_queued: bool = false
 
 
 func _ready() -> void:
@@ -41,6 +42,8 @@ func bind_context(sidebar: Sidebar, overview: AtlasOverviewPanel, canvas: AtlasC
         _overview.query_changed.disconnect(_on_query_changed)
         _overview.entry_activated.disconnect(_open_overview_entry)
         _overview.source_focus_requested.disconnect(_focus_overview_source)
+    if _canvas != null:
+        _canvas.view_region_changed.disconnect(_on_view_region_changed)
 
     _sidebar = sidebar
     _overview = overview
@@ -51,6 +54,7 @@ func bind_context(sidebar: Sidebar, overview: AtlasOverviewPanel, canvas: AtlasC
     _overview.query_changed.connect(_on_query_changed)
     _overview.entry_activated.connect(_open_overview_entry)
     _overview.source_focus_requested.connect(_focus_overview_source)
+    _canvas.view_region_changed.connect(_on_view_region_changed)
 
 
 func refresh(campaign: AtlasCampaign) -> void:
@@ -141,6 +145,24 @@ func _preview_map_index(index: int) -> void:
 
 func _on_query_changed() -> void:
     refresh_search(_sidebar.get_search_query())
+
+
+func _on_view_region_changed() -> void:
+    if _spatial_refresh_queued or not _overview.is_visible_in_tree():
+        return
+    if _overview.mode_picker.selected != AtlasOverview.Filter.VISIBLE:
+        return
+    # One zoom changes both center and scale, and layout can resize repeatedly.
+    # Query the final region once, without polling or serializing artwork.
+    _spatial_refresh_queued = true
+    _refresh_visible_region.call_deferred()
+
+
+func _refresh_visible_region() -> void:
+    _spatial_refresh_queued = false
+    if (is_inside_tree() and _overview.is_visible_in_tree()
+            and _overview.mode_picker.selected == AtlasOverview.Filter.VISIBLE):
+        refresh_search(_sidebar.get_search_query())
 
 
 func _on_sidebar_view_selected(id: StringName) -> void:

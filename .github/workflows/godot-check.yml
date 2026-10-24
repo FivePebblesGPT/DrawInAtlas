@@ -84,6 +84,21 @@ jobs:
           grep -q 'ATLAS_FLOORS_VIEW_PASSED' /tmp/godot-floors_view_smoke.log
           grep -q 'ATLAS_OVERVIEW_PASSED' /tmp/godot-overview_smoke.log
           grep -q 'ATLAS_PREVIEW_CACHE_PASSED' /tmp/godot-preview_cache_smoke.log
+      - name: Install native framebuffer test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+      - name: Run native framebuffer acceptance
+        timeout-minutes: 5
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          for suite in visual_smoke preview_ui_smoke; do
+            xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_VISUAL_PASSED' /tmp/godot-visual_smoke.log
+          grep -q 'ATLAS_PREVIEW_UI_PASSED' /tmp/godot-preview_ui_smoke.log
       - name: Launch main scene headlessly
         shell: bash
         run: |
