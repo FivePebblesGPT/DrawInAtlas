@@ -1,5 +1,26 @@
 # Implementation Notes
 
+## Execution milestone 3 — typed layers and recoverable native saves
+
+The **local client** is the current acceptance target. The user explicitly postponed Web smoke testing to reduce compute/token cost; compatibility boundaries and optional tests are retained, but the new browser import/recovery flow is not claimed verified.
+
+- Floors own ordered, typed `AtlasTileLayer`, `AtlasInkLayer` and `AtlasRasterLayer` content. The Layers sidebar selects the edit target, creates ink/terrain layers, renames, raises/lowers, and controls visibility, locks and opacity. Hidden/locked content is rejected by typed stroke/tile commands and cannot be overwritten through generic layer transactions; metadata changes such as unlocking remain possible.
+- Layer transactions capture deep before/after snapshots and preserve IDs across undo/redo. Terrain painting is now reversible. CanvasGroup compositing applies layer opacity once to overlapping content, rather than making stroke intersections darker. Raster chunks render in board coordinates and the grid remains a separate overlay.
+- **Import image…** uses the native file picker for PNG/JPEG/WebP input. A selected image becomes a new raster layer with bounded 256-pixel RGBA8 chunks. Canonical persistence always encodes lossless WebP and verifies exact decoded bytes, including hidden RGB beneath alpha=0. Import is bounded to 32 MiB encoded / 4096 pixels per edge; moving/resizing/raster painting is milestone 4.
+- Schema **v4** migrates v1–v3 floor terrain/ink into typed layers without rescaling art or losing frozen tile geometry. Layer IDs/types/flags, chunk references and nested map/floor/link/placement data are validated before activation. Failed Load keeps current work/history; recovered Load reports the backup source and marks the session dirty for repair.
+- Save stages/verifies immutable content-addressed assets, writes/verifies full-precision metadata with a checksum, preserves a validated previous head at `.bak`, then renames the staged head into place. Pending files are ignored by recovery. Corrupt heads never overwrite valid backups; failed saves cannot clear dirty state. The injection seam is `AtlasStoreIO`, with diagnostics in `AtlasStoreResult`.
+
+### Milestone 3 verification
+
+- Layer transactions/migrations/guards: `tests/layers_smoke.gd`.
+- Recovery, interrupted/torn writes and rename failures, asset reuse/corruption, exact RGBA WebP: `tests/storage_smoke.gd` (**135 checks**).
+- Native integrated layer controls, raster import pipeline, failed-load state preservation and visible recovery status: `tests/layer_ui_smoke.gd`.
+- Existing 174 artwork and 448 board/grid checks continue to pass. Native framebuffer checks cover order, visibility, raster alpha and equal opacity at overlapping stroke intersections, plus clipping/grid invariance and compact layout.
+- A live KWin session exercised the real KDE file picker, imported a PNG into the client, rendered it and saved a verified WebP checkpoint with a clean dirty state. The dedicated preview used a separate validation save path.
+- A minimal browser picker probe found and fixed a beta bridge Boolean/int mismatch using a typed string handshake. Extended upload/retry/IndexedDB recovery remains **deferred**; no completed M3 browser smoke is claimed. `tests/browser_smoke.py --extended-storage` retains that future validation path.
+
+Remaining storage limits: one retained backup (not full journaling/autosave), no orphan-asset garbage collection, and snapshot-based history unsuitable for unbounded editing sessions. Filesystem flush/rename guarantees are bounded by the platform API; there is no claim of hardware power-loss durability. Networking/projector privacy remains milestones 7–8.
+
 ## Execution milestone 2 — independent boards and grids
 
 - **File → New board** / Ctrl+N opens a scrollable creation form. Empty names are rejected; no grid is the default. Square/pointy-hex/flat-hex boards retain chosen spacing, origin, rotation, visibility and native distance/unit. Each gets a stable random ID, empty artwork and no automatically invented links.
@@ -56,19 +77,19 @@ The `gpt/feat/gdscript-editor-scaffold` prototype has been reconciled with the c
 - **Engine:** Godot **4.8-beta1**, standard build (`4.8.beta1.official.4d10419ca` locally). Do not downgrade to the scaffold's former 4.7.2 baseline.
 - **Application language:** typed GDScript; no C# or mandatory GDExtension. The inherited `.NET` assembly-name setting is inert metadata, not an application dependency.
 - **Rendering/export:** Compatibility / WebGL 2, single-thread Web, extension support off. The Web preset keeps development tests out of the exported application.
-- **Canonical raster storage:** lossless `.webp`; only derived previews may be lossy. `AtlasWebPStore` is tested, but canonical raster layers are **not implemented**. PNG screenshots/export-shell icons are validation/UI artifacts, not persisted campaign artwork.
+- **Canonical raster storage:** lossless `.webp`; only derived previews may be lossy. Typed raster layers store verified, content-addressed WebP chunks. PNG screenshots/test fixtures/export-shell icons are not canonical campaign artwork.
 - **Browser storage:** `user://` maps to IndexedDB in the tested Chromium environment. Browser profiles/quota/private-mode policies still determine durability. Native file pickers, windowing or threads are not core requirements.
 
 ## Running behavior
 
 Open `project.godot` in Godot 4.8-beta1 and run the main scene (F5).
 
-- **Sidebar:** Maps lists campaign documents; Search filters name/type and opens results by double-click; Layers honestly reports the single-terrain-layer prototype. Clicking the active icon collapses/reopens the panel. Ctrl+B / Command+B toggles it; dragging its divider changes width.
+- **Sidebar:** Maps lists campaign documents; Search filters name/type and opens results by double-click; Layers controls ordered tile/ink/raster content. Clicking the active icon collapses/reopens the panel. Ctrl+B / Command+B toggles it; dragging its divider changes width.
 - **Canvas:** freehand ink plus legacy cell paint/select/lock, pointer-centered wheel zoom, and middle/right-drag pan. The canvas clips its custom drawing, so artwork/grid/preview commands cannot paint over editor chrome. The inspector scrolls when its controls exceed the available height.
 - **Navigation:** use map/search results, a double-clicked link marker or Back. Automatic linked-map zoom is **off by default**. When explicitly enabled, exactly three additional logical steps at the zoom limit enter/return; leaving the link or beginning another interaction resets pending progress.
 - **Native map scale:** the inspector separates native distance/unit from overlay spacing, shape, origin and rotation. Neither operation rescales artwork or converts linked maps. The sample world uses 3 mi/cell; loaded values are preserved.
 - **Inherited encounter prototype:** drag a rotated footprint to create an independent encounter map. In Select mode, double-clicking a marker navigates; Pen/Eraser clicks stay drawing actions. Spatial terrain references are read-only; symbolic placements do not render child art as a physically aligned overlay. Parent freehand-reference previews still await refinement. This is a secondary feature, not the next development priority.
-- **Persistence:** Save/Load uses `user://drawinatlas_campaign.json`; File menu actions use the same pathways. Do not use the provisional single save slot as the sole copy of valuable campaign work.
+- **Persistence:** Save/Load uses `user://drawinatlas_campaign.json` with a validated `.bak` and adjacent `.assets` chunks. Recovery is reported; failed Load never replaces active work.
 - Existing F11 / Alt+Enter fullscreen and F5 reload actions are routed through `util/global_shortcuts.gd`.
 
 ## Code layout
@@ -78,12 +99,15 @@ main.tscn                      Origin scene root + CanvasLayer UI
 prefab/ui.tscn, ui.gd           Menu, split layout and sidebar integration
 prefab/sidebar.tscn, .gd        Reusable activity rail/view container
 scripts/domain/                Grid, floor, independent maps, links and placements
-scripts/services/              Three-step gate, prototype JSON store, WebP utility
+scripts/services/              History, three-step gate, staged store/IO, WebP codec
 scripts/ui/atlas_editor.gd      Workspace controls/navigation and scaffold edits
 scripts/ui/atlas_canvas.gd      Clipped canvas rendering, picking and input
 tests/smoke.gd                 Headless domain + integrated scene checks
 tests/artwork_smoke.gd         Vector artwork, eraser and drawing history checks
 tests/board_grid_smoke.gd      Board/grid commands, migration and invariance checks
+tests/layers_smoke.gd          Typed layer transactions and migration/validation
+tests/storage_smoke.gd         Failure-injected storage and exact raster roundtrips
+tests/layer_ui_smoke.gd        Native UI layer/repair integration
 tests/visual_smoke.gd          Real framebuffer clipping regression
 tests/browser_smoke.py         Optional external Playwright UI/storage smoke
 ```
@@ -97,6 +121,9 @@ godot --headless --path . --editor --import --quit
 godot --headless --path . --script res://tests/smoke.gd
 godot --headless --path . --script res://tests/artwork_smoke.gd
 godot --headless --path . --script res://tests/board_grid_smoke.gd
+godot --headless --path . --script res://tests/layers_smoke.gd
+godot --headless --path . --script res://tests/storage_smoke.gd
+godot --headless --path . --script res://tests/layer_ui_smoke.gd
 godot --headless --path . --quit-after 10
 godot --path . --script res://tests/visual_smoke.gd
 mkdir -p build/web
@@ -104,11 +131,12 @@ godot --headless --path . --export-release Web build/web/index.html
 python -m http.server 8765 --bind 127.0.0.1 --directory build/web
 ```
 
-In a second terminal, optional browser tooling can run in an isolated uv environment:
+Browser validation is deferred for current development. When revisited, optional tooling can run in an isolated uv environment (the extended M3 path remains unverified):
 
 ```sh
 uv run --no-project --with playwright python -m playwright install chromium --only-shell
 uv run --no-project --with playwright python tests/browser_smoke.py
+uv run --no-project --with playwright python tests/browser_smoke.py --extended-storage
 ```
 
 The visual test requires a real display/renderer and writes `user://validation/integrated-editor.png`. It compares rendered images with and without the canvas: drawing must change pixels inside the canvas and **zero sampled pixels outside**. The browser test uses an isolated profile and fixed 1280×720 viewport, captures UI states, changes Greyhaven to 7.5 km/cell while the world remains 3 mi/cell, saves to IndexedDB, reloads, re-saves, and checks the resulting campaign exactly. It also fails on browser/script errors.
@@ -125,6 +153,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Execution milestones 1 and 2 are complete. Next is typed layers and reliable persistence (milestone 3). Do not expand battlemap tooling first.
+Execution milestones 1–3 are complete for the local client. Next is drawing/selection/clipboard tooling (milestone 4), not additional battlemap recursion. M3 Web smoke is deferred rather than part of this completion claim.
 
-Legacy terrain painting/placement actions are marked dirty but still await undoable commands; grid/native-unit edits are reversible. Floors/layers are not configurable. The JSON store is a single non-atomic slot, does not robustly validate all inherited nested data, and lacks recovery/import/export UX. Recoverable WebP chunk storage remains future work. Selected-cell lock currently protects terrain painting only and is disabled for ink; precise artwork confinement is later work. Trackpad behavior beyond the tested wheel normalization remains device-dependent.
+Placement actions still await undoable commands; floor-switching UI, raster editing and campaign import/export UX are later work. Selected-cell lock currently protects terrain painting only and is disabled for ink; precise artwork confinement is later work. Trackpad behavior beyond the tested wheel normalization remains device-dependent. See milestone 3 limits above for recovery/history scaling and deferred browser validation.

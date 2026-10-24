@@ -1,6 +1,6 @@
 # DrawInAtlas
 
-**Status: freehand drawing and independent board/grid milestones implemented; broader editor/VTT features are in progress.**
+**Status: drawing, independent boards/grids, typed layers and recoverable native persistence implemented; broader editor/VTT features are in progress.**
 
 DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
@@ -20,14 +20,16 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - The sample campaign includes a world hexcrawl and linked Greyhaven city. Draw freely with the pen, cut ink with the eraser, and undo/redo complete gestures. Ink uses continuous board coordinates, including on gridless maps.
 - **File → New board** creates an independent blank board with no grid, square cells, or pointy/flat hexes. Choose native units and distance per cell. The inspector edits spacing, origin, rotation and visibility without moving artwork; creation/grid edits support undo/redo.
 - B selects the pen, E the eraser; Ctrl+N opens New board, Ctrl+Z undoes an edit, Ctrl+Shift+Z / Ctrl+Y redoes it, Ctrl+S saves, and Escape cancels an unfinished gesture. Brush width is in board units. An asterisk marks unsaved work.
-- Save/load uses the provisional `user://drawinatlas_campaign.json` slot.
+- The Layers sidebar selects editable ink/terrain layers, imports raster images, and controls names, visibility, locks, opacity and order. Hidden/locked content is protected by edit commands.
+- Save/load uses `user://drawinatlas_campaign.json`, a verified previous `.bak` checkpoint and immutable lossless WebP chunk assets in the adjacent `.assets` directory. Load reports backup recovery instead of silently dropping bad content.
 - The sidebar supports Maps, Search and Layers views, draggable width, active-icon collapse, and Ctrl+B (Command+B on macOS).
 - One top menu bar provides **File** (new board/save/load), **Edit** (undo/redo), and **View** (sidebar, grid overlay, navigation). Drawing controls live in the grouped right inspector; the document title and dirty marker appear at the top right.
 - Normal zoom stays on the current board; automatic linked-map navigation is opt-in. Native distance/unit labels are independent per map and never rescale artwork.
 - Headless smoke tests: `godot --headless --path . --script res://tests/smoke.gd`.
 - Artwork/history tests: `godot --headless --path . --script res://tests/artwork_smoke.gd`.
 - Board/grid tests: `godot --headless --path . --script res://tests/board_grid_smoke.gd`.
-- Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. Web UI/IndexedDB validation is in `tests/browser_smoke.py`; setup is documented in the implementation notes.
+- Layer/storage tests: run `tests/layers_smoke.gd`, `tests/storage_smoke.gd` and `tests/layer_ui_smoke.gd` with the same headless invocation.
+- Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
 
 ## Documentation
 
@@ -41,4 +43,4 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 | [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized data and storage |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
 
-Configurable layers/floors, raster painting, projector output, networking and browser file import/export remain future work. Legacy terrain painting and placement actions still await reversible commands. See the implementation notes for tested scope and provisional storage limits.
+Floor controls, raster painting/selection, projector output, networking and campaign import/export UX remain future work. Placement actions still await reversible commands. See the implementation notes for tested native scope and the deferred browser validation.

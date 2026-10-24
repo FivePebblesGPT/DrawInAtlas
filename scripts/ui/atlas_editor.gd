@@ -14,6 +14,7 @@ var locked_to_cell: bool = false
 var palette_id: int = 2
 var automatic_navigation: bool = false
 var edits: AtlasEditHistory = AtlasEditHistory.new()
+var store_io: AtlasStoreIO
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
@@ -35,6 +36,8 @@ var distance_spinner: SpinBox
 var unit_picker: OptionButton
 var grid_controls: AtlasGridControls
 var board_dialog: AtlasBoardDialog
+var layer_panel: AtlasLayerPanel
+var raster_importer: AtlasRasterImporter
 var brush_color_picker: ColorPickerButton
 var brush_width_spinner: SpinBox
 var _ink_section: VBoxContainer
@@ -46,15 +49,21 @@ const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 
 func _ready() -> void:
     _build_ui()
+    var restored: AtlasStoreResult
     if load_saved_on_startup:
-        campaign = AtlasCampaignStore.load_campaign(save_path)
+        restored = AtlasCampaignStore.load_result(save_path, store_io)
+        campaign = restored.campaign
     var loaded: bool = campaign != null
     if campaign == null:
         campaign = AtlasCampaign.sample()
     edits.changed.connect(_refresh_edit_state)
-    edits.reset(campaign, loaded)
+    edits.reset(campaign, loaded and (restored == null or not restored.recovered))
     _show_map(campaign.get_map(campaign.root_map_id))
     _message("Draw freely across cells. B: pen · E: eraser · Ctrl+Z: undo · Middle-drag: pan.")
+    if restored != null and restored.recovered:
+        _message(restored.message + " Save to establish a fresh checkpoint.")
+    elif restored != null and restored.error != OK and restored.error != ERR_FILE_NOT_FOUND:
+        _message(restored.message + " A temporary sample is open; the save was not replaced.")
 
 
 func _build_ui() -> void:
@@ -76,6 +85,10 @@ func _build_ui() -> void:
     board_dialog.theme = sidebar.theme
     board_dialog.board_requested.connect(_on_board_requested)
     add_child(board_dialog)
+    raster_importer = AtlasRasterImporter.new()
+    raster_importer.image_ready.connect(import_raster)
+    raster_importer.failed.connect(_message)
+    add_child(raster_importer)
     _on_tool_changed(tool_picker.selected)
 
 
@@ -97,8 +110,14 @@ func _build_sidebar_views() -> void:
     sidebar.search_changed.connect(_refresh_search_list)
 
     var layers_view: Control = sidebar.get_view_content(&"Layers")
-    layers_view.get_node("Heading").text = "Ink + terrain (prototype)"
-    layers_view.get_node("Description").text = "Freehand ink uses board coordinates. Layer visibility, locking and ordering are pending."
+    layers_view.get_node("Heading").hide()
+    layers_view.get_node("Description").hide()
+    layer_panel = AtlasLayerPanel.new()
+    layer_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    layer_panel.layer_selected.connect(select_layer)
+    layer_panel.layers_changed.connect(apply_layers)
+    layer_panel.import_requested.connect(func() -> void: raster_importer.request_import())
+    layers_view.add_child(layer_panel)
 
 
 func _build_canvas(parent: HBoxContainer) -> void:
@@ -357,6 +376,7 @@ func _show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom_value:
         return
     canvas.set_document(map, campaign)
     edits.active_map_id = map.id
+    _refresh_layers()
     canvas.camera_center = focus
     canvas.camera_zoom = clampf(zoom_value, MIN_ZOOM, MAX_ZOOM)
     _refresh_grid_controls()
@@ -386,14 +406,18 @@ func _refresh_edit_state() -> void:
 func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
     if not stroke.is_valid():
         return
-    var before: Array[AtlasStroke] = canvas.floor.strokes
+    var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+    if layer == null or not layer.is_editable():
+        _message("Select a visible, unlocked ink layer to draw.")
+        return
+    var before: Array[AtlasStroke] = layer.strokes
     var after: Array[AtlasStroke]
     if erasing:
         after = AtlasStrokeEraser.erase(before, stroke.points, stroke.width)
     else:
         after = AtlasStroke.clone_all(before)
         after.append(stroke.copy())
-    var command: AtlasStrokeEdit = AtlasStrokeEdit.new(canvas.map.id, canvas.floor.id, before, after)
+    var command: AtlasStrokeEdit = AtlasStrokeEdit.new(canvas.map.id, canvas.floor.id, before, after, layer.id)
     if edits.execute(command):
         canvas.queue_redraw()
         _message("Erased ink. One gesture = one undo." if erasing else "Stroke added in board coordinates.")
@@ -426,10 +450,64 @@ func _on_redo() -> void:
 
 
 func _refresh_after_history() -> void:
+    _refresh_layers()
     _refresh_grid_controls()
     _refresh_map_list()
     _refresh_edit_state()
     canvas.queue_redraw()
+
+
+func _refresh_layers(preferred_id: String = "") -> void:
+    if not preferred_id.is_empty():
+        canvas.active_layer_id = preferred_id
+    if canvas.floor.layer_by_id(canvas.active_layer_id) == null:
+        var ink: AtlasInkLayer = canvas.floor.ink_layer()
+        canvas.active_layer_id = ink.id if ink != null else ""
+        if ink == null and not canvas.floor.layers.is_empty():
+            canvas.active_layer_id = canvas.floor.layers[-1].id
+    layer_panel.set_floor(canvas.floor, canvas.active_layer_id)
+
+
+func select_layer(id: String) -> void:
+    if canvas.floor.layer_by_id(id) == null:
+        return
+    canvas.cancel_edit()
+    canvas.active_layer_id = id
+    _refresh_layers()
+    _message("Selected layer: %s" % canvas.floor.layer_by_id(id).display_name)
+
+
+func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> void:
+    canvas.cancel_edit()
+    for layer: AtlasLayer in layers:
+        if layer is AtlasTileLayer and layer.grid == null:
+            if canvas.floor.layer_by_id(layer.id) != null:
+                layer.grid = canvas.map.get_terrain_grid().copy()
+            elif canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
+                _message("Choose a square or hex grid before creating a terrain layer.")
+                _refresh_layers()
+                return
+            else:
+                layer.grid = canvas.map.grid.copy()
+    var command: AtlasLayerEdit = AtlasLayerEdit.new(canvas.map.id, canvas.floor.id, canvas.floor.layers, layers)
+    if edits.execute(command):
+        _refresh_layers(selected_id)
+        canvas.queue_redraw()
+        _message("Layer changed. Hidden or locked layers are not editable.")
+    else:
+        _refresh_layers()
+
+
+func import_raster(image: Image) -> void:
+    var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(image)
+    if layer == null:
+        _message("Could not create a raster layer from that image.")
+        return
+    layer.id = "raster-" + Crypto.new().generate_random_bytes(16).hex_encode()
+    layer.display_name = "Imported image"
+    var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+    layers.append(layer)
+    apply_layers(layers, layer.id)
 
 
 func _refresh_map_list() -> void:
@@ -480,22 +558,22 @@ func _on_sample() -> void:
 
 func _on_save() -> void:
     canvas.commit_edit()
-    var result: Error = AtlasCampaignStore.save_campaign(campaign, save_path)
+    var result: Error = AtlasCampaignStore.save_campaign(campaign, save_path, store_io)
     if result == OK:
         edits.mark_saved()
     _message("Saved to %s" % save_path if result == OK else "Save failed: %s" % result)
 
 
 func _on_load() -> void:
-    var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(save_path)
-    if loaded == null:
-        _message("No compatible saved campaign found.")
+    var result: AtlasStoreResult = AtlasCampaignStore.load_result(save_path, store_io)
+    if result.campaign == null:
+        _message(result.message)
         return
-    campaign = loaded
-    edits.reset(campaign, true)
+    campaign = result.campaign
+    edits.reset(campaign, not result.recovered)
     history.clear()
     _show_map(campaign.get_map(campaign.root_map_id))
-    _message("Campaign loaded.")
+    _message(result.message + " Save to repair the current checkpoint." if result.recovered else "Campaign loaded.")
 
 
 func _on_map_activated(index: int) -> void:
@@ -518,6 +596,16 @@ func _on_tool_changed(index: int) -> void:
     brush_color_picker.disabled = canvas.tool == AtlasCanvas.Tool.ERASER
     _terrain_section.visible = canvas.tool == AtlasCanvas.Tool.PAINT
     _placement_section.visible = canvas.tool == AtlasCanvas.Tool.BATTLEMAP
+    if canvas.floor != null:
+        var current: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+        if canvas.tool == AtlasCanvas.Tool.PAINT and not current is AtlasTileLayer:
+            var tiles: AtlasTileLayer = canvas.floor.terrain_layer()
+            if tiles != null:
+                select_layer(tiles.id)
+        elif canvas.tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER] and not current is AtlasInkLayer:
+            var ink: AtlasInkLayer = canvas.floor.ink_layer()
+            if ink != null:
+                select_layer(ink.id)
     zoom_gate.reset()
 
 
@@ -535,16 +623,28 @@ func _on_paint(cell: Vector2i) -> void:
     if canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
         _message("Cell paint requires a square or hex grid.")
         return
-    if not canvas.map.grid.same_geometry(canvas.map.get_terrain_grid()):
+    var layer: AtlasTileLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTileLayer
+    if layer == null or not layer.is_editable():
+        _message("Select a visible, unlocked terrain layer to paint.")
+        return
+    var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+    if not canvas.map.grid.same_geometry(basis):
         _message("Legacy terrain uses its original grid. Use pen/eraser on an edited overlay.")
         return
     if locked_to_cell and (not canvas.has_selected_cell or canvas.selected_cell != cell):
         _message("Edit blocked by selected-cell lock.")
         return
-    if canvas.floor.get_terrain(cell) == palette_id:
+    var key: String = "%d,%d" % [cell.x, cell.y]
+    if int(layer.terrain.get(key, 0)) == palette_id:
         return
-    canvas.floor.paint(cell, palette_id)
-    edits.mark_external_change()
+    var after: Dictionary = layer.terrain.duplicate()
+    if palette_id == 0:
+        after.erase(key)
+    else:
+        after[key] = palette_id
+    var command: AtlasTileEdit = AtlasTileEdit.new(canvas.map.id, canvas.floor.id, layer.id, layer.terrain, after)
+    if not edits.execute(command):
+        return
     canvas.queue_redraw()
 
 

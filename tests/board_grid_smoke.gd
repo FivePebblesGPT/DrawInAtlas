@@ -201,7 +201,8 @@ func _persistence() -> void:
     overlay.kind = AtlasGrid.Kind.SQUARE
     _check(_history(campaign).execute(AtlasGridEdit.new("world", map.grid, overlay)), "persistence freezes distinct terrain basis")
     var restored: AtlasCampaign = AtlasCampaign.from_dict(campaign.to_dict())
-    _check(restored != null and restored.to_dict() == campaign.to_dict() and campaign.to_dict()["schema_version"] == 3, "schema 3 dictionary roundtrip")
+    _check(restored != null and restored.to_dict() == campaign.to_dict()
+        and campaign.to_dict()["schema_version"] == AtlasCampaign.SCHEMA_VERSION, "current schema dictionary roundtrip")
     for field: String in ["grid", "terrain_grid"]:
         var bad: Dictionary = campaign.to_dict()
         bad["maps"][0][field] = {"rotation": NAN}

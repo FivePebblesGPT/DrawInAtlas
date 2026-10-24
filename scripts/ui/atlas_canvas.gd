@@ -16,6 +16,7 @@ enum Preview { OFF, MARKERS, THUMBNAILS }
 var campaign: AtlasCampaign
 var map: AtlasMapDocument
 var floor: AtlasFloor
+var active_layer_id: String = "ink"
 var tool: Tool = Tool.PEN
 var preview: Preview = Preview.THUMBNAILS
 
@@ -46,6 +47,10 @@ var _draft_stroke: AtlasStroke
 var _erasing: bool = false
 var _stroke_left_canvas: bool = false
 var _erase_preview: Array[AtlasStroke] = []
+var _layer_groups: Dictionary[String, CanvasGroup] = {}
+var _layer_drawers: Dictionary[String, Node2D] = {}
+var _raster_textures: Dictionary[String, ImageTexture] = {}
+var _overlay: Node2D
 
 const EMPTY_COLOR := Color("#212c34")
 const TERRAIN_COLORS := [
@@ -60,6 +65,10 @@ func _ready() -> void:
     focus_mode = Control.FOCUS_ALL
     resized.connect(_on_resized)
     get_window().focus_exited.connect(cancel_edit)
+    _overlay = Node2D.new()
+    _overlay.z_index = 1
+    _overlay.draw.connect(_draw_overlays.bind(_overlay))
+    add_child(_overlay)
 
 
 func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign) -> void:
@@ -67,6 +76,7 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign) -> v
     map = value
     campaign = current_campaign
     floor = map.floor_by_id(map.default_floor_id) if map != null else null
+    _raster_textures.clear()
     has_selected_cell = false
     _drawing_battlemap = false
     queue_redraw()
@@ -120,21 +130,82 @@ func _draw() -> void:
 
     draw_set_transform(size * 0.5 - camera_center * camera_zoom, 0.0, Vector2.ONE * camera_zoom)
     _draw_parent_reference()
-    _draw_cells(false)
-    var artwork: Array[AtlasStroke] = _erase_preview if is_editing() and _erasing else floor.strokes
-    for stroke: AtlasStroke in artwork:
-        _draw_stroke(stroke)
-    if is_editing() and not _erasing:
-        _draw_stroke(_draft_stroke)
+    draw_set_transform(Vector2.ZERO)
+    _sync_layer_renderers()
+
+
+func _sync_layer_renderers() -> void:
+    var present: Dictionary[String, bool] = {}
+    for index: int in range(floor.layers.size()):
+        var layer: AtlasLayer = floor.layers[index]
+        present[layer.id] = true
+        if not _layer_groups.has(layer.id):
+            var group: CanvasGroup = CanvasGroup.new()
+            var drawer: Node2D = Node2D.new()
+            drawer.draw.connect(_draw_content_layer.bind(drawer, layer.id))
+            group.add_child(drawer)
+            add_child(group)
+            _layer_groups[layer.id] = group
+            _layer_drawers[layer.id] = drawer
+        var group: CanvasGroup = _layer_groups[layer.id]
+        move_child(group, index)
+        group.position = size * 0.5 - camera_center * camera_zoom
+        group.scale = Vector2.ONE * camera_zoom
+        group.self_modulate = Color(1, 1, 1, layer.opacity)
+        group.visible = layer.visible and layer.opacity > 0.0
+        _layer_drawers[layer.id].queue_redraw()
+    for id: String in _layer_groups.keys():
+        if not present.has(id):
+            _layer_groups[id].hide()
+            _layer_groups[id].queue_free()
+            _layer_groups.erase(id)
+            _layer_drawers.erase(id)
+    _overlay.position = size * 0.5 - camera_center * camera_zoom
+    _overlay.scale = Vector2.ONE * camera_zoom
+    _overlay.queue_redraw()
+
+
+func _draw_content_layer(item: Node2D, id: String) -> void:
+    if floor == null:
+        return
+    var layer: AtlasLayer = floor.layer_by_id(id)
+    if layer is AtlasTileLayer:
+        var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid()
+        for key: String in layer.terrain:
+            var xy: PackedStringArray = key.split(",")
+            var cell: Vector2i = Vector2i(int(xy[0]), int(xy[1]))
+            if layer.terrain[key] != 0:
+                item.draw_colored_polygon(grid.cell_polygon(cell), _terrain_color(layer.terrain[key]))
+    elif layer is AtlasInkLayer:
+        var previewing: bool = is_editing() and active_layer_id == id
+        var artwork: Array[AtlasStroke] = _erase_preview if previewing and _erasing else layer.strokes
+        for stroke: AtlasStroke in artwork:
+            _draw_stroke(stroke, item)
+        if previewing and not _erasing:
+            _draw_stroke(_draft_stroke, item)
+    elif layer is AtlasRasterLayer:
+        for chunk: AtlasRasterChunk in layer.chunks.values():
+            if chunk.image == null:
+                continue
+            var asset: String = chunk.asset_id
+            if not _raster_textures.has(asset):
+                _raster_textures[asset] = ImageTexture.create_from_image(chunk.image)
+            var origin: Vector2 = Vector2(chunk.coord) * AtlasRasterChunk.SIZE / layer.pixels_per_unit
+            var dimensions: Vector2 = Vector2(chunk.width, chunk.height) / layer.pixels_per_unit
+            item.draw_texture_rect(_raster_textures[asset], Rect2(origin, dimensions), false)
+
+
+func _draw_overlays(item: Node2D) -> void:
+    if map == null or floor == null:
+        return
     if show_grid:
-        _draw_cells(true)
-    _draw_links()
+        _draw_grid(item)
+    _draw_links(item)
     if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
         var outline := map.grid.cell_polygon(selected_cell)
-        _stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom)
+        _stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
     if _drawing_battlemap:
-        _draw_draft()
-    draw_set_transform(Vector2.ZERO)
+        _draw_draft(item)
 
 
 func _draw_parent_reference() -> void:
@@ -148,6 +219,9 @@ func _draw_parent_reference() -> void:
             continue
         var parent_floor := parent.floor_by_id(parent.default_floor_id)
         if parent_floor == null:
+            continue
+        var terrain: AtlasTileLayer = parent_floor.terrain_layer()
+        if terrain == null or not terrain.visible or terrain.opacity <= 0.0:
             continue
         var clipping := PackedVector2Array([
             Vector2.ZERO,
@@ -165,25 +239,16 @@ func _draw_parent_reference() -> void:
             for point in polygon:
                 transformed.append(placement.parent_point_to_child(point))
             var color := _terrain_color(parent_floor.get_terrain(cell))
-            color.a = reference_opacity
+            color.a = reference_opacity * terrain.opacity
             if transformed.size() >= 3:
                 for clipped in Geometry2D.intersect_polygons(transformed, clipping):
                     if clipped.size() >= 3:
                         draw_colored_polygon(clipped, color)
 
 
-func _draw_cells(grid_only: bool) -> void:
-    var grid: AtlasGrid = map.grid if grid_only else map.get_terrain_grid()
+func _draw_grid(item: Node2D) -> void:
+    var grid: AtlasGrid = map.grid
     if grid.kind == AtlasGrid.Kind.GRIDLESS:
-        return
-    if not grid_only:
-        for key: String in floor.terrain:
-            var parts: PackedStringArray = key.split(",")
-            if parts.size() != 2:
-                continue
-            var cell: Vector2i = Vector2i(int(parts[0]), int(parts[1]))
-            if floor.get_terrain(cell) != 0:
-                draw_colored_polygon(grid.cell_polygon(cell), _terrain_color(floor.get_terrain(cell)))
         return
     # Dense grids are hidden rather than drawing an incomplete central patch or stalling the UI.
     if grid.cell_size * camera_zoom < 8.0:
@@ -203,14 +268,14 @@ func _draw_cells(grid_only: bool) -> void:
         for y: int in range(minimum.y, maximum.y + 1):
             var cell := Vector2i(x, y)
             var polygon := grid.cell_polygon(cell)
-            _stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom)
+            _stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom, item)
 
 
-func _draw_stroke(stroke: AtlasStroke) -> void:
+func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
     if stroke.points.size() > 1:
-        draw_polyline(stroke.points, stroke.color, stroke.width, true)
+        item.draw_polyline(stroke.points, stroke.color, stroke.width, true)
     for point: Vector2 in stroke.points:
-        draw_circle(point, stroke.width * 0.5, stroke.color)
+        item.draw_circle(point, stroke.width * 0.5, stroke.color)
 
 
 func _append_stroke_point(local_position: Vector2) -> void:
@@ -222,11 +287,13 @@ func _append_stroke_point(local_position: Vector2) -> void:
     if _draft_stroke.points[-1].distance_squared_to(point) >= 0.01:
         _draft_stroke.points.append(point)
     if _erasing:
-        _erase_preview = AtlasStrokeEraser.erase(floor.strokes, _draft_stroke.points, _draft_stroke.width)
+        var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+        if layer != null:
+            _erase_preview = AtlasStrokeEraser.erase(layer.strokes, _draft_stroke.points, _draft_stroke.width)
     queue_redraw()
 
 
-func _draw_links() -> void:
+func _draw_links(item: Node2D) -> void:
     if campaign == null or preview == Preview.OFF:
         return
     for link in campaign.outgoing_links(map.id):
@@ -239,23 +306,26 @@ func _draw_links() -> void:
                 continue
             var corners := placement.corners()
             var fill := Color(0.24, 0.70, 0.82, 0.15)
-            draw_colored_polygon(corners, fill)
-            _stroke_polygon(corners, Color("#63d3e5"), 2.0 / camera_zoom)
+            item.draw_colored_polygon(corners, fill)
+            _stroke_polygon(corners, Color("#63d3e5"), 2.0 / camera_zoom, item)
             if preview == Preview.THUMBNAILS and not placement.symbolic:
-                _draw_placement_preview(placement, target)
-            draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
+                _draw_placement_preview(placement, target, item)
+            item.draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
                 HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
         else:
-            draw_circle(link.anchor, 18.0 / camera_zoom, Color("#efd797"))
-            draw_arc(link.anchor, 18.0 / camera_zoom, 0.0, TAU, 24,
+            item.draw_circle(link.anchor, 18.0 / camera_zoom, Color("#efd797"))
+            item.draw_arc(link.anchor, 18.0 / camera_zoom, 0.0, TAU, 24,
                 Color("#395760"), 2.0 / camera_zoom)
-            draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
+            item.draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
                 target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
 
-func _draw_placement_preview(placement: AtlasPlacement, target: AtlasMapDocument) -> void:
+func _draw_placement_preview(placement: AtlasPlacement, target: AtlasMapDocument, item: Node2D) -> void:
     var child_floor := target.floor_by_id(target.default_floor_id)
     if child_floor == null:
+        return
+    var terrain: AtlasTileLayer = child_floor.terrain_layer()
+    if terrain == null or not terrain.visible or terrain.opacity <= 0.0:
         return
     for key: String in child_floor.terrain.keys():
         var xy := key.split(",")
@@ -271,14 +341,14 @@ func _draw_placement_preview(placement: AtlasPlacement, target: AtlasMapDocument
             transform * (u + Vector2.ONE), transform * (u + Vector2.DOWN)
         ])
         var color := _terrain_color(child_floor.get_terrain(cell))
-        color.a = 0.7
-        draw_colored_polygon(square, color)
+        color.a = 0.7 * terrain.opacity
+        item.draw_colored_polygon(square, color)
 
 
-func _draw_draft() -> void:
+func _draw_draft(item: Node2D) -> void:
     var footprint := _draft_polygon()
-    draw_colored_polygon(footprint, Color(0.26, 0.76, 0.87, 0.16))
-    _stroke_polygon(footprint, Color("#87e1f2"), 2.0 / camera_zoom)
+    item.draw_colored_polygon(footprint, Color(0.26, 0.76, 0.87, 0.16))
+    _stroke_polygon(footprint, Color("#87e1f2"), 2.0 / camera_zoom, item)
 
 
 func _draft_polygon() -> PackedVector2Array:
@@ -293,12 +363,12 @@ func _draft_polygon() -> PackedVector2Array:
     ])
 
 
-func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float) -> void:
+func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, item: Node2D) -> void:
     if polygon.size() < 2:
         return
     var outline := polygon.duplicate()
     outline.append(polygon[0])
-    draw_polyline(outline, color, width, true)
+    item.draw_polyline(outline, color, width, true)
 
 
 func _terrain_color(palette: int) -> Color:
@@ -349,6 +419,10 @@ func _gui_input(event: InputEvent) -> void:
                         return
                 match tool:
                     Tool.PEN, Tool.ERASER:
+                        var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+                        if layer == null or not layer.is_editable():
+                            accept_event()
+                            return
                         _erasing = tool == Tool.ERASER
                         _stroke_left_canvas = false
                         _draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)

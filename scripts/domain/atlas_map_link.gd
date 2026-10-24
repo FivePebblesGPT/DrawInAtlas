@@ -23,12 +23,23 @@ func to_dict() -> Dictionary:
 
 
 static func from_dict(data: Dictionary) -> AtlasMapLink:
+    for field: String in ["id", "source_map_id", "target_map_id"]:
+        if not AtlasData.text(data.get(field)):
+            return null
+    var source: Variant = data.get("anchor", [0.0, 0.0])
+    var target: Variant = data.get("target_focus", [0.0, 0.0])
+    var radius: Variant = data.get("hit_radius", 48.0)
+    var zoom: Variant = data.get("target_zoom", 1.0)
+    if not AtlasData.vector(source) or not AtlasData.vector(target):
+        return null
+    if not AtlasData.number(radius) or float(radius) <= 0.0 or not AtlasData.number(zoom) or float(zoom) <= 0.0:
+        return null
+    if not AtlasData.text(data.get("target_floor_id", "ground")) or not data.get("placement_id", "") is String:
+        return null
     var link := AtlasMapLink.new()
     link.id = str(data.get("id", ""))
     link.source_map_id = str(data.get("source_map_id", ""))
     link.target_map_id = str(data.get("target_map_id", ""))
-    var source: Array = data.get("anchor", [0.0, 0.0])
-    var target: Array = data.get("target_focus", [0.0, 0.0])
     link.anchor = Vector2(float(source[0]), float(source[1]))
     link.target_focus = Vector2(float(target[0]), float(target[1]))
     link.hit_radius = float(data.get("hit_radius", 48.0))

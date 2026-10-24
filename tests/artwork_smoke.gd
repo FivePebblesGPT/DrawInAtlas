@@ -208,7 +208,7 @@ func _test_vector_persistence() -> void:
     floor.strokes = _copies(expected)
     floor.paint(Vector2i(-2, 3), 7)
     var floor_data: Dictionary = floor.to_dict()
-    _check(floor_data.has("strokes"), "floor persists strokes explicitly")
+    _check(floor_data.has("layers"), "floor persists typed ordered layers")
     _check(_json_value(floor_data), "floor artwork is canonical JSON vector data")
     var restored_floor: AtlasFloor = AtlasFloor.from_dict(floor_data)
     _check(restored_floor != null, "floor with artwork restores")

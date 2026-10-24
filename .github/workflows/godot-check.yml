@@ -45,6 +45,17 @@ jobs:
           godot --headless --path . --script res://tests/board_grid_smoke.gd 2>&1 | tee /tmp/godot-board-grid.log
           grep -q 'ATLAS_BOARD_GRID_PASSED' /tmp/godot-board-grid.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-board-grid.log; then exit 1; fi
+      - name: Run layer and recovery tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in layers_smoke storage_smoke layer_ui_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_LAYERS_PASSED' /tmp/godot-layers_smoke.log
+          grep -q 'ATLAS_STORAGE_PASSED' /tmp/godot-storage_smoke.log
+          grep -q 'ATLAS_LAYER_UI_PASSED' /tmp/godot-layer_ui_smoke.log
       - name: Launch main scene headlessly
         shell: bash
         run: |

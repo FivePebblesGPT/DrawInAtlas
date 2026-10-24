@@ -1,7 +1,7 @@
 class_name AtlasCampaign
 extends RefCounted
 
-const SCHEMA_VERSION: int = 3
+const SCHEMA_VERSION: int = 4
 
 var display_name: String = "West Marches"
 var root_map_id: String = "world"
@@ -66,12 +66,20 @@ func to_dict() -> Dictionary:
 
 
 static func from_dict(data: Dictionary) -> AtlasCampaign:
-    if int(data.get("schema_version", 0)) not in [1, 2, SCHEMA_VERSION]:
+    var version: Variant = data.get("schema_version")
+    if not AtlasData.integer(version) or int(version) not in [1, 2, 3, SCHEMA_VERSION]:
+        return null
+    var raw_maps: Variant = data.get("maps")
+    var raw_links: Variant = data.get("links", [])
+    var raw_placements: Variant = data.get("placements", [])
+    if not raw_maps is Array or not raw_links is Array or not raw_placements is Array:
+        return null
+    if not AtlasData.text(data.get("root_map_id")) or not AtlasData.text(data.get("name", "West Marches")):
         return null
     var campaign := AtlasCampaign.new()
     campaign.display_name = str(data.get("name", "West Marches"))
     campaign.root_map_id = str(data.get("root_map_id", "world"))
-    for saved_map in data.get("maps", []):
+    for saved_map: Variant in raw_maps:
         if not saved_map is Dictionary:
             return null
         var document: AtlasMapDocument = AtlasMapDocument.from_dict(saved_map)
@@ -80,10 +88,24 @@ static func from_dict(data: Dictionary) -> AtlasCampaign:
         if campaign.maps.has(document.id):
             return null
         campaign.add_map(document)
-    for saved_link in data.get("links", []):
-        campaign.links.append(AtlasMapLink.from_dict(saved_link))
-    for saved_placement in data.get("placements", []):
-        campaign.placements.append(AtlasPlacement.from_dict(saved_placement))
+    var link_ids: Dictionary[String, bool] = {}
+    for saved_link: Variant in raw_links:
+        if not saved_link is Dictionary:
+            return null
+        var link: AtlasMapLink = AtlasMapLink.from_dict(saved_link)
+        if link == null or link_ids.has(link.id):
+            return null
+        link_ids[link.id] = true
+        campaign.links.append(link)
+    var placement_ids: Dictionary[String, bool] = {}
+    for saved_placement: Variant in raw_placements:
+        if not saved_placement is Dictionary:
+            return null
+        var placement: AtlasPlacement = AtlasPlacement.from_dict(saved_placement)
+        if placement == null or placement_ids.has(placement.id):
+            return null
+        placement_ids[placement.id] = true
+        campaign.placements.append(placement)
     if campaign.get_map(campaign.root_map_id) == null:
         return null
     return campaign

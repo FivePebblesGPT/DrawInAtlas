@@ -21,11 +21,11 @@ func _run_suite() -> void:
     for frame: int in range(8):
         await process_frame
 
-    editor.canvas.self_modulate = Color(1, 1, 1, 0)
+    editor.canvas.modulate = Color(1, 1, 1, 0)
     await process_frame
     await RenderingServer.frame_post_draw
     var chrome_only: Image = root.get_texture().get_image()
-    editor.canvas.self_modulate = Color.WHITE
+    editor.canvas.modulate = Color.WHITE
     editor.canvas.camera_zoom = 0.5
     editor.canvas.queue_redraw()
     await process_frame
@@ -104,6 +104,50 @@ func _run_suite() -> void:
     var restored_ink: bool = undo_image.get_pixelv(center).is_equal_approx(ink)
     passed = passed and restored_ink
     passed = passed and undo_image.save_png(directory.path_join("undo-erase.png")) == OK
+    editor.select_layer("ink")
+    editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-100, -40), Vector2(-100, 40)]), ink, 20.0), false)
+    var translucent: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+    (translucent[1] as AtlasInkLayer).opacity = 0.5
+    editor.apply_layers(translucent, "ink")
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var alpha_frame: Image = root.get_texture().get_image()
+    var line_pixel: Color = alpha_frame.get_pixelv(center + Vector2i(-60, 0))
+    var crossing_pixel: Color = alpha_frame.get_pixelv(center + Vector2i(-100, 0))
+    var group_opacity: bool = line_pixel.is_equal_approx(crossing_pixel) and line_pixel.r > 0.2 and line_pixel.r < 0.9
+    passed = passed and group_opacity
+    var blue: Color = Color("#2070ff")
+    var image: Image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
+    image.fill(blue)
+    editor.import_raster(image)
+    var raster_id: String = canvas.active_layer_id
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var raster_frame: Image = root.get_texture().get_image()
+    var raster_on_top: bool = raster_frame.get_pixelv(center + Vector2i(20, 5)).is_equal_approx(blue)
+    passed = passed and raster_on_top
+    editor.layer_panel._move(-1)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var reordered_frame: Image = root.get_texture().get_image()
+    var layer_order: bool = not reordered_frame.get_pixelv(center + Vector2i(20, 5)).is_equal_approx(blue)
+    passed = passed and layer_order
+    editor.layer_panel.visibility_checkbox.button_pressed = false
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var hidden_frame: Image = root.get_texture().get_image()
+    var hidden_raster: bool = hidden_frame.get_pixelv(center + Vector2i(20, 20)).is_equal_approx(AtlasCanvas.EMPTY_COLOR)
+    passed = passed and hidden_raster
+    editor.layer_panel.visibility_checkbox.button_pressed = true
+    editor.layer_panel.opacity_spinner.value = 0.5
+    editor.sidebar.select_view(&"Layers")
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var layered_frame: Image = root.get_texture().get_image()
+    var partial: Color = layered_frame.get_pixelv(center + Vector2i(20, 20))
+    var raster_opacity: bool = partial.b > AtlasCanvas.EMPTY_COLOR.b and partial.b < blue.b
+    passed = passed and raster_opacity and canvas.floor.layer_by_id(raster_id) != null
+    passed = passed and layered_frame.save_png(directory.path_join("typed-layers.png")) == OK
     editor.open_board_dialog()
     await process_frame
     await RenderingServer.frame_post_draw
@@ -137,6 +181,8 @@ func _run_suite() -> void:
     print("ATLAS_INK_PIXELS gap=%s surviving_ink=%s undo=%s" % [real_gap, surviving_ink, restored_ink])
     print("ATLAS_COMPACT_LAYOUT %s" % compact_layout)
     print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [terrain_moved, compact_dialog])
+    print("ATLAS_LAYER_PIXELS grouped_alpha=%s raster_top=%s order=%s hidden=%s raster_alpha=%s" % [
+        group_opacity, raster_on_top, layer_order, hidden_raster, raster_opacity])
     root.remove_child(scene)
     scene.free()
     quit(0 if passed else 1)

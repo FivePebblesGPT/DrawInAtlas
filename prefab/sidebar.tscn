@@ -137,18 +137,14 @@ theme_override_constants/margin_top = 12
 theme_override_constants/margin_right = 18
 theme_override_constants/margin_bottom = 18
 
-[node name="Views" type="Control" parent="ViewPanel/Layout/Scroll/ContentMargin"]
+[node name="Views" type="VBoxContainer" parent="ViewPanel/Layout/Scroll/ContentMargin"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 160)
 
 [node name="Maps" type="VBoxContainer" parent="ViewPanel/Layout/Scroll/ContentMargin/Views"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="Heading" type="Label" parent="ViewPanel/Layout/Scroll/ContentMargin/Views/Maps"]
@@ -164,12 +160,8 @@ autowrap_mode = 3
 [node name="Search" type="VBoxContainer" parent="ViewPanel/Layout/Scroll/ContentMargin/Views"]
 unique_name_in_owner = true
 visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 14
 
 [node name="SearchInput" type="LineEdit" parent="ViewPanel/Layout/Scroll/ContentMargin/Views/Search"]
@@ -188,12 +180,8 @@ autowrap_mode = 3
 [node name="Layers" type="VBoxContainer" parent="ViewPanel/Layout/Scroll/ContentMargin/Views"]
 unique_name_in_owner = true
 visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="Heading" type="Label" parent="ViewPanel/Layout/Scroll/ContentMargin/Views/Layers"]

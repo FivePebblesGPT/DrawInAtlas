@@ -1,5 +1,9 @@
 extends SceneTree
 
+class FailedSaveIO extends AtlasStoreIO:
+    func write_bytes(_path: String, _bytes: PackedByteArray) -> Error:
+        return ERR_FILE_CANT_WRITE
+
 ## Run: godot --headless --path . --script res://tests/smoke.gd
 var failures: int = 0
 
@@ -181,6 +185,7 @@ func _test_editor_workflow() -> void:
         _check(not placement.symbolic, "city placement uses spatial reference")
         _check(is_equal_approx(rad_to_deg(placement.rotation), 37.0), "battlemap angle persists")
 
+    editor._on_tool_changed(AtlasCanvas.Tool.PAINT)
     editor._on_select(Vector2i(0, 0))
     editor.locked_to_cell = true
     editor._on_paint(Vector2i(1, 0))
@@ -301,10 +306,10 @@ func _test_drawing_input() -> void:
     var saved: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
     editor._on_undo()
     _check(editor.edits.is_dirty(), "undo away from saved state is dirty")
-    editor.save_path = "user://atlas_missing_directory_582701/campaign.json"
+    editor.store_io = FailedSaveIO.new()
     editor._on_save()
     _check(editor.edits.is_dirty(), "failed Save cannot clear dirty state")
-    editor.save_path = "user://atlas_input_smoke.json"
+    editor.store_io = null
     file_menu.id_pressed.emit(1)
     _check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "Load starts a fresh clean history")
     _check(AtlasStroke.same_artwork(saved, canvas.floor.strokes), "Save/Load preserves erased vector geometry")

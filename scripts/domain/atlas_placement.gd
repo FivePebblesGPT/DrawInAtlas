@@ -54,11 +54,24 @@ func to_dict() -> Dictionary:
 
 
 static func from_dict(data: Dictionary) -> AtlasPlacement:
+    for field: String in ["id", "parent_map_id", "child_map_id"]:
+        if not AtlasData.text(data.get(field)):
+            return null
+    var coords: Variant = data.get("origin", [0.0, 0.0])
+    if not AtlasData.vector(coords) or not AtlasData.number(data.get("rotation", 0.0)):
+        return null
+    for field: String in ["columns", "rows"]:
+        if not AtlasData.integer(data.get(field, 10)) or int(data.get(field, 10)) < 1:
+            return null
+    for field: String in ["parent_units_per_cell", "child_units_per_cell"]:
+        if not AtlasData.number(data.get(field, 24.0)) or float(data.get(field, 24.0)) <= 0.0:
+            return null
+    if not data.get("symbolic", false) is bool:
+        return null
     var result := AtlasPlacement.new()
     result.id = str(data.get("id", ""))
     result.parent_map_id = str(data.get("parent_map_id", ""))
     result.child_map_id = str(data.get("child_map_id", ""))
-    var coords: Array = data.get("origin", [0.0, 0.0])
     result.origin = Vector2(float(coords[0]), float(coords[1]))
     result.rotation = float(data.get("rotation", 0.0))
     result.columns = maxi(1, int(data.get("columns", 10)))

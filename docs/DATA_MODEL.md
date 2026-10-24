@@ -2,6 +2,16 @@
 
 **Status:** proposed versioned format, not current application serialization. The examples are illustrative and intentionally small. Final schema, migration strategy and language bindings should be tested during the first vertical slice.
 
+### Current runtime contract (v4)
+
+The implementation uses a compact runtime format distinct from the illustrative package below. `AtlasCampaignStore` writes a checksummed campaign at the selected JSON path, keeps its previous validated generation at `.bak`, and stores content-addressed lossless raster chunks at `.assets/<pixel-sha256>.webp`. Pending files are never load candidates. All assets are staged and verified before the metadata head is replaced; a damaged head or referenced asset can recover through the validated backup.
+
+Each floor owns an ordered `layers` array (back to front): `TILES` has sparse terrain plus its own geometry, `INK` has vector strokes, and `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths.
+
+Versions 1–3 migrate their single terrain/ink payloads into typed layers. The frozen terrain basis is preserved. The old floor `terrain`/`strokes` properties remain compatibility views in memory, not duplicate serialized authorities. Full-precision JSON and canonical checksums preserve numeric settings. Raster hashes include normalized RGBA8 pixel bytes and dimensions; native tests verify transparent RGB survives WebP exactly.
+
+The current recovery scheme retains one previous generation and immutable assets, not a full journal, autosave, or asset garbage collector. File flush/rename failure cases are tested; physical-media durability across power loss is not guaranteed by the Godot filesystem API. Browser smoke/recovery validation is deferred at the user's request.
+
 ## 1. Identity and relationships
 
 All persistent entities have immutable stable IDs (UUID-like strings preferred). Display names are editable and **never** serve as primary foreign keys.
