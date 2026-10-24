@@ -3,28 +3,15 @@ extends VBoxContainer
 ## A read-only, selected-floor snapshot rendered by a private AtlasCanvas.
 
 const PREVIEW_SIZE: Vector2i = Vector2i(192, 128)
+const RENDERER_SCENE: PackedScene = preload("res://prefab/preview_renderer.tscn")
 
 var cache: AtlasPreviewCache = AtlasPreviewCache.new()
-var texture_rect: TextureRect = TextureRect.new()
-var caption: Label = Label.new()
+@onready var texture_rect: TextureRect = $TextureRect
+@onready var caption: Label = $Caption
 
 var _viewport: SubViewport
 var _canvas: AtlasCanvas
 var _request_token: int = 0
-
-
-func _init() -> void:
-    texture_rect.custom_minimum_size = Vector2(0, 128)
-    texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-    texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-    texture_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    add_child(texture_rect)
-    caption.text = "Select a map to preview"
-    caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    caption.max_lines_visible = 2
-    caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-    caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    add_child(caption)
 
 
 func request_preview(campaign: AtlasCampaign, map_id: String, floor_id: String) -> void:
@@ -112,21 +99,17 @@ func _exit_tree() -> void:
 func _ensure_renderer() -> void:
     if _viewport != null:
         return
-    _viewport = SubViewport.new()
-    _viewport.size = PREVIEW_SIZE
-    _viewport.gui_disable_input = true
-    # Godot has no own_world_2d property: a fresh World2D provides isolation.
+
+    _viewport = RENDERER_SCENE.instantiate() as SubViewport
+    # A private world isolates this preview from the editor canvas.
     _viewport.world_2d = World2D.new()
-    _viewport.disable_3d = true
-    _viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-    add_child(_viewport)
-    _canvas = AtlasCanvas.new()
-    _canvas.size = Vector2(PREVIEW_SIZE)
+    _canvas = _viewport.get_node("Canvas") as AtlasCanvas
     _canvas.render_grid = false
     _canvas.preview = AtlasCanvas.Preview.OFF
     _canvas.show_reference = false
-    _viewport.add_child(_canvas)
-    # AtlasCanvas._ready assigns its interactive defaults, so override afterwards.
+    add_child(_viewport)
+
+    # AtlasCanvas._ready restores interactive defaults, so disable input afterwards.
     _canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _canvas.focus_mode = Control.FOCUS_NONE
     _canvas.set_process_input(false)

@@ -5,57 +5,31 @@ signal layer_selected(id: String)
 signal layers_changed(layers: Array[AtlasLayer], selected_id: String)
 signal import_requested
 
-var layer_list: ItemList
-var visibility_checkbox: CheckBox
-var lock_checkbox: CheckBox
-var opacity_spinner: SpinBox
-var name_input: LineEdit
+@onready var layer_list: ItemList = $LayerList
+@onready var visibility_checkbox: CheckBox = $VisibilityCheckbox
+@onready var lock_checkbox: CheckBox = $LockCheckbox
+@onready var opacity_spinner: SpinBox = $OpacitySpinner
+@onready var name_input: LineEdit = $NameInput
+@onready var _up: Button = $Order/RaiseButton
+@onready var _down: Button = $Order/LowerButton
 var _floor: AtlasFloor
 var _selected: String = ""
 var _ids: Array[String] = []
-var _up: Button
-var _down: Button
 
 
 func _ready() -> void:
-    add_theme_constant_override("separation", 8)
-    layer_list = ItemList.new()
-    layer_list.custom_minimum_size = Vector2(0, 120)
-    layer_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
     layer_list.item_selected.connect(_on_selected)
-    add_child(layer_list)
-    name_input = LineEdit.new()
-    name_input.placeholder_text = "Layer name"
     name_input.text_submitted.connect(_rename)
     name_input.focus_exited.connect(func() -> void: _rename(name_input.text))
-    add_child(name_input)
-    visibility_checkbox = CheckBox.new()
-    visibility_checkbox.text = "Visible"
     visibility_checkbox.toggled.connect(_set_property.bind(&"visible"))
-    add_child(visibility_checkbox)
-    lock_checkbox = CheckBox.new()
-    lock_checkbox.text = "Locked"
     lock_checkbox.toggled.connect(_set_property.bind(&"locked"))
-    add_child(lock_checkbox)
-    var label: Label = Label.new()
-    label.text = "Opacity"
-    add_child(label)
-    opacity_spinner = SpinBox.new()
-    opacity_spinner.min_value = 0.0
-    opacity_spinner.max_value = 1.0
-    opacity_spinner.step = 0.05
     opacity_spinner.value_changed.connect(_set_property.bind(&"opacity"))
-    add_child(opacity_spinner)
-    var order: HBoxContainer = HBoxContainer.new()
-    add_child(order)
-    _up = _button("Raise", _move.bind(1))
-    _down = _button("Lower", _move.bind(-1))
-    order.add_child(_up)
-    order.add_child(_down)
-    add_child(_button("New ink layer", _add_ink))
-    add_child(_button("New terrain layer", _add_tiles))
-    add_child(_button("New raster layer", _add_raster))
-    add_child(_button("Import image…", import_requested.emit))
+    _up.pressed.connect(_move.bind(1))
+    _down.pressed.connect(_move.bind(-1))
+    $NewInkButton.pressed.connect(_add_ink)
+    $NewTerrainButton.pressed.connect(_add_tiles)
+    $NewRasterButton.pressed.connect(_add_raster)
+    $ImportButton.pressed.connect(import_requested.emit)
 
 
 func set_floor(floor: AtlasFloor, selected_id: String) -> void:
@@ -154,10 +128,3 @@ func _add(layer: AtlasLayer) -> void:
     var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_floor.layers)
     layers.append(layer)
     layers_changed.emit(layers, layer.id)
-
-
-func _button(text: String, callback: Callable) -> Button:
-    var button: Button = Button.new()
-    button.text = text
-    button.pressed.connect(callback)
-    return button
