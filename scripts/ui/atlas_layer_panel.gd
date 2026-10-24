@@ -54,6 +54,7 @@ func _ready() -> void:
     order.add_child(_down)
     add_child(_button("New ink layer", _add_ink))
     add_child(_button("New terrain layer", _add_tiles))
+    add_child(_button("New raster layer", _add_raster))
     add_child(_button("Import image…", import_requested.emit))
 
 
@@ -139,6 +140,11 @@ func _add_ink() -> void:
 
 func _add_tiles() -> void:
     var layer: AtlasTileLayer = AtlasTileLayer.new("tiles-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Terrain")
+    _add(layer)
+
+
+func _add_raster() -> void:
+    var layer: AtlasRasterLayer = AtlasRasterLayer.new("raster-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Raster")
     _add(layer)
 
 

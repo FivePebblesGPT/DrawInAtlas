@@ -49,6 +49,18 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
             if not AtlasData.number(scale) or float(scale) <= 0.0 or not chunks is Array:
                 return null
             raster.pixels_per_unit = float(scale)
+            var placement: Variant = data.get("transform", [1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+            if not placement is Array or placement.size() != 6:
+                return null
+            for number: Variant in placement:
+                if not AtlasData.number(number):
+                    return null
+            raster.transform = Transform2D(Vector2(float(placement[0]), float(placement[1])),
+                Vector2(float(placement[2]), float(placement[3])), Vector2(float(placement[4]), float(placement[5])))
+            if not raster.transform.x.is_finite() or not raster.transform.y.is_finite() or not raster.transform.origin.is_finite():
+                return null
+            if not is_finite(raster.transform.determinant()) or absf(raster.transform.determinant()) < 0.00000001:
+                return null
             for raw: Variant in chunks:
                 if not raw is Dictionary:
                     return null

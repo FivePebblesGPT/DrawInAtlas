@@ -38,11 +38,21 @@ var grid_controls: AtlasGridControls
 var board_dialog: AtlasBoardDialog
 var layer_panel: AtlasLayerPanel
 var raster_importer: AtlasRasterImporter
+var use_system_clipboard: bool = true
+var clipboard_text: String = ""
+var _paste_count: int = 0
 var brush_color_picker: ColorPickerButton
 var brush_width_spinner: SpinBox
 var _ink_section: VBoxContainer
 var _terrain_section: VBoxContainer
 var _placement_section: VBoxContainer
+var _selection_section: VBoxContainer
+var selection_label: Label
+var move_x_spinner: SpinBox
+var move_y_spinner: SpinBox
+var scale_spinner: SpinBox
+var artwork_rotation_spinner: SpinBox
+var _transform_button: Button
 
 const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 
@@ -59,7 +69,7 @@ func _ready() -> void:
     edits.changed.connect(_refresh_edit_state)
     edits.reset(campaign, loaded and (restored == null or not restored.recovered))
     _show_map(campaign.get_map(campaign.root_map_id))
-    _message("Draw freely across cells. B: pen · E: eraser · Ctrl+Z: undo · Middle-drag: pan.")
+    _message("B pen · E eraser · V select · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
     if restored != null and restored.recovered:
         _message(restored.message + " Save to establish a fresh checkpoint.")
     elif restored != null and restored.error != OK and restored.error != ERR_FILE_NOT_FOUND:
@@ -134,6 +144,10 @@ func _build_canvas(parent: HBoxContainer) -> void:
     canvas.interaction_started.connect(zoom_gate.reset)
     canvas.mouse_exited.connect(zoom_gate.reset)
     canvas.stroke_requested.connect(_on_stroke)
+    canvas.selection_changed.connect(_on_selection_changed)
+    canvas.transform_requested.connect(transform_selection)
+    canvas.fill_requested.connect(fill_at)
+    canvas.interaction_started.connect(_refresh_scope)
     parent.add_child(canvas)
 
 
@@ -158,6 +172,7 @@ func _build_inspector(parent: HBoxContainer) -> void:
 
     _build_tool_controls(sections)
     _build_ink_controls(sections)
+    _build_selection_controls(sections)
     _build_terrain_controls(sections)
     _build_map_controls(sections)
     _build_placement_controls(sections)
@@ -167,7 +182,8 @@ func _build_inspector(parent: HBoxContainer) -> void:
 func _build_tool_controls(parent: VBoxContainer) -> void:
     var tools: VBoxContainer = _create_section(parent, "TOOLS")
     tool_picker = OptionButton.new()
-    for caption: String in ["Pen", "Eraser", "Paint cells (prototype)", "Select cell", "Drag battlemap"]:
+    for caption: String in ["Pen", "Eraser", "Paint cells", "Select scope cell", "Drag battlemap",
+            "Line", "Rectangle outline", "Ellipse outline", "Select artwork", "Fill raster / terrain"]:
         tool_picker.add_item(caption)
     tool_picker.item_selected.connect(_on_tool_changed)
     tools.add_child(tool_picker)
@@ -202,18 +218,48 @@ func _build_terrain_controls(parent: VBoxContainer) -> void:
     palette_picker.item_selected.connect(func(index: int) -> void: palette_id = index)
     _terrain_section.add_child(palette_picker)
 
-    lock_checkbox = CheckBox.new()
-    lock_checkbox.text = "Cell lock (terrain only)"
-    lock_checkbox.disabled = true
-    lock_checkbox.toggled.connect(func(on: bool) -> void:
-        locked_to_cell = on
-        _message("Cell lock %s" % ("ON" if on else "OFF"))
-    )
-    _terrain_section.add_child(lock_checkbox)
+
+
+func _build_selection_controls(parent: VBoxContainer) -> void:
+    _selection_section = _create_section(parent, "SELECTION")
+    selection_label = _create_label("Select artwork with V; drag the corner to scale uniformly.")
+    _selection_section.add_child(selection_label)
+    _selection_section.add_child(_create_label("Move X / Y (board units)"))
+    var row: HBoxContainer = HBoxContainer.new()
+    _selection_section.add_child(row)
+    move_x_spinner = _transform_number(-1000000.0, 1000000.0, 0.5, 0.0)
+    move_y_spinner = _transform_number(-1000000.0, 1000000.0, 0.5, 0.0)
+    row.add_child(move_x_spinner)
+    row.add_child(move_y_spinner)
+    _selection_section.add_child(_create_label("Scale / rotate about center"))
+    scale_spinner = _transform_number(0.01, 100.0, 0.01, 1.0)
+    artwork_rotation_spinner = _transform_number(-180.0, 180.0, 1.0, 0.0)
+    _selection_section.add_child(scale_spinner)
+    _selection_section.add_child(artwork_rotation_spinner)
+    _transform_button = Button.new()
+    _transform_button.text = "Apply transform"
+    _transform_button.pressed.connect(_apply_numeric_transform)
+    _selection_section.add_child(_transform_button)
+
+
+func _transform_number(minimum: float, maximum: float, step: float, value: float) -> SpinBox:
+    var field: SpinBox = SpinBox.new()
+    field.min_value = minimum
+    field.max_value = maximum
+    field.step = step
+    field.value = value
+    field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    return field
 
 
 func _build_map_controls(parent: VBoxContainer) -> void:
     var map_section: VBoxContainer = _create_section(parent, "MAP")
+    lock_checkbox = CheckBox.new()
+    lock_checkbox.text = "Lock to selected cell"
+    lock_checkbox.tooltip_text = "Use Select scope cell first. A locked scope with no cell blocks artwork edits."
+    lock_checkbox.disabled = true
+    lock_checkbox.toggled.connect(_on_scope_toggled)
+    map_section.add_child(lock_checkbox)
     grid_controls = AtlasGridControls.new()
     grid_controls.settings_changed.connect(apply_grid)
     map_section.add_child(grid_controls)
@@ -296,6 +342,272 @@ func _on_unit_changed(index: int) -> void:
         var candidate: AtlasGrid = canvas.map.grid.copy()
         candidate.distance_unit = NATIVE_UNITS[index]
         apply_grid(candidate)
+
+
+func _scope() -> AtlasEditScope:
+    var boundary: PackedVector2Array = PackedVector2Array()
+    if locked_to_cell and canvas.map != null and canvas.has_selected_cell:
+        boundary = canvas.map.grid.cell_polygon(canvas.selected_cell)
+    return AtlasEditScope.new(boundary, locked_to_cell)
+
+
+func _refresh_scope() -> void:
+    canvas.edit_scope = _scope()
+
+
+func _on_scope_toggled(enabled: bool) -> void:
+    canvas.cancel_edit()
+    locked_to_cell = enabled
+    _refresh_scope()
+    _message("Selected-cell scope %s." % ("enabled" if enabled else "disabled"))
+
+
+func _on_selection_changed() -> void:
+    if selection_label == null:
+        return
+    var selection: AtlasSelection = canvas.selection
+    selection_label.text = "Drag a marquee or click ink / a raster asset."
+    if not selection.is_empty():
+        selection_label.text = "Raster asset selected" if selection.raster_selected else "%d strokes selected" % selection.stroke_indices.size()
+    move_x_spinner.set_value_no_signal(0.0)
+    move_y_spinner.set_value_no_signal(0.0)
+    scale_spinner.set_value_no_signal(1.0)
+    artwork_rotation_spinner.set_value_no_signal(0.0)
+    _transform_button.disabled = not can_modify_selection()
+
+
+func select_all_artwork() -> void:
+    tool_picker.select(AtlasCanvas.Tool.ART_SELECT)
+    _on_tool_changed(AtlasCanvas.Tool.ART_SELECT)
+    canvas.select_all_artwork()
+
+
+func _apply_numeric_transform() -> void:
+    var delta: Transform2D = AtlasSelectionGeometry.about(canvas.selection.bounds.get_center(),
+        Vector2(move_x_spinner.value, move_y_spinner.value), scale_spinner.value, deg_to_rad(artwork_rotation_spinner.value))
+    transform_selection(canvas.selection, delta)
+
+
+func transform_selection(selection: AtlasSelection, delta: Transform2D) -> bool:
+    var layer: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    var transformed: AtlasLayer = AtlasSelectionGeometry.transformed(layer, selection, delta, _scope())
+    if transformed == null:
+        _message("Transform rejected: stale/locked selection or footprint outside the selected cell.")
+        return false
+    if transformed.to_dict() == layer.to_dict():
+        return false
+    var indices: Array[int] = selection.stroke_indices.duplicate()
+    var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+    layers[canvas.floor.layers.find(layer)] = transformed
+    if not apply_layers(layers, layer.id):
+        return false
+    canvas.selection = AtlasSelectionGeometry.select_indices(canvas.floor.layer_by_id(layer.id), indices)
+    canvas.selection_changed.emit()
+    canvas.queue_redraw()
+    _message("Transformed artwork without changing its grid or source pixels.")
+    return true
+
+
+func fill_at(point: Vector2) -> bool:
+    canvas.cancel_edit()
+    canvas.clear_selection()
+    var layer: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    if layer == null or not layer.is_editable():
+        _message("Fill needs visible, unlocked raster or terrain content.")
+        return false
+    var result: AtlasFillResult
+    if layer is AtlasRasterLayer:
+        result = AtlasFill.raster(layer, point, canvas.brush_color, _scope())
+        if result.ok:
+            var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+            layers[canvas.floor.layers.find(layer)] = result.layer
+            return apply_layers(layers, layer.id)
+    elif layer is AtlasTileLayer:
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        result = AtlasFill.tiles(basis, layer.terrain, basis.document_to_cell(point), palette_id, _scope())
+        if result.ok:
+            var command: AtlasTileEdit = AtlasTileEdit.new(canvas.map.id, canvas.floor.id, layer.id, layer.terrain, result.terrain)
+            if edits.execute(command):
+                canvas.queue_redraw()
+                _message("Filled connected cells in one undoable action.")
+                return true
+    if result != null:
+        _message(result.message)
+    else:
+        _message("Bucket fill targets raster pixels or terrain cells; outlines remain vector ink.")
+    return false
+
+
+func can_copy_selection() -> bool:
+    if canvas.floor == null:
+        return false
+    var layer: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    if layer == null or not layer.visible:
+        return false
+    if layer is AtlasTileLayer:
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        var key: String = "%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y]
+        return canvas.has_selected_cell and basis.same_geometry(canvas.map.grid) and layer.terrain.has(key)
+    return not canvas.selection.is_empty() and canvas.selection.matches(layer)
+
+
+func can_modify_selection() -> bool:
+    if not can_copy_selection():
+        return false
+    var layer: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    if not layer.is_editable():
+        return false
+    if layer is AtlasTileLayer:
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        return _scope().allows_polygon(basis.cell_polygon(canvas.selected_cell))
+    return _scope().contains_rect(canvas.selection.bounds)
+
+
+func _system_clipboard_enabled() -> bool:
+    return use_system_clipboard and not OS.has_feature("web") and DisplayServer.has_feature(DisplayServer.FEATURE_CLIPBOARD)
+
+
+func copy_selection() -> bool:
+    if not can_copy_selection():
+        _message("Select visible artwork first.")
+        return false
+    var layer: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    var encoded: String = ""
+    if layer is AtlasInkLayer:
+        encoded = AtlasClipboard.encode_ink(layer.strokes, canvas.selection.stroke_indices, canvas.selection.bounds.position)
+    elif layer is AtlasRasterLayer:
+        encoded = AtlasClipboard.encode_raster(layer, canvas.selection.bounds.position)
+    elif layer is AtlasTileLayer:
+        var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
+        var cells: Dictionary = {}
+        cells["%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y]] = layer.terrain["%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y]]
+        encoded = AtlasClipboard.encode_tiles(basis, cells, canvas.selected_cell)
+    if encoded.is_empty():
+        _message("Selection is invalid or too large for the artwork clipboard.")
+        return false
+    clipboard_text = encoded
+    _paste_count = 0
+    if _system_clipboard_enabled():
+        DisplayServer.clipboard_set(encoded)
+    _message("Copied typed artwork in board units; no physical unit conversion.")
+    return true
+
+
+func delete_selection() -> bool:
+    if not can_modify_selection():
+        _message("Delete rejected: locked/hidden selection or footprint outside edit scope.")
+        return false
+    var layer: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    if layer is AtlasTileLayer:
+        var after: Dictionary = layer.terrain.duplicate()
+        after.erase("%d,%d" % [canvas.selected_cell.x, canvas.selected_cell.y])
+        var command: AtlasTileEdit = AtlasTileEdit.new(canvas.map.id, canvas.floor.id, layer.id, layer.terrain, after)
+        if edits.execute(command):
+            canvas.queue_redraw()
+            return true
+        return false
+    var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+    var index: int = canvas.floor.layers.find(layer)
+    if layer is AtlasInkLayer:
+        var indices: Array[int] = canvas.selection.stroke_indices.duplicate()
+        indices.sort()
+        indices.reverse()
+        var ink: AtlasInkLayer = layers[index] as AtlasInkLayer
+        for stroke_index: int in indices:
+            ink.strokes.remove_at(stroke_index)
+    else:
+        layers.remove_at(index)
+    return apply_layers(layers, layer.id)
+
+
+func cut_selection() -> bool:
+    if not can_modify_selection():
+        return false
+    if not copy_selection():
+        return false
+    return delete_selection()
+
+
+func paste_selection() -> bool:
+    var text: String = DisplayServer.clipboard_get() if _system_clipboard_enabled() else clipboard_text
+    var payload: AtlasClipboardData = AtlasClipboard.decode(text)
+    if payload == null:
+        if _system_clipboard_enabled() and DisplayServer.clipboard_has_image():
+            var image: Image = DisplayServer.clipboard_get_image()
+            if image != null:
+                return import_raster(image)
+        _message("Clipboard has no supported artwork.")
+        return false
+    var anchor: Vector2 = canvas.camera_center + Vector2.ONE * float(20 * _paste_count)
+    if paste_payload(payload, anchor):
+        _paste_count += 1
+        return true
+    return false
+
+
+func paste_payload(payload: AtlasClipboardData, anchor: Vector2) -> bool:
+    if payload == null or not anchor.is_finite():
+        return false
+    var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    if payload.kind == "INK" and target is AtlasInkLayer and target.is_editable():
+        var pasted: Array[AtlasStroke] = AtlasStroke.clone_all(payload.strokes)
+        for stroke: AtlasStroke in pasted:
+            for point: int in range(stroke.points.size()):
+                stroke.points[point] += anchor
+        pasted = _scope().clip_strokes(pasted)
+        if pasted.is_empty():
+            return false
+        var after: Array[AtlasStroke] = AtlasStroke.clone_all(target.strokes)
+        var first: int = after.size()
+        after.append_array(pasted)
+        var command: AtlasStrokeEdit = AtlasStrokeEdit.new(canvas.map.id, canvas.floor.id, target.strokes, after, target.id)
+        if not edits.execute(command):
+            return false
+        tool_picker.select(AtlasCanvas.Tool.ART_SELECT)
+        _on_tool_changed(AtlasCanvas.Tool.ART_SELECT)
+        var indices: Array[int] = []
+        for index: int in range(first, after.size()):
+            indices.append(index)
+        canvas.selection = AtlasSelectionGeometry.select_indices(canvas.floor.layer_by_id(target.id), indices)
+        canvas.selection_changed.emit()
+        canvas.queue_redraw()
+        return true
+    if payload.kind == "RASTER" and payload.raster != null:
+        var raster: AtlasRasterLayer = AtlasLayerCodec.clone(payload.raster) as AtlasRasterLayer
+        raster.id = "raster-" + Crypto.new().generate_random_bytes(16).hex_encode()
+        raster.transform = Transform2D(0.0, anchor) * raster.transform
+        if not _scope().contains_rect(AtlasSelectionGeometry.select_all(raster).bounds):
+            return false
+        var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+        layers.append(raster)
+        if apply_layers(layers, raster.id):
+            select_all_artwork()
+            _message("Pasted raster asset. Drag it or use the corner handle to place it.")
+            return true
+        return false
+    if payload.kind == "TILES" and target is AtlasTileLayer and target.is_editable():
+        var basis: AtlasGrid = target.grid if target.grid != null else canvas.map.get_terrain_grid()
+        if basis.kind != payload.grid.kind or basis.cell_size != payload.grid.cell_size or basis.rotation != payload.grid.rotation:
+            _message("Tile paste needs matching grid shape, spacing and rotation; no implicit conversion.")
+            return false
+        var origin: Vector2i = basis.document_to_cell(anchor)
+        var cells: Dictionary = target.terrain.duplicate()
+        for key: String in payload.tiles:
+            var xy: PackedStringArray = key.split(",")
+            var x: int = origin.x + int(xy[0])
+            var y: int = origin.y + int(xy[1])
+            if abs(x) > 2147483647 or abs(y) > 2147483647:
+                return false
+            var cell: Vector2i = Vector2i(x, y)
+            if not _scope().allows_polygon(basis.cell_polygon(cell)):
+                return false
+            cells["%d,%d" % [cell.x, cell.y]] = payload.tiles[key]
+        var command: AtlasTileEdit = AtlasTileEdit.new(canvas.map.id, canvas.floor.id, target.id, target.terrain, cells)
+        if edits.execute(command):
+            canvas.queue_redraw()
+            return true
+    _message("Select a compatible, visible and unlocked destination layer.")
+    return false
 
 
 func apply_grid(candidate: AtlasGrid) -> void:
@@ -393,7 +705,10 @@ func _refresh_grid_controls() -> void:
         canvas.has_selected_cell = false
         locked_to_cell = false
         lock_checkbox.set_pressed_no_signal(false)
+        canvas.clear_selection()
     grid_controls.set_grid(canvas.map.grid)
+    lock_checkbox.disabled = canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS
+    _refresh_scope()
 
 
 func _refresh_edit_state() -> void:
@@ -406,17 +721,28 @@ func _refresh_edit_state() -> void:
 func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
     if not stroke.is_valid():
         return
-    var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+    canvas.clear_selection()
+    var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+    if target is AtlasRasterLayer:
+        var result: AtlasFillResult = AtlasRasterBrush.paint(target, stroke.points, stroke.color, stroke.width, erasing, _scope())
+        if not result.ok:
+            _message(result.message)
+            return
+        var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+        layers[canvas.floor.layers.find(target)] = result.layer
+        apply_layers(layers, target.id)
+        return
+    var layer: AtlasInkLayer = target as AtlasInkLayer
     if layer == null or not layer.is_editable():
-        _message("Select a visible, unlocked ink layer to draw.")
+        _message("Select visible, unlocked ink or raster content to draw.")
         return
     var before: Array[AtlasStroke] = layer.strokes
     var after: Array[AtlasStroke]
     if erasing:
-        after = AtlasStrokeEraser.erase(before, stroke.points, stroke.width)
+        after = _scope().erase(before, stroke.points, stroke.width)
     else:
         after = AtlasStroke.clone_all(before)
-        after.append(stroke.copy())
+        after.append_array(_scope().clip_strokes([stroke]))
     var command: AtlasStrokeEdit = AtlasStrokeEdit.new(canvas.map.id, canvas.floor.id, before, after, layer.id)
     if edits.execute(command):
         canvas.queue_redraw()
@@ -425,6 +751,7 @@ func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
 
 func _on_undo() -> void:
     canvas.cancel_edit()
+    canvas.clear_selection()
     if edits.undo():
         if campaign.get_map(canvas.map.id) == null:
             _on_back()
@@ -438,6 +765,7 @@ func _on_undo() -> void:
 
 func _on_redo() -> void:
     canvas.cancel_edit()
+    canvas.clear_selection()
     var command: AtlasEditCommand = edits.get_redo_command()
     if edits.redo():
         if command is AtlasCreateMap:
@@ -472,13 +800,15 @@ func select_layer(id: String) -> void:
     if canvas.floor.layer_by_id(id) == null:
         return
     canvas.cancel_edit()
+    canvas.clear_selection()
     canvas.active_layer_id = id
     _refresh_layers()
     _message("Selected layer: %s" % canvas.floor.layer_by_id(id).display_name)
 
 
-func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> void:
+func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
     canvas.cancel_edit()
+    canvas.clear_selection()
     for layer: AtlasLayer in layers:
         if layer is AtlasTileLayer and layer.grid == null:
             if canvas.floor.layer_by_id(layer.id) != null:
@@ -486,28 +816,44 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> void:
             elif canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
                 _message("Choose a square or hex grid before creating a terrain layer.")
                 _refresh_layers()
-                return
+                return false
             else:
                 layer.grid = canvas.map.grid.copy()
+    var new_layer: bool = canvas.floor.layer_by_id(selected_id) == null
     var command: AtlasLayerEdit = AtlasLayerEdit.new(canvas.map.id, canvas.floor.id, canvas.floor.layers, layers)
     if edits.execute(command):
         _refresh_layers(selected_id)
+        var selected: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+        if new_layer and ((selected is AtlasInkLayer and selected.strokes.is_empty())
+                or (selected is AtlasRasterLayer and selected.chunks.is_empty())):
+            tool_picker.select(AtlasCanvas.Tool.PEN)
+            _on_tool_changed(AtlasCanvas.Tool.PEN)
         canvas.queue_redraw()
         _message("Layer changed. Hidden or locked layers are not editable.")
+        return true
     else:
         _refresh_layers()
+    return false
 
 
-func import_raster(image: Image) -> void:
+func import_raster(image: Image) -> bool:
     var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(image)
     if layer == null:
         _message("Could not create a raster layer from that image.")
-        return
+        return false
     layer.id = "raster-" + Crypto.new().generate_random_bytes(16).hex_encode()
     layer.display_name = "Imported image"
+    layer.transform.origin = canvas.camera_center - AtlasSelectionGeometry.raster_local_bounds(layer).size * 0.5
+    if not _scope().contains_rect(AtlasSelectionGeometry.select_all(layer).bounds):
+        _message("Imported image does not fit the selected-cell scope.")
+        return false
     var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
     layers.append(layer)
-    apply_layers(layers, layer.id)
+    if apply_layers(layers, layer.id):
+        select_all_artwork()
+        _message("Imported raster asset. Drag it or use the corner handle to place it.")
+        return true
+    return false
 
 
 func _refresh_map_list() -> void:
@@ -588,25 +934,36 @@ func _on_map_activated(index: int) -> void:
 
 func _on_tool_changed(index: int) -> void:
     canvas.choose_tool(index as AtlasCanvas.Tool)
-    lock_checkbox.disabled = canvas.tool != AtlasCanvas.Tool.PAINT
+    lock_checkbox.disabled = canvas.map == null or canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS
     if lock_checkbox.disabled:
         locked_to_cell = false
         lock_checkbox.set_pressed_no_signal(false)
-    _ink_section.visible = canvas.tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER]
+    _ink_section.visible = canvas.tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
+        AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.FILL]
     brush_color_picker.disabled = canvas.tool == AtlasCanvas.Tool.ERASER
-    _terrain_section.visible = canvas.tool == AtlasCanvas.Tool.PAINT
+    brush_width_spinner.editable = canvas.tool != AtlasCanvas.Tool.FILL
+    _terrain_section.visible = canvas.tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
     _placement_section.visible = canvas.tool == AtlasCanvas.Tool.BATTLEMAP
+    _selection_section.visible = canvas.tool == AtlasCanvas.Tool.ART_SELECT
+    if canvas.tool != AtlasCanvas.Tool.ART_SELECT:
+        canvas.clear_selection()
     if canvas.floor != null:
         var current: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
         if canvas.tool == AtlasCanvas.Tool.PAINT and not current is AtlasTileLayer:
             var tiles: AtlasTileLayer = canvas.floor.terrain_layer()
             if tiles != null:
                 select_layer(tiles.id)
-        elif canvas.tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER] and not current is AtlasInkLayer:
+        elif canvas.tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE] and not current is AtlasInkLayer:
+            var ink: AtlasInkLayer = canvas.floor.ink_layer()
+            if ink != null:
+                select_layer(ink.id)
+        elif canvas.tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER] and not (current is AtlasInkLayer or current is AtlasRasterLayer):
             var ink: AtlasInkLayer = canvas.floor.ink_layer()
             if ink != null:
                 select_layer(ink.id)
     zoom_gate.reset()
+    _refresh_scope()
+    _on_selection_changed()
 
 
 func _on_select(cell: Vector2i) -> void:
@@ -615,23 +972,22 @@ func _on_select(cell: Vector2i) -> void:
         return
     canvas.selected_cell = cell
     canvas.has_selected_cell = true
+    _refresh_scope()
+    canvas.selection_changed.emit()
     canvas.queue_redraw()
     _message("Selected cell %s. Lock restricts mutations, not camera movement." % cell)
 
 
 func _on_paint(cell: Vector2i) -> void:
-    if canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
-        _message("Cell paint requires a square or hex grid.")
-        return
     var layer: AtlasTileLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTileLayer
     if layer == null or not layer.is_editable():
         _message("Select a visible, unlocked terrain layer to paint.")
         return
     var basis: AtlasGrid = layer.grid if layer.grid != null else canvas.map.get_terrain_grid()
-    if not canvas.map.grid.same_geometry(basis):
-        _message("Legacy terrain uses its original grid. Use pen/eraser on an edited overlay.")
+    if basis.kind == AtlasGrid.Kind.GRIDLESS:
+        _message("This terrain layer has no content grid.")
         return
-    if locked_to_cell and (not canvas.has_selected_cell or canvas.selected_cell != cell):
+    if not _scope().allows_polygon(basis.cell_polygon(cell)):
         _message("Edit blocked by selected-cell lock.")
         return
     var key: String = "%d,%d" % [cell.x, cell.y]
@@ -797,19 +1153,36 @@ func _unhandled_key_input(event: InputEvent) -> void:
                 _on_save()
             KEY_N:
                 open_board_dialog()
+            KEY_A:
+                select_all_artwork()
+            KEY_C:
+                copy_selection()
+            KEY_X:
+                cut_selection()
+            KEY_V:
+                paste_selection()
             _:
                 return
         get_viewport().set_input_as_handled()
         return
     if event.keycode == KEY_ESCAPE:
-        canvas.cancel_edit()
+        if canvas.is_editing():
+            canvas.cancel_edit()
+        else:
+            canvas.clear_selection()
         get_viewport().set_input_as_handled()
     elif (event.keycode == KEY_Q or event.keycode == KEY_E) and canvas.tool == AtlasCanvas.Tool.BATTLEMAP:
         var sign := -1.0 if event.keycode == KEY_Q else 1.0
         angle_spinner.value = wrapf(angle_spinner.value + 15.0 * sign, -180.0, 180.0)
         get_viewport().set_input_as_handled()
-    elif event.keycode == KEY_B or event.keycode == KEY_E:
-        var selected: int = AtlasCanvas.Tool.PEN if event.keycode == KEY_B else AtlasCanvas.Tool.ERASER
+    elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
+        delete_selection()
+        get_viewport().set_input_as_handled()
+    elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_F, KEY_L, KEY_R, KEY_O]:
+        var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
+            KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
+            KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE}
+        var selected: int = tools[event.keycode]
         tool_picker.select(selected)
         _on_tool_changed(selected)
         get_viewport().set_input_as_handled()

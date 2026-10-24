@@ -9,14 +9,20 @@ signal enter_requested(link: AtlasMapLink)
 signal pointer_moved(local_position: Vector2)
 signal interaction_started
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
+signal selection_changed
+signal transform_requested(selection: AtlasSelection, transform: Transform2D)
+signal fill_requested(position: Vector2)
 
-enum Tool { PEN, ERASER, PAINT, SELECT, BATTLEMAP }
+enum Tool { PEN, ERASER, PAINT, SELECT, BATTLEMAP, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL }
 enum Preview { OFF, MARKERS, THUMBNAILS }
+enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
 var campaign: AtlasCampaign
 var map: AtlasMapDocument
 var floor: AtlasFloor
 var active_layer_id: String = "ink"
+var selection: AtlasSelection = AtlasSelection.new()
+var edit_scope: AtlasEditScope = AtlasEditScope.new()
 var tool: Tool = Tool.PEN
 var preview: Preview = Preview.THUMBNAILS
 
@@ -51,6 +57,13 @@ var _layer_groups: Dictionary[String, CanvasGroup] = {}
 var _layer_drawers: Dictionary[String, Node2D] = {}
 var _raster_textures: Dictionary[String, ImageTexture] = {}
 var _overlay: Node2D
+var _manipulation: Manipulation = Manipulation.NONE
+var _gesture_start: Vector2
+var _gesture_end: Vector2
+var _shape_kind: String = ""
+var _preview_layer: AtlasLayer
+var _gesture_transform: Transform2D = Transform2D.IDENTITY
+var _add_selection: bool = false
 
 const EMPTY_COLOR := Color("#212c34")
 const TERRAIN_COLORS := [
@@ -77,6 +90,7 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign) -> v
     campaign = current_campaign
     floor = map.floor_by_id(map.default_floor_id) if map != null else null
     _raster_textures.clear()
+    clear_selection()
     has_selected_cell = false
     _drawing_battlemap = false
     queue_redraw()
@@ -88,7 +102,7 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-    return _draft_stroke != null
+    return _draft_stroke != null or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
 
 
 func cancel_edit() -> void:
@@ -96,17 +110,82 @@ func cancel_edit() -> void:
     _erase_preview.clear()
     _drawing_battlemap = false
     _panning = false
+    _manipulation = Manipulation.NONE
+    _shape_kind = ""
+    _preview_layer = null
+    _raster_textures.clear()
     queue_redraw()
 
 
 func commit_edit() -> void:
+    if _manipulation != Manipulation.NONE:
+        _finish_manipulation()
+        return
     if _draft_stroke == null:
+        _shape_kind = ""
+        _preview_layer = null
+        queue_redraw()
         return
     var stroke: AtlasStroke = _draft_stroke.copy()
     var erasing: bool = _erasing
     _draft_stroke = null
     _erase_preview.clear()
+    _shape_kind = ""
+    _preview_layer = null
+    _raster_textures.clear()
     stroke_requested.emit(stroke, erasing)
+    queue_redraw()
+
+
+func clear_selection() -> void:
+    selection = AtlasSelection.new()
+    selection_changed.emit()
+    queue_redraw()
+
+
+func select_all_artwork() -> void:
+    cancel_edit()
+    selection = AtlasSelectionGeometry.select_all(floor.layer_by_id(active_layer_id))
+    selection_changed.emit()
+    queue_redraw()
+
+
+func _update_manipulation(position: Vector2) -> void:
+    _gesture_end = position
+    var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+    if _manipulation == Manipulation.MOVE:
+        _gesture_transform = Transform2D(0.0, position - _gesture_start)
+    elif _manipulation == Manipulation.RESIZE:
+        var pivot: Vector2 = selection.bounds.position
+        var initial: Vector2 = _gesture_start - pivot
+        var scale: float = clampf((position - pivot).dot(initial) / maxf(initial.length_squared(), 0.0001), 0.05, 100.0)
+        _gesture_transform = AtlasSelectionGeometry.about(pivot, Vector2.ZERO, scale)
+    if _manipulation in [Manipulation.MOVE, Manipulation.RESIZE]:
+        _preview_layer = AtlasSelectionGeometry.transformed(layer, selection, _gesture_transform, edit_scope)
+    queue_redraw()
+
+
+func _finish_manipulation() -> void:
+    var mode: Manipulation = _manipulation
+    _manipulation = Manipulation.NONE
+    _preview_layer = null
+    if mode == Manipulation.MARQUEE:
+        var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+        var next: AtlasSelection
+        if _gesture_start.distance_to(_gesture_end) < 3.0 / camera_zoom:
+            next = AtlasSelectionGeometry.select_point(layer, _gesture_end, 5.0 / camera_zoom)
+        else:
+            next = AtlasSelectionGeometry.select_rect(layer, Rect2(_gesture_start, _gesture_end - _gesture_start).abs())
+        if _add_selection and layer is AtlasInkLayer and selection.matches(layer):
+            var indices: Array[int] = selection.stroke_indices.duplicate()
+            for index: int in next.stroke_indices:
+                if not indices.has(index):
+                    indices.append(index)
+            next = AtlasSelectionGeometry.select_indices(layer, indices)
+        selection = next
+        selection_changed.emit()
+    else:
+        transform_requested.emit(selection, _gesture_transform)
     queue_redraw()
 
 
@@ -169,6 +248,8 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
     if floor == null:
         return
     var layer: AtlasLayer = floor.layer_by_id(id)
+    if id == active_layer_id and _preview_layer != null:
+        layer = _preview_layer
     if layer is AtlasTileLayer:
         var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid()
         for key: String in layer.terrain:
@@ -177,13 +258,15 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
             if layer.terrain[key] != 0:
                 item.draw_colored_polygon(grid.cell_polygon(cell), _terrain_color(layer.terrain[key]))
     elif layer is AtlasInkLayer:
-        var previewing: bool = is_editing() and active_layer_id == id
+        var previewing: bool = _draft_stroke != null and active_layer_id == id
         var artwork: Array[AtlasStroke] = _erase_preview if previewing and _erasing else layer.strokes
         for stroke: AtlasStroke in artwork:
             _draw_stroke(stroke, item)
         if previewing and not _erasing:
-            _draw_stroke(_draft_stroke, item)
+            for stroke: AtlasStroke in edit_scope.clip_strokes([_draft_stroke]):
+                _draw_stroke(stroke, item)
     elif layer is AtlasRasterLayer:
+        item.draw_set_transform_matrix(layer.transform)
         for chunk: AtlasRasterChunk in layer.chunks.values():
             if chunk.image == null:
                 continue
@@ -206,6 +289,19 @@ func _draw_overlays(item: Node2D) -> void:
         _stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
     if _drawing_battlemap:
         _draw_draft(item)
+    if _manipulation == Manipulation.MARQUEE:
+        item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color(0.3, 0.7, 1.0, 0.15))
+        item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color("#4dabf2"), false, 1.0 / camera_zoom)
+    if not selection.is_empty() and selection.matches(floor.layer_by_id(active_layer_id)):
+        var bounds: Rect2 = selection.bounds
+        var color: Color = Color("#4dabf2")
+        if _manipulation in [Manipulation.MOVE, Manipulation.RESIZE]:
+            if _preview_layer != null:
+                bounds = AtlasSelectionGeometry.select_indices(_preview_layer, selection.stroke_indices).bounds
+            else:
+                color = Color("#f48771")
+        item.draw_rect(bounds, color, false, 1.5 / camera_zoom)
+        item.draw_rect(Rect2(bounds.end - Vector2.ONE * 4.0 / camera_zoom, Vector2.ONE * 8.0 / camera_zoom), color)
 
 
 func _draw_parent_reference() -> void:
@@ -281,15 +377,22 @@ func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
 func _append_stroke_point(local_position: Vector2) -> void:
     if not Rect2(Vector2.ZERO, size).has_point(local_position):
         _stroke_left_canvas = true
-    if _draft_stroke == null or _stroke_left_canvas:
+    if (_draft_stroke == null and _shape_kind.is_empty()) or _stroke_left_canvas:
         return
     var point: Vector2 = local_to_document(local_position)
+    if not _shape_kind.is_empty():
+        _draft_stroke = AtlasShapes.stroke(_shape_kind, _gesture_start, point, brush_color, brush_width)
+        queue_redraw()
+        return
     if _draft_stroke.points[-1].distance_squared_to(point) >= 0.01:
         _draft_stroke.points.append(point)
-    if _erasing:
-        var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
-        if layer != null:
-            _erase_preview = AtlasStrokeEraser.erase(layer.strokes, _draft_stroke.points, _draft_stroke.width)
+    var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+    if layer is AtlasInkLayer and _erasing:
+        _erase_preview = edit_scope.erase(layer.strokes, _draft_stroke.points, _draft_stroke.width)
+    elif layer is AtlasRasterLayer:
+        var result: AtlasFillResult = AtlasRasterBrush.paint(layer, _draft_stroke.points, _draft_stroke.color,
+            _draft_stroke.width, _erasing, edit_scope)
+        _preview_layer = result.layer if result.ok else null
     queue_redraw()
 
 
@@ -419,16 +522,38 @@ func _gui_input(event: InputEvent) -> void:
                         return
                 match tool:
                     Tool.PEN, Tool.ERASER:
-                        var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
-                        if layer == null or not layer.is_editable():
+                        var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+                        if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
                             accept_event()
                             return
                         _erasing = tool == Tool.ERASER
                         _stroke_left_canvas = false
                         _draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)
                         _append_stroke_point(mouse.position)
+                    Tool.LINE, Tool.RECTANGLE, Tool.ELLIPSE:
+                        var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+                        if layer != null and layer.is_editable():
+                            _shape_kind = Tool.keys()[tool]
+                            _gesture_start = position
+                            _stroke_left_canvas = false
+                            _draft_stroke = AtlasShapes.stroke("LINE", position, position, brush_color, brush_width)
+                    Tool.ART_SELECT:
+                        var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+                        _gesture_start = position
+                        _gesture_end = position
+                        _gesture_transform = Transform2D.IDENTITY
+                        _add_selection = mouse.shift_pressed
+                        if not mouse.shift_pressed and selection.matches(layer) and not selection.is_empty() and layer.is_editable():
+                            if position.distance_to(selection.bounds.end) <= 8.0 / camera_zoom:
+                                _manipulation = Manipulation.RESIZE
+                            elif selection.bounds.has_point(position):
+                                _manipulation = Manipulation.MOVE
+                        if _manipulation == Manipulation.NONE:
+                            _manipulation = Manipulation.MARQUEE
+                    Tool.FILL:
+                        fill_requested.emit(position)
                     Tool.PAINT:
-                        paint_requested.emit(map.grid.document_to_cell(position))
+                        _request_cell_paint(position)
                     Tool.SELECT:
                         selection_requested.emit(map.grid.document_to_cell(position))
                     Tool.BATTLEMAP:
@@ -436,6 +561,9 @@ func _gui_input(event: InputEvent) -> void:
                         _draft_start = position
                         _draft_end = position
                         queue_redraw()
+            elif _manipulation != Manipulation.NONE:
+                _update_manipulation(local_to_document(mouse.position))
+                _finish_manipulation()
             elif is_editing():
                 _append_stroke_point(mouse.position)
                 commit_edit()
@@ -452,6 +580,9 @@ func _gui_input(event: InputEvent) -> void:
             camera_center -= motion.relative / camera_zoom
             queue_redraw()
             accept_event()
+        elif _manipulation != Manipulation.NONE:
+            _update_manipulation(local_to_document(motion.position))
+            accept_event()
         elif is_editing():
             _append_stroke_point(motion.position)
             accept_event()
@@ -460,5 +591,14 @@ func _gui_input(event: InputEvent) -> void:
             queue_redraw()
             accept_event()
         elif tool == Tool.PAINT and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-            paint_requested.emit(map.grid.document_to_cell(local_to_document(motion.position)))
+            _request_cell_paint(local_to_document(motion.position))
             accept_event()
+
+
+func _request_cell_paint(position: Vector2) -> void:
+    var layer: AtlasTileLayer = floor.layer_by_id(active_layer_id) as AtlasTileLayer
+    if layer == null:
+        return
+    var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid()
+    if grid.kind != AtlasGrid.Kind.GRIDLESS:
+        paint_requested.emit(grid.document_to_cell(position))

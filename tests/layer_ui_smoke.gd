@@ -62,9 +62,10 @@ func _run() -> void:
     var raster_id: String = editor.canvas.active_layer_id
     var raster: AtlasRasterLayer = floor.layer_by_id(raster_id) as AtlasRasterLayer
     _check(raster != null and raster.chunks.size() == 1, "import creates a typed chunked raster layer")
+    editor.select_layer("terrain")
     command = editor.edits.get_undo_command()
     editor._on_stroke(stroke, false)
-    _check(editor.edits.get_undo_command() == command, "vector pen cannot mutate a raster layer")
+    _check(editor.edits.get_undo_command() == command, "pen cannot treat terrain cells as ink")
     editor._on_save()
     var checkpoint: Dictionary = editor.campaign.to_dict()
     _check(not editor.edits.is_dirty(), "validated save clears dirty state")

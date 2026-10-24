@@ -15,8 +15,8 @@ The integration checkpoint is complete. The following execution sequence superse
 | 1 | Document-space pen/eraser, stroke-level undo/redo, dirty/save checkpoints | Implemented and tested; see implementation notes |
 | 2 | Blank board creation; independent grid overlay geometry and per-map native units | Implemented and tested; see implementation notes |
 | 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Implemented and verified for the local client; Web smoke deferred |
-| 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Next |
-| 5 | Floors and map organization/overview/previews | Pending |
+| 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Implemented and verified for the local client |
+| 5 | Floors and map organization/overview/previews | Next |
 | 6 | Linked-map workflow refinement, placement/reference/navigation controls | Pending |
 | 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
 | 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
@@ -26,6 +26,8 @@ Milestone 1 stores editable vector strokes as JSON in schema v2 and reads legacy
 Milestone 2 upgrades the runtime schema to v3, reads v1/v2, and adds reversible board creation/grid configuration. Legacy terrain geometry is preserved separately from the editable overlay. Native/Web and live-session checks validate creation; framebuffer tests verify zero terrain pixels moved after an overlay change. Typed layers and recoverable saves are still milestone 3.
 
 Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import and lossless WebP chunks. Saves stage/verify assets and metadata, preserve a validated backup, and atomically replace the head. Native failure-injection, migration, layer/input and framebuffer checks are the gate. The user has prioritized the local client and postponed Web smoke tests; browser import/recovery validation is explicitly deferred rather than claimed complete.
+
+Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, active-layer selection with proportional transforms, typed self-contained clipboard data and central selected-cell scope. Schema v5 persists raster placement transforms and reads v1–v4. Native service/input/framebuffer and live-session checks are the gate; no new Web smoke was run.
 
 ### Original feature groupings (reference)
 
@@ -177,4 +179,4 @@ Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import a
 
 ## 6. Suggested next engineering task
 
-Implement execution milestone 4 for the local drawing client: richer drawing/selection, move/resize, fill, clipboard and asset workflows through typed reversible commands. Preserve layer locks, artwork coordinates and recoverable saves. Keep Web-compatible boundaries, but leave browser smoke to the deferred validation track. Do not expand battlemap recursion first.
+Implement execution milestone 5 for the local client: independent per-view floor controls and better campaign organization/search/overview/preview behavior. Retain artwork coordinates, per-map units, protected layers and recoverable saves; navigation should restore the correct floor/view. Keep browser smoke deferred and do not prioritize more battlemap recursion.

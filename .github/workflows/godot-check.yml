@@ -56,6 +56,18 @@ jobs:
           grep -q 'ATLAS_LAYERS_PASSED' /tmp/godot-layers_smoke.log
           grep -q 'ATLAS_STORAGE_PASSED' /tmp/godot-storage_smoke.log
           grep -q 'ATLAS_LAYER_UI_PASSED' /tmp/godot-layer_ui_smoke.log
+      - name: Run editing tool and clipboard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in fill_scope_smoke clipboard_smoke selection_smoke tools_ui_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_FILL_SCOPE_PASSED' /tmp/godot-fill_scope_smoke.log
+          grep -q 'ATLAS_CLIPBOARD_PASSED' /tmp/godot-clipboard_smoke.log
+          grep -q 'ATLAS_SELECTION_PASSED' /tmp/godot-selection_smoke.log
+          grep -q 'ATLAS_TOOLS_UI_PASSED' /tmp/godot-tools_ui_smoke.log
       - name: Launch main scene headlessly
         shell: bash
         run: |

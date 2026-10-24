@@ -2,6 +2,7 @@ class_name AtlasRasterLayer
 extends AtlasLayer
 
 var pixels_per_unit: float = 1.0
+var transform: Transform2D = Transform2D.IDENTITY
 var chunks: Dictionary[String, AtlasRasterChunk] = {}
 
 
@@ -19,6 +20,7 @@ func to_dict() -> Dictionary:
         saved.append(chunks[key].to_dict())
     data["pixels_per_unit"] = pixels_per_unit
     data["chunks"] = saved
+    data["transform"] = [transform.x.x, transform.x.y, transform.y.x, transform.y.y, transform.origin.x, transform.origin.y]
     return data
 
 

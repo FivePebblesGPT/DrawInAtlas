@@ -1,7 +1,7 @@
 class_name AtlasCampaign
 extends RefCounted
 
-const SCHEMA_VERSION: int = 4
+const SCHEMA_VERSION: int = 5
 
 var display_name: String = "West Marches"
 var root_map_id: String = "world"
@@ -67,7 +67,7 @@ func to_dict() -> Dictionary:
 
 static func from_dict(data: Dictionary) -> AtlasCampaign:
     var version: Variant = data.get("schema_version")
-    if not AtlasData.integer(version) or int(version) not in [1, 2, 3, SCHEMA_VERSION]:
+    if not AtlasData.integer(version) or int(version) not in [1, 2, 3, 4, SCHEMA_VERSION]:
         return null
     var raw_maps: Variant = data.get("maps")
     var raw_links: Variant = data.get("links", [])

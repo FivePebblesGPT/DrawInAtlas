@@ -88,10 +88,10 @@ static func _load_one(metadata_path: String, path: String, io: AtlasStoreIO) -> 
         return AtlasStoreResult.failure(ERR_INVALID_DATA, "Invalid metadata at " + metadata_path, metadata_path)
     var version: Variant = data.get("schema_version")
     if not (version is float or version is int) or not is_finite(float(version)) \
-            or float(version) != floorf(float(version)) or int(version) not in [1, 2, 3, 4]:
+            or float(version) != floorf(float(version)) or int(version) not in [1, 2, 3, 4, AtlasCampaign.SCHEMA_VERSION]:
         return AtlasStoreResult.failure(ERR_FILE_UNRECOGNIZED, "Unsupported schema at " + metadata_path, metadata_path)
     var checkpoint: Variant = data.get("_checkpoint")
-    if data.has("_checkpoint") or int(version) == 4:
+    if data.has("_checkpoint") or int(version) >= 4:
         data.erase("_checkpoint")
         if not checkpoint is Dictionary or not checkpoint.get("sha256") is String \
                 or checkpoint.get("sha256") != _canonical(data).sha256_text():

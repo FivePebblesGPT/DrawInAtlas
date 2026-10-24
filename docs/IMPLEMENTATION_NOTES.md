@@ -1,5 +1,27 @@
 # Implementation Notes
 
+## Execution milestone 4 — local editing and asset placement
+
+- **L/R/O** create line, rectangle and ellipse **outlines** on ink layers. Each drag is one command, including recovery from an initially zero-width shape. **B/E** paint/erase editable ink or raster pixels. New raster layers start empty; pen gestures lazily allocate canonical chunks, including negative coordinates. Raster erasing clears RGBA pixels instead of painting a backdrop.
+- **V** selects active-layer artwork. Click picks the topmost hit stroke or a raster asset; a marquee selects whole padded stroke bounds / the whole raster layer. Shift adds ink to the selection. Drag the selection to move, or its bottom-right handle for proportional resize. Numeric move/scale/rotation works about the selection center. Ink widths scale proportionally. Imported/pasted images enter selection mode ready for placement.
+- Previews are detached and do not dirty data until release. Escape/focus loss/tool/map changes cancel them. Save during a manipulation commits that accepted gesture first; mouse release cannot apply it twice. Undo/redo targets the original board/layer. Stale, hidden or locked selections cannot be transformed or deleted.
+- **F** bucket-fills connected terrain or raster pixels. Tile fill uses the content grid (not the overlay); unbounded background fill is rejected unless a finite cell scope bounds it. Raster fill traverses existing chunk pixels only. Limits are atomic: 8,192 terrain cells, 262,144 flood pixels, and 1,048,576 candidate brush pixels; rejection never leaves partial source edits.
+- **Ctrl+C/X/V**, **Ctrl+A**, Delete and Edit-menu actions operate on typed artwork. Ink paste targets a compatible editable ink layer; raster paste creates a new independent layer with self-contained pixels. Raster copy includes lossless WebP, not references to the source filesystem. Native clipboard images can also become raster assets. Tile copy uses the selected matching content-grid cell; paste refuses incompatible shape/spacing/rotation instead of reinterpreting coordinates. Native distance labels are never converted.
+- The native OS clipboard is used only for explicit clipboard actions; headless/native automation uses the internal clipboard flag to preserve the user's clipboard. An internal fallback remains for platforms without synchronous clipboard access. Payloads are bounded to 16 MiB, with typed validation and pixel/hash verification.
+- **Lock to selected cell** is a central document-space scope. With no selected cell it blocks writes. New vector paths are inset/clipped by brush radius, raster writes require the full pixel quad inside the scope, and cell edits require their whole polygon inside it. Move/resize/delete require both footprints wholly contained. Ink erase under scope conservatively leaves crossing strokes intact rather than changing their off-cell portions. Copy is read-only and may read outside the edit scope.
+- Schema **v5** stores raster placement transforms and reads v1–v4; v4 assets migrate to identity placement. Transform commands change geometry, not source chunk hashes. Existing recoverable checkpoints, image verification and layer guards remain in force.
+
+### Milestone 4 verification
+
+- `tests/fill_scope_smoke.gd`: **123 checks** for finite/atomic fills, raster paint/erase, negative/partial chunks, transforms, scope filtering and snapshots.
+- `tests/clipboard_smoke.gd`: **436 checks** for detached typed payloads, invalid/corrupt/bounded data, exact RGBA and tile normalization.
+- `tests/selection_smoke.gd`: **202 checks** for outlines, hits/marquees, stale/locked selection guards, proportional transforms, unchanged raster assets and migration/persistence.
+- `tests/tools_ui_smoke.gd`: **36 native input/UI checks**, including previews, shape/move/resize gestures, mid-gesture Save, clipboard cross-board isolation, scope enforcement, raster painting/fill/erase, tile content-grid routing and save/load.
+- Native framebuffer checks confirm asset movement/resizing without changed pixel hashes, outline pixels, raster fill and undo restoration, plus prior opacity/clipping/compact-layout checks.
+- Live KWin input moved selected shapes by exactly 100×50 board units in one command; Ctrl+Z restored their original coordinates. The dedicated preview did not write the user's save or clipboard.
+
+These are whole-stroke and whole-raster-asset selections, not per-pixel lasso or nonuniform ink warping. Bucket fill targets raster/terrain content, not vector-outline interiors. Raster brushes are hard round pixel replacement; pressure/antialiased raster painting and a richer asset catalog remain refinements. Web smoke remains deferred per user direction.
+
 ## Execution milestone 3 — typed layers and recoverable native saves
 
 The **local client** is the current acceptance target. The user explicitly postponed Web smoke testing to reduce compute/token cost; compatibility boundaries and optional tests are retained, but the new browser import/recovery flow is not claimed verified.
@@ -108,6 +130,10 @@ tests/board_grid_smoke.gd      Board/grid commands, migration and invariance che
 tests/layers_smoke.gd          Typed layer transactions and migration/validation
 tests/storage_smoke.gd         Failure-injected storage and exact raster roundtrips
 tests/layer_ui_smoke.gd        Native UI layer/repair integration
+tests/fill_scope_smoke.gd      Bounded fills, raster brush and central cell scope
+tests/clipboard_smoke.gd       Typed, self-contained clipboard codec
+tests/selection_smoke.gd       Outline/selection/transform and migration checks
+tests/tools_ui_smoke.gd        Native editing gestures, clipboard and persistence
 tests/visual_smoke.gd          Real framebuffer clipping regression
 tests/browser_smoke.py         Optional external Playwright UI/storage smoke
 ```
@@ -124,6 +150,10 @@ godot --headless --path . --script res://tests/board_grid_smoke.gd
 godot --headless --path . --script res://tests/layers_smoke.gd
 godot --headless --path . --script res://tests/storage_smoke.gd
 godot --headless --path . --script res://tests/layer_ui_smoke.gd
+godot --headless --path . --script res://tests/fill_scope_smoke.gd
+godot --headless --path . --script res://tests/clipboard_smoke.gd
+godot --headless --path . --script res://tests/selection_smoke.gd
+godot --headless --path . --script res://tests/tools_ui_smoke.gd
 godot --headless --path . --quit-after 10
 godot --path . --script res://tests/visual_smoke.gd
 mkdir -p build/web
@@ -153,6 +183,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Execution milestones 1–3 are complete for the local client. Next is drawing/selection/clipboard tooling (milestone 4), not additional battlemap recursion. M3 Web smoke is deferred rather than part of this completion claim.
+Execution milestones 1–4 are complete for the local client. Next is floors and map organization/overview/previews (milestone 5), not additional battlemap recursion. Web smoke remains deferred rather than part of this completion claim.
 
-Placement actions still await undoable commands; floor-switching UI, raster editing and campaign import/export UX are later work. Selected-cell lock currently protects terrain painting only and is disabled for ink; precise artwork confinement is later work. Trackpad behavior beyond the tested wheel normalization remains device-dependent. See milestone 3 limits above for recovery/history scaling and deferred browser validation.
+Legacy linked-map placement actions still await undoable commands; floor-switching UI and campaign import/export UX are later work. See milestone 4 for conservative scope/selection semantics and raster limits. Trackpad behavior beyond the tested wheel normalization remains device-dependent. Milestone 3 storage/history scaling limits and deferred browser validation still apply.

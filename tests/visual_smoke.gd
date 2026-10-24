@@ -148,6 +148,50 @@ func _run_suite() -> void:
     var raster_opacity: bool = partial.b > AtlasCanvas.EMPTY_COLOR.b and partial.b < blue.b
     passed = passed and raster_opacity and canvas.floor.layer_by_id(raster_id) != null
     passed = passed and layered_frame.save_png(directory.path_join("typed-layers.png")) == OK
+    editor.select_layer(raster_id)
+    editor.select_all_artwork()
+    var original_raster: AtlasRasterLayer = canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer
+    var original_asset: String = original_raster.chunks["0,0"].asset_id
+    var moved: bool = editor.transform_selection(canvas.selection, Transform2D(0.0, Vector2(120, -90)))
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var moved_frame: Image = root.get_texture().get_image()
+    var asset_move_pixels: bool = (
+        moved and moved_frame.get_pixelv(center + Vector2i(20, 20)).is_equal_approx(AtlasCanvas.EMPTY_COLOR)
+        and moved_frame.get_pixelv(center + Vector2i(140, -70)).is_equal_approx(partial)
+    )
+    var delta: Transform2D = AtlasSelectionGeometry.about(canvas.selection.bounds.get_center(), Vector2.ZERO, 2.0)
+    var scaled: bool = editor.transform_selection(canvas.selection, delta)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var scaled_frame: Image = root.get_texture().get_image()
+    var asset_scale_pixels: bool = scaled and scaled_frame.get_pixelv(center + Vector2i(175, -90)).b > AtlasCanvas.EMPTY_COLOR.b
+    var unchanged_asset: bool = (canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer).chunks["0,0"].asset_id == original_asset
+    passed = passed and asset_move_pixels and asset_scale_pixels and unchanged_asset
+    passed = passed and scaled_frame.save_png(directory.path_join("selection-transform.png")) == OK
+    editor._on_undo()
+    editor._on_undo()
+    editor.select_layer("ink")
+    editor._on_stroke(AtlasShapes.stroke("RECTANGLE", Vector2(-220, -120), Vector2(-160, -60), Color.LIME, 4.0), false)
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var shape_frame: Image = root.get_texture().get_image()
+    var shape_pixels: bool = shape_frame.get_pixelv(center + Vector2i(-190, -120)).g > 0.4
+    passed = passed and shape_pixels
+    editor.layer_panel._add_raster()
+    editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-60, 90), Vector2(60, 90)]), Color.RED, 20.0), false)
+    canvas.brush_color = Color.BLUE
+    var filled: bool = editor.fill_at(Vector2(0, 90))
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var painted_frame: Image = root.get_texture().get_image()
+    var fill_pixels: bool = filled and painted_frame.get_pixelv(center + Vector2i(0, 90)).is_equal_approx(Color.BLUE)
+    editor._on_undo()
+    await process_frame
+    await RenderingServer.frame_post_draw
+    var fill_undo_pixels: bool = root.get_texture().get_image().get_pixelv(center + Vector2i(0, 90)).is_equal_approx(Color.RED)
+    passed = passed and fill_pixels and fill_undo_pixels
+    passed = passed and painted_frame.save_png(directory.path_join("drawing-tools.png")) == OK
     editor.open_board_dialog()
     await process_frame
     await RenderingServer.frame_post_draw
@@ -183,6 +227,8 @@ func _run_suite() -> void:
     print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [terrain_moved, compact_dialog])
     print("ATLAS_LAYER_PIXELS grouped_alpha=%s raster_top=%s order=%s hidden=%s raster_alpha=%s" % [
         group_opacity, raster_on_top, layer_order, hidden_raster, raster_opacity])
+    print("ATLAS_TOOL_PIXELS move=%s scale=%s asset_unchanged=%s shape=%s fill=%s undo_fill=%s" % [
+        asset_move_pixels, asset_scale_pixels, unchanged_asset, shape_pixels, fill_pixels, fill_undo_pixels])
     root.remove_child(scene)
     scene.free()
     quit(0 if passed else 1)
