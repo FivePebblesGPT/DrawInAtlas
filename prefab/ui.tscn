@@ -5,6 +5,9 @@
 [ext_resource type="Theme" path="res://prefab/editor_theme.tres" id="3"]
 [ext_resource type="Script" path="res://scripts/interface/editor.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/interface/canvas.gd" id="5"]
+[ext_resource type="PackedScene" path="res://prefab/inspector.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://prefab/board_dialog.tscn" id="7"]
+[ext_resource type="Script" path="res://scripts/interface/raster_importer.gd" id="8"]
 
 [node name="UI" type="Control" unique_id=484751465]
 layout_mode = 3
@@ -115,28 +118,8 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("5")
 
-[node name="InspectorPanel" type="PanelContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector"]
+[node name="InspectorPanel" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector" instance=ExtResource("6")]
 layout_mode = 2
-custom_minimum_size = Vector2(252, 0)
-
-[node name="Scroll" type="ScrollContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector/InspectorPanel"]
-layout_mode = 2
-horizontal_scroll_mode = 0
-follow_focus = true
-
-[node name="Margin" type="MarginContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector/InspectorPanel/Scroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Sections" type="VBoxContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector/InspectorPanel/Scroll/Margin"]
-layout_mode = 2
-custom_minimum_size = Vector2(204, 0)
-size_flags_horizontal = 3
-theme_override_constants/separation = 20
 
 [node name="Status" type="Label" parent="WorkspaceSplit/Workspace/Shell"]
 custom_minimum_size = Vector2(1, 0)
@@ -144,3 +127,8 @@ layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 12
 autowrap_mode = 3
+
+[node name="BoardDialog" parent="WorkspaceSplit/Workspace" instance=ExtResource("7")]
+
+[node name="RasterImporter" type="Node" parent="WorkspaceSplit/Workspace"]
+script = ExtResource("8")

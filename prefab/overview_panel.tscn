@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" path="res://prefab/preview_panel.tscn" id="2"]
 
 [node name="OverviewPanel" type="VBoxContainer"]
+size_flags_vertical = 3
 script = ExtResource("1")
 theme_override_constants/separation = 8
 

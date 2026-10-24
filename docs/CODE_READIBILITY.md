@@ -16,12 +16,16 @@ Migrated in this refactor:
   `prefab/preview_panel.tscn` define stable controls and layout.
 - `prefab/preview_renderer.tscn` defines the hidden viewport/canvas and is
   instantiated only on demand, preserving lazy preview rendering.
+- `prefab/inspector.tscn` owns the complete floor/tool/artwork/grid/reference
+  form; `AtlasInspector` binds scene-unique controls and emits typed intents.
+- `prefab/campaign_browser.tscn` owns the map list, name/tags form and preview;
+  `AtlasCampaignBrowser` coordinates read-only discovery in Maps and Search.
 
-**Still WIP:** `AtlasEditor` creates inspector section controls and map
-sidebar fields in `_build_*_controls` and `_build_sidebar_views`. Migrate
-these separately without breaking exported/public references. `AtlasCanvas`
-creates data-dependent layer renderers while drawing; unlike fixed interface
-controls, these are appropriate runtime-created nodes.
+`AtlasEditor` no longer constructs fixed controls with `.new()`. It composes
+panels from scenes and connects their intents to workspace actions. Its public
+control references still refer to the actual scene nodes. `AtlasCanvas` creates
+data-dependent layer renderers while drawing; these are appropriate
+runtime-created nodes.
 
 Guideline: author stable visual hierarchies and defaults in `.tscn`, then
 instantiate reusable views with `PackedScene.instantiate()`. Pure
@@ -51,8 +55,36 @@ prefix now that ownership is expressed by directories.
 - Bind scene-owned controls via `@onready`; keep signals/actions in scripts.
 - A link's `hit_radius` is a **document-space** marker pick tolerance, not a
   grid cell size or viewport pixel radius. See `scripts/campaign/map_link.gd`.
-- Preserve the JSON + WebP save format for user-edited campaigns; use
-  `Resource`/`.tres` for authorable presets and reusable Godot assets.
+- The intended user-save direction is native Godot `.res`/`.scn`. The running
+  store still uses JSON + WebP checkpoints until that migration is implemented.
+  Keep format-specific loading/saving in `scripts/persistence/`, rather than
+  teaching panels, gestures or navigation about either representation.
+
+## Workspace ownership
+
+The module refactor reduces `scripts/interface/editor.gd` from 1,462 to 716
+lines and removes its 23 fixed-control constructor call sites (including shared
+builders). The important change is the ownership boundary, not the line count:
+
+| Owner | Responsibility | Communication |
+| --- | --- | --- |
+| `AtlasEditor` | Session startup/save/load, document-level commands, undo/redo and composition | Connects typed signals and refreshes panels |
+| `AtlasInspector` | Fixed inspector form, floor-ID mapping, conditional sections, numeric values | Emits intents; never edits campaign data |
+| `AtlasCampaignBrowser` | Maps/search results, metadata form, read-only preview requests | Emits Open/Focus/metadata intents |
+| `AtlasArtworkEditor` | Scoped ink/raster/tile editing, selections, import and clipboard | Uses canvas/history; emits layer/tool/message signals |
+| `AtlasMapNavigator` | Map/floor camera memory, Back, pointer zoom and opt-in link gate | Uses canvas/view session; emits successful view changes |
+
+Modules receive their actual dependencies, not an `AtlasEditor` backpointer.
+The inspector and browser do not execute edit commands. Navigation does not
+dirty documents. Artwork editing does not know which form or sidebar is open.
+The existing menu/action facade is retained at the workspace boundary; internal
+canvas signals connect directly to the responsible module.
+
+Example: clicking the inspector's Add floor button emits `floor_created(name)`.
+The workspace submits an `AtlasFloorEdit`, then asks the navigator to activate
+the new floor. The successful view change refreshes the scene-owned forms.
+Changing a label, section layout or default is now a scene edit, rather than a
+change to that command workflow.
 
 
 ## Explain algorithms, not syntax
@@ -69,5 +101,7 @@ prefix now that ownership is expressed by directories.
 
 Run the Godot 4.8-beta1 headless import/parse check and the UI smoke tests
 listed in the README, notably `tests/layer_ui_smoke.gd`,
-`tests/organization_ui_smoke.gd` and `tests/tools_ui_smoke.gd`.
+`tests/organization_ui_smoke.gd`, `tests/tools_ui_smoke.gd` and
+`tests/editor_modules_smoke.gd`. The module suite exercises form signals,
+numeric transforms, campaign replacement and two-workspace state isolation.
 Scene path checks alone cannot prove signal or focus behavior.

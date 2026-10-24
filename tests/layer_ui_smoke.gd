@@ -121,8 +121,8 @@ func _run() -> void:
 
 
 ## Godot warns if an autowrapping Label has no positive width constraint.
-## Traverse the instantiated scene, including embedded panel scenes and the
-## remaining code-built inspector labels, so new controls cannot regress.
+## Traverse the instantiated scene, including embedded inspector/browser scenes,
+## so changes to reusable forms cannot regress their width constraints.
 func _check_wrapped_labels(node: Node) -> void:
     if node is Label:
         var label: Label = node as Label

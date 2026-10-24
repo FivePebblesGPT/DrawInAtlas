@@ -32,6 +32,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - Board/grid tests: `godot --headless --path . --script res://tests/board_grid_smoke.gd`.
 - Layer/storage tests: run `tests/layers_smoke.gd`, `tests/storage_smoke.gd` and `tests/layer_ui_smoke.gd` with the same headless invocation.
 - Editing tests: run `tests/fill_scope_smoke.gd`, `tests/clipboard_smoke.gd`, `tests/selection_smoke.gd` and `tests/tools_ui_smoke.gd` the same way.
+- Workspace/organization tests: run `tests/editor_modules_smoke.gd`, `tests/organization_ui_smoke.gd`, `tests/floors_view_smoke.gd`, `tests/overview_smoke.gd` and `tests/preview_cache_smoke.gd` the same way.
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
 
 ## Project layout
@@ -43,6 +44,13 @@ view/navigation services in `scripts/navigation/`, and save/load code in
 `scripts/persistence/`. The editable bundled campaign is in
 `examples/northern_marches.tres` (Godot Resources); user saves deliberately
 retain validated JSON and WebP assets for recovery and Web export.
+
+`AtlasEditor` composes scene-owned inspector/browser forms, an
+`AtlasArtworkEditor` for scoped editing and an `AtlasMapNavigator` for view
+state. See [Code readability](docs/CODE_READIBILITY.md) for responsibilities.
+The intended save-format migration is to native Godot **`.res`/`.scn`**;
+the current JSON/WebP store remains behind `AtlasCampaignStore` during this
+behavior-preserving UI refactor.
 
 ## Documentation
 

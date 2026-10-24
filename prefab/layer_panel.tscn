@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/interface/layer_panel.gd" id="1"]
 
 [node name="LayerPanel" type="VBoxContainer"]
+size_flags_vertical = 3
 script = ExtResource("1")
 theme_override_constants/separation = 8
 

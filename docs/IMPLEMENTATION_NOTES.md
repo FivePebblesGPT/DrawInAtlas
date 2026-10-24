@@ -1,5 +1,47 @@
 # Implementation Notes
 
+## Editor-module readability follow-up — 2026-10-24
+
+Starting from merged readability PR #3 (`dace0fc`), `AtlasEditor` is reduced
+from **1,462 to 716 lines**, with all **23 fixed-control constructor call sites**
+removed (including shared builders).
+Two scene-owned forms replace the remaining inspector/sidebar builders:
+`prefab/inspector.tscn` and `prefab/campaign_browser.tscn`. Their controllers
+own presentation and emit typed intents. Existing public controls/actions are
+retained as references/facades for menus and integrations.
+
+`AtlasArtworkEditor` owns scoped artwork operations and workspace-local
+clipboard state. `AtlasMapNavigator` owns camera/floor/layer memory, Back and
+the opt-in zoom gate. Both receive concrete dependencies without an editor
+backpointer. The workspace retains session/save/load, document-level commands
+and undo/redo coordination. See [Code readability](CODE_READIBILITY.md) for
+the ownership table and representative floor workflow.
+
+Verification on Godot **4.8-beta1**:
+
+- Headless editor import and all **15 headless smoke suites** passed, including
+  organization (32), floor/view (102), overview (67), preview cache (46),
+  tools UI (36), layers/recovery and the existing editing/domain suites.
+- `tests/editor_modules_smoke.gd`: **32 new checks** for scene-owned controls,
+  metadata submission/undo, form routing, numeric transforms, read-only
+  browsing/preferences, campaign replacement, pre-startup clipboard
+  initialization, expanding Search/Layers lists and two-workspace state isolation.
+- Real-renderer `tests/visual_smoke.gd`: zero sampled changes outside the
+  canvas; ink/erase/undo, layer order/opacity, raster move/scale/fill, grid
+  invariance, 800×600 layout and compact dialog all passed.
+- Matching-beta Web release export passed; browser smoke remains deferred.
+- Opened the authored inspector in the native Godot editor and inspected its
+  layout: no wrapping-label warnings. The root has a preview size for standalone
+  scene authoring; the workspace container still determines its runtime size.
+  Editor output did contain existing Godot AI configuration/port warnings and
+  shutdown cleanup warnings, so this is not a claim that all editor output is
+  warning-free.
+
+**Persistence direction:** the intended replacement format is native Godot
+`.res`/`.scn`. The current JSON/WebP checkpoint implementation is still behind
+`AtlasCampaignStore`; this UI refactor does not implement that migration or
+change canonical save data.
+
 ## Execution milestone 4 — local editing and asset placement
 
 - **L/R/O** create line, rectangle and ellipse **outlines** on ink layers. Each drag is one command, including recovery from an initially zero-width shape. **B/E** paint/erase editable ink or raster pixels. New raster layers start empty; pen gestures lazily allocate canonical chunks, including negative coordinates. Raster erasing clears RGBA pixels instead of painting a backdrop.
@@ -123,7 +165,11 @@ prefab/sidebar.tscn, .gd        Reusable activity rail/view container
 scripts/campaign/              Grid, floor, independent maps, links and placements
 scripts/editing/, navigation/    History, three-step gate and document navigation
 scripts/persistence/            Staged store/IO and WebP codec
-scripts/interface/editor.gd      Workspace controls/navigation and scaffold edits
+scripts/interface/editor.gd      Workspace composition, session and document commands
+scripts/interface/inspector.gd   Scene-owned inspector presentation and intents
+scripts/interface/campaign_browser.gd Maps/search/forms and read-only previews
+scripts/interface/artwork_editor.gd Scoped edits, selection/import and clipboard
+scripts/navigation/map_navigator.gd Per-workspace view memory, zoom and Back
 scripts/interface/canvas.gd      Clipped canvas rendering, picking and input
 tests/smoke.gd                 Headless domain + integrated scene checks
 tests/artwork_smoke.gd         Vector artwork, eraser and drawing history checks
@@ -135,6 +181,7 @@ tests/fill_scope_smoke.gd      Bounded fills, raster brush and central cell scop
 tests/clipboard_smoke.gd       Typed, self-contained clipboard codec
 tests/selection_smoke.gd       Outline/selection/transform and migration checks
 tests/tools_ui_smoke.gd        Native editing gestures, clipboard and persistence
+tests/editor_modules_smoke.gd  Forms, module wiring and two-workspace isolation
 tests/visual_smoke.gd          Real framebuffer clipping regression
 tests/browser_smoke.py         Optional external Playwright UI/storage smoke
 ```
@@ -155,6 +202,11 @@ godot --headless --path . --script res://tests/fill_scope_smoke.gd
 godot --headless --path . --script res://tests/clipboard_smoke.gd
 godot --headless --path . --script res://tests/selection_smoke.gd
 godot --headless --path . --script res://tests/tools_ui_smoke.gd
+godot --headless --path . --script res://tests/editor_modules_smoke.gd
+godot --headless --path . --script res://tests/organization_ui_smoke.gd
+godot --headless --path . --script res://tests/floors_view_smoke.gd
+godot --headless --path . --script res://tests/overview_smoke.gd
+godot --headless --path . --script res://tests/preview_cache_smoke.gd
 godot --headless --path . --quit-after 10
 godot --path . --script res://tests/visual_smoke.gd
 mkdir -p build/web

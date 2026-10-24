@@ -1,0 +1,29 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/interface/campaign_browser.gd" id="1"]
+[ext_resource type="PackedScene" path="res://prefab/preview_panel.tscn" id="2"]
+
+[node name="CampaignBrowser" type="VBoxContainer"]
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+script = ExtResource("1")
+
+[node name="MapList" type="ItemList" parent="."]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MapNameInput" type="LineEdit" parent="."]
+layout_mode = 2
+placeholder_text = "Current board name"
+
+[node name="MapTagsInput" type="LineEdit" parent="."]
+layout_mode = 2
+placeholder_text = "Tags, comma separated"
+
+[node name="ApplyMetadata" type="Button" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Apply name / tags"
+
+[node name="MapPreview" parent="." instance=ExtResource("2")]
+layout_mode = 2

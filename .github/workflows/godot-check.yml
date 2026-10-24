@@ -71,6 +71,19 @@ jobs:
           grep -q 'ATLAS_CLIPBOARD_PASSED' /tmp/godot-clipboard_smoke.log
           grep -q 'ATLAS_SELECTION_PASSED' /tmp/godot-selection_smoke.log
           grep -q 'ATLAS_TOOLS_UI_PASSED' /tmp/godot-tools_ui_smoke.log
+      - name: Run workspace composition and organization tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in editor_modules_smoke organization_ui_smoke floors_view_smoke overview_smoke preview_cache_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_EDITOR_MODULES_PASSED' /tmp/godot-editor_modules_smoke.log
+          grep -q 'ATLAS_ORGANIZATION_UI_PASSED' /tmp/godot-organization_ui_smoke.log
+          grep -q 'ATLAS_FLOORS_VIEW_PASSED' /tmp/godot-floors_view_smoke.log
+          grep -q 'ATLAS_OVERVIEW_PASSED' /tmp/godot-overview_smoke.log
+          grep -q 'ATLAS_PREVIEW_CACHE_PASSED' /tmp/godot-preview_cache_smoke.log
       - name: Launch main scene headlessly
         shell: bash
         run: |
