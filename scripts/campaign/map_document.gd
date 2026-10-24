@@ -1,6 +1,10 @@
 class_name AtlasMapDocument
 extends RefCounted
 
+## One independently editable board. Floors own ordered artwork layers.
+## grid is the adjustable display overlay; terrain_grid (or a tile layer's
+## explicit grid) preserves legacy cell geometry after the overlay is edited.
+
 var id: String = ""
 var display_name: String = ""
 var kind: String = "REGION"
@@ -24,6 +28,8 @@ func floor_by_id(floor_id: String) -> AtlasFloor:
     return null
 
 
+## Grid precedence is important for old saves: per-layer snapshot, legacy
+## document terrain grid, then the current adjustable overlay.
 func get_terrain_grid(floor_id: String = "") -> AtlasGrid:
     var selected_id: String = default_floor_id if floor_id.is_empty() else floor_id
     var floor: AtlasFloor = floor_by_id(selected_id)

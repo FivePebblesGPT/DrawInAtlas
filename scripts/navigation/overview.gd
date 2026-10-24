@@ -66,6 +66,9 @@ static func _campaign_entries(campaign: AtlasCampaign, tokens: PackedStringArray
                 return
 
 
+## Bounded breadth-first traversal. Track (map, floor) pairs instead of only
+## map IDs, since one map may have multiple entrances on distinct floors.
+## Entry/depth/visit limits prevent cycles from freezing the search panel.
 static func _walk(campaign: AtlasCampaign, map_id: String, floor_id: String,
         tokens: PackedStringArray, region: PackedVector2Array, spatial: bool,
         recursive: bool, limit: int, max_depth: int, result: AtlasOverviewResult) -> void:

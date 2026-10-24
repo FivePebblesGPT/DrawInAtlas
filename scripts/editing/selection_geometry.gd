@@ -1,6 +1,9 @@
 class_name AtlasSelectionGeometry
 extends RefCounted
 
+## Hit testing and transforms in canonical board coordinates. This service
+## returns copies of layer data; the caller decides whether to commit an edit.
+
 
 static func stroke_bounds(stroke: AtlasStroke) -> Rect2:
     var bounds: Rect2 = Rect2(stroke.points[0], Vector2.ZERO)
@@ -89,6 +92,9 @@ static func select_rect(layer: AtlasLayer, rectangle: Rect2) -> AtlasSelection:
     return AtlasSelection.new()
 
 
+## Ink strokes are uniformly scaled (including line width). Raster images
+## retain exact stored pixels and instead compose affine layer transforms.
+## Scope constraints check BOTH the source and the destination footprints.
 static func transformed(layer: AtlasLayer, selection: AtlasSelection, transform: Transform2D,
         scope: AtlasEditScope = null) -> AtlasLayer:
     if selection.is_empty() or not selection.matches(layer) or not layer.is_editable():

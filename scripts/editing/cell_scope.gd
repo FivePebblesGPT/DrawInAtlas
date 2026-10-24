@@ -34,6 +34,8 @@ func contains_rect(rect: Rect2) -> bool:
     ]))
 
 
+## Shrink the allowed cell by half the brush width before clipping the stroke
+## centerline. Otherwise a legal centerline could paint pixels outside scope.
 func clip_strokes(strokes: Array[AtlasStroke]) -> Array[AtlasStroke]:
     if not enabled:
         return AtlasStroke.clone_all(strokes)

@@ -1,7 +1,9 @@
 class_name AtlasEditor
 extends Control
 
-## Vertical-slice editor shell. Entire domain and UI are pure GDScript.
+## Workspace coordinator: read the permanent node tree from prefab/ui.tscn,
+## instantiate reusable panels, and dispatch edits to services/command history.
+## Avoid storing presentation or camera state in canonical map documents.
 const MIN_ZOOM: float = 0.5
 const MAX_ZOOM: float = 3.0
 const ZOOM_FACTOR: float = 1.2
@@ -155,6 +157,8 @@ func _build_sidebar_views() -> void:
     layers_view.add_child(layer_panel)
 
 
+## The editor scene owns the canvas. This script wires behavior, rather than
+## rebuilding a second canvas node at runtime.
 func _connect_canvas() -> void:
     canvas = $Shell/CanvasAndInspector/Canvas
     canvas.paint_requested.connect(_on_paint)
@@ -1344,6 +1348,8 @@ func _on_back() -> void:
     _message("No previous map.")
 
 
+## Keep ordinary zoom on the current document. Only blocked wheel steps are
+## eligible for the explicit three-step linked-map navigation gate.
 func _on_wheel_step(direction: int, local_position: Vector2) -> void:
     var old_zoom := canvas.camera_zoom
     var new_zoom := clampf(

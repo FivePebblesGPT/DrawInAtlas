@@ -1,6 +1,10 @@
 class_name AtlasCampaign
 extends RefCounted
 
+## Mutable runtime graph of independent map documents. A link is a directed
+## navigation edge; an optional placement describes a spatial battlemap footprint.
+## The editor saves this graph through AtlasCampaignStore (not ResourceSaver).
+
 const SCHEMA_VERSION: int = 6
 
 var display_name: String = "West Marches"
@@ -25,6 +29,9 @@ func placement_by_id(placement_id: String) -> AtlasPlacement:
     return null
 
 
+## Find entrances at a point expressed in source MAP units, never screen pixels.
+## Ignore dangling destinations and floor references; a missing placement must
+## not silently turn a footprint link into an ordinary marker.
 func find_links_at(map_id: String, point: Vector2, floor_id: String = "") -> Array[AtlasMapLink]:
     var matches: Array[AtlasMapLink] = []
     var source: AtlasMapDocument = get_map(map_id)
@@ -76,6 +83,9 @@ func to_dict() -> Dictionary:
     }
 
 
+## Validate and reconstruct the complete document graph before it becomes
+## user-visible. Incomplete/dangling navigation links may still be represented
+## so the overview can report them rather than destroying user content.
 static func from_dict(data: Dictionary) -> AtlasCampaign:
     var version: Variant = data.get("schema_version")
     if not AtlasData.integer(version) or int(version) < 1 or int(version) > SCHEMA_VERSION:

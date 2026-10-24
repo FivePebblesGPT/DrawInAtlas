@@ -1,6 +1,9 @@
 class_name AtlasEditHistory
 extends RefCounted
-## Campaign-local drawing history with save checkpoints that survive divergent branches.
+## Campaign-local command log and dirty-state tracking. _states stores unique
+## history-state identifiers, not cursor indexes: after undo + a new command,
+## the new branch must not inherit the checkpoint identity of discarded redo.
+## _external_revision accounts for changes not yet represented by commands.
 
 signal changed
 
@@ -32,6 +35,8 @@ func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
     changed.emit()
 
 
+## Applying a command is transactional: invalid commands do not mutate history.
+## Only after successful apply do we discard the redo branch and issue a state ID.
 func execute(command: AtlasEditCommand) -> bool:
     if _campaign == null or command == null or command.map_id != active_map_id:
         return false
