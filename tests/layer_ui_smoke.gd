@@ -21,6 +21,22 @@ func _run() -> void:
     root.add_child(scene)
     for frame: int in range(6):
         await process_frame
+    # The fixed workspace and reusable panels must come from scene files.
+    _check(editor.canvas == editor.get_node("Shell/CanvasAndInspector/Canvas"),
+        "the editor uses the scene-owned canvas")
+    _check(editor.board_dialog.grid_controls ==
+        editor.board_dialog.get_node("Scroll/Margin/Form/GridControls"),
+        "board creation uses the embedded grid form scene")
+    _check(editor.grid_controls.distance_spinner ==
+        editor.grid_controls.get_node("DistanceRow/DistanceSpinner"),
+        "inspector grid form binds its scene controls")
+    _check(editor.layer_panel.layer_list == editor.layer_panel.get_node("LayerList"),
+        "layer panel binds its scene controls")
+    _check(editor.overview_panel.preview == editor.overview_panel.get_node("Preview"),
+        "overview embeds its preview panel")
+    _check(editor.map_preview.texture_rect == editor.map_preview.get_node("TextureRect"),
+        "map preview binds its scene texture display")
+
     var floor: AtlasFloor = editor.canvas.floor
     var basis: PackedVector2Array = editor.canvas.map.get_terrain_grid().cell_polygon(Vector2i.ZERO)
     var overlay: AtlasGrid = editor.canvas.map.grid.copy()

@@ -39,6 +39,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 | Document | Purpose |
 | --- | --- |
 | [Implementation notes](docs/IMPLEMENTATION_NOTES.md) | Implemented behavior, validation and remaining limitations |
+| [Code readability](docs/CODE_READIBILITY.md) | UI scene composition, naming, comments and remaining cleanup work |
 | [Product design](docs/PRODUCT_DESIGN.md) | Goals, planned features and acceptance criteria |
 | [Architecture](docs/ARCHITECTURE.md) | Proposed runtime boundaries, rendering and commands |
 | [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics and geometry |

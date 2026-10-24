@@ -10,11 +10,13 @@ ok_button_text = "Create"
 dialog_hide_on_ok = false
 
 [node name="Scroll" type="ScrollContainer" parent="."]
+layout_mode = 2
 custom_minimum_size = Vector2(400, 420)
 horizontal_scroll_mode = 0
 follow_focus = true
 
 [node name="Margin" type="MarginContainer" parent="Scroll"]
+layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/margin_left = 12
 theme_override_constants/margin_top = 12
@@ -22,6 +24,7 @@ theme_override_constants/margin_right = 12
 theme_override_constants/margin_bottom = 12
 
 [node name="Form" type="VBoxContainer" parent="Scroll/Margin"]
+layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="BoardNameLabel" type="Label" parent="Scroll/Margin/Form"]
@@ -29,7 +32,9 @@ layout_mode = 2
 text = "Board name"
 
 [node name="NameInput" type="LineEdit" parent="Scroll/Margin/Form"]
+layout_mode = 2
 placeholder_text = "Untitled board"
 
 [node name="GridControls" parent="Scroll/Margin/Form" instance=ExtResource("2")]
+layout_mode = 2
 
