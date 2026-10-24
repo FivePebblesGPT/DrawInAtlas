@@ -1,6 +1,6 @@
 extends SceneTree
 
-const Overview = preload("res://scripts/services/atlas_overview.gd")
+const Overview = preload("res://scripts/navigation/overview.gd")
 var _checks: int = 0
 var _failures: int = 0
 

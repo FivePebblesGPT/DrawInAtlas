@@ -1,7 +1,7 @@
 extends SceneTree
 
-const G = preload("res://scripts/services/atlas_selection_geometry.gd")
-const Shapes = preload("res://scripts/services/atlas_shapes.gd")
+const G = preload("res://scripts/editing/selection_geometry.gd")
+const Shapes = preload("res://scripts/artwork/shape_tools.gd")
 var _checks: int = 0
 var _failures: int = 0
 
