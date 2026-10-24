@@ -839,6 +839,7 @@ func _create_section(parent: VBoxContainer, caption: String) -> VBoxContainer:
 func _create_label(caption: String) -> Label:
     var result: Label = Label.new()
     result.text = caption
+    result.custom_minimum_size = Vector2(1, 0)
     result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     return result
 

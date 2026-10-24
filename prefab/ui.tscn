@@ -139,6 +139,7 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 20
 
 [node name="Status" type="Label" parent="WorkspaceSplit/Workspace/Shell"]
+custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 12

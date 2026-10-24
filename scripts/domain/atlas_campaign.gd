@@ -45,7 +45,7 @@ func find_links_at(map_id: String, point: Vector2, floor_id: String = "") -> Arr
             if (placement != null and placement.parent_map_id == map_id
                     and placement.child_map_id == link.target_map_id and placement.contains_parent_point(point)):
                 matches.append(link)
-        elif link.anchor.distance_to(point) <= link.hit_radius:
+        elif link.contains_marker_point(point):
             matches.append(link)
     return matches
 
@@ -128,39 +128,26 @@ static func from_dict(data: Dictionary) -> AtlasCampaign:
     return campaign
 
 
+## Load the authorable example from a .tres Resource rather than constructing
+## presentation content inline. The loaded preset is immutable; fresh model
+## objects are created for each call, so edits never modify res:// assets.
 static func sample() -> AtlasCampaign:
-    var campaign := AtlasCampaign.new()
-    campaign.display_name = "Northern Marches (sample)"
+    var preset: AtlasExampleCampaign = load("res://examples/northern_marches.tres") as AtlasExampleCampaign
+    if preset == null:
+        push_error("Missing example campaign: res://examples/northern_marches.tres")
+        return null
 
-    var world := AtlasMapDocument.new("world", "Northern Marches")
-    world.kind = "WORLD"
-    world.grid = AtlasGrid.new(AtlasGrid.Kind.HEX_POINTY, 45.0)
-    world.grid.distance_per_cell = 3.0
-    world.grid.distance_unit = "mi"
-    for q in range(-6, 7):
-        for r in range(-5, 6):
-            var terrain := 2 if (q + r * 3) % 7 == 0 else 1
-            world.floors[0].paint(Vector2i(q, r), terrain)
+    var campaign: AtlasCampaign = AtlasCampaign.new()
+    campaign.display_name = preset.display_name
+
+    var world: AtlasMapDocument = preset.world.create_document()
+    var city: AtlasMapDocument = preset.city.create_document()
+    campaign.root_map_id = world.id
     campaign.add_map(world)
-
-    var city := AtlasMapDocument.new("greyhaven", "Greyhaven")
-    city.kind = "CITY"
-    city.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 48.0)
-    city.grid.distance_per_cell = 10.0
-    city.grid.distance_unit = "ft"
-    for x in range(-6, 7):
-        for y in range(-4, 5):
-            if x % 4 == 0 or y % 3 == 0:
-                city.floors[0].paint(Vector2i(x, y), 3)
-            else:
-                city.floors[0].paint(Vector2i(x, y), 1)
     campaign.add_map(city)
 
-    var entrance := AtlasMapLink.new()
-    entrance.id = "enter-greyhaven"
-    entrance.source_map_id = "world"
-    entrance.target_map_id = "greyhaven"
-    entrance.anchor = world.grid.cell_to_document(Vector2i(2, 0))
-    entrance.hit_radius = 44.0
+    var entrance: AtlasMapLink = AtlasMapLink.from_dict(preset.entrance.to_dict())
+    # The marker follows its source grid cell if cell size/rotation changes.
+    entrance.anchor = world.grid.cell_to_document(preset.entrance_source_cell)
     campaign.links.append(entrance)
     return campaign

@@ -13,6 +13,7 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="Caption" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 mouse_filter = 2
 text = "Select a map to preview"

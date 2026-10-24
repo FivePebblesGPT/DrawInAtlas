@@ -1,16 +1,28 @@
 class_name AtlasMapLink
-extends RefCounted
+extends Resource
 
-var id: String = ""
-var source_map_id: String = ""
-var source_floor_id: String = "ground"
-var target_map_id: String = ""
-var anchor: Vector2 = Vector2.ZERO
-var hit_radius: float = 48.0
-var target_focus: Vector2 = Vector2.ZERO
-var target_zoom: float = 1.0
-var target_floor_id: String = "ground"
-var placement_id: String = ""
+## A directed navigation link, not the visible footprint of a child map.
+## Marker links use anchor + hit_radius in the SOURCE board's units; links
+## with a placement_id use the placement polygon instead (see AtlasCampaign).
+
+@export var id: String = ""
+@export var source_map_id: String = ""
+@export var source_floor_id: String = "ground"
+@export var target_map_id: String = ""
+@export var anchor: Vector2 = Vector2.ZERO
+## Pointer hit-test tolerance for a marker-only entrance in source document units.
+## Do not confuse this with a viewport-pixel radius or a placed battlemap size.
+@export_range(0.001, 1000000.0, 0.001, "or_greater") var hit_radius: float = 48.0
+@export var target_focus: Vector2 = Vector2.ZERO
+@export var target_zoom: float = 1.0
+@export var target_floor_id: String = "ground"
+@export var placement_id: String = ""
+
+
+## A marker's clickable area is circular in document coordinates. The placement
+## case is evaluated by AtlasCampaign using AtlasPlacement.contains_parent_point().
+func contains_marker_point(document_position: Vector2) -> bool:
+    return anchor.distance_to(document_position) <= hit_radius
 
 
 func to_dict() -> Dictionary:

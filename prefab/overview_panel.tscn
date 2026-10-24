@@ -16,6 +16,7 @@ button_pressed = true
 text = "Include descendants"
 
 [node name="Summary" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 autowrap_mode = 3
 theme_type_variation = &"MutedLabel"
