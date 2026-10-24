@@ -152,6 +152,7 @@ layout_mode = 2
 text = "No campaign open"
 
 [node name="Description" type="Label" parent="ViewPanel/Layout/Scroll/ContentMargin/Views/Maps"]
+custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 text = "Your campaign’s maps will appear here."
@@ -172,6 +173,7 @@ expand_to_text_length = false
 context_menu_enabled = true
 
 [node name="Description" type="Label" parent="ViewPanel/Layout/Scroll/ContentMargin/Views/Search"]
+custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 text = "Open a campaign to search its maps and locations."
@@ -189,6 +191,7 @@ layout_mode = 2
 text = "No map selected"
 
 [node name="Description" type="Label" parent="ViewPanel/Layout/Scroll/ContentMargin/Views/Layers"]
+custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 text = "Select a map to see its floors and layers."

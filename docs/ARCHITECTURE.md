@@ -2,6 +2,56 @@
 
 **Status:** target architecture; the running integration scaffold implements only part of it. The development baseline is **Godot 4.8-beta1**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [Implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
+## What runs today
+
+The first sections below describe the long-term target architecture. The
+**current implementation** (Godot 4.8-beta1) follows this simpler route:
+
+```text
+main.tscn
+└── prefab/ui.tscn              Menu bar, sidebar, workspace and inspector
+    └── scripts/interface/editor.gd          AtlasEditor: coordinates user actions
+        ├── scripts/interface/canvas.gd      AtlasCanvas: draw and emit gestures
+        ├── scripts/editing/                 Scope, tools, selection, clipboard
+        │   ├── commands/                    Reversible operations on the graph
+        │   └── history.gd                   Undo/redo/savepoint state IDs
+        ├── scripts/campaign/                Campaign → map → floor → layers
+        ├── scripts/artwork/                 Stroke, terrain and raster data
+        ├── scripts/navigation/              Per-floor view, linked navigation
+        └── scripts/persistence/             Checksummed JSON + lossless WebP
+```
+
+**Editing flow:** a pointer gesture reaches `AtlasCanvas`, which emits an
+intent such as `stroke_requested`. `AtlasEditor` resolves the currently
+selected floor/layer and asks a typed editing command or service to validate
+it. `AtlasEditHistory` applies reversible changes to the in-memory
+`AtlasCampaign` graph. The `changed` signal refreshes panels and the canvas.
+The canvas is a view of document data; its runtime `CanvasGroup` nodes are
+not the model and their count is determined by the current layers.
+
+**Navigation flow:** `AtlasMapLink` is a directed edge. A marker-only link
+uses an anchor and `hit_radius` measured in the SOURCE map's continuous board
+coordinates, not screen pixels. A link with a placement uses the rotated
+`AtlasPlacement` footprint instead. `AtlasViewSession` preserves each
+map/floor's camera and selected layer without dirtying persisted artwork.
+`AtlasZoomGate` requires three further wheel steps at the zoom boundary.
+
+**Authoring vs saving:** `examples/northern_marches.tres` is an Inspector-
+editable shipped `Resource` fixture containing two map presets, two
+`AtlasGrid` resources and a link resource. `AtlasCampaign.sample()` creates
+independent runtime objects from that immutable asset. User-edited work is
+persisted through `AtlasCampaignStore` as validated JSON and SHA-256-addressed,
+lossless WebP chunks with a staged checkpoint and verified `.bak`. It is not
+written back over the bundled `.tres`.
+
+**Where to begin:** to change a form, edit `prefab/*.tscn` and its
+`scripts/interface/` controller. To change document rules, start with
+`scripts/campaign/` and `scripts/artwork/` and add smoke-test cases. To
+change an edit gesture, follow the canvas signal into the editor and then
+`scripts/editing/commands/`. See [Code readability](CODE_READIBILITY.md).
+
+---
+
 ## 1. Architectural goals
 
 - Local-first and projector-first: a campaign must function without hosting a server.

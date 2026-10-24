@@ -3,7 +3,8 @@
 [ext_resource type="Script" path="res://prefab/ui.gd" id="1"]
 [ext_resource type="PackedScene" path="res://prefab/sidebar.tscn" id="2"]
 [ext_resource type="Theme" path="res://prefab/editor_theme.tres" id="3"]
-[ext_resource type="Script" path="res://scripts/ui/atlas_editor.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/interface/editor.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/interface/canvas.gd" id="5"]
 
 [node name="UI" type="Control" unique_id=484751465]
 layout_mode = 3
@@ -93,3 +94,53 @@ clip_contents = true
 script = ExtResource("4")
 sidebar = NodePath("../Sidebar")
 title_label = NodePath("../../Chrome/Layout/DocumentTitle")
+
+[node name="Shell" type="VBoxContainer" parent="WorkspaceSplit/Workspace"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1
+anchor_bottom = 1
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CanvasAndInspector" type="HBoxContainer" parent="WorkspaceSplit/Workspace/Shell"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 1
+
+[node name="Canvas" type="Control" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 160)
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("5")
+
+[node name="InspectorPanel" type="PanelContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector"]
+layout_mode = 2
+custom_minimum_size = Vector2(252, 0)
+
+[node name="Scroll" type="ScrollContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector/InspectorPanel"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Margin" type="MarginContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector/InspectorPanel/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Sections" type="VBoxContainer" parent="WorkspaceSplit/Workspace/Shell/CanvasAndInspector/InspectorPanel/Scroll/Margin"]
+layout_mode = 2
+custom_minimum_size = Vector2(204, 0)
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+
+[node name="Status" type="Label" parent="WorkspaceSplit/Workspace/Shell"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 3

@@ -1,6 +1,10 @@
 class_name AtlasViewSession
 extends RefCounted
 
+## Ephemeral per-map/per-floor camera and edit-target preferences. This is
+## intentionally separate from campaign data: visiting a floor does not dirty
+## the document or change the default floor written to the save file.
+
 class MapViews extends RefCounted:
     var floors: Dictionary[String, AtlasViewState] = {}
     var last_floor_id: String = ""
@@ -22,6 +26,8 @@ func remember(state: AtlasViewState) -> void:
     views.last_floor_id = state.floor_id
 
 
+## Prefer the last explicitly visited floor if none was requested. Validate
+## the retained layer ID against the current floor, since undo can remove layers.
 func resolve(campaign: AtlasCampaign, map_id: String, floor_id: String = "", fallback_focus: Vector2 = Vector2.ZERO, fallback_zoom: float = 1.0) -> AtlasViewState:
     if campaign == null:
         return null

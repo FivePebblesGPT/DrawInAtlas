@@ -1,6 +1,10 @@
 class_name AtlasCanvas
 extends Control
 
+## Document-space renderer and gesture input, not the campaign's source of
+## truth. The static editor shell lives in .tscn; per-layer draw nodes are
+## runtime-created because their count/order depends on the open document.
+
 signal paint_requested(cell: Vector2i)
 signal selection_requested(cell: Vector2i)
 signal battlemap_requested(start: Vector2, finish: Vector2, rotation_radians: float)
@@ -202,6 +206,8 @@ func _on_resized() -> void:
     queue_redraw()
 
 
+## Screen pixels are converted to stable document units via the editor camera.
+## Brush widths, link hit radii and terrain coordinates all use document units.
 func local_to_document(local_position: Vector2) -> Vector2:
     return camera_center + (local_position - size * 0.5) / camera_zoom
 
@@ -221,6 +227,9 @@ func _draw() -> void:
     _sync_layer_renderers()
 
 
+## One CanvasGroup per current layer isolates opacity/visibility. Reconcile by
+## stable layer ID so ordering/undo reuses drawers and deleted layers are freed.
+## This dynamic tree should NOT be duplicated as dozens of static scene nodes.
 func _sync_layer_renderers() -> void:
     var present: Dictionary[String, bool] = {}
     for index: int in range(floor.layers.size()):

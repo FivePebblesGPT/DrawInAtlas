@@ -1,0 +1,107 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/interface/grid_controls.gd" id="1"]
+
+[node name="GridControls" type="VBoxContainer"]
+script = ExtResource("1")
+theme_override_constants/separation = 8
+
+[node name="GridShapeLabel" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Grid shape"
+autowrap_mode = 3
+
+[node name="ShapePicker" type="OptionButton" parent="."]
+layout_mode = 2
+
+[node name="VisibilityCheckbox" type="CheckBox" parent="."]
+layout_mode = 2
+text = "Show grid overlay"
+tooltip_text = "Very dense grids hide while zoomed out; zoom in to see their lines."
+
+[node name="CellSizeLabel" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Cell size (board units)"
+autowrap_mode = 3
+
+[node name="CellSizeSpinner" type="SpinBox" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.001
+max_value = 4096
+step = 0.001
+allow_greater = true
+
+[node name="OriginLabel" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Origin (board units)"
+autowrap_mode = 3
+
+[node name="OriginRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="OriginXSpinner" type="SpinBox" parent="OriginRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -1000000
+max_value = 1000000
+step = 0.001
+allow_greater = true
+allow_lesser = true
+tooltip_text = "Origin X"
+
+[node name="OriginYSpinner" type="SpinBox" parent="OriginRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -1000000
+max_value = 1000000
+step = 0.001
+allow_greater = true
+allow_lesser = true
+tooltip_text = "Origin Y"
+
+[node name="RotationLabel" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Rotation (degrees)"
+autowrap_mode = 3
+
+[node name="RotationSpinner" type="SpinBox" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -3600
+max_value = 3600
+step = 0.1
+allow_greater = true
+allow_lesser = true
+
+[node name="DistanceLabel" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Native distance per cell / unit"
+autowrap_mode = 3
+
+[node name="DistanceRow" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="DistanceSpinner" type="SpinBox" parent="DistanceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.001
+max_value = 1000000
+step = 0.001
+allow_greater = true
+
+[node name="UnitPicker" type="OptionButton" parent="DistanceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Hint" type="Label" parent="."]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Overlay settings never resize artwork or convert another board’s units."
+autowrap_mode = 3
+theme_type_variation = &"MutedLabel"

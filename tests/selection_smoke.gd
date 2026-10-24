@@ -1,7 +1,7 @@
 extends SceneTree
 
-const G = preload("res://scripts/services/atlas_selection_geometry.gd")
-const Shapes = preload("res://scripts/services/atlas_shapes.gd")
+const G = preload("res://scripts/editing/selection_geometry.gd")
+const Shapes = preload("res://scripts/artwork/shape_tools.gd")
 var _checks: int = 0
 var _failures: int = 0
 
@@ -193,7 +193,7 @@ func _store() -> void:
     campaign.add_map(AtlasMapDocument.new("world", "Selection persistence"))
     campaign.get_map("world").floors[0].layers = [moved, placed]
     var path: String = "user://selection_smoke_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()]
-    _check(AtlasCampaign.SCHEMA_VERSION == 5 and placed.to_dict().transform.size() == 6, "schema5 serializes six affine floats")
+    _check(AtlasCampaign.SCHEMA_VERSION == 6 and placed.to_dict().transform.size() == 6, "schema6 serializes six affine floats")
     _check(AtlasCampaignStore.save_campaign(campaign, path) == OK, "real store saves shapes/transforms/WebP")
     var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(path)
     _check(loaded != null and loaded.to_dict() == campaign.to_dict(), "real store roundtrips geometry, style, order, placement")

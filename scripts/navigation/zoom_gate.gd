@@ -1,7 +1,9 @@
 class_name AtlasZoomGate
 extends RefCounted
 
-## Only call for logical wheel steps that occur *after* the camera hits a limit.
+## Three consecutive logical wheel steps in the same direction, targeting the
+## same link, are required AFTER the camera reaches its zoom limit.
+## This stops ordinary zooming from accidentally opening neighboring maps.
 const REQUIRED_STEPS: int = 3
 const RESET_TIMEOUT_MS: int = 900
 
@@ -18,6 +20,8 @@ func reset() -> void:
     last_step_ms = -1
 
 
+## A direction/target change or a pause resets the gesture. After the third
+## accepted blocked step, reset so another navigation requires a fresh gesture.
 func accept_blocked_step(next_direction: int, next_candidate: String, now_ms: int) -> bool:
     if next_direction == 0 or next_candidate.is_empty():
         reset()

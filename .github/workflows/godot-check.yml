@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Godot cannot import LFS pointer text as textures.
+          lfs: true
       - name: Install Godot 4.8-beta1 (standard, non-.NET)
         uses: chickensoft-games/setup-godot@v2
         with:

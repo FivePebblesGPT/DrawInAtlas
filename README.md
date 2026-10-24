@@ -34,11 +34,22 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - Editing tests: run `tests/fill_scope_smoke.gd`, `tests/clipboard_smoke.gd`, `tests/selection_smoke.gd` and `tests/tools_ui_smoke.gd` the same way.
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
 
+## Project layout
+
+Editor UI is composed in `prefab/*.tscn`, with controllers in
+`scripts/interface/`. Core document types live in `scripts/campaign/` and
+`scripts/artwork/`. Commands and editing tools live in `scripts/editing/`,
+view/navigation services in `scripts/navigation/`, and save/load code in
+`scripts/persistence/`. The editable bundled campaign is in
+`examples/northern_marches.tres` (Godot Resources); user saves deliberately
+retain validated JSON and WebP assets for recovery and Web export.
+
 ## Documentation
 
 | Document | Purpose |
 | --- | --- |
 | [Implementation notes](docs/IMPLEMENTATION_NOTES.md) | Implemented behavior, validation and remaining limitations |
+| [Code readability](docs/CODE_READIBILITY.md) | UI scene composition, naming, comments and remaining cleanup work |
 | [Product design](docs/PRODUCT_DESIGN.md) | Goals, planned features and acceptance criteria |
 | [Architecture](docs/ARCHITECTURE.md) | Proposed runtime boundaries, rendering and commands |
 | [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics and geometry |

@@ -1,0 +1,60 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/interface/layer_panel.gd" id="1"]
+
+[node name="LayerPanel" type="VBoxContainer"]
+script = ExtResource("1")
+theme_override_constants/separation = 8
+
+[node name="LayerList" type="ItemList" parent="."]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+size_flags_vertical = 3
+
+[node name="NameInput" type="LineEdit" parent="."]
+layout_mode = 2
+placeholder_text = "Layer name"
+
+[node name="VisibilityCheckbox" type="CheckBox" parent="."]
+layout_mode = 2
+text = "Visible"
+
+[node name="LockCheckbox" type="CheckBox" parent="."]
+layout_mode = 2
+text = "Locked"
+
+[node name="OpacityLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Opacity"
+
+[node name="OpacitySpinner" type="SpinBox" parent="."]
+layout_mode = 2
+max_value = 1
+step = 0.05
+
+[node name="Order" type="HBoxContainer" parent="."]
+layout_mode = 2
+
+[node name="RaiseButton" type="Button" parent="Order"]
+layout_mode = 2
+text = "Raise"
+
+[node name="LowerButton" type="Button" parent="Order"]
+layout_mode = 2
+text = "Lower"
+
+[node name="NewInkButton" type="Button" parent="."]
+layout_mode = 2
+text = "New ink layer"
+
+[node name="NewTerrainButton" type="Button" parent="."]
+layout_mode = 2
+text = "New terrain layer"
+
+[node name="NewRasterButton" type="Button" parent="."]
+layout_mode = 2
+text = "New raster layer"
+
+[node name="ImportButton" type="Button" parent="."]
+layout_mode = 2
+text = "Import image…"

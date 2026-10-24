@@ -1,6 +1,10 @@
 class_name AtlasCampaignStore
 extends RefCounted
 
+## User-save adapter: verified JSON metadata plus immutable, SHA-256-addressed
+## lossless WebP chunks. A .tres is suitable for shipped presets, but canonical
+## mutable saves need strict validation, checkpoint hashes and backup recovery.
+
 const DEFAULT_PATH: String = "user://drawinatlas_campaign.json"
 
 
@@ -61,6 +65,8 @@ static func load_campaign(path: String = DEFAULT_PATH, io: AtlasStoreIO = null) 
     return load_result(path, io).campaign
 
 
+## Never merge a partially loaded head into live state. Validate the entire
+## head first; only then consider the last verified .bak generation.
 static func load_result(path: String = DEFAULT_PATH, io: AtlasStoreIO = null) -> AtlasStoreResult:
     var storage: AtlasStoreIO = io if io != null else AtlasStoreIO.new()
     var head: AtlasStoreResult = _load_one(path, path, storage)

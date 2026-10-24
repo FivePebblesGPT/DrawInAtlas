@@ -1,17 +1,21 @@
 class_name AtlasPlacement
-extends RefCounted
+extends Resource
 
-## A parent-space rectangle with independent child-map cell coordinates.
-var id: String = ""
-var parent_map_id: String = ""
-var child_map_id: String = ""
-var origin: Vector2 = Vector2.ZERO
-var rotation: float = 0.0
-var columns: int = 10
-var rows: int = 10
-var parent_units_per_cell: float = 24.0
-var child_units_per_cell: float = 64.0
-var symbolic: bool = false
+## A rotated battlemap footprint in the PARENT board's coordinate system.
+## Origin is the top-left corner in parent units; columns/rows count cells,
+## parent_units_per_cell controls only the footprint, and child_units_per_cell
+## maps parent footprint cells into independent child-map coordinates.
+## Unlike a marker link, picking uses this polygon rather than hit_radius.
+@export var id: String = ""
+@export var parent_map_id: String = ""
+@export var child_map_id: String = ""
+@export var origin: Vector2 = Vector2.ZERO
+@export var rotation: float = 0.0
+@export var columns: int = 10
+@export var rows: int = 10
+@export var parent_units_per_cell: float = 24.0
+@export var child_units_per_cell: float = 64.0
+@export var symbolic: bool = false
 
 
 func local_to_parent() -> Transform2D:
@@ -27,6 +31,8 @@ func contains_parent_point(position: Vector2) -> bool:
     return local.x >= 0.0 and local.y >= 0.0 and local.x < columns and local.y < rows
 
 
+## Entering a child map converts its local cell coordinate to the child's
+## board units; the child's grid need not share the parent's physical scale.
 func parent_point_to_child(position: Vector2) -> Vector2:
     return parent_to_local(position) * child_units_per_cell
 

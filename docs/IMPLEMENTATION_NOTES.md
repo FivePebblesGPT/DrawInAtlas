@@ -79,7 +79,7 @@ Implemented on top of the integration checkpoint:
 - **B**: pen; **E**: eraser; **Ctrl/Cmd+Z**: drawing undo; **Ctrl/Cmd+Shift+Z** or **Ctrl/Cmd+Y**: redo; **Ctrl/Cmd+S**: save; **Escape**: cancel preview. Text inputs retain their own keyboard editing behavior. In the legacy battlemap tool Q/E still rotates the footprint.
 - Vector artwork is structured JSON, not a raster image. Campaign schema **v2** carries strokes; v1 files load with empty ink, while old v1-only readers reject v2 rather than silently discarding artwork. Invalid new stroke payloads reject loading instead of dropping ink.
 
-New code: `scripts/domain/atlas_stroke.gd`, `atlas_edit_command.gd`, `atlas_stroke_edit.gd`; `scripts/services/atlas_edit_history.gd`, `atlas_stroke_eraser.gd`. Layer ordering/locking, raster artwork, stroke selection and optimized delta/chunk histories are later milestones. Current history snapshots all ink on an edited floor, which is suitable for this initial slice rather than a large-campaign memory solution.
+New code: `scripts/artwork/stroke.gd`, `atlas_edit_command.gd`, `atlas_stroke_edit.gd`; `scripts/editing/history.gd`, `atlas_stroke_eraser.gd`. Layer ordering/locking, raster artwork, stroke selection and optimized delta/chunk histories are later milestones. Current history snapshots all ink on an edited floor, which is suitable for this initial slice rather than a large-campaign memory solution.
 
 ### Milestone 1 verification
 
@@ -120,10 +120,11 @@ Open `project.godot` in Godot 4.8-beta1 and run the main scene (F5).
 main.tscn                      Origin scene root + CanvasLayer UI
 prefab/ui.tscn, ui.gd           Menu, split layout and sidebar integration
 prefab/sidebar.tscn, .gd        Reusable activity rail/view container
-scripts/domain/                Grid, floor, independent maps, links and placements
-scripts/services/              History, three-step gate, staged store/IO, WebP codec
-scripts/ui/atlas_editor.gd      Workspace controls/navigation and scaffold edits
-scripts/ui/atlas_canvas.gd      Clipped canvas rendering, picking and input
+scripts/campaign/              Grid, floor, independent maps, links and placements
+scripts/editing/, navigation/    History, three-step gate and document navigation
+scripts/persistence/            Staged store/IO and WebP codec
+scripts/interface/editor.gd      Workspace controls/navigation and scaffold edits
+scripts/interface/canvas.gd      Clipped canvas rendering, picking and input
 tests/smoke.gd                 Headless domain + integrated scene checks
 tests/artwork_smoke.gd         Vector artwork, eraser and drawing history checks
 tests/board_grid_smoke.gd      Board/grid commands, migration and invariance checks

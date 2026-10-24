@@ -1,16 +1,17 @@
 class_name AtlasGrid
-extends RefCounted
+extends Resource
 
-## A document-local grid. Coordinate conversion has no knowledge of map links.
+## Grid geometry is expressed in the document's native board units, not screen pixels.
+## A grid can be reused as an Inspector-editable preset; editors copy it before mutation.
 enum Kind { GRIDLESS, SQUARE, HEX_POINTY, HEX_FLAT }
 
-var kind: Kind = Kind.HEX_POINTY
-var cell_size: float = 48.0
-var origin: Vector2 = Vector2.ZERO
-var rotation: float = 0.0
-var distance_per_cell: float = 6.0
-var distance_unit: String = "mi"
-var visible: bool = true
+@export var kind: Kind = Kind.HEX_POINTY
+@export var cell_size: float = 48.0
+@export var origin: Vector2 = Vector2.ZERO
+@export var rotation: float = 0.0
+@export var distance_per_cell: float = 6.0
+@export var distance_unit: String = "mi"
+@export var visible: bool = true
 
 
 func _init(grid_kind: Kind = Kind.HEX_POINTY, size: float = 48.0) -> void:
@@ -47,6 +48,8 @@ func same_geometry(other: AtlasGrid) -> bool:
         and origin == other.origin and rotation == other.rotation)
 
 
+## Convert an axial hex coordinate or square cell index into document-space units.
+## Hex coordinates are axial (q, r); the pointy/flat formulas intentionally differ.
 func cell_to_document(cell: Vector2i) -> Vector2:
     var local := Vector2.ZERO
     match kind:
@@ -143,6 +146,7 @@ static func _is_number(value: Variant) -> bool:
     return (value is int or value is float) and is_finite(float(value))
 
 
+## Cube-coordinate rounding preserves q + r + s = 0 after rounding each axis.
 static func _round_axial(q: float, r: float) -> Vector2i:
     var s := -q - r
     var rq := roundi(q)

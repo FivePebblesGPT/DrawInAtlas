@@ -1,7 +1,9 @@
 class_name AtlasEditor
 extends Control
 
-## Vertical-slice editor shell. Entire domain and UI are pure GDScript.
+## Workspace coordinator: read the permanent node tree from prefab/ui.tscn,
+## instantiate reusable panels, and dispatch edits to services/command history.
+## Avoid storing presentation or camera state in canonical map documents.
 const MIN_ZOOM: float = 0.5
 const MAX_ZOOM: float = 3.0
 const ZOOM_FACTOR: float = 1.2
@@ -30,7 +32,7 @@ var angle_spinner: SpinBox
 var lock_checkbox: CheckBox
 var reference_checkbox: CheckBox
 var opacity_slider: HSlider
-var status_label: Label
+@onready var status_label: Label = $Shell/Status
 var search_list: ItemList
 var search_map_ids: Array[String] = []
 var distance_spinner: SpinBox
@@ -68,6 +70,11 @@ var overview_panel: AtlasOverviewPanel
 var _search_entries: Array[AtlasOverviewEntry] = []
 
 const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
+const BOARD_DIALOG_SCENE: PackedScene = preload("res://prefab/board_dialog.tscn")
+const GRID_CONTROLS_SCENE: PackedScene = preload("res://prefab/grid_controls.tscn")
+const LAYER_PANEL_SCENE: PackedScene = preload("res://prefab/layer_panel.tscn")
+const OVERVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/overview_panel.tscn")
+const PREVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/preview_panel.tscn")
 
 
 func _ready() -> void:
@@ -91,21 +98,11 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-    var shell: VBoxContainer = VBoxContainer.new()
-    shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    add_child(shell)
-
-    var content: HBoxContainer = HBoxContainer.new()
-    content.name = "CanvasAndInspector"
-    content.add_theme_constant_override("separation", 1)
-    content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    shell.add_child(content)
-
     _build_sidebar_views()
-    _build_canvas(content)
-    _build_inspector(content)
-    _build_status_label(shell)
-    board_dialog = AtlasBoardDialog.new()
+    _connect_canvas()
+    _build_inspector()
+
+    board_dialog = BOARD_DIALOG_SCENE.instantiate() as AtlasBoardDialog
     board_dialog.theme = sidebar.theme
     board_dialog.board_requested.connect(_on_board_requested)
     add_child(board_dialog)
@@ -134,12 +131,12 @@ func _build_sidebar_views() -> void:
     map_tags_input.text_submitted.connect(func(_text: String) -> void: _apply_map_metadata())
     maps_view.add_child(map_tags_input)
     maps_view.add_child(_action_button("Apply name / tags", _apply_map_metadata))
-    map_preview = AtlasPreviewPanel.new()
+    map_preview = PREVIEW_PANEL_SCENE.instantiate() as AtlasPreviewPanel
     maps_view.add_child(map_preview)
 
     var search_view: Control = sidebar.get_view_content(&"Search")
     search_view.get_node("Description").text = "Name, floor, kind or #tag. Double-click to open."
-    overview_panel = AtlasOverviewPanel.new()
+    overview_panel = OVERVIEW_PANEL_SCENE.instantiate() as AtlasOverviewPanel
     overview_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
     overview_panel.query_changed.connect(func() -> void: _refresh_search_list(sidebar.get_search_query()))
     overview_panel.entry_activated.connect(_open_overview_entry)
@@ -152,7 +149,7 @@ func _build_sidebar_views() -> void:
     var layers_view: Control = sidebar.get_view_content(&"Layers")
     layers_view.get_node("Heading").hide()
     layers_view.get_node("Description").hide()
-    layer_panel = AtlasLayerPanel.new()
+    layer_panel = LAYER_PANEL_SCENE.instantiate() as AtlasLayerPanel
     layer_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
     layer_panel.layer_selected.connect(select_layer)
     layer_panel.layers_changed.connect(apply_layers)
@@ -160,11 +157,10 @@ func _build_sidebar_views() -> void:
     layers_view.add_child(layer_panel)
 
 
-func _build_canvas(parent: HBoxContainer) -> void:
-    canvas = AtlasCanvas.new()
-    canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    canvas.custom_minimum_size = Vector2(160, 160)
+## The editor scene owns the canvas. This script wires behavior, rather than
+## rebuilding a second canvas node at runtime.
+func _connect_canvas() -> void:
+    canvas = $Shell/CanvasAndInspector/Canvas
     canvas.paint_requested.connect(_on_paint)
     canvas.selection_requested.connect(_on_select)
     canvas.battlemap_requested.connect(_on_create_battlemap)
@@ -178,27 +174,10 @@ func _build_canvas(parent: HBoxContainer) -> void:
     canvas.transform_requested.connect(transform_selection)
     canvas.fill_requested.connect(fill_at)
     canvas.interaction_started.connect(_refresh_scope)
-    parent.add_child(canvas)
 
 
-func _build_inspector(parent: HBoxContainer) -> void:
-    var panel: PanelContainer = PanelContainer.new()
-    panel.custom_minimum_size = Vector2(252, 0)
-    parent.add_child(panel)
-    var inspector: ScrollContainer = ScrollContainer.new()
-    inspector.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    inspector.follow_focus = true
-    panel.add_child(inspector)
-    var margin: MarginContainer = MarginContainer.new()
-    margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    for edge: String in ["left", "top", "right", "bottom"]:
-        margin.add_theme_constant_override("margin_" + edge, 14)
-    inspector.add_child(margin)
-    var sections: VBoxContainer = VBoxContainer.new()
-    sections.custom_minimum_size = Vector2(204, 0)
-    sections.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    sections.add_theme_constant_override("separation", 20)
-    margin.add_child(sections)
+func _build_inspector() -> void:
+    var sections: VBoxContainer = $Shell/CanvasAndInspector/InspectorPanel/Scroll/Margin/Sections
 
     _build_floor_controls(sections)
     _build_tool_controls(sections)
@@ -459,7 +438,7 @@ func _build_map_controls(parent: VBoxContainer) -> void:
     lock_checkbox.disabled = true
     lock_checkbox.toggled.connect(_on_scope_toggled)
     map_section.add_child(lock_checkbox)
-    grid_controls = AtlasGridControls.new()
+    grid_controls = GRID_CONTROLS_SCENE.instantiate() as AtlasGridControls
     grid_controls.settings_changed.connect(apply_grid)
     map_section.add_child(grid_controls)
     distance_spinner = grid_controls.distance_spinner
@@ -519,14 +498,6 @@ func _build_reference_controls(parent: VBoxContainer) -> void:
         zoom_gate.reset()
     )
     reference_section.add_child(navigation_toggle)
-
-
-func _build_status_label(parent: VBoxContainer) -> void:
-    status_label = Label.new()
-    status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    status_label.theme_type_variation = &"MutedLabel"
-    status_label.add_theme_font_size_override("font_size", 12)
-    parent.add_child(status_label)
 
 
 func _on_distance_changed(value: float) -> void:
@@ -872,6 +843,7 @@ func _create_section(parent: VBoxContainer, caption: String) -> VBoxContainer:
 func _create_label(caption: String) -> Label:
     var result: Label = Label.new()
     result.text = caption
+    result.custom_minimum_size = Vector2(1, 0)
     result.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     return result
 
@@ -1376,6 +1348,8 @@ func _on_back() -> void:
     _message("No previous map.")
 
 
+## Keep ordinary zoom on the current document. Only blocked wheel steps are
+## eligible for the explicit three-step linked-map navigation gate.
 func _on_wheel_step(direction: int, local_position: Vector2) -> void:
     var old_zoom := canvas.camera_zoom
     var new_zoom := clampf(

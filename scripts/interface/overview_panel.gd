@@ -6,49 +6,27 @@ signal query_changed
 signal entry_activated(entry: AtlasOverviewEntry)
 signal source_focus_requested(entry: AtlasOverviewEntry)
 
-var mode_picker: OptionButton
-var recursive_checkbox: CheckBox
-var result_list: ItemList
-var summary: Label
-var preview: AtlasPreviewPanel
+@onready var mode_picker: OptionButton = $ModePicker
+@onready var recursive_checkbox: CheckBox = $RecursiveCheckbox
+@onready var result_list: ItemList = $ResultList
+@onready var summary: Label = $Summary
+@onready var preview: AtlasPreviewPanel = $Preview
+@onready var _open: Button = $OpenButton
+@onready var _focus: Button = $FocusButton
 var entries: Array[AtlasOverviewEntry] = []
 var _campaign: AtlasCampaign
-var _open: Button
-var _focus: Button
 
 
 func _ready() -> void:
-    add_theme_constant_override("separation", 8)
-    mode_picker = OptionButton.new()
     for label: String in ["Campaign", "Current floor links", "Visible area links", "Selected cell links"]:
         mode_picker.add_item(label)
+
     mode_picker.item_selected.connect(func(_index: int) -> void: query_changed.emit())
-    add_child(mode_picker)
-    recursive_checkbox = CheckBox.new()
-    recursive_checkbox.text = "Include descendants"
-    recursive_checkbox.button_pressed = true
     recursive_checkbox.toggled.connect(func(_enabled: bool) -> void: query_changed.emit())
-    add_child(recursive_checkbox)
-    summary = Label.new()
-    summary.theme_type_variation = &"MutedLabel"
-    summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    add_child(summary)
-    result_list = ItemList.new()
-    result_list.custom_minimum_size = Vector2(0, 100)
-    result_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
     result_list.item_selected.connect(_select)
     result_list.item_activated.connect(_activate)
-    add_child(result_list)
-    _open = Button.new()
-    _open.text = "Open map / floor"
     _open.pressed.connect(func() -> void: _activate(_selected_index()))
-    add_child(_open)
-    _focus = Button.new()
-    _focus.text = "Focus source anchor"
     _focus.pressed.connect(_focus_source)
-    add_child(_focus)
-    preview = AtlasPreviewPanel.new()
-    add_child(preview)
     _update_actions(null)
 
 
