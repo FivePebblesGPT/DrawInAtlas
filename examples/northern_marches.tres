@@ -1,9 +1,9 @@
 [gd_resource type="Resource" script_class="AtlasExampleCampaign" load_steps=7 format=3]
 
-[ext_resource type="Script" path="res://scripts/domain/example_campaign.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/domain/example_map.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/domain/atlas_grid.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/domain/atlas_map_link.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/examples/campaign_preset.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/examples/map_preset.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/campaign/grid.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/campaign/map_link.gd" id="4"]
 
 [sub_resource type="Resource" id="WorldGrid"]
 script = ExtResource("3")

@@ -27,17 +27,33 @@ Guideline: author stable visual hierarchies and defaults in `.tscn`, then
 instantiate reusable views with `PackedScene.instantiate()`. Pure
 `RefCounted` domain objects and service classes do not need a scene.
 
-## Naming and responsibility
+## Find code by responsibility
 
-- Prefer clear identifiers such as `floor_id` and `selected_layer_id` over
-  ambiguous `id` or `data` where several kinds of ID coexist.
-- Use `snake_case` for variables/functions/files, and `PascalCase` for
-  `class_name` types and scene node names.
-- Bind fixed UI controls via `@onready` paths and keep their event wiring in
-  scripts. Avoid public API renames unless all call sites/tests are updated.
-- Keep domain logic in `scripts/domain/`, use cases in `scripts/services/`
-  and UI orchestration in `scripts/ui/`. See [Architecture](ARCHITECTURE.md)
-  and [Implementation notes](IMPLEMENTATION_NOTES.md).
+```text
+scripts/
+  campaign/                 Campaign, maps, floors, grids, links and placements
+  artwork/                  Layers, strokes and raster chunks
+  editing/                  User gestures, selection, clipboard and history
+    commands/               Reversible edits applied to campaign data
+  navigation/               Overview/search, view state, previews and zoom gate
+  persistence/              JSON/WebP store, validation and layer codec
+  interface/                Canvas, editor shell, panels and import controls
+  examples/                 Resource definitions for bundled demonstration data
+examples/
+  northern_marches.tres     Editable example maps, grids, terrain and link
+```
+
+The `Atlas` **class-name** prefix remains a deliberate namespace because
+GDScript's `class_name` registry is global. Filenames omit that redundant
+prefix now that ownership is expressed by directories.
+
+- Prefer specific identifiers such as `floor_id` and `selected_layer_id`.
+- Bind scene-owned controls via `@onready`; keep signals/actions in scripts.
+- A link's `hit_radius` is a **document-space** marker pick tolerance, not a
+  grid cell size or viewport pixel radius. See `scripts/campaign/map_link.gd`.
+- Preserve the JSON + WebP save format for user-edited campaigns; use
+  `Resource`/`.tres` for authorable presets and reusable Godot assets.
+
 
 ## Explain algorithms, not syntax
 

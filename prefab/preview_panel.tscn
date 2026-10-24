@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/atlas_preview_panel.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/interface/preview_panel.gd" id="1"]
 
 [node name="PreviewPanel" type="VBoxContainer"]
 script = ExtResource("1")

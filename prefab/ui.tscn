@@ -3,8 +3,8 @@
 [ext_resource type="Script" path="res://prefab/ui.gd" id="1"]
 [ext_resource type="PackedScene" path="res://prefab/sidebar.tscn" id="2"]
 [ext_resource type="Theme" path="res://prefab/editor_theme.tres" id="3"]
-[ext_resource type="Script" path="res://scripts/ui/atlas_editor.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/ui/atlas_canvas.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/interface/editor.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/interface/canvas.gd" id="5"]
 
 [node name="UI" type="Control" unique_id=484751465]
 layout_mode = 3
