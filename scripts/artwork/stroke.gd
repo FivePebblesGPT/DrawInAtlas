@@ -1,10 +1,10 @@
 class_name AtlasStroke
-extends RefCounted
+extends Resource
 ## Editable ink in continuous document coordinates, independent of any grid.
 
-var points: PackedVector2Array
-var color: Color
-var width: float
+@export_storage var points: PackedVector2Array
+@export_storage var color: Color
+@export_storage var width: float
 
 
 func _init(path: PackedVector2Array = PackedVector2Array(), ink: Color = Color.BLACK,

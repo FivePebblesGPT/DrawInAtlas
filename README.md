@@ -46,15 +46,15 @@ Editor UI is composed in `prefab/*.tscn`, with controllers in
 `scripts/artwork/`. Commands and editing tools live in `scripts/editing/`,
 view/navigation services in `scripts/navigation/`, and save/load code in
 `scripts/persistence/`. The editable bundled campaign is in
-`examples/northern_marches.tres` (Godot Resources); user saves deliberately
-retain validated JSON and WebP assets for recovery and Web export.
+`examples/northern_marches.tres` (Godot Resources); user saves use a single embedded binary `.scn` and an adjacent validated
+`.bak.scn` recovery generation (native regression verification pending).
 
 `AtlasEditor` composes scene-owned inspector/browser forms, an
 `AtlasArtworkEditor` for scoped editing and an `AtlasMapNavigator` for view
 state. See [Code readability](docs/CODE_READIBILITY.md) for responsibilities.
-The intended save-format migration is to native Godot **`.res`/`.scn`**;
-the current JSON/WebP store remains behind `AtlasCampaignStore` during this
-behavior-preserving UI refactor.
+The native campaign save implementation uses one binary **`.scn`**
+containing Resource-backed domain data and embedded lossless WebP chunks.
+No standalone `.res` or artwork sidecars are written.
 
 ## Documentation
 
@@ -69,4 +69,4 @@ behavior-preserving UI refactor.
 | [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized data and storage |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
 
-Linked-map refinements, projector output, networking, native `.res`/`.scn` save migration and campaign import/export UX remain future work. Legacy placement actions still await reversible commands. See implementation notes for precise selection/fill limits and deferred browser validation.
+Linked-map refinements, projector output, networking and campaign import/export UX remain future work. The native save implementation still requires Godot 4.8-beta1 acceptance and raster benchmarking. Legacy placement actions still await reversible commands. See implementation notes for precise selection/fill limits and deferred browser validation.

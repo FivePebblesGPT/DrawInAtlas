@@ -192,7 +192,7 @@ func _store() -> void:
 	var campaign: AtlasCampaign = AtlasCampaign.new()
 	campaign.add_map(AtlasMapDocument.new("world", "Selection persistence"))
 	campaign.get_map("world").floors[0].layers = [moved, placed]
-	var path: String = "user://selection_smoke_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()]
+	var path: String = "user://selection_smoke_%d_%d.scn" % [OS.get_process_id(), Time.get_ticks_usec()]
 	_check(AtlasCampaign.SCHEMA_VERSION == 6 and placed.to_dict().transform.size() == 6, "schema6 serializes six affine floats")
 	_check(AtlasCampaignStore.save_campaign(campaign, path) == OK, "real store saves shapes/transforms/WebP")
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(path)
@@ -200,21 +200,9 @@ func _store() -> void:
 	if loaded != null:
 		var restored: AtlasRasterLayer = loaded.get_map("world").floors[0].layer_by_id(placed.id) as AtlasRasterLayer
 		_check(restored != null and restored.chunks["-1,0"].image.get_data() == raster.chunks["-1,0"].image.get_data(), "real WebP hydration preserves exact pixels and content hash")
-	var legacy: Dictionary = campaign.to_dict()
-	legacy.schema_version = 4
-	legacy.maps[0].floors[0].layers[1].erase("transform")
-	var canonical: String = JSON.stringify(JSON.parse_string(JSON.stringify(legacy, "", true, true)), "", true, true)
-	legacy["_checkpoint"] = {"sha256": canonical.sha256_text()}
-	_check(AtlasStoreIO.new().write_bytes(path, JSON.stringify(legacy, "", true, true).to_utf8_buffer()) == OK, "write checksummed v4 fixture without transform")
-	loaded = AtlasCampaignStore.load_campaign(path)
-	_check(loaded != null, "real store accepts v4 missing-transform migration")
-	if loaded != null:
-		var restored: AtlasRasterLayer = loaded.get_map("world").floors[0].layer_by_id(placed.id) as AtlasRasterLayer
-		_check(restored != null and restored.transform == Transform2D.IDENTITY and restored.chunks["-1,0"].asset_id == raster.chunks["-1,0"].asset_id, "v4 defaults identity without changing pixel hashes")
-		_check(AtlasCampaignStore.save_campaign(loaded, path) == OK and AtlasCampaignStore.load_campaign(path).to_dict() == loaded.to_dict(), "migrated campaign persists as schema5")
-	for entry: String in DirAccess.get_files_at(path + ".assets"):
-		DirAccess.remove_absolute(path + ".assets/" + entry)
-	DirAccess.remove_absolute(path + ".assets")
-	for suffix: String in ["", ".bak", ".pending", ".bak.pending"]:
-		if FileAccess.file_exists(path + suffix):
-			DirAccess.remove_absolute(path + suffix)
+	# Legacy JSON checkpoints are no longer accepted as user campaign files.
+	for old_path: String in [path, path.trim_suffix(".scn") + ".bak.scn",
+			path.trim_suffix(".scn") + ".pending.scn",
+			path.trim_suffix(".scn") + ".bak.pending.scn"]:
+		if FileAccess.file_exists(old_path):
+			DirAccess.remove_absolute(old_path)

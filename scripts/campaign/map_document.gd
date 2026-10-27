@@ -1,18 +1,18 @@
 class_name AtlasMapDocument
-extends RefCounted
+extends Resource
 
 ## One independently editable board. Floors own ordered artwork layers.
 ## grid is the adjustable display overlay; terrain_grid (or a tile layer's
 ## explicit grid) preserves legacy cell geometry after the overlay is edited.
 
-var id: String = ""
-var display_name: String = ""
-var kind: String = "REGION"
-var tags: Array[String] = []
-var grid: AtlasGrid = AtlasGrid.new()
-var terrain_grid: AtlasGrid
-var floors: Array[AtlasFloor] = []
-var default_floor_id: String = "ground"
+@export_storage var id: String = ""
+@export_storage var display_name: String = ""
+@export_storage var kind: String = "REGION"
+@export_storage var tags: Array[String] = []
+@export_storage var grid: AtlasGrid = AtlasGrid.new()
+@export_storage var terrain_grid: AtlasGrid
+@export_storage var floors: Array[AtlasFloor] = []
+@export_storage var default_floor_id: String = "ground"
 
 
 func _init(map_id: String = "", map_name: String = "") -> void:
