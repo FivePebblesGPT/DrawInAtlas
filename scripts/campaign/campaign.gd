@@ -69,8 +69,11 @@ func to_dict() -> Dictionary:
 	var saved_maps: Array[Dictionary] = []
 	var saved_links: Array[Dictionary] = []
 	var saved_placements: Array[Dictionary] = []
-	for map: AtlasMapDocument in maps.values():
-		saved_maps.append(map.to_dict())
+	# Registry insertion/scene-child order is not persistent map identity.
+	var map_ids: Array = maps.keys()
+	map_ids.sort()
+	for map_id: String in map_ids:
+		saved_maps.append(get_map(map_id).to_dict())
 	for link in links:
 		saved_links.append(link.to_dict())
 	for placement in placements:

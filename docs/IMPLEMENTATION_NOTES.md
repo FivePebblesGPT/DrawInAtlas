@@ -1,5 +1,49 @@
 # Implementation Notes
 
+## Native single-file saves — local validation, 2026-10-27
+
+This section supersedes the historical JSON/checkpoint descriptions below.
+User campaigns now use one compressed binary `.scn`, embedded Resource-backed
+documents and lossless WebP chunks, with adjacent verified `.bak.scn` recovery.
+The native version is **1**; in-memory compatibility schema **6** is not the
+user-file format. Old JSON saves remain untouched, without an importer.
+
+PR #4's semantic round-trip failure was registry order, not lost map content:
+packing sorted map nodes while `to_dict()` used dictionary insertion order.
+Metadata now sorts map IDs consistently; floor/layer ordering is unchanged.
+Three composed UI suites also still used JSON save/backup names; they now test
+the actual native store. Deliberately corrupt fixtures suppress only their
+expected loader diagnostics; normal paths retain error reporting. Storage test
+phases must return completion, preventing a runtime error from silently passing.
+
+Local Godot **4.8.beta1.official.4d10419ca** evidence:
+
+- All **15 headless suites** pass, including **76 native storage checks** for
+  exact RGBA8/hidden RGB, negative/partial chunks, affine placement, independent
+  floors, cyclic/multiple entrances, metadata, nested Resource/Image isolation,
+  invalid version/digest/payload/external assets, injected transaction failures,
+  corrupt-head backup recovery and real Linux head/backup replacement.
+- Both framebuffer suites pass under **Xvfb/Mesa Compatibility**: the visual
+  suite reports zero changes outside the canvas, unchanged artwork under grid
+  edits and preserved raster bytes under transforms; preview acceptance passes
+  **31 checks**. The generated editor and floor/preview screenshots were inspected.
+- Fresh import, main-scene startup and Web release export pass. Source-created
+  single-file fixtures load in a separately imported checkout and an exported
+  resource pack; pack-created fixtures reload in both pack and source processes.
+  These checks use isolated test slots, not the user's real saves.
+  CI now checks source/pack cross-process roundtrips after producing the Web pack.
+- The AD-10 matrix compares native Images, embedded WebP and raw/Zstd, with and
+  without container compression. [Results and codec selection](NATIVE_SAVE_BENCHMARKS.md)
+  include production transaction costs, working/peak memory and historical size
+  context. WebP is retained; whole-scene compression reduces metadata-heavy saves.
+
+This is local acceptance, not a new GitHub Actions result. Browser runtime,
+Windows/macOS replacement behavior and physical-media power-loss durability are
+not claimed. Linux release export templates were unavailable; compiled resource
+pack roundtrips supplement source/native-renderer checks. Milestone 6 remains
+after integration of this migration. See [native saves](NATIVE_SAVE_IMPLEMENTATION.md)
+for the format and remaining operational limits.
+
 ## Execution milestone 5 — floors, discovery and read-only previews
 
 - The Floors inspector creates, renames, raises/lowers, chooses a saved default
@@ -29,12 +73,12 @@
   selections or replaced documents from publishing stale images. Empty floors
   show a neutral board. Rendering stops after capture; headless mode skips GPU
   capture instead of waiting indefinitely.
-- Runtime checkpoint **v6** includes map tags and link source-floor IDs and
-  reads v1–v5. Native **`.res`/`.scn` saves are the intended replacement**:
-  document commands and discovery use typed objects/IDs, while the store owns
-  serialization. Packing the workspace, camera history or private preview
-  renderers into saved campaign content is explicitly outside that boundary.
-  The native-format migration itself is not part of this completion claim.
+- At milestone 5 completion, runtime checkpoint **v6** included map tags and link
+  source-floor IDs and read v1–v5. The native-format migration was not part of
+  that original completion claim; its later validation is recorded above.
+  Document commands and discovery use typed objects/IDs, while the store owns
+  serialization. Workspace, camera history and private preview renderers remain
+  outside canonical saved content.
 
 ### Milestone 5 verification — Godot 4.8-beta1
 
@@ -96,10 +140,9 @@ Verification on Godot **4.8-beta1**:
   shutdown cleanup warnings, so this is not a claim that all editor output is
   warning-free.
 
-**Persistence direction:** the intended replacement format is native Godot
-`.res`/`.scn`. The current JSON/WebP checkpoint implementation is still behind
-`AtlasCampaignStore`; this UI refactor does not implement that migration or
-change canonical save data.
+**Historical persistence boundary:** the UI refactor retained the then-current
+JSON/WebP store and did not change canonical save data. The later native `.scn`
+migration above preserves that `AtlasCampaignStore` boundary.
 
 ## Execution milestone 4 — local editing and asset placement
 
@@ -200,7 +243,7 @@ The `gpt/feat/gdscript-editor-scaffold` prototype has been reconciled with the c
 - **Engine:** Godot **4.8-beta1**, standard build (`4.8.beta1.official.4d10419ca` locally). Do not downgrade to the scaffold's former 4.7.2 baseline.
 - **Application language:** typed GDScript; no C# or mandatory GDExtension. The inherited `.NET` assembly-name setting is inert metadata, not an application dependency.
 - **Rendering/export:** Compatibility / WebGL 2, single-thread Web, extension support off. The Web preset keeps development tests out of the exported application.
-- **Canonical raster storage:** lossless `.webp`; only derived previews may be lossy. Typed raster layers store verified, content-addressed WebP chunks. PNG screenshots/test fixtures/export-shell icons are not canonical campaign artwork.
+- **Canonical raster storage:** embedded lossless WebP; only derived previews may be lossy. Typed raster layers store verified pixel-hashed chunks inside the campaign scene. PNG screenshots/test fixtures/export-shell icons are not canonical campaign artwork.
 - **Browser storage:** `user://` maps to IndexedDB in the tested Chromium environment. Browser profiles/quota/private-mode policies still determine durability. Native file pickers, windowing or threads are not core requirements.
 
 ## Running behavior
@@ -212,7 +255,7 @@ Open `project.godot` in Godot 4.8-beta1 and run the main scene (F5).
 - **Navigation:** use map/search results, a double-clicked link marker or Back. Automatic linked-map zoom is **off by default**. When explicitly enabled, exactly three additional logical steps at the zoom limit enter/return; leaving the link or beginning another interaction resets pending progress.
 - **Native map scale:** the inspector separates native distance/unit from overlay spacing, shape, origin and rotation. Neither operation rescales artwork or converts linked maps. The sample world uses 3 mi/cell; loaded values are preserved.
 - **Inherited encounter prototype:** drag a rotated footprint to create an independent encounter map. In Select mode, double-clicking a marker navigates; Pen/Eraser clicks stay drawing actions. Spatial terrain references are read-only; symbolic placements do not render child art as a physically aligned overlay. Parent freehand-reference previews still await refinement. This is a secondary feature, not the next development priority.
-- **Persistence:** Save/Load uses `user://drawinatlas_campaign.json` with a validated `.bak` and adjacent `.assets` chunks. Recovery is reported; failed Load never replaces active work.
+- **Persistence:** Save/Load uses `user://drawinatlas_campaign.scn` with embedded artwork and a validated adjacent `.bak.scn`. Recovery is reported; failed Load never replaces active work. Old JSON saves are not imported or deleted.
 - Existing F11 / Alt+Enter fullscreen and F5 reload actions are routed through `util/global_shortcuts.gd`.
 
 ## Code layout
@@ -298,6 +341,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Execution milestones 1–5 are complete for the local client. Next is the linked-map workflow refinement (milestone 6), followed by local table/projector privacy and collaboration. The planned native `.res`/`.scn` save migration remains explicit future work. Web browser smoke stays deferred.
+Execution milestones 1–5 and native-save local acceptance are complete. Native-save integration and its remote CI result precede linked-map workflow refinement (milestone 6), followed by local table/projector privacy and collaboration. Web browser smoke stays deferred.
 
 Legacy linked-map placement actions still await undoable commands; campaign import/export UX is later work. See milestone 4 for conservative scope/selection semantics and raster limits. Trackpad behavior beyond the tested wheel normalization remains device-dependent. Milestone 3 storage/history scaling limits and deferred browser validation still apply.

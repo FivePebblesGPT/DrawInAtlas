@@ -23,7 +23,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - Ctrl+C/X/V copies/cuts/pastes typed artwork; Ctrl+A selects all active ink or a raster asset, Delete removes the selection. Native clipboard images can be pasted as raster assets. Ctrl+N opens New board, Ctrl+Z / Ctrl+Shift+Z undo/redo, Ctrl+S saves, and Escape cancels a gesture. An asterisk marks unsaved work.
 - The Layers panel creates empty raster layers for pixel painting and imports images ready for placement. Selected-cell scope clips new ink/pixels and rejects out-of-cell transforms; it never changes camera or grid geometry.
 - The Layers sidebar selects editable ink/terrain layers, imports raster images, and controls names, visibility, locks, opacity and order. Hidden/locked content is protected by edit commands.
-- Save/load uses `user://drawinatlas_campaign.json`, a verified previous `.bak` checkpoint and immutable lossless WebP chunk assets in the adjacent `.assets` directory. Load reports backup recovery instead of silently dropping bad content.
+- Save/load uses `user://drawinatlas_campaign.scn`: one compressed binary scene containing every map and embedded lossless WebP artwork, plus an adjacent `drawinatlas_campaign.bak.scn` recovery generation. Load reports backup recovery instead of silently dropping bad content. Old JSON saves are left untouched and are not imported.
 - The sidebar supports Maps, Search and Layers views, draggable width, active-icon collapse, and Ctrl+B (Command+B on macOS).
 - One top menu bar provides **File** (new board/save/load), **Edit** (undo/redo), and **View** (sidebar, grid overlay, navigation). Drawing controls live in the grouped right inspector; the document title and dirty marker appear at the top right.
 - Normal zoom stays on the current board; automatic linked-map navigation is opt-in. Native distance/unit labels are independent per map and never rescale artwork.
@@ -38,6 +38,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - Workspace/organization tests: run `tests/editor_modules_smoke.gd`, `tests/organization_ui_smoke.gd`, `tests/floors_view_smoke.gd`, `tests/overview_smoke.gd` and `tests/preview_cache_smoke.gd` the same way.
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
 - Native preview acceptance: `godot --path . --script res://tests/preview_ui_smoke.gd`. For an isolated software-rendered run, use `LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --path . --script res://tests/preview_ui_smoke.gd`.
+- Reproduce raster codec and complete save-transaction measurements with the commands in [native raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md).
 
 ## Project layout
 
@@ -47,7 +48,7 @@ Editor UI is composed in `prefab/*.tscn`, with controllers in
 view/navigation services in `scripts/navigation/`, and save/load code in
 `scripts/persistence/`. The editable bundled campaign is in
 `examples/northern_marches.tres` (Godot Resources); user saves use a single embedded binary `.scn` and an adjacent validated
-`.bak.scn` recovery generation (native regression verification pending).
+`.bak.scn` recovery generation.
 
 `AtlasEditor` composes scene-owned inspector/browser forms, an
 `AtlasArtworkEditor` for scoped editing and an `AtlasMapNavigator` for view
@@ -66,7 +67,9 @@ No standalone `.res` or artwork sidecars are written.
 | [Architecture](docs/ARCHITECTURE.md) | Proposed runtime boundaries, rendering and commands |
 | [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics and geometry |
 | [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Navigation and exact three-step buffer |
-| [Data model and storage](docs/DATA_MODEL.md) | Proposed serialized data and storage |
+| [Data model and storage](docs/DATA_MODEL.md) | Current domain/native storage contract and historical examples |
+| [Native saves](docs/NATIVE_SAVE_IMPLEMENTATION.md) | Current scene format, verification and portability limits |
+| [Raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md) | Codec decision AD-10, measurements and reproduction commands |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
 
-Linked-map refinements, projector output, networking and campaign import/export UX remain future work. The native save implementation still requires Godot 4.8-beta1 acceptance and raster benchmarking. Legacy placement actions still await reversible commands. See implementation notes for precise selection/fill limits and deferred browser validation.
+Linked-map refinements, projector output, networking and campaign import/export UX remain future work. Native saves pass local Godot 4.8-beta1 acceptance; whole-file rewrite/load costs and codec trade-offs are documented in the benchmark report. Legacy placement actions still await reversible commands. See implementation notes for precise selection/fill limits and deferred browser validation.

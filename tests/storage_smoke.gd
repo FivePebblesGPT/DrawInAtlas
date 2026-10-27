@@ -11,6 +11,16 @@ class MemoryIO extends AtlasStoreIO:
 	var fail_at: int = -1
 	var torn: bool = false
 	var deny_directory: bool = false
+	var expected_corruption: Array[PackedByteArray] = []
+
+	func decode_scene(bytes: PackedByteArray) -> PackedScene:
+		# Silence only deliberately corrupt fixtures, never ordinary load failures.
+		var printed_errors: bool = Engine.print_error_messages
+		if expected_corruption.has(bytes):
+			Engine.print_error_messages = false
+		var scene: PackedScene = super.decode_scene(bytes)
+		Engine.print_error_messages = printed_errors
+		return scene
 
 	func exists(path: String) -> bool:
 		return files.has(path)
@@ -58,13 +68,16 @@ func _check(condition: bool, description: String) -> void:
 
 
 func _run() -> void:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	if args.size() == 2 and args[0] in ["write-portable", "read-portable"]:
+		_check(_portable_fixture(args[0], args[1]), "fresh-process portable campaign " + args[0])
+		print("ATLAS_PORTABILITY_%s" % ["PASSED" if failures == 0 else "FAILED"])
+		quit(0 if failures == 0 else 1)
+		return
 	var default_existed: bool = FileAccess.file_exists(AtlasCampaignStore.DEFAULT_PATH)
 	var default_bytes: PackedByteArray = FileAccess.get_file_as_bytes(AtlasCampaignStore.DEFAULT_PATH) if default_existed else PackedByteArray()
-	_roundtrip()
-	_recovery()
-	_format_validation()
-	_injected_failures()
-	_invalid()
+	for phase: String in ["_roundtrip", "_recovery", "_format_validation", "_injected_failures", "_invalid"]:
+		_check(call(phase) == true, phase + " completes without a runtime error")
 	_check(FileAccess.file_exists(AtlasCampaignStore.DEFAULT_PATH) == default_existed,
 		"tests never create the default campaign slot")
 	if default_existed:
@@ -73,6 +86,21 @@ func _run() -> void:
 	print("ATLAS_STORAGE_%s (%d checks, %d failures)" % [
 		"PASSED" if failures == 0 else "FAILED", checks, failures])
 	quit(0 if failures == 0 else 1)
+
+
+func _portable_fixture(mode: String, path: String) -> bool:
+	var expected: AtlasCampaign = _campaign(41)
+	if mode == "write-portable":
+		return AtlasCampaignStore.save_campaign(expected, path) == OK
+	var result: AtlasStoreResult = AtlasCampaignStore.load_result(path)
+	if result.campaign == null or result.recovered or result.campaign.to_dict() != expected.to_dict():
+		return false
+	var expected_raster: AtlasRasterLayer = _raster(expected)
+	var actual: AtlasRasterLayer = _raster(result.campaign)
+	for key: String in expected_raster.chunks:
+		if actual.chunks[key].image.get_data() != expected_raster.chunks[key].image.get_data():
+			return false
+	return true
 
 
 func _pixels() -> Image:
@@ -91,8 +119,35 @@ func _campaign(seed: int = 0) -> AtlasCampaign:
 	result.display_name = "Native Generation %d" % seed
 	var map: AtlasMapDocument = result.get_map("world")
 	map.tags.append("native")
+	var upper := AtlasFloor.new()
+	upper.id = "upper"
+	upper.display_name = "Upper floor"
+	upper.terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 37.5)
+	upper.strokes.append(AtlasStroke.new(PackedVector2Array([
+		Vector2(-3.125, 0.25), Vector2(17.75, -40.5)]), Color(0.25, 0.5, 0.75, 0.5), 1.2345678901234567))
+	map.floors.append(upper)
+	map.default_floor_id = upper.id
+	var reverse: AtlasMapLink = AtlasMapLink.from_dict(result.links[0].to_dict())
+	reverse.id = "cycle"
+	reverse.source_map_id = "greyhaven"
+	reverse.target_map_id = "world"
+	reverse.target_floor_id = upper.id
+	result.links.append(reverse)
+	var placement := AtlasPlacement.new()
+	placement.id = "native-placement"
+	placement.parent_map_id = "world"
+	placement.child_map_id = "greyhaven"
+	placement.origin = Vector2(-53.25, 17.5)
+	placement.rotation = 0.12345678901234567
+	result.placements.append(placement)
+	var extra: AtlasMapLink = AtlasMapLink.from_dict(result.links[0].to_dict())
+	extra.id = "second-entrance"
+	extra.source_floor_id = upper.id
+	extra.placement_id = placement.id
+	result.links.append(extra)
 	var raster: AtlasRasterLayer = AtlasRasterLayer.from_image(_pixels(), 1.2345678901234567)
 	raster.id = "native-raster"
+	raster.transform = Transform2D(0.31, Vector2(1.25, 0.75), 0.1, Vector2(-53.5, 29.25))
 	var shifted: Dictionary[String, AtlasRasterChunk] = {}
 	for chunk: AtlasRasterChunk in raster.chunks.values():
 		chunk.coord -= Vector2i(2, 1)
@@ -106,20 +161,23 @@ func _raster(campaign: AtlasCampaign) -> AtlasRasterLayer:
 	return campaign.get_map("world").floors[0].layer_by_id("native-raster") as AtlasRasterLayer
 
 
-func _roundtrip() -> void:
+func _roundtrip() -> bool:
 	var original: AtlasCampaign = _campaign()
 	var saved: Error = AtlasCampaignStore.save_campaign(original, SLOT)
 	_check(saved == OK, "real native .scn file save: " + error_string(saved))
 	if saved != OK:
-		return
+		return false
 	var result: AtlasStoreResult = AtlasCampaignStore.load_result(SLOT)
 	_check(result.error == OK and result.campaign != null and not result.recovered,
 		"native scene reload: " + result.message)
 	if result.campaign == null:
-		return
-	_check(original.to_dict() == result.campaign.to_dict(), "semantic graph and metadata roundtrip")
-	_check(result.campaign.maps.size() == 2 and result.campaign.links.size() == 1,
-		"independent map graph embedded in one file")
+		return false
+	_check(original.maps.keys() != result.campaign.maps.keys(), "fixture exercises reordered map registry")
+	_check(original.to_dict() == result.campaign.to_dict(),
+		"semantic graph and metadata roundtrip independent of map registry order")
+	_check(result.campaign.maps.size() == 2 and result.campaign.links.size() == 3
+		and result.campaign.placements.size() == 1,
+		"independent cyclic map graph and multiple entrances embedded in one file")
 	var expected: AtlasRasterLayer = _raster(original)
 	var actual: AtlasRasterLayer = _raster(result.campaign)
 	_check(actual != null and actual.chunks.size() == 4, "four raster chunks incl. edges")
@@ -135,12 +193,27 @@ func _roundtrip() -> void:
 		second.get_map("world").display_name = "mutated"
 		_check(result.campaign.get_map("world").display_name != "mutated",
 			"loaded mutable Resources do not alias")
-	_check(not FileAccess.file_exists(SLOT + ".assets") and not FileAccess.file_exists(SLOT.trim_suffix(".scn") + ".webp"),
+		second.get_map("world").floors[1].strokes[0].width = 99.0
+		_check(result.campaign.get_map("world").floors[1].strokes[0].width != 99.0,
+			"nested floor/stroke Resources do not alias")
+		_raster(second).chunks["-2,-1"].image.set_pixel(0, 0, Color.MAGENTA)
+		_check(actual.chunks["-2,-1"].image.get_data() == expected.chunks["-2,-1"].image.get_data(),
+			"decoded raster Images do not alias across loads or the source")
+	_check(not DirAccess.dir_exists_absolute(SLOT + ".assets") and not FileAccess.file_exists(SLOT.trim_suffix(".scn") + ".webp"),
 		"no raster sidecars")
-	DirAccess.remove_absolute(SLOT)
+	_check(AtlasCampaignStore.save_campaign(_campaign(1), SLOT) == OK,
+		"real filesystem replaces an existing head")
+	_check(AtlasCampaignStore.save_campaign(_campaign(2), SLOT) == OK,
+		"real filesystem replaces an existing adjacent backup")
+	var backup: AtlasCampaign = AtlasCampaignStore.load_campaign(SLOT.trim_suffix(".scn") + ".bak.scn")
+	_check(backup != null and backup.display_name == "Native Generation 1",
+		"real filesystem retains the previous validated generation")
+	for suffix: String in [".scn", ".bak.scn", ".pending.scn", ".bak.pending.scn"]:
+		DirAccess.remove_absolute(SLOT.trim_suffix(".scn") + suffix)
+	return true
 
 
-func _recovery() -> void:
+func _recovery() -> bool:
 	var io := MemoryIO.new()
 	_check(AtlasCampaignStore.save_campaign(_campaign(1), MEMORY_SLOT, io) == OK, "first generation")
 	_check(AtlasCampaignStore.save_campaign(_campaign(2), MEMORY_SLOT, io) == OK, "backup generation")
@@ -148,6 +221,7 @@ func _recovery() -> void:
 	var backup_path: String = MEMORY_SLOT.trim_suffix(".scn") + ".bak.scn"
 	_check(io.files.has(backup_path), "adjacent backup exists")
 	io.files[MEMORY_SLOT] = head.slice(0, 23)
+	io.expected_corruption.append(io.files[MEMORY_SLOT])
 	var loaded: AtlasStoreResult = AtlasCampaignStore.load_result(MEMORY_SLOT, io)
 	_check(loaded.error == OK and loaded.recovered and loaded.campaign.display_name == "Native Generation 1",
 		"corrupt head recovers validated backup")
@@ -157,27 +231,31 @@ func _recovery() -> void:
 	_check(io.files[backup_path] == previous_backup, "corrupt head cannot replace healthy backup")
 	io.files[MEMORY_SLOT] = PackedByteArray([1, 2, 3])
 	io.files[backup_path] = PackedByteArray([3, 2, 1])
+	io.expected_corruption.append_array([io.files[MEMORY_SLOT], io.files[backup_path]])
 	loaded = AtlasCampaignStore.load_result(MEMORY_SLOT, io)
 	_check(loaded.campaign == null and loaded.error != OK and loaded.message.contains("backup:"),
 		"two invalid generations return actionable error")
+	return true
 
 
-func _format_validation() -> void:
+func _format_validation() -> bool:
 	var storage := MemoryIO.new()
 	var base: PackedScene = AtlasNativeScene.pack_campaign(_campaign())
 	_check(base != null, "native fixture scene can be packed")
 	if base == null:
-		return
-	for damage: String in ["version", "digest", "raster"]:
+		return false
+	for damage: String in ["version", "digest", "external-asset", "raster"]:
 		var root: AtlasCampaignSaveRoot = base.instantiate() as AtlasCampaignSaveRoot
 		if root == null:
 			_check(false, "test fixture scene root type")
-			return
+			return false
 		match damage:
 			"version":
 				root.native_version = 99
 			"digest":
 				root.semantic_digest = "invalid-digest"
+			"external-asset":
+				root.set_meta("sidecar", load("res://img/icon.svg"))
 			"raster":
 				for child: Node in root.get_children():
 					var map_node: AtlasMapSaveNode = child as AtlasMapSaveNode
@@ -193,9 +271,10 @@ func _format_validation() -> void:
 		storage.files[MEMORY_SLOT] = bytes
 		var restored: AtlasStoreResult = AtlasCampaignStore.load_result(MEMORY_SLOT, storage)
 		_check(restored.campaign == null, "corrupt native %s rejected" % damage)
+	return true
 
 
-func _injected_failures() -> void:
+func _injected_failures() -> bool:
 	var seed := MemoryIO.new()
 	_check(AtlasCampaignStore.save_campaign(_campaign(0), MEMORY_SLOT, seed) == OK,
 		"failure fixture initial checkpoint")
@@ -219,9 +298,10 @@ func _injected_failures() -> void:
 			_check(restored.error == OK and restored.campaign != null,
 				"fault %d retains a valid generation" % step)
 			_check(io.files.has(backup_path), "backup remains after failure")
+	return true
 
 
-func _invalid() -> void:
+func _invalid() -> bool:
 	var io := MemoryIO.new()
 	_check(AtlasCampaignStore.load_result(MEMORY_SLOT, io).error == ERR_FILE_NOT_FOUND,
 		"missing head and backup")
@@ -239,3 +319,4 @@ func _invalid() -> void:
 	io.files[MEMORY_SLOT.trim_suffix(".scn") + ".pending.scn"] = PackedByteArray([1, 2])
 	_check(AtlasCampaignStore.load_result(MEMORY_SLOT, io).campaign == null,
 		"stale pending ignored")
+	return true

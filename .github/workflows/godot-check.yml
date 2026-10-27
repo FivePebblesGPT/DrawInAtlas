@@ -113,6 +113,19 @@ jobs:
           godot --headless --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-export.log
           test -s build/web/index.html
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-export.log; then exit 1; fi
+      - name: Verify fresh-process saves across exported script remaps
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/storage_smoke.gd -- write-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-source-write.log
+          godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- read-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-pack-read.log
+          godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- write-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-pack-write.log
+          godot --headless --path . --script res://tests/storage_smoke.gd -- read-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-source-read.log
+          for log in /tmp/atlas-source-write.log /tmp/atlas-pack-read.log /tmp/atlas-pack-write.log /tmp/atlas-source-read.log; do
+            grep -q 'ATLAS_PORTABILITY_PASSED' "$log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "$log"; then exit 1; fi
+          done
       - name: Upload Web build
         uses: actions/upload-artifact@v4
         with:

@@ -122,10 +122,8 @@ static func _verify_chunk(chunk: AtlasRasterChunk) -> bool:
 
 
 static func _digest(campaign: AtlasCampaign) -> String:
-	# Sorted map IDs make the digest independent of scene-child order.
+	# to_dict orders map IDs independently of registry/scene-child order.
 	# Each verified raster hash commits to the exact width/height/RGBA8 bytes.
 	var canonical: Dictionary = campaign.to_dict()
-	var maps: Array = canonical["maps"]
-	maps.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["id"] < b["id"])
 	var normalized: Variant = JSON.parse_string(JSON.stringify(canonical, "", true, true))
 	return JSON.stringify(normalized, "", true, true).sha256_text()

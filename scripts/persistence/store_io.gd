@@ -38,7 +38,8 @@ func encode_scene(scene: PackedScene) -> PackedByteArray:
 	var path: String = _temporary_path()
 	if DirAccess.make_dir_recursive_absolute(path.get_base_dir()) != OK:
 		return PackedByteArray()
-	var error: Error = ResourceSaver.save(scene, path)
+	# Whole-scene compression also bounds metadata-heavy ink/layer saves.
+	var error: Error = ResourceSaver.save(scene, path, ResourceSaver.FLAG_COMPRESS)
 	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path) if error == OK else PackedByteArray()
 	DirAccess.remove_absolute(path)
 	return bytes

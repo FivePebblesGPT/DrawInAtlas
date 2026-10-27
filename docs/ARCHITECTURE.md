@@ -22,7 +22,7 @@ main.tscn
         ├── scripts/campaign/                Campaign → map → floor → layers
         ├── scripts/artwork/                 Stroke, terrain and raster data
         ├── scripts/navigation/              Per-floor view, linked navigation
-        └── scripts/persistence/             Checksummed JSON + lossless WebP
+        └── scripts/persistence/             Native .scn + embedded lossless WebP
 ```
 
 **Editing flow:** a pointer gesture reaches `AtlasCanvas`, which emits an
@@ -45,13 +45,16 @@ camera and selected layer without dirtying persisted artwork.
 editable shipped `Resource` fixture containing two map presets, two
 `AtlasGrid` resources and a link resource. `AtlasCampaign.sample()` creates
 independent runtime objects from that immutable asset. User-edited work is
-currently persisted through `AtlasCampaignStore` as validated JSON and
-SHA-256-addressed, lossless WebP chunks with a staged checkpoint and verified
-`.bak`. It is not written back over the bundled `.tres`.
-The intended replacement save format is native Godot **`.res`/`.scn`**.
-That persistence migration is separate from the editor split: keep its
-implementation behind the store boundary and keep transient workspace controls,
-camera state and preview renderers separate from saved data.
+persisted through `AtlasCampaignStore` as one compressed binary **`.scn`**,
+with embedded Resource-backed domain data and lossless WebP chunks, a semantic
+digest, staged verification and an adjacent verified **`.bak.scn`**. It is not
+written back over the bundled `.tres`. A minimal data-only scene root owns map
+document nodes; their stable IDs reconstruct the runtime registry. No standalone
+`.res` or raster assets are required. Transient workspace controls, camera state
+and preview renderers remain separate from saved data. Legacy JSON user saves
+are neither imported nor deleted. See [native saves](NATIVE_SAVE_IMPLEMENTATION.md)
+for validation boundaries and [benchmarks](NATIVE_SAVE_BENCHMARKS.md) for the
+measured whole-file save/load costs.
 
 **Where to begin:** to change a form, edit `prefab/*.tscn` and its
 `scripts/interface/` controller. To change document rules, start with
@@ -273,6 +276,6 @@ Initial collaboration can be host-sequenced commands with conflict rejection or 
 
 ## 10. Recommended implementation conventions
 
-Use typed **GDScript** for the domain and all core features. GDExtensions may be optional accelerators only with WebAssembly builds and fallback paths; no mandatory native-only library, OS-specific file API or threads in the core. Godot Compatibility renderer / single-thread web export is the baseline. Canonical raster chunk and preview image files use **WebP**; derived thumbnails can be lossy, editable source must be lossless.
+Use typed **GDScript** for the domain and all core features. GDExtensions may be optional accelerators only with WebAssembly builds and fallback paths; no mandatory native-only library, OS-specific file API or threads in the core. Godot Compatibility renderer / single-thread web export is the baseline. Canonical raster payloads use lossless **WebP** embedded in the campaign scene; derived thumbnails may be lossy.
 
 See [Maps and grids](MAPS_AND_GRIDS.md) for geometry and editing constraints; [Semantic zoom](SEMANTIC_ZOOM.md) for navigation state; [Implementation plan](IMPLEMENTATION_PLAN.md) for staged validation.

@@ -1,6 +1,6 @@
 # Implementation Plan and Decision Log
 
-**Status:** execution milestones **1–5** verified for the local client on Godot **4.8-beta1**. Milestones 6–8 remain open; the older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
+**Status:** execution milestones **1–5** and the intervening native-save migration are verified locally on Godot **4.8-beta1**. Milestones 6–8 remain open; milestone 6 follows native-save integration. The older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
 ## 1. Principle: vertical slices before feature breadth
 
@@ -17,9 +17,12 @@ The integration checkpoint is complete. The following execution sequence superse
 | 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Implemented and verified for the local client; Web smoke deferred |
 | 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Implemented and verified for the local client |
 | 5 | Floors and map organization/overview/previews | Implemented and verified for the local client |
+| Native-save gate | One embedded `.scn`, adjacent backup, Resource isolation, codec benchmarks | Local acceptance passed; see [native saves](NATIVE_SAVE_IMPLEMENTATION.md) and [AD-10](NATIVE_SAVE_BENCHMARKS.md). Integration/remote CI remains separate. |
 | 6 | Linked-map workflow refinement, placement/reference/navigation controls | Pending |
 | 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
 | 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
+
+The following milestone storage descriptions are historical. Native format v1 now replaces JSON user checkpoints; legacy JSON saves are left untouched, with no importer. In-memory compatibility dictionaries and clipboard formats remain separate APIs.
 
 Milestone 1 stores editable vector strokes as JSON in schema v2 and reads legacy v1 campaigns. Raster artwork/chunks are not introduced in this slice; their canonical format remains lossless WebP. Undo covers pen/eraser gestures, while legacy terrain/metadata actions are marked dirty but await command conversion.
 
@@ -29,7 +32,7 @@ Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import a
 
 Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, active-layer selection with proportional transforms, typed self-contained clipboard data and central selected-cell scope. Schema v5 persists raster placement transforms and reads v1–v4. Native service/input/framebuffer and live-session checks are the gate; no new Web smoke was run.
 
-Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Runtime checkpoint v6 records tags and source/target floor identity and reads v1–v5. The intended persistence target is native Godot `.res`/`.scn`: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](DATA_MODEL.md) for current versus planned storage.
+Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Its historical runtime checkpoint v6 recorded tags and source/target floor identity. The subsequent native-save migration uses one binary `.scn` with embedded Resources: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](DATA_MODEL.md) for the current storage contract.
 
 ### Original feature groupings (reference)
 
@@ -155,15 +158,15 @@ Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/
 | Optional selected-cell edit lock (off by default) | Accepted design | Constrain changes while permitting roads across neighbors |
 | Floors distinct from layers and map scale | Accepted design | Tower/basement support |
 | Host-authoritative networking | Proposed | Simpler permission enforcement and session consistency |
-| Canonical chunk sizes and formats | Open | Benchmark first |
+| Canonical raster chunks | Decided / measured | 256-pixel RGBA8 chunks, embedded lossless WebP; see AD-10 benchmark report |
 | Godot scripting language | **Decided** | GDScript mandatory; no C#/.NET dependency |
-| Native campaign persistence | **Decided direction** | Godot `.res`/`.scn`; format migration remains to be implemented behind the store boundary |
+| Native campaign persistence | **Implemented / locally verified** | One binary `.scn` with embedded Resources, adjacent `.bak.scn`, store boundary retained |
 | Drawing-board-first editing | Accepted clarification | Continuous artwork; grids are overlays, links are optional |
 | Native measurement units per map | Accepted clarification | DM chooses distance/unit; no automatic conversion or harmonization |
 | Automatic map navigation default | Off / opt-in | Ordinary drawing-board zoom must not change maps |
 | Default reference refresh: live vs frozen | Open | UX/performance tradeoff |
 | Trackpad normalization/timeouts | Open defaults | Test with actual devices; preserve 3-step semantics |
-| Exact storage container (directory/package) | Open | Prefer first testing versioned directory |
+| Exact storage container | Decided | One binary `.scn` primary; no standalone Resource or artwork sidecars |
 | Optional auto-exit on minimum zoom | Accepted design with condition | Only when a navigation-history return target exists |
 
 ## 5. Risk register
@@ -182,4 +185,4 @@ Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/
 
 ## 6. Suggested next engineering task
 
-Proceed with execution milestone 6: reversible linked-map placement/reference workflows and explicit navigation controls. Preserve the now-verified floor, overview and preview behavior. Account for the planned native `.res`/`.scn` save migration through the store boundary, retain artwork coordinates and native map units, and keep browser smoke deferred.
+Integrate the locally validated native-save changes and obtain the corresponding remote CI result. Then proceed with execution milestone 6: reversible linked-map placement/reference workflows and explicit navigation controls. Preserve the verified floor, overview and preview behavior, the native store boundary, artwork coordinates and native map units. Keep browser smoke deferred.
