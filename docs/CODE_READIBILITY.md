@@ -20,6 +20,8 @@ Migrated in this refactor:
   form; `AtlasInspector` binds scene-unique controls and emits typed intents.
 - `prefab/campaign_browser.tscn` owns the map list, name/tags form and preview;
   `AtlasCampaignBrowser` coordinates read-only discovery in Maps and Search.
+- `prefab/link_dialog.tscn` owns entrance/footprint draft controls;
+  `AtlasLinkedMaps` translates its intents into `AtlasLinkEdit` transactions.
 
 `AtlasEditor` no longer constructs fixed controls with `.new()`. It composes
 panels from scenes and connects their intents to workspace actions. Its public
@@ -62,8 +64,8 @@ prefix now that ownership is expressed by directories.
 
 ## Workspace ownership
 
-The module refactor reduces `scripts/interface/editor.gd` from 1,462 to 716
-lines and removes its 23 fixed-control constructor call sites (including shared
+The original module refactor reduced `scripts/interface/editor.gd` from 1,462 to 716
+lines and removed its 23 fixed-control constructor call sites (including shared
 builders). The important change is the ownership boundary, not the line count:
 
 | Owner | Responsibility | Communication |
@@ -73,6 +75,10 @@ builders). The important change is the ownership boundary, not the line count:
 | `AtlasCampaignBrowser` | Maps/search results, metadata form, read-only preview requests | Emits Open/Focus/metadata intents |
 | `AtlasArtworkEditor` | Scoped ink/raster/tile editing, selections, import and clipboard | Uses canvas/history; emits layer/tool/message signals |
 | `AtlasMapNavigator` | Map/floor camera memory, Back, pointer zoom and opt-in link gate | Uses canvas/view session; emits successful view changes |
+| `AtlasLinkedMaps` | Parent-owned link/placement actions, command submission and draft creation | Uses canvas/history/navigator; never constructs forms |
+| `AtlasLinkDialog` | Scene-owned endpoint, arrival, mode and geometry draft controls | Emits detached Resource intents; never edits the campaign |
+| `AtlasMapReferences` | Derived crops, bounded capture scheduling, parent source/freeze and child display | Uses content-aware image cache and private capture service |
+| `AtlasMapCapture` | Isolated input-disabled artwork rendering, cancellation and signatures | Shared by sidebar previews and reference crops |
 
 Modules receive their actual dependencies, not an `AtlasEditor` backpointer.
 The inspector and browser do not execute edit commands. Navigation does not

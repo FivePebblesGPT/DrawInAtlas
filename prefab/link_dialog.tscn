@@ -1,0 +1,295 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/interface/link_dialog.gd" id="1"]
+
+[node name="LinkDialog" type="ConfirmationDialog"]
+title = "Linked maps — source floor"
+initial_position = 2
+size = Vector2i(520, 680)
+min_size = Vector2i(360, 320)
+visible = false
+dialog_hide_on_ok = false
+script = ExtResource("1")
+
+[node name="Scroll" type="ScrollContainer" parent="."]
+offset_left = 12.0
+offset_top = 12.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -12.0
+offset_bottom = -56.0
+horizontal_scroll_mode = 0
+
+[node name="Form" type="VBoxContainer" parent="Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SourceLabel" type="Label" parent="Scroll/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="LinkList" type="ItemList" parent="Scroll/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 110)
+layout_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="Scroll/Form"]
+layout_mode = 2
+
+[node name="FocusButton" type="Button" parent="Scroll/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Focus source"
+
+[node name="EnterButton" type="Button" parent="Scroll/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Enter"
+
+[node name="RemoveButton" type="Button" parent="Scroll/Form/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Unlink"
+tooltip_text = "Remove this entrance and its unshared footprint, keeping the destination document."
+
+[node name="TargetLabel" type="Label" parent="Scroll/Form"]
+layout_mode = 2
+text = "Destination document and floor"
+
+[node name="TargetPicker" type="OptionButton" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+fit_to_longest_item = false
+clip_text = true
+
+[node name="TargetFloorPicker" type="OptionButton" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+fit_to_longest_item = false
+clip_text = true
+
+[node name="ModePicker" type="OptionButton" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+fit_to_longest_item = false
+selected = 0
+item_count = 3
+popup/item_0/text = "Spatial footprint"
+popup/item_0/id = 0
+popup/item_1/text = "Symbolic footprint (not aligned)"
+popup/item_1/id = 1
+popup/item_2/text = "Marker / portal"
+popup/item_2/id = 2
+
+[node name="NewDocument" type="VBoxContainer" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="NameInput" type="LineEdit" parent="Scroll/Form/NewDocument"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "New independent document name"
+
+[node name="KindPicker" type="OptionButton" parent="Scroll/Form/NewDocument"]
+unique_name_in_owner = true
+layout_mode = 2
+selected = 0
+item_count = 4
+popup/item_0/text = "BATTLEMAP"
+popup/item_0/id = 0
+popup/item_1/text = "CITY"
+popup/item_1/id = 1
+popup/item_2/text = "DUNGEON"
+popup/item_2/id = 2
+popup/item_3/text = "BOARD"
+popup/item_3/id = 3
+
+[node name="NativeLabel" type="Label" parent="Scroll/Form/NewDocument"]
+layout_mode = 2
+text = "New document native distance per cell (never converted)"
+custom_minimum_size = Vector2(1, 0)
+autowrap_mode = 3
+
+[node name="NativeRow" type="HBoxContainer" parent="Scroll/Form/NewDocument"]
+layout_mode = 2
+
+[node name="NativeDistance" type="SpinBox" parent="Scroll/Form/NewDocument/NativeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.001
+max_value = 1000000.0
+step = 0.001
+value = 5.0
+
+[node name="NativeUnit" type="OptionButton" parent="Scroll/Form/NewDocument/NativeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+selected = 0
+item_count = 5
+popup/item_0/text = "ft"
+popup/item_0/id = 0
+popup/item_1/text = "m"
+popup/item_1/id = 1
+popup/item_2/text = "mi"
+popup/item_2/id = 2
+popup/item_3/text = "km"
+popup/item_3/id = 3
+popup/item_4/text = "tiles"
+popup/item_4/id = 4
+
+[node name="PositionLabel" type="Label" parent="Scroll/Form"]
+layout_mode = 2
+text = "Source anchor / footprint origin (board units)"
+
+[node name="PositionRow" type="HBoxContainer" parent="Scroll/Form"]
+layout_mode = 2
+
+[node name="OriginX" type="SpinBox" parent="Scroll/Form/PositionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -10000000.0
+max_value = 10000000.0
+step = 0.01
+format = "X %s"
+
+[node name="OriginY" type="SpinBox" parent="Scroll/Form/PositionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -10000000.0
+max_value = 10000000.0
+step = 0.01
+format = "Y %s"
+
+[node name="FootprintFields" type="GridContainer" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+columns = 2
+
+[node name="AngleLabel" type="Label" parent="Scroll/Form/FootprintFields"]
+layout_mode = 2
+text = "Rotation (degrees)"
+
+[node name="Angle" type="SpinBox" parent="Scroll/Form/FootprintFields"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -180.0
+max_value = 180.0
+step = 0.01
+
+[node name="ColumnsLabel" type="Label" parent="Scroll/Form/FootprintFields"]
+layout_mode = 2
+text = "Columns"
+
+[node name="Columns" type="SpinBox" parent="Scroll/Form/FootprintFields"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 10000.0
+value = 10.0
+
+[node name="RowsLabel" type="Label" parent="Scroll/Form/FootprintFields"]
+layout_mode = 2
+text = "Rows"
+
+[node name="Rows" type="SpinBox" parent="Scroll/Form/FootprintFields"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 10000.0
+value = 10.0
+
+[node name="ParentPitchLabel" type="Label" parent="Scroll/Form/FootprintFields"]
+layout_mode = 2
+text = "Parent units / cell"
+
+[node name="ParentPitch" type="SpinBox" parent="Scroll/Form/FootprintFields"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.001
+max_value = 100000.0
+step = 0.001
+value = 24.0
+tooltip_text = "Source board-coordinate units per footprint cell; native mi/ft/etc. labels are never converted."
+
+[node name="ChildPitchLabel" type="Label" parent="Scroll/Form/FootprintFields"]
+layout_mode = 2
+text = "Child units / cell"
+
+[node name="ChildPitch" type="SpinBox" parent="Scroll/Form/FootprintFields"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.001
+max_value = 100000.0
+step = 0.001
+value = 64.0
+tooltip_text = "Placement calibration only; changing an existing destination never moves its artwork or grid."
+
+[node name="MarkerFields" type="HBoxContainer" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="RadiusLabel" type="Label" parent="Scroll/Form/MarkerFields"]
+layout_mode = 2
+text = "Marker hit radius"
+
+[node name="Radius" type="SpinBox" parent="Scroll/Form/MarkerFields"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.001
+max_value = 100000.0
+step = 0.001
+value = 48.0
+
+[node name="ArrivalLabel" type="Label" parent="Scroll/Form"]
+layout_mode = 2
+text = "Arrival camera in destination board units"
+
+[node name="CenterArrival" type="CheckBox" parent="Scroll/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Center arrival on footprint"
+
+[node name="ArrivalRow" type="HBoxContainer" parent="Scroll/Form"]
+layout_mode = 2
+
+[node name="ArrivalX" type="SpinBox" parent="Scroll/Form/ArrivalRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -10000000.0
+max_value = 10000000.0
+step = 0.01
+format = "X %s"
+
+[node name="ArrivalY" type="SpinBox" parent="Scroll/Form/ArrivalRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = -10000000.0
+max_value = 10000000.0
+step = 0.01
+format = "Y %s"
+
+[node name="ArrivalZoom" type="SpinBox" parent="Scroll/Form/ArrivalRow"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.5
+max_value = 3.0
+step = 0.01
+value = 1.0
+format = "Zoom %s"
+
+[node name="ErrorLabel" type="Label" parent="Scroll/Form"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+autowrap_mode = 3

@@ -6,6 +6,7 @@ extends RefCounted
 
 signal view_changed
 signal message(text: String)
+signal candidates_requested(links: Array[AtlasMapLink])
 
 const MIN_ZOOM: float = 0.5
 const MAX_ZOOM: float = 3.0
@@ -14,7 +15,13 @@ const ZOOM_FACTOR: float = 1.2
 var views: AtlasViewSession = AtlasViewSession.new()
 var zoom_gate: AtlasZoomGate = AtlasZoomGate.new()
 var history: Array[Dictionary] = []
-var automatic_navigation: bool = false
+var automatic_navigation: bool = false:
+	set(value):
+		automatic_navigation = value
+		zoom_gate.reset()
+var now_msec: Callable = Time.get_ticks_msec
+var active_entrance_id: String = ""
+var _next_history_id: int = 0
 var campaign: AtlasCampaign
 var _canvas: AtlasCanvas
 
@@ -26,6 +33,8 @@ func _init(canvas: AtlasCanvas) -> void:
 func reset(value: AtlasCampaign) -> void:
 	campaign = value
 	history.clear()
+	active_entrance_id = ""
+	_next_history_id = 0
 	views.reset()
 	zoom_gate.reset()
 
@@ -37,7 +46,7 @@ func remember_view() -> void:
 
 
 func show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom: float = 1.0,
-		floor_id: String = "", layer_id: String = "") -> bool:
+		floor_id: String = "", layer_id: String = "", entrance_id: String = "") -> bool:
 	if map == null or not _canvas.set_document(map, campaign, floor_id):
 		message.emit("Map not found.")
 		return false
@@ -45,6 +54,7 @@ func show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom: float 
 		_canvas.active_layer_id = layer_id
 	_canvas.camera_center = focus
 	_canvas.camera_zoom = clampf(zoom, MIN_ZOOM, MAX_ZOOM)
+	active_entrance_id = entrance_id
 	zoom_gate.reset()
 	view_changed.emit()
 	_canvas.queue_redraw()
@@ -77,7 +87,9 @@ func push_history() -> void:
 	if _canvas.map == null:
 		return
 	remember_view()
+	_next_history_id += 1
 	history.append({
+		"history_id": _next_history_id, "entrance_id": active_entrance_id,
 		"map_id": _canvas.map.id,
 		"floor_id": _canvas.floor.id,
 		"layer_id": _canvas.active_layer_id,
@@ -86,17 +98,34 @@ func push_history() -> void:
 	})
 
 
-func enter_link(link: AtlasMapLink) -> void:
-	if link.source_map_id != _canvas.map.id or link.source_floor_id != _canvas.floor.id:
-		return
+func enter_link(link: AtlasMapLink) -> bool:
+	zoom_gate.reset()
+	if link == null or campaign.link_by_id(link.id) != link or link.source_map_id != _canvas.map.id or link.source_floor_id != _canvas.floor.id:
+		return false
 	var destination: AtlasMapDocument = campaign.get_map(link.target_map_id)
 	if destination == null or destination.floor_by_id(link.target_floor_id) == null:
 		message.emit("Broken map link: %s" % link.target_map_id)
-		return
+		return false
+	if not link.placement_id.is_empty():
+		var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
+		if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
+			message.emit("Broken footprint; the current view and history were kept.")
+			return false
 	push_history()
 	var arrival: AtlasViewState = views.resolve(campaign, destination.id, link.target_floor_id, link.target_focus, link.target_zoom)
-	show_map(destination, link.target_focus, link.target_zoom, link.target_floor_id, arrival.layer_id)
-	message.emit("Entered %s. Use Back or 3 extra outward wheel steps." % destination.display_name)
+	show_map(destination, link.target_focus, link.target_zoom, link.target_floor_id, arrival.layer_id, link.id)
+	message.emit("Entered %s. Use Back%s." % [destination.display_name,
+		" or 3 extra outward wheel steps" if automatic_navigation else ""])
+	return true
+
+
+func choose_links(links: Array[AtlasMapLink]) -> void:
+	zoom_gate.reset()
+	if links.size() == 1:
+		enter_link(links[0])
+	elif links.size() > 1:
+		candidates_requested.emit(links)
+		message.emit("Choose an entrance; overlapping links are never entered automatically.")
 
 
 func back() -> void:
@@ -106,7 +135,8 @@ func back() -> void:
 		var floor_id: String = str(snapshot.get("floor_id", map.default_floor_id if map != null else ""))
 		if map != null and map.floor_by_id(floor_id) != null:
 			remember_view()
-			show_map(map, snapshot["focus"], float(snapshot["zoom"]), floor_id, str(snapshot.get("layer_id", "")))
+			show_map(map, snapshot["focus"], float(snapshot["zoom"]), floor_id,
+				str(snapshot.get("layer_id", "")), str(snapshot.get("entrance_id", "")))
 			message.emit("Returned to %s." % map.display_name)
 			return
 	message.emit("No previous map.")
@@ -147,16 +177,15 @@ func wheel_step(direction: int, local_position: Vector2) -> void:
 			target_link = possible[0]
 			candidate = target_link.id
 		elif possible.size() > 1:
-			zoom_gate.reset()
-			message.emit("Multiple linked maps overlap. Double-click or use the map list.")
+			choose_links(possible)
 			return
 	elif not history.is_empty():
-		candidate = "return:" + str(history[-1]["map_id"])
+		candidate = "return:" + str(history[-1].get("history_id", history[-1]["map_id"]))
 	if candidate.is_empty():
 		zoom_gate.reset()
 		message.emit("Zoom limit reached; no map available in that direction.")
 		return
-	if zoom_gate.accept_blocked_step(direction, candidate, Time.get_ticks_msec()):
+	if zoom_gate.accept_blocked_step(direction, candidate, int(now_msec.call())):
 		if direction > 0:
 			enter_link(target_link)
 		else:
@@ -171,3 +200,13 @@ func pointer_moved(local_position: Vector2) -> void:
 	var links: Array[AtlasMapLink] = campaign.find_links_at(_canvas.map.id, _canvas.local_to_document(local_position), _canvas.floor.id)
 	if links.size() != 1 or links[0].id != zoom_gate.candidate_id:
 		zoom_gate.reset()
+
+
+func magnify(factor: float, local_position: Vector2) -> void:
+	zoom_gate.reset()
+	if not is_finite(factor) or factor <= 0.0:
+		return
+	var point: Vector2 = _canvas.local_to_document(local_position)
+	_canvas.camera_zoom = clampf(_canvas.camera_zoom * factor, MIN_ZOOM, MAX_ZOOM)
+	_canvas.camera_center = point - (local_position - _canvas.size * 0.5) / _canvas.camera_zoom
+	_canvas.queue_redraw()

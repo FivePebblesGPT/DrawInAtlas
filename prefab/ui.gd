@@ -2,7 +2,7 @@ extends Control
 
 enum FileAction { SAVE, LOAD, RESET_SAMPLE, NEW_BOARD }
 enum EditAction { UNDO, REDO, COPY, CUT, PASTE, SELECT_ALL, DELETE }
-enum ViewAction { SIDEBAR, GRID, BACK }
+enum ViewAction { SIDEBAR, GRID, BACK, LINKS }
 
 @onready var _split: HSplitContainer = %WorkspaceSplit
 @onready var _sidebar: Sidebar = %Sidebar
@@ -48,6 +48,7 @@ func _build_menus() -> void:
 	_view_menu.add_check_item("Grid overlay", ViewAction.GRID)
 	_view_menu.add_separator()
 	_view_menu.add_item("Back to previous map", ViewAction.BACK)
+	_view_menu.add_item("Linked maps…", ViewAction.LINKS)
 	# Display accelerator hints; existing context-aware handlers retain text-input undo.
 	%MenuBar.set_disable_shortcuts(true)
 
@@ -104,6 +105,8 @@ func _on_view_menu(id: int) -> void:
 			_editor.set_grid_visible(not _editor.canvas.show_grid)
 		ViewAction.BACK:
 			_editor._on_back()
+		ViewAction.LINKS:
+			_editor.linked_maps.open()
 	_sync_menus()
 
 

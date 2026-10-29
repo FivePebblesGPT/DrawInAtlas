@@ -20,6 +20,10 @@ signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
 signal reference_opacity_changed(value: float)
 signal automatic_navigation_toggled(enabled: bool)
+signal linked_maps_requested
+signal back_requested
+signal reference_source_changed(link_id: String, floor_id: String)
+signal reference_freeze_toggled(enabled: bool)
 
 @onready var tool_picker: OptionButton = %ToolPicker
 @onready var preview_picker: OptionButton = %PreviewPicker
@@ -51,8 +55,15 @@ signal automatic_navigation_toggled(enabled: bool)
 @onready var _floor_default: Button = %FloorDefault
 @onready var _palette_picker: OptionButton = %PalettePicker
 @onready var _navigation_toggle: CheckBox = %NavigationToggle
+@onready var reference_source_picker: OptionButton = %ReferenceSourcePicker
+@onready var reference_floor_picker: OptionButton = %ReferenceFloorPicker
+@onready var freeze_checkbox: CheckBox = %FreezeReference
 
 var _floor_ids: Array[String] = []
+var _reference_ids: Array[String] = []
+var _reference_floors: Array[String] = []
+var _reference_campaign: AtlasCampaign
+var _automatic_reference: String = ""
 
 
 func _ready() -> void:
@@ -76,6 +87,13 @@ func _ready() -> void:
 	reference_checkbox.toggled.connect(reference_toggled.emit)
 	opacity_slider.value_changed.connect(reference_opacity_changed.emit)
 	_navigation_toggle.toggled.connect(automatic_navigation_toggled.emit)
+	%ManageLinks.pressed.connect(linked_maps_requested.emit)
+	%BackButton.pressed.connect(back_requested.emit)
+	reference_source_picker.item_selected.connect(_on_reference_source)
+	reference_floor_picker.item_selected.connect(func(index: int) -> void:
+		reference_source_changed.emit(_reference_ids[reference_source_picker.selected], _reference_floors[index])
+		freeze_checkbox.set_pressed_no_signal(false))
+	freeze_checkbox.toggled.connect(reference_freeze_toggled.emit)
 
 
 func refresh_floors(map: AtlasMapDocument, floor: AtlasFloor) -> void:
@@ -142,3 +160,45 @@ func _on_transform_requested() -> void:
 
 func _on_placement_rotation_changed(value: float) -> void:
 	placement_rotation_changed.emit(deg_to_rad(value))
+
+
+func refresh_references(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor,
+		link_id: String, floor_id: String, frozen: bool, can_back: bool) -> void:
+	_reference_campaign = campaign
+	var incoming: Array[AtlasMapLink] = campaign.incoming_links(map.id, floor.id)
+	_automatic_reference = incoming[0].id if incoming.size() == 1 else ""
+	reference_source_picker.clear()
+	_reference_ids = [""]
+	reference_source_picker.add_item("Automatic (one entrance only)")
+	for link: AtlasMapLink in incoming:
+		var source: AtlasMapDocument = campaign.get_map(link.source_map_id)
+		_reference_ids.append(link.id)
+		reference_source_picker.add_item((source.display_name if source != null else "Missing source") + " / " + link.source_floor_id + " · " + link.id)
+	reference_source_picker.select(maxi(0, _reference_ids.find(link_id)))
+	_refresh_reference_floors(floor_id)
+	freeze_checkbox.set_pressed_no_signal(frozen)
+	%BackButton.disabled = not can_back
+
+
+func _refresh_reference_floors(preferred: String = "") -> void:
+	reference_floor_picker.clear()
+	_reference_floors.clear()
+	var id: String = _reference_ids[reference_source_picker.selected]
+	var link: AtlasMapLink = _reference_campaign.link_by_id(_automatic_reference if id.is_empty() else id)
+	var source: AtlasMapDocument = _reference_campaign.get_map(link.source_map_id) if link != null else null
+	if source != null:
+		for floor: AtlasFloor in source.floors:
+			_reference_floors.append(floor.id)
+			reference_floor_picker.add_item(floor.display_name + " · " + floor.id)
+		var selected: String = preferred if not preferred.is_empty() else link.source_floor_id
+		reference_floor_picker.select(_reference_floors.find(selected))
+	reference_floor_picker.disabled = source == null
+	freeze_checkbox.disabled = source == null
+
+
+func _on_reference_source(_index: int) -> void:
+	_refresh_reference_floors()
+	var selected: int = reference_floor_picker.selected
+	reference_source_changed.emit(_reference_ids[reference_source_picker.selected],
+		_reference_floors[selected] if selected >= 0 else "")
+	freeze_checkbox.set_pressed_no_signal(false)

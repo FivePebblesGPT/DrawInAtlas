@@ -14,6 +14,10 @@ main.tscn
         ├── prefab/inspector.tscn            AtlasInspector: forms emit typed intents
         ├── prefab/campaign_browser.tscn     AtlasCampaignBrowser: discovery and previews
         ├── scripts/interface/artwork_editor.gd  Scoped edits, selections and clipboard
+        ├── prefab/link_dialog.tscn             Scene-owned entrance/footprint drafts
+        ├── scripts/interface/linked_maps.gd    Parent-owned graph edit commands
+        ├── scripts/interface/map_references.gd Bounded derived references/previews
+        ├── scripts/interface/map_capture.gd    Shared private artwork renderer
         ├── scripts/navigation/map_navigator.gd Cameras, floor memory and Back
         ├── scripts/interface/canvas.gd      AtlasCanvas: draw and emit gestures
         ├── scripts/editing/                 Scope, tools, selection, clipboard
@@ -40,6 +44,18 @@ coordinates, not screen pixels. A link with a placement uses the rotated
 and Back history for one workspace. The view session preserves each map/floor's
 camera and selected layer without dirtying persisted artwork.
 `AtlasZoomGate` requires three further wheel steps at the zoom boundary.
+Ambiguous candidates open the scene-owned chooser and do not accumulate steps.
+`AtlasLinkEdit` applies/reverts an entrance, its footprint and an optional new
+document atomically. Stale geometry/endpoints and out-of-scope edits are rejected;
+unlinking preserves independent destinations and shared footprints.
+
+**Reference flow:** `AtlasMapReferences` schedules bounded floor/crop images via
+`AtlasMapCapture`, shared with sidebar previews. Only the private artwork canvas
+renders, with references/grid/link overlays and input disabled. Generation tokens,
+content signatures and an LRU protect against stale captures. Spatial crops map
+through the placement transform; symbolic links stay unregistered thumbnails.
+Reference source/floor, opacity, freeze and captures are viewer state. See
+[linked maps](LINKED_MAPS.md) for budgets, registration and current limitations.
 
 **Authoring vs saving:** `examples/northern_marches.tres` is an Inspector-
 editable shipped `Resource` fixture containing two map presets, two

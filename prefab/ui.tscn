@@ -8,6 +8,8 @@
 [ext_resource type="PackedScene" uid="uid://ba8os0lsdl52b" path="res://prefab/inspector.tscn" id="6"]
 [ext_resource type="PackedScene" uid="uid://dqrogil6sut2l" path="res://prefab/board_dialog.tscn" id="7"]
 [ext_resource type="Script" uid="uid://c1urpm8d5q3j7" path="res://scripts/interface/raster_importer.gd" id="8"]
+[ext_resource type="PackedScene" path="res://prefab/link_dialog.tscn" id="9"]
+[ext_resource type="Script" path="res://scripts/interface/map_references.gd" id="10"]
 
 [node name="UI" type="Control" unique_id=484751465]
 layout_mode = 3
@@ -133,3 +135,10 @@ autowrap_mode = 3
 
 [node name="RasterImporter" type="Node" parent="WorkspaceSplit/Workspace" unique_id=1081737290]
 script = ExtResource("8")
+
+[node name="LinkDialog" parent="WorkspaceSplit/Workspace" instance=ExtResource("9")]
+
+[node name="LinkChooser" type="PopupMenu" parent="WorkspaceSplit/Workspace"]
+
+[node name="MapReferences" type="Node" parent="WorkspaceSplit/Workspace"]
+script = ExtResource("10")

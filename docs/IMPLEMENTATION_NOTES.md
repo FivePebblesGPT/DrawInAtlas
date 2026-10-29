@@ -1,5 +1,78 @@
 # Implementation Notes
 
+## Execution milestone 6 — linked maps and artwork references, 2026-10-29
+
+- `prefab/link_dialog.tscn` owns destination/floor, arrival camera, mode and
+  placement drafts. `AtlasLinkedMaps` submits `AtlasLinkEdit` commands; the
+  workspace no longer directly appends battlemap/map/link objects or marks those
+  edits as external. See [linked-map usage](LINKED_MAPS.md).
+- New independent documents, entrances and footprints form one reversible
+  transaction. Existing destinations can be reused without changing their
+  artwork/grid/units. Moving, resizing, rotating, retargeting and unlinking are
+  reversible; unlinking retains destinations and shared footprints. Creation
+  undo rejects later child artwork or other references instead of deleting them.
+  Draft snapshots, active source ownership, valid endpoint floors and selected-cell
+  scope are checked before mutation. Shared geometry edits through one entrance
+  are rejected. Untouched native numbers are retained despite display rounding.
+- Select / enter drags source markers/footprints; the battlemap tool creates a
+  quantized rectangle with configurable pitch and arbitrary angle. Q/E rotate
+  its live draft, Escape cancels and Save commits before checkpointing. Spatial
+  versus symbolic mode is explicit rather than inferred from map kind.
+- Enter and Back use explicit source/target floors, arrival cameras and exact
+  source view/layer history. Overlap opens a chooser. Fractional wheel and
+  vertical pan-gesture dispatch normalize to at most one step each; partial
+  reversal, timeout, tool changes, Escape, pointer/candidate exit and disabling
+  automatic navigation reset the gate. Pinch is geometric only. Automatic
+  navigation remains off by default; transitions remain instant.
+- `AtlasMapReferences` draws all-layer spatial parent crops and child overlays,
+  plus unregistered symbolic/marker thumbnails. Source entrance/floor, show/hide,
+  opacity and frozen snapshots are viewer-only. Hiding retains a frozen image;
+  source/context changes invalidate it. `AtlasMapCapture` shares the proven
+  private, input-disabled artwork renderer with sidebar previews. Content
+  signatures and request generations reject edits/navigation/replacement races;
+  recursive previews, grid overlays and selection UI are absent from captures.
+- Captures are bounded to eight nearby children plus one parent; spatial images
+  have at most 512 pixels per axis and the LRU holds 16 images. Extra entries keep
+  markers and a Search hint. Source artwork/native graph loading remains eager;
+  these are output/scheduling budgets, not streaming guarantees.
+- Native format **v1** and compatibility dictionary schema **6** are unchanged.
+  Only existing link/placement fields are persisted. Capture nodes, frozen images,
+  viewer preferences, navigation/zoom state and caches never enter campaign files.
+
+### Milestone 6 verification — Godot 4.8.beta1.official.4d10419ca
+
+- All **17 headless suites** and **four native-renderer suites** pass, retaining
+  existing drawing, geometry, scope, clipboard, floor, organization, preview and
+  native storage coverage. Native storage remains **76 checks**.
+- `tests/links_smoke.gd`: **28 checks** for atomic creation/edit/unlink,
+  detached/stale transactions, scope, shared ownership, independent destinations,
+  transform inversion, native roundtrips and guarded undo.
+- `tests/linked_maps_ui_smoke.gd`: **55 headless / 56 native checks** for real
+  authored form signals, pointer/key/gesture dispatch, live rotation/cancel/save,
+  untouched precision, active-floor ownership, stale forms, undo/redo, source
+  restoration, overlap choice and exact boundary behavior. The boundary clock is
+  controlled in timeout tests: a SceneTreeTimer had intermittently expired before
+  900 monotonic milliseconds, while the product's real-time gate behaved correctly.
+- `tests/references_ui_smoke.gd`: **46 real-framebuffer checks** for rotated
+  tile/ink/raster references, crop boundaries, child editing isolation, opacity,
+  freeze/hide/unfreeze and frozen registration, source floor/entrance choice, spatial overlays, symbolic
+  fallback, bounded captures/cache and cancellation/input isolation.
+- Existing native visual acceptance retains zero sampled changes outside the
+  canvas and passing ink/layer/grid/transform/fill/compact-layout checks. Sidebar
+  preview acceptance retains **31 checks** after sharing its capture service.
+- Fresh import/startup, matching-beta Web release export and source/exported-pack
+  single-file save roundtrips pass. CI includes the new headless and native suites;
+  no remote CI result is claimed for this local milestone.
+- `actionlint` passes. The scene/resource reference checker reports **0 errors**;
+  its six warnings are existing addon fixtures/import metadata. Native evidence
+  inspected: `user://validation/linked-map-editor.png` and
+  `user://validation/linked-map-references.png`, alongside existing screenshots.
+
+Browser runtime smoke and physical trackpad tuning remain deferred. Player-output
+privacy and collaboration remain milestones 7–8; reference caches are editor-only.
+Next: milestone 7, local table/projector mode with tokens, fog and privacy-filtered
+player output.
+
 ## Native single-file saves — local validation, 2026-10-29
 
 This section supersedes the historical JSON/checkpoint descriptions below.
@@ -259,7 +332,7 @@ Open `project.godot` in Godot 4.8-beta1 and run the main scene (F5).
 - **Canvas:** freehand ink plus legacy cell paint/select/lock, pointer-centered wheel zoom, and middle/right-drag pan. The canvas clips its custom drawing, so artwork/grid/preview commands cannot paint over editor chrome. The inspector scrolls when its controls exceed the available height.
 - **Navigation:** use map/search results, a double-clicked link marker or Back. Automatic linked-map zoom is **off by default**. When explicitly enabled, exactly three additional logical steps at the zoom limit enter/return; leaving the link or beginning another interaction resets pending progress.
 - **Native map scale:** the inspector separates native distance/unit from overlay spacing, shape, origin and rotation. Neither operation rescales artwork or converts linked maps. The sample world uses 3 mi/cell; loaded values are preserved.
-- **Inherited encounter prototype:** drag a rotated footprint to create an independent encounter map. In Select mode, double-clicking a marker navigates; Pen/Eraser clicks stay drawing actions. Spatial terrain references are read-only; symbolic placements do not render child art as a physically aligned overlay. Parent freehand-reference previews still await refinement. This is a secondary feature, not the next development priority.
+- **Linked maps:** the authored form creates/reuses independent destinations, edits entrances/footprints and arrival floors/cameras, and unlinks without deleting destination art. Placement creation/edits are reversible. Select / enter moves locations and chooses overlapping entrances; Pen/Eraser remain drawing actions. All-layer spatial references are read-only; symbolic links use unregistered thumbnails. See the milestone-6 section above.
 - **Persistence:** Save/Load uses `user://drawinatlas_campaign.scn` with embedded artwork and a validated adjacent `.bak.scn`. Recovery is reported; failed Load never replaces active work. Old JSON saves are not imported or deleted.
 - Existing F11 / Alt+Enter fullscreen and F5 reload actions are routed through `util/global_shortcuts.gd`.
 
@@ -346,6 +419,6 @@ The GitHub workflow is updated to install/check the exact beta and run headless 
 
 ## Remaining limitations / next milestone
 
-Execution milestones 1–5 and native-save local acceptance are complete. Native-save integration and its remote CI result precede linked-map workflow refinement (milestone 6), followed by local table/projector privacy and collaboration. Web browser smoke stays deferred.
+Execution milestones 1–6 and the native-save gate are complete for the local client. Native saves were squash-merged as `eb877d7` after green PR checks. Next are local table/projector privacy (milestone 7) and collaboration (milestone 8). Web browser smoke stays deferred.
 
-Legacy linked-map placement actions still await undoable commands; campaign import/export UX is later work. See milestone 4 for conservative scope/selection semantics and raster limits. Trackpad behavior beyond the tested wheel normalization remains device-dependent. Milestone 3 storage/history scaling limits and deferred browser validation still apply.
+Linked-map placement actions now use reversible commands (milestone 6); campaign import/export UX is later work. See milestone 4 for conservative scope/selection semantics and raster limits. Physical trackpad behavior beyond synthetic wheel/gesture dispatch remains device-dependent. Native-save whole-file/history scaling limits and deferred browser validation still apply.

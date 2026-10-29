@@ -30,6 +30,11 @@ var overview_panel: AtlasOverviewPanel
 @onready var raster_importer: AtlasRasterImporter = $RasterImporter
 @onready var navigator: AtlasMapNavigator = AtlasMapNavigator.new(canvas)
 @onready var artwork: AtlasArtworkEditor = AtlasArtworkEditor.new(canvas, edits)
+@onready var link_dialog: AtlasLinkDialog = $LinkDialog
+@onready var linked_maps: AtlasLinkedMaps = AtlasLinkedMaps.new(canvas, edits, navigator, link_dialog)
+@onready var map_references: AtlasMapReferences = $MapReferences
+@onready var link_chooser: PopupMenu = $LinkChooser
+var _link_choices: Array[String] = []
 
 # Keep existing menu/test integrations pointing at the scene-owned controls.
 # These references never own another copy of the form or its state.
@@ -115,6 +120,8 @@ func _ready() -> void:
 	artwork.use_system_clipboard = use_system_clipboard
 	artwork.palette_id = palette_id
 	navigator.automatic_navigation = automatic_navigation
+	map_references.bind(canvas)
+	canvas.references = map_references
 	_mount_sidebar_views()
 	_connect_workspace()
 	_on_tool_changed(tool_picker.selected)
@@ -128,6 +135,7 @@ func _ready() -> void:
 	navigator.reset(campaign)
 	edits.changed.connect(_refresh_edit_state)
 	edits.changed.connect(_on_documents_changed)
+	edits.changed.connect(map_references.refresh)
 	edits.reset(campaign, loaded and (restored == null or not restored.recovered))
 	_show_map(campaign.get_map(campaign.root_map_id))
 	_message("B pen · E eraser · V select · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
@@ -167,6 +175,10 @@ func _connect_workspace() -> void:
 	artwork.tool_requested.connect(_choose_tool)
 	navigator.message.connect(_message)
 	navigator.view_changed.connect(_on_view_changed)
+	navigator.candidates_requested.connect(_show_link_choices)
+	linked_maps.message.connect(_message)
+	linked_maps.changed.connect(_refresh_after_history)
+	link_chooser.id_pressed.connect(_choose_link)
 	board_dialog.theme = sidebar.theme
 	board_dialog.board_requested.connect(_on_board_requested)
 	raster_importer.image_ready.connect(import_raster)
@@ -180,6 +192,10 @@ func _connect_workspace() -> void:
 	canvas.battlemap_requested.connect(_on_create_battlemap)
 	canvas.wheel_step.connect(navigator.wheel_step)
 	canvas.enter_requested.connect(navigator.enter_link)
+	canvas.link_candidates_requested.connect(navigator.choose_links)
+	canvas.magnify_requested.connect(navigator.magnify)
+	canvas.link_move_requested.connect(linked_maps.move)
+	canvas.zoom_interrupted.connect(navigator.zoom_gate.reset)
 	canvas.pointer_moved.connect(navigator.pointer_moved)
 	canvas.interaction_started.connect(navigator.zoom_gate.reset)
 	canvas.mouse_exited.connect(navigator.zoom_gate.reset)
@@ -197,12 +213,16 @@ func _connect_workspace() -> void:
 	inspector.brush_color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
 	inspector.brush_width_changed.connect(func(width: float) -> void: canvas.brush_width = width)
 	inspector.palette_selected.connect(func(index: int) -> void: palette_id = index)
-	inspector.placement_rotation_changed.connect(func(radians: float) -> void: canvas.battle_rotation = radians)
+	inspector.placement_rotation_changed.connect(func(radians: float) -> void:
+		canvas.battle_rotation = radians
+		canvas.queue_redraw())
 	inspector.preview_changed.connect(func(index: int) -> void:
 		canvas.preview = index as AtlasCanvas.Preview
+		map_references.refresh()
 		canvas.queue_redraw())
 	inspector.reference_toggled.connect(func(enabled: bool) -> void:
 		canvas.show_reference = enabled
+		map_references.refresh()
 		canvas.queue_redraw())
 	inspector.reference_opacity_changed.connect(func(value: float) -> void:
 		canvas.reference_opacity = value
@@ -210,10 +230,17 @@ func _connect_workspace() -> void:
 	inspector.automatic_navigation_toggled.connect(func(enabled: bool) -> void:
 		automatic_navigation = enabled
 		zoom_gate.reset())
+	inspector.linked_maps_requested.connect(linked_maps.open)
+	inspector.back_requested.connect(_on_back)
+	inspector.reference_source_changed.connect(map_references.select_source)
+	inspector.reference_freeze_toggled.connect(map_references.set_frozen)
 	inspector.sync_brush(canvas.brush_color, canvas.brush_width)
 
 
 func _on_view_changed() -> void:
+	link_dialog.hide()
+	link_chooser.hide()
+	map_references.select_source(navigator.active_entrance_id)
 	edits.active_map_id = canvas.map.id
 	_refresh_layers()
 	_refresh_grid_controls()
@@ -223,6 +250,7 @@ func _on_view_changed() -> void:
 	browser.refresh_metadata()
 	_refresh_edit_state()
 	browser.refresh(campaign)
+	_refresh_reference_controls()
 
 
 func _refresh_after_history() -> void:
@@ -234,6 +262,8 @@ func _refresh_after_history() -> void:
 	browser.refresh(campaign)
 	_refresh_edit_state()
 	canvas.queue_redraw()
+	linked_maps.refresh()
+	_refresh_reference_controls()
 
 
 func _refresh_layers(preferred_id: String = "") -> void:
@@ -270,6 +300,7 @@ func _on_documents_changed() -> void:
 		return
 	if campaign.get_map(canvas.map.id) == canvas.map and canvas.map.floor_by_id(canvas.floor.id) != null:
 		browser.refresh(campaign)
+		linked_maps.refresh()
 
 
 func _message(value: String) -> void:
@@ -439,6 +470,9 @@ func _on_load() -> void:
 func _reset_view_helpers() -> void:
 	navigator.reset(campaign)
 	browser.reset_previews()
+	map_references.reset()
+	link_dialog.hide()
+	link_chooser.hide()
 
 
 func _on_undo() -> void:
@@ -470,42 +504,31 @@ func _on_redo() -> void:
 
 
 func _on_create_battlemap(start: Vector2, finish: Vector2, radians: float) -> void:
-	var delta: Vector2 = (finish - start).rotated(-radians)
-	if delta.length() < 30.0:
-		_message("Drag a larger rectangle to create a battlemap.")
-		return
-	const PITCH: float = 24.0
-	var local_min: Vector2 = Vector2(minf(0.0, delta.x), minf(0.0, delta.y))
-	var placement: AtlasPlacement = AtlasPlacement.new()
-	placement.id = "placement-%d-%d" % [Time.get_ticks_msec(), randi()]
-	placement.parent_map_id = canvas.map.id
-	placement.origin = start + local_min.rotated(radians)
-	placement.rotation = radians
-	placement.columns = maxi(2, roundi(absf(delta.x) / PITCH))
-	placement.rows = maxi(2, roundi(absf(delta.y) / PITCH))
-	placement.parent_units_per_cell = PITCH
-	placement.child_units_per_cell = 64.0
-	placement.symbolic = canvas.map.kind == "WORLD"
-	var child_id: String = "encounter-%d-%d" % [Time.get_ticks_msec(), randi()]
-	placement.child_map_id = child_id
-	var encounter: AtlasMapDocument = AtlasMapDocument.new(child_id, "Encounter %d" % campaign.maps.size())
-	encounter.kind = "BATTLEMAP"
-	encounter.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, placement.child_units_per_cell)
-	encounter.grid.distance_per_cell = 5.0
-	encounter.grid.distance_unit = "ft"
-	campaign.add_map(encounter)
-	campaign.placements.append(placement)
-	var link: AtlasMapLink = AtlasMapLink.new()
-	link.id = "link-" + placement.id
-	link.source_map_id = canvas.map.id
-	link.source_floor_id = canvas.floor.id
-	link.target_map_id = child_id
-	link.placement_id = placement.id
-	link.anchor = placement.origin
-	link.target_focus = Vector2(placement.columns, placement.rows) * placement.child_units_per_cell * 0.5
-	campaign.links.append(link)
-	edits.mark_external_change()
-	_enter_link(link)
+	linked_maps.create_drag(start, finish, radians)
+
+
+func _refresh_reference_controls() -> void:
+	inspector.refresh_references(campaign, canvas.map, canvas.floor,
+		map_references.source_link_id, map_references.source_floor_id, map_references.frozen, not history.is_empty())
+
+
+func _show_link_choices(links: Array[AtlasMapLink]) -> void:
+	link_chooser.clear()
+	_link_choices.clear()
+	for link: AtlasMapLink in links:
+		var target: AtlasMapDocument = campaign.get_map(link.target_map_id)
+		if target != null:
+			_link_choices.append(link.id)
+			link_chooser.add_item("%d · %s / %s · arrival %s" % [_link_choices.size(), target.display_name,
+				link.target_floor_id, link.target_focus], _link_choices.size() - 1)
+			link_chooser.set_item_tooltip(_link_choices.size() - 1, "Entrance " + link.id)
+	if not _link_choices.is_empty():
+		link_chooser.popup_centered_clamped(Vector2i(360, 0), 0.9)
+
+
+func _choose_link(index: int) -> void:
+	if index >= 0 and index < _link_choices.size():
+		navigator.enter_link(campaign.link_by_id(_link_choices[index]))
 
 
 func _choose_tool(tool: AtlasCanvas.Tool) -> void:
@@ -515,6 +538,8 @@ func _choose_tool(tool: AtlasCanvas.Tool) -> void:
 
 func _on_tool_changed(index: int) -> void:
 	artwork.choose_tool(index as AtlasCanvas.Tool)
+	if index == AtlasCanvas.Tool.BATTLEMAP and campaign != null and canvas.map != null:
+		linked_maps.prepare_drag()
 	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	if not locked_to_cell:
 		lock_checkbox.set_pressed_no_signal(false)
@@ -696,6 +721,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
+		zoom_gate.reset()
 		if canvas.is_editing():
 			canvas.cancel_edit()
 		else:

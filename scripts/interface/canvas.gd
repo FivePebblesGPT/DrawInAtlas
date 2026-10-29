@@ -10,6 +10,11 @@ signal selection_requested(cell: Vector2i)
 signal battlemap_requested(start: Vector2, finish: Vector2, rotation_radians: float)
 signal wheel_step(direction: int, local_position: Vector2)
 signal enter_requested(link: AtlasMapLink)
+signal link_candidates_requested(links: Array[AtlasMapLink])
+signal link_selected(id: String)
+signal magnify_requested(factor: float, position: Vector2)
+signal link_move_requested(id: String, offset: Vector2)
+signal zoom_interrupted
 signal pointer_moved(local_position: Vector2)
 signal interaction_started
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
@@ -19,7 +24,7 @@ signal fill_requested(position: Vector2)
 signal view_region_changed
 
 enum Tool { PEN, ERASER, PAINT, SELECT, BATTLEMAP, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL }
-enum Preview { OFF, MARKERS, THUMBNAILS }
+enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
 var campaign: AtlasCampaign
@@ -46,8 +51,11 @@ var camera_zoom: float = 1.0:
 var selected_cell: Vector2i = Vector2i.ZERO
 var has_selected_cell: bool = false
 var battle_rotation: float = 0.0
+var battle_pitch: float = 24.0
 var reference_opacity: float = 0.35
 var show_reference: bool = true
+var references: AtlasMapReferences
+var selected_link_id: String = ""
 var render_grid: bool = true
 var show_grid: bool:
 	get:
@@ -65,6 +73,7 @@ var _draft_start: Vector2 = Vector2.ZERO
 var _draft_end: Vector2 = Vector2.ZERO
 var _wheel_fraction: float = 0.0
 var _wheel_direction: int = 0
+var _wheel_last_ms: int = -1
 var _draft_stroke: AtlasStroke
 var _erasing: bool = false
 var _stroke_left_canvas: bool = false
@@ -80,6 +89,9 @@ var _shape_kind: String = ""
 var _preview_layer: AtlasLayer
 var _gesture_transform: Transform2D = Transform2D.IDENTITY
 var _add_selection: bool = false
+var _moving_link_id: String = ""
+var _link_move_start: Vector2
+var _link_move_end: Vector2
 
 const EMPTY_COLOR := Color("#212c34")
 const TERRAIN_COLORS := [
@@ -115,6 +127,7 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	clear_selection()
 	has_selected_cell = false
 	_drawing_battlemap = false
+	selected_link_id = ""
 	queue_redraw()
 	return true
 
@@ -125,7 +138,7 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return _draft_stroke != null or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
+	return not _moving_link_id.is_empty() or _drawing_battlemap or _draft_stroke != null or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
 
 
 func cancel_edit() -> void:
@@ -136,11 +149,28 @@ func cancel_edit() -> void:
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
 	_preview_layer = null
+	_wheel_fraction = 0.0
+	_wheel_direction = 0
+	_wheel_last_ms = -1
+	_moving_link_id = ""
 	_raster_textures.clear()
 	queue_redraw()
 
 
 func commit_edit() -> void:
+	if not _moving_link_id.is_empty():
+		var id: String = _moving_link_id
+		_moving_link_id = ""
+		var offset: Vector2 = _link_move_end - _link_move_start
+		if offset.length_squared() > 0.0001:
+			link_move_requested.emit(id, offset)
+		queue_redraw()
+		return
+	if _drawing_battlemap:
+		_drawing_battlemap = false
+		battlemap_requested.emit(_draft_start, _draft_end, battle_rotation)
+		queue_redraw()
+		return
 	if _manipulation != Manipulation.NONE:
 		_finish_manipulation()
 		return
@@ -313,11 +343,25 @@ func _draw_overlays(item: Node2D) -> void:
 	if render_grid and show_grid:
 		_draw_grid(item)
 	_draw_links(item)
+	if references != null:
+		references.draw_children(item)
 	if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
 		var outline := map.grid.cell_polygon(selected_cell)
 		_stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
 	if _drawing_battlemap:
 		_draw_draft(item)
+	if not _moving_link_id.is_empty():
+		var link: AtlasMapLink = campaign.link_by_id(_moving_link_id)
+		if link != null:
+			var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
+			var offset: Vector2 = _link_move_end - _link_move_start
+			if placement != null:
+				var points: PackedVector2Array = placement.corners()
+				for index: int in range(points.size()):
+					points[index] += offset
+				_stroke_polygon(points, Color("#f9cc65"), 2.0 / camera_zoom, item)
+			else:
+				item.draw_arc(link.anchor + offset, link.hit_radius, 0, TAU, 48, Color("#f9cc65"), 2.0 / camera_zoom)
 	if _manipulation == Manipulation.MARQUEE:
 		item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color(0.3, 0.7, 1.0, 0.15))
 		item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color("#4dabf2"), false, 1.0 / camera_zoom)
@@ -334,48 +378,8 @@ func _draw_overlays(item: Node2D) -> void:
 
 
 func _draw_parent_reference() -> void:
-	if not show_reference or campaign == null:
-		return
-	for placement in campaign.placements:
-		if placement.child_map_id != map.id or placement.symbolic:
-			continue
-		var parent := campaign.get_map(placement.parent_map_id)
-		if parent == null:
-			continue
-		var references: Array[AtlasMapLink] = []
-		for link: AtlasMapLink in campaign.links:
-			if (link.placement_id == placement.id and link.source_map_id == parent.id
-					and link.target_map_id == map.id and link.target_floor_id == floor.id):
-				references.append(link)
-		if references.size() != 1:
-			continue
-		var parent_floor: AtlasFloor = parent.floor_by_id(references[0].source_floor_id)
-		if parent_floor == null:
-			continue
-		var terrain: AtlasTileLayer = parent_floor.terrain_layer()
-		if terrain == null or not terrain.visible or terrain.opacity <= 0.0:
-			continue
-		var clipping := PackedVector2Array([
-			Vector2.ZERO,
-			Vector2(placement.columns * placement.child_units_per_cell, 0.0),
-			Vector2(placement.columns, placement.rows) * placement.child_units_per_cell,
-			Vector2(0.0, placement.rows * placement.child_units_per_cell)
-		])
-		for key: String in parent_floor.terrain.keys():
-			var xy := key.split(",")
-			if xy.size() != 2:
-				continue
-			var cell := Vector2i(int(xy[0]), int(xy[1]))
-			var polygon: PackedVector2Array = parent.get_terrain_grid(parent_floor.id).cell_polygon(cell)
-			var transformed := PackedVector2Array()
-			for point in polygon:
-				transformed.append(placement.parent_point_to_child(point))
-			var color := _terrain_color(parent_floor.get_terrain(cell))
-			color.a = reference_opacity * terrain.opacity
-			if transformed.size() >= 3:
-				for clipped in Geometry2D.intersect_polygons(transformed, clipping):
-					if clipped.size() >= 3:
-						draw_colored_polygon(clipped, color)
+	if show_reference and references != null:
+		references.draw_parent(self)
 
 
 func _draw_grid(item: Node2D) -> void:
@@ -441,14 +445,12 @@ func _draw_links(item: Node2D) -> void:
 			continue
 		if not link.placement_id.is_empty():
 			var placement := campaign.placement_by_id(link.placement_id)
-			if placement == null:
+			if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
 				continue
 			var corners := placement.corners()
 			var fill := Color(0.24, 0.70, 0.82, 0.15)
 			item.draw_colored_polygon(corners, fill)
-			_stroke_polygon(corners, Color("#63d3e5"), 2.0 / camera_zoom, item)
-			if preview == Preview.THUMBNAILS and not placement.symbolic:
-				_draw_placement_preview(placement, target, item, link.target_floor_id)
+			_stroke_polygon(corners, Color("#f9cc65") if link.id == selected_link_id else Color("#63d3e5"), 2.0 / camera_zoom, item)
 			item.draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
 		else:
@@ -457,32 +459,6 @@ func _draw_links(item: Node2D) -> void:
 				Color("#395760"), 2.0 / camera_zoom)
 			item.draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
 				target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
-
-
-func _draw_placement_preview(placement: AtlasPlacement, target: AtlasMapDocument, item: Node2D, floor_id: String = "") -> void:
-	var selected_id: String = target.default_floor_id if floor_id.is_empty() else floor_id
-	var child_floor: AtlasFloor = target.floor_by_id(selected_id)
-	if child_floor == null:
-		return
-	var terrain: AtlasTileLayer = child_floor.terrain_layer()
-	if terrain == null or not terrain.visible or terrain.opacity <= 0.0:
-		return
-	for key: String in child_floor.terrain.keys():
-		var xy := key.split(",")
-		if xy.size() != 2:
-			continue
-		var cell := Vector2i(int(xy[0]), int(xy[1]))
-		var u := Vector2(cell)
-		if u.x < 0 or u.y < 0 or u.x >= placement.columns or u.y >= placement.rows:
-			continue
-		var transform := placement.local_to_parent()
-		var square := PackedVector2Array([
-			transform * u, transform * (u + Vector2.RIGHT),
-			transform * (u + Vector2.ONE), transform * (u + Vector2.DOWN)
-		])
-		var color := _terrain_color(child_floor.get_terrain(cell))
-		color.a = 0.7 * terrain.opacity
-		item.draw_colored_polygon(square, color)
 
 
 func _draw_draft(item: Node2D) -> void:
@@ -494,7 +470,8 @@ func _draw_draft(item: Node2D) -> void:
 func _draft_polygon() -> PackedVector2Array:
 	var rotated := (_draft_end - _draft_start).rotated(-battle_rotation)
 	var minimum := Vector2(minf(rotated.x, 0.0), minf(rotated.y, 0.0))
-	var maximum := Vector2(maxf(rotated.x, 0.0), maxf(rotated.y, 0.0))
+	var dimensions := Vector2(maxi(1, roundi(absf(rotated.x) / battle_pitch)), maxi(1, roundi(absf(rotated.y) / battle_pitch))) * battle_pitch
+	var maximum: Vector2 = minimum + dimensions
 	return PackedVector2Array([
 		_draft_start + minimum.rotated(battle_rotation),
 		_draft_start + Vector2(maximum.x, minimum.y).rotated(battle_rotation),
@@ -520,6 +497,16 @@ func _terrain_color(palette: int) -> Color:
 func _gui_input(event: InputEvent) -> void:
 	if map == null:
 		return
+	if event is InputEventPanGesture:
+		if not is_editing() and event.delta.y != 0.0:
+			_consume_wheel(-1 if event.delta.y > 0 else 1, absf(event.delta.y), event.position)
+		accept_event()
+		return
+	if event is InputEventMagnifyGesture:
+		if not is_editing():
+			magnify_requested.emit(event.factor, event.position)
+		accept_event()
+		return
 	if event is InputEventMouseButton:
 		var mouse := event as InputEventMouseButton
 		if mouse.button_index == MOUSE_BUTTON_WHEEL_UP or mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -529,14 +516,7 @@ func _gui_input(event: InputEvent) -> void:
 			if mouse.pressed:
 				var delta := mouse.factor if mouse.factor > 0.0 else 1.0
 				var wheel_direction := 1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1
-				if _wheel_direction != wheel_direction:
-					_wheel_fraction = 0.0
-					_wheel_direction = wheel_direction
-				_wheel_fraction += minf(delta, 1.0)
-				if _wheel_fraction >= 1.0:
-					_wheel_fraction = 0.0
-					# Never carry a burst's overscroll into later wheel events.
-					wheel_step.emit(wheel_direction, mouse.position)
+				_consume_wheel(wheel_direction, delta, mouse.position)
 			accept_event()
 			return
 		if mouse.button_index == MOUSE_BUTTON_MIDDLE or mouse.button_index == MOUSE_BUTTON_RIGHT:
@@ -551,12 +531,18 @@ func _gui_input(event: InputEvent) -> void:
 				interaction_started.emit()
 				grab_focus()
 				var position := local_to_document(mouse.position)
-				if mouse.double_click and campaign != null and tool == Tool.SELECT:
+				if campaign != null and tool == Tool.SELECT:
 					var links := campaign.find_links_at(map.id, position, floor.id)
-					if links.size() == 1:
-						enter_requested.emit(links[0])
+					if mouse.double_click and not links.is_empty():
+						link_candidates_requested.emit(links)
 						accept_event()
 						return
+					selected_link_id = links[0].id if links.size() == 1 else ""
+					link_selected.emit(selected_link_id)
+					if not selected_link_id.is_empty():
+						_moving_link_id = selected_link_id
+						_link_move_start = position
+						_link_move_end = position
 				match tool:
 					Tool.PEN, Tool.ERASER:
 						var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
@@ -598,17 +584,18 @@ func _gui_input(event: InputEvent) -> void:
 						_draft_start = position
 						_draft_end = position
 						queue_redraw()
+			elif not _moving_link_id.is_empty():
+				_link_move_end = local_to_document(mouse.position)
+				commit_edit()
 			elif _manipulation != Manipulation.NONE:
 				_update_manipulation(local_to_document(mouse.position))
 				_finish_manipulation()
+			elif _drawing_battlemap:
+				_draft_end = local_to_document(mouse.position)
+				commit_edit()
 			elif is_editing():
 				_append_stroke_point(mouse.position)
 				commit_edit()
-			elif _drawing_battlemap:
-				_draft_end = local_to_document(mouse.position)
-				_drawing_battlemap = false
-				battlemap_requested.emit(_draft_start, _draft_end, battle_rotation)
-				queue_redraw()
 			accept_event()
 	elif event is InputEventMouseMotion:
 		var motion := event as InputEventMouseMotion
@@ -617,15 +604,19 @@ func _gui_input(event: InputEvent) -> void:
 			camera_center -= motion.relative / camera_zoom
 			queue_redraw()
 			accept_event()
+		elif not _moving_link_id.is_empty():
+			_link_move_end = local_to_document(motion.position)
+			queue_redraw()
+			accept_event()
 		elif _manipulation != Manipulation.NONE:
 			_update_manipulation(local_to_document(motion.position))
-			accept_event()
-		elif is_editing():
-			_append_stroke_point(motion.position)
 			accept_event()
 		elif _drawing_battlemap:
 			_draft_end = local_to_document(motion.position)
 			queue_redraw()
+			accept_event()
+		elif is_editing():
+			_append_stroke_point(motion.position)
 			accept_event()
 		elif tool == Tool.PAINT and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
 			_request_cell_paint(local_to_document(motion.position))
@@ -638,4 +629,19 @@ func _request_cell_paint(position: Vector2) -> void:
 		return
 	var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
 	if grid.kind != AtlasGrid.Kind.GRIDLESS:
-		paint_requested.emit(grid.document_to_cell(position))
+			paint_requested.emit(grid.document_to_cell(position))
+
+
+func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void:
+	if direction == 0 or not is_finite(magnitude) or magnitude <= 0.0:
+		return
+	var now: int = Time.get_ticks_msec()
+	if _wheel_direction != direction or (_wheel_last_ms >= 0 and now - _wheel_last_ms > AtlasZoomGate.RESET_TIMEOUT_MS):
+		_wheel_fraction = 0.0
+		zoom_interrupted.emit()
+	_wheel_direction = direction
+	_wheel_last_ms = now
+	_wheel_fraction += minf(magnitude, 1.0)
+	if _wheel_fraction >= 1.0:
+		_wheel_fraction = 0.0
+		wheel_step.emit(direction, position)

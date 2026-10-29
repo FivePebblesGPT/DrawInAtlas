@@ -39,6 +39,12 @@ See [native saves](NATIVE_SAVE_IMPLEMENTATION.md) for transaction details and
 portability evidence. Browser smoke remains deferred; Windows/macOS replacement
 and physical-media power-loss durability are not claimed.
 
+Milestone 6 uses the existing link/placement fields and native format v1 without
+adding a schema. `AtlasLinkEdit` atomically changes one source-owned entrance,
+its footprint and an optional new independent document. Reference sources,
+frozen images, preview crops and traversed-entrance history are viewer state,
+not extra Resources in the campaign file. See [linked maps](LINKED_MAPS.md).
+
 ### Historical JSON checkpoint / retained in-memory dictionary schema (v6)
 
 Before native saves, the store wrote a checksummed JSON head, `.bak` and immutable

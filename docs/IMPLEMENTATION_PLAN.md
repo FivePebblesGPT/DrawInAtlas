@@ -1,6 +1,6 @@
 # Implementation Plan and Decision Log
 
-**Status:** execution milestones **1–5** and the intervening native-save migration are verified locally on Godot **4.8-beta1**. Milestones 6–8 remain open; milestone 6 follows native-save integration. The older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
+**Status:** execution milestones **1–6** and the intervening native-save migration are verified locally on Godot **4.8-beta1**. Milestones **7–8** remain open. Native-save PR #4 was squash-merged as `eb877d7` after green checks. The older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
 ## 1. Principle: vertical slices before feature breadth
 
@@ -17,8 +17,8 @@ The integration checkpoint is complete. The following execution sequence superse
 | 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Implemented and verified for the local client; Web smoke deferred |
 | 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Implemented and verified for the local client |
 | 5 | Floors and map organization/overview/previews | Implemented and verified for the local client |
-| Native-save gate | One embedded `.scn`, adjacent backup, Resource isolation, codec benchmarks | Local acceptance passed; see [native saves](NATIVE_SAVE_IMPLEMENTATION.md) and [AD-10](NATIVE_SAVE_BENCHMARKS.md). Integration/remote CI remains separate. |
-| 6 | Linked-map workflow refinement, placement/reference/navigation controls | Pending |
+| Native-save gate | One embedded `.scn`, adjacent backup, Resource isolation, codec benchmarks | Verified and squash-merged as `eb877d7`; see [native saves](NATIVE_SAVE_IMPLEMENTATION.md) and [AD-10](NATIVE_SAVE_BENCHMARKS.md) |
+| 6 | Linked-map workflow refinement, placement/reference/navigation controls | Implemented and verified locally; [usage and limits](LINKED_MAPS.md) |
 | 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
 | 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
 
@@ -33,6 +33,14 @@ Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import a
 Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, active-layer selection with proportional transforms, typed self-contained clipboard data and central selected-cell scope. Schema v5 persists raster placement transforms and reads v1–v4. Native service/input/framebuffer and live-session checks are the gate; no new Web smoke was run.
 
 Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Its historical runtime checkpoint v6 recorded tags and source/target floor identity. The subsequent native-save migration uses one binary `.scn` with embedded Resources: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](DATA_MODEL.md) for the current storage contract.
+
+Milestone 6 adds reversible, source-owned entrances/footprints and optional new
+documents, a scene-owned linked-map form, native drag/numeric editing, explicit
+overlap selection and floor/camera-aware navigation. All-layer parent references
+and child previews share bounded, cancellable artwork captures; symbolic links
+stay unregistered. Viewer choices/frozen images are not saved. Native v1 remains
+unchanged; source/exported-pack interoperability, headless and framebuffer checks
+are the gate. Browser smoke remains deferred.
 
 ### Original feature groupings (reference)
 
@@ -164,7 +172,7 @@ Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/
 | Drawing-board-first editing | Accepted clarification | Continuous artwork; grids are overlays, links are optional |
 | Native measurement units per map | Accepted clarification | DM chooses distance/unit; no automatic conversion or harmonization |
 | Automatic map navigation default | Off / opt-in | Ordinary drawing-board zoom must not change maps |
-| Default reference refresh: live vs frozen | Open | UX/performance tradeoff |
+| Default reference refresh: live vs frozen | Implemented | Live by default, with explicit viewer-only freeze; see linked-map capture budgets |
 | Trackpad normalization/timeouts | Open defaults | Test with actual devices; preserve 3-step semantics |
 | Exact storage container | Decided | One binary `.scn` primary; no standalone Resource or artwork sidecars |
 | Optional auto-exit on minimum zoom | Accepted design with condition | Only when a navigation-history return target exists |
@@ -185,4 +193,9 @@ Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/
 
 ## 6. Suggested next engineering task
 
-Integrate the locally validated native-save changes and obtain the corresponding remote CI result. Then proceed with execution milestone 6: reversible linked-map placement/reference workflows and explicit navigation controls. Preserve the verified floor, overview and preview behavior, the native store boundary, artwork coordinates and native map units. Keep browser smoke deferred.
+Proceed with execution milestone 7: local table/projector mode, tokens/fog and
+privacy-filtered player output with a Web-compatible fallback. Preserve one
+editable document per workspace, independent native units, source-owned commands
+and native saves. Editor reference captures are not player-safe projections:
+permission filtering must be designed and tested at the output boundary. Keep
+browser smoke deferred unless the user changes that priority.

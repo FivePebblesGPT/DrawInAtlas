@@ -1,6 +1,6 @@
 # Semantic Zoom, Navigation and Cross-Map Previews
 
-**Status:** proposed behavior. Semantic zoom is navigation between documents, not automatically resampling the same drawing.
+**Status:** the local client implements explicit navigation, the opt-in three-step gate, reversible entrances/placements and read-only artwork references; see [current linked-map workflows](LINKED_MAPS.md). Animated transitions, richer clustering and player-authorized previews below remain design targets. Semantic zoom is navigation between documents, not automatically resampling the same drawing.
 
 ## 1. Geometric versus semantic zoom
 

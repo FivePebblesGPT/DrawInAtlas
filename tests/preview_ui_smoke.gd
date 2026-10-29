@@ -130,7 +130,7 @@ func _floor_pixels() -> void:
 	_check(_center_is(Color.RED), "ground preview contains its raster, without grid, links or another floor")
 	_check(_image() != null and _image().get_size() == AtlasPreviewPanel.PREVIEW_SIZE,
 		"native capture has the declared bounded size")
-	var viewport: SubViewport = _panel.get_node("PreviewRenderer")
+	var viewport: SubViewport = _panel.capture_renderer.viewport
 	var renderer: AtlasCanvas = viewport.get_node("Canvas")
 	_check(viewport.world_2d != root.world_2d and viewport.gui_disable_input,
 		"preview has an isolated world and no viewport GUI input")
@@ -184,7 +184,7 @@ func _input_isolation() -> void:
 	_mouse(center, MOUSE_BUTTON_WHEEL_UP, true)
 	_mouse(center, MOUSE_BUTTON_WHEEL_UP, false)
 	await _frames()
-	var renderer: AtlasCanvas = _panel.get_node("PreviewRenderer/Canvas")
+	var renderer: AtlasCanvas = _panel.capture_renderer.canvas
 	_check(not _editor.canvas.is_editing() and not renderer.is_editing() and renderer.selection.is_empty(),
 		"click/drag/wheel on the displayed preview starts no editing or selection")
 	_check(_editor.canvas.camera_center == camera and _editor.canvas.camera_zoom == zoom
@@ -250,7 +250,7 @@ func _cancel_and_replace() -> void:
 	await _frames(6)
 	_check(_panel.texture_rect.texture == null and _panel.cache.entry_count() == 0,
 		"clearing a pending preview cancels both publication and caching")
-	var renderer: AtlasCanvas = _panel.get_node("PreviewRenderer/Canvas")
+	var renderer: AtlasCanvas = _panel.capture_renderer.canvas
 	_check(renderer.map == null and renderer.floor == null and renderer.campaign == null,
 		"clear releases the renderer's source document references")
 	_panel.request_preview(_campaign, "tower", "upper")

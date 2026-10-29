@@ -37,6 +37,15 @@ func parent_point_to_child(position: Vector2) -> Vector2:
 	return parent_to_local(position) * child_units_per_cell
 
 
+func child_to_parent() -> Transform2D:
+	var basis: Transform2D = local_to_parent()
+	return Transform2D(basis.x / child_units_per_cell, basis.y / child_units_per_cell, origin)
+
+
+func child_bounds() -> Rect2:
+	return Rect2(Vector2.ZERO, Vector2(columns, rows) * child_units_per_cell)
+
+
 func corners() -> PackedVector2Array:
 	var transform := local_to_parent()
 	return PackedVector2Array([

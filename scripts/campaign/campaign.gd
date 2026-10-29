@@ -29,6 +29,21 @@ func placement_by_id(placement_id: String) -> AtlasPlacement:
 	return null
 
 
+func link_by_id(link_id: String) -> AtlasMapLink:
+	for link: AtlasMapLink in links:
+		if link.id == link_id:
+			return link
+	return null
+
+
+func incoming_links(map_id: String, floor_id: String = "") -> Array[AtlasMapLink]:
+	var result: Array[AtlasMapLink] = []
+	for link: AtlasMapLink in links:
+		if link.target_map_id == map_id and (floor_id.is_empty() or link.target_floor_id == floor_id):
+			result.append(link)
+	return result
+
+
 ## Find entrances at a point expressed in source MAP units, never screen pixels.
 ## Ignore dangling destinations and floor references; a missing placement must
 ## not silently turn a footprint link into an ordinary marker.

@@ -1,6 +1,6 @@
 # DrawInAtlas
 
-**Status: native drawing/selection/clipboard tools, independent boards/grids/floors, typed layers, campaign overview/search/previews and recoverable persistence implemented; broader VTT features are in progress.**
+**Status: native drawing/selection/clipboard tools, independent boards/grids/floors, typed layers, reversible linked-map workflows, read-only artwork references, campaign discovery and native recoverable saves implemented; projector and collaboration features are next.**
 
 DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
@@ -30,14 +30,19 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - The Floors inspector adds, renames, reorders and chooses the saved default floor through undoable edits. Each floor retains independent artwork and viewer camera/layer preferences. Referenced/protected floors cannot be deleted.
 - Maps edits board names and comma-separated tags. Search supports names, floors, kinds and exact `#tags`, with campaign/current-floor/visible-area/selected-cell filters and bounded descendant traversal. Open enters the selected floor; Focus visits an entrance's source, including broken links.
 - Map/overview previews are read-only, floor-specific and cached. Visible-area search updates when the canvas pans, zooms or resizes. Preview clicks never edit the source map.
+- **Linked maps…** in the inspector/View menu creates or edits marker entrances and spatial/symbolic footprints. Choose an existing target or a new independent document, destination floor and arrival camera. Select / enter drags source locations; numeric controls resize/rotate them. Edits and unlinking support undo/redo; unlinking keeps the destination.
+- The battlemap tool drags a quantized footprint using configured pitch and rotation; Q/E rotate its draft, Escape cancels, and Save commits it. The new document/link/placement is one reversible transaction. Overlapping entrances open a chooser rather than selecting an arbitrary map.
+- Parent references render all visible artwork types, with source entrance/floor, opacity and freeze controls. Child Spatial overlay aligns registered footprints and falls back to pinned thumbnails for symbolic links. References remain derived viewer content, never editable map layers. See [linked-map workflows](docs/LINKED_MAPS.md).
 - Headless smoke tests: `godot --headless --path . --script res://tests/smoke.gd`.
 - Artwork/history tests: `godot --headless --path . --script res://tests/artwork_smoke.gd`.
 - Board/grid tests: `godot --headless --path . --script res://tests/board_grid_smoke.gd`.
 - Layer/storage tests: run `tests/layers_smoke.gd`, `tests/storage_smoke.gd` and `tests/layer_ui_smoke.gd` with the same headless invocation.
 - Editing tests: run `tests/fill_scope_smoke.gd`, `tests/clipboard_smoke.gd`, `tests/selection_smoke.gd` and `tests/tools_ui_smoke.gd` the same way.
 - Workspace/organization tests: run `tests/editor_modules_smoke.gd`, `tests/organization_ui_smoke.gd`, `tests/floors_view_smoke.gd`, `tests/overview_smoke.gd` and `tests/preview_cache_smoke.gd` the same way.
+- Linked-map command/UI tests: run `tests/links_smoke.gd` and `tests/linked_maps_ui_smoke.gd` headlessly. The UI suite also runs with the native renderer.
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
 - Native preview acceptance: `godot --path . --script res://tests/preview_ui_smoke.gd`. For an isolated software-rendered run, use `LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/preview_ui_smoke.gd`.
+- Native linked-map/reference acceptance: use the same Xvfb/Mesa command with `tests/linked_maps_ui_smoke.gd` and `tests/references_ui_smoke.gd`.
 - Reproduce raster codec and complete save-transaction measurements with the commands in [native raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md).
 
 ## Project layout
@@ -67,9 +72,10 @@ No standalone `.res` or artwork sidecars are written.
 | [Architecture](docs/ARCHITECTURE.md) | Proposed runtime boundaries, rendering and commands |
 | [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics and geometry |
 | [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Navigation and exact three-step buffer |
+| [Linked-map workflows](docs/LINKED_MAPS.md) | Reversible entrances/placements, explicit navigation and read-only artwork references |
 | [Data model and storage](docs/DATA_MODEL.md) | Current domain/native storage contract and historical examples |
 | [Native saves](docs/NATIVE_SAVE_IMPLEMENTATION.md) | Current scene format, verification and portability limits |
 | [Raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md) | Codec decision AD-10, measurements and reproduction commands |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
 
-Linked-map refinements, projector output, networking and campaign import/export UX remain future work. Native saves pass local Godot 4.8-beta1 acceptance; whole-file rewrite/load costs and codec trade-offs are documented in the benchmark report. Legacy placement actions still await reversible commands. See implementation notes for precise selection/fill limits and deferred browser validation.
+Projector output, networking and campaign import/export UX remain future work. Native saves pass Godot 4.8-beta1 acceptance; whole-file rewrite/load costs and codec trade-offs are documented in the benchmark report. See implementation notes for precise feature limits and deferred browser validation.
