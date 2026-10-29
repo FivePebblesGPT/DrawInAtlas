@@ -207,7 +207,7 @@ func _persistence() -> void:
 		var bad: Dictionary = campaign.to_dict()
 		bad["maps"][0][field] = {"rotation": NAN}
 		_check(AtlasCampaign.from_dict(bad) == null, "campaign rejects invalid " + field)
-	var path: String = "user://board_grid_smoke_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()]
+	var path: String = "user://board_grid_smoke_%d_%d.scn" % [OS.get_process_id(), Time.get_ticks_usec()]
 	_check(AtlasCampaignStore.save_campaign(campaign, path) == OK, "real store writes unique test file")
 	restored = AtlasCampaignStore.load_campaign(path)
 	_check(restored != null, "real store reloads schema 3 campaign")

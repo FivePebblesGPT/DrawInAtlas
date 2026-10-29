@@ -98,7 +98,7 @@ func _test_campaign_roundtrip() -> void:
 	var city: AtlasMapDocument = restored.get_map("greyhaven")
 	city.grid.distance_per_cell = 7.5
 	city.grid.distance_unit = "km"
-	var path: String = "user://atlas_smoke_campaign.json"
+	var path: String = "user://atlas_smoke_campaign.scn"
 	_check(AtlasCampaignStore.save_campaign(restored, path) == OK, "campaign saves through real store")
 	var reopened: AtlasCampaign = AtlasCampaignStore.load_campaign(path)
 	_check(reopened != null, "campaign reopens through real store")
@@ -220,7 +220,7 @@ func _test_drawing_input() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
 	editor.load_saved_on_startup = false
-	editor.save_path = "user://atlas_input_smoke.json"
+	editor.save_path = "user://atlas_input_smoke.scn"
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame
@@ -380,7 +380,7 @@ func _test_board_workflow() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
 	editor.load_saved_on_startup = false
-	editor.save_path = "user://atlas_board_workflow.json"
+	editor.save_path = "user://atlas_board_workflow.scn"
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame

@@ -3,6 +3,16 @@ extends SceneTree
 var failures: int = 0
 
 
+class RecoveryIO extends AtlasStoreIO:
+	func decode_scene(bytes: PackedByteArray) -> PackedScene:
+		var printed_errors: bool = Engine.print_error_messages
+		if bytes == "invalid checkpoint".to_utf8_buffer():
+			Engine.print_error_messages = false
+		var scene: PackedScene = super.decode_scene(bytes)
+		Engine.print_error_messages = printed_errors
+		return scene
+
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -17,7 +27,8 @@ func _run() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
 	editor.load_saved_on_startup = false
-	editor.save_path = "user://layer-ui-%d.json" % Time.get_ticks_usec()
+	editor.save_path = "user://layer-ui-%d.scn" % Time.get_ticks_usec()
+	editor.store_io = RecoveryIO.new()
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame
@@ -90,7 +101,8 @@ func _run() -> void:
 	editor.select_layer(id)
 	editor.layer_panel._rename("Renamed ink")
 	editor._on_save()
-	_check(FileAccess.file_exists(editor.save_path + ".bak"), "second save retains the previous checkpoint")
+	var basename: String = editor.save_path.trim_suffix(".scn")
+	_check(FileAccess.file_exists(basename + ".bak.scn"), "second save retains the previous checkpoint")
 	_corrupt(editor.save_path)
 	editor._on_load()
 	_check(editor.campaign.to_dict() == checkpoint and editor.edits.is_dirty(),
@@ -99,20 +111,16 @@ func _run() -> void:
 	var recovered_raster: AtlasRasterLayer = editor.canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer
 	_check(recovered_raster != null and recovered_raster.chunks["0,0"].image.get_data() == pixels.get_data(),
 		"UI recovery hydrates exact raster pixels")
-	_corrupt(editor.save_path + ".bak")
+	_corrupt(basename + ".bak.scn")
 	var retained: AtlasCampaign = editor.campaign
 	editor._on_load()
 	_check(editor.campaign == retained and editor.edits.is_dirty(), "failed load never replaces active work or history")
 	editor._on_save()
 	_check(not editor.edits.is_dirty(), "saving recovered work establishes a valid new head")
-	for suffix: String in ["", ".bak", ".pending", ".bak.pending"]:
-		var file_path: String = editor.save_path + suffix
+	for suffix: String in [".scn", ".bak.scn", ".pending.scn", ".bak.pending.scn"]:
+		var file_path: String = basename + suffix
 		if FileAccess.file_exists(file_path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(file_path))
-	var directory: String = editor.save_path + ".assets"
-	for chunk: AtlasRasterChunk in recovered_raster.chunks.values():
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(directory.path_join(chunk.asset_id + ".webp")))
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(directory))
 	root.remove_child(scene)
 	scene.free()
 	if failures == 0:

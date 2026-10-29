@@ -1,8 +1,8 @@
 class_name AtlasTileLayer
 extends AtlasLayer
 
-var terrain: Dictionary[String, int] = {}
-var grid: AtlasGrid
+@export_storage var terrain: Dictionary[String, int] = {}
+@export_storage var grid: AtlasGrid
 
 
 func _init(layer_id: String = "terrain", layer_name: String = "Terrain") -> void:

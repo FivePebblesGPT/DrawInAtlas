@@ -1,12 +1,12 @@
 class_name AtlasLayer
-extends RefCounted
+extends Resource
 
-var id: String
-var display_name: String
-var kind: String
-var visible: bool = true
-var locked: bool = false
-var opacity: float = 1.0
+@export_storage var id: String
+@export_storage var display_name: String
+@export_storage var kind: String
+@export_storage var visible: bool = true
+@export_storage var locked: bool = false
+@export_storage var opacity: float = 1.0
 
 
 func _init(layer_id: String = "", layer_name: String = "") -> void:

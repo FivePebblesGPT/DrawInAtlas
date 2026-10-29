@@ -29,7 +29,7 @@ runtime-created nodes.
 
 Guideline: author stable visual hierarchies and defaults in `.tscn`, then
 instantiate reusable views with `PackedScene.instantiate()`. Pure
-`RefCounted` domain objects and service classes do not need a scene.
+`Resource` data objects and `RefCounted` service classes do not need a visual scene.
 
 ## Find code by responsibility
 
@@ -40,7 +40,7 @@ scripts/
   editing/                  User gestures, selection, clipboard and history
     commands/               Reversible edits applied to campaign data
   navigation/               Overview/search, view state, previews and zoom gate
-  persistence/              JSON/WebP store, validation and layer codec
+  persistence/              Native scene store, validation and layer/pixel codecs
   interface/                Canvas, editor shell, panels and import controls
   examples/                 Resource definitions for bundled demonstration data
 examples/
@@ -55,8 +55,8 @@ prefix now that ownership is expressed by directories.
 - Bind scene-owned controls via `@onready`; keep signals/actions in scripts.
 - A link's `hit_radius` is a **document-space** marker pick tolerance, not a
   grid cell size or viewport pixel radius. See `scripts/campaign/map_link.gd`.
-- The intended user-save direction is native Godot `.res`/`.scn`. The running
-  store still uses JSON + WebP checkpoints until that migration is implemented.
+- User saves are one binary `.scn` containing data-only map nodes and embedded
+  Resources/WebP, plus an adjacent `.bak.scn`. UI render scenes are not save nodes.
   Keep format-specific loading/saving in `scripts/persistence/`, rather than
   teaching panels, gestures or navigation about either representation.
 

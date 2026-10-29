@@ -1,9 +1,9 @@
 class_name AtlasFloor
-extends RefCounted
+extends Resource
 
-var id: String = "ground"
-var display_name: String = "Ground"
-var layers: Array[AtlasLayer] = [AtlasTileLayer.new(), AtlasInkLayer.new()]
+@export_storage var id: String = "ground"
+@export_storage var display_name: String = "Ground"
+@export_storage var layers: Array[AtlasLayer] = [AtlasTileLayer.new(), AtlasInkLayer.new()]
 
 # Compatibility views for the original terrain/ink APIs; ordered layers own the data.
 var terrain: Dictionary:

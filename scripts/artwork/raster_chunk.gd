@@ -1,19 +1,20 @@
 class_name AtlasRasterChunk
-extends RefCounted
+extends Resource
 ## A bounded RGBA8 image, addressed independently of its location by pixel content.
 
 const SIZE: int = 256
 
-var coord: Vector2i
-var image: Image
-var width: int = SIZE
-var height: int = SIZE
-var _asset_id: String = ""
+@export_storage var coord: Vector2i
+var image: Image # decoded runtime cache; never serialized
+@export_storage var encoded_webp: PackedByteArray = PackedByteArray()
+@export_storage var width: int = SIZE
+@export_storage var height: int = SIZE
+@export_storage var stored_asset_id: String = ""
 var asset_id: String:
 	get:
-		return image_hash(image) if image != null else _asset_id
+		return image_hash(image) if image != null else stored_asset_id
 	set(value):
-		_asset_id = value
+		stored_asset_id = value
 
 
 func _init(position: Vector2i = Vector2i.ZERO, pixels: Image = null) -> void:
@@ -31,7 +32,7 @@ func is_valid(require_image: bool = false) -> bool:
 	if image != null:
 		return (not image.is_empty() and image.get_format() == Image.FORMAT_RGBA8
 			and not image.has_mipmaps() and image.get_width() == width and image.get_height() == height)
-	return not require_image and valid_asset_id(_asset_id)
+	return not require_image and valid_asset_id(stored_asset_id)
 
 
 func to_dict() -> Dictionary:

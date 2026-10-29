@@ -21,7 +21,7 @@ func _run() -> void:
 	editor.load_saved_on_startup = false
 	editor.use_system_clipboard = false
 	var directory: String = "user://organization-ui-%d" % Time.get_ticks_usec()
-	editor.save_path = directory + "/campaign.json"
+	editor.save_path = directory + "/campaign.scn"
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame
@@ -131,7 +131,7 @@ func _run() -> void:
 	var saved: Dictionary = editor.campaign.to_dict()
 	editor._on_load()
 	_check(editor.campaign.to_dict() == saved and canvas.map.id == "world" and canvas.floor.id == upper_id,
-		"schema6 save/load preserves metadata/floors and uses persisted startup default")
+		"native save/load preserves metadata/floors and uses persisted startup default")
 	var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
 	var raster: AtlasRasterLayer = city.floor_by_id(roof_id).layer_by_id(roof_layer) as AtlasRasterLayer
 	_check(raster != null and raster.chunks["0,0"].image.get_data() == pixels.get_data(), "inactive floor raster data is fully persisted")

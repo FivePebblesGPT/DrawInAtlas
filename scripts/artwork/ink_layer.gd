@@ -1,7 +1,7 @@
 class_name AtlasInkLayer
 extends AtlasLayer
 
-var strokes: Array[AtlasStroke] = []
+@export_storage var strokes: Array[AtlasStroke] = []
 
 
 func _init(layer_id: String = "ink", layer_name: String = "Ink") -> void:

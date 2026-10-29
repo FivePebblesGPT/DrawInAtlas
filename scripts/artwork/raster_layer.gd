@@ -1,9 +1,9 @@
 class_name AtlasRasterLayer
 extends AtlasLayer
 
-var pixels_per_unit: float = 1.0
-var transform: Transform2D = Transform2D.IDENTITY
-var chunks: Dictionary[String, AtlasRasterChunk] = {}
+@export_storage var pixels_per_unit: float = 1.0
+@export_storage var transform: Transform2D = Transform2D.IDENTITY
+@export_storage var chunks: Dictionary[String, AtlasRasterChunk] = {}
 
 
 func _init(layer_id: String = "raster", layer_name: String = "Raster") -> void:

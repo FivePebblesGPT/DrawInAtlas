@@ -1,5 +1,5 @@
 class_name AtlasCampaign
-extends RefCounted
+extends Resource
 
 ## Mutable runtime graph of independent map documents. A link is a directed
 ## navigation edge; an optional placement describes a spatial battlemap footprint.
@@ -7,11 +7,11 @@ extends RefCounted
 
 const SCHEMA_VERSION: int = 6
 
-var display_name: String = "West Marches"
-var root_map_id: String = "world"
+@export_storage var display_name: String = "West Marches"
+@export_storage var root_map_id: String = "world"
 var maps: Dictionary = {} # map ID -> AtlasMapDocument
-var links: Array[AtlasMapLink] = []
-var placements: Array[AtlasPlacement] = []
+@export_storage var links: Array[AtlasMapLink] = []
+@export_storage var placements: Array[AtlasPlacement] = []
 
 
 func add_map(map: AtlasMapDocument) -> void:
@@ -69,8 +69,11 @@ func to_dict() -> Dictionary:
 	var saved_maps: Array[Dictionary] = []
 	var saved_links: Array[Dictionary] = []
 	var saved_placements: Array[Dictionary] = []
-	for map: AtlasMapDocument in maps.values():
-		saved_maps.append(map.to_dict())
+	# Registry insertion/scene-child order is not persistent map identity.
+	var map_ids: Array = maps.keys()
+	map_ids.sort()
+	for map_id: String in map_ids:
+		saved_maps.append(get_map(map_id).to_dict())
 	for link in links:
 		saved_links.append(link.to_dict())
 	for placement in placements:

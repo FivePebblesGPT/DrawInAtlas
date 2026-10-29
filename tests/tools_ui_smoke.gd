@@ -21,7 +21,7 @@ func _run() -> void:
 	editor.load_saved_on_startup = false
 	editor.use_system_clipboard = false
 	var directory: String = "user://tools-ui-%d" % Time.get_ticks_usec()
-	editor.save_path = directory + "/campaign.json"
+	editor.save_path = directory + "/campaign.scn"
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame

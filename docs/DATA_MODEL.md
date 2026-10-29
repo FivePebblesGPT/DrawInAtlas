@@ -1,8 +1,8 @@
 # Campaign Data Model and Persistence
 
-**Status:** current runtime model plus planned native Godot saves. The intended save format is **`.res`/`.scn`**. The JSON package examples farther below are historical illustrations of relationships, not the target storage layout.
+**Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, locally verified on Godot 4.8-beta1. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
 
-## Native save direction
+## Current native checkpoint contract (native v1)
 
 Keep native resource/scene serialization behind `AtlasCampaignStore`. Floor,
 overview and editing code operate on typed runtime objects and stable IDs;
@@ -14,13 +14,37 @@ Persist canonical campaign/map/floor/layer/link/placement content. Do not pack
 the running editor workspace into a save: its selected floor/layer, camera,
 Back history, gesture state and private preview renderers belong to the viewer.
 Preview images are derived data, never substitutes for the original artwork.
-Preserve recoverable activation, diagnostic reporting and exact raster pixels
-when implementing the native-format migration. The current checkpoint format
-below remains the implementation until that migration is added.
+The data-only save root owns map-document nodes whose embedded Resources supply
+the map registry. Map IDs, rather than child order, are canonical; floor/layer
+array order remains significant. The binary `.scn` embeds every map and lossless
+WebP chunk and uses whole-scene ResourceSaver compression. Native version **1**,
+domain validation, exact RGBA8 hashes and a deterministic semantic digest gate
+activation. No user artwork sidecars or JSON schema are written inside the file.
 
-### Current runtime checkpoint contract (v6)
+`AtlasCampaignStore` stages and verifies candidates, retains the previous
+validated generation beside the campaign as `.bak.scn`, and replaces the head.
+`.pending.scn` and `.bak.pending.scn` are never automatic recovery candidates.
+Only a valid head may rotate into the backup. Failure leaves active work intact;
+backup recovery carries diagnostics and requires a new save to clear dirty state.
 
-The implementation uses a compact runtime format distinct from the illustrative package below. `AtlasCampaignStore` writes a checksummed campaign at the selected JSON path, keeps its previous validated generation at `.bak`, and stores content-addressed lossless raster chunks at `.assets/<pixel-sha256>.webp`. Pending files are never load candidates. All assets are staged and verified before the metadata head is replaced; a damaged head or referenced asset can recover through the validated backup.
+All raster payloads reconstruct exact RGBA8 bytes including transparent RGB;
+the decoded Image is a runtime cache. Repeated loads isolate mutable nested
+Resources and Images. Shipped application scripts are permitted external
+dependencies; arbitrary external artwork/campaign dependencies are rejected.
+Old JSON saves remain untouched, with **no legacy user-save importer**.
+
+Whole-file save/load and eager hydration costs, codec selection AD-10 and
+measured fidelity/size/memory trade-offs are in [benchmarks](NATIVE_SAVE_BENCHMARKS.md).
+See [native saves](NATIVE_SAVE_IMPLEMENTATION.md) for transaction details and
+portability evidence. Browser smoke remains deferred; Windows/macOS replacement
+and physical-media power-loss durability are not claimed.
+
+### Historical JSON checkpoint / retained in-memory dictionary schema (v6)
+
+Before native saves, the store wrote a checksummed JSON head, `.bak` and immutable
+`.assets/<pixel-sha256>.webp` chunks. That user-file path has been retired, not
+converted. The following v1–v6 rules still describe the compatibility dictionaries
+used by validation, cloning and tests; they are not the native container schema.
 
 Each floor owns an ordered `layers` array (back to front): `TILES` has sparse terrain plus its own geometry, `INK` has vector strokes, and `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths.
 
@@ -36,7 +60,9 @@ overview placeholders and source Focus actions.
 
 Clipboard payloads use a separate `drawinatlas.clipboard` v1 envelope, not campaign IDs or file paths. Ink coordinates are relative to the copied bounds; raster chunks carry self-contained verified lossless WebP bytes; tile cells carry explicit grid metadata and relative coordinates. Paste assigns fresh raster layer IDs and does not harmonize native units. Viewer selections, gesture previews and edit scopes remain transient and are never saved as artwork.
 
-The current recovery scheme retains one previous generation and immutable assets, not a full journal, autosave, or asset garbage collector. File flush/rename failure cases are tested; physical-media durability across power loss is not guaranteed by the Godot filesystem API. Browser smoke/recovery validation is deferred at the user's request.
+Neither the historical checkpoint nor the native replacement implements a full
+journal or autosave. Native recovery retains one complete previous generation;
+artwork is embedded rather than stored as immutable sidecars.
 
 ## 1. Identity and relationships
 
@@ -66,7 +92,7 @@ A `MapDocument` may have zero or more incoming links. Do not embed documents rec
 
 ## 2. Historical illustrative JSON package
 
-This earlier proposal is superseded by the native `.res`/`.scn` direction.
+This earlier proposal is superseded by the single binary `.scn` contract above.
 Its following examples describe graph relationships rather than prescribe
 the format of new saves.
 
@@ -96,9 +122,8 @@ campaign/
 ```
 
 The earlier layout used JSON metadata and **lossless .webp** raster chunks,
-with optional lossy derived thumbnails. The current implementation still uses
-JSON checkpoints and lossless WebP; native resource/scene packaging will
-replace its metadata representation without turning thumbnails into artwork.
+with optional lossy derived thumbnails. Native scene packaging now embeds
+metadata Resources and lossless WebP bytes without turning thumbnails into artwork.
 
 ## 3. Manifest example
 
