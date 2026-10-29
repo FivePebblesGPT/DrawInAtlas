@@ -91,23 +91,26 @@ func focus(id: String) -> void:
 
 func create_drag(start: Vector2, finish: Vector2, radians: float) -> bool:
 	dialog.prepare_new(_canvas.campaign, _canvas.map, _canvas.floor, start)
-	if dialog.mode_picker.selected == 2:
+	if dialog.is_marker_mode():
 		message.emit("Choose a spatial or symbolic footprint in Linked maps before dragging.")
 		return false
-	var values: Array[Resource] = dialog.draft("", start, finish, radians)
-	if values.size() != 3:
+	var drafts: Array[Resource] = dialog.draft("", start, finish, radians)
+	if drafts.size() != 3:
 		message.emit("Drag at least half a footprint cell; each dimension is quantized to one cell or more.")
 		return false
-	var link: AtlasMapLink = values[0] as AtlasMapLink
-	if not submit(link, values[1] as AtlasPlacement, values[2] as AtlasMapDocument):
+	var link: AtlasMapLink = drafts[0] as AtlasMapLink
+	var placement: AtlasPlacement = drafts[1] as AtlasPlacement
+	var new_map: AtlasMapDocument = drafts[2] as AtlasMapDocument
+	if not submit(link, placement, new_map):
 		return false
 	_navigator.enter_link(_canvas.campaign.link_by_id(link.id))
+	# Success describes the graph submission, independently of the view transition.
 	return true
 
 
 func prepare_drag() -> void:
 	dialog.prepare_new(_canvas.campaign, _canvas.map, _canvas.floor, _canvas.camera_center)
-	_canvas.battle_pitch = dialog.parent_pitch.value
+	_canvas.battle_pitch = dialog.get_parent_pitch()
 
 
 func move(id: String, offset: Vector2) -> bool:
@@ -129,5 +132,5 @@ func _owns(link: AtlasMapLink) -> bool:
 
 func _rejected() -> void:
 	var text: String = "Link unchanged or rejected: invalid/stale data, shared footprint, or outside selected-cell scope."
-	dialog.error_label.text = text
+	dialog.show_error(text)
 	message.emit(text)

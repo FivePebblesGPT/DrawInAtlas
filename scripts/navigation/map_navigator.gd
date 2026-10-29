@@ -20,7 +20,7 @@ var automatic_navigation: bool = false:
 		automatic_navigation = value
 		zoom_gate.reset()
 var now_msec: Callable = Time.get_ticks_msec
-var active_entrance_id: String = ""
+var active_entrance_id: String = "" # Traversal context, even if that link is later removed.
 var _next_history_id: int = 0
 var campaign: AtlasCampaign
 var _canvas: AtlasCanvas
@@ -112,8 +112,8 @@ func enter_link(link: AtlasMapLink) -> bool:
 			message.emit("Broken footprint; the current view and history were kept.")
 			return false
 	push_history()
-	var arrival: AtlasViewState = views.resolve(campaign, destination.id, link.target_floor_id, link.target_focus, link.target_zoom)
-	show_map(destination, link.target_focus, link.target_zoom, link.target_floor_id, arrival.layer_id, link.id)
+	var destination_preferences: AtlasViewState = views.resolve(campaign, destination.id, link.target_floor_id, link.target_focus, link.target_zoom)
+	show_map(destination, link.target_focus, link.target_zoom, link.target_floor_id, destination_preferences.layer_id, link.id)
 	message.emit("Entered %s. Use Back%s." % [destination.display_name,
 		" or 3 extra outward wheel steps" if automatic_navigation else ""])
 	return true
@@ -156,19 +156,29 @@ func reconcile_floors() -> void:
 ## Ordinary zoom never changes documents. Only further blocked steps reach the
 ## opt-in gate, whose candidate must remain unambiguous beneath the pointer.
 func wheel_step(direction: int, local_position: Vector2) -> void:
-	var old_zoom: float = _canvas.camera_zoom
-	var new_zoom: float = clampf(old_zoom * (ZOOM_FACTOR if direction > 0 else 1.0 / ZOOM_FACTOR), MIN_ZOOM, MAX_ZOOM)
-	if not is_equal_approx(old_zoom, new_zoom):
-		var point_before: Vector2 = _canvas.local_to_document(local_position)
-		_canvas.camera_zoom = new_zoom
-		_canvas.camera_center = point_before - (local_position - _canvas.size * 0.5) / new_zoom
-		zoom_gate.reset()
-		_canvas.queue_redraw()
+	if _apply_geometric_wheel_step(direction, local_position):
 		return
 	if not automatic_navigation:
 		zoom_gate.reset()
 		message.emit("Zoom limit. Use Maps or double-click a marker to open another board.")
 		return
+	_consume_boundary_step(direction, local_position)
+
+
+func _apply_geometric_wheel_step(direction: int, local_position: Vector2) -> bool:
+	var old_zoom: float = _canvas.camera_zoom
+	var new_zoom: float = clampf(old_zoom * (ZOOM_FACTOR if direction > 0 else 1.0 / ZOOM_FACTOR), MIN_ZOOM, MAX_ZOOM)
+	if is_equal_approx(old_zoom, new_zoom):
+		return false
+	var point_before: Vector2 = _canvas.local_to_document(local_position)
+	_canvas.camera_zoom = new_zoom
+	_canvas.camera_center = point_before - (local_position - _canvas.size * 0.5) / new_zoom
+	zoom_gate.reset()
+	_canvas.queue_redraw()
+	return true
+
+
+func _consume_boundary_step(direction: int, local_position: Vector2) -> void:
 	var candidate: String = ""
 	var target_link: AtlasMapLink
 	if direction > 0:
@@ -180,7 +190,7 @@ func wheel_step(direction: int, local_position: Vector2) -> void:
 			choose_links(possible)
 			return
 	elif not history.is_empty():
-		candidate = "return:" + str(history[-1].get("history_id", history[-1]["map_id"]))
+		candidate = _return_candidate_id(history[-1])
 	if candidate.is_empty():
 		zoom_gate.reset()
 		message.emit("Zoom limit reached; no map available in that direction.")
@@ -192,6 +202,11 @@ func wheel_step(direction: int, local_position: Vector2) -> void:
 			back()
 	else:
 		message.emit("Semantic zoom buffer %d/3 — %s" % [zoom_gate.count, "enter" if direction > 0 else "return"])
+
+
+func _return_candidate_id(snapshot: Dictionary) -> String:
+	# Public history entries created before history IDs use their map ID instead.
+	return "return:" + str(snapshot.get("history_id", snapshot["map_id"]))
 
 
 func pointer_moved(local_position: Vector2) -> void:

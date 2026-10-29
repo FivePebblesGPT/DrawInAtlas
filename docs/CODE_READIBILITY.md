@@ -4,6 +4,9 @@ This document tracks readability improvements on `aidev`. Comparing the number
 of `.gd` files to `.tscn` files was misleading: the domain model, application
 services and test scripts do not describe node trees.
 
+For the post-milestone-6 simplification, code-only review findings and prioritized
+manual-review paths, see [Readability review](READABILITY_REVIEW.md).
+
 ## Fixed UI belongs in scenes
 
 Migrated in this refactor:

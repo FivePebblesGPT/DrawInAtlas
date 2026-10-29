@@ -71,9 +71,9 @@ var _panning: bool = false
 var _drawing_battlemap: bool = false
 var _draft_start: Vector2 = Vector2.ZERO
 var _draft_end: Vector2 = Vector2.ZERO
-var _wheel_fraction: float = 0.0
-var _wheel_direction: int = 0
-var _wheel_last_ms: int = -1
+var _pending_wheel_fraction: float = 0.0
+var _wheel_dispatch_direction: int = 0
+var _last_wheel_dispatch_ms: int = -1
 var _draft_stroke: AtlasStroke
 var _erasing: bool = false
 var _stroke_left_canvas: bool = false
@@ -149,9 +149,9 @@ func cancel_edit() -> void:
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
 	_preview_layer = null
-	_wheel_fraction = 0.0
-	_wheel_direction = 0
-	_wheel_last_ms = -1
+	_pending_wheel_fraction = 0.0
+	_wheel_dispatch_direction = 0
+	_last_wheel_dispatch_ms = -1
 	_moving_link_id = ""
 	_raster_textures.clear()
 	queue_redraw()
@@ -497,130 +497,154 @@ func _terrain_color(palette: int) -> Color:
 func _gui_input(event: InputEvent) -> void:
 	if map == null:
 		return
+	if _handle_gesture(event):
+		return
+	if event is InputEventMouseButton:
+		_handle_mouse_button(event)
+	elif event is InputEventMouseMotion:
+		_handle_mouse_motion(event)
+
+
+func _handle_gesture(event: InputEvent) -> bool:
 	if event is InputEventPanGesture:
 		if not is_editing() and event.delta.y != 0.0:
 			_consume_wheel(-1 if event.delta.y > 0 else 1, absf(event.delta.y), event.position)
 		accept_event()
-		return
+		return true
 	if event is InputEventMagnifyGesture:
 		if not is_editing():
 			magnify_requested.emit(event.factor, event.position)
 		accept_event()
-		return
-	if event is InputEventMouseButton:
-		var mouse := event as InputEventMouseButton
-		if mouse.button_index == MOUSE_BUTTON_WHEEL_UP or mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			if is_editing():
-				accept_event()
-				return
-			if mouse.pressed:
-				var delta := mouse.factor if mouse.factor > 0.0 else 1.0
-				var wheel_direction := 1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1
-				_consume_wheel(wheel_direction, delta, mouse.position)
-			accept_event()
-			return
-		if mouse.button_index == MOUSE_BUTTON_MIDDLE or mouse.button_index == MOUSE_BUTTON_RIGHT:
+		return true
+	return false
+
+
+func _handle_mouse_button(mouse: InputEventMouseButton) -> void:
+	match mouse.button_index:
+		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
+			_handle_wheel_button(mouse)
+		MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT:
 			if mouse.pressed:
 				cancel_edit()
 				interaction_started.emit()
 			_panning = mouse.pressed
 			accept_event()
-			return
-		if mouse.button_index == MOUSE_BUTTON_LEFT:
+		MOUSE_BUTTON_LEFT:
 			if mouse.pressed:
-				interaction_started.emit()
-				grab_focus()
-				var position := local_to_document(mouse.position)
-				if campaign != null and tool == Tool.SELECT:
-					var links := campaign.find_links_at(map.id, position, floor.id)
-					if mouse.double_click and not links.is_empty():
-						link_candidates_requested.emit(links)
-						accept_event()
-						return
-					selected_link_id = links[0].id if links.size() == 1 else ""
-					link_selected.emit(selected_link_id)
-					if not selected_link_id.is_empty():
-						_moving_link_id = selected_link_id
-						_link_move_start = position
-						_link_move_end = position
-				match tool:
-					Tool.PEN, Tool.ERASER:
-						var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-						if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
-							accept_event()
-							return
-						_erasing = tool == Tool.ERASER
-						_stroke_left_canvas = false
-						_draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)
-						_append_stroke_point(mouse.position)
-					Tool.LINE, Tool.RECTANGLE, Tool.ELLIPSE:
-						var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
-						if layer != null and layer.is_editable():
-							_shape_kind = Tool.keys()[tool]
-							_gesture_start = position
-							_stroke_left_canvas = false
-							_draft_stroke = AtlasShapes.stroke("LINE", position, position, brush_color, brush_width)
-					Tool.ART_SELECT:
-						var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-						_gesture_start = position
-						_gesture_end = position
-						_gesture_transform = Transform2D.IDENTITY
-						_add_selection = mouse.shift_pressed
-						if not mouse.shift_pressed and selection.matches(layer) and not selection.is_empty() and layer.is_editable():
-							if position.distance_to(selection.bounds.end) <= 8.0 / camera_zoom:
-								_manipulation = Manipulation.RESIZE
-							elif selection.bounds.has_point(position):
-								_manipulation = Manipulation.MOVE
-						if _manipulation == Manipulation.NONE:
-							_manipulation = Manipulation.MARQUEE
-					Tool.FILL:
-						fill_requested.emit(position)
-					Tool.PAINT:
-						_request_cell_paint(position)
-					Tool.SELECT:
-						selection_requested.emit(map.grid.document_to_cell(position))
-					Tool.BATTLEMAP:
-						_drawing_battlemap = true
-						_draft_start = position
-						_draft_end = position
-						queue_redraw()
-			elif not _moving_link_id.is_empty():
-				_link_move_end = local_to_document(mouse.position)
-				commit_edit()
-			elif _manipulation != Manipulation.NONE:
-				_update_manipulation(local_to_document(mouse.position))
-				_finish_manipulation()
-			elif _drawing_battlemap:
-				_draft_end = local_to_document(mouse.position)
-				commit_edit()
-			elif is_editing():
-				_append_stroke_point(mouse.position)
-				commit_edit()
+				_begin_left_press(mouse)
+			else:
+				_finish_left_release(mouse)
 			accept_event()
-	elif event is InputEventMouseMotion:
-		var motion := event as InputEventMouseMotion
-		pointer_moved.emit(motion.position)
-		if _panning:
-			camera_center -= motion.relative / camera_zoom
+
+
+func _handle_wheel_button(mouse: InputEventMouseButton) -> void:
+	if not is_editing() and mouse.pressed:
+		var magnitude: float = mouse.factor if mouse.factor > 0.0 else 1.0
+		var direction: int = 1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1
+		_consume_wheel(direction, magnitude, mouse.position)
+	accept_event()
+
+
+func _begin_left_press(mouse: InputEventMouseButton) -> void:
+	interaction_started.emit()
+	grab_focus()
+	var position: Vector2 = local_to_document(mouse.position)
+	if _begin_link_press(mouse, position):
+		return
+	match tool:
+		Tool.PEN, Tool.ERASER:
+			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+			if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
+				return
+			_erasing = tool == Tool.ERASER
+			_stroke_left_canvas = false
+			_draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)
+			_append_stroke_point(mouse.position)
+		Tool.LINE, Tool.RECTANGLE, Tool.ELLIPSE:
+			var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+			if layer != null and layer.is_editable():
+				_shape_kind = Tool.keys()[tool]
+				_gesture_start = position
+				_stroke_left_canvas = false
+				_draft_stroke = AtlasShapes.stroke("LINE", position, position, brush_color, brush_width)
+		Tool.ART_SELECT:
+			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+			_gesture_start = position
+			_gesture_end = position
+			_gesture_transform = Transform2D.IDENTITY
+			_add_selection = mouse.shift_pressed
+			if not mouse.shift_pressed and selection.matches(layer) and not selection.is_empty() and layer.is_editable():
+				if position.distance_to(selection.bounds.end) <= 8.0 / camera_zoom:
+					_manipulation = Manipulation.RESIZE
+				elif selection.bounds.has_point(position):
+					_manipulation = Manipulation.MOVE
+			if _manipulation == Manipulation.NONE:
+				_manipulation = Manipulation.MARQUEE
+		Tool.FILL:
+			fill_requested.emit(position)
+		Tool.PAINT:
+			_request_cell_paint(position)
+		Tool.SELECT:
+			selection_requested.emit(map.grid.document_to_cell(position))
+		Tool.BATTLEMAP:
+			_drawing_battlemap = true
+			_draft_start = position
+			_draft_end = position
 			queue_redraw()
-			accept_event()
-		elif not _moving_link_id.is_empty():
-			_link_move_end = local_to_document(motion.position)
-			queue_redraw()
-			accept_event()
-		elif _manipulation != Manipulation.NONE:
-			_update_manipulation(local_to_document(motion.position))
-			accept_event()
-		elif _drawing_battlemap:
-			_draft_end = local_to_document(motion.position)
-			queue_redraw()
-			accept_event()
-		elif is_editing():
-			_append_stroke_point(motion.position)
-			accept_event()
-		elif tool == Tool.PAINT and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-			_request_cell_paint(local_to_document(motion.position))
-			accept_event()
+
+
+func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
+	if campaign == null or tool != Tool.SELECT:
+		return false
+	var links: Array[AtlasMapLink] = campaign.find_links_at(map.id, position, floor.id)
+	if mouse.double_click and not links.is_empty():
+		link_candidates_requested.emit(links)
+		return true
+	selected_link_id = links[0].id if links.size() == 1 else ""
+	link_selected.emit(selected_link_id)
+	if not selected_link_id.is_empty():
+		_moving_link_id = selected_link_id
+		_link_move_start = position
+		_link_move_end = position
+	# Selecting a link still falls through to grid-cell selection; entering does not.
+	return false
+
+
+func _finish_left_release(mouse: InputEventMouseButton) -> void:
+	if not _moving_link_id.is_empty():
+		_link_move_end = local_to_document(mouse.position)
+		commit_edit()
+	elif _manipulation != Manipulation.NONE:
+		_update_manipulation(local_to_document(mouse.position))
+		_finish_manipulation()
+	elif _drawing_battlemap:
+		_draft_end = local_to_document(mouse.position)
+		commit_edit()
+	elif is_editing():
+		_append_stroke_point(mouse.position)
+		commit_edit()
+
+
+func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
+	pointer_moved.emit(motion.position)
+	if _panning:
+		camera_center -= motion.relative / camera_zoom
+		queue_redraw()
+	elif not _moving_link_id.is_empty():
+		_link_move_end = local_to_document(motion.position)
+		queue_redraw()
+	elif _manipulation != Manipulation.NONE:
+		_update_manipulation(local_to_document(motion.position))
+	elif _drawing_battlemap:
+		_draft_end = local_to_document(motion.position)
+		queue_redraw()
+	elif is_editing():
+		_append_stroke_point(motion.position)
+	elif tool == Tool.PAINT and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
+		_request_cell_paint(local_to_document(motion.position))
+	else:
+		return
+	accept_event()
 
 
 func _request_cell_paint(position: Vector2) -> void:
@@ -629,19 +653,20 @@ func _request_cell_paint(position: Vector2) -> void:
 		return
 	var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
 	if grid.kind != AtlasGrid.Kind.GRIDLESS:
-			paint_requested.emit(grid.document_to_cell(position))
+		paint_requested.emit(grid.document_to_cell(position))
 
 
 func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void:
 	if direction == 0 or not is_finite(magnitude) or magnitude <= 0.0:
 		return
 	var now: int = Time.get_ticks_msec()
-	if _wheel_direction != direction or (_wheel_last_ms >= 0 and now - _wheel_last_ms > AtlasZoomGate.RESET_TIMEOUT_MS):
-		_wheel_fraction = 0.0
+	if _wheel_dispatch_direction != direction or (_last_wheel_dispatch_ms >= 0 and now - _last_wheel_dispatch_ms > AtlasZoomGate.RESET_TIMEOUT_MS):
+		_pending_wheel_fraction = 0.0
 		zoom_interrupted.emit()
-	_wheel_direction = direction
-	_wheel_last_ms = now
-	_wheel_fraction += minf(magnitude, 1.0)
-	if _wheel_fraction >= 1.0:
-		_wheel_fraction = 0.0
+	_wheel_dispatch_direction = direction
+	_last_wheel_dispatch_ms = now
+	_pending_wheel_fraction += minf(magnitude, 1.0)
+	if _pending_wheel_fraction >= 1.0:
+		# One dispatch emits at most one logical step, discarding any remainder.
+		_pending_wheel_fraction = 0.0
 		wheel_step.emit(direction, position)
