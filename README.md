@@ -37,7 +37,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - Editing tests: run `tests/fill_scope_smoke.gd`, `tests/clipboard_smoke.gd`, `tests/selection_smoke.gd` and `tests/tools_ui_smoke.gd` the same way.
 - Workspace/organization tests: run `tests/editor_modules_smoke.gd`, `tests/organization_ui_smoke.gd`, `tests/floors_view_smoke.gd`, `tests/overview_smoke.gd` and `tests/preview_cache_smoke.gd` the same way.
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
-- Native preview acceptance: `godot --path . --script res://tests/preview_ui_smoke.gd`. For an isolated software-rendered run, use `LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --path . --script res://tests/preview_ui_smoke.gd`.
+- Native preview acceptance: `godot --path . --script res://tests/preview_ui_smoke.gd`. For an isolated software-rendered run, use `LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/preview_ui_smoke.gd`.
 - Reproduce raster codec and complete save-transaction measurements with the commands in [native raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md).
 
 ## Project layout

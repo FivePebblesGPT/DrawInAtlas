@@ -1,6 +1,6 @@
 # Implementation Notes
 
-## Native single-file saves — local validation, 2026-10-27
+## Native single-file saves — local validation, 2026-10-29
 
 This section supersedes the historical JSON/checkpoint descriptions below.
 User campaigns now use one compressed binary `.scn`, embedded Resource-backed
@@ -43,6 +43,11 @@ not claimed. Linux release export templates were unavailable; compiled resource
 pack roundtrips supplement source/native-renderer checks. Milestone 6 remains
 after integration of this migration. See [native saves](NATIVE_SAVE_IMPLEMENTATION.md)
 for the format and remaining operational limits.
+
+The subsequent GitHub Actions run passed the headless suites and visual
+assertions, but its strict error-log gate caught ALSA initialization failure on
+the audio-device-free runner. Framebuffer commands now explicitly select
+`--audio-driver Dummy`; error-log checks remain enabled.
 
 ## Execution milestone 5 — floors, discovery and read-only previews
 

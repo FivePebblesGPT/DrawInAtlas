@@ -1,6 +1,6 @@
 # Native raster benchmark and AD-10 decision
 
-**Measured:** 2026-10-27, local Arch Linux x86-64 workstation, standard Godot
+**Measured:** 2026-10-29, local Arch Linux x86-64 workstation, standard Godot
 **4.8.beta1.official.4d10419ca**, headless. These are local synthetic workloads,
 not user-campaign performance guarantees or remote CI measurements.
 

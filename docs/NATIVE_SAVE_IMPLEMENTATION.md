@@ -1,6 +1,6 @@
 # Native single-file campaign saves
 
-**Status:** local Godot 4.8-beta1 acceptance passed on 2026-10-27. This records
+**Status:** local Godot 4.8-beta1 acceptance passed on 2026-10-29. This records
 local evidence, not a successful remote CI run or merge of draft PR #4.
 
 ## Physical and runtime contract
@@ -47,7 +47,7 @@ the clipboard retains its independent format. Neither is a JSON save loader.
 
 ## Evidence and limits
 
-See [implementation notes](IMPLEMENTATION_NOTES.md#native-single-file-saves--local-validation-2026-10-27)
+See [implementation notes](IMPLEMENTATION_NOTES.md#native-single-file-saves--local-validation-2026-10-29)
 for all headless, framebuffer, startup and export results. `tests/storage_smoke.gd`
 includes **76 checks** and explicit portable-fixture commands:
 
