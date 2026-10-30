@@ -40,10 +40,10 @@ func _ready() -> void:
 	show_editing_detail.pressed.connect(show_editing_detail_requested.emit)
 	_up.pressed.connect(_move.bind(1))
 	_down.pressed.connect(_move.bind(-1))
-	$NewInkButton.pressed.connect(_add_ink)
-	$NewTerrainButton.pressed.connect(_add_tiles)
-	$NewRasterButton.pressed.connect(_add_raster)
-	$ImportButton.pressed.connect(import_requested.emit)
+	$Order/NewInkButton.pressed.connect(_add_ink)
+	$Order/NewTerrainButton.pressed.connect(_add_tiles)
+	$Order/NewRasterButton.pressed.connect(_add_raster)
+	$Order/ImportButton.pressed.connect(import_requested.emit)
 
 
 func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0, automatic: bool = true) -> void:

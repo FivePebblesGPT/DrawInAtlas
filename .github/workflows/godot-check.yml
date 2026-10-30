@@ -96,6 +96,13 @@ jobs:
           godot --headless --path . --script res://tests/tool_palette_smoke.gd 2>&1 | tee /tmp/godot-tool-palette.log
           grep -q 'ATLAS_TOOL_PALETTE_PASSED' /tmp/godot-tool-palette.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-tool-palette.log; then exit 1; fi
+      - name: Verify compact action controls (T-007)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/compact_controls_smoke.gd 2>&1 | tee /tmp/godot-compact-controls.log
+          grep -q 'ATLAS_COMPACT_CONTROLS_PASSED' /tmp/godot-compact-controls.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-compact-controls.log; then exit 1; fi
       - name: Run editing tool and clipboard tests
         shell: bash
         run: |
@@ -141,7 +148,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
+          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
             xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
           done
@@ -151,6 +158,7 @@ jobs:
           grep -q 'ATLAS_ALIGNED_DETAIL_PREVIEWS_VISUAL_PASSED' /tmp/godot-aligned_detail_previews_visual.log
           grep -q 'ATLAS_AUTOMATIC_ARTWORK_LOD_VISUAL_PASSED' /tmp/godot-automatic_artwork_lod_visual.log
           grep -q 'ATLAS_TOOL_PALETTE_VISUAL_PASSED' /tmp/godot-tool_palette_visual.log
+          grep -q 'ATLAS_COMPACT_CONTROLS_VISUAL_PASSED' /tmp/godot-compact_controls_visual.log
           grep -q 'ATLAS_PREVIEW_UI_PASSED' /tmp/godot-preview_ui_smoke.log
           grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
           grep -q 'ATLAS_REFERENCES_UI_PASSED' /tmp/godot-references_ui_smoke.log

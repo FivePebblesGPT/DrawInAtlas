@@ -3,9 +3,14 @@
 [ext_resource type="Script" uid="uid://c3jrf6x5ew6qh" path="res://scripts/interface/inspector.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://cfisw8d1wjsa7" path="res://prefab/grid_controls.tscn" id="2"]
 
+[ext_resource type="Texture2D" path="res://img/controls/add.svg" id="3"]
+[ext_resource type="Texture2D" path="res://img/controls/rename.svg" id="4"]
+[ext_resource type="Texture2D" path="res://img/controls/raise.svg" id="5"]
+[ext_resource type="Texture2D" path="res://img/controls/lower.svg" id="6"]
+
 [node name="InspectorPanel" type="PanelContainer" unique_id=1180319672]
-custom_minimum_size = Vector2(252, 0)
-offset_right = 252.0
+custom_minimum_size = Vector2(232, 0)
+offset_right = 232.0
 offset_bottom = 640.0
 script = ExtResource("1")
 
@@ -23,7 +28,7 @@ theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 14
 
 [node name="Sections" type="VBoxContainer" parent="Scroll/Margin" unique_id=1122101354]
-custom_minimum_size = Vector2(204, 0)
+custom_minimum_size = Vector2(184, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 20
@@ -50,35 +55,49 @@ unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Floor name"
 
-[node name="Names" type="HBoxContainer" parent="Scroll/Margin/Sections/FloorSection" unique_id=1118679550]
+[node name="FloorActions" type="HBoxContainer" parent="Scroll/Margin/Sections/FloorSection" unique_id=1118679550]
 layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="FloorAdd" type="Button" parent="Scroll/Margin/Sections/FloorSection/Names" unique_id=1710289388]
+[node name="FloorAdd" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=1710289388]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Add"
+tooltip_text = "Add a floor using the name above"
+accessibility_name = "Add floor"
+icon = ExtResource("3")
+icon_alignment = 1
 
-[node name="FloorRename" type="Button" parent="Scroll/Margin/Sections/FloorSection/Names" unique_id=1400989511]
+[node name="FloorRename" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=1400989511]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Rename"
+tooltip_text = "Rename selected floor using the name above"
+accessibility_name = "Rename selected floor"
+icon = ExtResource("4")
+icon_alignment = 1
 
-[node name="Order" type="HBoxContainer" parent="Scroll/Margin/Sections/FloorSection" unique_id=217643372]
-layout_mode = 2
-
-[node name="FloorUp" type="Button" parent="Scroll/Margin/Sections/FloorSection/Order" unique_id=844295673]
+[node name="FloorUp" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=844295673]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Raise"
+tooltip_text = "Raise selected floor"
+accessibility_name = "Raise selected floor"
+icon = ExtResource("5")
+icon_alignment = 1
 
-[node name="FloorDown" type="Button" parent="Scroll/Margin/Sections/FloorSection/Order" unique_id=811350563]
+[node name="FloorDown" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=811350563]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Lower"
+tooltip_text = "Lower selected floor"
+accessibility_name = "Lower selected floor"
+icon = ExtResource("6")
+icon_alignment = 1
 
 [node name="FloorDefault" type="Button" parent="Scroll/Margin/Sections/FloorSection" unique_id=1533414022]
 unique_name_in_owner = true
