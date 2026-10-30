@@ -49,7 +49,7 @@ static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Colo
 	if columns > limit or rows > limit or columns > limit / rows:
 		return AtlasFill._failure("Brush exceeds the candidate pixel limit.")
 	var replacement: Color = Color(0.0, 0.0, 0.0, 0.0) if erase else AtlasFill._canonical_color(color)
-	var affected: Array[Vector2i] = []
+	var changes: Dictionary[Vector2i, Color] = {}
 	for y: int in range(top, bottom):
 		for x: int in range(left, right):
 			var pixel: Vector2i = Vector2i(x, y)
@@ -67,9 +67,27 @@ static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Colo
 			var previous: Color = Color(0.0, 0.0, 0.0, 0.0)
 			if chunk != null:
 				previous = chunk.image.get_pixelv(AtlasFill._local_pixel(pixel))
-			if previous != replacement:
-				affected.append(pixel)
-	return AtlasFill._paint_snapshot(layer, affected, replacement)
+			# Source-over on the pre-gesture snapshot, not one alpha pass per
+			# pointer sample; repeated points must not darken a translucent brush.
+			var next: Color = replacement if erase else _source_over(replacement, previous)
+			if previous != next:
+				changes[pixel] = next
+	return AtlasFill._paint_pixel_colors(layer, changes)
+
+
+static func _source_over(source: Color, destination: Color) -> Color:
+	if source.a <= 0.0:
+		return destination
+	var opacity: float = clampf(source.a, 0.0, 1.0)
+	var alpha: float = opacity + destination.a * (1.0 - opacity)
+	if alpha <= 0.0:
+		return Color.TRANSPARENT
+	var result: Color = Color(
+		(source.r * opacity + destination.r * destination.a * (1.0 - opacity)) / alpha,
+		(source.g * opacity + destination.g * destination.a * (1.0 - opacity)) / alpha,
+		(source.b * opacity + destination.b * destination.a * (1.0 - opacity)) / alpha,
+		alpha)
+	return AtlasFill._canonical_color(result)
 
 
 static func _touches(point: Vector2, path: PackedVector2Array, radius: float) -> bool:

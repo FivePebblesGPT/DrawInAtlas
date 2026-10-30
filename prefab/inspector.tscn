@@ -157,13 +157,13 @@ custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 11
-text = "INK"
+text = "BRUSH & STROKE"
 autowrap_mode = 3
 
 [node name="ColorLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=1830986059]
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
-text = "Color"
+text = "Color / opacity"
 autowrap_mode = 3
 
 [node name="BrushColorPicker" type="ColorPickerButton" parent="Scroll/Margin/Sections/InkSection" unique_id=1078165809]
@@ -171,7 +171,8 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 color = Color(0.9607843, 0.70980394, 0.27058825, 1)
-edit_alpha = false
+edit_alpha = true
+tooltip_text = "Choose brush color and alpha (opacity); edits apply to the next stroke."
 
 [node name="WidthLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=2138069015]
 custom_minimum_size = Vector2(1, 0)

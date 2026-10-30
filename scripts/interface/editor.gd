@@ -144,7 +144,7 @@ func _ready() -> void:
 	edits.changed.connect(map_references.refresh)
 	edits.reset(campaign, loaded and (restored == null or not restored.recovered))
 	_show_map(campaign.get_map(campaign.root_map_id))
-	_message("B pen · E eraser · V select · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
+	_message("B brush · E eraser · V select · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
 	if restored != null and restored.recovered:
 		_message(restored.message + " Save to establish a fresh checkpoint.")
 	elif restored != null and restored.error != OK and restored.error != ERR_FILE_NOT_FOUND:

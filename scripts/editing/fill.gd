@@ -177,12 +177,21 @@ static func _allows_pixel(layer: AtlasRasterLayer, point: Vector2i, scope: Atlas
 
 static func _paint_snapshot(layer: AtlasRasterLayer, points: Array[Vector2i],
 		color: Color) -> AtlasFillResult:
-	if points.is_empty():
+	var changes: Dictionary[Vector2i, Color] = {}
+	for point: Vector2i in points:
+		changes[point] = color
+	return _paint_pixel_colors(layer, changes)
+
+
+## Shared immutable snapshot writer: fill uses one color, brush supplies blended pixels.
+static func _paint_pixel_colors(layer: AtlasRasterLayer,
+		changes: Dictionary[Vector2i, Color]) -> AtlasFillResult:
+	if changes.is_empty():
 		return _failure("Edit would not change any pixels.")
 	var snapshot: AtlasRasterLayer = AtlasLayerCodec.clone(layer) as AtlasRasterLayer
 	if snapshot == null:
 		return _failure("Could not clone the raster layer.")
-	for point: Vector2i in points:
+	for point: Vector2i in changes:
 		var coord: Vector2i = AtlasRasterLayer.pixel_to_chunk(point)
 		var key: String = _key(coord)
 		var local: Vector2i = _local_pixel(point)
@@ -200,7 +209,7 @@ static func _paint_snapshot(layer: AtlasRasterLayer, points: Array[Vector2i],
 			chunk.image = expanded
 			chunk.width = AtlasRasterChunk.SIZE
 			chunk.height = AtlasRasterChunk.SIZE
-		chunk.image.set_pixelv(local, color)
+		chunk.image.set_pixelv(local, changes[point])
 	var result: AtlasFillResult = AtlasFillResult.new()
 	result.ok = true
 	result.layer = snapshot

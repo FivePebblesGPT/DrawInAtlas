@@ -98,6 +98,8 @@ var _last_wheel_dispatch_ms: int = -1
 var _draft_stroke: AtlasStroke
 var _erasing: bool = false
 var _stroke_left_canvas: bool = false
+var _brush_cursor_local: Vector2 = Vector2.ZERO
+var _brush_cursor_inside: bool = false
 var _erase_preview: Array[AtlasStroke] = []
 var _layer_groups: Dictionary[String, CanvasGroup] = {}
 var _layer_drawers: Dictionary[String, Node2D] = {}
@@ -128,6 +130,7 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	resized.connect(_on_resized)
 	get_window().focus_exited.connect(cancel_edit)
+	mouse_exited.connect(_clear_brush_cursor)
 	_overlay = Node2D.new()
 	_overlay.z_index = 1
 	_overlay.draw.connect(_draw_overlays.bind(_overlay))
@@ -157,6 +160,7 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 func choose_tool(value: Tool) -> void:
 	cancel_edit()
 	tool = value
+	_overlay.queue_redraw()
 
 
 func is_editing() -> bool:
@@ -392,6 +396,30 @@ func _draw_overlays(item: Node2D) -> void:
 				color = Color("#f48771")
 		item.draw_rect(bounds, color, false, 1.5 / camera_zoom)
 		item.draw_rect(Rect2(bounds.end - Vector2.ONE * 4.0 / camera_zoom, Vector2.ONE * 8.0 / camera_zoom), color)
+	_draw_brush_cursor(item)
+
+
+## A screen-space pointer ring represents the actual board-unit diameter at any zoom.
+## Keep it out of source artwork, layer previews, capture and saved scenes.
+func _draw_brush_cursor(item: Node2D) -> void:
+	if not _brush_cursor_inside or tool != Tool.PEN or not editing_target_is_presented():
+		return
+	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+	if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
+		return
+	var center: Vector2 = local_to_document(_brush_cursor_local)
+	var radius: float = brush_width * 0.5
+	if radius <= 0.0:
+		return
+	# Dual outline stays visible against both dark and light artwork.
+	item.draw_arc(center, radius, 0.0, TAU, 64, Color(0, 0, 0, 0.85), 2.5 / camera_zoom, true)
+	item.draw_arc(center, radius, 0.0, TAU, 64, Color(1, 1, 1, 0.95), 1.0 / camera_zoom, true)
+
+
+func _clear_brush_cursor() -> void:
+	_brush_cursor_inside = false
+	if _overlay != null:
+		_overlay.queue_redraw()
 
 
 func _draw_parent_reference() -> void:
@@ -642,6 +670,9 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 
 
 func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
+	_brush_cursor_local = motion.position
+	_brush_cursor_inside = Rect2(Vector2.ZERO, size).has_point(motion.position)
+	_overlay.queue_redraw()
 	pointer_moved.emit(motion.position)
 	if _panning:
 		camera_center -= motion.relative / camera_zoom

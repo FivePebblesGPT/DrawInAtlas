@@ -6,7 +6,7 @@ signal tool_selected(index: int)
 
 const CATEGORIES: Array[Dictionary] = [
 	{"title": "DRAW & ERASE", "tools": [
-		{"id": AtlasCanvas.Tool.PEN, "name": "Pen", "key": "B", "icon": "pen", "hint": "Draw on the active ink or raster layer"},
+		{"id": AtlasCanvas.Tool.PEN, "name": "Brush", "key": "B", "icon": "pen", "hint": "Drag or tap to paint on the active ink or raster layer; width and opacity in the inspector"},
 		{"id": AtlasCanvas.Tool.ERASER, "name": "Eraser", "key": "E", "icon": "eraser", "hint": "Erase artwork on the active layer"},
 		{"id": AtlasCanvas.Tool.FILL, "name": "Fill", "key": "F", "icon": "fill", "hint": "Fill raster pixels or terrain cells"},
 	]},
