@@ -22,7 +22,7 @@
 - [x] [[T-005|T-005 · Automatic artwork LOD on by default]]
 - [x] [[T-006|T-006 · Categorized sidebar drawing palette]]
 - [x] [[T-007|T-007 · Compact recognizable icon controls]]
-- [ ] [[T-008|T-008 · Toolbar-opened grid settings popup]]
+- [x] [[T-008|T-008 · Toolbar-opened grid settings popup]]
 - [ ] [[T-009|T-009 · Search and world discovery purpose]]
 - [ ] [[T-010|T-010 · Smooth pen turns]]
 - [ ] [[T-011|T-011 · Mouse-wheel pen width]]

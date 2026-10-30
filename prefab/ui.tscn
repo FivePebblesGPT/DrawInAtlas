@@ -10,6 +10,8 @@
 [ext_resource type="Script" uid="uid://c1urpm8d5q3j7" path="res://scripts/interface/raster_importer.gd" id="8"]
 [ext_resource type="PackedScene" path="res://prefab/link_dialog.tscn" id="9"]
 [ext_resource type="Script" path="res://scripts/interface/map_references.gd" id="10"]
+[ext_resource type="PackedScene" path="res://prefab/grid_settings_popup.tscn" id="11"]
+[ext_resource type="Texture2D" path="res://img/controls/grid-settings.svg" id="12"]
 
 [node name="UI" type="Control" unique_id=484751465]
 layout_mode = 3
@@ -63,6 +65,14 @@ title = "Edit"
 [node name="View" type="PopupMenu" parent="Chrome/Layout/MenuBar" unique_id=2110933312]
 unique_name_in_owner = true
 title = "View"
+
+[node name="GridSettingsButton" type="Button" parent="Chrome/Layout"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 2
+tooltip_text = "Grid settings: shape, spacing, origin, rotation, overlay and native distance"
+text = "Grid"
+icon = ExtResource("12")
 
 [node name="DocumentTitle" type="Label" parent="Chrome/Layout" unique_id=65228190]
 unique_name_in_owner = true
@@ -142,3 +152,5 @@ script = ExtResource("8")
 
 [node name="MapReferences" type="Node" parent="WorkspaceSplit/Workspace"]
 script = ExtResource("10")
+
+[node name="GridSettingsPopup" parent="." instance=ExtResource("11")]

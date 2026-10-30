@@ -40,7 +40,7 @@ func _run() -> void:
 		"board creation uses the embedded grid form scene")
 	_check(editor.grid_controls.distance_spinner ==
 		editor.grid_controls.get_node("DistanceRow/DistanceSpinner"),
-		"inspector grid form binds its scene controls")
+		"popup grid form binds its scene controls")
 	_check(editor.layer_panel.layer_list == editor.layer_panel.get_node("LayerList"),
 		"layer panel binds its scene controls")
 	_check(editor.overview_panel.preview == editor.overview_panel.get_node("Preview"),

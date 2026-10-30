@@ -45,7 +45,9 @@ var _link_choices: Array[String] = []
 @onready var lock_checkbox: CheckBox = inspector.lock_checkbox
 @onready var reference_checkbox: CheckBox = inspector.reference_checkbox
 @onready var opacity_slider: HSlider = inspector.opacity_slider
-@onready var grid_controls: AtlasGridControls = inspector.grid_controls
+@onready var grid_settings_popup: AtlasGridSettingsPopup = get_node("../../GridSettingsPopup") as AtlasGridSettingsPopup
+@onready var grid_settings_button: Button = get_node("../../Chrome/Layout/GridSettingsButton") as Button
+@onready var grid_controls: AtlasGridControls = get_node("../../GridSettingsPopup/Panel/Margin/Layout/Scroll/GridControls") as AtlasGridControls
 @onready var distance_spinner: SpinBox = grid_controls.distance_spinner
 @onready var unit_picker: OptionButton = grid_controls.unit_picker
 @onready var brush_color_picker: ColorPickerButton = inspector.brush_color_picker
@@ -220,7 +222,8 @@ func _connect_workspace() -> void:
 	inspector.floor_moved.connect(move_floor)
 	inspector.floor_default_requested.connect(make_floor_default)
 	inspector.floor_removed.connect(remove_floor)
-	inspector.grid_changed.connect(apply_grid)
+	grid_controls.settings_changed.connect(apply_grid)
+	grid_settings_button.pressed.connect(open_grid_settings)
 	inspector.scope_toggled.connect(_on_scope_toggled)
 	inspector.selection_transform_requested.connect(_transform_from_inspector)
 	inspector.brush_color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
@@ -341,6 +344,14 @@ func _refresh_automatic_detail() -> void:
 		canvas.size, canvas.presented_detail_level)
 	if next != canvas.presented_detail_level and canvas.set_presented_detail_level(next):
 		_refresh_layers()
+
+
+func open_grid_settings() -> void:
+	# The form is merely a view of the current board, never a pending second copy.
+	if canvas.map == null:
+		return
+	_refresh_grid_controls()
+	grid_settings_popup.open_from(grid_settings_button)
 
 
 func _refresh_grid_controls() -> void:

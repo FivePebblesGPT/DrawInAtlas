@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://ba8os0lsdl52b"]
 
 [ext_resource type="Script" uid="uid://c3jrf6x5ew6qh" path="res://scripts/interface/inspector.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://cfisw8d1wjsa7" path="res://prefab/grid_controls.tscn" id="2"]
 
 [ext_resource type="Texture2D" path="res://img/controls/add.svg" id="3"]
 [ext_resource type="Texture2D" path="res://img/controls/rename.svg" id="4"]
@@ -287,7 +286,7 @@ custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 11
-text = "MAP"
+text = "EDIT MASK"
 autowrap_mode = 3
 
 [node name="LockCheckbox" type="CheckBox" parent="Scroll/Margin/Sections/MapSection" unique_id=668682371]
@@ -296,10 +295,6 @@ layout_mode = 2
 tooltip_text = "Use Select scope cell first. A locked scope with no cell blocks artwork edits."
 disabled = true
 text = "Lock to selected cell"
-
-[node name="GridControls" parent="Scroll/Margin/Sections/MapSection" unique_id=1880573347 instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 2
 
 [node name="PlacementSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=361657607]
 unique_name_in_owner = true

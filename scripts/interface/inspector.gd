@@ -8,7 +8,6 @@ signal floor_renamed(name: String)
 signal floor_moved(direction: int)
 signal floor_default_requested()
 signal floor_removed()
-signal grid_changed(grid: AtlasGrid)
 signal scope_toggled(enabled: bool)
 signal selection_transform_requested(offset: Vector2, factor: float, radians: float)
 signal brush_color_changed(color: Color)
@@ -29,7 +28,6 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var lock_checkbox: CheckBox = %LockCheckbox
 @onready var reference_checkbox: CheckBox = %ReferenceCheckbox
 @onready var opacity_slider: HSlider = %OpacitySlider
-@onready var grid_controls: AtlasGridControls = %GridControls
 @onready var brush_color_picker: ColorPickerButton = %BrushColorPicker
 @onready var brush_width_spinner: SpinBox = %BrushWidthSpinner
 @onready var selection_label: Label = %SelectionLabel
@@ -75,7 +73,6 @@ func _ready() -> void:
 	_floor_down.pressed.connect(floor_moved.emit.bind(-1))
 	_floor_default.pressed.connect(floor_default_requested.emit)
 	_floor_remove.pressed.connect(floor_removed.emit)
-	grid_controls.settings_changed.connect(grid_changed.emit)
 	lock_checkbox.toggled.connect(scope_toggled.emit)
 	_transform_button.pressed.connect(_on_transform_requested)
 	brush_color_picker.color_changed.connect(brush_color_changed.emit)

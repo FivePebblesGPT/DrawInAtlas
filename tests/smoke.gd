@@ -418,6 +418,7 @@ func _test_board_workflow() -> void:
 		"redo creation restores the same board identity and configuration")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-10.125, 3.25), Vector2(45.5, -30.75)])), false)
 	var ink_before: Array[AtlasStroke] = AtlasStroke.clone_all(editor.canvas.floor.strokes)
+	editor.open_grid_settings()
 	editor.grid_controls.size_spinner.value = 120.0
 	editor.grid_controls.rotation_spinner.value = 37.0
 	editor.grid_controls.origin_x_spinner.value = 50.25
@@ -431,7 +432,7 @@ func _test_board_workflow() -> void:
 	var updated: AtlasGrid = editor.canvas.map.grid
 	_check(updated.kind == AtlasGrid.Kind.SQUARE and updated.cell_size == 120.0
 		and updated.origin == Vector2(50.25, -80.5) and is_equal_approx(rad_to_deg(updated.rotation), 37.0),
-		"inspector edits grid shape, spacing, origin and rotation")
+		"popup edits grid shape, spacing, origin and rotation")
 	_check(updated.distance_per_cell == 2.5 and updated.distance_unit == "km" and not updated.visible,
 		"native units and visibility belong to this board")
 	_check(AtlasStroke.same_artwork(ink_before, editor.canvas.floor.strokes), "grid controls never rescale ink")
