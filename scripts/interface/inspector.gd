@@ -77,6 +77,9 @@ func _ready() -> void:
 	_transform_button.pressed.connect(_on_transform_requested)
 	brush_color_picker.color_changed.connect(brush_color_changed.emit)
 	brush_width_spinner.value_changed.connect(brush_width_changed.emit)
+	# SpinBox has an inner LineEdit; both it and the arrows receive wheel input separately.
+	brush_width_spinner.gui_input.connect(_on_brush_width_wheel)
+	brush_width_spinner.get_line_edit().gui_input.connect(_on_brush_width_wheel)
 	_palette_picker.item_selected.connect(palette_selected.emit)
 	angle_spinner.value_changed.connect(_on_placement_rotation_changed)
 	preview_picker.item_selected.connect(preview_changed.emit)
@@ -143,6 +146,21 @@ func sync_brush(color: Color, width: float) -> void:
 	brush_color_picker.color = color
 	brush_color_picker.set_block_signals(signals_blocked)
 	brush_width_spinner.set_value_no_signal(width)
+
+
+func _on_brush_width_wheel(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if not mouse.pressed or mouse.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		return
+	if not brush_width_spinner.editable:
+		return
+	var direction: float = 1.0 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
+	# Consume only wheel events over the field, so the parent ScrollContainer never scrolls here.
+	brush_width_spinner.value = clampf(brush_width_spinner.value + direction * brush_width_spinner.step,
+		brush_width_spinner.min_value, brush_width_spinner.max_value)
+	get_viewport().set_input_as_handled()
 
 
 func _on_floor_selected(index: int) -> void:

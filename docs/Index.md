@@ -25,7 +25,7 @@
 - [x] [[T-008|T-008 · Toolbar-opened grid settings popup]]
 - [ ] [[T-009|T-009 · Search and world discovery purpose]]
 - [x] [[T-010|T-010 · Smooth pen turns]]
-- [ ] [[T-011|T-011 · Mouse-wheel pen width]]
+- [x] [[T-011|T-011 · Mouse-wheel pen width]]
 - [ ] [[T-012|T-012 · Replace battlemats with authored local detail]]
 - [ ] [[T-014|T-014 · Retire battlemat creation controls]]
 - [ ] [[T-015|T-015 · Retire the old model while preserving artwork]]
