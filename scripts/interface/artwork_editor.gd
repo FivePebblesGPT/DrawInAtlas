@@ -36,7 +36,7 @@ func choose_tool(tool: AtlasCanvas.Tool) -> void:
 	_canvas.choose_tool(tool)
 	if _canvas.map == null or _canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
 		locked_to_cell = false
-	if tool != AtlasCanvas.Tool.ART_SELECT:
+	if tool not in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]:
 		_canvas.clear_selection()
 	if _canvas.floor != null:
 		var current: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)

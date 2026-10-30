@@ -23,7 +23,7 @@ signal transform_requested(selection: AtlasSelection, transform: Transform2D)
 signal fill_requested(position: Vector2)
 signal view_region_changed
 
-enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL }
+enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
@@ -247,6 +247,7 @@ func _update_manipulation(position: Vector2) -> void:
 
 func _finish_manipulation() -> void:
 	var mode: Manipulation = _manipulation
+	var valid_preview: bool = _preview_layer != null
 	_manipulation = Manipulation.NONE
 	_preview_layer = null
 	if mode == Manipulation.MARQUEE:
@@ -258,7 +259,8 @@ func _finish_manipulation() -> void:
 			next = AtlasSelectionGeometry.select_rect(layer, Rect2(_gesture_start, _gesture_end - _gesture_start).abs())
 		selection = AtlasSelectionGeometry.combined(layer, selection, next, _selection_mode)
 		selection_changed.emit()
-	else:
+	elif valid_preview and _gesture_transform != Transform2D.IDENTITY:
+		# Never commit an invalid (masked/locked) preview or a click without movement.
 		transform_requested.emit(selection, _gesture_transform)
 	queue_redraw()
 	interaction_finished.emit()
@@ -611,6 +613,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_stroke_left_canvas = false
 				_draft_stroke = AtlasShapes.stroke("LINE", _gesture_start, _gesture_start, brush_color, brush_width)
+		Tool.MOVE:
+			_begin_artwork_move(position)
 		Tool.ART_SELECT:
 			if not editing_target_is_presented():
 				return
@@ -637,6 +641,30 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_request_cell_paint(position)
 		Tool.SELECT:
 			selection_requested.emit(map.grid.document_to_cell(position))
+
+
+## Move acts on selected objects without a marquee. A click on a new object
+## selects it on the active layer, and a drag moves it in one history entry.
+## Existing multi-object selections are retained when the pointer starts
+## inside their bounds; no other layer or detail level is implicitly targeted.
+func _begin_artwork_move(position: Vector2) -> void:
+	if not editing_target_is_presented():
+		return
+	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+	if layer == null or not (layer is AtlasInkLayer or layer is AtlasRasterLayer):
+		return
+	if selection.is_empty() or not selection.matches(layer) or not selection.bounds.has_point(position):
+		selection = AtlasSelectionGeometry.select_point(layer, position, 5.0 / camera_zoom)
+		selection_changed.emit()
+		queue_redraw()
+	if selection.is_empty() or not layer.is_editable():
+		return
+	_gesture_start = position
+	_gesture_end = position
+	_gesture_snap = snap_to_grid
+	_gesture_transform = Transform2D.IDENTITY
+	_preview_layer = null
+	_manipulation = Manipulation.MOVE
 
 
 func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:

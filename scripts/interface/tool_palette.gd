@@ -17,6 +17,7 @@ const CATEGORIES: Array[Dictionary] = [
 	]},
 	{"title": "SELECT", "tools": [
 		{"id": AtlasCanvas.Tool.ART_SELECT, "name": "Select artwork", "key": "V", "icon": "select", "hint": "Active-layer objects: drag/select, Ctrl+drag add, Alt+drag subtract; Ctrl+D deselect"},
+		{"id": AtlasCanvas.Tool.MOVE, "name": "Move artwork", "key": "M", "icon": "move", "hint": "Pick an object or drag the existing active-layer selection; grid snapping optional; Escape cancels"},
 		{"id": AtlasCanvas.Tool.SELECT, "name": "Select grid cell", "key": "", "icon": "cell", "hint": "Choose the cell used by the edit-scope mask"},
 	]},
 	{"title": "TERRAIN", "tools": [

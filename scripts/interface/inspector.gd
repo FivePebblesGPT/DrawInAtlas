@@ -65,6 +65,7 @@ var _reference_ids: Array[String] = []
 var _reference_floors: Array[String] = []
 var _reference_campaign: AtlasCampaign
 var _automatic_reference: String = ""
+var _current_tool: AtlasCanvas.Tool = AtlasCanvas.Tool.PEN
 
 
 func _ready() -> void:
@@ -121,6 +122,7 @@ func refresh_floors(map: AtlasMapDocument, floor: AtlasFloor) -> void:
 
 
 func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
+	_current_tool = tool
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
@@ -133,16 +135,21 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	brush_color_picker.disabled = erasing
 	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
 	_terrain_section.visible = tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
-	_selection_section.visible = tool == AtlasCanvas.Tool.ART_SELECT
-	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.ART_SELECT]
+	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
+		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	snap_checkbox.disabled = not grid_available
 
 
 func refresh_selection(selection: AtlasSelection, can_modify: bool) -> void:
-	selection_label.text = "Active layer only. Drag or click; Ctrl add, Alt subtract, Ctrl+D clear. Raster selects the whole layer."
+	selection_label.text = ("Move: click an object and drag; V selects groups. Escape cancels."
+		if _current_tool == AtlasCanvas.Tool.MOVE else
+		"Active layer only. Drag or click; Ctrl add, Alt subtract, Ctrl+D clear. Raster selects the whole layer.")
 	if not selection.is_empty():
 		var count: int = selection.stroke_indices.size()
-		selection_label.text = "Raster asset selected" if selection.raster_selected else "%d stroke%s selected" % [count, "" if count == 1 else "s"]
+		var object_name: String = "Raster asset" if selection.raster_selected else "%d ink stroke%s" % [count, "" if count == 1 else "s"]
+		selection_label.text = ("%s selected · drag to move" % object_name
+			if _current_tool == AtlasCanvas.Tool.MOVE else "%s selected" % object_name)
 	move_x_spinner.set_value_no_signal(0.0)
 	move_y_spinner.set_value_no_signal(0.0)
 	scale_spinner.set_value_no_signal(1.0)
