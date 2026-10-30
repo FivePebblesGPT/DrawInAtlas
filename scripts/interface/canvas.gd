@@ -25,7 +25,7 @@ signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
 
-enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE }
+enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
@@ -91,6 +91,7 @@ var brush_color: Color = Color("#f5b545")
 var brush_width: float = 8.0
 ## Session-only; grid changes never rewrite existing artwork.
 var snap_to_grid: bool = false
+var polygon_solid_fill: bool = false
 var fill_tolerance: float = 0.0
 var fill_global: bool = false
 
@@ -115,6 +116,8 @@ var _gesture_start: Vector2
 var _gesture_end: Vector2
 var _gesture_snap: bool = false
 var _shape_kind: String = ""
+var _polygon_vertices: PackedVector2Array = PackedVector2Array()
+var _polygon_pointer: Vector2 = Vector2.ZERO
 var _preview_layer: AtlasLayer
 var _gesture_transform: Transform2D = Transform2D.IDENTITY
 var _selection_mode: AtlasSelectionGeometry.CombineMode = AtlasSelectionGeometry.CombineMode.REPLACE
@@ -169,7 +172,7 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
+	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty()
 
 
 func cancel_edit() -> void:
@@ -182,6 +185,7 @@ func cancel_edit() -> void:
 	_tile_painting = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
+	_polygon_vertices.clear()
 	_gesture_snap = false
 	_preview_layer = null
 	_pending_wheel_fraction = 0.0
@@ -194,6 +198,16 @@ func cancel_edit() -> void:
 
 
 func commit_edit() -> void:
+	if not _polygon_vertices.is_empty():
+		var shape: AtlasStroke = AtlasShapes.polygon(_polygon_vertices, brush_color, brush_width, polygon_solid_fill)
+		_polygon_vertices.clear()
+		_draft_stroke = null
+		_gesture_snap = false
+		if shape != null:
+			stroke_requested.emit(shape, false)
+		queue_redraw()
+		interaction_finished.emit()
+		return
 	if not _moving_link_id.is_empty():
 		var id: String = _moving_link_id
 		_moving_link_id = ""
@@ -355,8 +369,12 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 		for stroke: AtlasStroke in artwork:
 			_draw_stroke(stroke, item)
 		if previewing and not _erasing:
-			for stroke: AtlasStroke in edit_scope.clip_strokes([_draft_stroke]):
-				_draw_stroke(stroke, item)
+			if _draft_stroke.filled:
+				if edit_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(_draft_stroke)):
+					_draw_stroke(_draft_stroke, item)
+			else:
+				for stroke: AtlasStroke in edit_scope.clip_strokes([_draft_stroke]):
+					_draw_stroke(stroke, item)
 	elif layer is AtlasRasterLayer:
 		item.draw_set_transform_matrix(layer.transform)
 		for chunk: AtlasRasterChunk in layer.chunks.values():
@@ -406,6 +424,13 @@ func _draw_overlays(item: Node2D) -> void:
 				color = Color("#f48771")
 		item.draw_rect(bounds, color, false, 1.5 / camera_zoom)
 		item.draw_rect(Rect2(bounds.end - Vector2.ONE * 4.0 / camera_zoom, Vector2.ONE * 8.0 / camera_zoom), color)
+	if not _polygon_vertices.is_empty():
+		var guide: PackedVector2Array = _polygon_vertices.duplicate()
+		guide.append(_polygon_pointer)
+		if guide.size() >= 2:
+			item.draw_polyline(guide, Color("#f9cc65"), 1.5 / camera_zoom, true)
+		for vertex: Vector2 in _polygon_vertices:
+			item.draw_circle(vertex, 3.0 / camera_zoom, Color("#f9cc65"))
 	_draw_brush_cursor(item)
 
 
@@ -468,6 +493,11 @@ func _draw_grid(item: Node2D) -> void:
 
 
 func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
+	if stroke.filled:
+		var interior: PackedVector2Array = stroke.points.duplicate()
+		interior.remove_at(interior.size() - 1)
+		item.draw_colored_polygon(interior, stroke.color)
+		return
 	var centers: PackedVector2Array = AtlasStrokeGeometry.centers(stroke.points)
 	if centers.size() == 1:
 		item.draw_circle(centers[0], stroke.width * 0.5, stroke.color, true, -1.0, true)
@@ -559,6 +589,23 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_mouse_button(event)
 	elif event is InputEventMouseMotion:
 		_handle_mouse_motion(event)
+	elif event is InputEventKey and tool == Tool.POLYGON and not _polygon_vertices.is_empty():
+		var key: InputEventKey = event as InputEventKey
+		if key.pressed and not key.echo:
+			match key.keycode:
+				KEY_ENTER, KEY_KP_ENTER:
+					commit_edit()
+					accept_event()
+				KEY_BACKSPACE:
+					_polygon_vertices.remove_at(_polygon_vertices.size() - 1)
+					if _polygon_vertices.is_empty():
+						cancel_edit()
+					else:
+						_update_polygon_preview(_brush_cursor_local)
+					accept_event()
+				KEY_ESCAPE:
+					cancel_edit()
+					accept_event()
 	elif event is InputEventKey and _shape_kind == "LINE" and _draft_stroke != null:
 		var key: InputEventKey = event as InputEventKey
 		if key.keycode in [KEY_SHIFT, KEY_ALT] and not key.echo:
@@ -584,6 +631,11 @@ func _handle_mouse_button(mouse: InputEventMouseButton) -> void:
 		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
 			_handle_wheel_button(mouse)
 		MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT:
+			if mouse.button_index == MOUSE_BUTTON_RIGHT and tool == Tool.POLYGON and not _polygon_vertices.is_empty():
+				if mouse.pressed:
+					commit_edit()
+				accept_event()
+				return
 			if mouse.pressed:
 				cancel_edit()
 				interaction_started.emit()
@@ -612,6 +664,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	if _begin_link_press(mouse, position):
 		return
 	match tool:
+		Tool.POLYGON:
+			_begin_polygon_vertex(mouse, position)
 		Tool.PEN, Tool.ERASER:
 			if not editing_target_is_presented():
 				return
@@ -713,6 +767,9 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		_raster_textures.clear()
 		queue_redraw()
 		interaction_finished.emit()
+	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
+		# Vertices are placed by clicks; mouse release never finishes a shape.
+		_update_polygon_preview(mouse.position)
 	elif _tile_painting:
 		_tile_painting = false
 		interaction_finished.emit()
@@ -740,6 +797,8 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 		queue_redraw()
 	elif _manipulation != Manipulation.NONE:
 		_update_manipulation(local_to_document(motion.position))
+	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
+		_update_polygon_preview(motion.position)
 	elif tool == Tool.PAINT and _tile_painting:
 		_request_cell_paint(local_to_document(motion.position))
 	elif is_editing():
@@ -772,3 +831,43 @@ func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void
 		# One dispatch emits at most one logical step, discarding any remainder.
 		_pending_wheel_fraction = 0.0
 		wheel_step.emit(direction, position)
+
+
+## Each click fixes a vertex. Click near the first point, double-click, Enter,
+## or right-click to close. Backspace removes the last vertex; Escape cancels.
+func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> void:
+	if not editing_target_is_presented():
+		return
+	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable():
+		return
+	if _polygon_vertices.is_empty():
+		_gesture_snap = snap_to_grid
+	var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
+	if mouse.double_click:
+		if _polygon_vertices.size() >= 3:
+			commit_edit()
+		return
+	if _polygon_vertices.size() >= 3 and point.distance_to(_polygon_vertices[0]) <= 8.0 / camera_zoom:
+		commit_edit()
+		return
+	if _polygon_vertices.size() >= AtlasShapes.MAX_POLYGON_VERTICES or (not _polygon_vertices.is_empty() and
+			point.distance_squared_to(_polygon_vertices[-1]) <= 0.0001):
+		return
+	_polygon_vertices.append(point)
+	_update_polygon_preview(mouse.position)
+
+
+func _update_polygon_preview(local_position: Vector2) -> void:
+	if _polygon_vertices.is_empty():
+		return
+	_polygon_pointer = local_to_document(local_position)
+	if _gesture_snap:
+		_polygon_pointer = AtlasGridSnap.point(map.grid, _polygon_pointer)
+	var candidates: PackedVector2Array = _polygon_vertices.duplicate()
+	# Once at least three vertices are fixed, Enter/close commits exactly this
+	# preview; the pointer's next edge remains a gold guide, not a phantom fill.
+	if candidates.size() < 3 and candidates[-1].distance_squared_to(_polygon_pointer) > 0.0001:
+		candidates.append(_polygon_pointer)
+	_draft_stroke = AtlasShapes.polygon(candidates, brush_color, brush_width, polygon_solid_fill)
+	queue_redraw()

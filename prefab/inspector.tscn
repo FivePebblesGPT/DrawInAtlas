@@ -206,6 +206,21 @@ visible = false
 text = "Drag start → end. Shift: 15° angles; Alt: draw about center. Esc cancels. Solid line with round ends; width/color above."
 autowrap_mode = 3
 
+[node name="PolygonHint" type="Label" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+visible = false
+text = "Click vertices. Enter, right-click, double-click, or click first vertex to close; Backspace removes last, Esc cancels. One closed shape, not an editable wall path."
+autowrap_mode = 3
+
+[node name="PolygonFill" type="CheckBox" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+text = "Solid fill (no outline)"
+tooltip_text = "Off: solid rounded outline using stroke width. On: solid interior in the chosen color and opacity; width applies to outlines only."
+
 [node name="BucketSection" type="VBoxContainer" parent="Scroll/Margin/Sections"]
 unique_name_in_owner = true
 layout_mode = 2

@@ -227,6 +227,10 @@ func _connect_workspace() -> void:
 	grid_controls.settings_changed.connect(apply_grid)
 	grid_settings_button.pressed.connect(open_grid_settings)
 	inspector.scope_toggled.connect(_on_scope_toggled)
+	inspector.polygon_fill_toggled.connect(func(enabled: bool) -> void:
+		canvas.polygon_solid_fill = enabled
+		if canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+			canvas._update_polygon_preview(canvas._brush_cursor_local))
 	inspector.grid_snapping_toggled.connect(func(enabled: bool) -> void:
 		canvas.snap_to_grid = enabled)
 	inspector.selection_transform_requested.connect(_transform_from_inspector)
@@ -837,7 +841,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_: return
 		get_viewport().set_input_as_handled()
 		return
-	if event.keycode == KEY_ENTER and canvas.tool == AtlasCanvas.Tool.ART_SELECT:
+	if event.keycode in [KEY_ENTER, KEY_KP_ENTER] and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+		canvas.commit_edit()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_BACKSPACE and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+		canvas._polygon_vertices.remove_at(canvas._polygon_vertices.size() - 1)
+		if canvas._polygon_vertices.is_empty():
+			canvas.cancel_edit()
+		else:
+			canvas._update_polygon_preview(canvas._brush_cursor_local)
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ENTER and canvas.tool == AtlasCanvas.Tool.ART_SELECT:
 		canvas.clear_selection()
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_ESCAPE:
@@ -850,9 +864,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
 			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE}
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

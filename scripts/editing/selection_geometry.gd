@@ -98,6 +98,8 @@ static func select_point(layer: AtlasLayer, point: Vector2, tolerance: float) ->
 		for index: int in range(layer.strokes.size() - 1, -1, -1):
 			var stroke: AtlasStroke = layer.strokes[index]
 			var radius: float = stroke.width * 0.5 + tolerance
+			if stroke.filled and Geometry2D.is_point_in_polygon(point, stroke.points):
+				return select_indices(layer, [index])
 			for segment: int in range(maxi(1, stroke.points.size() - 1)):
 				var start: Vector2 = stroke.points[segment]
 				var finish: Vector2 = stroke.points[mini(segment + 1, stroke.points.size() - 1)]

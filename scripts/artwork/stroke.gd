@@ -5,17 +5,20 @@ extends Resource
 @export_storage var points: PackedVector2Array
 @export_storage var color: Color
 @export_storage var width: float
+## Solid polygon shape, as opposed to a round-ended centerline stroke.
+@export_storage var filled: bool = false
 
 
 func _init(path: PackedVector2Array = PackedVector2Array(), ink: Color = Color.BLACK,
-		diameter: float = 8.0) -> void:
+		diameter: float = 8.0, solid_fill: bool = false) -> void:
 	points = path.duplicate()
 	color = ink
 	width = diameter
+	filled = solid_fill
 
 
 func copy() -> AtlasStroke:
-	return AtlasStroke.new(points, color, width)
+	return AtlasStroke.new(points, color, width, filled)
 
 
 func is_valid() -> bool:
@@ -26,6 +29,13 @@ func is_valid() -> bool:
 	for point: Vector2 in points:
 		if not point.is_finite():
 			return false
+	if filled:
+		if points.size() < 4 or points[0] != points[-1]:
+			return false
+		var vertices: PackedVector2Array = points.duplicate()
+		vertices.remove_at(vertices.size() - 1)
+		if not AtlasShapes.valid_polygon_vertices(vertices):
+			return false
 	return true
 
 
@@ -33,16 +43,20 @@ func to_dict() -> Dictionary:
 	var path: Array[Array] = []
 	for point: Vector2 in points:
 		path.append([point.x, point.y])
-	return {"points": path, "color": [color.r, color.g, color.b, color.a], "width": width}
+	var data: Dictionary = {"points": path, "color": [color.r, color.g, color.b, color.a], "width": width}
+	if filled:
+		data["filled"] = true
+	return data
 
 
 static func from_dict(data: Dictionary) -> AtlasStroke:
 	var raw_points: Variant = data.get("points")
 	var raw_color: Variant = data.get("color")
 	var raw_width: Variant = data.get("width")
+	var raw_fill: Variant = data.get("filled", false)
 	if not raw_points is Array or not raw_color is Array or raw_color.size() != 4:
 		return null
-	if not _is_number(raw_width):
+	if not _is_number(raw_width) or not raw_fill is bool:
 		return null
 	var path: PackedVector2Array = PackedVector2Array()
 	for value: Variant in raw_points:
@@ -55,7 +69,7 @@ static func from_dict(data: Dictionary) -> AtlasStroke:
 		if not _is_number(value):
 			return null
 	var ink: Color = Color(float(raw_color[0]), float(raw_color[1]), float(raw_color[2]), float(raw_color[3]))
-	var result: AtlasStroke = AtlasStroke.new(path, ink, float(raw_width))
+	var result: AtlasStroke = AtlasStroke.new(path, ink, float(raw_width), raw_fill)
 	return result if result.is_valid() else null
 
 
@@ -70,7 +84,7 @@ static func same_artwork(first: Array[AtlasStroke], second: Array[AtlasStroke]) 
 	if first.size() != second.size():
 		return false
 	for index: int in range(first.size()):
-		if first[index].points != second[index].points or first[index].color != second[index].color:
+		if first[index].points != second[index].points or first[index].color != second[index].color or first[index].filled != second[index].filled:
 			return false
 		if first[index].width != second[index].width:
 			return false

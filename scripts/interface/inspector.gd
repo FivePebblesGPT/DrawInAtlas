@@ -15,6 +15,7 @@ signal brush_width_changed(value: float)
 signal fill_tolerance_changed(value: float)
 signal fill_global_changed(enabled: bool)
 signal grid_snapping_toggled(enabled: bool)
+signal polygon_fill_toggled(enabled: bool)
 signal palette_selected(index: int)
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
@@ -51,6 +52,8 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var _ink_color_label: Label = $Scroll/Margin/Sections/InkSection/ColorLabel
 @onready var _eraser_hint: Label = %EraserHint
 @onready var _line_hint: Label = %LineHint
+@onready var _polygon_hint: Label = %PolygonHint
+@onready var polygon_fill_checkbox: CheckBox = %PolygonFill
 @onready var _terrain_section: VBoxContainer = %TerrainSection
 @onready var _selection_section: VBoxContainer = %SelectionSection
 @onready var _transform_button: Button = %TransformButton
@@ -87,6 +90,7 @@ func _ready() -> void:
 	_floor_remove.pressed.connect(floor_removed.emit)
 	lock_checkbox.toggled.connect(scope_toggled.emit)
 	snap_checkbox.toggled.connect(grid_snapping_toggled.emit)
+	polygon_fill_checkbox.toggled.connect(polygon_fill_toggled.emit)
 	_transform_button.pressed.connect(_on_transform_requested)
 	brush_color_picker.color_changed.connect(brush_color_changed.emit)
 	brush_width_spinner.value_changed.connect(brush_width_changed.emit)
@@ -136,7 +140,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
 	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "BRUSH & STROKE")
 	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
@@ -148,6 +152,8 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	fill_global_checkbox.visible = not terrain_active
 	_eraser_hint.visible = erasing
 	_line_hint.visible = tool == AtlasCanvas.Tool.LINE
+	_polygon_hint.visible = tool == AtlasCanvas.Tool.POLYGON
+	polygon_fill_checkbox.visible = tool == AtlasCanvas.Tool.POLYGON
 	_ink_color_label.visible = not erasing
 	brush_color_picker.visible = not erasing
 	brush_color_picker.disabled = erasing
@@ -157,7 +163,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	_terrain_section.visible = tool == AtlasCanvas.Tool.PAINT or (tool == AtlasCanvas.Tool.FILL and terrain_active)
 	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
-		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	snap_checkbox.disabled = not grid_available
 
 

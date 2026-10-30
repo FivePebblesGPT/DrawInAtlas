@@ -47,7 +47,7 @@ func choose_tool(tool: AtlasCanvas.Tool) -> void:
 			var tiles: AtlasTileLayer = _canvas.floor.terrain_layer()
 			if tiles != null:
 				select_layer(tiles.id)
-		elif tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE] and not current is AtlasInkLayer:
+		elif tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON] and not current is AtlasInkLayer:
 			var ink: AtlasInkLayer = _canvas.floor.ink_layer()
 			if ink != null:
 				select_layer(ink.id)
@@ -130,7 +130,15 @@ func stroke(stroke: AtlasStroke, erasing: bool) -> void:
 		after = scope().erase(before, stroke.points, stroke.width)
 	else:
 		after = AtlasStroke.clone_all(before)
-		after.append_array(scope().clip_strokes([stroke]))
+		if stroke.filled:
+			# A solid fill must never spill outside a cell mask. Reject the entire
+			# polygon rather than splitting its interior into unrelated strokes.
+			if not scope().contains_rect(AtlasSelectionGeometry.stroke_bounds(stroke)):
+				message.emit("Polygon is outside the selected-cell edit mask.")
+				return
+			after.append(stroke.copy())
+		else:
+			after.append_array(scope().clip_strokes([stroke]))
 	var command: AtlasStrokeEdit = AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, before, after, layer.id)
 	if _edits.execute(command):
 		_canvas.queue_redraw()
