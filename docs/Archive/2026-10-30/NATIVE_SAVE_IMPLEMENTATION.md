@@ -1,3 +1,13 @@
+---
+type: archive
+archived: 2026-10-30
+original_path: docs/NATIVE_SAVE_IMPLEMENTATION.md
+---
+
+> [!info] Historical native-save report
+> Preserved implementation/validation evidence, not a new acceptance decision. Current persistence cleanup and revalidation are tracked by [[E-SAVE]] and [[T-029]]; completion is tracked only in [[Index]].
+
+<!-- Original report; relative links rebased only. -->
 # Native single-file campaign saves
 
 **Status:** local Godot 4.8-beta1 acceptance passed on 2026-10-29. This records

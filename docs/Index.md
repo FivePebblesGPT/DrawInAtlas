@@ -1,0 +1,71 @@
+# Index
+
+## Epics
+- [ ] [[E-001|E-001 · Drawing, erasing and edit history]]
+- [ ] [[E-002|E-002 · Continuous chunked board and grid masks]]
+- [ ] [[E-003|E-003 · Typed artwork model and persistence]]
+- [ ] [[E-004|E-004 · Usable drawing and manipulation]]
+- [ ] [[E-TOOLS|E-TOOLS · Familiar drawing-tool suite]]
+- [ ] [[E-005|E-005 · Discovery, previews and floors]]
+- [ ] [[E-006|E-006 · Artwork LOD and local canvas objects]]
+- [ ] [[E-SAVE|E-SAVE · Native-save integrity through cleanup]]
+- [ ] [[E-007|E-007 · Local table and projector output]]
+- [ ] [[E-008|E-008 · Host-authoritative collaboration]]
+
+## First priority
+- [ ] [[T-001|T-001 · Explicit types and corrected skill guidance]]
+
+## Review work
+- [ ] [[T-002|T-002 · Continuous chunked-canvas model]]
+- [ ] [[T-003|T-003 · Aligned transparent detail previews]]
+- [ ] [[T-004|T-004 · Viewport-appropriate zoom and artwork LOD]]
+- [ ] [[T-005|T-005 · Automatic artwork LOD on by default]]
+- [ ] [[T-006|T-006 · Categorized sidebar drawing palette]]
+- [ ] [[T-007|T-007 · Compact recognizable icon controls]]
+- [ ] [[T-008|T-008 · Toolbar-opened grid settings popup]]
+- [ ] [[T-009|T-009 · Search and world discovery purpose]]
+- [ ] [[T-010|T-010 · Smooth pen turns]]
+- [ ] [[T-011|T-011 · Mouse-wheel pen width]]
+- [ ] [[T-012|T-012 · Within-map local canvas objects]]
+- [ ] [[T-013|T-013 · Canvas-object move/resize and drawing behavior]]
+- [ ] [[T-014|T-014 · Creation affordance and world-level restrictions]]
+- [ ] [[T-015|T-015 · No nested battlemats]]
+- [ ] [[T-016|T-016 · Coherent canvas-object snapping]]
+- [ ] [[T-018|T-018 · Compact layer/object/link hierarchy]]
+- [ ] [[T-019|T-019 · Selection and selection masks]]
+- [ ] [[T-020|T-020 · Brush]]
+- [ ] [[T-021|T-021 · Eraser]]
+- [ ] [[T-022|T-022 · Move]]
+- [ ] [[T-023|T-023 · Bucket]]
+- [ ] [[T-024|T-024 · Line]]
+- [ ] [[T-025|T-025 · Polygon]]
+- [ ] [[T-026|T-026 · Contour]]
+- [ ] [[T-027|T-027 · Text]]
+- [ ] [[T-028|T-028 · Ink representation decision]]
+- [ ] [[T-029|T-029 · Dictionary conversion audit and cleanup]]
+- [ ] [[T-030|T-030 · Raster import/chunk conversion clarity]]
+- [ ] [[T-031|T-031 · Tile-layer naming and type authority]]
+- [ ] [[T-032|T-032 · Field encodings and invariants]]
+- [ ] [[T-033|T-033 · Fill readability]]
+- [ ] [[T-034|T-034 · Raster brush readability]]
+- [ ] [[T-035|T-035 · Selection geometry readability]]
+- [ ] [[T-036|T-036 · Stroke eraser readability]]
+- [ ] [[T-037|T-037 · Commented function-step convention]]
+- [ ] [[T-038|T-038 · Broader code-only review]]
+
+## After core usability
+- [ ] [[T-017|T-017 · Revisit floor-link authoring/testing]]
+
+## Milestone 7
+- [ ] [[T-039|T-039 · Player projection and privacy contract]]
+- [ ] [[T-040|T-040 · GM/player views and calibration]]
+- [ ] [[T-041|T-041 · Tokens]]
+- [ ] [[T-042|T-042 · Fog and reveal]]
+- [ ] [[T-043|T-043 · Player-output privacy acceptance]]
+- [ ] [[T-044|T-044 · Web-compatible player fallback]]
+
+## Milestone 8
+- [ ] [[T-045|T-045 · Authoritative sessions and commands]]
+- [ ] [[T-046|T-046 · Roles and filtered replication]]
+- [ ] [[T-047|T-047 · Reconnect and resynchronization]]
+- [ ] [[T-048|T-048 · Collaboration acceptance]]

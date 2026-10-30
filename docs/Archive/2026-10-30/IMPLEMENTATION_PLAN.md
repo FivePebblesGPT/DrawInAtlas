@@ -1,3 +1,13 @@
+---
+type: archive
+archived: 2026-10-30
+original_path: docs/IMPLEMENTATION_PLAN.md
+---
+
+> [!info] Superseded roadmap
+> This preserves both the execution milestones and older 0–5 feature groupings. Active epic notes use execution milestones 1–8 plus the native-save gate. Review-driven acceptance and confirmed changes are tracked through [[Index]], [[E-002]] and [[E-006]].
+
+<!-- Original report; relative links rebased only. -->
 # Implementation Plan and Decision Log
 
 **Status:** execution milestones **1–6** and the intervening native-save migration are verified locally on Godot **4.8-beta1**. Milestones **7–8** remain open. Native-save PR #4 was squash-merged as `eb877d7` after green checks. The older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
@@ -18,7 +28,7 @@ The integration checkpoint is complete. The following execution sequence superse
 | 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Implemented and verified for the local client |
 | 5 | Floors and map organization/overview/previews | Implemented and verified for the local client |
 | Native-save gate | One embedded `.scn`, adjacent backup, Resource isolation, codec benchmarks | Verified and squash-merged as `eb877d7`; see [native saves](NATIVE_SAVE_IMPLEMENTATION.md) and [AD-10](NATIVE_SAVE_BENCHMARKS.md) |
-| 6 | Linked-map workflow refinement, placement/reference/navigation controls | Implemented and verified locally; [usage and limits](LINKED_MAPS.md) |
+| 6 | Linked-map workflow refinement, placement/reference/navigation controls | Implemented and verified locally; [usage and limits](../../LINKED_MAPS.md) |
 | 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
 | 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
 
@@ -32,7 +42,7 @@ Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import a
 
 Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, active-layer selection with proportional transforms, typed self-contained clipboard data and central selected-cell scope. Schema v5 persists raster placement transforms and reads v1–v4. Native service/input/framebuffer and live-session checks are the gate; no new Web smoke was run.
 
-Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Its historical runtime checkpoint v6 recorded tags and source/target floor identity. The subsequent native-save migration uses one binary `.scn` with embedded Resources: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](DATA_MODEL.md) for the current storage contract.
+Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Its historical runtime checkpoint v6 recorded tags and source/target floor identity. The subsequent native-save migration uses one binary `.scn` with embedded Resources: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](../../DATA_MODEL.md) for the current storage contract.
 
 Milestone 6 adds reversible, source-owned entrances/footprints and optional new
 documents, a scene-owned linked-map form, native drag/numeric editing, explicit

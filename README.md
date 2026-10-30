@@ -1,20 +1,22 @@
 # DrawInAtlas
 
-**Status: native drawing/selection/clipboard tools, independent boards/grids/floors, typed layers, reversible linked-map workflows, read-only artwork references, campaign discovery and native recoverable saves implemented; projector and collaboration features are next.**
+**Status: implementation exists, but the 2026-10-30 manual review found the editing experience unusable. Core usability/model corrections precede projector and collaboration work.**
+
+Start with the [completion checklist](docs/Index.md), [manual review](docs/ManualReview_2026-10-30.md), and current epic/ticket notes. Historical implementation reports are archived; previous passing checks are not current usability acceptance.
 
 DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
 The development engine is **Godot 4.8-beta1**, standard build. Application code is GDScript. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
 
-## Product principles
+## Confirmed target interaction model
 
-- One editable map at a time; references remain read-only.
-- Independent documents with different grids, scales, floors and layers.
-- Pointer-centered zoom, with three additional logical wheel steps at a boundary before automatic map navigation.
-- Arbitrarily rotated battlemap footprints linked to independent encounter maps.
-- Local-first editing; player presentation and multiplayer are future milestones.
+- Hexes overlay one continuous, chunked drawing board, including higher-detail artwork across their borders; no separate canvas/document per hex.
+- Automatic zoom-dependent **artwork-layer LOD** is a core feature and should be on by default. This is not the existing linked-document navigation flag.
+- “Restrict edits to current tile” acts as a selection mask.
+- Battlemats are movable/resizable canvas objects inside local maps, with explicit control over moving drawings; world/hex-level and nested battlemat creation are excluded.
+- The target model and existing implementation differ. See the epic notes and checklist for pending work; local table/projector and collaboration remain later milestones.
 
-## Run and test
+## Run and test the existing implementation
 
 - Open `project.godot` in Godot **4.8-beta1** and run `main.tscn` / F5.
 - The sample campaign includes a world hexcrawl and linked Greyhaven city. Draw freely with the pen, cut ink with the eraser, and undo/redo complete gestures. Ink uses continuous board coordinates, including on gridless maps.
@@ -43,7 +45,7 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 - Native framebuffer test: `godot --path . --script res://tests/visual_smoke.gd`. The local client is the current priority; Web smoke testing is deferred while Web-compatible architecture is retained.
 - Native preview acceptance: `godot --path . --script res://tests/preview_ui_smoke.gd`. For an isolated software-rendered run, use `LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/preview_ui_smoke.gd`.
 - Native linked-map/reference acceptance: use the same Xvfb/Mesa command with `tests/linked_maps_ui_smoke.gd` and `tests/references_ui_smoke.gd`.
-- Reproduce raster codec and complete save-transaction measurements with the commands in [native raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md).
+- Reproduce historical raster codec/save-transaction measurements with the commands in [archived native raster benchmarks](docs/Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md).
 
 ## Project layout
 
@@ -66,16 +68,18 @@ No standalone `.res` or artwork sidecars are written.
 
 | Document | Purpose |
 | --- | --- |
-| [Implementation notes](docs/IMPLEMENTATION_NOTES.md) | Implemented behavior, validation and remaining limitations |
+| [Index](docs/Index.md) | Obsidian epic/task completion checklist |
+| [Manual review](docs/ManualReview_2026-10-30.md) | Original usability and code-review findings |
+| [Implementation notes archive](docs/Archive/2026-10-30/IMPLEMENTATION_NOTES.md) | Historical implementation/check evidence |
 | [Code readability](docs/CODE_READIBILITY.md) | UI scene composition, naming, comments and remaining cleanup work |
 | [Product design](docs/PRODUCT_DESIGN.md) | Goals, planned features and acceptance criteria |
 | [Architecture](docs/ARCHITECTURE.md) | Proposed runtime boundaries, rendering and commands |
 | [Maps and grids](docs/MAPS_AND_GRIDS.md) | Map/floor/layer semantics and geometry |
-| [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Navigation and exact three-step buffer |
-| [Linked-map workflows](docs/LINKED_MAPS.md) | Reversible entrances/placements, explicit navigation and read-only artwork references |
+| [Semantic zoom and previews](docs/SEMANTIC_ZOOM.md) | Existing linked-document behavior and earlier design, superseded where marked |
+| [Linked-map workflows](docs/LINKED_MAPS.md) | Existing implementation reference, not accepted revised UX |
 | [Data model and storage](docs/DATA_MODEL.md) | Current domain/native storage contract and historical examples |
-| [Native saves](docs/NATIVE_SAVE_IMPLEMENTATION.md) | Current scene format, verification and portability limits |
-| [Raster benchmarks](docs/NATIVE_SAVE_BENCHMARKS.md) | Codec decision AD-10, measurements and reproduction commands |
-| [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Roadmap and decision log |
+| [Native-save report archive](docs/Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.md) | Historical scene format and validation report |
+| [Raster benchmark archive](docs/Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md) | Recorded codec measurements and reproduction commands |
+| [Milestone plan archive](docs/Archive/2026-10-30/IMPLEMENTATION_PLAN.md) | Previous roadmap, milestones and decision log |
 
-Projector output, networking and campaign import/export UX remain future work. Native saves pass Godot 4.8-beta1 acceptance; whole-file rewrite/load costs and codec trade-offs are documented in the benchmark report. See implementation notes for precise feature limits and deferred browser validation.
+The active backlog is local Obsidian Markdown: one note per epic/ticket, wikilinks for relationships, and only the checkboxes in `docs/Index.md` for completion. Priorities and dependencies live in the notes. Browser runtime smoke remains deferred.

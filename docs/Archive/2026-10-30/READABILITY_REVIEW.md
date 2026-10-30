@@ -1,3 +1,13 @@
+---
+type: archive
+archived: 2026-10-30
+original_path: docs/READABILITY_REVIEW.md
+---
+
+> [!info] Historical focused readability pass
+> This report covers the previously selected milestone-6 code, not the whole codebase. The broader manual findings are in [[ManualReview_2026-10-30]], with follow-up work in [[T-033]], [[T-034]], [[T-035]], [[T-036]] and [[T-038]].
+
+<!-- Original report; relative links rebased only. -->
 # Readability review — post-milestone 6
 
 This pass refines the implementation introduced in `c46fb66`. It preserves the

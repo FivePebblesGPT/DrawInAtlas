@@ -1,5 +1,8 @@
 # Campaign Data Model and Persistence
 
+> [!important] Existing representation, pending model decisions
+> This describes the implementation, not the revised canvas contract. [[E-002]] and [[E-006]] record the confirmed shared-board/artwork-LOD/local-object direction; [[E-003]] and [[E-SAVE]] track model and persistence cleanup. Existing dictionary helpers are under investigation in [[T-029]]. Completion is tracked in [[Index]].
+
 **Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, locally verified on Godot 4.8-beta1. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
 
 ## Current native checkpoint contract (native v1)
@@ -34,8 +37,8 @@ dependencies; arbitrary external artwork/campaign dependencies are rejected.
 Old JSON saves remain untouched, with **no legacy user-save importer**.
 
 Whole-file save/load and eager hydration costs, codec selection AD-10 and
-measured fidelity/size/memory trade-offs are in [benchmarks](NATIVE_SAVE_BENCHMARKS.md).
-See [native saves](NATIVE_SAVE_IMPLEMENTATION.md) for transaction details and
+measured fidelity/size/memory trade-offs are in [archived benchmarks](Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md).
+See [archived native-save report](Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.md) for transaction details and
 portability evidence. Browser smoke remains deferred; Windows/macOS replacement
 and physical-media power-loss durability are not claimed.
 

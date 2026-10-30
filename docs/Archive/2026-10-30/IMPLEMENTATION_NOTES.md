@@ -1,3 +1,13 @@
+---
+type: archive
+archived: 2026-10-30
+original_path: docs/IMPLEMENTATION_NOTES.md
+---
+
+> [!info] Historical implementation evidence
+> Preserved after [[ManualReview_2026-10-30]]. Passing implementation checks did not establish usability acceptance. Current work and completion tracking are in [[Index]]; clarified canvas/LOD requirements are in [[E-002]] and [[E-006]].
+
+<!-- Original report; relative links rebased only. -->
 # Implementation Notes
 
 ## Execution milestone 6 — linked maps and artwork references, 2026-10-29
@@ -5,7 +15,7 @@
 - `prefab/link_dialog.tscn` owns destination/floor, arrival camera, mode and
   placement drafts. `AtlasLinkedMaps` submits `AtlasLinkEdit` commands; the
   workspace no longer directly appends battlemap/map/link objects or marks those
-  edits as external. See [linked-map usage](LINKED_MAPS.md).
+  edits as external. See [linked-map usage](../../LINKED_MAPS.md).
 - New independent documents, entrances and footprints form one reversible
   transaction. Existing destinations can be reused without changing their
   artwork/grid/units. Moving, resizing, rotating, retargeting and unlinking are
@@ -195,7 +205,7 @@ retained as references/facades for menus and integrations.
 clipboard state. `AtlasMapNavigator` owns camera/floor/layer memory, Back and
 the opt-in zoom gate. Both receive concrete dependencies without an editor
 backpointer. The workspace retains session/save/load, document-level commands
-and undo/redo coordination. See [Code readability](CODE_READIBILITY.md) for
+and undo/redo coordination. See [Code readability](../../CODE_READIBILITY.md) for
 the ownership table and representative floor workflow.
 
 Verification on Godot **4.8-beta1**:

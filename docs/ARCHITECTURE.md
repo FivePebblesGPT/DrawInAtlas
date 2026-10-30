@@ -1,6 +1,9 @@
 # Technical Architecture
 
-**Status:** target architecture; the running integration scaffold implements only part of it. The development baseline is **Godot 4.8-beta1**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [Implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
+> [!important] Reference implementation and earlier design
+> [[Index]] is the active backlog. The user confirmed a continuous chunked board under all hexes, automatic artwork-layer LOD, and local within-map canvas objects: see [[E-002]] and [[E-006]]. Earlier independent-document/footprint assumptions below are superseded where they conflict. This document is not current usability acceptance.
+
+**Status:** earlier target architecture plus implementation reference. The development baseline is **Godot 4.8-beta1**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [archived implementation notes](Archive/2026-10-30/IMPLEMENTATION_NOTES.md) for historical checks.
 
 ## What runs today
 
@@ -68,8 +71,8 @@ written back over the bundled `.tres`. A minimal data-only scene root owns map
 document nodes; their stable IDs reconstruct the runtime registry. No standalone
 `.res` or raster assets are required. Transient workspace controls, camera state
 and preview renderers remain separate from saved data. Legacy JSON user saves
-are neither imported nor deleted. See [native saves](NATIVE_SAVE_IMPLEMENTATION.md)
-for validation boundaries and [benchmarks](NATIVE_SAVE_BENCHMARKS.md) for the
+are neither imported nor deleted. See [native saves](Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.md)
+for validation boundaries and [benchmarks](Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md) for the
 measured whole-file save/load costs.
 
 **Where to begin:** to change a form, edit `prefab/*.tscn` and its
@@ -294,4 +297,4 @@ Initial collaboration can be host-sequenced commands with conflict rejection or 
 
 Use typed **GDScript** for the domain and all core features. GDExtensions may be optional accelerators only with WebAssembly builds and fallback paths; no mandatory native-only library, OS-specific file API or threads in the core. Godot Compatibility renderer / single-thread web export is the baseline. Canonical raster payloads use lossless **WebP** embedded in the campaign scene; derived thumbnails may be lossy.
 
-See [Maps and grids](MAPS_AND_GRIDS.md) for geometry and editing constraints; [Semantic zoom](SEMANTIC_ZOOM.md) for navigation state; [Implementation plan](IMPLEMENTATION_PLAN.md) for staged validation.
+See [Maps and grids](MAPS_AND_GRIDS.md) for reference geometry and [Semantic zoom](SEMANTIC_ZOOM.md) for the previous navigation model. Current work/acceptance is tracked in [[Index]]; the [previous implementation plan](Archive/2026-10-30/IMPLEMENTATION_PLAN.md) is archived.

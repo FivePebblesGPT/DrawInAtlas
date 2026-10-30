@@ -1,11 +1,14 @@
 # Code readability and scene structure
 
+> [!info] Implementation reference
+> The broader findings in [[ManualReview_2026-10-30]] now drive [[Index]]. Explicit typing/skill guidance is [[T-001]]; additional module readability and commented-step work is tracked by [[T-033]], [[T-034]], [[T-035]], [[T-036]] and [[T-037]]. Earlier focused readability checks are historical evidence.
+
 This document tracks readability improvements on `aidev`. Comparing the number
 of `.gd` files to `.tscn` files was misleading: the domain model, application
 services and test scripts do not describe node trees.
 
 For the post-milestone-6 simplification, code-only review findings and prioritized
-manual-review paths, see [Readability review](READABILITY_REVIEW.md).
+manual-review paths, see [archived readability review](Archive/2026-10-30/READABILITY_REVIEW.md).
 
 ## Fixed UI belongs in scenes
 

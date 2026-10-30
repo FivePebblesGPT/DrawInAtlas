@@ -1,5 +1,8 @@
 # Product Design Specification
 
+> [!important] Earlier proposal — current decisions take precedence
+> The manual review and subsequent clarification supersede conflicting assumptions here. Hexes share a continuous chunked board; automatic zoom means artwork-layer LOD, on by default; battlemats are non-nested local canvas objects. See [[E-002]], [[E-006]], [[ManualReview_2026-10-30]] and the active checklist [[Index]].
+
 **Status:** proposed design, October 2026. Nothing here implies that the feature is already implemented.
 
 ## 1. Purpose and audience

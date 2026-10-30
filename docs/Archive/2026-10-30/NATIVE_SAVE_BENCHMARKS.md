@@ -1,3 +1,13 @@
+---
+type: archive
+archived: 2026-10-30
+original_path: docs/NATIVE_SAVE_BENCHMARKS.md
+---
+
+> [!info] Historical measurements
+> These fixture results remain evidence for their recorded implementation, not proof of the revised canvas/LOD model's performance. See [[E-SAVE]], [[T-002]] and [[T-004]] for current work and [[Index]] for completion.
+
+<!-- Original report; relative links rebased only. -->
 # Native raster benchmark and AD-10 decision
 
 **Measured:** 2026-10-29, local Arch Linux x86-64 workstation, standard Godot
