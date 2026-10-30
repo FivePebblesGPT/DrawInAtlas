@@ -176,6 +176,34 @@ func edit_path(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> v
 		message.emit("Editable wall path updated.")
 
 
+## One guarded snapshot per placement/revision; text is never flattened.
+func edit_text(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> void:
+	if not _canvas.editing_target_is_presented():
+		return
+	var layer: AtlasInkLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable() or replacement == null or not replacement.is_text() or not replacement.is_valid():
+		return
+	if index < -1 or index >= layer.strokes.size():
+		return
+	if index >= 0 and (expected == null or not expected.is_text() or layer.strokes[index].to_dict() != expected.to_dict()):
+		return
+	var active_scope: AtlasEditScope = scope()
+	if not active_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(replacement)):
+		message.emit("Text must fit inside the edit mask.")
+		return
+	if expected != null and not active_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(expected)):
+		message.emit("Cannot edit text crossing the edit mask.")
+		return
+	var after: Array[AtlasStroke] = AtlasStroke.clone_all(layer.strokes)
+	if index == -1:
+		after.append(replacement.copy())
+	else:
+		after[index] = replacement.copy()
+	if _edits.execute(AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, layer.strokes, after, layer.id)):
+		_canvas.queue_redraw()
+		message.emit("Editable text updated.")
+
+
 func paint(cell: Vector2i) -> void:
 	if not _canvas.editing_target_is_presented():
 		message.emit("Select the editing layer's detail level before painting.")

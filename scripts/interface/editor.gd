@@ -24,6 +24,7 @@ var browser: AtlasCampaignBrowser
 var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
 var tool_palette: AtlasToolPalette
+var text_editor: AtlasTextEditorPopup
 
 @onready var canvas: AtlasCanvas = $Shell/CanvasAndInspector/Canvas
 @onready var inspector: AtlasInspector = $Shell/CanvasAndInspector/InspectorPanel
@@ -129,6 +130,9 @@ func _ready() -> void:
 	map_references.bind(canvas)
 	canvas.references = map_references
 	_mount_sidebar_views()
+	text_editor = AtlasTextEditorPopup.new()
+	add_child(text_editor)
+	text_editor.text_confirmed.connect(artwork.edit_text)
 	_connect_workspace()
 	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
@@ -200,6 +204,7 @@ func _connect_workspace() -> void:
 	canvas.paint_requested.connect(artwork.paint)
 	canvas.stroke_requested.connect(artwork.stroke)
 	canvas.path_edit_requested.connect(artwork.edit_path)
+	canvas.text_requested.connect(_open_text_editor)
 	canvas.transform_requested.connect(artwork.transform_selection)
 	canvas.fill_requested.connect(artwork.commit_preview_fill)
 	canvas.fill_preview_requested.connect(artwork.preview_fill)
@@ -743,6 +748,16 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	return artwork.apply_layers(layers, selected_id)
 
 
+func _open_text_editor(anchor: Vector2, index: int) -> void:
+	var original: AtlasStroke
+	var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable():
+		return
+	if index >= 0 and index < layer.strokes.size():
+		original = layer.strokes[index]
+	text_editor.open_editor(anchor, original, index, canvas.brush_color)
+
+
 func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
 	artwork.stroke(stroke, erasing)
 
@@ -822,6 +837,8 @@ func _on_unit_changed(index: int) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if text_editor != null and text_editor.visible:
+		return
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	if event.is_command_or_control_pressed():
@@ -872,9 +889,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
 			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH}
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

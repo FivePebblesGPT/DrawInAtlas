@@ -19,6 +19,7 @@ signal interaction_started
 signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 signal path_edit_requested(index: int, expected: AtlasStroke, replacement: AtlasStroke)
+signal text_requested(anchor: Vector2, index: int)
 signal selection_changed
 signal transform_requested(selection: AtlasSelection, transform: Transform2D)
 signal fill_requested
@@ -26,7 +27,7 @@ signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
 
-enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH }
+enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
@@ -542,6 +543,13 @@ func _draw_grid(item: Node2D) -> void:
 
 
 func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
+	if stroke.is_text():
+		if AtlasTextLayout.readable(stroke, camera_zoom):
+			item.draw_set_transform(stroke.points[0], stroke.text_rotation)
+			item.draw_multiline_string(AtlasTextLayout.font_for(stroke), Vector2.ZERO, stroke.text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, roundi(stroke.width), -1, stroke.color)
+			item.draw_set_transform_matrix(Transform2D.IDENTITY)
+		return
 	if stroke.filled:
 		var interior: PackedVector2Array = stroke.points.duplicate()
 		interior.remove_at(interior.size() - 1)
@@ -720,6 +728,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	if _begin_link_press(mouse, position):
 		return
 	match tool:
+		Tool.TEXT:
+			_begin_text_edit(position)
 		Tool.POLYGON:
 			_begin_polygon_vertex(mouse, position)
 		Tool.WALL_PATH:
@@ -898,6 +908,24 @@ func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void
 		# One dispatch emits at most one logical step, discarding any remainder.
 		_pending_wheel_fraction = 0.0
 		wheel_step.emit(direction, position)
+
+
+## Clicking existing text reopens the same object; empty space places new text.
+func _begin_text_edit(position: Vector2) -> void:
+	if not editing_target_is_presented():
+		return
+	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable():
+		return
+	for index: int in range(layer.strokes.size() - 1, -1, -1):
+		var candidate: AtlasStroke = layer.strokes[index]
+		if candidate.is_text() and AtlasTextLayout.bounds(candidate).grow(5.0 / camera_zoom).has_point(position):
+			text_requested.emit(position, index)
+			interaction_finished.emit()
+			return
+	var anchor: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+	text_requested.emit(anchor, -1)
+	interaction_finished.emit()
 
 
 ## Construct and edit independently typed wall paths on the selected ink layer.

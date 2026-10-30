@@ -12,6 +12,17 @@ static func erase(strokes: Array[AtlasStroke], path: PackedVector2Array, width: 
 	var result: Array[AtlasStroke] = []
 	for stroke: AtlasStroke in strokes:
 		var radius: float = (width + stroke.width) * 0.5
+		if stroke.is_text():
+			# Never convert glyphs into non-editable outline fragments.
+			var touched: bool = false
+			var hit_region: Rect2 = AtlasTextLayout.bounds(stroke).grow(width * 0.5)
+			for segment: int in range(maxi(1, path.size() - 1)):
+				if _segment_hits_rect(hit_region, path[segment], path[mini(segment + 1, path.size() - 1)]):
+					touched = true
+					break
+			if not touched:
+				result.append(stroke.copy())
+			continue
 		if stroke.editable_path:
 			var path_points: PackedVector2Array = AtlasEditablePath.render_points(stroke)
 			if not _touches(path_points, path, radius):
@@ -70,4 +81,15 @@ static func _touches(ink: PackedVector2Array, path: PackedVector2Array, radius: 
 			)
 			if closest[0].distance_squared_to(closest[1]) <= radius * radius:
 				return true
+	return false
+
+
+static func _segment_hits_rect(bounds: Rect2, start: Vector2, finish: Vector2) -> bool:
+	if bounds.has_point(start) or bounds.has_point(finish):
+		return true
+	var corners: Array[Vector2] = [bounds.position, Vector2(bounds.end.x, bounds.position.y),
+		bounds.end, Vector2(bounds.position.x, bounds.end.y)]
+	for side: int in range(4):
+		if Geometry2D.segment_intersects_segment(start, finish, corners[side], corners[(side + 1) % 4]) != null:
+			return true
 	return false

@@ -155,9 +155,9 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
-	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "BRUSH & STROKE")
+	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "TEXT COLOR" if tool == AtlasCanvas.Tool.TEXT else "BRUSH & STROKE")
 	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
 	_bucket_hint.text = ("Terrain: contiguous equal-palette cells on the active terrain grid. No tolerance; empty regions need a cell edit mask. Press/release fills; Esc cancels."
 		if tool == AtlasCanvas.Tool.FILL and terrain_active else
@@ -173,13 +173,13 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	_ink_color_label.visible = not erasing
 	brush_color_picker.visible = not erasing
 	brush_color_picker.disabled = erasing
-	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
-	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool != AtlasCanvas.Tool.FILL
-	brush_width_spinner.visible = tool != AtlasCanvas.Tool.FILL
+	brush_width_spinner.editable = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
+	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
+	brush_width_spinner.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
 	_terrain_section.visible = tool == AtlasCanvas.Tool.PAINT or (tool == AtlasCanvas.Tool.FILL and terrain_active)
 	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
-		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	snap_checkbox.disabled = not grid_available
 
 

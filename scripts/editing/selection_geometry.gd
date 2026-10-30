@@ -6,6 +6,8 @@ extends RefCounted
 
 
 static func stroke_bounds(stroke: AtlasStroke) -> Rect2:
+	if stroke.is_text():
+		return AtlasTextLayout.bounds(stroke)
 	var bounds: Rect2 = Rect2(stroke.points[0], Vector2.ZERO)
 	for point: Vector2 in stroke.points:
 		bounds = bounds.expand(point)
@@ -98,6 +100,10 @@ static func select_point(layer: AtlasLayer, point: Vector2, tolerance: float) ->
 		for index: int in range(layer.strokes.size() - 1, -1, -1):
 			var stroke: AtlasStroke = layer.strokes[index]
 			var radius: float = stroke.width * 0.5 + tolerance
+			if stroke.is_text():
+				if stroke_bounds(stroke).grow(tolerance).has_point(point):
+					return select_indices(layer, [index])
+				continue
 			if stroke.filled and Geometry2D.is_point_in_polygon(point, stroke.points):
 				return select_indices(layer, [index])
 			var path_points: PackedVector2Array = AtlasEditablePath.render_points(stroke) if stroke.editable_path else stroke.points
@@ -150,6 +156,8 @@ static func transformed(layer: AtlasLayer, selection: AtlasSelection, transform:
 			for point: int in range(original.points.size()):
 				original.points[point] = transform * original.points[point]
 			original.width *= scale
+			if original.is_text():
+				original.text_rotation += transform.get_rotation()
 			if not original.is_valid() or (scope != null and not scope.contains_rect(stroke_bounds(original))):
 				return null
 	elif result is AtlasRasterLayer:

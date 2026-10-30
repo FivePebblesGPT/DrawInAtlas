@@ -45,6 +45,10 @@ func clip_strokes(strokes: Array[AtlasStroke]) -> Array[AtlasStroke]:
 	for stroke: AtlasStroke in strokes:
 		if stroke == null or not stroke.is_valid():
 			continue
+		if stroke.is_text():
+			if contains_rect(AtlasTextLayout.bounds(stroke)):
+				result.append(stroke.copy())
+			continue
 		var centerline: PackedVector2Array = PackedVector2Array()
 		for point: Vector2 in stroke.points:
 			if centerline.is_empty() or point != centerline[-1]:
@@ -74,10 +78,8 @@ func erase(strokes: Array[AtlasStroke], path: PackedVector2Array, width: float) 
 		if not stroke.is_valid() or not _valid_boundary():
 			result.append(stroke.copy())
 			continue
-		var bounds: Rect2 = Rect2(stroke.points[0], Vector2.ZERO)
-		for point: Vector2 in stroke.points:
-			bounds = bounds.expand(point)
-		if contains_rect(bounds.grow(stroke.width * 0.5)):
+		var bounds: Rect2 = AtlasSelectionGeometry.stroke_bounds(stroke)
+		if contains_rect(bounds):
 			var eligible: Array[AtlasStroke] = [stroke]
 			result.append_array(AtlasStrokeEraser.erase(eligible, path, width))
 		else:
