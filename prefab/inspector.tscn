@@ -160,6 +160,14 @@ theme_override_font_sizes/font_size = 11
 text = "BRUSH & STROKE"
 autowrap_mode = 3
 
+[node name="EraserHint" type="Label" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+visible = false
+text = "Erases only the active layer: cuts ink strokes or clears raster pixels to transparency. Not maps, links, or terrain. One drag = one undo."
+autowrap_mode = 3
+
 [node name="ColorLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=1830986059]
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2

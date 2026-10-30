@@ -33,7 +33,7 @@
 - [ ] [[T-018|T-018 · Compact layer/object/link hierarchy]]
 - [x] [[T-019|T-019 · Selection and selection masks]]
 - [x] [[T-020|T-020 · Brush]]
-- [ ] [[T-021|T-021 · Eraser]]
+- [x] [[T-021|T-021 · Eraser]]
 - [ ] [[T-022|T-022 · Move]]
 - [ ] [[T-023|T-023 · Bucket]]
 - [ ] [[T-024|T-024 · Line]]

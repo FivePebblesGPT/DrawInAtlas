@@ -399,10 +399,10 @@ func _draw_overlays(item: Node2D) -> void:
 	_draw_brush_cursor(item)
 
 
-## A screen-space pointer ring represents the actual board-unit diameter at any zoom.
-## Keep it out of source artwork, layer previews, capture and saved scenes.
+## A pointer ring shows the active Brush or Eraser diameter at any zoom.
+## Keep it out of authored ink/raster, captured references and saved scenes.
 func _draw_brush_cursor(item: Node2D) -> void:
-	if not _brush_cursor_inside or tool != Tool.PEN or not editing_target_is_presented():
+	if not _brush_cursor_inside or tool not in [Tool.PEN, Tool.ERASER] or not editing_target_is_presented():
 		return
 	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
 	if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
@@ -413,7 +413,9 @@ func _draw_brush_cursor(item: Node2D) -> void:
 		return
 	# Dual outline stays visible against both dark and light artwork.
 	item.draw_arc(center, radius, 0.0, TAU, 64, Color(0, 0, 0, 0.85), 2.5 / camera_zoom, true)
-	item.draw_arc(center, radius, 0.0, TAU, 64, Color(1, 1, 1, 0.95), 1.0 / camera_zoom, true)
+	item.draw_arc(center, radius, 0.0, TAU, 64,
+		Color(1.0, 0.53, 0.45, 0.95) if tool == Tool.ERASER else Color(1, 1, 1, 0.95),
+		1.0 / camera_zoom, true)
 
 
 func _clear_brush_cursor() -> void:

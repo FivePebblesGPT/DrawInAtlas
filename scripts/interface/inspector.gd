@@ -40,6 +40,9 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var snap_checkbox: CheckBox = %SnapCheckbox
 @onready var _snap_section: VBoxContainer = %SnapSection
 @onready var _ink_section: VBoxContainer = %InkSection
+@onready var _ink_heading: Label = $Scroll/Margin/Sections/InkSection/Heading
+@onready var _ink_color_label: Label = $Scroll/Margin/Sections/InkSection/ColorLabel
+@onready var _eraser_hint: Label = %EraserHint
 @onready var _terrain_section: VBoxContainer = %TerrainSection
 @onready var _selection_section: VBoxContainer = %SelectionSection
 @onready var _transform_button: Button = %TransformButton
@@ -122,7 +125,12 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
 		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.FILL]
-	brush_color_picker.disabled = tool == AtlasCanvas.Tool.ERASER
+	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
+	_ink_heading.text = "ERASER" if erasing else "BRUSH & STROKE"
+	_eraser_hint.visible = erasing
+	_ink_color_label.visible = not erasing
+	brush_color_picker.visible = not erasing
+	brush_color_picker.disabled = erasing
 	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
 	_terrain_section.visible = tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
 	_selection_section.visible = tool == AtlasCanvas.Tool.ART_SELECT
