@@ -2,8 +2,14 @@ class_name AtlasStroke
 extends Resource
 ## Editable ink in continuous document coordinates, independent of any grid.
 
+## Canonical ordered vertices in document/board units. A text object has one
+## anchor; a filled polygon repeats its first vertex at the end. Copies own
+## their PackedVector2Array so history cannot mutate an earlier shape.
 @export_storage var points: PackedVector2Array
+## Unpremultiplied RGBA for drawing and saving; alpha is not layer opacity.
 @export_storage var color: Color
+## Diameter in board units for ink, but font size in board units for text.
+## Must be finite and positive; text additionally obeys AtlasTextLayout limits.
 @export_storage var width: float
 ## Solid polygon shape, as opposed to a round-ended centerline stroke.
 @export_storage var filled: bool = false
@@ -15,6 +21,8 @@ extends Resource
 @export_storage var font_family: String = "Sans"
 @export_storage var text_bold: bool = false
 @export_storage var text_italic: bool = false
+## Text-only rotation in radians about the single document-space anchor.
+## Non-text strokes must keep all text-style fields at their defaults.
 @export_storage var text_rotation: float = 0.0
 
 

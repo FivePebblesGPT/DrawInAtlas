@@ -2,10 +2,14 @@ class_name AtlasViewState
 extends RefCounted
 ## Viewer-local camera and layer selection; never serialized into the campaign.
 
+## Viewer/session-only identifiers, never part of saved campaign defaults.
 var map_id: String
 var floor_id: String
+## Camera center in current map's board units, not a screen-local offset.
 var focus: Vector2
+## Positive board-to-screen magnification, not an authored D0–D32 level.
 var zoom: float
+## Active editing layer ID; camera navigation never changes authored content.
 var layer_id: String
 
 

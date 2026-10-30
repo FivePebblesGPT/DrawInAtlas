@@ -3,6 +3,9 @@ extends RefCounted
 ## Cuts vector centerlines against the swept round eraser, accounting for ink width.
 
 
+## Both swept path and widths are in board units. The collision radius is
+## half the sum of eraser and ink diameters; retained fragments are new stroke
+## objects so command snapshots can undo without aliasing original vertices.
 static func erase(strokes: Array[AtlasStroke], path: PackedVector2Array, width: float) -> Array[AtlasStroke]:
 	if path.is_empty() or not is_finite(width) or width <= 0.0:
 		return AtlasStroke.clone_all(strokes)

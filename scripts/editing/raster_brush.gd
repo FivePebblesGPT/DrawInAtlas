@@ -3,6 +3,9 @@ extends RefCounted
 ## Hard round swept brush, measured in document units, returning a detached layer.
 
 
+## path/width are in document-board units; candidate coordinates and limit
+## are in raster PIXELS after inverse transform and pixels_per_unit scaling.
+## The resulting layer is detached; no source pixels are modified in place.
 static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Color,
 		width: float, erase: bool, scope: AtlasEditScope = null,
 		limit: int = 1048576) -> AtlasFillResult:

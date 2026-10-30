@@ -12,6 +12,8 @@ var palette_id: int = 2
 var use_system_clipboard: bool = true
 var clipboard_text: String = ""
 var _paste_count: int = 0
+## Detached fill candidate while the pointer is pressed: no persisted pixels
+## or history entry until release, and switching layers cancels the candidate.
 var _pending_fill: AtlasFillResult
 var _pending_fill_layer_id: String = ""
 var _pending_fill_is_terrain: bool = false

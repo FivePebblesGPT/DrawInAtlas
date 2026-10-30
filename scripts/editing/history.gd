@@ -10,10 +10,16 @@ signal changed
 var active_map_id: String = ""
 var _campaign: AtlasCampaign
 var _commands: Array[AtlasEditCommand] = []
+## One unique state token per command boundary (length = commands + 1).
+## Tokens are identities, not array positions, and may skip after branching.
 var _states: Array[int] = [0]
+## Number of currently applied commands; 0.._commands.size().
 var _cursor: int = 0
 var _next_state: int = 0
+## Saved checkpoint identity compared to _states[_cursor] for dirty status.
 var _saved_state: int = 0
+## Dirty revisions for direct mutations outside history commands; the saved
+## counterpart captures only the last persisted external revision.
 var _external_revision: int = 0
 var _saved_external_revision: int = 0
 

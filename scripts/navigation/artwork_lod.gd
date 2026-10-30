@@ -9,6 +9,8 @@ const EXIT_COVERAGE: float = 0.45
 
 # Cache individual visible pieces, not a single merged group rectangle: two
 # disconnected towns must not synthesize D1 artwork in the empty space between.
+## Rebuilt, derived visible board-space rectangles by authored D level.
+## This is a presentation cache, never persisted or used as edit ownership.
 var _pieces_by_level: Dictionary[int, Array] = {}
 
 

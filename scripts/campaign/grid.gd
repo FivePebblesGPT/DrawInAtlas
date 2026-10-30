@@ -6,9 +6,14 @@ extends Resource
 enum Kind { GRIDLESS, SQUARE, HEX_POINTY, HEX_FLAT }
 
 @export var kind: Kind = Kind.HEX_POINTY
+## Positive document units per square side or hex center-to-corner radius.
 @export var cell_size: float = 48.0
+## Board-space grid origin; cell indices are relative to this point.
 @export var origin: Vector2 = Vector2.ZERO
+## Grid orientation in radians (not degrees); stored independently of artwork.
 @export var rotation: float = 0.0
+## Native measurement metadata, NOT a conversion of cell_size or screen zoom.
+## Positive distance represented by one cell, labeled using distance_unit.
 @export var distance_per_cell: float = 6.0
 @export var distance_unit: String = "mi"
 @export var visible: bool = true

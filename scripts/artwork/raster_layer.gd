@@ -1,8 +1,15 @@
 class_name AtlasRasterLayer
 extends AtlasLayer
 
+## Positive density of raster pixels per *local* board unit. A local pixel at
+## (x, y) maps to (x, y) / pixels_per_unit before applying transform.
 @export_storage var pixels_per_unit: float = 1.0
+## Affine local-board -> document-board transform; must be finite/invertible.
+## Moving a raster changes this field, not the stored pixel bytes.
 @export_storage var transform: Transform2D = Transform2D.IDENTITY
+## Canonical sparse chunk ownership: key "cx,cy" matches chunk.coord, with signed
+## chunk indexes and 256-pixel strides. Each chunk owns independent RGBA8 bytes;
+## absent chunks are not implicit editable pixels.
 @export_storage var chunks: Dictionary[String, AtlasRasterChunk] = {}
 
 

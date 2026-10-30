@@ -6,9 +6,11 @@ extends RefCounted
 ## the document or change the default floor written to the save file.
 
 class MapViews extends RefCounted:
+	## Snapshot by floor ID; nested MapViews values are session-only copies.
 	var floors: Dictionary[String, AtlasViewState] = {}
 	var last_floor_id: String = ""
 
+## Ephemeral map-ID -> remembered floor views; deliberately not exported.
 var _maps: Dictionary[String, MapViews] = {}
 
 

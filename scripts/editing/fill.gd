@@ -2,10 +2,14 @@ class_name AtlasFill
 extends RefCounted
 ## Atomic tile and existing-pixel flood fills. Scope boundaries stop traversal.
 
+## Four-connected INTEGER pixel-space offsets (not terrain grid neighbors).
+## A raster fill never traverses an unstored chunk or leaves its edit scope.
 const PIXEL_NEIGHBORS: Array[Vector2i] = [
 	Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP
 ]
 # Leave room for neighbor arithmetic and float32 pixel-to-document conversion.
+## Conservative signed pixel-coordinate bounds for safe neighbor arithmetic;
+## pixel coordinates are floor(inverse layer transform * board point * density).
 const PIXEL_MIN: int = -2147483000
 const PIXEL_MAX: int = 2147483000
 

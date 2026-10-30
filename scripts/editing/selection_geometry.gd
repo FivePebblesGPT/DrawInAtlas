@@ -14,6 +14,8 @@ static func stroke_bounds(stroke: AtlasStroke) -> Rect2:
 	return bounds.grow(stroke.width * 0.5)
 
 
+## Local board-unit bounds of stored raster chunks, before layer.transform.
+## Signed chunk coords are pixel origins (coord * SIZE) divided by density.
 static func raster_local_bounds(layer: AtlasRasterLayer) -> Rect2:
 	var bounds: Rect2
 	var first: bool = true
@@ -25,6 +27,8 @@ static func raster_local_bounds(layer: AtlasRasterLayer) -> Rect2:
 	return bounds
 
 
+## Derived axis-aligned board-space envelope of all four transformed corners;
+## the rectangle is an interaction bound, not raster content or a saved mask.
 static func transformed_rect(bounds: Rect2, transform: Transform2D) -> Rect2:
 	var result: Rect2 = Rect2(transform * bounds.position, Vector2.ZERO)
 	for corner: Vector2 in [bounds.position, Vector2(bounds.end.x, bounds.position.y), bounds.end, Vector2(bounds.position.x, bounds.end.y)]:

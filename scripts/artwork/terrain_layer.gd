@@ -3,7 +3,12 @@
 class_name AtlasTerrainLayer
 extends AtlasLayer
 
+## Sparse canonical palette: "q,r" axial hex keys or "x,y" square keys.
+## Zero means unpainted/background; stored palette IDs are nonnegative integers.
+## Coordinates are *cell indices* under grid, never document pixel positions.
 @export_storage var terrain: Dictionary[String, int] = {}
+## Optional retained cell geometry; editing the display overlay must not remap
+## existing terrain. A null grid falls back through the document's terrain grid.
 @export_storage var grid: AtlasGrid
 
 

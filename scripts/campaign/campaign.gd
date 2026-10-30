@@ -9,8 +9,13 @@ const SCHEMA_VERSION: int = 6
 
 @export_storage var display_name: String = "West Marches"
 @export_storage var root_map_id: String = "world"
+## Canonical runtime document graph keyed by stable map ID; reconstructed from
+## native-save nodes rather than directly exported as a Resource property.
 var maps: Dictionary = {} # map ID -> AtlasMapDocument
+## Directed navigation edges between independent documents (not artwork LOD).
 @export_storage var links: Array[AtlasMapLink] = []
+## Legacy optional parent-board footprints. Keep for old-save compatibility;
+## a symbolic link does not thereby acquire a spatial footprint.
 @export_storage var placements: Array[AtlasPlacement] = []
 
 

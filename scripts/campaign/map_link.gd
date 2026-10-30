@@ -13,9 +13,12 @@ extends Resource
 ## Pointer hit-test tolerance for a marker-only entrance in source document units.
 ## Do not confuse this with a viewport-pixel radius or a placed battlemap size.
 @export_range(0.001, 1000000.0, 0.001, "or_greater") var hit_radius: float = 48.0
+## Saved arrival camera focus in TARGET document units (not source coordinates).
 @export var target_focus: Vector2 = Vector2.ZERO
+## Target camera magnification, positive screen-pixels-per-board-unit scale.
 @export var target_zoom: float = 1.0
 @export var target_floor_id: String = "ground"
+## Optional legacy footprint ID; empty means a simple source-board marker.
 @export var placement_id: String = ""
 
 

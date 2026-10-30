@@ -7,11 +7,17 @@ extends Resource
 
 @export_storage var id: String = ""
 @export_storage var display_name: String = ""
+## Legacy map category for independent documents, not an artwork/detail layer.
 @export_storage var kind: String = "REGION"
 @export_storage var tags: Array[String] = []
+## Mutable display/grid-settings overlay, with no authority to move ink pixels.
 @export_storage var grid: AtlasGrid = AtlasGrid.new()
+## Historical cell basis used if a terrain layer has no explicit grid. This is
+## canonical for interpreting legacy terrain, not a second visible grid overlay.
 @export_storage var terrain_grid: AtlasGrid
+## Canonical ordered floor contents; each floor independently owns its layers.
 @export_storage var floors: Array[AtlasFloor] = []
+## Saved default floor ID; opening a different floor is session-only view state.
 @export_storage var default_floor_id: String = "ground"
 
 

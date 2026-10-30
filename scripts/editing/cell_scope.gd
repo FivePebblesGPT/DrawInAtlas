@@ -2,7 +2,10 @@ class_name AtlasEditScope
 extends RefCounted
 ## Document-space convex selection boundary. An enabled empty scope denies edits.
 
+## Disabled = unrestricted edits; enabled with an empty polygon = deny all.
 var enabled: bool = false
+## Board-space convex cell footprint copied from the active edit-mask grid.
+## This is transient eligibility geometry, not the editable terrain shape.
 var polygon: PackedVector2Array = PackedVector2Array()
 
 

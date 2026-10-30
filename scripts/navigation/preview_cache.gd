@@ -3,7 +3,9 @@ extends RefCounted
 ## Editor artwork snapshots. Audience partitions entries; it does not filter content.
 
 var _max_entries: int
+## Derived rendered previews keyed by audience/map/view; not canonical art.
 var _entries: Dictionary[String, Dictionary] = {}
+## Least-recently-used key order, not a persisted order of saved documents.
 var _lru: Array[String] = []
 
 

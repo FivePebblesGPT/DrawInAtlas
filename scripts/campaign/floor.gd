@@ -3,6 +3,8 @@ extends Resource
 
 @export_storage var id: String = "ground"
 @export_storage var display_name: String = "Ground"
+## Canonical back-to-front ordered layer resources. A detail level is a layer
+## property, not a separate board or a child document.
 @export_storage var layers: Array[AtlasLayer] = [AtlasTerrainLayer.new(), AtlasInkLayer.new()]
 
 # Compatibility views for the original terrain/ink APIs; ordered layers own the data.

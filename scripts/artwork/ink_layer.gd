@@ -1,6 +1,8 @@
 class_name AtlasInkLayer
 extends AtlasLayer
 
+## Canonical ordered objects; indices are transient selection identities and
+## can change after edits. Commands copy the objects for before/after snapshots.
 @export_storage var strokes: Array[AtlasStroke] = []
 
 

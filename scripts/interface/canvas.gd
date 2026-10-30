@@ -63,12 +63,14 @@ var preview: Preview = Preview.OVERLAY
 ## Private capture only: retain source alpha instead of painting the editor board.
 var transparent_background: bool = false
 
+## View-only document-board point at the center of the widget's viewport.
 var camera_center: Vector2 = Vector2.ZERO:
 	set(value):
 		if camera_center == value:
 			return
 		camera_center = value
 		view_region_changed.emit()
+## View-only scale (screen pixels per board unit); not a D-level selector.
 var camera_zoom: float = 1.0:
 	set(value):
 		if camera_zoom == value:
@@ -90,10 +92,13 @@ var show_grid: bool:
 			map.grid.visible = value
 		queue_redraw()
 var brush_color: Color = Color("#f5b545")
+## Brush/eraser/line diameter in document units; pointer ring converts with
+## camera_zoom. Never store a screen-pixel width in a stroke.
 var brush_width: float = 8.0
 ## Session-only; grid changes never rewrite existing artwork.
 var snap_to_grid: bool = false
 var polygon_solid_fill: bool = false
+## Session-only normalized [0, 1] premultiplied-RGBA fill tolerance.
 var fill_tolerance: float = 0.0
 var fill_global: bool = false
 
@@ -109,13 +114,17 @@ var _stroke_left_canvas: bool = false
 var _brush_cursor_local: Vector2 = Vector2.ZERO
 var _brush_cursor_inside: bool = false
 var _erase_preview: Array[AtlasStroke] = []
+## Derived per-layer render nodes keyed by stable layer ID; never saved as art.
 var _layer_groups: Dictionary[String, CanvasGroup] = {}
 var _layer_drawers: Dictionary[String, Node2D] = {}
+## Rebuildable GPU cache; raster pixel ownership remains with AtlasRasterChunk.
 var _raster_textures: Dictionary[String, ImageTexture] = {}
 var _overlay: Node2D
 var _manipulation: Manipulation = Manipulation.NONE
+## Transient gesture endpoints in board units, not raw pointer pixels.
 var _gesture_start: Vector2
 var _gesture_end: Vector2
+## Frozen at gesture start so a toggle cannot desynchronize draft and commit.
 var _gesture_snap: bool = false
 var _shape_kind: String = ""
 var _polygon_vertices: PackedVector2Array = PackedVector2Array()
@@ -128,7 +137,9 @@ var _wall_drag_vertex: int = -1
 var _wall_drag_origin: Vector2 = Vector2.ZERO
 var _wall_before: AtlasStroke
 var _wall_preview: AtlasStroke
+## Detached candidate rendered during editing; history owns the actual commit.
 var _preview_layer: AtlasLayer
+## Selection transform in board units, not a camera or raster-pixel transform.
 var _gesture_transform: Transform2D = Transform2D.IDENTITY
 var _selection_mode: AtlasSelectionGeometry.CombineMode = AtlasSelectionGeometry.CombineMode.REPLACE
 var _moving_link_id: String = ""
