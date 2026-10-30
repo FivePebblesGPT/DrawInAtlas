@@ -78,6 +78,35 @@ func _raster_color() -> void:
 		"locked raster layers refuse brush edits")
 
 
+func _transformed_partial_chunk() -> void:
+	# A rotated, half-density imported image has one stored blue pixel.
+	# Brush may grow the chunk, but cannot edit the input image in place.
+	var source: Image = Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+	source.fill(Color.BLUE)
+	var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(source, 2.0)
+	layer.transform = Transform2D(Vector2(0, 1), Vector2(-1, 0), Vector2(7, -5))
+	var document_center: Vector2 = layer.transform * (Vector2(1.5, 0.5) / layer.pixels_per_unit)
+	var path: PackedVector2Array = PackedVector2Array([document_center])
+	var painted: AtlasFillResult = AtlasRasterBrush.paint(layer, path, Color(1, 0, 0, 0.5), 0.6, false)
+	_check(painted.ok and painted.layer != null, "rotated partial raster accepts a pixel-center brush")
+	if not painted.ok:
+		return
+	var expanded: AtlasRasterChunk = painted.layer.chunks.get("0,0")
+	_check(expanded != null and expanded.width == AtlasRasterChunk.SIZE
+		and expanded.height == AtlasRasterChunk.SIZE,
+		"painting just beyond a partial image expands only the result chunk")
+	_check(_pixel(painted.layer, Vector2i(1, 0)).a > 0.49,
+		"document-space brush footprint maps to the intended local raster pixel")
+	_check(layer.chunks["0,0"].width == 1 and layer.chunks["0,0"].height == 1
+		and _pixel(layer, Vector2i.ZERO) == Color.BLUE,
+		"the original partial image remains independently owned")
+	var rejected: AtlasFillResult = AtlasRasterBrush.paint(layer, path, Color.RED, 20.0,
+		false, null, 3)
+	_check(not rejected.ok and rejected.message == "Brush exceeds the candidate pixel limit."
+		and layer.chunks["0,0"].width == 1 and _pixel(layer, Vector2i.ZERO) == Color.BLUE,
+		"candidate overflow rejects the entire transformed gesture atomically")
+
+
 func _editor_gesture() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
@@ -164,6 +193,7 @@ func _editor_gesture() -> void:
 
 func _run() -> void:
 	_raster_color()
+	_transformed_partial_chunk()
 	await _editor_gesture()
 	print("ATLAS_BRUSH_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])
 	quit(0 if failures == 0 else 1)

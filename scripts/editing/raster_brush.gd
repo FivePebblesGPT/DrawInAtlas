@@ -57,36 +57,57 @@ static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Colo
 	if columns > limit or rows > limit or columns > limit / rows:
 		return AtlasFill._failure("Brush exceeds the candidate pixel limit.")
 
-	# Test each pixel center and edit-mask quad against the sweep; stage only
-	# changes from the original layer, never incremental writes per path sample.
+	# Collect changes against the original images. A non-finite transformed
+	# center aborts the entire gesture; no snapshot has been created yet.
 	var replacement: Color = Color(0.0, 0.0, 0.0, 0.0) if erase else AtlasFill._canonical_color(color)
 	var changes: Dictionary[Vector2i, Color] = {}
-	for y: int in range(top, bottom):
-		for x: int in range(left, right):
-			var pixel: Vector2i = Vector2i(x, y)
-			var chunk: AtlasRasterChunk = AtlasFill._existing_chunk(layer, pixel)
-			if erase and chunk == null:
-				continue
-			var center: Vector2 = layer.transform * ((Vector2(pixel) + Vector2(0.5, 0.5))
-				/ layer.pixels_per_unit)
-			if not center.is_finite():
-				return AtlasFill._failure("Transformed brush pixel is not finite.")
-			if not _touches(center, path, radius):
-				continue
-			if not AtlasFill._allows_pixel(layer, pixel, scope):
-				continue
-			var previous: Color = Color(0.0, 0.0, 0.0, 0.0)
-			if chunk != null:
-				previous = chunk.image.get_pixelv(AtlasFill._local_pixel(pixel))
-			# Source-over on the pre-gesture snapshot, not one alpha pass per
-			# pointer sample; repeated points must not darken a translucent brush.
-			var next: Color = replacement if erase else _source_over(replacement, previous)
-			if previous != next:
-				changes[pixel] = next
+	var scan_error: String = _stage_pixel_changes(layer, path, radius, replacement, erase, scope,
+		Vector2i(left, top), Vector2i(right, bottom), changes)
+	if not scan_error.is_empty():
+		return AtlasFill._failure(scan_error)
 
-	# Produce a detached layer only after every candidate has been checked.
+	# Build the detached result only after all candidate pixels have passed.
 	return AtlasFill._paint_pixel_colors(layer, changes)
 
+
+## Scan the half-open rectangle of global raster pixel coordinates, staging only
+## changed colors. A nonempty error means the caller must discard the changes.
+## For erase, missing chunks are skipped *before* computing transformed centers;
+## painting is allowed to create them in the shared snapshot writer.
+static func _stage_pixel_changes(layer: AtlasRasterLayer, path: PackedVector2Array,
+		radius: float, replacement: Color, erase: bool, scope: AtlasEditScope,
+		pixel_start: Vector2i, pixel_end: Vector2i,
+		changes: Dictionary[Vector2i, Color]) -> String:
+	for y: int in range(pixel_start.y, pixel_end.y):
+		for x: int in range(pixel_start.x, pixel_end.x):
+			var pixel: Vector2i = Vector2i(x, y)
+			var source_chunk: AtlasRasterChunk = AtlasFill._existing_chunk(layer, pixel)
+			if erase and source_chunk == null:
+				continue
+
+			# Coverage is measured at the transformed pixel center in document
+			# units, even for rotated or skewed raster layers.
+			var document_center: Vector2 = layer.transform * ((Vector2(pixel) + Vector2(0.5, 0.5))
+				/ layer.pixels_per_unit)
+			if not document_center.is_finite():
+				return "Transformed brush pixel is not finite."
+			if not _touches(document_center, path, radius):
+				continue
+
+			# A scope must admit the entire transformed pixel quad, not just its
+			# center. Neither coverage nor scope may mutate the source layer.
+			if not AtlasFill._allows_pixel(layer, pixel, scope):
+				continue
+
+			# Blend once per covered pixel against the pre-gesture image. Multiple
+			# pointer samples must not multiply the alpha of one brush gesture.
+			var previous: Color = Color(0.0, 0.0, 0.0, 0.0)
+			if source_chunk != null:
+				previous = source_chunk.image.get_pixelv(AtlasFill._local_pixel(pixel))
+			var next_color: Color = replacement if erase else _source_over(replacement, previous)
+			if previous != next_color:
+				changes[pixel] = next_color
+	return ""
 
 static func _source_over(source: Color, destination: Color) -> Color:
 	if source.a <= 0.0:

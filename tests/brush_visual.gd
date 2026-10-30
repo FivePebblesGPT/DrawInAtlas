@@ -119,6 +119,41 @@ func _run() -> void:
 	await _frames(4)
 	_check(not canvas._brush_cursor_inside or canvas.tool != AtlasCanvas.Tool.PEN,
 		"brush cursor is disabled for other tools")
+
+	# Drive a real raster gesture across x=0, then cancel a second gesture.
+	# Only release after a valid gesture is allowed to produce an undo entry.
+	var next_layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+	next_layers.append(AtlasRasterLayer.new("visual-raster", "Visual raster"))
+	_check(editor.apply_layers(next_layers, "visual-raster"), "native UI can create a raster paint target")
+	editor.select_layer("visual-raster")
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
+	editor.inspector.brush_width_spinner.value = 4.0
+	canvas.camera_center = Vector2.ZERO
+	canvas.camera_zoom = 1.0
+	var seam: Vector2 = canvas.size * 0.5
+	await _button(canvas, seam + Vector2(-8, 0), true)
+	await _move(canvas, seam + Vector2(8, 0), true)
+	await _button(canvas, seam + Vector2(8, 0), false)
+	var raster: AtlasRasterLayer = canvas.floor.layer_by_id("visual-raster") as AtlasRasterLayer
+	_check(raster != null and raster.chunks.has("-1,0") and raster.chunks.has("0,0"),
+		"native pointer gesture creates both sides of the signed raster seam")
+	editor._on_undo()
+	raster = canvas.floor.layer_by_id("visual-raster") as AtlasRasterLayer
+	_check(raster != null and raster.chunks.is_empty(), "undo removes the full native raster sweep")
+	editor._on_redo()
+	raster = canvas.floor.layer_by_id("visual-raster") as AtlasRasterLayer
+	_check(raster != null and raster.chunks.has("-1,0") and raster.chunks.has("0,0"),
+		"redo restores both raster chunks")
+	var committed: AtlasRasterLayer = raster
+	var committed_hash: String = AtlasRasterChunk.image_hash(committed.chunks["0,0"].image)
+	await _button(canvas, seam + Vector2(25, 25), true)
+	await _move(canvas, seam + Vector2(35, 25), true)
+	_check(canvas.is_editing(), "a second native raster gesture can be previewed")
+	canvas.cancel_edit()
+	await _button(canvas, seam + Vector2(35, 25), false)
+	_check(canvas.floor.layer_by_id("visual-raster") == committed
+		and AtlasRasterChunk.image_hash(committed.chunks["0,0"].image) == committed_hash,
+		"cancelled native raster preview preserves the source snapshot and pixels")
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_BRUSH_VISUAL_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])

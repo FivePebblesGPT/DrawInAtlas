@@ -46,7 +46,7 @@
 - [x] [[T-031|T-031 · Tile-layer naming and type authority]]
 - [x] [[T-032|T-032 · Field encodings and invariants]]
 - [x] [[T-033|T-033 · Fill readability]]
-- [ ] [[T-034|T-034 · Raster brush readability]]
+- [x] [[T-034|T-034 · Raster brush readability]]
 - [ ] [[T-035|T-035 · Selection geometry readability]]
 - [ ] [[T-036|T-036 · Stroke eraser readability]]
 - [x] [[T-037|T-037 · Commented function-step convention]]

@@ -141,11 +141,20 @@ its algorithm:
 
 The source already has meaningful `_touches()`, `_source_over()` and
 `AtlasFill._paint_pixel_colors()` helpers; keep them instead of making the
-main flow a series of one-line calls. This demonstration adds only comments
-and phase spacing. It **does not** preempt the broader brush refactor in
-[[T-034]], or the dedicated fill/geometry/eraser passes in [[T-033]],
-[[T-035]] and [[T-036]]. Those tickets apply the same convention while
-keeping each module's behavior intact.
+main flow a series of one-line calls. The T-037 demonstration added only
+comments and spacing; the later [[T-034]] implementation extracted a cohesive
+pixel-staging scan. The geometry/eraser passes [[T-035]] and [[T-036]] remain
+separate and must preserve their modules' behavior.
+
+**Raster brush application (T-034):** `AtlasRasterBrush.paint()` now validates and
+maps the board-space sweep to a raster candidate rectangle, checks the
+candidate-work budget, and hands eligible pixels to `_stage_pixel_changes()`.
+That helper keeps sparse-chunk erase gating before coordinate conversion,
+checks coverage at transformed pixel centers, tests whole-quad edit masks,
+and blends each accepted pixel once against its original image. On success,
+the shared writer constructs a detached snapshot; on error, staged colors
+are discarded. Keep these decisions in this order rather than replacing
+them with per-sample writes or eager snapshot allocation.
 
 **Fill application (T-033):** `AtlasFill.tiles()` now makes the terrain-key
 validation, finite background bound, cell eligibility, bounded traversal and
