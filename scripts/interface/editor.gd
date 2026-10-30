@@ -41,7 +41,6 @@ var _link_choices: Array[String] = []
 # Keep existing menu/test integrations pointing at the scene-owned controls.
 # These references never own another copy of the form or its state.
 @onready var preview_picker: OptionButton = inspector.preview_picker
-@onready var angle_spinner: SpinBox = inspector.angle_spinner
 @onready var lock_checkbox: CheckBox = inspector.lock_checkbox
 @onready var reference_checkbox: CheckBox = inspector.reference_checkbox
 @onready var opacity_slider: HSlider = inspector.opacity_slider
@@ -202,7 +201,6 @@ func _connect_workspace() -> void:
 	canvas.fill_requested.connect(artwork.fill_at)
 	canvas.selection_requested.connect(_on_select)
 	canvas.selection_changed.connect(_on_selection_changed)
-	canvas.battlemap_requested.connect(_on_create_battlemap)
 	canvas.wheel_step.connect(navigator.wheel_step)
 	canvas.enter_requested.connect(navigator.enter_link)
 	canvas.link_candidates_requested.connect(navigator.choose_links)
@@ -229,9 +227,6 @@ func _connect_workspace() -> void:
 	inspector.brush_color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
 	inspector.brush_width_changed.connect(func(width: float) -> void: canvas.brush_width = width)
 	inspector.palette_selected.connect(func(index: int) -> void: palette_id = index)
-	inspector.placement_rotation_changed.connect(func(radians: float) -> void:
-		canvas.battle_rotation = radians
-		canvas.queue_redraw())
 	inspector.preview_changed.connect(func(index: int) -> void:
 		canvas.preview = index as AtlasCanvas.Preview
 		map_references.refresh()
@@ -580,10 +575,6 @@ func _on_redo() -> void:
 		_message("Redo blocked: the target changed outside this history.")
 
 
-func _on_create_battlemap(start: Vector2, finish: Vector2, radians: float) -> void:
-	linked_maps.create_drag(start, finish, radians)
-
-
 func _refresh_reference_controls() -> void:
 	inspector.refresh_references(campaign, canvas.map, canvas.floor,
 		map_references.source_link_id, map_references.source_floor_id, map_references.frozen, not history.is_empty())
@@ -616,8 +607,6 @@ func _on_tool_changed(index: int) -> void:
 	artwork.choose_tool(index as AtlasCanvas.Tool)
 	if tool_palette != null:
 		tool_palette.sync_tool(index)
-	if index == AtlasCanvas.Tool.BATTLEMAP and campaign != null and canvas.map != null:
-		linked_maps.prepare_drag()
 	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	if not locked_to_cell:
 		lock_checkbox.set_pressed_no_signal(false)
@@ -804,10 +793,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			canvas.cancel_edit()
 		else:
 			canvas.clear_selection()
-		get_viewport().set_input_as_handled()
-	elif (event.keycode == KEY_Q or event.keycode == KEY_E) and canvas.tool == AtlasCanvas.Tool.BATTLEMAP:
-		var sign: float = -1.0 if event.keycode == KEY_Q else 1.0
-		angle_spinner.value = wrapf(angle_spinner.value + 15.0 * sign, -180.0, 180.0)
 		get_viewport().set_input_as_handled()
 	elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		delete_selection()

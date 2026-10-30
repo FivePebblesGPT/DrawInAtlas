@@ -177,13 +177,34 @@ func _test_editor_workflow() -> void:
 
 	var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
 	var parent_before: String = JSON.stringify(city.floors[0].terrain)
-	editor._on_create_battlemap(Vector2(-100, -70), Vector2(150, 125), deg_to_rad(37))
-	_check(canvas.map.kind == "BATTLEMAP", "drag creation opens a child battlemap workspace")
-	_check(editor.campaign.placements.size() == 1, "child has a placement")
-	if not editor.campaign.placements.is_empty():
-		var placement: AtlasPlacement = editor.campaign.placements[0]
-		_check(not placement.symbolic, "city placement uses spatial reference")
-		_check(is_equal_approx(rad_to_deg(placement.rotation), 37.0), "battlemap angle persists")
+	# Import a historical battlemap graph via the low-level command; the UI no
+	# longer offers creation, but old saves must remain navigable and editable.
+	var legacy_child: AtlasMapDocument = AtlasMapDocument.new("legacy-encounter", "Saved encounter")
+	legacy_child.kind = "BATTLEMAP"
+	legacy_child.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 24.0)
+	var legacy_link: AtlasMapLink = AtlasMapLink.new()
+	legacy_link.id = "legacy-entrance"
+	legacy_link.source_map_id = city.id
+	legacy_link.source_floor_id = canvas.floor.id
+	legacy_link.target_map_id = legacy_child.id
+	legacy_link.target_floor_id = legacy_child.default_floor_id
+	legacy_link.anchor = Vector2(-100, -70)
+	legacy_link.placement_id = "legacy-placement"
+	var legacy_placement: AtlasPlacement = AtlasPlacement.new()
+	legacy_placement.id = legacy_link.placement_id
+	legacy_placement.parent_map_id = city.id
+	legacy_placement.child_map_id = legacy_child.id
+	legacy_placement.origin = legacy_link.anchor
+	legacy_placement.rotation = deg_to_rad(37)
+	_check(editor.edits.execute(AtlasLinkEdit.new(city.id, null, legacy_link, null, legacy_placement, legacy_child)),
+		"legacy fixture imports a saved footprint and independent child document")
+	_check(editor.linked_maps.submit(legacy_link, legacy_placement, legacy_child) == false,
+		"public linked-map facade refuses new battlemap creation")
+	editor.linked_maps.enter(legacy_link.id)
+	_check(canvas.map.id == legacy_child.id, "legacy battlemap remains navigable")
+	_check(editor.campaign.placements.size() == 1, "legacy placement retained")
+	_check(is_equal_approx(rad_to_deg(editor.campaign.placements[0].rotation), 37.0),
+		"legacy rotation retained")
 
 	editor._on_tool_changed(AtlasCanvas.Tool.PAINT)
 	editor._on_select(Vector2i(0, 0))

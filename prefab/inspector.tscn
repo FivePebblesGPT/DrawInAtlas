@@ -298,32 +298,6 @@ tooltip_text = "Use Select scope cell first. A locked scope with no cell blocks 
 disabled = true
 text = "Lock to selected cell"
 
-[node name="PlacementSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=361657607]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Scroll/Margin/Sections/PlacementSection" unique_id=1719210073]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 11
-text = "PLACEMENT"
-autowrap_mode = 3
-
-[node name="RotationLabel" type="Label" parent="Scroll/Margin/Sections/PlacementSection" unique_id=1895047211]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-text = "Rotation (degrees)"
-autowrap_mode = 3
-
-[node name="AngleSpinner" type="SpinBox" parent="Scroll/Margin/Sections/PlacementSection" unique_id=656639003]
-unique_name_in_owner = true
-layout_mode = 2
-min_value = -180.0
-max_value = 180.0
-step = 0.01
-
 [node name="ReferenceSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=1487948131]
 layout_mode = 2
 theme_override_constants/separation = 8

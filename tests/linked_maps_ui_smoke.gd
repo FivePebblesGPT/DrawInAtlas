@@ -41,7 +41,7 @@ func _run() -> void:
 		await process_frame
 	canvas = editor.canvas
 	dialog = editor.link_dialog
-	for phase: String in ["_forms_and_history", "_drag_creation", "_navigation"]:
+	for phase: String in ["_forms_and_history", "_retired_creation", "_navigation"]:
 		_check(await call(phase) == true, phase + " completes")
 	root.remove_child(_scene)
 	_scene.free()
@@ -99,9 +99,28 @@ func _forms_and_history() -> bool:
 	_check(editor.campaign.link_by_id(_entrance_id).anchor == Vector2(-5, 30), "native Select drag moves one entrance in board units")
 	editor._on_undo()
 	_check(editor.campaign.link_by_id(_entrance_id).anchor == Vector2(-30, 40), "drag movement is undoable")
+	# Marker-only links cannot be converted into new footprints via the form.
 	editor.linked_maps.open()
 	dialog.mode_picker.select(0)
-	dialog.mode_picker.item_selected.emit(0)
+	_check(dialog.draft().is_empty(), "marker cannot draft a new spatial footprint")
+	var forbidden: AtlasPlacement = AtlasPlacement.new()
+	forbidden.parent_map_id = canvas.map.id
+	forbidden.child_map_id = "greyhaven"
+	_check(not editor.linked_maps.submit(AtlasMapLink.from_dict(link.to_dict()), forbidden),
+		"linked-map command facade refuses a new footprint")
+	dialog.hide()
+	# Simulate a previously saved placement to retain coverage for legacy editing.
+	var legacy_link: AtlasMapLink = AtlasMapLink.from_dict(link.to_dict())
+	var legacy_placement: AtlasPlacement = AtlasPlacement.new()
+	legacy_placement.id = "legacy-fixture"
+	legacy_placement.parent_map_id = canvas.map.id
+	legacy_placement.child_map_id = "greyhaven"
+	legacy_placement.origin = Vector2(-30, 40)
+	legacy_link.placement_id = legacy_placement.id
+	_check(editor.edits.execute(AtlasLinkEdit.new(canvas.map.id, link, legacy_link, null, legacy_placement)),
+		"legacy placement fixture loads through existing edit command")
+	editor.linked_maps.open()
+	_check(not dialog.mode_picker.disabled, "existing legacy footprint can still be edited")
 	dialog.columns.value = 20
 	dialog.rows.value = 15
 	dialog.parent_pitch.value = 3.0
@@ -111,8 +130,9 @@ func _forms_and_history() -> bool:
 	link = editor.campaign.link_by_id(_entrance_id)
 	var footprint: AtlasPlacement = editor.campaign.placement_by_id(link.placement_id)
 	_check(footprint != null and footprint.columns == 20 and footprint.rows == 15
-		and is_equal_approx(footprint.rotation, deg_to_rad(37.0)), "numeric controls convert marker to a 37-degree 20x15 footprint")
-	_check(editor.campaign.get_map("greyhaven").to_dict() == target_before, "footprint calibration never resamples the existing child")
+		and is_equal_approx(footprint.rotation, deg_to_rad(37.0)), "legacy footprint geometry remains editable")
+	_check(editor.campaign.get_map("greyhaven").to_dict() == target_before,
+		"legacy calibration never resamples independent art")
 	var precise: AtlasMapLink = AtlasMapLink.from_dict(link.to_dict())
 	precise.target_zoom = 1.2345678901234567
 	precise.target_focus = Vector2(-4.123456, 12.34567)
@@ -151,58 +171,39 @@ func _forms_and_history() -> bool:
 	return true
 
 
-func _drag_creation() -> bool:
-	canvas.selected_link_id = ""
-	editor.linked_maps.prepare_drag()
-	dialog.mode_picker.select(1)
-	dialog.native_distance.value = 3.048
-	dialog.native_unit.select(1)
-	dialog.parent_pitch.value = 12.0
-	dialog.name_input.text = "Symbolic encounter"
-	editor._on_tool_changed(AtlasCanvas.Tool.BATTLEMAP)
-	editor.angle_spinner.value = 37.0
-	var source_map: String = canvas.map.id
-	var source_floor: String = canvas.floor.id
-	var source_focus: Vector2 = canvas.camera_center
-	var source_zoom: float = canvas.camera_zoom
+func _retired_creation() -> bool:
 	var map_count: int = editor.campaign.maps.size()
+	var placement_count: int = editor.campaign.placements.size()
+	var link_count: int = editor.campaign.links.size()
+	_check(not AtlasCanvas.Tool.keys().has("BATTLEMAP") and editor.tool_palette.button_for(999) == null,
+		"retired battlemap tool is not offered in the palette or enum")
+	_check(not canvas.has_signal("battlemap_requested") and not editor.has_method("_on_create_battlemap")
+		and not editor.linked_maps.has_method("create_drag"),
+		"gesture and facade creation routes were removed")
+	editor.linked_maps.open()
+	_check(dialog.target_picker.item_count == map_count and dialog.mode_picker.disabled,
+		"new entrances choose only existing documents and disable footprint modes")
+	_check(dialog.get_node_or_null("Scroll/Form/NewDocument") == null
+		and editor.inspector.get_node_or_null("Scroll/Margin/Sections/PlacementSection") == null,
+		"new child document and placement spinner are absent")
+	_check(dialog.mode_picker.selected == AtlasLinkDialog.LinkMode.MARKER,
+		"new links default to marker-only navigation")
+	dialog.hide()
+	var old_map: String = canvas.map.id
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
 	var start: Vector2 = canvas.document_to_local(Vector2(-20, -10))
-	var finish: Vector2 = canvas.document_to_local(Vector2(-20, -10) + Vector2(120, 72).rotated(deg_to_rad(37.0)))
+	var finish: Vector2 = canvas.document_to_local(Vector2(30, 10))
+	var original_count: int = canvas.floor.strokes.size()
 	_button(start, true)
 	_motion(finish)
-	_check(canvas.is_editing(), "footprint draft participates in gesture cancellation")
-	_key(KEY_Q)
-	_check(is_equal_approx(canvas.battle_rotation, deg_to_rad(22.0)), "Q rotates the live draft")
-	_key(KEY_E)
-	_check(is_equal_approx(canvas.battle_rotation, deg_to_rad(37.0)), "E rotates the draft instead of selecting eraser")
-	_key(KEY_ESCAPE)
-	_check(editor.campaign.maps.size() == map_count, "cancelled footprint creates no campaign objects")
-	_button(start, true)
-	_motion(finish)
-	editor._on_save()
-	_check(canvas.map.kind == "BATTLEMAP" and editor.campaign.maps.size() == map_count + 1,
-		"Save commits an in-flight footprint and opens its independent workspace")
-	var child_id: String = canvas.map.id
-	var link_id: String = editor.navigator.active_entrance_id
-	var footprint: AtlasPlacement = editor.campaign.placement_by_id(editor.campaign.link_by_id(link_id).placement_id)
-	_check(footprint.symbolic and footprint.columns == 10 and footprint.rows == 6, "explicit symbolic choice and configured pitch determine the quantized rectangle")
-	_check(is_equal_approx(footprint.rotation, deg_to_rad(37.0)), "drag rotation is arbitrary, not limited to five-degree increments")
-	_check(canvas.map.grid.distance_unit == "m" and is_equal_approx(canvas.map.grid.distance_per_cell, 3.048)
-		and editor.campaign.get_map(source_map).grid.distance_unit == "mi", "new child native units are independent and never converted")
-	_check(not editor.edits.is_dirty(), "native Save clears dirty state only after bundle verification")
+	_button(finish, false)
+	_check(canvas.floor.strokes.size() == original_count + 1,
+		"pointer drag continues drawing on the same authored board")
+	_check(canvas.map.id == old_map and editor.campaign.maps.size() == map_count
+		and editor.campaign.placements.size() == placement_count and editor.campaign.links.size() == link_count,
+		"ordinary drawing never creates nested maps or footprints")
 	editor._on_undo()
-	_check(editor.campaign.get_map(child_id) == null and canvas.map.id == source_map and canvas.floor.id == source_floor,
-		"one undo removes the complete blank creation and restores a valid source floor")
-	_check(canvas.camera_center == source_focus and canvas.camera_zoom == source_zoom, "creation undo restores source view through Back")
-	editor._on_redo()
-	_check(editor.campaign.get_map(child_id) != null and editor.campaign.link_by_id(link_id) != null, "redo restores stable map/link/placement IDs")
-	editor.linked_maps.enter(link_id)
-	_check(editor.map_references.source_link_id == link_id, "reference context follows the actual traversed entrance")
-	editor._on_back()
-	editor._on_save()
-	var saved: Dictionary = editor.campaign.to_dict()
-	editor._on_load()
-	_check(editor.campaign.to_dict() == saved and not editor.edits.is_dirty(), "native save/load retains linked-map edits without viewer state")
+	_check(canvas.floor.strokes.size() == original_count, "ordinary drawing remains undoable")
 	return true
 
 
@@ -293,7 +294,7 @@ func _marker(anchor: Vector2, floor_id: String) -> String:
 func _target(id: String, floor_id: String) -> void:
 	var ids: Array = editor.campaign.maps.keys()
 	ids.sort()
-	var index: int = ids.find(id) + 1
+	var index: int = ids.find(id)
 	dialog.target_picker.select(index)
 	dialog.target_picker.item_selected.emit(index)
 	var map: AtlasMapDocument = editor.campaign.get_map(id)

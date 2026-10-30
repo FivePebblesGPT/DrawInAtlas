@@ -13,7 +13,6 @@ signal selection_transform_requested(offset: Vector2, factor: float, radians: fl
 signal brush_color_changed(color: Color)
 signal brush_width_changed(value: float)
 signal palette_selected(index: int)
-signal placement_rotation_changed(radians: float)
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
 signal reference_opacity_changed(value: float)
@@ -24,7 +23,6 @@ signal reference_source_changed(link_id: String, floor_id: String)
 signal reference_freeze_toggled(enabled: bool)
 
 @onready var preview_picker: OptionButton = %PreviewPicker
-@onready var angle_spinner: SpinBox = %AngleSpinner
 @onready var lock_checkbox: CheckBox = %LockCheckbox
 @onready var reference_checkbox: CheckBox = %ReferenceCheckbox
 @onready var opacity_slider: HSlider = %OpacitySlider
@@ -40,7 +38,6 @@ signal reference_freeze_toggled(enabled: bool)
 
 @onready var _ink_section: VBoxContainer = %InkSection
 @onready var _terrain_section: VBoxContainer = %TerrainSection
-@onready var _placement_section: VBoxContainer = %PlacementSection
 @onready var _selection_section: VBoxContainer = %SelectionSection
 @onready var _transform_button: Button = %TransformButton
 @onready var _floor_add: Button = %FloorAdd
@@ -81,7 +78,6 @@ func _ready() -> void:
 	brush_width_spinner.gui_input.connect(_on_brush_width_wheel)
 	brush_width_spinner.get_line_edit().gui_input.connect(_on_brush_width_wheel)
 	_palette_picker.item_selected.connect(palette_selected.emit)
-	angle_spinner.value_changed.connect(_on_placement_rotation_changed)
 	preview_picker.item_selected.connect(preview_changed.emit)
 	reference_checkbox.toggled.connect(reference_toggled.emit)
 	opacity_slider.value_changed.connect(reference_opacity_changed.emit)
@@ -125,7 +121,6 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	brush_color_picker.disabled = tool == AtlasCanvas.Tool.ERASER
 	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
 	_terrain_section.visible = tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
-	_placement_section.visible = tool == AtlasCanvas.Tool.BATTLEMAP
 	_selection_section.visible = tool == AtlasCanvas.Tool.ART_SELECT
 
 
@@ -171,10 +166,6 @@ func _on_floor_selected(index: int) -> void:
 func _on_transform_requested() -> void:
 	selection_transform_requested.emit(Vector2(move_x_spinner.value, move_y_spinner.value),
 		scale_spinner.value, deg_to_rad(artwork_rotation_spinner.value))
-
-
-func _on_placement_rotation_changed(value: float) -> void:
-	placement_rotation_changed.emit(deg_to_rad(value))
 
 
 func refresh_references(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor,

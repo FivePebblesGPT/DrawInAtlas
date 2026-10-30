@@ -15,10 +15,6 @@ enum LinkMode { SPATIAL, SYMBOLIC, MARKER }
 @onready var target_picker: OptionButton = %TargetPicker
 @onready var target_floor_picker: OptionButton = %TargetFloorPicker
 @onready var mode_picker: OptionButton = %ModePicker
-@onready var name_input: LineEdit = %NameInput
-@onready var kind_picker: OptionButton = %KindPicker
-@onready var native_distance: SpinBox = %NativeDistance
-@onready var native_unit: OptionButton = %NativeUnit
 @onready var origin_x: SpinBox = %OriginX
 @onready var origin_y: SpinBox = %OriginY
 @onready var angle: SpinBox = %Angle
@@ -63,11 +59,6 @@ func open(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor, cen
 	popup_centered_clamped(Vector2i(520, 680), 0.92)
 
 
-func prepare_new(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor, center: Vector2) -> void:
-	if _campaign != campaign or _source_id != map.id or _source_floor != floor.id or not selected_id.is_empty():
-		configure(campaign, map, floor, center)
-
-
 func configure(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor, center: Vector2, selected: String = "") -> void:
 	_campaign = campaign
 	_source_id = map.id
@@ -76,7 +67,7 @@ func configure(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor
 	source_label.text = "Source: %s / %s" % [map.display_name, floor.display_name]
 	link_list.clear()
 	_link_ids = [""]
-	link_list.add_item("+ New entrance / footprint")
+	link_list.add_item("+ New marker to an existing map")
 	for link: AtlasMapLink in campaign.outgoing_links(map.id, floor.id):
 		_link_ids.append(link.id)
 		var target: AtlasMapDocument = campaign.get_map(link.target_map_id)
@@ -101,7 +92,7 @@ func _select(index: int) -> void:
 	_load_geometry(link, placement)
 	_load_arrival(link)
 	_remember_displayed_values()
-	_reset_creation_and_arrival_options(link == null)
+	center_arrival.set_pressed_no_signal(link == null)
 	_select_destination(link)
 	remove_button.disabled = link == null
 	focus_button.disabled = link == null
@@ -112,9 +103,7 @@ func _select(index: int) -> void:
 
 func _populate_targets() -> void:
 	target_picker.clear()
-	_target_ids = [""]
-	target_picker.add_item("Create independent document")
-	target_picker.set_item_disabled(0, not selected_id.is_empty())
+	_target_ids.clear()
 	var ids: Array = _campaign.maps.keys()
 	ids.sort()
 	for id: String in ids:
@@ -131,7 +120,7 @@ func _load_geometry(link: AtlasMapLink, placement: AtlasPlacement) -> void:
 	elif link != null:
 		mode_picker.select(LinkMode.MARKER)
 	else:
-		mode_picker.select(LinkMode.SPATIAL)
+		mode_picker.select(LinkMode.MARKER)
 	var geometry: AtlasPlacement = placement
 	if geometry == null:
 		geometry = AtlasPlacement.new()
@@ -159,16 +148,15 @@ func _remember_displayed_values() -> void:
 		"arrival_x": arrival_x.value, "arrival_y": arrival_y.value, "zoom": arrival_zoom.value}
 
 
-func _reset_creation_and_arrival_options(is_new_link: bool) -> void:
-	center_arrival.set_pressed_no_signal(is_new_link)
-	name_input.text = "Encounter %d" % _campaign.maps.size()
-	kind_picker.select(0)
-	native_distance.value = 5.0
-	native_unit.select(0)
-
-
 func _select_destination(link: AtlasMapLink) -> void:
 	var target_index: int = _target_ids.find(link.target_map_id) if link != null else 0
+	if link == null:
+		for candidate_index: int in range(_target_ids.size()):
+			if _target_ids[candidate_index] != _source_id:
+				target_index = candidate_index
+				break
+	if target_index < 0 or target_picker.item_count == 0:
+		return
 	target_picker.select(target_index)
 	_target_changed(target_index)
 	if link != null:
@@ -189,11 +177,8 @@ func _can_enter(link: AtlasMapLink, placement: AtlasPlacement) -> bool:
 func _target_changed(index: int) -> void:
 	target_floor_picker.clear()
 	_floor_ids.clear()
-	var target: AtlasMapDocument = _campaign.get_map(_target_ids[index]) if index > 0 else null
-	if target == null:
-		_floor_ids.append("ground")
-		target_floor_picker.add_item("Ground (new document)")
-	else:
+	var target: AtlasMapDocument = _campaign.get_map(_target_ids[index]) if index >= 0 and index < _target_ids.size() else null
+	if target != null:
 		for floor: AtlasFloor in target.floors:
 			_floor_ids.append(floor.id)
 			target_floor_picker.add_item(floor.display_name + " · " + floor.id)
@@ -202,29 +187,26 @@ func _target_changed(index: int) -> void:
 
 
 func _sync_fields() -> void:
-	%NewDocument.visible = target_picker.selected == 0
-	%FootprintFields.visible = mode_picker.selected != LinkMode.MARKER
+	var existing: AtlasMapLink = _campaign.link_by_id(selected_id) if _campaign != null else null
+	var legacy_placement: bool = existing != null and not existing.placement_id.is_empty()
+	# No new footprint can be selected, including for existing marker-only links.
+	mode_picker.disabled = not legacy_placement
+	%FootprintFields.visible = legacy_placement and mode_picker.selected != LinkMode.MARKER
 	%MarkerFields.visible = mode_picker.selected == LinkMode.MARKER
 
 
-func draft(new_id: String = "", start: Vector2 = Vector2.INF, finish: Vector2 = Vector2.INF,
-		radians: float = 0.0) -> Array[Resource]:
-	if target_picker.selected < 0 or target_floor_picker.selected < 0:
+func draft() -> Array[Resource]:
+	if target_picker.selected < 0 or target_picker.selected >= _target_ids.size() or target_floor_picker.selected < 0:
 		return []
 	var previous: AtlasMapLink = AtlasMapLink.from_dict(_expected_link) if not _expected_link.is_empty() else null
 	var old_placement: AtlasPlacement = AtlasPlacement.from_dict(_expected_placement) if not _expected_placement.is_empty() else null
+	# The form can edit old footprints, not create a new footprint or document.
+	if old_placement == null and mode_picker.selected != LinkMode.MARKER:
+		return []
 	var link: AtlasMapLink = _draft_link(previous, old_placement)
-	var child: AtlasMapDocument
-	if target_picker.selected == 0:
-		if name_input.text.strip_edges().is_empty():
-			return []
-		child = _draft_document(new_id)
-		link.target_map_id = child.id
 	var placement: AtlasPlacement
 	if mode_picker.selected != LinkMode.MARKER:
 		placement = _draft_placement(link, old_placement)
-		if not _apply_drag(placement, start, finish, radians):
-			return []
 		link.placement_id = placement.id
 		if previous != null and old_placement != null and placement.origin == old_placement.origin:
 			link.anchor = previous.anchor
@@ -232,7 +214,7 @@ func draft(new_id: String = "", start: Vector2 = Vector2.INF, finish: Vector2 = 
 			link.anchor = placement.origin
 		if center_arrival.button_pressed:
 			link.target_focus = placement.child_bounds().get_center()
-	return [link, placement, child]
+	return [link, placement, null]
 
 
 func _draft_link(previous: AtlasMapLink, old_placement: AtlasPlacement) -> AtlasMapLink:
@@ -256,21 +238,6 @@ func _draft_link(previous: AtlasMapLink, old_placement: AtlasPlacement) -> Atlas
 		link.target_zoom = _preserved_number(arrival_zoom, "zoom", previous.target_zoom)
 	link.placement_id = ""
 	return link
-
-
-func _draft_document(new_id: String) -> AtlasMapDocument:
-	var id: String = _id("map") if new_id.is_empty() else new_id
-	var child: AtlasMapDocument = AtlasMapDocument.new(id, name_input.text.strip_edges())
-	child.kind = kind_picker.get_item_text(kind_picker.selected)
-	var grid_kind: AtlasGrid.Kind = AtlasGrid.Kind.SQUARE
-	if mode_picker.selected == LinkMode.MARKER:
-		grid_kind = AtlasGrid.Kind.GRIDLESS
-	child.grid = AtlasGrid.new(grid_kind, child_pitch.value)
-	child.grid.distance_per_cell = native_distance.value
-	child.grid.distance_unit = native_unit.get_item_text(native_unit.selected)
-	child.terrain_grid = child.grid.copy()
-	child.floors[0].terrain_layer().grid = child.grid.copy()
-	return child
 
 
 func _draft_placement(link: AtlasMapLink, snapshot_placement: AtlasPlacement) -> AtlasPlacement:
@@ -301,19 +268,6 @@ func _draft_placement(link: AtlasMapLink, snapshot_placement: AtlasPlacement) ->
 	return placement
 
 
-func _apply_drag(placement: AtlasPlacement, start: Vector2, finish: Vector2, radians: float) -> bool:
-	if not start.is_finite() or not finish.is_finite():
-		return true
-	var delta: Vector2 = (finish - start).rotated(-radians)
-	if delta.length() < parent_pitch.value * 0.5:
-		return false
-	placement.rotation = radians
-	placement.origin = start + Vector2(minf(0, delta.x), minf(0, delta.y)).rotated(radians)
-	placement.columns = maxi(1, roundi(absf(delta.x) / parent_pitch.value))
-	placement.rows = maxi(1, roundi(absf(delta.y) / parent_pitch.value))
-	return true
-
-
 func _original_origin(link: AtlasMapLink, placement: AtlasPlacement, fallback: Vector2) -> Vector2:
 	if placement != null:
 		return placement.origin
@@ -325,7 +279,7 @@ func _original_origin(link: AtlasMapLink, placement: AtlasPlacement, fallback: V
 func _submit() -> void:
 	var values: Array[Resource] = draft()
 	if values.size() != 3:
-		error_label.text = "Choose a valid target/floor and a name for a new document."
+		error_label.text = "Choose an existing destination and floor; new footprints are unavailable."
 		return
 	submitted.emit(values[0] as AtlasMapLink, values[1] as AtlasPlacement, values[2] as AtlasMapDocument)
 

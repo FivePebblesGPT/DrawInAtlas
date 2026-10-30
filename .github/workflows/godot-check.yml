@@ -124,6 +124,13 @@ jobs:
           godot --headless --path . --script res://tests/local_detail_workflow_smoke.gd 2>&1 | tee /tmp/godot-local-detail.log
           grep -q 'ATLAS_LOCAL_DETAIL_WORKFLOW_PASSED' /tmp/godot-local-detail.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-local-detail.log; then exit 1; fi
+      - name: Verify retired battlemat creation paths (T-014)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/retired_battlemap_controls_smoke.gd 2>&1 | tee /tmp/godot-retired-battlemap.log
+          grep -q 'ATLAS_RETIRED_BATTLEMAP_PASSED' /tmp/godot-retired-battlemap.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-retired-battlemap.log; then exit 1; fi
       - name: Verify mouse-wheel brush width (T-011)
         shell: bash
         run: |

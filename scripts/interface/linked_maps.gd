@@ -42,6 +42,10 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 		return false
 	var before: AtlasMapLink = _canvas.campaign.link_by_id(link.id)
 	var old: AtlasPlacement = _canvas.campaign.placement_by_id(before.placement_id) if before != null else null
+	# Keep editing legacy footprints, but never create new containers through links.
+	if new_map != null or (placement != null and old == null):
+		_rejected()
+		return false
 	if dialog.visible and dialog.selected_id == link.id and not dialog.is_current(before, old):
 		_rejected()
 		return false
@@ -87,30 +91,6 @@ func focus(id: String) -> void:
 	_navigator.zoom_gate.reset()
 	_canvas.queue_redraw()
 	dialog.hide()
-
-
-func create_drag(start: Vector2, finish: Vector2, radians: float) -> bool:
-	dialog.prepare_new(_canvas.campaign, _canvas.map, _canvas.floor, start)
-	if dialog.is_marker_mode():
-		message.emit("Choose a spatial or symbolic footprint in Linked maps before dragging.")
-		return false
-	var drafts: Array[Resource] = dialog.draft("", start, finish, radians)
-	if drafts.size() != 3:
-		message.emit("Drag at least half a footprint cell; each dimension is quantized to one cell or more.")
-		return false
-	var link: AtlasMapLink = drafts[0] as AtlasMapLink
-	var placement: AtlasPlacement = drafts[1] as AtlasPlacement
-	var new_map: AtlasMapDocument = drafts[2] as AtlasMapDocument
-	if not submit(link, placement, new_map):
-		return false
-	_navigator.enter_link(_canvas.campaign.link_by_id(link.id))
-	# Success describes the graph submission, independently of the view transition.
-	return true
-
-
-func prepare_drag() -> void:
-	dialog.prepare_new(_canvas.campaign, _canvas.map, _canvas.floor, _canvas.camera_center)
-	_canvas.battle_pitch = dialog.get_parent_pitch()
 
 
 func move(id: String, offset: Vector2) -> bool:

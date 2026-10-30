@@ -111,13 +111,12 @@ func _run() -> void:
 	editor.preview_picker.item_selected.emit(0)
 	editor.reference_checkbox.button_pressed = false
 	editor.opacity_slider.value = 0.6
-	editor.angle_spinner.value = 35.0
 	editor.brush_width_spinner.value = 12.0
 	editor.brush_color_picker.color_changed.emit(Color.BLUE)
 	_check(canvas.preview == AtlasCanvas.Preview.OFF and not canvas.show_reference
 		and is_equal_approx(canvas.reference_opacity, 0.6), "reference/preview controls update only the active canvas")
-	_check(is_equal_approx(canvas.battle_rotation, deg_to_rad(35.0)) and canvas.brush_width == 12.0
-		and canvas.brush_color == Color.BLUE, "placement and brush controls keep their signal wiring")
+	_check(canvas.brush_width == 12.0 and canvas.brush_color == Color.BLUE,
+		"brush controls keep their signal wiring without placement UI")
 	_check(editor.campaign.to_dict() == canonical and editor.edits.get_undo_command() == command,
 		"presentation and brush preferences never create document edits")
 

@@ -7,7 +7,6 @@ extends Control
 
 signal paint_requested(cell: Vector2i)
 signal selection_requested(cell: Vector2i)
-signal battlemap_requested(start: Vector2, finish: Vector2, rotation_radians: float)
 signal wheel_step(direction: int, local_position: Vector2)
 signal enter_requested(link: AtlasMapLink)
 signal link_candidates_requested(links: Array[AtlasMapLink])
@@ -24,7 +23,7 @@ signal transform_requested(selection: AtlasSelection, transform: Transform2D)
 signal fill_requested(position: Vector2)
 signal view_region_changed
 
-enum Tool { PEN, ERASER, PAINT, SELECT, BATTLEMAP, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL }
+enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
@@ -74,8 +73,6 @@ var camera_zoom: float = 1.0:
 		view_region_changed.emit()
 var selected_cell: Vector2i = Vector2i.ZERO
 var has_selected_cell: bool = false
-var battle_rotation: float = 0.0
-var battle_pitch: float = 24.0
 var reference_opacity: float = 0.35
 var show_reference: bool = true
 var references: AtlasMapReferences
@@ -93,9 +90,6 @@ var brush_width: float = 8.0
 
 var _panning: bool = false
 var _tile_painting: bool = false
-var _drawing_battlemap: bool = false
-var _draft_start: Vector2 = Vector2.ZERO
-var _draft_end: Vector2 = Vector2.ZERO
 var _pending_wheel_fraction: float = 0.0
 var _wheel_dispatch_direction: int = 0
 var _last_wheel_dispatch_ms: int = -1
@@ -152,7 +146,6 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	_raster_textures.clear()
 	clear_selection()
 	has_selected_cell = false
-	_drawing_battlemap = false
 	selected_link_id = ""
 	queue_redraw()
 	return true
@@ -164,13 +157,12 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _drawing_battlemap or _draft_stroke != null or _tile_painting or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
+	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
 
 
 func cancel_edit() -> void:
 	_draft_stroke = null
 	_erase_preview.clear()
-	_drawing_battlemap = false
 	_panning = false
 	_tile_painting = false
 	_manipulation = Manipulation.NONE
@@ -192,12 +184,6 @@ func commit_edit() -> void:
 		var offset: Vector2 = _link_move_end - _link_move_start
 		if offset.length_squared() > 0.0001:
 			link_move_requested.emit(id, offset)
-		queue_redraw()
-		interaction_finished.emit()
-		return
-	if _drawing_battlemap:
-		_drawing_battlemap = false
-		battlemap_requested.emit(_draft_start, _draft_end, battle_rotation)
 		queue_redraw()
 		interaction_finished.emit()
 		return
@@ -382,8 +368,6 @@ func _draw_overlays(item: Node2D) -> void:
 	if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
 		var outline: PackedVector2Array = map.grid.cell_polygon(selected_cell)
 		_stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
-	if _drawing_battlemap:
-		_draw_draft(item)
 	if not _moving_link_id.is_empty():
 		var link: AtlasMapLink = campaign.link_by_id(_moving_link_id)
 		if link != null:
@@ -504,25 +488,6 @@ func _draw_links(item: Node2D) -> void:
 				target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
 
-func _draw_draft(item: Node2D) -> void:
-	var footprint: PackedVector2Array = _draft_polygon()
-	item.draw_colored_polygon(footprint, Color(0.26, 0.76, 0.87, 0.16))
-	_stroke_polygon(footprint, Color("#87e1f2"), 2.0 / camera_zoom, item)
-
-
-func _draft_polygon() -> PackedVector2Array:
-	var rotated: Vector2 = (_draft_end - _draft_start).rotated(-battle_rotation)
-	var minimum: Vector2 = Vector2(minf(rotated.x, 0.0), minf(rotated.y, 0.0))
-	var dimensions: Vector2 = Vector2(maxi(1, roundi(absf(rotated.x) / battle_pitch)), maxi(1, roundi(absf(rotated.y) / battle_pitch))) * battle_pitch
-	var maximum: Vector2 = minimum + dimensions
-	return PackedVector2Array([
-		_draft_start + minimum.rotated(battle_rotation),
-		_draft_start + Vector2(maximum.x, minimum.y).rotated(battle_rotation),
-		_draft_start + maximum.rotated(battle_rotation),
-		_draft_start + Vector2(minimum.x, maximum.y).rotated(battle_rotation)
-	])
-
-
 func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, item: Node2D) -> void:
 	if polygon.size() < 2:
 		return
@@ -638,11 +603,6 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_request_cell_paint(position)
 		Tool.SELECT:
 			selection_requested.emit(map.grid.document_to_cell(position))
-		Tool.BATTLEMAP:
-			_drawing_battlemap = true
-			_draft_start = position
-			_draft_end = position
-			queue_redraw()
 
 
 func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
@@ -672,9 +632,6 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 	elif _manipulation != Manipulation.NONE:
 		_update_manipulation(local_to_document(mouse.position))
 		_finish_manipulation()
-	elif _drawing_battlemap:
-		_draft_end = local_to_document(mouse.position)
-		commit_edit()
 	elif is_editing():
 		_append_stroke_point(mouse.position)
 		commit_edit()
@@ -690,9 +647,6 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 		queue_redraw()
 	elif _manipulation != Manipulation.NONE:
 		_update_manipulation(local_to_document(motion.position))
-	elif _drawing_battlemap:
-		_draft_end = local_to_document(motion.position)
-		queue_redraw()
 	elif tool == Tool.PAINT and _tile_painting:
 		_request_cell_paint(local_to_document(motion.position))
 	elif is_editing():
