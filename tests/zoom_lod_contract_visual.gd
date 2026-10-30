@@ -1,6 +1,6 @@
 extends SceneTree
-## Native pixel witness for the T-004 zoom/LOD design. Uses the existing manual
-## presentation setter; automatic level selection remains a separate ticket.
+## Historical T-004 native fit witness. Uses the manual presentation setter;
+## T-005 separately exercises the live automatic presentation controller.
 
 var _checks: int = 0
 var _failures: int = 0
@@ -53,15 +53,15 @@ func _run() -> void:
 	canvas.active_layer_id = overview.id
 	await _witness(canvas, center, Color.RED, "zoom-lod-overview.png")
 
-	# Proof of derived fit without shipping a new navigation policy in this ticket.
+	# Reuse the historical fit witness; expanded zoom is implemented under T-005.
 	var polygon: PackedVector2Array = board.grid.cell_polygon(Vector2i(2, -1))
 	var bounds: Rect2 = Rect2(polygon[0], Vector2.ZERO)
 	for point: Vector2 in polygon:
 		bounds = bounds.expand(point)
 	canvas.camera_zoom = minf(0.8 * canvas.size.x / bounds.size.x,
 		0.8 * canvas.size.y / bounds.size.y)
-	_check(canvas.camera_zoom > AtlasMapNavigator.MAX_ZOOM,
-		"local fit lies beyond old hardcoded 3x navigator limit")
+	_check(canvas.camera_zoom > 3.0 and canvas.camera_zoom < AtlasMapNavigator.MAX_ZOOM,
+		"local fit is now inside expanded navigator range beyond historical 3x")
 	_check(canvas.set_presented_detail_level(1), "explicitly present local authored level")
 	await _witness(canvas, center, Color.GREEN, "zoom-lod-local-fit.png")
 	_check(canvas.active_layer_id == overview.id and not canvas.editing_target_is_presented(),

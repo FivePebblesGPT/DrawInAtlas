@@ -9,7 +9,7 @@ signal message(text: String)
 signal candidates_requested(links: Array[AtlasMapLink])
 
 const MIN_ZOOM: float = 0.5
-const MAX_ZOOM: float = 3.0
+const MAX_ZOOM: float = 24.0
 const ZOOM_FACTOR: float = 1.2
 
 var views: AtlasViewSession = AtlasViewSession.new()

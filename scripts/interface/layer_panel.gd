@@ -5,6 +5,8 @@ signal layer_selected(id: String)
 signal layers_changed(layers: Array[AtlasLayer], selected_id: String)
 signal import_requested
 signal presented_detail_selected(level: int)
+signal automatic_detail_toggled(enabled: bool)
+signal show_editing_detail_requested
 
 @onready var layer_list: ItemList = $LayerList
 @onready var visibility_checkbox: CheckBox = $VisibilityCheckbox
@@ -13,6 +15,9 @@ signal presented_detail_selected(level: int)
 @onready var name_input: LineEdit = $NameInput
 @onready var layer_detail_spinner: SpinBox = $LayerDetailSpinner
 @onready var view_detail_spinner: SpinBox = $ViewDetailSpinner
+@onready var auto_detail_checkbox: CheckBox = $AutoDetailCheckbox
+@onready var detail_status: Label = $DetailStatus
+@onready var show_editing_detail: Button = $ShowEditingDetail
 @onready var _up: Button = $Order/RaiseButton
 @onready var _down: Button = $Order/LowerButton
 var _floor: AtlasFloor
@@ -31,6 +36,8 @@ func _ready() -> void:
 		_set_property(int(value), &"detail_level"))
 	view_detail_spinner.value_changed.connect(func(value: float) -> void:
 		presented_detail_selected.emit(int(value)))
+	auto_detail_checkbox.toggled.connect(automatic_detail_toggled.emit)
+	show_editing_detail.pressed.connect(show_editing_detail_requested.emit)
 	_up.pressed.connect(_move.bind(1))
 	_down.pressed.connect(_move.bind(-1))
 	$NewInkButton.pressed.connect(_add_ink)
@@ -39,10 +46,12 @@ func _ready() -> void:
 	$ImportButton.pressed.connect(import_requested.emit)
 
 
-func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0) -> void:
+func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0, automatic: bool = true) -> void:
 	_floor = floor
 	_selected = selected_id
 	view_detail_spinner.set_value_no_signal(view_level)
+	auto_detail_checkbox.set_pressed_no_signal(automatic)
+	view_detail_spinner.editable = not automatic
 	layer_list.clear()
 	_ids.clear()
 	for index: int in range(floor.layers.size() - 1, -1, -1):
@@ -57,6 +66,10 @@ func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0) -> v
 		if layer.id == _selected:
 			layer_list.select(layer_list.item_count - 1)
 	var current: AtlasLayer = floor.layer_by_id(_selected)
+	var hidden_target: bool = current != null and current.detail_level != view_level
+	detail_status.text = ("Viewing D%d · Editing %s (D%d, hidden)" % [view_level, current.display_name, current.detail_level]
+		if hidden_target else "Viewing D%d · Editing %s" % [view_level, current.display_name if current != null else "none"])
+	show_editing_detail.visible = hidden_target
 	name_input.editable = current != null
 	visibility_checkbox.disabled = current == null
 	lock_checkbox.disabled = current == null

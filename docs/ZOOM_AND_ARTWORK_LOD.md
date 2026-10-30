@@ -8,6 +8,12 @@
 > ownership/editing decisions are in [[E-002]], [[E-006]] and
 > [[MAPS_AND_GRIDS#Current shared-board coordinate and ownership contract — T-002 (2026-10-30)|T-002's coordinate contract]].
 
+> [!note] Subsequent implementation in T-005
+> Automatic artwork LOD, the 24× camera ceiling and inspection control now
+> exist. This T-004 investigation preserves measurements of the *earlier* 3×
+> implementation for context. The implemented 0.65/0.45 thresholds still need
+> real-device/usability tuning; see [[T-005]].
+
 ## 1. Reproduce the observed scale problem
 
 The checked-in `examples/northern_marches.tres` sample still demonstrates the

@@ -17,6 +17,7 @@ signal link_move_requested(id: String, offset: Vector2)
 signal zoom_interrupted
 signal pointer_moved(local_position: Vector2)
 signal interaction_started
+signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 signal selection_changed
 signal transform_requested(selection: AtlasSelection, transform: Transform2D)
@@ -91,6 +92,7 @@ var brush_color: Color = Color("#f5b545")
 var brush_width: float = 8.0
 
 var _panning: bool = false
+var _tile_painting: bool = false
 var _drawing_battlemap: bool = false
 var _draft_start: Vector2 = Vector2.ZERO
 var _draft_end: Vector2 = Vector2.ZERO
@@ -162,7 +164,7 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _drawing_battlemap or _draft_stroke != null or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
+	return not _moving_link_id.is_empty() or _drawing_battlemap or _draft_stroke != null or _tile_painting or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
 
 
 func cancel_edit() -> void:
@@ -170,6 +172,7 @@ func cancel_edit() -> void:
 	_erase_preview.clear()
 	_drawing_battlemap = false
 	_panning = false
+	_tile_painting = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
 	_preview_layer = null
@@ -179,6 +182,7 @@ func cancel_edit() -> void:
 	_moving_link_id = ""
 	_raster_textures.clear()
 	queue_redraw()
+	interaction_finished.emit()
 
 
 func commit_edit() -> void:
@@ -189,11 +193,13 @@ func commit_edit() -> void:
 		if offset.length_squared() > 0.0001:
 			link_move_requested.emit(id, offset)
 		queue_redraw()
+		interaction_finished.emit()
 		return
 	if _drawing_battlemap:
 		_drawing_battlemap = false
 		battlemap_requested.emit(_draft_start, _draft_end, battle_rotation)
 		queue_redraw()
+		interaction_finished.emit()
 		return
 	if _manipulation != Manipulation.NONE:
 		_finish_manipulation()
@@ -202,6 +208,7 @@ func commit_edit() -> void:
 		_shape_kind = ""
 		_preview_layer = null
 		queue_redraw()
+		interaction_finished.emit()
 		return
 	var stroke: AtlasStroke = _draft_stroke.copy()
 	var erasing: bool = _erasing
@@ -212,6 +219,7 @@ func commit_edit() -> void:
 	_raster_textures.clear()
 	stroke_requested.emit(stroke, erasing)
 	queue_redraw()
+	interaction_finished.emit()
 
 
 func clear_selection() -> void:
@@ -264,6 +272,7 @@ func _finish_manipulation() -> void:
 	else:
 		transform_requested.emit(selection, _gesture_transform)
 	queue_redraw()
+	interaction_finished.emit()
 
 
 func _on_resized() -> void:
@@ -616,6 +625,7 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				fill_requested.emit(position)
 		Tool.PAINT:
 			if editing_target_is_presented():
+				_tile_painting = true
 				_request_cell_paint(position)
 		Tool.SELECT:
 			selection_requested.emit(map.grid.document_to_cell(position))
@@ -644,7 +654,10 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 
 
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
-	if not _moving_link_id.is_empty():
+	if _tile_painting:
+		_tile_painting = false
+		interaction_finished.emit()
+	elif not _moving_link_id.is_empty():
 		_link_move_end = local_to_document(mouse.position)
 		commit_edit()
 	elif _manipulation != Manipulation.NONE:
@@ -671,10 +684,10 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 	elif _drawing_battlemap:
 		_draft_end = local_to_document(motion.position)
 		queue_redraw()
+	elif tool == Tool.PAINT and _tile_painting:
+		_request_cell_paint(local_to_document(motion.position))
 	elif is_editing():
 		_append_stroke_point(motion.position)
-	elif tool == Tool.PAINT and (motion.button_mask & MOUSE_BUTTON_MASK_LEFT) != 0:
-		_request_cell_paint(local_to_document(motion.position))
 	else:
 		return
 	accept_event()

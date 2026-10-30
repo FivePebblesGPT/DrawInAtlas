@@ -70,7 +70,7 @@ func _test_shared_camera_and_detail() -> void:
 		_check(canvas.local_to_document(local_pointer).distance_to(anchor_before) < 0.001,
 			"zoom-in wheel step %d retains pointer anchor" % index)
 	_check(canvas.camera_zoom > 2.98 and canvas.camera_zoom < 3.0,
-		"existing 3x limit is approached from an ordinary zoom-in gesture")
+		"six ordinary wheel steps grow the camera continuously without a jump")
 	_check(canvas.map == board and canvas.active_layer_id == overview.id
 		and canvas.presented_detail_level == 0, "ordinary geometric zoom never changes maps or editing target")
 	for index: int in range(6):
@@ -86,15 +86,15 @@ func _test_shared_camera_and_detail() -> void:
 	var bounds: Rect2 = Rect2(polygon[0], Vector2.ZERO)
 	for point: Vector2 in polygon:
 		bounds = bounds.expand(point)
-	var coverage_at_limit: float = maxf(bounds.size.x * AtlasMapNavigator.MAX_ZOOM / canvas.size.x,
-		bounds.size.y * AtlasMapNavigator.MAX_ZOOM / canvas.size.y)
-	_check(coverage_at_limit < 0.6, "3x camera limit still leaves the sample hex below 60% viewport coverage")
+	var coverage_at_three: float = maxf(bounds.size.x * 3.0 / canvas.size.x,
+		bounds.size.y * 3.0 / canvas.size.y)
+	_check(coverage_at_three < 0.6, "historical 3x camera framing left the hex below 60% viewport coverage")
 	var fitted_zoom: float = minf(0.8 * canvas.size.x / bounds.size.x,
 		0.8 * canvas.size.y / bounds.size.y)
-	_check(fitted_zoom > AtlasMapNavigator.MAX_ZOOM,
-		"viewport-derived 80% single-hex fit requires zoom beyond the historical 3x cap")
+	_check(fitted_zoom > 3.0 and fitted_zoom < AtlasMapNavigator.MAX_ZOOM,
+		"expanded navigator range admits the 80% fit beyond the historical 3x cap")
 	canvas.camera_center = center
-	canvas.camera_zoom = fitted_zoom # Design witness only; navigator currently clamps to 3x.
+	canvas.camera_zoom = fitted_zoom # Shared-coordinate design witness at the now-reachable local scale.
 	_check(canvas.document_to_local(center).distance_to(canvas.size * 0.5) < 0.001,
 		"fit target remains at the exact board position despite rotated grid")
 	_check(canvas.set_presented_detail_level(1) and not canvas.editing_target_is_presented(),

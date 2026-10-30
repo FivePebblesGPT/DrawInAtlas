@@ -106,6 +106,10 @@ var palette_id: int = 2:
 		palette_id = value
 		if artwork != null:
 			artwork.palette_id = value
+var automatic_artwork_lod: bool = true
+var artwork_lod: AtlasArtworkLOD = AtlasArtworkLOD.new()
+var _lod_refresh_queued: bool = false
+
 var automatic_navigation: bool = false:
 	set(value):
 		automatic_navigation = value
@@ -167,6 +171,8 @@ func _mount_sidebar_views() -> void:
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.layers_changed.connect(apply_layers)
 	layer_panel.presented_detail_selected.connect(_on_presented_detail_selected)
+	layer_panel.automatic_detail_toggled.connect(_on_automatic_detail_toggled)
+	layer_panel.show_editing_detail_requested.connect(_show_editing_detail)
 	layer_panel.import_requested.connect(raster_importer.request_import)
 
 
@@ -201,6 +207,9 @@ func _connect_workspace() -> void:
 	canvas.interaction_started.connect(navigator.zoom_gate.reset)
 	canvas.mouse_exited.connect(navigator.zoom_gate.reset)
 	canvas.interaction_started.connect(artwork.refresh_scope)
+	canvas.interaction_finished.connect(_queue_lod_refresh)
+	canvas.view_region_changed.connect(_queue_lod_refresh)
+	edits.changed.connect(_rebuild_lod)
 	inspector.tool_selected.connect(_on_tool_changed)
 	inspector.floor_selected.connect(switch_floor)
 	inspector.floor_created.connect(create_floor)
@@ -243,6 +252,7 @@ func _on_view_changed() -> void:
 	link_chooser.hide()
 	map_references.select_source(navigator.active_entrance_id)
 	edits.active_map_id = canvas.map.id
+	_rebuild_lod()
 	_refresh_layers()
 	_refresh_grid_controls()
 	locked_to_cell = false
@@ -256,6 +266,7 @@ func _on_view_changed() -> void:
 
 func _refresh_after_history() -> void:
 	navigator.reconcile_floors()
+	_rebuild_lod()
 	_refresh_layers()
 	inspector.refresh_floors(canvas.map, canvas.floor)
 	browser.refresh_metadata()
@@ -275,10 +286,11 @@ func _refresh_layers(preferred_id: String = "") -> void:
 		canvas.active_layer_id = ink.id if ink != null else ""
 		if ink == null and not canvas.floor.layers.is_empty():
 			canvas.active_layer_id = canvas.floor.layers[-1].id
-	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level)
+	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
 
 
 func _on_presented_detail_selected(level: int) -> void:
+	automatic_artwork_lod = false
 	if canvas.set_presented_detail_level(level):
 		_refresh_layers()
 		if not canvas.editing_target_is_presented():
@@ -286,6 +298,45 @@ func _on_presented_detail_selected(level: int) -> void:
 			_message("Viewing detail D%d; editing target stays %s. Select its level before editing." % [
 				level, "%s (D%d)" % [target.display_name, target.detail_level] if target != null else "none"])
 	else:
+		_refresh_layers()
+
+
+func _on_automatic_detail_toggled(enabled: bool) -> void:
+	automatic_artwork_lod = enabled
+	if enabled:
+		_queue_lod_refresh()
+	_refresh_layers()
+
+
+func _show_editing_detail() -> void:
+	var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+	if target != null:
+		_on_presented_detail_selected(target.detail_level)
+
+
+func _rebuild_lod() -> void:
+	if canvas.map == null or canvas.floor == null:
+		return
+	artwork_lod.rebuild(canvas.map, canvas.floor)
+	_queue_lod_refresh()
+
+
+func _queue_lod_refresh() -> void:
+	if not automatic_artwork_lod or _lod_refresh_queued or canvas == null:
+		return
+	_lod_refresh_queued = true
+	call_deferred("_refresh_automatic_detail")
+
+
+func _refresh_automatic_detail() -> void:
+	_lod_refresh_queued = false
+	if not automatic_artwork_lod or canvas.map == null or canvas.floor == null:
+		return
+	if canvas.is_editing():
+		return # interaction_finished schedules the deferred evaluation.
+	var next: int = artwork_lod.choose(canvas.map, canvas.camera_center, canvas.camera_zoom,
+		canvas.size, canvas.presented_detail_level)
+	if next != canvas.presented_detail_level and canvas.set_presented_detail_level(next):
 		_refresh_layers()
 
 

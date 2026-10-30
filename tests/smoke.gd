@@ -144,11 +144,11 @@ func _test_editor_workflow() -> void:
 	_check(editor.search_map_ids == ["greyhaven"], "sidebar search filters campaign maps")
 	editor._refresh_search_list("")
 
-	# At max zoom: exactly three *additional* logical steps enter the city.
+	# At the expanded camera limit: three *additional* blocked steps enter the city.
 	var canvas: AtlasCanvas = editor.canvas
 	var world: AtlasMapDocument = editor.campaign.get_map("world")
 	canvas.camera_center = world.grid.cell_to_document(Vector2i(2, 0))
-	canvas.camera_zoom = 3.0
+	canvas.camera_zoom = AtlasEditor.MAX_ZOOM
 	var pointer: Vector2 = canvas.size * 0.5
 	for step: int in range(5):
 		editor._on_wheel_step(1, pointer)
@@ -156,7 +156,7 @@ func _test_editor_workflow() -> void:
 	editor.automatic_navigation = true
 	editor._on_wheel_step(1, pointer)
 	editor._on_wheel_step(1, pointer)
-	editor._on_pointer_moved(pointer + Vector2(500, 500))
+	editor._on_pointer_moved(pointer + Vector2(3000, 3000))
 	_check(editor.zoom_gate.count == 0, "leaving a link discards pending automatic navigation")
 	editor._on_wheel_step(1, pointer)
 	editor._on_wheel_step(1, pointer)

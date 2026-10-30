@@ -20,7 +20,7 @@ The development engine is **Godot 4.8-beta2**, standard build. Application code 
 
 ## Run and test the existing implementation
 
-- Open `project.godot` in Godot **4.8-beta1** and run `main.tscn` / F5.
+- Open `project.godot` in Godot **4.8-beta2** and run `main.tscn` / F5.
 - The sample campaign includes a world hexcrawl and linked Greyhaven city. Draw freely with the pen, cut ink with the eraser, and undo/redo complete gestures. Ink uses continuous board coordinates, including on gridless maps.
 - **File → New board** creates an independent blank board with no grid, square cells, or pointy/flat hexes. Choose native units and distance per cell. The inspector edits spacing, origin, rotation and visibility without moving artwork; creation/grid edits support undo/redo.
 - B selects the pen, E the eraser, V artwork selection, F raster/terrain fill, and L/R/O line/rectangle/ellipse outlines. Pen/eraser target editable ink or raster layers. Drag a selection to move it and its corner handle to scale uniformly; numeric selection controls also rotate it.
@@ -31,6 +31,7 @@ The development engine is **Godot 4.8-beta2**, standard build. Application code 
 - The sidebar supports Maps, Search and Layers views, draggable width, active-icon collapse, and Ctrl+B (Command+B on macOS).
 - One top menu bar provides **File** (new board/save/load), **Edit** (undo/redo), and **View** (sidebar, grid overlay, navigation). Drawing controls live in the grouped right inspector; the document title and dirty marker appear at the top right.
 - Normal zoom stays on the current board; automatic linked-map navigation is opt-in. Native distance/unit labels are independent per map and never rescale artwork.
+- **Artwork detail LOD is automatic by default** and separate from linked-map navigation. The Layers panel displays the presented `D` level and the selected editing layer; turn off **Automatic artwork detail (zoom)** to inspect a level manually. If an automatic transition hides the editing target, choose **Show editing layer detail** before drawing into it. Zoom can reach 24×; transitions use provisional viewport-coverage thresholds pending manual tuning.
 - The Floors inspector adds, renames, reorders and chooses the saved default floor through undoable edits. Each floor retains independent artwork and viewer camera/layer preferences. Referenced/protected floors cannot be deleted.
 - Maps edits board names and comma-separated tags. Search supports names, floors, kinds and exact `#tags`, with campaign/current-floor/visible-area/selected-cell filters and bounded descendant traversal. Open enters the selected floor; Focus visits an entrance's source, including broken links.
 - Map/overview previews are read-only, floor-specific and cached. Visible-area search updates when the canvas pans, zooms or resizes. Preview clicks never edit the source map.
@@ -41,6 +42,7 @@ The development engine is **Godot 4.8-beta2**, standard build. Application code 
 - Artwork/history tests: `godot --headless --path . --script res://tests/artwork_smoke.gd`.
 - Board/grid tests: `godot --headless --path . --script res://tests/board_grid_smoke.gd`.
 - Continuous board/detail-level tests: `godot --headless --path . --script res://tests/continuous_canvas_smoke.gd`.
+- Automatic artwork-LOD tests: `godot --headless --path . --script res://tests/automatic_artwork_lod_smoke.gd` (native witness: `tests/automatic_artwork_lod_visual.gd` with Xvfb).
 - Native adjacent-hex/detail framebuffer test: `xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/continuous_canvas_visual.gd`.
 - Layer/storage tests: run `tests/layers_smoke.gd`, `tests/storage_smoke.gd` and `tests/layer_ui_smoke.gd` with the same headless invocation.
 - Editing tests: run `tests/fill_scope_smoke.gd`, `tests/clipboard_smoke.gd`, `tests/selection_smoke.gd` and `tests/tools_ui_smoke.gd` the same way.

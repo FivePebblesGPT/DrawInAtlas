@@ -12,9 +12,25 @@ custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_vertical = 3
 
+[node name="AutoDetailCheckbox" type="CheckBox" parent="."]
+layout_mode = 2
+button_pressed = true
+text = "Automatic artwork detail (zoom)"
+
+[node name="DetailStatus" type="Label" parent="."]
+custom_minimum_size = Vector2(115, 0)
+layout_mode = 2
+autowrap_mode = 3
+text = "Viewing D0 · Editing Ink"
+
+[node name="ShowEditingDetail" type="Button" parent="."]
+layout_mode = 2
+visible = false
+text = "Show editing layer detail"
+
 [node name="ViewDetailLabel" type="Label" parent="."]
 layout_mode = 2
-text = "Presented artwork detail (D0 = overview)"
+text = "Manual artwork detail (D0 = overview)"
 
 [node name="ViewDetailSpinner" type="SpinBox" parent="."]
 layout_mode = 2
