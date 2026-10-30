@@ -143,8 +143,8 @@ The source already has meaningful `_touches()`, `_source_over()` and
 `AtlasFill._paint_pixel_colors()` helpers; keep them instead of making the
 main flow a series of one-line calls. The T-037 demonstration added only
 comments and spacing; the later [[T-034]] implementation extracted a cohesive
-pixel-staging scan. The geometry/eraser passes [[T-035]] and [[T-036]] remain
-separate and must preserve their modules' behavior.
+pixel-staging scan. The geometry cleanup [[T-035]] is now complete; the eraser
+pass [[T-036]] remains separate and must preserve its module's behavior.
 
 **Raster brush application (T-034):** `AtlasRasterBrush.paint()` now validates and
 maps the board-space sweep to a raster candidate rectangle, checks the
@@ -165,6 +165,19 @@ eligible pixels; the caller rejects overflow before asking the shared snapshot
 writer to clone and edit any image. Masking uses whole transformed pixel quads;
 even transparent pixels must be stored. The shared writer can also grow partial
 chunks for brush edits, while fills never select those unstored areas.
+
+**Selection geometry application (T-035):** `AtlasSelectionGeometry` keeps
+selection identity and index validation in `select_indices()`, picks ink in
+reverse painter order with `_hits_stroke()`, and inverse-maps raster document
+points into local board units. Raster selection uses a transformed AABB of
+sparse chunks; gaps and transparent pixels inside that envelope still count
+as selected. `transformed()` validates a live selection and a finite,
+invertible transform, clones the layer, then delegates to `_transform_ink()`
+or `_transform_raster()` and revalidates the result. Ink requires uniform,
+orthogonal scaling and scales stroke widths; raster composes affine placement
+without resampling pixels. Both paths require complete source and destination
+footprints inside an enabled edit mask. Helpers mutate only the detached
+snapshot, never the live layer; a rejected edit discards it.
 
 ## Validation
 
