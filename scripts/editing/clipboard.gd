@@ -10,6 +10,10 @@ const GRID_KEYS: Array[String] = [
 	"kind", "cell_size", "origin", "rotation", "distance_per_cell", "distance_unit", "visible"
 ]
 const RASTER_KEYS: Array[String] = [
+	"id", "name", "kind", "visible", "locked", "opacity", "pixels_per_unit", "transform", "chunks",
+	"detail_level"
+]
+const LEGACY_RASTER_KEYS: Array[String] = [
 	"id", "name", "kind", "visible", "locked", "opacity", "pixels_per_unit", "transform", "chunks"
 ]
 
@@ -142,7 +146,8 @@ static func _decode_raster(data: Dictionary) -> AtlasClipboardData:
 	var metadata: Variant = data["raster"]
 	var assets: Variant = data["assets"]
 	if not metadata is Dictionary or not assets is Dictionary \
-			or not _has_keys(metadata, RASTER_KEYS) or not metadata["kind"] is String \
+			or (not _has_keys(metadata, RASTER_KEYS) and not _has_keys(metadata, LEGACY_RASTER_KEYS)) \
+			or not metadata["kind"] is String \
 			or metadata["kind"] != "RASTER":
 		return null
 	var chunks: Variant = metadata["chunks"]

@@ -40,6 +40,8 @@ The development engine is **Godot 4.8-beta2**, standard build. Application code 
 - Headless smoke tests: `godot --headless --path . --script res://tests/smoke.gd`.
 - Artwork/history tests: `godot --headless --path . --script res://tests/artwork_smoke.gd`.
 - Board/grid tests: `godot --headless --path . --script res://tests/board_grid_smoke.gd`.
+- Continuous board/detail-level tests: `godot --headless --path . --script res://tests/continuous_canvas_smoke.gd`.
+- Native adjacent-hex/detail framebuffer test: `xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/continuous_canvas_visual.gd`.
 - Layer/storage tests: run `tests/layers_smoke.gd`, `tests/storage_smoke.gd` and `tests/layer_ui_smoke.gd` with the same headless invocation.
 - Editing tests: run `tests/fill_scope_smoke.gd`, `tests/clipboard_smoke.gd`, `tests/selection_smoke.gd` and `tests/tools_ui_smoke.gd` the same way.
 - Workspace/organization tests: run `tests/editor_modules_smoke.gd`, `tests/organization_ui_smoke.gd`, `tests/floors_view_smoke.gd`, `tests/overview_smoke.gd` and `tests/preview_cache_smoke.gd` the same way.

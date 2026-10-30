@@ -50,6 +50,13 @@ jobs:
           godot --headless --path . --script res://tests/board_grid_smoke.gd 2>&1 | tee /tmp/godot-board-grid.log
           grep -q 'ATLAS_BOARD_GRID_PASSED' /tmp/godot-board-grid.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-board-grid.log; then exit 1; fi
+      - name: Run continuous shared-canvas regression (T-002)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/continuous_canvas_smoke.gd 2>&1 | tee /tmp/godot-continuous-canvas.log
+          grep -q 'ATLAS_CONTINUOUS_CANVAS_PASSED' /tmp/godot-continuous-canvas.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-continuous-canvas.log; then exit 1; fi
       - name: Run layer and recovery tests
         shell: bash
         run: |
@@ -106,11 +113,12 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          for suite in visual_smoke preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
+          for suite in visual_smoke continuous_canvas_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
             xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
           done
           grep -q 'ATLAS_VISUAL_PASSED' /tmp/godot-visual_smoke.log
+          grep -q 'ATLAS_CONTINUOUS_CANVAS_VISUAL_PASSED' /tmp/godot-continuous_canvas_visual.log
           grep -q 'ATLAS_PREVIEW_UI_PASSED' /tmp/godot-preview_ui_smoke.log
           grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
           grep -q 'ATLAS_REFERENCES_UI_PASSED' /tmp/godot-references_ui_smoke.log

@@ -65,6 +65,19 @@ func _run() -> void:
 	editor._on_stroke(stroke, false)
 	_check((floor.layer_by_id(id) as AtlasInkLayer).strokes.size() == 1 and floor.strokes.is_empty(),
 		"ink goes only into the selected layer")
+	# Presentation is a view choice; assigning a layer to a different authored
+	# detail group is history-backed metadata, not a new document or transform.
+	editor.layer_panel.layer_detail_spinner.value = 1
+	_check(floor.layer_by_id(id).detail_level == 1 and not editor.canvas.editing_target_is_presented(),
+		"layer detail assignment is persistent and does not silently change presentation")
+	editor.layer_panel.view_detail_spinner.value = 1
+	_check(editor.canvas.presented_detail_level == 1 and editor.canvas.active_layer_id == id
+		and editor.canvas.editing_target_is_presented(),
+		"manual detail presentation does not retarget editing")
+	editor.layer_panel.layer_detail_spinner.value = 0
+	editor.layer_panel.view_detail_spinner.value = 0
+	_check(floor.layer_by_id(id).detail_level == 0 and editor.canvas.editing_target_is_presented(),
+		"editor can return to overview editing without another map")
 	editor.layer_panel.lock_checkbox.button_pressed = true
 	var command: AtlasEditCommand = editor.edits.get_undo_command()
 	editor._on_stroke(stroke, false)

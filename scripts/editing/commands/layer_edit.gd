@@ -50,7 +50,7 @@ func _replace(campaign: AtlasCampaign, expected: Array[AtlasLayer], replacement:
 
 func _content(layer: AtlasLayer, document: AtlasMapDocument) -> Dictionary:
 	var data: Dictionary = layer.to_dict()
-	for key: String in ["id", "name", "visible", "locked", "opacity"]:
+	for key: String in ["id", "name", "visible", "locked", "opacity", "detail_level"]:
 		data.erase(key)
 	if layer is AtlasTileLayer and layer.grid == null:
 		data.grid = document.get_terrain_grid(floor_id).to_dict()

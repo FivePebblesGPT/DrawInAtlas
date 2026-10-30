@@ -12,6 +12,14 @@ custom_minimum_size = Vector2(0, 120)
 layout_mode = 2
 size_flags_vertical = 3
 
+[node name="ViewDetailLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Presented artwork detail (D0 = overview)"
+
+[node name="ViewDetailSpinner" type="SpinBox" parent="."]
+layout_mode = 2
+max_value = 32.0
+
 [node name="NameInput" type="LineEdit" parent="." unique_id=1833914338]
 layout_mode = 2
 placeholder_text = "Layer name"
@@ -23,6 +31,14 @@ text = "Visible"
 [node name="LockCheckbox" type="CheckBox" parent="." unique_id=336951583]
 layout_mode = 2
 text = "Locked"
+
+[node name="LayerDetailLabel" type="Label" parent="."]
+layout_mode = 2
+text = "Selected editing layer's authored detail"
+
+[node name="LayerDetailSpinner" type="SpinBox" parent="."]
+layout_mode = 2
+max_value = 32.0
 
 [node name="OpacityLabel" type="Label" parent="." unique_id=1640509169]
 layout_mode = 2

@@ -61,6 +61,9 @@ func select_layer(id: String) -> void:
 	_canvas.cancel_edit()
 	_canvas.clear_selection()
 	_canvas.active_layer_id = id
+	# Selecting a layer is an explicit authoring decision. Zoom/presentation
+	# updates never perform this operation or change the editing target.
+	_canvas.set_presented_detail_level(_canvas.floor.layer_by_id(id).detail_level)
 	layers_changed.emit(id)
 	message.emit("Selected layer: %s" % _canvas.floor.layer_by_id(id).display_name)
 
@@ -89,11 +92,18 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 			or (selected is AtlasRasterLayer and selected.chunks.is_empty())):
 		tool_requested.emit(AtlasCanvas.Tool.PEN)
 	_canvas.queue_redraw()
-	message.emit("Layer changed. Hidden or locked layers are not editable.")
+	if not _canvas.editing_target_is_presented():
+		message.emit("Layer changed. Editing target is in D%d, but D%d is displayed; select its detail level before drawing." % [
+			_canvas.floor.layer_by_id(_canvas.active_layer_id).detail_level, _canvas.presented_detail_level])
+	else:
+		message.emit("Layer changed. Hidden or locked layers are not editable.")
 	return true
 
 
 func stroke(stroke: AtlasStroke, erasing: bool) -> void:
+	if not _canvas.editing_target_is_presented():
+		message.emit("Editing layer is outside the displayed detail level. Select its level to edit.")
+		return
 	if not stroke.is_valid():
 		return
 	_canvas.clear_selection()
@@ -125,6 +135,9 @@ func stroke(stroke: AtlasStroke, erasing: bool) -> void:
 
 
 func paint(cell: Vector2i) -> void:
+	if not _canvas.editing_target_is_presented():
+		message.emit("Select the editing layer's detail level before painting.")
+		return
 	var layer: AtlasTileLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasTileLayer
 	if layer == null or not layer.is_editable():
 		message.emit("Select a visible, unlocked terrain layer to paint.")
@@ -150,6 +163,9 @@ func paint(cell: Vector2i) -> void:
 
 
 func fill_at(point: Vector2) -> bool:
+	if not _canvas.editing_target_is_presented():
+		message.emit("Select the editing layer's detail level before filling.")
+		return false
 	_canvas.cancel_edit()
 	_canvas.clear_selection()
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
@@ -177,6 +193,8 @@ func fill_at(point: Vector2) -> bool:
 
 
 func transform_selection(selection: AtlasSelection, delta: Transform2D) -> bool:
+	if not _canvas.editing_target_is_presented():
+		return false
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	var transformed: AtlasLayer = AtlasSelectionGeometry.transformed(layer, selection, delta, scope())
 	if transformed == null:
@@ -202,7 +220,7 @@ func select_all_artwork() -> void:
 
 
 func can_copy_selection() -> bool:
-	if _canvas.floor == null:
+	if _canvas.floor == null or not _canvas.editing_target_is_presented():
 		return false
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if layer == null or not layer.visible:
@@ -305,7 +323,7 @@ func paste_selection() -> bool:
 
 
 func paste_payload(payload: AtlasClipboardData, anchor: Vector2) -> bool:
-	if payload == null or not anchor.is_finite():
+	if payload == null or not anchor.is_finite() or not _canvas.editing_target_is_presented():
 		return false
 	var target: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if payload.kind == "INK" and target is AtlasInkLayer and target.is_editable():
@@ -345,6 +363,9 @@ func _paste_ink(payload: AtlasClipboardData, target: AtlasInkLayer, anchor: Vect
 func _paste_raster(source: AtlasRasterLayer, anchor: Vector2) -> bool:
 	var raster: AtlasRasterLayer = AtlasLayerCodec.clone(source) as AtlasRasterLayer
 	raster.id = "raster-" + Crypto.new().generate_random_bytes(16).hex_encode()
+	# Clipboard source may come from a different group; paste into the
+	# explicitly presented authoring group, at unchanged board coordinates.
+	raster.detail_level = _canvas.presented_detail_level
 	raster.transform = Transform2D(0.0, anchor) * raster.transform
 	if not scope().contains_rect(AtlasSelectionGeometry.select_all(raster).bounds):
 		return false
@@ -389,6 +410,7 @@ func import_raster(image: Image) -> bool:
 		return false
 	layer.id = "raster-" + Crypto.new().generate_random_bytes(16).hex_encode()
 	layer.display_name = "Imported image"
+	layer.detail_level = _canvas.presented_detail_level
 	layer.transform.origin = _canvas.camera_center - AtlasSelectionGeometry.raster_local_bounds(layer).size * 0.5
 	if not scope().contains_rect(AtlasSelectionGeometry.select_all(layer).bounds):
 		message.emit("Imported image does not fit the selected-cell scope.")

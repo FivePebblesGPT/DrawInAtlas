@@ -52,6 +52,9 @@ func show_map(map: AtlasMapDocument, focus: Vector2 = Vector2.ZERO, zoom: float 
 		return false
 	if not layer_id.is_empty():
 		_canvas.active_layer_id = layer_id
+		var target: AtlasLayer = _canvas.floor.layer_by_id(layer_id)
+		if target != null:
+			_canvas.set_presented_detail_level(target.detail_level)
 	_canvas.camera_center = focus
 	_canvas.camera_zoom = clampf(zoom, MIN_ZOOM, MAX_ZOOM)
 	active_entrance_id = entrance_id

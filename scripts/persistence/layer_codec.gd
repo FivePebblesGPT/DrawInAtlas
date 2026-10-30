@@ -8,7 +8,10 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	var visible: Variant = data.get("visible", true)
 	var locked: Variant = data.get("locked", false)
 	var opacity: Variant = data.get("opacity", 1.0)
+	var detail: Variant = data.get("detail_level", 0)
 	if not visible is bool or not locked is bool or not AtlasData.number(opacity):
+		return null
+	if not AtlasData.integer(detail) or int(detail) < 0 or int(detail) > AtlasLayer.MAX_DETAIL_LEVEL:
 		return null
 	if float(opacity) < 0.0 or float(opacity) > 1.0:
 		return null
@@ -77,6 +80,7 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	layer.visible = visible
 	layer.locked = locked
 	layer.opacity = float(opacity)
+	layer.detail_level = int(detail)
 	return layer
 
 

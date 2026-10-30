@@ -16,7 +16,7 @@
 - [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
 
 ## Review work
-- [ ] [[T-002|T-002 · Continuous chunked-canvas model]]
+- [x] [[T-002|T-002 · Continuous chunked-canvas model]]
 - [ ] [[T-003|T-003 · Aligned transparent detail previews]]
 - [ ] [[T-004|T-004 · Viewport-appropriate zoom and artwork LOD]]
 - [ ] [[T-005|T-005 · Automatic artwork LOD on by default]]

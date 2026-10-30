@@ -3,7 +3,88 @@
 > [!important] Geometry reference, not the revised ownership contract
 > Earlier independent-document scale/battlemap assumptions below are superseded where they conflict with [[E-002]] and [[E-006]]. The hex overlay covers one shared chunked board with separately authored detail; tile restriction is a selection mask. Battlemats are retired. A projection frame in [[E-007]] controls viewing, not artwork transforms. Keep useful coordinate math, but use [[Index]] for current acceptance.
 
-**Status:** proposed design and coordinate conventions.
+**Status:** T-002 shared-board contract implemented below; older sections are historical/proposed and must not override it.
+
+## Current shared-board coordinate and ownership contract — T-002 (2026-10-30)
+
+This section takes precedence over legacy map-scale and battlemap-placement language below.
+It describes the **implemented shared board**, not the future semantic-zoom
+thresholds, preview policy or battlemat migration (T-003–T-005, T-012/T-015).
+
+1. **Board identity and coordinates.** Each `AtlasMapDocument` is one independent,
+   unbounded two-dimensional document with coordinates `Vector2` in **board units**.
+   A world map has **one** document for all hexes, assigned and empty alike.
+   A floor is a vertical content stack; an authored detail level is a subset of
+   its layers. No implicit per-hex document exists, and the camera never
+   changes boards by scrolling into an unassigned hex. Pointer conversion is
+   `document = camera_center + (screen - viewport_center) / camera_zoom`;
+   zoom/pan do not alter authored data.
+2. **Grid versus content.** The optional board grid maps document points to
+   square indices or axial `(q,r)` hexes, using its own origin/rotation/spacing.
+   `cell_polygon` lives in the same document coordinates as drawing, and the
+   half-open cell/axial rounding rule selects one cell. A highlighted cell is
+   **not** an image or edit owner: *Restrict edits to current tile* supplies
+   its polygon as an optional `AtlasEditScope` mask to ink, raster, terrain and
+   transforms. Without the mask ink and raster can cross any cell border.
+3. **Chunk ownership.** Raster content belongs to an `AtlasRasterLayer`, not
+   to the hex under it. Within a raster layer, a pixel `(x,y)` has exactly one
+   signed chunk owner `(floor(x/256), floor(y/256))` and local pixel
+   `(x,y) - 256*owner` in `[0,255]²`, including negative positions. Chunks
+   are addressed by that canonical key and stored once per raster layer;
+   painting/erasing across seams updates multiple chunks as **one gesture**.
+   Pixels are mapped from board space through the inverse raster-layer
+   transform and `pixels_per_unit`; changing the overlay grid does not move
+   them. Imported partial edge chunks may expand to 256² without moving
+   existing pixels. Continuous vector ink is owned exactly once by its ink
+   layer as a whole `AtlasStroke` in board coordinates, even if it crosses
+   many virtual chunk regions: there is **no per-cell duplication** or
+   chunk-split vector object yet. Terrain cells retain their own frozen
+   content-grid geometry where applicable (older prototype behavior).
+4. **Detail-group authority.** Each authored `AtlasLayer` carries a
+   `detail_level` integer, `0..32` (`D0` = overview; absent in older saves
+   defaults to `0`). A group is the set of layers on the same floor with the
+   same level; **all groups use identical board coordinates**. To author more
+   detail, assign/create a layer in `D1`, `D2`, etc., instead of creating a
+   hex child document, subdividing an existing stroke or rescaling pixels.
+   Layer IDs remain unique within the floor across groups. Each detail layer
+   is independently editable and persistable, with normal undo/redo.
+5. **Presentation versus editing.** The Layers panel independently exposes
+   *Presented artwork detail* (a viewer-local level; not saved) and the
+   selected layer's *authored detail* (history-backed saved metadata). Only
+   layers in the presented level are drawn. Picking a layer explicitly makes
+   its level the presented one; merely changing the presented level **never
+   changes** `active_layer_id`. Hidden-by-LOD editing is refused rather than
+   silently painting another level. Presentation switches during a gesture
+   are refused, so an eventual automatic LOD driver must defer them until
+   the gesture completes. T-004 will decide viewport thresholds and hidden
+   target indication; T-005 will enable/configure automatic presentation.
+   This ticket deliberately does **not** interpret `automatic_navigation`
+   (which currently enters linked documents at a zoom limit) as artwork LOD.
+6. **Measurement and persistence.** `grid.cell_size` is hex circumradius or
+   square side **in board units**; `grid.distance_per_cell` and
+   `grid.distance_unit` describe the map's native travel measurement (e.g.
+   `3 mi/hex` or `5 ft/square`). Editing those values, grid origin, rotation,
+   visibility or spacing never rescales freehand art/chunks. It is **not**
+   a camera, battlemap or physical projector scale. Native `.scn` saves
+   persist the per-layer `detail_level` through `@export_storage` and the
+   layer validation/clone path. Old native/legacy layers are interpreted as
+   `D0`; raster clipboard decode accepts both the prior metadata shape and
+   the new one, rejecting invalid new levels. Camera/presented level remain
+   transient viewer state.
+
+**Adjacent-hex reproduction:** On a hex board, use D0 ink from the center of
+axial `(-1,0)` through `(2,0)` in one stroke. On a D0 raster layer, make a
+stroke from board `(-261,4)` to `(261,4)` with a 3-unit brush. It crosses
+hex cells and three signed x chunk seams (`-256`, `0`, `256`) without
+leaving gaps/duplicate owners; erasing follows the same path. Zoom toward an
+unassigned axial `(41,-38)` cell: no new document is created. Turn on
+*Restrict edits* after selecting a cell: new edits clip/reject against its
+polygon, while the existing cross-hex stroke is unchanged. Add a D1 ink layer
+and draw at the same board coordinates; changing the presented detail shows
+D1 instead of D0 without changing the active editing target or the native
+measurement. `tests/continuous_canvas_smoke.gd` exercises these cases and a
+native-save round-trip; the Layers UI regression exercises the real panel.
+
 
 ## 1. Keep four different concepts separate
 

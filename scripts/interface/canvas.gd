@@ -31,6 +31,27 @@ var campaign: AtlasCampaign
 var map: AtlasMapDocument
 var floor: AtlasFloor
 var active_layer_id: String = "ink"
+## Presentation only: never changes the authored layer, floor, map or camera.
+## Automatic LOD (T-004/T-005) must use set_presented_detail_level so an
+## in-progress gesture cannot be redirected or visually interrupted.
+var presented_detail_level: int = 0
+
+
+func set_presented_detail_level(level: int) -> bool:
+	if level < 0 or level > AtlasLayer.MAX_DETAIL_LEVEL or is_editing():
+		return false
+	if presented_detail_level != level:
+		clear_selection()
+	presented_detail_level = level
+	queue_redraw()
+	return true
+
+
+func editing_target_is_presented() -> bool:
+	if floor == null:
+		return false
+	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+	return layer != null and layer.detail_level == presented_detail_level
 var selection: AtlasSelection = AtlasSelection.new()
 var edit_scope: AtlasEditScope = AtlasEditScope.new()
 var tool: Tool = Tool.PEN
@@ -123,6 +144,7 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	map = value
 	campaign = current_campaign
 	floor = selected_floor
+	presented_detail_level = 0
 	_raster_textures.clear()
 	clear_selection()
 	has_selected_cell = false
@@ -290,7 +312,7 @@ func _sync_layer_renderers() -> void:
 		group.position = size * 0.5 - camera_center * camera_zoom
 		group.scale = Vector2.ONE * camera_zoom
 		group.self_modulate = Color(1, 1, 1, layer.opacity)
-		group.visible = layer.visible and layer.opacity > 0.0
+		group.visible = layer.visible and layer.opacity > 0.0 and layer.detail_level == presented_detail_level
 		_layer_drawers[layer.id].queue_redraw()
 	for id: String in _layer_groups.keys():
 		if not present.has(id):
@@ -553,6 +575,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 		return
 	match tool:
 		Tool.PEN, Tool.ERASER:
+			if not editing_target_is_presented():
+				return
 			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
 			if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
 				return
@@ -561,6 +585,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			_draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)
 			_append_stroke_point(mouse.position)
 		Tool.LINE, Tool.RECTANGLE, Tool.ELLIPSE:
+			if not editing_target_is_presented():
+				return
 			var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
 			if layer != null and layer.is_editable():
 				_shape_kind = Tool.keys()[tool]
@@ -568,6 +594,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_stroke_left_canvas = false
 				_draft_stroke = AtlasShapes.stroke("LINE", position, position, brush_color, brush_width)
 		Tool.ART_SELECT:
+			if not editing_target_is_presented():
+				return
 			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
 			_gesture_start = position
 			_gesture_end = position
@@ -581,9 +609,11 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			if _manipulation == Manipulation.NONE:
 				_manipulation = Manipulation.MARQUEE
 		Tool.FILL:
-			fill_requested.emit(position)
+			if editing_target_is_presented():
+				fill_requested.emit(position)
 		Tool.PAINT:
-			_request_cell_paint(position)
+			if editing_target_is_presented():
+				_request_cell_paint(position)
 		Tool.SELECT:
 			selection_requested.emit(map.grid.document_to_cell(position))
 		Tool.BATTLEMAP:

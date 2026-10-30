@@ -166,6 +166,7 @@ func _mount_sidebar_views() -> void:
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.layers_changed.connect(apply_layers)
+	layer_panel.presented_detail_selected.connect(_on_presented_detail_selected)
 	layer_panel.import_requested.connect(raster_importer.request_import)
 
 
@@ -274,7 +275,18 @@ func _refresh_layers(preferred_id: String = "") -> void:
 		canvas.active_layer_id = ink.id if ink != null else ""
 		if ink == null and not canvas.floor.layers.is_empty():
 			canvas.active_layer_id = canvas.floor.layers[-1].id
-	layer_panel.set_floor(canvas.floor, canvas.active_layer_id)
+	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level)
+
+
+func _on_presented_detail_selected(level: int) -> void:
+	if canvas.set_presented_detail_level(level):
+		_refresh_layers()
+		if not canvas.editing_target_is_presented():
+			var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+			_message("Viewing detail D%d; editing target stays %s. Select its level before editing." % [
+				level, "%s (D%d)" % [target.display_name, target.detail_level] if target != null else "none"])
+	else:
+		_refresh_layers()
 
 
 func _refresh_grid_controls() -> void:

@@ -4,12 +4,15 @@ extends VBoxContainer
 signal layer_selected(id: String)
 signal layers_changed(layers: Array[AtlasLayer], selected_id: String)
 signal import_requested
+signal presented_detail_selected(level: int)
 
 @onready var layer_list: ItemList = $LayerList
 @onready var visibility_checkbox: CheckBox = $VisibilityCheckbox
 @onready var lock_checkbox: CheckBox = $LockCheckbox
 @onready var opacity_spinner: SpinBox = $OpacitySpinner
 @onready var name_input: LineEdit = $NameInput
+@onready var layer_detail_spinner: SpinBox = $LayerDetailSpinner
+@onready var view_detail_spinner: SpinBox = $ViewDetailSpinner
 @onready var _up: Button = $Order/RaiseButton
 @onready var _down: Button = $Order/LowerButton
 var _floor: AtlasFloor
@@ -24,6 +27,10 @@ func _ready() -> void:
 	visibility_checkbox.toggled.connect(_set_property.bind(&"visible"))
 	lock_checkbox.toggled.connect(_set_property.bind(&"locked"))
 	opacity_spinner.value_changed.connect(_set_property.bind(&"opacity"))
+	layer_detail_spinner.value_changed.connect(func(value: float) -> void:
+		_set_property(int(value), &"detail_level"))
+	view_detail_spinner.value_changed.connect(func(value: float) -> void:
+		presented_detail_selected.emit(int(value)))
 	_up.pressed.connect(_move.bind(1))
 	_down.pressed.connect(_move.bind(-1))
 	$NewInkButton.pressed.connect(_add_ink)
@@ -32,9 +39,10 @@ func _ready() -> void:
 	$ImportButton.pressed.connect(import_requested.emit)
 
 
-func set_floor(floor: AtlasFloor, selected_id: String) -> void:
+func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0) -> void:
 	_floor = floor
 	_selected = selected_id
+	view_detail_spinner.set_value_no_signal(view_level)
 	layer_list.clear()
 	_ids.clear()
 	for index: int in range(floor.layers.size() - 1, -1, -1):
@@ -45,7 +53,7 @@ func set_floor(floor: AtlasFloor, selected_id: String) -> void:
 			flags += " [locked]"
 		if not layer.visible:
 			flags += " [hidden]"
-		layer_list.add_item(layer.display_name + " · " + layer.kind + flags)
+		layer_list.add_item(layer.display_name + " · D%d · " % layer.detail_level + layer.kind + flags)
 		if layer.id == _selected:
 			layer_list.select(layer_list.item_count - 1)
 	var current: AtlasLayer = floor.layer_by_id(_selected)
@@ -53,13 +61,16 @@ func set_floor(floor: AtlasFloor, selected_id: String) -> void:
 	visibility_checkbox.disabled = current == null
 	lock_checkbox.disabled = current == null
 	opacity_spinner.editable = current != null
+	layer_detail_spinner.editable = current != null
 	if current != null:
 		name_input.text = current.display_name
 		visibility_checkbox.set_pressed_no_signal(current.visible)
 		lock_checkbox.set_pressed_no_signal(current.locked)
 		opacity_spinner.set_value_no_signal(current.opacity)
+		layer_detail_spinner.set_value_no_signal(current.detail_level)
 	else:
 		name_input.text = ""
+		layer_detail_spinner.set_value_no_signal(0)
 	var index: int = _index()
 	_up.disabled = index < 0 or index == floor.layers.size() - 1
 	_down.disabled = index <= 0
@@ -126,5 +137,6 @@ func _add(layer: AtlasLayer) -> void:
 	if _floor == null:
 		return
 	var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_floor.layers)
+	layer.detail_level = int(view_detail_spinner.value)
 	layers.append(layer)
 	layers_changed.emit(layers, layer.id)

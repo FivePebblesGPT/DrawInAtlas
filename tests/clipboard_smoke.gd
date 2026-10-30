@@ -294,7 +294,11 @@ func _test_invalid_raster() -> void:
 	for key: String in AtlasClipboard.RASTER_KEYS:
 		var missing: Dictionary = valid.duplicate(true)
 		missing.raster.erase(key)
-		_reject(missing, "missing raster metadata " + key)
+		if key == "detail_level":
+			_check(AtlasClipboard.decode(JSON.stringify(missing)) != null,
+				"legacy raster clipboard without detail metadata loads as overview")
+		else:
+			_reject(missing, "missing raster metadata " + key)
 		for bad: Variant in [null, [], {}]:
 			var data: Dictionary = valid.duplicate(true)
 			data.raster[key] = bad
