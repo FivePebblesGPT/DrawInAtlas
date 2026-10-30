@@ -72,6 +72,8 @@ thresholds, preview policy or battlemat migration (T-003–T-005, T-012/T-015).
    the new one, rejecting invalid new levels. Camera/presented level remain
    transient viewer state.
 
+Viewport fit, visual-scale mismatch and automatic authored-LOD transition design are specified in [[ZOOM_AND_ARTWORK_LOD]] (T-004). The existing T-002 presentation controls remain manual until T-005.
+
 **Adjacent-hex reproduction:** On a hex board, use D0 ink from the center of
 axial `(-1,0)` through `(2,0)` in one stroke. On a D0 raster layer, make a
 stroke from board `(-261,4)` to `(261,4)` with a 3-unit brush. It crosses
