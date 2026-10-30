@@ -8,7 +8,7 @@ const CATEGORIES: Array[Dictionary] = [
 	{"title": "DRAW & ERASE", "tools": [
 		{"id": AtlasCanvas.Tool.PEN, "name": "Brush", "key": "B", "icon": "pen", "hint": "Drag or tap to paint on the active ink or raster layer; width and opacity in the inspector"},
 		{"id": AtlasCanvas.Tool.ERASER, "name": "Eraser", "key": "E", "icon": "eraser", "hint": "Cut ink segments or clear raster pixels on the active layer; width in inspector"},
-		{"id": AtlasCanvas.Tool.FILL, "name": "Fill", "key": "F", "icon": "fill", "hint": "Fill raster pixels or terrain cells"},
+		{"id": AtlasCanvas.Tool.FILL, "name": "Fill", "key": "F", "icon": "fill", "hint": "Raster: preview contiguous/global RGBA fill with tolerance; terrain: contiguous palette cells. Release to apply; Esc cancels"},
 	]},
 	{"title": "SHAPES", "tools": [
 		{"id": AtlasCanvas.Tool.LINE, "name": "Line", "key": "L", "icon": "line", "hint": "Drag to draw a straight line"},

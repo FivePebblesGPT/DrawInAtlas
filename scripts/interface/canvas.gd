@@ -20,7 +20,9 @@ signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 signal selection_changed
 signal transform_requested(selection: AtlasSelection, transform: Transform2D)
-signal fill_requested(position: Vector2)
+signal fill_requested
+signal fill_preview_requested(position: Vector2, invert_global: bool)
+signal fill_cancel_requested
 signal view_region_changed
 
 enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE }
@@ -89,9 +91,12 @@ var brush_color: Color = Color("#f5b545")
 var brush_width: float = 8.0
 ## Session-only; grid changes never rewrite existing artwork.
 var snap_to_grid: bool = false
+var fill_tolerance: float = 0.0
+var fill_global: bool = false
 
 var _panning: bool = false
 var _tile_painting: bool = false
+var _fill_pending: bool = false
 var _pending_wheel_fraction: float = 0.0
 var _wheel_dispatch_direction: int = 0
 var _last_wheel_dispatch_ms: int = -1
@@ -164,10 +169,13 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
+	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty()
 
 
 func cancel_edit() -> void:
+	if _fill_pending:
+		_fill_pending = false
+		fill_cancel_requested.emit()
 	_draft_stroke = null
 	_erase_preview.clear()
 	_panning = false
@@ -421,6 +429,9 @@ func _draw_brush_cursor(item: Node2D) -> void:
 
 
 func _clear_brush_cursor() -> void:
+	# Do not leave a release-to-commit fill pending after the pointer exits.
+	if _fill_pending:
+		cancel_edit()
 	_brush_cursor_inside = false
 	if _overlay != null:
 		_overlay.queue_redraw()
@@ -634,7 +645,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_manipulation = Manipulation.MARQUEE
 		Tool.FILL:
 			if editing_target_is_presented():
-				fill_requested.emit(position)
+				_fill_pending = true
+				fill_preview_requested.emit(position, mouse.shift_pressed)
 		Tool.PAINT:
 			if editing_target_is_presented():
 				_tile_painting = true
@@ -685,7 +697,14 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 
 
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
-	if _tile_painting:
+	if _fill_pending:
+		_fill_pending = false
+		fill_requested.emit()
+		_preview_layer = null
+		_raster_textures.clear()
+		queue_redraw()
+		interaction_finished.emit()
+	elif _tile_painting:
 		_tile_painting = false
 		interaction_finished.emit()
 	elif not _moving_link_id.is_empty():

@@ -12,6 +12,9 @@ var palette_id: int = 2
 var use_system_clipboard: bool = true
 var clipboard_text: String = ""
 var _paste_count: int = 0
+var _pending_fill: AtlasFillResult
+var _pending_fill_layer_id: String = ""
+var _pending_fill_is_terrain: bool = false
 var _canvas: AtlasCanvas
 var _edits: AtlasEditHistory
 
@@ -162,33 +165,101 @@ func paint(cell: Vector2i) -> void:
 		_canvas.queue_redraw()
 
 
-func fill_at(point: Vector2) -> bool:
+func _compute_fill(point: Vector2, inverted_global: bool = false) -> AtlasFillResult:
 	if not _canvas.editing_target_is_presented():
-		message.emit("Select the editing layer's detail level before filling.")
-		return false
-	_canvas.cancel_edit()
-	_canvas.clear_selection()
+		var hidden: AtlasFillResult = AtlasFillResult.new()
+		hidden.message = "Select the editing layer's detail level before filling."
+		return hidden
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if layer == null or not layer.is_editable():
-		message.emit("Fill needs visible, unlocked raster or terrain content.")
-		return false
-	var result: AtlasFillResult
+		var blocked: AtlasFillResult = AtlasFillResult.new()
+		blocked.message = "Fill needs visible, unlocked raster or terrain content."
+		return blocked
 	if layer is AtlasRasterLayer:
-		result = AtlasFill.raster(layer, point, _canvas.brush_color, scope())
-		if result.ok:
-			var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
-			layers[_canvas.floor.layers.find(layer)] = result.layer
-			return apply_layers(layers, layer.id)
-	elif layer is AtlasTileLayer:
+		return AtlasFill.raster(layer, point, _canvas.brush_color, scope(), 262144,
+			_canvas.fill_tolerance, _canvas.fill_global == inverted_global)
+	if layer is AtlasTileLayer:
 		var basis: AtlasGrid = layer.grid if layer.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-		result = AtlasFill.tiles(basis, layer.terrain, basis.document_to_cell(point), palette_id, scope())
-		if result.ok:
-			var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, layer.id, layer.terrain, result.terrain)
-			if _edits.execute(command):
-				_canvas.queue_redraw()
-				message.emit("Filled connected cells in one undoable action.")
-				return true
-	message.emit(result.message if result != null else "Bucket fill targets raster pixels or terrain cells; outlines remain vector ink.")
+		return AtlasFill.tiles(basis, layer.terrain, basis.document_to_cell(point), palette_id, scope())
+	var unsupported: AtlasFillResult = AtlasFillResult.new()
+	unsupported.message = "Select raster pixels or terrain cells; ink outlines are not fill boundaries."
+	return unsupported
+
+
+## A preview is detached: no history command, no persisted change, and no
+## in-progress edit can leave modified pixels on the source layer.
+func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
+	cancel_preview_fill()
+	_pending_fill_layer_id = _canvas.active_layer_id
+	_pending_fill_is_terrain = _canvas.floor.layer_by_id(_pending_fill_layer_id) is AtlasTileLayer
+	_pending_fill = _compute_fill(point, inverted_global)
+	if not _pending_fill.ok:
+		message.emit(_pending_fill.message)
+		return
+	if _pending_fill_is_terrain:
+		var original: AtlasTileLayer = _canvas.floor.layer_by_id(_pending_fill_layer_id) as AtlasTileLayer
+		var preview: AtlasTileLayer = AtlasLayerCodec.clone(original) as AtlasTileLayer
+		preview.terrain = _pending_fill.terrain
+		_canvas._preview_layer = preview
+	else:
+		_canvas._preview_layer = _pending_fill.layer
+	_canvas._raster_textures.clear()
+	_canvas.queue_redraw()
+	message.emit("Fill preview — release to apply, Escape to cancel.")
+
+
+func cancel_preview_fill() -> void:
+	_pending_fill = null
+	_pending_fill_layer_id = ""
+	_pending_fill_is_terrain = false
+	_canvas._preview_layer = null
+	_canvas._raster_textures.clear()
+	_canvas.queue_redraw()
+
+
+func commit_preview_fill() -> void:
+	if _pending_fill == null:
+		return
+	var result: AtlasFillResult = _pending_fill
+	var id: String = _pending_fill_layer_id
+	var is_terrain: bool = _pending_fill_is_terrain
+	cancel_preview_fill()
+	if result.ok:
+		_apply_fill_result(result, id, is_terrain)
+
+
+func fill_at(point: Vector2) -> bool:
+	_canvas.cancel_edit()
+	var result: AtlasFillResult = _compute_fill(point)
+	if not result.ok:
+		message.emit(result.message)
+		return false
+	return _apply_fill_result(result, _canvas.active_layer_id,
+		_canvas.floor.layer_by_id(_canvas.active_layer_id) is AtlasTileLayer)
+
+
+func _apply_fill_result(result: AtlasFillResult, id: String, is_terrain: bool) -> bool:
+	_canvas.clear_selection()
+	var current: AtlasLayer = _canvas.floor.layer_by_id(id)
+	if current == null or not current.is_editable() or not _canvas.editing_target_is_presented():
+		message.emit("Fill target changed; nothing applied.")
+		return false
+	if is_terrain:
+		var tiles: AtlasTileLayer = current as AtlasTileLayer
+		if tiles == null:
+			return false
+		var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, id,
+			tiles.terrain, result.terrain)
+		if _edits.execute(command):
+			_canvas.queue_redraw()
+			message.emit("Filled terrain cells in one undoable action.")
+			return true
+	elif current is AtlasRasterLayer and result.layer != null:
+		var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
+		layers[_canvas.floor.layers.find(current)] = result.layer
+		if apply_layers(layers, id):
+			message.emit("Filled raster pixels in one undoable action.")
+			return true
 	return false
 
 

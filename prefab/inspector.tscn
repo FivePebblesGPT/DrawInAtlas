@@ -198,6 +198,44 @@ step = 0.5
 value = 8.0
 tooltip_text = "Wheel: ±0.5 board units per notch (0.5–256); type an exact value."
 
+[node name="BucketSection" type="VBoxContainer" parent="Scroll/Margin/Sections"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BucketHeading" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 11
+text = "BUCKET FILL"
+
+[node name="BucketHint" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Active layer only. Press to preview, release to fill; Esc cancels. Transparent or empty areas must be bounded."
+autowrap_mode = 3
+
+[node name="FillToleranceLabel" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Raster tolerance (%)"
+
+[node name="FillTolerance" type="SpinBox" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+step = 1.0
+value = 0.0
+tooltip_text = "0 = exact match. Higher tolerance accepts larger premultiplied RGBA differences from the clicked pixel."
+
+[node name="FillGlobal" type="CheckBox" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Global (all matching pixels)"
+tooltip_text = "Unchecked: four-connected region. Checked: all matching pixels in stored raster chunks. Hold Shift to temporarily invert."
+
 [node name="SelectionSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=1827189808]
 unique_name_in_owner = true
 layout_mode = 2

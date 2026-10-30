@@ -12,6 +12,8 @@ signal scope_toggled(enabled: bool)
 signal selection_transform_requested(offset: Vector2, factor: float, radians: float)
 signal brush_color_changed(color: Color)
 signal brush_width_changed(value: float)
+signal fill_tolerance_changed(value: float)
+signal fill_global_changed(enabled: bool)
 signal grid_snapping_toggled(enabled: bool)
 signal palette_selected(index: int)
 signal preview_changed(index: int)
@@ -29,6 +31,11 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var opacity_slider: HSlider = %OpacitySlider
 @onready var brush_color_picker: ColorPickerButton = %BrushColorPicker
 @onready var brush_width_spinner: SpinBox = %BrushWidthSpinner
+@onready var fill_tolerance_spinner: SpinBox = %FillTolerance
+@onready var fill_global_checkbox: CheckBox = %FillGlobal
+@onready var _bucket_section: VBoxContainer = %BucketSection
+@onready var _bucket_hint: Label = %BucketHint
+@onready var _bucket_tolerance_label: Label = %FillToleranceLabel
 @onready var selection_label: Label = %SelectionLabel
 @onready var move_x_spinner: SpinBox = %MoveXSpinner
 @onready var move_y_spinner: SpinBox = %MoveYSpinner
@@ -82,6 +89,8 @@ func _ready() -> void:
 	_transform_button.pressed.connect(_on_transform_requested)
 	brush_color_picker.color_changed.connect(brush_color_changed.emit)
 	brush_width_spinner.value_changed.connect(brush_width_changed.emit)
+	fill_tolerance_spinner.value_changed.connect(func(value: float) -> void: fill_tolerance_changed.emit(value / 100.0))
+	fill_global_checkbox.toggled.connect(fill_global_changed.emit)
 	# SpinBox has an inner LineEdit; both it and the arrows receive wheel input separately.
 	brush_width_spinner.gui_input.connect(_on_brush_width_wheel)
 	brush_width_spinner.get_line_edit().gui_input.connect(_on_brush_width_wheel)
@@ -121,20 +130,29 @@ func refresh_floors(map: AtlasMapDocument, floor: AtlasFloor) -> void:
 	_floor_default.disabled = floor.id == map.default_floor_id
 
 
-func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
+func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: bool = false) -> void:
 	_current_tool = tool
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.FILL]
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
-	_ink_heading.text = "ERASER" if erasing else "BRUSH & STROKE"
+	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "BRUSH & STROKE")
+	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
+	_bucket_hint.text = ("Terrain: contiguous equal-palette cells on the active terrain grid. No tolerance; empty regions need a cell edit mask. Press/release fills; Esc cancels."
+		if tool == AtlasCanvas.Tool.FILL and terrain_active else
+		"Raster: active layer's stored pixels only. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode.")
+	_bucket_tolerance_label.visible = not terrain_active
+	fill_tolerance_spinner.visible = not terrain_active
+	fill_global_checkbox.visible = not terrain_active
 	_eraser_hint.visible = erasing
 	_ink_color_label.visible = not erasing
 	brush_color_picker.visible = not erasing
 	brush_color_picker.disabled = erasing
 	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
-	_terrain_section.visible = tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
+	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool != AtlasCanvas.Tool.FILL
+	brush_width_spinner.visible = tool != AtlasCanvas.Tool.FILL
+	_terrain_section.visible = tool == AtlasCanvas.Tool.PAINT or (tool == AtlasCanvas.Tool.FILL and terrain_active)
 	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
 		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]

@@ -56,11 +56,13 @@ static func tiles(grid: AtlasGrid, terrain: Dictionary, start: Vector2i, palette
 
 
 static func raster(layer: AtlasRasterLayer, document_point: Vector2, color: Color,
-		scope: AtlasEditScope = null, limit: int = 262144) -> AtlasFillResult:
+		scope: AtlasEditScope = null, limit: int = 262144, tolerance: float = 0.0,
+		contiguous: bool = true) -> AtlasFillResult:
 	var error: String = _raster_error(layer)
 	if not error.is_empty():
 		return _failure(error)
-	if not document_point.is_finite() or not _finite_color(color) or limit <= 0:
+	if (not document_point.is_finite() or not _finite_color(color) or limit <= 0
+			or not is_finite(tolerance) or tolerance < 0.0 or tolerance > 1.0):
 		return _failure("Invalid fill point, color or pixel limit.")
 	var mapped: Vector2 = (layer.transform.affine_inverse() * document_point) * layer.pixels_per_unit
 	if not _pixel_position_valid(mapped):
@@ -73,29 +75,65 @@ static func raster(layer: AtlasRasterLayer, document_point: Vector2, color: Colo
 		return _failure("Starting pixel is outside the edit scope.")
 	var target: Color = chunk.image.get_pixelv(_local_pixel(start))
 	var replacement: Color = _canonical_color(color)
-	if target == replacement:
+	if target == replacement and tolerance == 0.0:
 		return _failure("Fill would not change any pixels.")
-	var pending: Array[Vector2i] = [start]
-	var visited: Dictionary[Vector2i, bool] = {start: true}
 	var affected: Array[Vector2i] = []
-	var cursor: int = 0
-	while cursor < pending.size():
-		var point: Vector2i = pending[cursor]
-		cursor += 1
-		chunk = _existing_chunk(layer, point)
-		if chunk == null or chunk.image.get_pixelv(_local_pixel(point)) != target:
-			continue
-		if not _allows_pixel(layer, point, scope):
-			continue
-		affected.append(point)
-		if affected.size() > limit:
-			return _failure("Raster fill exceeds the pixel limit.")
-		for offset: Vector2i in PIXEL_NEIGHBORS:
-			var neighbor: Vector2i = point + offset
-			if not visited.has(neighbor):
-				visited[neighbor] = true
-				pending.append(neighbor)
+	if contiguous:
+		# Visit only reachable pixels. Match each neighbor against the *seed* color,
+		# not the last neighbor, so tolerance cannot progressively bleed outward.
+		var pending: Array[Vector2i] = [start]
+		var visited: Dictionary[Vector2i, bool] = {start: true}
+		var cursor: int = 0
+		while cursor < pending.size():
+			var point: Vector2i = pending[cursor]
+			cursor += 1
+			chunk = _existing_chunk(layer, point)
+			if chunk == null or not _matches(chunk.image.get_pixelv(_local_pixel(point)), target, tolerance):
+				continue
+			if not _allows_pixel(layer, point, scope):
+				continue
+			affected.append(point)
+			if affected.size() > limit:
+				return _failure("Raster fill exceeds the pixel limit; no pixels were changed.")
+			for offset: Vector2i in PIXEL_NEIGHBORS:
+				var neighbor: Vector2i = point + offset
+				if not visited.has(neighbor):
+					visited[neighbor] = true
+					pending.append(neighbor)
+	else:
+		# Global mode never invents a canvas extent: visit *only* stored pixels,
+		# even if the seed is fully transparent. Sorted keys stabilize traversal.
+		var keys: Array[String] = layer.chunks.keys()
+		keys.sort()
+		for key: String in keys:
+			chunk = layer.chunks[key]
+			for y: int in range(chunk.height):
+				for x: int in range(chunk.width):
+					if not _matches(chunk.image.get_pixel(x, y), target, tolerance):
+						continue
+					var point: Vector2i = chunk.coord * AtlasRasterChunk.SIZE + Vector2i(x, y)
+					if not _allows_pixel(layer, point, scope):
+						continue
+					affected.append(point)
+					if affected.size() > limit:
+						return _failure("Raster fill exceeds the pixel limit; no pixels were changed.")
+	if affected.all(func(point: Vector2i) -> bool:
+		var found: AtlasRasterChunk = _existing_chunk(layer, point)
+		return found.image.get_pixelv(_local_pixel(point)) == replacement):
+		return _failure("Fill would not change any pixels.")
 	return _paint_snapshot(layer, affected, replacement)
+
+
+## Premultiplied RGBA comparison: transparent colors match regardless of their
+## hidden RGB bytes. At tolerance 0, only identical visible RGBA matches.
+static func _matches(candidate: Color, seed: Color, tolerance: float) -> bool:
+	if tolerance == 0.0 and candidate == seed:
+		return true
+	var diff: float = maxf(absf(candidate.a - seed.a),
+		maxf(absf(candidate.r * candidate.a - seed.r * seed.a),
+			maxf(absf(candidate.g * candidate.a - seed.g * seed.a),
+				absf(candidate.b * candidate.a - seed.b * seed.a))))
+	return diff <= tolerance + 0.0000001
 
 
 static func _failure(message: String) -> AtlasFillResult:
