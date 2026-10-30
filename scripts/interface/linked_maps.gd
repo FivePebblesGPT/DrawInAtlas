@@ -45,7 +45,7 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 	if dialog.visible and dialog.selected_id == link.id and not dialog.is_current(before, old):
 		_rejected()
 		return false
-	var command := AtlasLinkEdit.new(_canvas.map.id, before, link, old, placement, new_map, _canvas.edit_scope)
+	var command: AtlasLinkEdit = AtlasLinkEdit.new(_canvas.map.id, before, link, old, placement, new_map, _canvas.edit_scope)
 	if not _history.execute(command):
 		_rejected()
 		return false

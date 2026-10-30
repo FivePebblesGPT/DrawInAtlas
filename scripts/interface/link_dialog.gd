@@ -260,7 +260,7 @@ func _draft_link(previous: AtlasMapLink, old_placement: AtlasPlacement) -> Atlas
 
 func _draft_document(new_id: String) -> AtlasMapDocument:
 	var id: String = _id("map") if new_id.is_empty() else new_id
-	var child := AtlasMapDocument.new(id, name_input.text.strip_edges())
+	var child: AtlasMapDocument = AtlasMapDocument.new(id, name_input.text.strip_edges())
 	child.kind = kind_picker.get_item_text(kind_picker.selected)
 	var grid_kind: AtlasGrid.Kind = AtlasGrid.Kind.SQUARE
 	if mode_picker.selected == LinkMode.MARKER:
@@ -275,7 +275,7 @@ func _draft_document(new_id: String) -> AtlasMapDocument:
 
 func _draft_placement(link: AtlasMapLink, snapshot_placement: AtlasPlacement) -> AtlasPlacement:
 	var current_link: AtlasMapLink = _campaign.link_by_id(selected_id)
-	var placement := AtlasPlacement.new()
+	var placement: AtlasPlacement = AtlasPlacement.new()
 	if current_link != null and not current_link.placement_id.is_empty():
 		placement.id = current_link.placement_id
 	else:

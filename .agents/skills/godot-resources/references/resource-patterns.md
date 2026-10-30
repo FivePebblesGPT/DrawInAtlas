@@ -14,19 +14,19 @@ Depth companion to `godot-resources`.
 Avoid frame hitches when loading large scenes/assets:
 
 ```gdscript
-const PATH := "res://levels/big_level.tscn"
+const PATH: String = "res://levels/big_level.tscn"
 
 func begin_load() -> void:
     ResourceLoader.load_threaded_request(PATH)
 
 func _process(_delta: float) -> void:
-    var progress := []
+    var progress: Array = []
     match ResourceLoader.load_threaded_get_status(PATH, progress):
         ResourceLoader.THREAD_LOAD_IN_PROGRESS:
             update_bar(progress[0])           # 0.0–1.0
         ResourceLoader.THREAD_LOAD_LOADED:
             set_process(false)                # after load_threaded_get the status
-            var res := ResourceLoader.load_threaded_get(PATH)  # turns INVALID_RESOURCE
+            var res: Resource = ResourceLoader.load_threaded_get(PATH)  # turns INVALID_RESOURCE
             _on_loaded(res)
         ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
             set_process(false)
@@ -74,11 +74,11 @@ Prefer letting the editor manage UIDs; avoid hand-editing `.uid` files.
 ## Common API
 
 ```gdscript
-res.duplicate(deep := false)      # copy; deep copies arrays/dicts + embedded sub-resources
+res.duplicate(false)      # shallow copy; pass true to duplicate nested containers
 res.duplicate_deep(Resource.DEEP_DUPLICATE_ALL)  # also copies sub-resources saved to files
 res.take_over_path("res://x.tres")
 res.resource_path                 # where it loaded from ("" if in-memory)
-ResourceLoader.exists(path, type_hint := "")
-ResourceLoader.load(path, type_hint := "", cache_mode := CACHE_MODE_REUSE)
-ResourceSaver.save(res, path, flags := 0)   # FLAG_COMPRESS, FLAG_BUNDLE_RESOURCES, ...
+ResourceLoader.exists(path, "")
+ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REUSE)
+ResourceSaver.save(res, path, 0)   # FLAG_COMPRESS, FLAG_BUNDLE_RESOURCES, ...
 ```

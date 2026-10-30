@@ -9,7 +9,7 @@ static func pack_campaign(source: AtlasCampaign) -> PackedScene:
 	var snapshot: AtlasCampaign = _snapshot(source)
 	if snapshot == null:
 		return null
-	var root := AtlasCampaignSaveRoot.new()
+	var root: AtlasCampaignSaveRoot = AtlasCampaignSaveRoot.new()
 	root.name = "Campaign"
 	root.campaign = snapshot
 	root.semantic_digest = _digest(snapshot)
@@ -18,12 +18,12 @@ static func pack_campaign(source: AtlasCampaign) -> PackedScene:
 		ids.append(id)
 	ids.sort()
 	for id: String in ids:
-		var child := AtlasMapSaveNode.new()
+		var child: AtlasMapSaveNode = AtlasMapSaveNode.new()
 		child.name = "Map" # Names and child order are not document identity.
 		child.document = snapshot.get_map(id)
 		root.add_child(child)
 		child.owner = root
-	var packed := PackedScene.new()
+	var packed: PackedScene = PackedScene.new()
 	var error: Error = packed.pack(root)
 	root.free()
 	return packed if error == OK else null

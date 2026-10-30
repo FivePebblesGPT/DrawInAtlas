@@ -104,7 +104,7 @@ func _portable_fixture(mode: String, path: String) -> bool:
 
 
 func _pixels() -> Image:
-	var bytes := PackedByteArray()
+	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(273 * 269 * 4)
 	for pixel: int in range(273 * 269):
 		bytes[pixel * 4] = (pixel * 3 + 17) % 256
@@ -119,7 +119,7 @@ func _campaign(seed: int = 0) -> AtlasCampaign:
 	result.display_name = "Native Generation %d" % seed
 	var map: AtlasMapDocument = result.get_map("world")
 	map.tags.append("native")
-	var upper := AtlasFloor.new()
+	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	upper.display_name = "Upper floor"
 	upper.terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 37.5)
@@ -133,7 +133,7 @@ func _campaign(seed: int = 0) -> AtlasCampaign:
 	reverse.target_map_id = "world"
 	reverse.target_floor_id = upper.id
 	result.links.append(reverse)
-	var placement := AtlasPlacement.new()
+	var placement: AtlasPlacement = AtlasPlacement.new()
 	placement.id = "native-placement"
 	placement.parent_map_id = "world"
 	placement.child_map_id = "greyhaven"
@@ -214,7 +214,7 @@ func _roundtrip() -> bool:
 
 
 func _recovery() -> bool:
-	var io := MemoryIO.new()
+	var io: MemoryIO = MemoryIO.new()
 	_check(AtlasCampaignStore.save_campaign(_campaign(1), MEMORY_SLOT, io) == OK, "first generation")
 	_check(AtlasCampaignStore.save_campaign(_campaign(2), MEMORY_SLOT, io) == OK, "backup generation")
 	var head: PackedByteArray = io.files[MEMORY_SLOT]
@@ -239,7 +239,7 @@ func _recovery() -> bool:
 
 
 func _format_validation() -> bool:
-	var storage := MemoryIO.new()
+	var storage: MemoryIO = MemoryIO.new()
 	var base: PackedScene = AtlasNativeScene.pack_campaign(_campaign())
 	_check(base != null, "native fixture scene can be packed")
 	if base == null:
@@ -263,7 +263,7 @@ func _format_validation() -> bool:
 						var raster: AtlasRasterLayer = map_node.document.floors[0].layer_by_id("native-raster") as AtlasRasterLayer
 						var chunk: AtlasRasterChunk = raster.chunks.values()[0]
 						chunk.encoded_webp = PackedByteArray([1, 2, 3])
-		var changed := PackedScene.new()
+		var changed: PackedScene = PackedScene.new()
 		_check(changed.pack(root) == OK, "modified native fixture can be packed")
 		root.free()
 		var bytes: PackedByteArray = storage.encode_scene(changed)
@@ -275,20 +275,20 @@ func _format_validation() -> bool:
 
 
 func _injected_failures() -> bool:
-	var seed := MemoryIO.new()
+	var seed: MemoryIO = MemoryIO.new()
 	_check(AtlasCampaignStore.save_campaign(_campaign(0), MEMORY_SLOT, seed) == OK,
 		"failure fixture initial checkpoint")
 	_check(AtlasCampaignStore.save_campaign(_campaign(1), MEMORY_SLOT, seed) == OK,
 		"failure fixture second checkpoint")
 	var next: AtlasCampaign = _campaign(2)
-	var baseline := MemoryIO.new()
+	var baseline: MemoryIO = MemoryIO.new()
 	baseline.files = seed.files.duplicate(true)
 	_check(AtlasCampaignStore.save_campaign(next, MEMORY_SLOT, baseline) == OK,
 		"baseline successful operation trace")
 	var backup_path: String = MEMORY_SLOT.trim_suffix(".scn") + ".bak.scn"
 	for torn: bool in [false, true]:
 		for step: int in range(1, baseline.operations.size() + 1):
-			var io := MemoryIO.new()
+			var io: MemoryIO = MemoryIO.new()
 			io.files = seed.files.duplicate(true)
 			io.fail_at = step
 			io.torn = torn
@@ -302,7 +302,7 @@ func _injected_failures() -> bool:
 
 
 func _invalid() -> bool:
-	var io := MemoryIO.new()
+	var io: MemoryIO = MemoryIO.new()
 	_check(AtlasCampaignStore.load_result(MEMORY_SLOT, io).error == ERR_FILE_NOT_FOUND,
 		"missing head and backup")
 	_check(AtlasCampaignStore.save_campaign(_campaign(), "user://wrong.json", io) == ERR_INVALID_PARAMETER,
@@ -311,7 +311,7 @@ func _invalid() -> bool:
 	_raster(invalid).pixels_per_unit = NAN
 	_check(AtlasCampaignStore.save_campaign(invalid, MEMORY_SLOT, io) != OK,
 		"nonfinite raster settings rejected")
-	var denied := MemoryIO.new()
+	var denied: MemoryIO = MemoryIO.new()
 	denied.deny_directory = true
 	_check(AtlasCampaignStore.save_campaign(_campaign(), MEMORY_SLOT, denied) != OK,
 		"directory creation failure")

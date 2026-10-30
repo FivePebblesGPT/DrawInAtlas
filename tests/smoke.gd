@@ -37,13 +37,13 @@ func _check(condition: bool, description: String) -> void:
 
 func _test_grids() -> void:
 	for kind in [AtlasGrid.Kind.SQUARE, AtlasGrid.Kind.HEX_POINTY, AtlasGrid.Kind.HEX_FLAT]:
-		var grid := AtlasGrid.new(kind, 42.0)
+		var grid: AtlasGrid = AtlasGrid.new(kind, 42.0)
 		grid.origin = Vector2(97.0, -28.0)
 		grid.rotation = deg_to_rad(37.0)
 		for x in range(-4, 5):
 			for y in range(-4, 5):
-				var cell := Vector2i(x, y)
-				var center := grid.cell_to_document(cell)
+				var cell: Vector2i = Vector2i(x, y)
+				var center: Vector2 = grid.cell_to_document(cell)
 				_check(grid.document_to_cell(center) == cell, "grid roundtrip %s %s" % [kind, cell])
 				_check(grid.cell_polygon(cell).size() >= 4, "grid polygon is available")
 		_check(grid.neighbors(Vector2i.ZERO).size() == (4 if kind == AtlasGrid.Kind.SQUARE else 6),
@@ -51,14 +51,14 @@ func _test_grids() -> void:
 
 
 func _test_placements() -> void:
-	var placement := AtlasPlacement.new()
+	var placement: AtlasPlacement = AtlasPlacement.new()
 	placement.origin = Vector2(84.0, -17.0)
 	placement.rotation = deg_to_rad(37.0)
 	placement.parent_units_per_cell = 24.0
 	placement.child_units_per_cell = 64.0
 	placement.columns = 20
 	placement.rows = 15
-	var parent_position := placement.local_to_parent() * Vector2(8.0, 6.0)
+	var parent_position: Vector2 = placement.local_to_parent() * Vector2(8.0, 6.0)
 	_check(placement.contains_parent_point(parent_position), "rotated placement hit test")
 	_check(placement.parent_to_local(parent_position).distance_to(Vector2(8.0, 6.0)) < 0.001,
 		"rotated placement inverse")
@@ -67,7 +67,7 @@ func _test_placements() -> void:
 
 
 func _test_zoom_gate() -> void:
-	var gate := AtlasZoomGate.new()
+	var gate: AtlasZoomGate = AtlasZoomGate.new()
 	_check(not gate.accept_blocked_step(1, "city", 1000), "step one does not transition")
 	_check(not gate.accept_blocked_step(1, "city", 1100), "step two does not transition")
 	_check(gate.accept_blocked_step(1, "city", 1200), "step three transitions")
@@ -82,16 +82,16 @@ func _test_zoom_gate() -> void:
 
 
 func _test_campaign_roundtrip() -> void:
-	var sample := AtlasCampaign.sample()
-	var raw := JSON.stringify(sample.to_dict())
+	var sample: AtlasCampaign = AtlasCampaign.sample()
+	var raw: String = JSON.stringify(sample.to_dict())
 	var parsed: Variant = JSON.parse_string(raw)
-	var restored := AtlasCampaign.from_dict(parsed)
+	var restored: AtlasCampaign = AtlasCampaign.from_dict(parsed)
 	_check(restored != null, "campaign restore")
 	if restored == null:
 		return
 	_check(restored.maps.size() == 2, "campaign has world and city")
-	var world := restored.get_map("world")
-	var anchor := world.grid.cell_to_document(Vector2i(2, 0))
+	var world: AtlasMapDocument = restored.get_map("world")
+	var anchor: Vector2 = world.grid.cell_to_document(Vector2i(2, 0))
 	_check(restored.find_links_at("world", anchor).size() == 1, "city link index works")
 	_check(world.floors[0].get_terrain(Vector2i.ZERO) > 0, "tile paint survives JSON")
 	_check(AtlasCampaign.from_dict({"schema_version": 999}) == null, "version mismatch fails")
@@ -113,11 +113,11 @@ func _test_campaign_roundtrip() -> void:
 
 
 func _test_webp() -> void:
-	var image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	var image: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.2, 0.4, 0.6, 1.0))
-	var file_path := "user://atlas_smoke.webp"
+	var file_path: String = "user://atlas_smoke.webp"
 	_check(AtlasWebPStore.write_image(file_path, image) == OK, "lossless WebP save")
-	var restored := AtlasWebPStore.read_image(file_path)
+	var restored: Image = AtlasWebPStore.read_image(file_path)
 	_check(restored != null, "lossless WebP decode")
 	if restored != null:
 		_check(restored.get_pixel(3, 3).is_equal_approx(image.get_pixel(3, 3)),
@@ -149,7 +149,7 @@ func _test_editor_workflow() -> void:
 	var world: AtlasMapDocument = editor.campaign.get_map("world")
 	canvas.camera_center = world.grid.cell_to_document(Vector2i(2, 0))
 	canvas.camera_zoom = 3.0
-	var pointer := canvas.size * 0.5
+	var pointer: Vector2 = canvas.size * 0.5
 	for step: int in range(5):
 		editor._on_wheel_step(1, pointer)
 	_check(canvas.map.id == "world", "repeated boundary scroll stays on board unless enabled")
@@ -176,7 +176,7 @@ func _test_editor_workflow() -> void:
 	_check(city_units == "ft", "sample maps start with independent native units")
 
 	var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
-	var parent_before := JSON.stringify(city.floors[0].terrain)
+	var parent_before: String = JSON.stringify(city.floors[0].terrain)
 	editor._on_create_battlemap(Vector2(-100, -70), Vector2(150, 125), deg_to_rad(37))
 	_check(canvas.map.kind == "BATTLEMAP", "drag creation opens a child battlemap workspace")
 	_check(editor.campaign.placements.size() == 1, "child has a placement")

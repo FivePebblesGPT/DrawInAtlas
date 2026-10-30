@@ -33,7 +33,7 @@ func _run() -> void:
 	editor.use_system_clipboard = false
 	editor.save_path = _slot
 	editor.campaign = AtlasCampaign.sample()
-	var roof := AtlasFloor.new()
+	var roof: AtlasFloor = AtlasFloor.new()
 	roof.id = "roof"
 	editor.campaign.get_map("greyhaven").floors.append(roof)
 	root.add_child(_scene)
@@ -254,13 +254,13 @@ func _navigation() -> bool:
 	_check(editor.zoom_gate.count == 1 and canvas.map.id == "world", "timeout resets the gate and a burst still counts at most once")
 	_key(KEY_ESCAPE)
 	_check(editor.zoom_gate.count == 0, "Escape cancels pending semantic navigation")
-	var magnify := InputEventMagnifyGesture.new()
+	var magnify: InputEventMagnifyGesture = InputEventMagnifyGesture.new()
 	magnify.position = canvas.size * 0.5 + canvas.global_position
 	magnify.factor = 2.0
 	root.push_input(magnify, true)
 	_check(editor.zoom_gate.count == 0 and canvas.map.id == "world", "pinch clamping never contributes semantic boundary steps")
 	for event_index: int in range(2):
-		var pan := InputEventPanGesture.new()
+		var pan: InputEventPanGesture = InputEventPanGesture.new()
 		pan.position = canvas.size * 0.5 + canvas.global_position
 		pan.delta = Vector2(0, -8)
 		root.push_input(pan, true)
@@ -304,7 +304,7 @@ func _target(id: String, floor_id: String) -> void:
 
 
 func _button(position: Vector2, pressed: bool) -> void:
-	var event := InputEventMouseButton.new()
+	var event: InputEventMouseButton = InputEventMouseButton.new()
 	event.position = canvas.global_position + position
 	event.global_position = event.position
 	event.button_index = MOUSE_BUTTON_LEFT
@@ -313,7 +313,7 @@ func _button(position: Vector2, pressed: bool) -> void:
 
 
 func _motion(position: Vector2) -> void:
-	var event := InputEventMouseMotion.new()
+	var event: InputEventMouseMotion = InputEventMouseMotion.new()
 	event.position = canvas.global_position + position
 	event.global_position = event.position
 	event.button_mask = MOUSE_BUTTON_MASK_LEFT
@@ -321,7 +321,7 @@ func _motion(position: Vector2) -> void:
 
 
 func _wheel(direction: int, factor: float = 1.0) -> void:
-	var event := InputEventMouseButton.new()
+	var event: InputEventMouseButton = InputEventMouseButton.new()
 	event.position = canvas.global_position + canvas.size * 0.5
 	event.global_position = event.position
 	event.button_index = MOUSE_BUTTON_WHEEL_UP if direction > 0 else MOUSE_BUTTON_WHEEL_DOWN
@@ -331,7 +331,7 @@ func _wheel(direction: int, factor: float = 1.0) -> void:
 
 
 func _key(code: Key) -> void:
-	var event := InputEventKey.new()
+	var event: InputEventKey = InputEventKey.new()
 	event.keycode = code
 	event.pressed = true
 	root.push_input(event, true)

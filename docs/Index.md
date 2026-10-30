@@ -13,7 +13,7 @@
 - [ ] [[E-008|E-008 · Host-authoritative collaboration]]
 
 ## First priority
-- [ ] [[T-001|T-001 · Explicit types and corrected skill guidance]]
+- [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
 
 ## Review work
 - [ ] [[T-002|T-002 · Continuous chunked-canvas model]]

@@ -27,7 +27,7 @@ func parent_to_local(position: Vector2) -> Vector2:
 
 
 func contains_parent_point(position: Vector2) -> bool:
-	var local := parent_to_local(position)
+	var local: Vector2 = parent_to_local(position)
 	return local.x >= 0.0 and local.y >= 0.0 and local.x < columns and local.y < rows
 
 
@@ -47,7 +47,7 @@ func child_bounds() -> Rect2:
 
 
 func corners() -> PackedVector2Array:
-	var transform := local_to_parent()
+	var transform: Transform2D = local_to_parent()
 	return PackedVector2Array([
 		transform * Vector2.ZERO,
 		transform * Vector2(columns, 0),
@@ -83,7 +83,7 @@ static func from_dict(data: Dictionary) -> AtlasPlacement:
 			return null
 	if not data.get("symbolic", false) is bool:
 		return null
-	var result := AtlasPlacement.new()
+	var result: AtlasPlacement = AtlasPlacement.new()
 	result.id = str(data.get("id", ""))
 	result.parent_map_id = str(data.get("parent_map_id", ""))
 	result.child_map_id = str(data.get("child_map_id", ""))

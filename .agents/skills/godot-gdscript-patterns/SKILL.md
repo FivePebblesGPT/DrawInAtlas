@@ -74,11 +74,12 @@ func take_damage(amount: int) -> void:
 
 ## Static Typing (Godot 4.4+)
 
-Prefer statically typed GDScript throughout examples and generated code. Type
-member variables, local variables, parameters, and return values (including
-`-> void`). Type inference with `:=` is also static when the initializer has
-a known type, but explicit annotations make instructional examples easier to
-read. Prefer precise built-in or custom classes and typed collections:
+Use explicit type annotations in all GDScript declarations, including
+constants, members, local variables, parameters, and return values (`-> void`
+for procedures). Do not use the `:=` inference syntax, even when the compiler
+can infer a concrete type. Choose the narrowest meaningful type supported by
+the engine; use `Variant` only for genuinely dynamic data boundaries.
+Prefer precise built-in or custom classes and typed collections:
 `Array[ElementType]` and `Dictionary[KeyType, ValueType]`. **Typed
 dictionaries require Godot 4.4+**.
 

@@ -63,7 +63,7 @@ func find_links_at(map_id: String, point: Vector2, floor_id: String = "") -> Arr
 		if target == null or target.floor_by_id(link.target_floor_id) == null:
 			continue
 		if not link.placement_id.is_empty():
-			var placement := placement_by_id(link.placement_id)
+			var placement: AtlasPlacement = placement_by_id(link.placement_id)
 			if (placement != null and placement.parent_map_id == map_id
 					and placement.child_map_id == link.target_map_id and placement.contains_parent_point(point)):
 				matches.append(link)
@@ -115,7 +115,7 @@ static func from_dict(data: Dictionary) -> AtlasCampaign:
 		return null
 	if not AtlasData.text(data.get("root_map_id")) or not AtlasData.text(data.get("name", "West Marches")):
 		return null
-	var campaign := AtlasCampaign.new()
+	var campaign: AtlasCampaign = AtlasCampaign.new()
 	campaign.display_name = str(data.get("name", "West Marches"))
 	campaign.root_map_id = str(data.get("root_map_id", "world"))
 	for saved_map: Variant in raw_maps:

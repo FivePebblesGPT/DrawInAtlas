@@ -57,7 +57,7 @@ func play_jump() -> void:
 
 ```gdscript
 func set_music_volume(linear_0_to_1: float) -> void:
-    var bus := AudioServer.get_bus_index("Music")
+    var bus: int = AudioServer.get_bus_index("Music")
     # Convert a 0..1 slider to decibels; clamp avoids -inf at 0.
     AudioServer.set_bus_volume_db(bus, linear_to_db(maxf(linear_0_to_1, 0.0001)))
 
@@ -71,15 +71,15 @@ func toggle_sfx(muted: bool) -> void:
 @onready var a: AudioStreamPlayer = $MusicA
 @onready var b: AudioStreamPlayer = $MusicB
 
-func crossfade_to(stream: AudioStream, secs := 1.5) -> void:
+func crossfade_to(stream: AudioStream, secs: float = 1.5) -> void:
     b.stream = stream
     b.volume_db = -40.0
     b.play()
-    var tw := create_tween().set_parallel(true)
+    var tw: Tween = create_tween().set_parallel(true)
     tw.tween_property(a, "volume_db", -40.0, secs)   # fade out current
     tw.tween_property(b, "volume_db", 0.0, secs)     # fade in next
     tw.chain().tween_callback(a.stop)
-    var tmp := a; a = b; b = tmp                      # swap roles
+    var tmp: AudioStreamPlayer = a; a = b; b = tmp                      # swap roles
 ```
 
 ### 4. Beat-accurate timing (compensate for output latency)
@@ -89,7 +89,7 @@ func crossfade_to(stream: AudioStream, secs := 1.5) -> void:
 
 func get_playback_time() -> float:
     # Add time since the last audio mix, subtract output latency, for sub-frame accuracy.
-    var t := music.get_playback_position() + AudioServer.get_time_since_last_mix()
+    var t: float = music.get_playback_position() + AudioServer.get_time_since_last_mix()
     return t - AudioServer.get_output_latency()
 ```
 

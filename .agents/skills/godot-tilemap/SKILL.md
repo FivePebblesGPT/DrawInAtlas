@@ -53,9 +53,9 @@ func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventMouseButton and event.pressed:
         # event.position is in viewport pixels and ignores Camera2D scroll/zoom.
         # make_input_local() converts it into this layer's local space.
-        var local_event := make_input_local(event) as InputEventMouseButton
-        var cell := local_to_map(local_event.position)
-        var data := get_cell_tile_data(cell)   # TileData or null
+        var local_event: InputEventMouseButton = make_input_local(event) as InputEventMouseButton
+        var cell: Vector2i = local_to_map(local_event.position)
+        var data: TileData = get_cell_tile_data(cell)   # TileData or null
         if data:
             var dmg: int = data.get_custom_data("damage")  # custom data layer
             print("Cell %s deals %d damage" % [cell, dmg])
@@ -81,8 +81,8 @@ func clear_level() -> void:
 # Paint a filled area with terrain `terrain` of terrain set `terrain_set`;
 # Godot picks the correct edge/corner tiles to connect them.
 func fill_with_grass(cells: Array[Vector2i]) -> void:
-    var terrain_set := 0
-    var grass_terrain := 0
+    var terrain_set: int = 0
+    var grass_terrain: int = 0
     set_cells_terrain_connect(cells, terrain_set, grass_terrain, true)
 ```
 
@@ -92,7 +92,7 @@ func fill_with_grass(cells: Array[Vector2i]) -> void:
 func find_spawns() -> Array[Vector2i]:
     var spawns: Array[Vector2i] = []
     for cell in get_used_cells():
-        var data := get_cell_tile_data(cell)
+        var data: TileData = get_cell_tile_data(cell)
         if data and data.get_custom_data("is_spawn"):
             spawns.append(cell)
     return spawns

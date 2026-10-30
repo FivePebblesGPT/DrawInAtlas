@@ -21,6 +21,8 @@ jobs:
       - name: Verify the exact beta engine
         shell: bash
         run: godot --version | grep -E '^4\.8\.beta2\.official\.'
+      - name: Enforce explicit types in owned GDScript and skill examples
+        run: python3 tests/check_explicit_types.py
       - name: Import resources and parse scripts
         shell: bash
         run: |

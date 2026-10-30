@@ -153,7 +153,7 @@ func _child_requests() -> Array[CaptureRequest]:
 
 
 func _child_request(link: AtlasMapLink, document: AtlasMapDocument, placement: AtlasPlacement) -> CaptureRequest:
-	var request := CaptureRequest.new(document, link.target_floor_id, link.id)
+	var request: CaptureRequest = CaptureRequest.new(document, link.target_floor_id, link.id)
 	request.spatial = placement != null and not placement.symbolic and _canvas.preview == AtlasCanvas.Preview.OVERLAY
 	if request.spatial:
 		request.bounds = placement.child_bounds()
@@ -213,7 +213,7 @@ func _parent_request(link: AtlasMapLink) -> CaptureRequest:
 	if document.floor_by_id(floor_id) == null:
 		return null
 	var placement: AtlasPlacement = _placement(link)
-	var request := CaptureRequest.new(document, floor_id, link.id)
+	var request: CaptureRequest = CaptureRequest.new(document, floor_id, link.id)
 	request.is_parent = true
 	request.spatial = placement != null and not placement.symbolic
 	if request.spatial:
@@ -308,7 +308,7 @@ static func _rect_points(rect: Rect2) -> PackedVector2Array:
 
 
 static func _uvs(points: PackedVector2Array, rect: Rect2) -> PackedVector2Array:
-	var result := PackedVector2Array()
+	var result: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in points:
 		result.append((point - rect.position) / rect.size)
 	return result

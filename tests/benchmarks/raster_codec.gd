@@ -34,12 +34,12 @@ func _benchmark() -> bool:
 	var initial_memory: int = OS.get_static_memory_usage()
 	var expected: Dictionary = campaign.to_dict()
 	var start: int = Time.get_ticks_usec()
-	var root_node := AtlasCampaignSaveRoot.new()
+	var root_node: AtlasCampaignSaveRoot = AtlasCampaignSaveRoot.new()
 	root_node.campaign = campaign
 	var payloads: Array[Resource] = []
 	var raw_bytes: int = 0
 	for map: AtlasMapDocument in campaign.maps.values():
-		var map_node := AtlasMapSaveNode.new()
+		var map_node: AtlasMapSaveNode = AtlasMapSaveNode.new()
 		map_node.document = map
 		root_node.add_child(map_node, true)
 		map_node.owner = root_node
@@ -56,7 +56,7 @@ func _benchmark() -> bool:
 	# The same actual domain graph is embedded in every controlled container.
 	# Only raster payload storage differs; these are not production save files.
 	root_node.set_meta("raster_payloads", payloads)
-	var packed := PackedScene.new()
+	var packed: PackedScene = PackedScene.new()
 	var pack_error: Error = packed.pack(root_node)
 	root_node.free()
 	var flags: int = ResourceSaver.FLAG_COMPRESS if compressed else 0
@@ -182,11 +182,11 @@ func _load_verified(path: String, codec: String, expected: Dictionary) -> Node:
 
 
 func _fixture(kind: String) -> AtlasCampaign:
-	var campaign := AtlasCampaign.new()
+	var campaign: AtlasCampaign = AtlasCampaign.new()
 	campaign.root_map_id = "map-0"
 	var map_count: int = 4 if kind == "multi" else 1
 	for index: int in range(map_count):
-		var map := AtlasMapDocument.new("map-%d" % index, "Benchmark %d" % index)
+		var map: AtlasMapDocument = AtlasMapDocument.new("map-%d" % index, "Benchmark %d" % index)
 		campaign.add_map(map)
 		var floors: int = 2 if kind == "multi" else 1
 		for floor_index: int in range(floors):
@@ -205,7 +205,7 @@ func _fixture(kind: String) -> AtlasCampaign:
 						Vector2(stroke_index, -stroke_index), Vector2(stroke_index + 0.25, 15.5)])))
 			if kind == "ink":
 				continue
-			var size := Vector2i(769, 513) if kind == "multi" else Vector2i(273, 269)
+			var size: Vector2i = Vector2i(769, 513) if kind == "multi" else Vector2i(273, 269)
 			if kind == "detail":
 				size = Vector2i(2049, 1537)
 			var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(_pixels(size, kind, index + floor_index))
@@ -221,9 +221,9 @@ func _fixture(kind: String) -> AtlasCampaign:
 
 
 func _pixels(size: Vector2i, kind: String, seed_value: int) -> Image:
-	var bytes := PackedByteArray()
+	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(size.x * size.y * 4)
-	var random := RandomNumberGenerator.new()
+	var random: RandomNumberGenerator = RandomNumberGenerator.new()
 	random.seed = 1951 + seed_value
 	for index: int in range(size.x * size.y):
 		var x: int = index % size.x

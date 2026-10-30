@@ -91,7 +91,7 @@ Add tags under a preset's *Features* (or `custom_features`) and branch at runtim
 Export extra content as a separate `.pck` and load it at runtime:
 
 ```gdscript
-var ok := ProjectSettings.load_resource_pack("user://dlc1.pck")  # mounts into res://
+var ok: bool = ProjectSettings.load_resource_pack("user://dlc1.pck")  # mounts into res://
 ```
 
 A patch pack can override or add files. Use `--export-pack` to produce packs in CI, or

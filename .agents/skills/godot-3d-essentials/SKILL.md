@@ -47,13 +47,13 @@ template → the `fps-shooter` genre skill.
 extends Camera3D
 
 @export var target: Node3D
-@export var offset := Vector3(0, 4, 8)
-@export var smooth := 6.0
+@export var offset: Vector3 = Vector3(0, 4, 8)
+@export var smooth: float = 6.0
 
 func _physics_process(delta: float) -> void:
     if target == null:
         return
-    var desired := target.global_position + offset
+    var desired: Vector3 = target.global_position + offset
     global_position = global_position.lerp(desired, smooth * delta)  # smooth follow
     look_at(target.global_position, Vector3.UP)                      # face the target
 ```
@@ -62,13 +62,13 @@ func _physics_process(delta: float) -> void:
 
 ```gdscript
 func _ready() -> void:
-    var sun := DirectionalLight3D.new()
+    var sun: DirectionalLight3D = DirectionalLight3D.new()
     sun.rotation_degrees = Vector3(-45, -30, 0)
     sun.shadow_enabled = true
     add_child(sun)
 
-    var we := WorldEnvironment.new()
-    var env := Environment.new()
+    var we: WorldEnvironment = WorldEnvironment.new()
+    var env: Environment = Environment.new()
     env.background_mode = Environment.BG_SKY
     env.sky = Sky.new()
     env.sky.sky_material = ProceduralSkyMaterial.new()
@@ -83,7 +83,7 @@ func _ready() -> void:
 
 ```gdscript
 func tint_mesh(mesh: MeshInstance3D, color: Color) -> void:
-    var mat := StandardMaterial3D.new()
+    var mat: StandardMaterial3D = StandardMaterial3D.new()
     mat.albedo_color = color
     mat.metallic = 0.0
     mat.roughness = 0.6

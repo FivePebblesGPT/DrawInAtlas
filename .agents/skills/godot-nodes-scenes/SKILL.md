@@ -32,7 +32,7 @@ decoupling → `godot-signals-groups`; physics bodies/collisions → `godot-phys
    Save it; it becomes a `PackedScene` you can instance many times.
 3. **Instance at runtime** with `preload`/`load` → `scene.instantiate()` →
    `add_child(instance)`. Set position/state _after_ adding (or before, both work).
-4. **Access nodes safely.** Use `@onready var x = $Path` for fixed children; use unique
+4. **Access nodes safely.** Use `@onready var x: Node = $Path` for fixed children; use unique
    names (`%Name`) for nodes deep in the tree; never assume a node still exists.
 5. **Use autoloads for global state/services** (game state, audio, scene switching) —
    registered in Project Settings > Globals (Autoload), accessible by name everywhere.
@@ -53,10 +53,10 @@ decoupling → `godot-signals-groups`; physics bodies/collisions → `godot-phys
 ```gdscript
 extends Node2D
 
-const BULLET := preload("res://bullet.tscn")   # preload: loaded at compile time
+const BULLET: PackedScene = preload("res://bullet.tscn")   # preload: loaded at compile time
 
 func shoot(at: Vector2, dir: Vector2) -> void:
-    var bullet := BULLET.instantiate()         # create an instance of the scene
+    var bullet: Node = BULLET.instantiate()         # create an instance of the scene
     bullet.global_position = at
     bullet.direction = dir                      # set exported/public state
     add_child(bullet)                           # now it's in the tree and runs
@@ -69,7 +69,7 @@ func shoot(at: Vector2, dir: Vector2) -> void:
 @onready var health_bar: ProgressBar = %HealthBar # % = scene-unique name (rename-proof)
 
 func update() -> void:
-    var optional := get_node_or_null("Maybe/Missing")  # returns null instead of erroring
+    var optional: Node = get_node_or_null("Maybe/Missing")  # returns null instead of erroring
     if optional:
         optional.queue_free()
 ```
@@ -80,7 +80,7 @@ func update() -> void:
 # game_state.gd — add in Project Settings > Globals > Autoload as "GameState".
 extends Node
 
-var score := 0
+var score: int = 0
 signal score_changed(value: int)
 
 func add_score(points: int) -> void:

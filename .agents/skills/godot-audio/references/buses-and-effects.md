@@ -15,7 +15,7 @@ layout resource (`default_bus_layout.tres` by default; set in Project Settings >
 ## AudioServer API
 
 ```gdscript
-var i := AudioServer.get_bus_index("Music")
+var i: int = AudioServer.get_bus_index("Music")
 AudioServer.set_bus_volume_db(i, linear_to_db(0.8))
 AudioServer.set_bus_volume_linear(i, 0.8)    # same thing, converts for you
 AudioServer.set_bus_mute(i, true)
@@ -77,14 +77,14 @@ filled in `_process` to avoid underruns.
 ## Sync-to-beat recipe
 
 ```gdscript
-const BPM := 120.0
-var sec_per_beat := 60.0 / BPM
-var last_beat := -1
+const BPM: float = 120.0
+var sec_per_beat: float = 60.0 / BPM
+var last_beat: int = -1
 
 func _process(_d: float) -> void:
-    var t := music.get_playback_position() + AudioServer.get_time_since_last_mix() \
+    var t: float = music.get_playback_position() + AudioServer.get_time_since_last_mix() \
              - AudioServer.get_output_latency()
-    var beat := int(t / sec_per_beat)
+    var beat: int = int(t / sec_per_beat)
     if beat != last_beat:
         last_beat = beat
         _on_beat(beat)        # spawn, flash, or step a rhythm here

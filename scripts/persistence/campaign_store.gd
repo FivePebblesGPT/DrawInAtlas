@@ -75,7 +75,7 @@ static func _validate_bytes(bytes: PackedByteArray, path: String, storage: Atlas
 	var campaign: AtlasCampaign = AtlasNativeScene.unpack_campaign(scene)
 	if campaign == null:
 		return AtlasStoreResult.failure(ERR_INVALID_DATA, "Invalid native campaign at " + path, path)
-	var result := AtlasStoreResult.new()
+	var result: AtlasStoreResult = AtlasStoreResult.new()
 	result.campaign = campaign
 	result.source_path = path
 	return result

@@ -50,9 +50,9 @@ func _run() -> void:
 
 
 func _fixture() -> AtlasCampaign:
-	var result := AtlasCampaign.new()
+	var result: AtlasCampaign = AtlasCampaign.new()
 	result.root_map_id = "parent"
-	var parent := AtlasMapDocument.new("parent", "City source")
+	var parent: AtlasMapDocument = AtlasMapDocument.new("parent", "City source")
 	parent.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 40.0)
 	parent.grid.visible = false
 	for x: int in range(-3, 4):
@@ -60,17 +60,17 @@ func _fixture() -> AtlasCampaign:
 			parent.floors[0].paint(Vector2i(x, y), 4)
 	parent_raster = _raster(Color.RED, Vector2(-80, -80), Vector2i(79, 160))
 	parent.floors[0].layers.append(parent_raster)
-	var ink := AtlasInkLayer.new("top-ink", "Top ink")
+	var ink: AtlasInkLayer = AtlasInkLayer.new("top-ink", "Top ink")
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([Vector2(-10, -100), Vector2(-10, 100)]), Color.GREEN, 8.0))
 	parent.floors[0].layers.append(ink)
-	var upper := AtlasFloor.new()
+	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	upper.display_name = "Blue upper floor"
 	upper.layers.append(_raster(Color.BLUE, Vector2(-96, -96), Vector2i(192, 192)))
 	parent.floors.append(upper)
-	var child := AtlasMapDocument.new("child", "Encounter")
+	var child: AtlasMapDocument = AtlasMapDocument.new("child", "Encounter")
 	child.grid.visible = false
-	var other := AtlasMapDocument.new("other", "Unregistered source")
+	var other: AtlasMapDocument = AtlasMapDocument.new("other", "Unregistered source")
 	other.grid.visible = false
 	other.floors[0].layers.append(_raster(Color.GREEN, Vector2.ZERO, Vector2i(64, 64)))
 	result.add_map(parent)
@@ -87,7 +87,7 @@ func _fixture() -> AtlasCampaign:
 	placement.parent_units_per_cell = 20.0
 	placement.child_units_per_cell = 64.0
 	result.placements.append(placement)
-	var link := AtlasMapLink.new()
+	var link: AtlasMapLink = AtlasMapLink.new()
 	link.id = "spatial-door"
 	link.source_map_id = parent.id
 	link.target_map_id = child.id
@@ -242,7 +242,7 @@ func _preview_budget() -> bool:
 	canvas.camera_center = Vector2.ZERO
 	canvas.camera_zoom = 1.0
 	for index: int in range(9):
-		var link := AtlasMapLink.new()
+		var link: AtlasMapLink = AtlasMapLink.new()
 		link.id = "budget-%d" % index
 		link.source_map_id = "parent"
 		link.target_map_id = "child"

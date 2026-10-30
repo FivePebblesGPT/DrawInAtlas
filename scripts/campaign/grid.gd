@@ -51,7 +51,7 @@ func same_geometry(other: AtlasGrid) -> bool:
 ## Convert an axial hex coordinate or square cell index into document-space units.
 ## Hex coordinates are axial (q, r); the pointy/flat formulas intentionally differ.
 func cell_to_document(cell: Vector2i) -> Vector2:
-	var local := Vector2.ZERO
+	var local: Vector2 = Vector2.ZERO
 	match kind:
 		Kind.SQUARE:
 			local = Vector2(cell) * cell_size + Vector2.ONE * cell_size * 0.5
@@ -63,7 +63,7 @@ func cell_to_document(cell: Vector2i) -> Vector2:
 
 
 func document_to_cell(position: Vector2) -> Vector2i:
-	var local := (position - origin).rotated(-rotation) / cell_size
+	var local: Vector2 = (position - origin).rotated(-rotation) / cell_size
 	match kind:
 		Kind.SQUARE:
 			return Vector2i(floori(local.x), floori(local.y))
@@ -75,17 +75,17 @@ func document_to_cell(position: Vector2) -> Vector2i:
 
 
 func cell_polygon(cell: Vector2i) -> PackedVector2Array:
-	var result := PackedVector2Array()
+	var result: PackedVector2Array = PackedVector2Array()
 	if kind == Kind.GRIDLESS:
 		return result
-	var center := cell_to_document(cell)
+	var center: Vector2 = cell_to_document(cell)
 	if kind == Kind.SQUARE:
 		for corner in [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]:
 			result.append(center + (corner * cell_size).rotated(rotation))
 	else:
 		var offset: float = -PI / 6.0 if kind == Kind.HEX_POINTY else 0.0
 		for side in range(6):
-			var angle := offset + float(side) * TAU / 6.0 + rotation
+			var angle: float = offset + float(side) * TAU / 6.0 + rotation
 			result.append(center + Vector2.RIGHT.rotated(angle) * cell_size)
 	return result
 
@@ -148,13 +148,13 @@ static func _is_number(value: Variant) -> bool:
 
 ## Cube-coordinate rounding preserves q + r + s = 0 after rounding each axis.
 static func _round_axial(q: float, r: float) -> Vector2i:
-	var s := -q - r
-	var rq := roundi(q)
-	var rr := roundi(r)
-	var rs := roundi(s)
-	var q_error := absf(float(rq) - q)
-	var r_error := absf(float(rr) - r)
-	var s_error := absf(float(rs) - s)
+	var s: float = -q - r
+	var rq: int = roundi(q)
+	var rr: int = roundi(r)
+	var rs: int = roundi(s)
+	var q_error: float = absf(float(rq) - q)
+	var r_error: float = absf(float(rr) - r)
+	var s_error: float = absf(float(rs) - s)
 	if q_error > r_error and q_error > s_error:
 		rq = -rr - rs
 	elif r_error > s_error:

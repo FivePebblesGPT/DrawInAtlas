@@ -18,8 +18,8 @@ select a supported coding agent.
 
 ## Changes from upstream
 
-- Replaces implicitly and dynamically typed variable declarations with
-  explicit annotations in the main and reference examples.
+- Requires explicit types for constants, members, locals, parameters, and
+  returns; disallows inference syntax even when the inferred type is static.
 - Prefers typed arrays and dictionaries, and documents typed dictionaries'
   Godot 4.4 minimum version.
 - Documents unsupported nested type parameters and safe alternatives.

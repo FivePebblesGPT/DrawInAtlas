@@ -55,7 +55,7 @@ func _replace(campaign: AtlasCampaign, expected_link_snapshot: Dictionary, next_
 		return false
 	if expected_link_snapshot == next_link_snapshot and expected_placement_snapshot == next_placement_snapshot:
 		return false
-	var change := ValidatedChange.new()
+	var change: ValidatedChange = ValidatedChange.new()
 	if not _prepare_link(campaign, source, change, expected_link_snapshot, next_link_snapshot):
 		return false
 	if not _prepare_document(campaign, change, expected_placement_snapshot, undoing):

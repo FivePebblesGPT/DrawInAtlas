@@ -51,7 +51,7 @@ static func from_dict(data: Dictionary) -> AtlasMapLink:
 		return null
 	if not AtlasData.text(data.get("target_floor_id", "ground")) or not data.get("placement_id", "") is String:
 		return null
-	var link := AtlasMapLink.new()
+	var link: AtlasMapLink = AtlasMapLink.new()
 	link.id = str(data.get("id", ""))
 	link.source_map_id = str(data.get("source_map_id", ""))
 	link.source_floor_id = data.get("source_floor_id", "ground")

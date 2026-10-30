@@ -20,14 +20,14 @@ func _check(value: bool, label: String) -> void:
 
 
 func _campaign() -> AtlasCampaign:
-	var campaign := AtlasCampaign.new()
+	var campaign: AtlasCampaign = AtlasCampaign.new()
 	campaign.root_map_id = "parent"
-	var parent := AtlasMapDocument.new("parent", "Source")
+	var parent: AtlasMapDocument = AtlasMapDocument.new("parent", "Source")
 	parent.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 100.0)
 	parent.grid.distance_unit = "mi"
-	var child := AtlasMapDocument.new("child", "Destination")
+	var child: AtlasMapDocument = AtlasMapDocument.new("child", "Destination")
 	child.grid.distance_unit = "ft"
-	var upper := AtlasFloor.new()
+	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	child.floors.append(upper)
 	var image: Image = Image.create(9, 7, false, Image.FORMAT_RGBA8)
@@ -39,7 +39,7 @@ func _campaign() -> AtlasCampaign:
 
 
 func _link(id: String = "entrance") -> AtlasMapLink:
-	var link := AtlasMapLink.new()
+	var link: AtlasMapLink = AtlasMapLink.new()
 	link.id = id
 	link.source_map_id = "parent"
 	link.target_map_id = "child"
@@ -52,7 +52,7 @@ func _link(id: String = "entrance") -> AtlasMapLink:
 
 
 func _placement() -> AtlasPlacement:
-	var placement := AtlasPlacement.new()
+	var placement: AtlasPlacement = AtlasPlacement.new()
 	placement.id = "footprint"
 	placement.parent_map_id = "parent"
 	placement.child_map_id = "child"
@@ -66,17 +66,17 @@ func _placement() -> AtlasPlacement:
 
 func _creation() -> bool:
 	var campaign: AtlasCampaign = _campaign()
-	var history := AtlasEditHistory.new(campaign)
+	var history: AtlasEditHistory = AtlasEditHistory.new(campaign)
 	history.active_map_id = "parent"
 	var original: Dictionary = campaign.to_dict()
-	var document := AtlasMapDocument.new("new-child", "Independent encounter")
+	var document: AtlasMapDocument = AtlasMapDocument.new("new-child", "Independent encounter")
 	var link: AtlasMapLink = _link()
 	link.target_map_id = document.id
 	link.target_floor_id = "ground"
 	var placement: AtlasPlacement = _placement()
 	placement.child_map_id = document.id
 	link.placement_id = placement.id
-	var command := AtlasLinkEdit.new("parent", null, link, null, placement, document)
+	var command: AtlasLinkEdit = AtlasLinkEdit.new("parent", null, link, null, placement, document)
 	link.anchor = Vector2(9999, 9999)
 	placement.columns = 999
 	document.display_name = "changed after snapshot"
@@ -89,7 +89,7 @@ func _creation() -> bool:
 	campaign.get_map("new-child").floors[0].strokes.append(AtlasStroke.new(PackedVector2Array([Vector2.ONE])))
 	var changed: Dictionary = campaign.to_dict()
 	_check(not history.undo() and campaign.to_dict() == changed, "undo cannot delete externally edited child content")
-	var wrong := AtlasLinkEdit.new("child", campaign.links[0], null, campaign.placements[0])
+	var wrong: AtlasLinkEdit = AtlasLinkEdit.new("child", campaign.links[0], null, campaign.placements[0])
 	_check(not wrong.apply(campaign) and campaign.to_dict() == changed, "another document cannot unlink a source entrance")
 	return true
 
@@ -111,22 +111,22 @@ func _editing() -> bool:
 	resized.symbolic = true
 	next.anchor = resized.origin
 	next.target_focus = Vector2(-100.25, 500.5)
-	var edit := AtlasLinkEdit.new("parent", old, next, campaign.placement_by_id(placement.id), resized)
+	var edit: AtlasLinkEdit = AtlasLinkEdit.new("parent", old, next, campaign.placement_by_id(placement.id), resized)
 	_check(edit.apply(campaign), "move/rotate/resize and change arrival without resampling child")
 	_check(campaign.get_map("child").to_dict() == before_child, "child artwork/grid/units are unchanged")
 	var transform: Transform2D = campaign.placement_by_id(placement.id).child_to_parent()
 	var roundtrip: Vector2 = transform.affine_inverse() * (transform * Vector2(123, 456))
 	_check(roundtrip.is_equal_approx(Vector2(123, 456)), "37-degree child/parent affine basis is invertible")
 	var native: PackedScene = AtlasNativeScene.pack_campaign(campaign)
-	var io := AtlasStoreIO.new()
+	var io: AtlasStoreIO = AtlasStoreIO.new()
 	var restored: AtlasCampaign = AtlasNativeScene.unpack_campaign(io.decode_scene(io.encode_scene(native)))
 	_check(restored != null and restored.to_dict() == campaign.to_dict(), "native v1 roundtrip retains entrance/floor/placement edits")
 	_check(edit.revert(campaign), "undo restores original placement and arrival")
-	var stale := AtlasLinkEdit.new("parent", campaign.links[0], next, campaign.placements[0], resized)
+	var stale: AtlasLinkEdit = AtlasLinkEdit.new("parent", campaign.links[0], next, campaign.placements[0], resized)
 	campaign.links[0].hit_radius += 1.0
 	var stale_state: Dictionary = campaign.to_dict()
 	_check(not stale.apply(campaign) and campaign.to_dict() == stale_state, "stale transaction is rejected atomically")
-	var remove := AtlasLinkEdit.new("parent", campaign.links[0], null, campaign.placements[0])
+	var remove: AtlasLinkEdit = AtlasLinkEdit.new("parent", campaign.links[0], null, campaign.placements[0])
 	_check(remove.apply(campaign) and campaign.links.is_empty() and campaign.placements.is_empty(), "unlink removes unshared footprint")
 	_check(campaign.get_map("child").to_dict() == before_child, "unlink keeps destination and exact artwork")
 	_check(remove.revert(campaign) and campaign.links.size() == 1, "undo unlink restores identity and order")
@@ -135,7 +135,7 @@ func _editing() -> bool:
 
 func _scope_and_sharing() -> bool:
 	var campaign: AtlasCampaign = _campaign()
-	var scope := AtlasEditScope.new(campaign.get_map("parent").grid.cell_polygon(Vector2i.ZERO), true)
+	var scope: AtlasEditScope = AtlasEditScope.new(campaign.get_map("parent").grid.cell_polygon(Vector2i.ZERO), true)
 	var link: AtlasMapLink = _link()
 	var placement: AtlasPlacement = _placement()
 	link.placement_id = placement.id
@@ -149,7 +149,7 @@ func _scope_and_sharing() -> bool:
 	second.placement_id = placement.id
 	campaign.links.append(second)
 	_check(not AtlasLinkEdit.new("parent", campaign.links[0], link, campaign.placements[0], outside).apply(campaign), "shared geometry cannot be changed through one entrance")
-	var remove := AtlasLinkEdit.new("parent", campaign.links[0], null, campaign.placements[0])
+	var remove: AtlasLinkEdit = AtlasLinkEdit.new("parent", campaign.links[0], null, campaign.placements[0])
 	_check(remove.apply(campaign) and campaign.placements.size() == 1 and campaign.links.size() == 1, "unlink retains a footprint still used by another entrance")
 	_check(remove.revert(campaign) and campaign.links[0].id == link.id, "undo shared unlink restores original entrance order")
 	var marker: AtlasMapLink = _link("outside-marker")

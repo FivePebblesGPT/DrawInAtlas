@@ -68,8 +68,8 @@ process exit code CI can act on. Targets **Godot 4.7** headless CLI.
 #   godot --headless --path . --script res://test_runner.gd
 extends SceneTree
 
-var passed := 0
-var failed := 0
+var passed: int = 0
+var failed: int = 0
 
 func _initialize() -> void:
     test_add()
@@ -97,8 +97,8 @@ res://test_runner.gd` prints `Results: N passed, M failed` to stdout, routes
 ```gdscript
 extends SceneTree
 
-var passed := 0
-var failed := 0
+var passed: int = 0
+var failed: int = 0
 
 func _initialize() -> void:
     await run_tests()
@@ -116,7 +116,7 @@ func run_tests() -> void:
     # `root` is not inside the tree yet during _initialize(): a Timer started now
     # errors ("not inside the tree") and its `timeout` never fires. Wait one frame.
     await process_frame
-    var timer_node := Timer.new()
+    var timer_node: Timer = Timer.new()
     timer_node.one_shot = true   # default Timer restarts after timeout
     root.add_child(timer_node)
     timer_node.start(0.1)

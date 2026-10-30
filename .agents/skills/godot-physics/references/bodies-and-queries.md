@@ -50,20 +50,20 @@ Enable `contact_monitor` and set `max_contacts_reported > 0` to receive
 ## Space-state queries (code-driven, no node)
 
 ```gdscript
-var space := get_world_3d().direct_space_state
+var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 
 # Ray
-var rq := PhysicsRayQueryParameters3D.create(from, to)
+var rq: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
 rq.collision_mask = 0b0010
 rq.exclude = [self.get_rid()]
-var hit := space.intersect_ray(rq)   # {position, normal, collider, collider_id, rid, shape, face_index}
+var hit: Dictionary = space.intersect_ray(rq)   # {position, normal, collider, collider_id, rid, shape, face_index}
 
 # Shape overlap (e.g. "what's inside this sphere?")
-var shape := SphereShape3D.new(); shape.radius = 2.0
-var sq := PhysicsShapeQueryParameters3D.new()
+var shape: SphereShape3D = SphereShape3D.new(); shape.radius = 2.0
+var sq: PhysicsShapeQueryParameters3D = PhysicsShapeQueryParameters3D.new()
 sq.shape = shape
 sq.transform = Transform3D(Basis(), global_position)
-var hits := space.intersect_shape(sq, 32)  # array of {collider, rid, shape}
+var hits: Array[Dictionary] = space.intersect_shape(sq, 32)  # array of {collider, rid, shape}
 ```
 
 `intersect_point` (point picks) and `cast_motion`/`collide_shape` (swept and contact tests)

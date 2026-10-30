@@ -47,9 +47,9 @@ the `platformer` genre skill; engine-agnostic feel tuning → `physics-tuning`.
 ```gdscript
 extends CharacterBody2D
 
-@export var speed := 200.0
-@export var jump_velocity := -400.0
-@export var gravity := 1200.0          # pixels/sec^2 (tune to taste)
+@export var speed: float = 200.0
+@export var jump_velocity: float = -400.0
+@export var gravity: float = 1200.0          # pixels/sec^2 (tune to taste)
 
 func _physics_process(delta: float) -> void:
     # Apply gravity while airborne.
@@ -61,7 +61,7 @@ func _physics_process(delta: float) -> void:
         velocity.y = jump_velocity
 
     # Horizontal input: -1, 0, or 1.
-    var dir := Input.get_axis("move_left", "move_right")
+    var dir: float = Input.get_axis("move_left", "move_right")
     if dir != 0.0:
         velocity.x = dir * speed
     else:
@@ -79,14 +79,14 @@ A fixed `gravity` export keeps tuning simple. To follow the project setting
 ```gdscript
 extends CharacterBody2D
 
-@export var speed := 220.0
+@export var speed: float = 220.0
 
 func _ready() -> void:
     motion_mode = CharacterBody2D.MOTION_MODE_FLOATING  # no floor/ceiling concept
 
 func _physics_process(_delta: float) -> void:
     # get_vector returns a normalized-ish Vector2 from four input actions.
-    var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+    var input: Vector2 = Input.get_vector("move_left", "move_right", "move_up", "move_down")
     velocity = input * speed
     move_and_slide()
 ```
@@ -98,8 +98,8 @@ func _physics_process(delta: float) -> void:
     # ... set velocity ...
     move_and_slide()
     for i in get_slide_collision_count():
-        var c := get_slide_collision(i)
-        var other := c.get_collider()
+        var c: KinematicCollision2D = get_slide_collision(i)
+        var other: Object = c.get_collider()
         if other and other.is_in_group("enemies"):
             take_damage(1)        # touched an enemy while moving
 ```
@@ -107,8 +107,8 @@ func _physics_process(delta: float) -> void:
 ### 4. Coyote time (forgiving jump just after leaving a ledge)
 
 ```gdscript
-@export var coyote_time := 0.1
-var _coyote := 0.0
+@export var coyote_time: float = 0.1
+var _coyote: float = 0.0
 
 func _physics_process(delta: float) -> void:
     if not is_on_floor():

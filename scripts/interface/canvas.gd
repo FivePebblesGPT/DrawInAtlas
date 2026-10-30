@@ -93,8 +93,8 @@ var _moving_link_id: String = ""
 var _link_move_start: Vector2
 var _link_move_end: Vector2
 
-const EMPTY_COLOR := Color("#212c34")
-const TERRAIN_COLORS := [
+const EMPTY_COLOR: Color = Color("#212c34")
+const TERRAIN_COLORS: Array[Color] = [
 	Color("#36434b"), Color("#68846b"), Color("#94a47c"), Color("#ac8f68"),
 	Color("#62798d"), Color("#bac3a0")
 ]
@@ -346,7 +346,7 @@ func _draw_overlays(item: Node2D) -> void:
 	if references != null:
 		references.draw_children(item)
 	if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
-		var outline := map.grid.cell_polygon(selected_cell)
+		var outline: PackedVector2Array = map.grid.cell_polygon(selected_cell)
 		_stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
 	if _drawing_battlemap:
 		_draw_draft(item)
@@ -402,8 +402,8 @@ func _draw_grid(item: Node2D) -> void:
 		return
 	for x: int in range(minimum.x, maximum.x + 1):
 		for y: int in range(minimum.y, maximum.y + 1):
-			var cell := Vector2i(x, y)
-			var polygon := grid.cell_polygon(cell)
+			var cell: Vector2i = Vector2i(x, y)
+			var polygon: PackedVector2Array = grid.cell_polygon(cell)
 			_stroke_polygon(polygon, Color(0.77, 0.84, 0.78, 0.20), 0.8 / camera_zoom, item)
 
 
@@ -440,15 +440,15 @@ func _draw_links(item: Node2D) -> void:
 	if campaign == null or preview == Preview.OFF:
 		return
 	for link in campaign.outgoing_links(map.id, floor.id):
-		var target := campaign.get_map(link.target_map_id)
+		var target: AtlasMapDocument = campaign.get_map(link.target_map_id)
 		if target == null:
 			continue
 		if not link.placement_id.is_empty():
-			var placement := campaign.placement_by_id(link.placement_id)
+			var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
 			if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
 				continue
-			var corners := placement.corners()
-			var fill := Color(0.24, 0.70, 0.82, 0.15)
+			var corners: PackedVector2Array = placement.corners()
+			var fill: Color = Color(0.24, 0.70, 0.82, 0.15)
 			item.draw_colored_polygon(corners, fill)
 			_stroke_polygon(corners, Color("#f9cc65") if link.id == selected_link_id else Color("#63d3e5"), 2.0 / camera_zoom, item)
 			item.draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
@@ -462,15 +462,15 @@ func _draw_links(item: Node2D) -> void:
 
 
 func _draw_draft(item: Node2D) -> void:
-	var footprint := _draft_polygon()
+	var footprint: PackedVector2Array = _draft_polygon()
 	item.draw_colored_polygon(footprint, Color(0.26, 0.76, 0.87, 0.16))
 	_stroke_polygon(footprint, Color("#87e1f2"), 2.0 / camera_zoom, item)
 
 
 func _draft_polygon() -> PackedVector2Array:
-	var rotated := (_draft_end - _draft_start).rotated(-battle_rotation)
-	var minimum := Vector2(minf(rotated.x, 0.0), minf(rotated.y, 0.0))
-	var dimensions := Vector2(maxi(1, roundi(absf(rotated.x) / battle_pitch)), maxi(1, roundi(absf(rotated.y) / battle_pitch))) * battle_pitch
+	var rotated: Vector2 = (_draft_end - _draft_start).rotated(-battle_rotation)
+	var minimum: Vector2 = Vector2(minf(rotated.x, 0.0), minf(rotated.y, 0.0))
+	var dimensions: Vector2 = Vector2(maxi(1, roundi(absf(rotated.x) / battle_pitch)), maxi(1, roundi(absf(rotated.y) / battle_pitch))) * battle_pitch
 	var maximum: Vector2 = minimum + dimensions
 	return PackedVector2Array([
 		_draft_start + minimum.rotated(battle_rotation),
@@ -483,7 +483,7 @@ func _draft_polygon() -> PackedVector2Array:
 func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, item: Node2D) -> void:
 	if polygon.size() < 2:
 		return
-	var outline := polygon.duplicate()
+	var outline: PackedVector2Array = polygon.duplicate()
 	outline.append(polygon[0])
 	item.draw_polyline(outline, color, width, true)
 
