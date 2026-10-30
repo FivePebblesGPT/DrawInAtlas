@@ -131,8 +131,11 @@ static func _decode_ink(data: Dictionary) -> AtlasClipboardData:
 	var result: AtlasClipboardData = AtlasClipboardData.new()
 	result.kind = "INK"
 	for raw: Variant in strokes:
-		if not raw is Dictionary or not _has_keys(raw, ["points", "color", "width"]):
+		if not raw is Dictionary or not raw.has("points") or not raw.has("color") or not raw.has("width"):
 			return null
+		for key: Variant in raw:
+			if key not in ["points", "color", "width", "filled", "editable_path", "closed_path"]:
+				return null
 		var stroke: AtlasStroke = AtlasStroke.from_dict(raw)
 		if stroke == null:
 			return null

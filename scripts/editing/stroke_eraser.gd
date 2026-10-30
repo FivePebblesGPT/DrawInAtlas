@@ -12,6 +12,11 @@ static func erase(strokes: Array[AtlasStroke], path: PackedVector2Array, width: 
 	var result: Array[AtlasStroke] = []
 	for stroke: AtlasStroke in strokes:
 		var radius: float = (width + stroke.width) * 0.5
+		if stroke.editable_path:
+			var path_points: PackedVector2Array = AtlasEditablePath.render_points(stroke)
+			if not _touches(path_points, path, radius):
+				result.append(stroke.copy())
+			continue
 		if stroke.filled:
 			# Solid polygons are single shapes, not polylines to be split into
 			# open segments. Erasing a touched filled area removes the whole shape.

@@ -199,6 +199,7 @@ func _connect_workspace() -> void:
 	raster_importer.failed.connect(_message)
 	canvas.paint_requested.connect(artwork.paint)
 	canvas.stroke_requested.connect(artwork.stroke)
+	canvas.path_edit_requested.connect(artwork.edit_path)
 	canvas.transform_requested.connect(artwork.transform_selection)
 	canvas.fill_requested.connect(artwork.commit_preview_fill)
 	canvas.fill_preview_requested.connect(artwork.preview_fill)
@@ -227,6 +228,7 @@ func _connect_workspace() -> void:
 	grid_controls.settings_changed.connect(apply_grid)
 	grid_settings_button.pressed.connect(open_grid_settings)
 	inspector.scope_toggled.connect(_on_scope_toggled)
+	inspector.wall_restyle_requested.connect(canvas.restyle_selected_wall)
 	inspector.polygon_fill_toggled.connect(func(enabled: bool) -> void:
 		canvas.polygon_solid_fill = enabled
 		if canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
@@ -841,7 +843,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_: return
 		get_viewport().set_input_as_handled()
 		return
-	if event.keycode in [KEY_ENTER, KEY_KP_ENTER] and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+	if event.keycode in [KEY_ENTER, KEY_KP_ENTER] and canvas.tool == AtlasCanvas.Tool.WALL_PATH and not canvas._wall_vertices.is_empty():
+		canvas.commit_edit()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_BACKSPACE and canvas.tool == AtlasCanvas.Tool.WALL_PATH and not canvas._wall_vertices.is_empty():
+		canvas._handle_wall_key(event)
+		get_viewport().set_input_as_handled()
+	elif event.keycode in [KEY_ENTER, KEY_KP_ENTER] and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
 		canvas.commit_edit()
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_BACKSPACE and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
@@ -864,9 +872,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
 			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON}
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

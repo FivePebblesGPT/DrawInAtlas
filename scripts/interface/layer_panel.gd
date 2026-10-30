@@ -273,9 +273,11 @@ func _rebuild_hierarchy() -> void:
 				var ink: AtlasInkLayer = layer as AtlasInkLayer
 				for stroke_index: int in range(mini(ink.strokes.size(), MAX_STROKE_ROWS)):
 					var stroke: AtlasStroke = ink.strokes[stroke_index]
-					var item: TreeItem = _make_row(entry, "Stroke %d · %d pts" % [stroke_index + 1,
-						stroke.points.size()], {"kind": "stroke", "id": layer.id, "index": stroke_index},
-						"Select this stroke for whole-object edits")
+					var title: String = ("Wall path %d%s · %d pts" % [stroke_index + 1,
+						" (closed)" if stroke.closed_path else "", stroke.points.size()]
+						if stroke.editable_path else "Stroke %d · %d pts" % [stroke_index + 1, stroke.points.size()])
+					var item: TreeItem = _make_row(entry, title, {"kind": "stroke", "id": layer.id,
+						"index": stroke_index}, "Select this object for whole-object edits")
 					_stroke_rows["%s:%d" % [layer.id, stroke_index]] = item
 				if ink.strokes.size() > MAX_STROKE_ROWS:
 					var more: TreeItem = _make_row(entry, "… %d more strokes (use Select tool)" %

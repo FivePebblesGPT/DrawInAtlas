@@ -16,6 +16,7 @@ signal fill_tolerance_changed(value: float)
 signal fill_global_changed(enabled: bool)
 signal grid_snapping_toggled(enabled: bool)
 signal polygon_fill_toggled(enabled: bool)
+signal wall_restyle_requested
 signal palette_selected(index: int)
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
@@ -77,9 +78,23 @@ var _reference_floors: Array[String] = []
 var _reference_campaign: AtlasCampaign
 var _automatic_reference: String = ""
 var _current_tool: AtlasCanvas.Tool = AtlasCanvas.Tool.PEN
+var _wall_controls: VBoxContainer
+var _wall_restyle_button: Button
 
 
 func _ready() -> void:
+	_wall_controls = VBoxContainer.new()
+	var hint: Label = Label.new()
+	hint.text = "Wall path: click points, Enter finishes open, right-click closes. Drag a blue node to move it; Shift+click an edge inserts, Alt+click a node deletes."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(1, 0)
+	_wall_controls.add_child(hint)
+	_wall_restyle_button = Button.new()
+	_wall_restyle_button.text = "Apply color & width to selected path"
+	_wall_restyle_button.pressed.connect(wall_restyle_requested.emit)
+	_wall_controls.add_child(_wall_restyle_button)
+	_ink_section.add_child(_wall_controls)
+	_wall_controls.hide()
 	floor_picker.item_selected.connect(_on_floor_selected)
 	floor_name_input.text_submitted.connect(func(_text: String) -> void: floor_renamed.emit(floor_name_input.text))
 	_floor_add.pressed.connect(func() -> void: floor_created.emit(floor_name_input.text))
@@ -140,7 +155,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
 	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "BRUSH & STROKE")
 	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
@@ -152,6 +167,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	fill_global_checkbox.visible = not terrain_active
 	_eraser_hint.visible = erasing
 	_line_hint.visible = tool == AtlasCanvas.Tool.LINE
+	_wall_controls.visible = tool == AtlasCanvas.Tool.WALL_PATH
 	_polygon_hint.visible = tool == AtlasCanvas.Tool.POLYGON
 	polygon_fill_checkbox.visible = tool == AtlasCanvas.Tool.POLYGON
 	_ink_color_label.visible = not erasing
@@ -163,7 +179,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	_terrain_section.visible = tool == AtlasCanvas.Tool.PAINT or (tool == AtlasCanvas.Tool.FILL and terrain_active)
 	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
-		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	snap_checkbox.disabled = not grid_available
 
 

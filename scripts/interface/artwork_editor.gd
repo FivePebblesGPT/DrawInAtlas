@@ -47,7 +47,7 @@ func choose_tool(tool: AtlasCanvas.Tool) -> void:
 			var tiles: AtlasTileLayer = _canvas.floor.terrain_layer()
 			if tiles != null:
 				select_layer(tiles.id)
-		elif tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON] and not current is AtlasInkLayer:
+		elif tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH] and not current is AtlasInkLayer:
 			var ink: AtlasInkLayer = _canvas.floor.ink_layer()
 			if ink != null:
 				select_layer(ink.id)
@@ -143,6 +143,37 @@ func stroke(stroke: AtlasStroke, erasing: bool) -> void:
 	if _edits.execute(command):
 		_canvas.queue_redraw()
 		message.emit("Erased ink. One gesture = one undo." if erasing else "Stroke added in board coordinates.")
+
+
+## A path is a separately editable stroke object; all changes use a guarded
+## history snapshot. Never clip vertices into ordinary non-editable strokes.
+func edit_path(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> void:
+	if not _canvas.editing_target_is_presented():
+		return
+	var layer: AtlasInkLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable() or replacement == null or not replacement.editable_path or not replacement.is_valid():
+		return
+	if index < -1 or index >= layer.strokes.size():
+		return
+	if index >= 0 and (expected == null or not expected.editable_path or not expected.is_valid()
+				or layer.strokes[index].to_dict() != expected.to_dict()):
+		return
+	var active_scope: AtlasEditScope = scope()
+	if not active_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(replacement)):
+		message.emit("Path is outside the edit mask.")
+		return
+	if index >= 0 and not active_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(expected)):
+		message.emit("Cannot edit a path crossing the edit mask.")
+		return
+	var before: Array[AtlasStroke] = layer.strokes
+	var after: Array[AtlasStroke] = AtlasStroke.clone_all(before)
+	if index == -1:
+		after.append(replacement.copy())
+	else:
+		after[index] = replacement.copy()
+	if _edits.execute(AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, before, after, layer.id)):
+		_canvas.queue_redraw()
+		message.emit("Editable wall path updated.")
 
 
 func paint(cell: Vector2i) -> void:

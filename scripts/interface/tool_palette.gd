@@ -12,6 +12,7 @@ const CATEGORIES: Array[Dictionary] = [
 	]},
 	{"title": "SHAPES", "tools": [
 		{"id": AtlasCanvas.Tool.LINE, "name": "Line", "key": "L", "icon": "line", "hint": "Drag to draw a straight line"},
+		{"id": AtlasCanvas.Tool.WALL_PATH, "name": "Wall path", "key": "W", "icon": "wall-path", "hint": "Click vertices, Enter finish open, right-click close; drag nodes, Shift insert, Alt delete; restyle from inspector"},
 		{"id": AtlasCanvas.Tool.POLYGON, "name": "Polygon", "key": "P", "icon": "polygon", "hint": "Click to place vertices, Enter/right-click/double-click to close; outline or solid fill in inspector"},
 		{"id": AtlasCanvas.Tool.RECTANGLE, "name": "Rectangle", "key": "R", "icon": "rectangle", "hint": "Drag a rectangle outline"},
 		{"id": AtlasCanvas.Tool.ELLIPSE, "name": "Ellipse", "key": "O", "icon": "ellipse", "hint": "Drag an ellipse outline"},

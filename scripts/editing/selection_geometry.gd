@@ -100,9 +100,10 @@ static func select_point(layer: AtlasLayer, point: Vector2, tolerance: float) ->
 			var radius: float = stroke.width * 0.5 + tolerance
 			if stroke.filled and Geometry2D.is_point_in_polygon(point, stroke.points):
 				return select_indices(layer, [index])
-			for segment: int in range(maxi(1, stroke.points.size() - 1)):
-				var start: Vector2 = stroke.points[segment]
-				var finish: Vector2 = stroke.points[mini(segment + 1, stroke.points.size() - 1)]
+			var path_points: PackedVector2Array = AtlasEditablePath.render_points(stroke) if stroke.editable_path else stroke.points
+			for segment: int in range(maxi(1, path_points.size() - 1)):
+				var start: Vector2 = path_points[segment]
+				var finish: Vector2 = path_points[mini(segment + 1, path_points.size() - 1)]
 				if Geometry2D.get_closest_point_to_segment(point, start, finish).distance_to(point) <= radius:
 					return select_indices(layer, [index])
 	elif layer is AtlasRasterLayer:

@@ -18,6 +18,7 @@ signal pointer_moved(local_position: Vector2)
 signal interaction_started
 signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
+signal path_edit_requested(index: int, expected: AtlasStroke, replacement: AtlasStroke)
 signal selection_changed
 signal transform_requested(selection: AtlasSelection, transform: Transform2D)
 signal fill_requested
@@ -25,7 +26,7 @@ signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
 
-enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON }
+enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
@@ -118,6 +119,14 @@ var _gesture_snap: bool = false
 var _shape_kind: String = ""
 var _polygon_vertices: PackedVector2Array = PackedVector2Array()
 var _polygon_pointer: Vector2 = Vector2.ZERO
+## Session-only vertex editing; resources remain in the ink layer and history.
+var _wall_vertices: PackedVector2Array = PackedVector2Array()
+var _wall_pointer: Vector2 = Vector2.ZERO
+var _wall_selected_index: int = -1
+var _wall_drag_vertex: int = -1
+var _wall_drag_origin: Vector2 = Vector2.ZERO
+var _wall_before: AtlasStroke
+var _wall_preview: AtlasStroke
 var _preview_layer: AtlasLayer
 var _gesture_transform: Transform2D = Transform2D.IDENTITY
 var _selection_mode: AtlasSelectionGeometry.CombineMode = AtlasSelectionGeometry.CombineMode.REPLACE
@@ -172,7 +181,7 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty()
+	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
@@ -186,6 +195,11 @@ func cancel_edit() -> void:
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
 	_polygon_vertices.clear()
+	_wall_vertices.clear()
+	_wall_drag_vertex = -1
+	_wall_before = null
+	_wall_preview = null
+	_wall_selected_index = -1
 	_gesture_snap = false
 	_preview_layer = null
 	_pending_wheel_fraction = 0.0
@@ -198,6 +212,12 @@ func cancel_edit() -> void:
 
 
 func commit_edit() -> void:
+	if not _wall_vertices.is_empty():
+		_finish_wall_path(false)
+		return
+	if _wall_drag_vertex >= 0:
+		_finish_wall_drag()
+		return
 	if not _polygon_vertices.is_empty():
 		var shape: AtlasStroke = AtlasShapes.polygon(_polygon_vertices, brush_color, brush_width, polygon_solid_fill)
 		_polygon_vertices.clear()
@@ -236,6 +256,18 @@ func commit_edit() -> void:
 	stroke_requested.emit(stroke, erasing)
 	queue_redraw()
 	interaction_finished.emit()
+
+
+func restyle_selected_wall() -> void:
+	if floor == null or not editing_target_is_presented() or _wall_selected_index < 0:
+		return
+	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable() or _wall_selected_index >= layer.strokes.size():
+		return
+	var original: AtlasStroke = layer.strokes[_wall_selected_index]
+	var restyled: AtlasStroke = AtlasEditablePath.restyled(original, brush_color, brush_width)
+	if restyled != null:
+		path_edit_requested.emit(_wall_selected_index, original.copy(), restyled)
 
 
 func clear_selection() -> void:
@@ -366,8 +398,15 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 	elif layer is AtlasInkLayer:
 		var previewing: bool = _draft_stroke != null and active_layer_id == id
 		var artwork: Array[AtlasStroke] = _erase_preview if previewing and _erasing else layer.strokes
-		for stroke: AtlasStroke in artwork:
-			_draw_stroke(stroke, item)
+		for index: int in range(artwork.size()):
+			var stroke: AtlasStroke = artwork[index]
+			_draw_stroke(_wall_preview if id == active_layer_id and _wall_preview != null and index == _wall_selected_index else stroke, item)
+		if id == active_layer_id and tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+			var guide: PackedVector2Array = _wall_vertices.duplicate()
+			if guide[-1].distance_squared_to(_wall_pointer) > 0.0001:
+				guide.append(_wall_pointer)
+			if guide.size() > 1:
+				item.draw_polyline(guide, Color(0.96, 0.72, 0.32, 0.65), brush_width, true)
 		if previewing and not _erasing:
 			if _draft_stroke.filled:
 				if edit_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(_draft_stroke)):
@@ -431,6 +470,16 @@ func _draw_overlays(item: Node2D) -> void:
 			item.draw_polyline(guide, Color("#f9cc65"), 1.5 / camera_zoom, true)
 		for vertex: Vector2 in _polygon_vertices:
 			item.draw_circle(vertex, 3.0 / camera_zoom, Color("#f9cc65"))
+	if tool == Tool.WALL_PATH and editing_target_is_presented():
+		var active: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+		if active != null and _wall_selected_index >= 0 and _wall_selected_index < active.strokes.size():
+			var wall: AtlasStroke = _wall_preview if _wall_preview != null else active.strokes[_wall_selected_index]
+			if wall.editable_path:
+				for vertex: Vector2 in wall.points:
+					item.draw_circle(vertex, 4.0 / camera_zoom, Color("#4dabf2"))
+		if not _wall_vertices.is_empty():
+			for vertex: Vector2 in _wall_vertices:
+				item.draw_circle(vertex, 3.5 / camera_zoom, Color("#f9cc65"))
 	_draw_brush_cursor(item)
 
 
@@ -498,7 +547,7 @@ func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
 		interior.remove_at(interior.size() - 1)
 		item.draw_colored_polygon(interior, stroke.color)
 		return
-	var centers: PackedVector2Array = AtlasStrokeGeometry.centers(stroke.points)
+	var centers: PackedVector2Array = AtlasStrokeGeometry.centers(AtlasEditablePath.render_points(stroke) if stroke.editable_path else stroke.points)
 	if centers.size() == 1:
 		item.draw_circle(centers[0], stroke.width * 0.5, stroke.color, true, -1.0, true)
 	elif centers.size() > 1:
@@ -589,6 +638,8 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_mouse_button(event)
 	elif event is InputEventMouseMotion:
 		_handle_mouse_motion(event)
+	elif event is InputEventKey and tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+		_handle_wall_key(event as InputEventKey)
 	elif event is InputEventKey and tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 		var key: InputEventKey = event as InputEventKey
 		if key.pressed and not key.echo:
@@ -631,6 +682,11 @@ func _handle_mouse_button(mouse: InputEventMouseButton) -> void:
 		MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN:
 			_handle_wheel_button(mouse)
 		MOUSE_BUTTON_MIDDLE, MOUSE_BUTTON_RIGHT:
+			if mouse.button_index == MOUSE_BUTTON_RIGHT and tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+				if mouse.pressed:
+					_finish_wall_path(_wall_vertices.size() >= 3)
+				accept_event()
+				return
 			if mouse.button_index == MOUSE_BUTTON_RIGHT and tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 				if mouse.pressed:
 					commit_edit()
@@ -666,6 +722,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	match tool:
 		Tool.POLYGON:
 			_begin_polygon_vertex(mouse, position)
+		Tool.WALL_PATH:
+			_begin_wall_point(mouse, position)
 		Tool.PEN, Tool.ERASER:
 			if not editing_target_is_presented():
 				return
@@ -767,6 +825,11 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		_raster_textures.clear()
 		queue_redraw()
 		interaction_finished.emit()
+	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:
+		_update_wall_drag(local_to_document(mouse.position))
+		_finish_wall_drag()
+	elif tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+		_update_wall_pointer(mouse.position)
 	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 		# Vertices are placed by clicks; mouse release never finishes a shape.
 		_update_polygon_preview(mouse.position)
@@ -797,6 +860,10 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 		queue_redraw()
 	elif _manipulation != Manipulation.NONE:
 		_update_manipulation(local_to_document(motion.position))
+	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:
+		_update_wall_drag(local_to_document(motion.position))
+	elif tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+		_update_wall_pointer(motion.position)
 	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 		_update_polygon_preview(motion.position)
 	elif tool == Tool.PAINT and _tile_painting:
@@ -831,6 +898,129 @@ func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void
 		# One dispatch emits at most one logical step, discarding any remainder.
 		_pending_wheel_fraction = 0.0
 		wheel_step.emit(direction, position)
+
+
+## Construct and edit independently typed wall paths on the selected ink layer.
+## Normal click selects an existing edge or drags its vertex. Shift+click
+## inserts a vertex, Alt+click deletes one; an explicit inspector action restyles.
+func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
+	if not editing_target_is_presented():
+		return
+	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	if layer == null or not layer.is_editable():
+		return
+	if not _wall_vertices.is_empty():
+		var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
+		if mouse.double_click:
+			_finish_wall_path(false)
+			return
+		if _wall_vertices.size() >= 3 and point.distance_to(_wall_vertices[0]) <= 8.0 / camera_zoom:
+			_finish_wall_path(true)
+			return
+		if _wall_vertices.size() < AtlasEditablePath.MAX_VERTICES and point.distance_squared_to(_wall_vertices[-1]) > 0.0001:
+			_wall_vertices.append(point)
+		_update_wall_pointer(mouse.position)
+		return
+	var radius: float = 8.0 / camera_zoom
+	for index: int in range(layer.strokes.size() - 1, -1, -1):
+		var path: AtlasStroke = layer.strokes[index]
+		if not path.editable_path:
+			continue
+		var vertex: int = AtlasEditablePath.vertex_at(path, position, radius)
+		var segment: int = AtlasEditablePath.segment_at(path, position, radius)
+		if vertex < 0 and segment < 0:
+			continue
+		_wall_selected_index = index
+		_gesture_snap = snap_to_grid
+		_wall_before = path.copy()
+		if mouse.alt_pressed and vertex >= 0:
+			var removed: AtlasStroke = AtlasEditablePath.deleted_vertex(path, vertex)
+			if removed != null:
+				path_edit_requested.emit(index, path.copy(), removed)
+			_wall_before = null
+		elif mouse.shift_pressed and segment >= 0:
+			var inserted_at: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+			var inserted: AtlasStroke = AtlasEditablePath.inserted_vertex(path, segment, inserted_at)
+			if inserted != null:
+				path_edit_requested.emit(index, path.copy(), inserted)
+			_wall_before = null
+		elif vertex >= 0:
+			_wall_drag_origin = position
+			_wall_drag_vertex = vertex
+			_wall_preview = path.copy()
+		else:
+			_wall_before = null
+		queue_redraw()
+		return
+	_wall_selected_index = -1
+	_wall_before = null
+	_gesture_snap = snap_to_grid
+	_wall_vertices = PackedVector2Array([AtlasGridSnap.point(map.grid, position) if _gesture_snap else position])
+	_update_wall_pointer(mouse.position)
+
+
+func _update_wall_pointer(local_position: Vector2) -> void:
+	_wall_pointer = local_to_document(local_position)
+	if _gesture_snap:
+		_wall_pointer = AtlasGridSnap.point(map.grid, _wall_pointer)
+	queue_redraw()
+
+
+func _finish_wall_path(closed: bool) -> void:
+	var path: AtlasStroke = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width, closed)
+	_wall_vertices.clear()
+	_wall_before = null
+	_gesture_snap = false
+	if path != null:
+		path_edit_requested.emit(-1, null, path)
+	queue_redraw()
+	interaction_finished.emit()
+
+
+func _update_wall_drag(position: Vector2) -> void:
+	if _wall_before == null:
+		return
+	# A simple click selects a vertex. It must not snap an existing off-grid
+	# vertex into a new position unless the pointer really moves.
+	if position.distance_squared_to(_wall_drag_origin) <= 0.000001:
+		_wall_preview = _wall_before.copy()
+		queue_redraw()
+		return
+	var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
+	_wall_preview = AtlasEditablePath.moved_vertex(_wall_before, _wall_drag_vertex, point)
+	queue_redraw()
+
+
+func _finish_wall_drag() -> void:
+	var index: int = _wall_selected_index
+	var before: AtlasStroke = _wall_before
+	var after: AtlasStroke = _wall_preview
+	_wall_drag_vertex = -1
+	_wall_before = null
+	_wall_preview = null
+	if before != null and after != null and before.to_dict() != after.to_dict():
+		path_edit_requested.emit(index, before, after)
+	queue_redraw()
+	interaction_finished.emit()
+
+
+func _handle_wall_key(event: InputEventKey) -> void:
+	if not event.pressed or event.echo:
+		return
+	match event.keycode:
+		KEY_ENTER, KEY_KP_ENTER:
+			_finish_wall_path(false)
+			accept_event()
+		KEY_BACKSPACE:
+			_wall_vertices.remove_at(_wall_vertices.size() - 1)
+			if _wall_vertices.is_empty():
+				cancel_edit()
+			else:
+				_update_wall_pointer(_brush_cursor_local)
+			accept_event()
+		KEY_ESCAPE:
+			cancel_edit()
+			accept_event()
 
 
 ## Each click fixes a vertex. Click near the first point, double-click, Enter,
