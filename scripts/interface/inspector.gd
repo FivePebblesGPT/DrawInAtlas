@@ -12,6 +12,7 @@ signal scope_toggled(enabled: bool)
 signal selection_transform_requested(offset: Vector2, factor: float, radians: float)
 signal brush_color_changed(color: Color)
 signal brush_width_changed(value: float)
+signal grid_snapping_toggled(enabled: bool)
 signal palette_selected(index: int)
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
@@ -36,6 +37,8 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var floor_picker: OptionButton = %FloorPicker
 @onready var floor_name_input: LineEdit = %FloorNameInput
 
+@onready var snap_checkbox: CheckBox = %SnapCheckbox
+@onready var _snap_section: VBoxContainer = %SnapSection
 @onready var _ink_section: VBoxContainer = %InkSection
 @onready var _terrain_section: VBoxContainer = %TerrainSection
 @onready var _selection_section: VBoxContainer = %SelectionSection
@@ -71,6 +74,7 @@ func _ready() -> void:
 	_floor_default.pressed.connect(floor_default_requested.emit)
 	_floor_remove.pressed.connect(floor_removed.emit)
 	lock_checkbox.toggled.connect(scope_toggled.emit)
+	snap_checkbox.toggled.connect(grid_snapping_toggled.emit)
 	_transform_button.pressed.connect(_on_transform_requested)
 	brush_color_picker.color_changed.connect(brush_color_changed.emit)
 	brush_width_spinner.value_changed.connect(brush_width_changed.emit)
@@ -122,6 +126,8 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
 	_terrain_section.visible = tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
 	_selection_section.visible = tool == AtlasCanvas.Tool.ART_SELECT
+	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.ART_SELECT]
+	snap_checkbox.disabled = not grid_available
 
 
 func refresh_selection(selection: AtlasSelection, can_modify: bool) -> void:

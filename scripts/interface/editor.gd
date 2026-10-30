@@ -223,6 +223,8 @@ func _connect_workspace() -> void:
 	grid_controls.settings_changed.connect(apply_grid)
 	grid_settings_button.pressed.connect(open_grid_settings)
 	inspector.scope_toggled.connect(_on_scope_toggled)
+	inspector.grid_snapping_toggled.connect(func(enabled: bool) -> void:
+		canvas.snap_to_grid = enabled)
 	inspector.selection_transform_requested.connect(_transform_from_inspector)
 	inspector.brush_color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
 	inspector.brush_width_changed.connect(func(width: float) -> void: canvas.brush_width = width)
@@ -357,6 +359,7 @@ func _refresh_grid_controls() -> void:
 		canvas.clear_selection()
 	grid_controls.set_grid(canvas.map.grid)
 	lock_checkbox.disabled = canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS
+	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	artwork.refresh_scope()
 
 

@@ -87,6 +87,8 @@ var show_grid: bool:
 		queue_redraw()
 var brush_color: Color = Color("#f5b545")
 var brush_width: float = 8.0
+## Session-only; grid changes never rewrite existing artwork.
+var snap_to_grid: bool = false
 
 var _panning: bool = false
 var _tile_painting: bool = false
@@ -104,6 +106,7 @@ var _overlay: Node2D
 var _manipulation: Manipulation = Manipulation.NONE
 var _gesture_start: Vector2
 var _gesture_end: Vector2
+var _gesture_snap: bool = false
 var _shape_kind: String = ""
 var _preview_layer: AtlasLayer
 var _gesture_transform: Transform2D = Transform2D.IDENTITY
@@ -167,6 +170,7 @@ func cancel_edit() -> void:
 	_tile_painting = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
+	_gesture_snap = false
 	_preview_layer = null
 	_pending_wheel_fraction = 0.0
 	_wheel_dispatch_direction = 0
@@ -225,7 +229,8 @@ func _update_manipulation(position: Vector2) -> void:
 	_gesture_end = position
 	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
 	if _manipulation == Manipulation.MOVE:
-		_gesture_transform = Transform2D(0.0, position - _gesture_start)
+		var movement: Vector2 = AtlasGridSnap.move_delta(map.grid, _gesture_start, position) if _gesture_snap else position - _gesture_start
+		_gesture_transform = Transform2D(0.0, movement)
 	elif _manipulation == Manipulation.RESIZE:
 		var pivot: Vector2 = selection.bounds.position
 		var initial: Vector2 = _gesture_start - pivot
@@ -442,6 +447,8 @@ func _append_stroke_point(local_position: Vector2) -> void:
 		return
 	var point: Vector2 = local_to_document(local_position)
 	if not _shape_kind.is_empty():
+		if _gesture_snap:
+			point = AtlasGridSnap.point(map.grid, point)
 		_draft_stroke = AtlasShapes.stroke(_shape_kind, _gesture_start, point, brush_color, brush_width)
 		queue_redraw()
 		return
@@ -570,14 +577,16 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
 			if layer != null and layer.is_editable():
 				_shape_kind = Tool.keys()[tool]
-				_gesture_start = position
+				_gesture_snap = snap_to_grid
+				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_stroke_left_canvas = false
-				_draft_stroke = AtlasShapes.stroke("LINE", position, position, brush_color, brush_width)
+				_draft_stroke = AtlasShapes.stroke("LINE", _gesture_start, _gesture_start, brush_color, brush_width)
 		Tool.ART_SELECT:
 			if not editing_target_is_presented():
 				return
 			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
 			_gesture_start = position
+			_gesture_snap = snap_to_grid
 			_gesture_end = position
 			_gesture_transform = Transform2D.IDENTITY
 			_selection_mode = AtlasSelectionGeometry.CombineMode.SUBTRACT if mouse.alt_pressed else (

@@ -29,7 +29,7 @@
 - [x] [[T-012|T-012 · Replace battlemats with authored local detail]]
 - [x] [[T-014|T-014 · Retire battlemat creation controls]]
 - [ ] [[T-015|T-015 · Retire the old model while preserving artwork]]
-- [ ] [[T-016|T-016 · Coherent detail-editing snapping]]
+- [x] [[T-016|T-016 · Coherent detail-editing snapping]]
 - [ ] [[T-018|T-018 · Compact layer/object/link hierarchy]]
 - [x] [[T-019|T-019 · Selection and selection masks]]
 - [ ] [[T-020|T-020 · Brush]]

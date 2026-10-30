@@ -129,6 +129,24 @@ layout_mode = 2
 text = "Pen (B) · Tools in left sidebar"
 autowrap_mode = 3
 
+[node name="SnapSection" type="VBoxContainer" parent="Scroll/Margin/Sections"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SnapHeading" type="Label" parent="Scroll/Margin/Sections/SnapSection"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 11
+text = "GRID SNAPPING"
+
+[node name="SnapCheckbox" type="CheckBox" parent="Scroll/Margin/Sections/SnapSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Snap to grid"
+tooltip_text = "Opt in: snap line/shape endpoints and selection moves to the board grid. Pen, selection marquee, resize and numeric transforms stay free."
+accessibility_name = "Snap artwork to editing grid"
+
 [node name="InkSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=751123006]
 unique_name_in_owner = true
 layout_mode = 2
