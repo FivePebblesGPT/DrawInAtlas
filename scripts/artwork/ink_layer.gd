@@ -6,8 +6,10 @@ extends AtlasLayer
 
 func _init(layer_id: String = "ink", layer_name: String = "Ink") -> void:
 	super(layer_id, layer_name)
-	kind = "INK"
 
+
+func layer_kind() -> String:
+	return "INK"
 
 func to_dict() -> Dictionary:
 	var data: Dictionary = super.to_dict()

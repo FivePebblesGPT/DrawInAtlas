@@ -3,7 +3,17 @@ extends Resource
 
 @export_storage var id: String
 @export_storage var display_name: String
-@export_storage var kind: String
+## Runtime type comes from the Resource class. `kind` is a read-only-in-practice
+## compatibility discriminator for existing native saves and dictionary/clipboard
+## boundaries, not a second mutable source of type truth.
+## Old native files still write this property; reject a mismatched serialized
+## value instead of silently interpreting the resource as another layer type.
+var _type_marker_valid: bool = true
+@export_storage var kind: String:
+	get:
+		return layer_kind()
+	set(value):
+		_type_marker_valid = value == layer_kind()
 @export_storage var visible: bool = true
 @export_storage var locked: bool = false
 @export_storage var opacity: float = 1.0
@@ -17,6 +27,15 @@ const MAX_DETAIL_LEVEL: int = 32
 func _init(layer_id: String = "", layer_name: String = "") -> void:
 	id = layer_id
 	display_name = layer_name
+
+
+## Subclasses report their wire-format discriminator; the class owns the type.
+func layer_kind() -> String:
+	return ""
+
+
+func has_valid_type_marker() -> bool:
+	return _type_marker_valid and not layer_kind().is_empty()
 
 
 func to_dict() -> Dictionary:

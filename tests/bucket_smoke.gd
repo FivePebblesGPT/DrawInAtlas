@@ -173,7 +173,7 @@ func _editor_preview() -> void:
 		and editor.inspector._bucket_section.visible and not editor.inspector.fill_global_checkbox.visible
 		and editor.inspector._terrain_section.visible,
 		"switching layers while Bucket stays active refreshes terrain-only controls")
-	var terrain: AtlasTileLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTileLayer
+	var terrain: AtlasTerrainLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTerrainLayer
 	var terrain_before: Dictionary = terrain.terrain.duplicate(true)
 	var grid: AtlasGrid = terrain.grid if terrain.grid != null else canvas.map.grid
 	var point: Vector2 = grid.cell_to_document(Vector2i.ZERO)
@@ -189,13 +189,13 @@ func _editor_preview() -> void:
 	editor.palette_id = 3
 	editor.artwork.preview_fill(point)
 	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok
-		and canvas._preview_layer is AtlasTileLayer and terrain.terrain == terrain_before,
+		and canvas._preview_layer is AtlasTerrainLayer and terrain.terrain == terrain_before,
 		"bounded terrain fill produces detached preview")
 	editor.artwork.commit_preview_fill()
-	_check((canvas.floor.layer_by_id(terrain.id) as AtlasTileLayer).terrain.get("0,0") == 3,
+	_check((canvas.floor.layer_by_id(terrain.id) as AtlasTerrainLayer).terrain.get("0,0") == 3,
 		"bounded terrain fill commits one cell with correct palette")
 	editor._on_undo()
-	_check((canvas.floor.layer_by_id(terrain.id) as AtlasTileLayer).terrain == terrain_before,
+	_check((canvas.floor.layer_by_id(terrain.id) as AtlasTerrainLayer).terrain == terrain_before,
 		"terrain preview commit is atomically undoable")
 	root.remove_child(scene)
 	scene.free()

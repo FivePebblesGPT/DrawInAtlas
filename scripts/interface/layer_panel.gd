@@ -164,7 +164,7 @@ func _add_ink() -> void:
 
 
 func _add_tiles() -> void:
-	var layer: AtlasTileLayer = AtlasTileLayer.new("tiles-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Terrain")
+	var layer: AtlasTerrainLayer = AtlasTerrainLayer.new("tiles-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Terrain")
 	_add(layer)
 
 
@@ -293,8 +293,8 @@ func _rebuild_hierarchy() -> void:
 				if not raster.chunks.is_empty():
 					_make_row(entry, "Raster pixels · %d chunks" % raster.chunks.size(),
 						{"kind": "raster", "id": layer.id}, "Whole-layer raster selection")
-			elif layer is AtlasTileLayer:
-				var terrain: AtlasTileLayer = layer as AtlasTileLayer
+			elif layer is AtlasTerrainLayer:
+				var terrain: AtlasTerrainLayer = layer as AtlasTerrainLayer
 				var summary: TreeItem = _make_row(entry, "%d painted cells" % terrain.terrain.size(),
 					{"kind": "summary"}, "Terrain cells belong to this layer, not separate maps")
 				summary.set_selectable(0, false)

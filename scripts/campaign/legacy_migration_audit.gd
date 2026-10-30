@@ -41,8 +41,8 @@ static func inspect(campaign: AtlasCampaign) -> Dictionary:
 				}
 				if layer is AtlasInkLayer:
 					layer_record["stroke_count"] = (layer as AtlasInkLayer).strokes.size()
-				elif layer is AtlasTileLayer:
-					var tiles: AtlasTileLayer = layer as AtlasTileLayer
+				elif layer is AtlasTerrainLayer:
+					var tiles: AtlasTerrainLayer = layer as AtlasTerrainLayer
 					layer_record["cell_count"] = tiles.terrain.size()
 					layer_record["grid"] = tiles.grid.to_dict() if tiles.grid != null else document.get_terrain_grid(floor.id).to_dict()
 				elif layer is AtlasRasterLayer:

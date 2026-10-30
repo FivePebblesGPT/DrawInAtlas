@@ -56,7 +56,7 @@ func _run() -> void:
 	var ink: AtlasInkLayer = child.floors[0].ink_layer()
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([
 		Vector2(-25, 12), Vector2(19, 47)]), Color(0.3, 0.5, 0.7, 0.4), 3.0))
-	var tile: AtlasTileLayer = child.floors[0].terrain_layer()
+	var tile: AtlasTerrainLayer = child.floors[0].terrain_layer()
 	tile.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 15.0)
 	tile.terrain["-3,4"] = 2
 	var image: Image = Image.create(3, 3, false, Image.FORMAT_RGBA8)

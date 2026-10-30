@@ -89,7 +89,7 @@ static func from_dict(data: Dictionary) -> AtlasMapDocument:
 			return null
 		floor_ids[floor.id] = true
 		for layer: AtlasLayer in floor.layers:
-			if layer is AtlasTileLayer and layer.grid == null:
+			if layer is AtlasTerrainLayer and layer.grid == null:
 				layer.grid = map.terrain_grid.copy()
 		map.floors.append(floor)
 	if map.floors.is_empty():

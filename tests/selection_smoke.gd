@@ -95,7 +95,7 @@ func _selection() -> void:
 		indices.assign(raw)
 		_check(G.select_indices(layer, indices).is_empty(), "invalid index selection rejects atomically: " + str(raw))
 	_check(G.select_indices(layer, []).is_empty() and G.select_all(AtlasInkLayer.new()).is_empty(), "empty ink selection")
-	_check(G.select_all(null).is_empty() and G.select_all(AtlasTileLayer.new()).is_empty(), "null/tiles have no artwork selection")
+	_check(G.select_all(null).is_empty() and G.select_all(AtlasTerrainLayer.new()).is_empty(), "null/tiles have no artwork selection")
 	layer.strokes[0].points[0] = Vector2(9, 9)
 	_check(selection.source.strokes[0].points[0] == [-1.75, -0.75] and not selection.matches(layer), "snapshot is detached and detects stale geometry")
 	_check(G.transformed(layer, selection, Transform2D.IDENTITY) == null, "stale transform rejected")

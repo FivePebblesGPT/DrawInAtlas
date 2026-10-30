@@ -3,15 +3,15 @@ extends Resource
 
 @export_storage var id: String = "ground"
 @export_storage var display_name: String = "Ground"
-@export_storage var layers: Array[AtlasLayer] = [AtlasTileLayer.new(), AtlasInkLayer.new()]
+@export_storage var layers: Array[AtlasLayer] = [AtlasTerrainLayer.new(), AtlasInkLayer.new()]
 
 # Compatibility views for the original terrain/ink APIs; ordered layers own the data.
 var terrain: Dictionary:
 	get:
-		var layer: AtlasTileLayer = terrain_layer()
+		var layer: AtlasTerrainLayer = terrain_layer()
 		return layer.terrain if layer != null else {}
 	set(value):
-		var layer: AtlasTileLayer = terrain_layer()
+		var layer: AtlasTerrainLayer = terrain_layer()
 		if layer != null:
 			layer.terrain.assign(value)
 var strokes: Array[AtlasStroke]:
@@ -38,9 +38,9 @@ func ink_layer() -> AtlasInkLayer:
 	return null
 
 
-func terrain_layer() -> AtlasTileLayer:
+func terrain_layer() -> AtlasTerrainLayer:
 	for layer: AtlasLayer in layers:
-		if layer is AtlasTileLayer:
+		if layer is AtlasTerrainLayer:
 			return layer
 	return null
 

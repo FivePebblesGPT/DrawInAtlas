@@ -160,7 +160,7 @@ func _run() -> void:
 	editor.palette_id = 3
 	_check(editor.fill_at(Vector2(150, 50)) and canvas.floor.terrain.get("1,0") == 3,
 		"terrain fill also resolves the content grid independently")
-	var tile_layer: AtlasTileLayer = canvas.floor.terrain_layer()
+	var tile_layer: AtlasTerrainLayer = canvas.floor.terrain_layer()
 	var payload: AtlasClipboardData = AtlasClipboard.decode(AtlasClipboard.encode_tiles(tile_layer.grid, {"1,0": 3}, Vector2i(1, 0)))
 	_check(editor.paste_payload(payload, Vector2(250, 50)) and canvas.floor.terrain.get("2,0") == 3,
 		"typed tile paste resolves destination content coordinates")

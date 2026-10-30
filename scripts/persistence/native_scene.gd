@@ -61,7 +61,7 @@ static func unpack_campaign(scene: PackedScene) -> AtlasCampaign:
 
 
 static func _snapshot(source: AtlasCampaign) -> AtlasCampaign:
-	if source == null:
+	if not _valid_live_layer_types(source):
 		return null
 	var result: AtlasCampaign = AtlasCampaign.from_dict(source.to_dict())
 	if result == null:
@@ -96,7 +96,9 @@ static func _snapshot(source: AtlasCampaign) -> AtlasCampaign:
 static func _validate_and_hydrate(campaign: AtlasCampaign) -> bool:
 	# Existing constructors implement strict geometry/ID/transform validation.
 	# No untrusted candidate becomes visible before complete validation.
-	if campaign == null or AtlasCampaign.from_dict(campaign.to_dict()) == null:
+	if not _valid_live_layer_types(campaign):
+		return false
+	if AtlasCampaign.from_dict(campaign.to_dict()) == null:
 		return false
 	for map: AtlasMapDocument in campaign.maps.values():
 		for floor: AtlasFloor in map.floors:
@@ -106,6 +108,21 @@ static func _validate_and_hydrate(campaign: AtlasCampaign) -> bool:
 				for chunk: AtlasRasterChunk in (layer as AtlasRasterLayer).chunks.values():
 					if not _verify_chunk(chunk):
 						return false
+	return true
+
+
+## A native Resource's script is its live type authority. Validate its stored
+## compatibility marker before to_dict() converts it to a canonical dictionary.
+static func _valid_live_layer_types(campaign: AtlasCampaign) -> bool:
+	if campaign == null:
+		return false
+	for value: Variant in campaign.maps.values():
+		if not value is AtlasMapDocument:
+			return false
+		var document: AtlasMapDocument = value as AtlasMapDocument
+		for floor: AtlasFloor in document.floors:
+			if floor == null or not AtlasLayerCodec.valid_collection(floor.layers):
+				return false
 	return true
 
 

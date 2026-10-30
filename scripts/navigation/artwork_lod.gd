@@ -25,7 +25,7 @@ func rebuild(document: AtlasMapDocument, floor: AtlasFloor) -> void:
 				if stroke.points.is_empty() or stroke.color.a <= 0.0:
 					continue
 				pieces.append(_point_bounds(stroke.points).grow(stroke.width * 0.5))
-		elif layer is AtlasTileLayer:
+		elif layer is AtlasTerrainLayer:
 			var grid: AtlasGrid = layer.grid if layer.grid != null else document.get_terrain_grid(floor.id)
 			if grid != null:
 				for key: String in layer.terrain:

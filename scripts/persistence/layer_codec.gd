@@ -18,6 +18,8 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	var layer: AtlasLayer
 	match data.get("kind"):
 		"INK":
+			if _has_any(data, ["terrain", "grid", "chunks", "pixels_per_unit", "transform"]):
+				return null
 			var ink: AtlasInkLayer = AtlasInkLayer.new(data.id, data.name)
 			var strokes: Variant = data.get("strokes", [])
 			if not strokes is Array:
@@ -31,7 +33,9 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 				ink.strokes.append(stroke)
 			layer = ink
 		"TILES":
-			var tiles: AtlasTileLayer = AtlasTileLayer.new(data.id, data.name)
+			if _has_any(data, ["strokes", "chunks", "pixels_per_unit", "transform"]):
+				return null
+			var tiles: AtlasTerrainLayer = AtlasTerrainLayer.new(data.id, data.name)
 			var cells: Variant = data.get("terrain", {})
 			var grid: Variant = data.get("grid")
 			if not cells is Dictionary or (grid != null and not grid is Dictionary):
@@ -46,6 +50,8 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 					return null
 			layer = tiles
 		"RASTER":
+			if _has_any(data, ["strokes", "terrain", "grid"]):
+				return null
 			var raster: AtlasRasterLayer = AtlasRasterLayer.new(data.id, data.name)
 			var scale: Variant = data.get("pixels_per_unit", 1.0)
 			var chunks: Variant = data.get("chunks", [])
@@ -84,12 +90,21 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	return layer
 
 
+## A discriminator at a dictionary boundary must not reinterpret another
+## concrete layer's shape by silently ignoring its type-specific fields.
+static func _has_any(data: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if data.has(key):
+			return true
+	return false
+
+
 ## Validate a live Resource against the existing dictionary codec without copying
 ## its decoded raster pixels. The codec remains the single metadata validator.
 ## Check the live chunk keys/images too: dictionary reconstruction alone cannot
 ## detect a stale in-memory dictionary key or malformed decoded Image.
 static func _validated_metadata(layer: AtlasLayer) -> AtlasLayer:
-	if layer == null:
+	if layer == null or not layer.has_valid_type_marker():
 		return null
 	if layer is AtlasRasterLayer:
 		for key: String in layer.chunks:

@@ -312,7 +312,7 @@ func _refresh_layers(preferred_id: String = "") -> void:
 	# Active layer changes can change Bucket's target plane without changing
 	# the selected tool (terrain palette versus raster RGBA/tolerance).
 	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS,
-		canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTileLayer)
+		canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTerrainLayer)
 
 
 func _on_presented_detail_selected(level: int) -> void:
@@ -382,7 +382,7 @@ func _refresh_grid_controls() -> void:
 		canvas.clear_selection()
 	grid_controls.set_grid(canvas.map.grid)
 	lock_checkbox.disabled = canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS
-	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS, canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTileLayer)
+	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS, canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTerrainLayer)
 	artwork.refresh_scope()
 
 
@@ -634,7 +634,7 @@ func _on_tool_changed(index: int) -> void:
 	artwork.choose_tool(index as AtlasCanvas.Tool)
 	if tool_palette != null:
 		tool_palette.sync_tool(index)
-	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS, canvas.floor != null and canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTileLayer)
+	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS, canvas.floor != null and canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTerrainLayer)
 	if not locked_to_cell:
 		lock_checkbox.set_pressed_no_signal(false)
 	zoom_gate.reset()

@@ -47,7 +47,7 @@ func _run() -> void:
 	_check(floor.layers.size() == original_layers + 1 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasInkLayer,
 		"new ink icon creates and selects an ink layer")
 	panel.get_node("Order/NewTerrainButton").pressed.emit()
-	_check(floor.layers.size() == original_layers + 2 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasTileLayer,
+	_check(floor.layers.size() == original_layers + 2 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasTerrainLayer,
 		"new terrain icon retains its original command")
 	panel.get_node("Order/NewRasterButton").pressed.emit()
 	_check(floor.layers.size() == original_layers + 3 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasRasterLayer,

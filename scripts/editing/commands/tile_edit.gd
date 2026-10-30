@@ -29,7 +29,7 @@ func _replace(campaign: AtlasCampaign, expected: Dictionary, replacement: Dictio
 	var floor: AtlasFloor = document.floor_by_id(floor_id)
 	if floor == null:
 		return false
-	var layer: AtlasTileLayer = floor.layer_by_id(layer_id) as AtlasTileLayer
+	var layer: AtlasTerrainLayer = floor.layer_by_id(layer_id) as AtlasTerrainLayer
 	if layer == null or layer.terrain != expected or (validate_target and not layer.is_editable()):
 		return false
 	var candidate: Dictionary = layer.to_dict()

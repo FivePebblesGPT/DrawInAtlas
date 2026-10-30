@@ -389,7 +389,7 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 	var layer: AtlasLayer = floor.layer_by_id(id)
 	if id == active_layer_id and _preview_layer != null:
 		layer = _preview_layer
-	if layer is AtlasTileLayer:
+	if layer is AtlasTerrainLayer:
 		var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
 		for key: String in layer.terrain:
 			var xy: PackedStringArray = key.split(",")
@@ -886,7 +886,7 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 
 
 func _request_cell_paint(position: Vector2) -> void:
-	var layer: AtlasTileLayer = floor.layer_by_id(active_layer_id) as AtlasTileLayer
+	var layer: AtlasTerrainLayer = floor.layer_by_id(active_layer_id) as AtlasTerrainLayer
 	if layer == null:
 		return
 	var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)

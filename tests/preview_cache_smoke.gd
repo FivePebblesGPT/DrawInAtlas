@@ -77,7 +77,7 @@ func _signatures() -> void:
 	raster.chunks["0,0"].image.fill(Color.GREEN)
 	_check(cache.signature(map, floor.id) == hidden, "hidden artwork edits do not invalidate")
 	upper.terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 7)
-	var fallback: AtlasTileLayer = AtlasTileLayer.new("extra", "Extra")
+	var fallback: AtlasTerrainLayer = AtlasTerrainLayer.new("extra", "Extra")
 	fallback.terrain["0,0"] = 1
 	upper.layers.append(fallback)
 	var before: String = cache.signature(map, upper.id)

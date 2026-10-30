@@ -53,7 +53,7 @@ func _migration() -> void:
 		_check(document.id == "m" and floor != null and floor.display_name == "Upper", "migration retains map/floor identity")
 		if floor == null:
 			continue
-		_check(floor.layers.size() == 2 and floor.layers[0] is AtlasTileLayer and floor.layers[1] is AtlasInkLayer, "ordered typed legacy layers")
+		_check(floor.layers.size() == 2 and floor.layers[0] is AtlasTerrainLayer and floor.layers[1] is AtlasInkLayer, "ordered typed legacy layers")
 		_check(floor.layers[0].id == "terrain" and floor.layers[1].id == "ink", "stable migration layer IDs")
 		_check(floor.terrain == {"-2,3": 4} and floor.strokes[0].to_dict() == _stroke().to_dict(), "legacy content retained")
 		var geometry: AtlasGrid = frozen if version == 3 else board
@@ -74,7 +74,7 @@ func _validation() -> void:
 		var edge: Dictionary = ink.duplicate(true)
 		edge.opacity = opacity
 		_check(AtlasLayerCodec.from_dict(edge) != null, "opacity boundary accepted")
-	_reject(AtlasTileLayer.new().to_dict(), [{"terrain": {"x,y": 1}}, {"terrain": {"0,0": -1}}, {"terrain": {"0,0": 1.5}}, {"grid": []}], AtlasLayerCodec.from_dict, "tile payload")
+	_reject(AtlasTerrainLayer.new().to_dict(), [{"terrain": {"x,y": 1}}, {"terrain": {"0,0": -1}}, {"terrain": {"0,0": 1.5}}, {"grid": []}], AtlasLayerCodec.from_dict, "tile payload")
 	var ref_data: Dictionary = {"coord": [-1, 2], "width": 256, "height": 1, "asset": "a".repeat(64) + ".webp"}
 	var raster: Dictionary = AtlasRasterLayer.new().to_dict()
 	raster.chunks = [ref_data]
@@ -119,7 +119,7 @@ func _layer_edits() -> void:
 		for source: AtlasLayer in before + after:
 			if source is AtlasInkLayer and not source.strokes.is_empty():
 				source.strokes[0].points[0] = Vector2(888, 888)
-			if source is AtlasTileLayer:
+			if source is AtlasTerrainLayer:
 				source.terrain["1,2"] = 99
 				source.grid.origin = Vector2(777, 777)
 		before[0].display_name = "mutated input"
