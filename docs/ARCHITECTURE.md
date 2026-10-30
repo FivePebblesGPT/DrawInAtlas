@@ -3,12 +3,12 @@
 > [!important] Reference implementation and earlier design
 > [[Index]] is the active backlog. The user confirmed a continuous chunked board with separately authored artwork LOD and an explicit editing target: see [[E-002]] and [[E-006]]. The battlemat concept is retired; projector framing belongs to [[E-007]]. Earlier independent-document/footprint assumptions below are superseded where they conflict. This document is not current usability acceptance.
 
-**Status:** earlier target architecture plus implementation reference. The development baseline is **Godot 4.8-beta1**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [archived implementation notes](Archive/2026-10-30/IMPLEMENTATION_NOTES.md) for historical checks.
+**Status:** earlier target architecture plus implementation reference. The development baseline is **Godot 4.8-beta2**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [archived implementation notes](Archive/2026-10-30/IMPLEMENTATION_NOTES.md) for historical checks.
 
 ## What runs today
 
 The first sections below describe the long-term target architecture. The
-**current implementation** (Godot 4.8-beta1) follows this simpler route:
+**current implementation** (Godot 4.8-beta2) follows this simpler route:
 
 ```text
 main.tscn

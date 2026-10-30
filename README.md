@@ -6,7 +6,7 @@ Start with the [completion checklist](docs/Index.md), [manual review](docs/Manua
 
 DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
-The development engine is **Godot 4.8-beta1**, standard build. Application code is GDScript. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
+The development engine is **Godot 4.8-beta2**, standard build. Application code is GDScript. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
 
 ## Confirmed target interaction model
 

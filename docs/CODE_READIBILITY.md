@@ -111,7 +111,7 @@ change to that command workflow.
 
 ## Validation
 
-Run the Godot 4.8-beta1 headless import/parse check and the UI smoke tests
+Run the Godot 4.8-beta2 headless import/parse check and the UI smoke tests
 listed in the README, notably `tests/layer_ui_smoke.gd`,
 `tests/organization_ui_smoke.gd`, `tests/tools_ui_smoke.gd` and
 `tests/editor_modules_smoke.gd`. The module suite exercises form signals,

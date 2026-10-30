@@ -12,15 +12,15 @@ jobs:
         with:
           # Godot cannot import LFS pointer text as textures.
           lfs: true
-      - name: Install Godot 4.8-beta1 (standard, non-.NET)
+      - name: Install Godot 4.8-beta2 (standard, non-.NET)
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta1
+          version: 4.8.0-beta2
           use-dotnet: false
           include-templates: true
       - name: Verify the exact beta engine
         shell: bash
-        run: godot --version | grep -E '^4\.8\.beta1\.official\.'
+        run: godot --version | grep -E '^4\.8\.beta2\.official\.'
       - name: Import resources and parse scripts
         shell: bash
         run: |
