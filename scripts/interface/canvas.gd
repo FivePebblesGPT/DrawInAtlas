@@ -107,7 +107,7 @@ var _gesture_end: Vector2
 var _shape_kind: String = ""
 var _preview_layer: AtlasLayer
 var _gesture_transform: Transform2D = Transform2D.IDENTITY
-var _add_selection: bool = false
+var _selection_mode: AtlasSelectionGeometry.CombineMode = AtlasSelectionGeometry.CombineMode.REPLACE
 var _moving_link_id: String = ""
 var _link_move_start: Vector2
 var _link_move_end: Vector2
@@ -216,7 +216,7 @@ func clear_selection() -> void:
 
 func select_all_artwork() -> void:
 	cancel_edit()
-	selection = AtlasSelectionGeometry.select_all(floor.layer_by_id(active_layer_id))
+	selection = AtlasSelectionGeometry.select_all(floor.layer_by_id(active_layer_id)) if editing_target_is_presented() else AtlasSelection.new()
 	selection_changed.emit()
 	queue_redraw()
 
@@ -247,13 +247,7 @@ func _finish_manipulation() -> void:
 			next = AtlasSelectionGeometry.select_point(layer, _gesture_end, 5.0 / camera_zoom)
 		else:
 			next = AtlasSelectionGeometry.select_rect(layer, Rect2(_gesture_start, _gesture_end - _gesture_start).abs())
-		if _add_selection and layer is AtlasInkLayer and selection.matches(layer):
-			var indices: Array[int] = selection.stroke_indices.duplicate()
-			for index: int in next.stroke_indices:
-				if not indices.has(index):
-					indices.append(index)
-			next = AtlasSelectionGeometry.select_indices(layer, indices)
-		selection = next
+		selection = AtlasSelectionGeometry.combined(layer, selection, next, _selection_mode)
 		selection_changed.emit()
 	else:
 		transform_requested.emit(selection, _gesture_transform)
@@ -383,7 +377,7 @@ func _draw_overlays(item: Node2D) -> void:
 	if _manipulation == Manipulation.MARQUEE:
 		item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color(0.3, 0.7, 1.0, 0.15))
 		item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color("#4dabf2"), false, 1.0 / camera_zoom)
-	if not selection.is_empty() and selection.matches(floor.layer_by_id(active_layer_id)):
+	if editing_target_is_presented() and not selection.is_empty() and selection.matches(floor.layer_by_id(active_layer_id)):
 		var bounds: Rect2 = selection.bounds
 		var color: Color = Color("#4dabf2")
 		if _manipulation in [Manipulation.MOVE, Manipulation.RESIZE]:
@@ -586,8 +580,9 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			_gesture_start = position
 			_gesture_end = position
 			_gesture_transform = Transform2D.IDENTITY
-			_add_selection = mouse.shift_pressed
-			if not mouse.shift_pressed and selection.matches(layer) and not selection.is_empty() and layer.is_editable():
+			_selection_mode = AtlasSelectionGeometry.CombineMode.SUBTRACT if mouse.alt_pressed else (
+				AtlasSelectionGeometry.CombineMode.ADD if mouse.ctrl_pressed or mouse.meta_pressed else AtlasSelectionGeometry.CombineMode.REPLACE)
+			if _selection_mode == AtlasSelectionGeometry.CombineMode.REPLACE and selection.matches(layer) and not selection.is_empty() and layer.is_editable():
 				if position.distance_to(selection.bounds.end) <= 8.0 / camera_zoom:
 					_manipulation = Manipulation.RESIZE
 				elif selection.bounds.has_point(position):

@@ -780,6 +780,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_S: _on_save()
 			KEY_N: open_board_dialog()
 			KEY_A: select_all_artwork()
+			KEY_D: canvas.clear_selection()
 			KEY_C: copy_selection()
 			KEY_X: cut_selection()
 			KEY_V: paste_selection()
@@ -787,7 +788,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_: return
 		get_viewport().set_input_as_handled()
 		return
-	if event.keycode == KEY_ESCAPE:
+	if event.keycode == KEY_ENTER and canvas.tool == AtlasCanvas.Tool.ART_SELECT:
+		canvas.clear_selection()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ESCAPE:
 		zoom_gate.reset()
 		if canvas.is_editing():
 			canvas.cancel_edit()

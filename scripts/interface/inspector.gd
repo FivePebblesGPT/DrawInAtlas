@@ -125,9 +125,10 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 
 
 func refresh_selection(selection: AtlasSelection, can_modify: bool) -> void:
-	selection_label.text = "Drag a marquee or click ink / a raster asset."
+	selection_label.text = "Active layer only. Drag or click; Ctrl add, Alt subtract, Ctrl+D clear. Raster selects the whole layer."
 	if not selection.is_empty():
-		selection_label.text = "Raster asset selected" if selection.raster_selected else "%d strokes selected" % selection.stroke_indices.size()
+		var count: int = selection.stroke_indices.size()
+		selection_label.text = "Raster asset selected" if selection.raster_selected else "%d stroke%s selected" % [count, "" if count == 1 else "s"]
 	move_x_spinner.set_value_no_signal(0.0)
 	move_y_spinner.set_value_no_signal(0.0)
 	scale_spinner.set_value_no_signal(1.0)

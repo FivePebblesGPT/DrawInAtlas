@@ -8,6 +8,7 @@ var _failures: int = 0
 func _initialize() -> void:
 	_shapes()
 	_selection()
+	_combination()
 	_guards()
 	_ink_transforms()
 	_raster_transforms()
@@ -117,6 +118,32 @@ func _guards() -> void:
 		layer.id += "-other"
 		_check(not selection.matches(layer) and G.transformed(layer, selection, Transform2D.IDENTITY) == null, "wrong layer identity rejected")
 	_check(G.transformed(_ink(), AtlasSelection.new(), Transform2D.IDENTITY) == null, "empty transform selection denied")
+
+
+func _combination() -> void:
+	var layer: AtlasInkLayer = _ink()
+	var a: AtlasSelection = G.select_indices(layer, [0])
+	var b: AtlasSelection = G.select_indices(layer, [1])
+	var add: AtlasSelection = G.combined(layer, a, b, G.CombineMode.ADD)
+	_check(add.stroke_indices == [0, 1], "add selection preserves original painter order")
+	_check(G.combined(layer, add, b, G.CombineMode.ADD).stroke_indices == [0, 1], "add ignores duplicate objects")
+	_check(G.combined(layer, add, a, G.CombineMode.SUBTRACT).stroke_indices == [1], "subtract removes selected stroke")
+	_check(G.combined(layer, add, b, G.CombineMode.SUBTRACT).stroke_indices == [0], "subtract keeps unrelated stroke")
+	_check(G.combined(layer, a, AtlasSelection.new(), G.CombineMode.SUBTRACT).stroke_indices == [0], "subtract missed hit is no-op")
+	_check(G.combined(layer, a, AtlasSelection.new(), G.CombineMode.ADD).stroke_indices == [0], "add missed hit is no-op")
+	_check(G.combined(layer, add, AtlasSelection.new(), G.CombineMode.REPLACE).is_empty(), "replace missed hit deselects")
+	var other: AtlasInkLayer = _ink()
+	other.id = "other"
+	_check(G.combined(other, a, G.select_indices(other, [1]), G.CombineMode.ADD).stroke_indices == [1], "selection cannot leak between layers")
+	layer.strokes[0].width += 0.125
+	_check(G.combined(layer, a, b, G.CombineMode.ADD).is_empty(), "stale original and incoming cannot select changed layer")
+	var refreshed: AtlasSelection = G.select_indices(layer, [1])
+	_check(G.combined(layer, a, refreshed, G.CombineMode.ADD).stroke_indices == [1], "stale original is discarded")
+	var raster: AtlasRasterLayer = _raster()
+	var raster_all: AtlasSelection = G.select_all(raster)
+	_check(G.combined(raster, raster_all, raster_all, G.CombineMode.SUBTRACT).is_empty(), "raster whole-layer subtract")
+	_check(G.combined(raster, raster_all, AtlasSelection.new(), G.CombineMode.SUBTRACT).raster_selected, "raster subtract miss preserves selection")
+	_check(G.combined(raster, AtlasSelection.new(), raster_all, G.CombineMode.ADD).raster_selected, "raster add selects complete layer")
 
 func _ink_transforms() -> void:
 	var layer: AtlasInkLayer = _ink()

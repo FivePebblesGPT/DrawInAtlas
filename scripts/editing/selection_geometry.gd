@@ -51,6 +51,38 @@ static func select_indices(layer: AtlasLayer, indices: Array[int] = []) -> Atlas
 	return result
 
 
+## Combine whole-object selections on the same active layer. The original
+## selection must still match the live layer; stale selections never survive
+## a layer edit or a switch to another layer/detail group.
+## Ink is selected by stroke identity; raster currently selects whole layers.
+enum CombineMode { REPLACE, ADD, SUBTRACT }
+
+static func combined(layer: AtlasLayer, current: AtlasSelection, incoming: AtlasSelection,
+		mode: CombineMode) -> AtlasSelection:
+	if mode == CombineMode.REPLACE:
+		return incoming if incoming.matches(layer) else AtlasSelection.new()
+	if layer == null or not layer.visible:
+		return AtlasSelection.new()
+	var indices: Array[int] = []
+	if layer is AtlasInkLayer:
+		if current.matches(layer):
+			indices = current.stroke_indices.duplicate()
+		if incoming.matches(layer):
+			for index: int in incoming.stroke_indices:
+				if mode == CombineMode.ADD and not indices.has(index):
+					indices.append(index)
+				elif mode == CombineMode.SUBTRACT:
+					indices.erase(index)
+		return select_indices(layer, indices)
+	if layer is AtlasRasterLayer:
+		var selected: bool = current.matches(layer) and current.raster_selected
+		var hit: bool = incoming.matches(layer) and incoming.raster_selected
+		if mode == CombineMode.ADD:
+			return select_all(layer) if selected or hit else AtlasSelection.new()
+		return select_all(layer) if selected and not hit else AtlasSelection.new()
+	return AtlasSelection.new()
+
+
 static func select_all(layer: AtlasLayer) -> AtlasSelection:
 	var indices: Array[int] = []
 	if layer is AtlasInkLayer:
