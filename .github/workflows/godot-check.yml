@@ -131,6 +131,13 @@ jobs:
           godot --headless --path . --script res://tests/retired_battlemap_controls_smoke.gd 2>&1 | tee /tmp/godot-retired-battlemap.log
           grep -q 'ATLAS_RETIRED_BATTLEMAP_PASSED' /tmp/godot-retired-battlemap.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-retired-battlemap.log; then exit 1; fi
+      - name: Inventory legacy placement migrations without modifying saves (T-015)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/legacy_migration_audit_smoke.gd 2>&1 | tee /tmp/godot-legacy-migration-audit.log
+          grep -q 'ATLAS_LEGACY_MIGRATION_AUDIT_PASSED' /tmp/godot-legacy-migration-audit.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-legacy-migration-audit.log; then exit 1; fi
       - name: Verify mouse-wheel brush width (T-011)
         shell: bash
         run: |
