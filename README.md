@@ -11,9 +11,11 @@ The development engine is **Godot 4.8-beta1**, standard build. Application code 
 ## Confirmed target interaction model
 
 - Hexes overlay one continuous, chunked drawing board, including higher-detail artwork across their borders; no separate canvas/document per hex.
-- Automatic zoom-dependent **artwork-layer LOD** is a core feature and should be on by default. This is not the existing linked-document navigation flag.
+- Automatic zoom-dependent **artwork-layer LOD** selects separately authored detail groups and should be on by default. The editing target stays explicit, including throughout a gesture.
 - “Restrict edits to current tile” acts as a selection mask.
-- Battlemats are movable/resizable canvas objects inside local maps, with explicit control over moving drawings; world/hex-level and nested battlemat creation are excluded.
+- Retire the battlemat/battlemap concept: closer local-map views are authored detail, not separate documents or movable containers.
+- A projector framing object on the GM board matches the output aspect ratio. Moving/resizing it pans/zooms the player view without transforming artwork; physical calibration is separate.
+- Paint.net is the primary tool-interaction reference. Selection defaults to the active layer; editable open/closed wall paths and persistent editable text with small-text culling are explicit requirements.
 - The target model and existing implementation differ. See the epic notes and checklist for pending work; local table/projector and collaboration remain later milestones.
 
 ## Run and test the existing implementation

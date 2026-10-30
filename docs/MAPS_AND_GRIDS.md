@@ -1,7 +1,7 @@
 # Map, Grid, Floor and Battlemap Geometry
 
 > [!important] Geometry reference, not the revised ownership contract
-> Earlier independent-document scale/battlemap assumptions below are superseded where they conflict with [[E-002]] and [[E-006]]. The hex overlay covers one shared chunked board; tile restriction is a selection mask; local battlemats are within-map objects. Keep useful coordinate math, but use [[Index]] and the clarified tickets for current acceptance.
+> Earlier independent-document scale/battlemap assumptions below are superseded where they conflict with [[E-002]] and [[E-006]]. The hex overlay covers one shared chunked board with separately authored detail; tile restriction is a selection mask. Battlemats are retired. A projection frame in [[E-007]] controls viewing, not artwork transforms. Keep useful coordinate math, but use [[Index]] for current acceptance.
 
 **Status:** proposed design and coordinate conventions.
 

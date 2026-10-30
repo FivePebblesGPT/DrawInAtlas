@@ -1,7 +1,7 @@
 # Linked maps, placements and references
 
 > [!important] Existing workflow, rejected as current UX acceptance
-> This records the implemented milestone-6 interface. [[ManualReview_2026-10-30]] and the user's clarification now require shared-board artwork LOD and local within-map canvas objects instead of the conflicting per-footprint/per-hex document interpretation. Follow [[E-002]], [[E-006]], [[T-018]] and [[Index]] for current work.
+> This records the implemented milestone-6 interface. [[ManualReview_2026-10-30]] and later decisions require shared-board, separately authored artwork LOD with explicit editing targets. Battlemats are retired, including the intermediate within-map-container proposal; projection framing is in [[E-007]]. Follow [[E-002]], [[E-006]], [[T-018]] and [[Index]] for current work.
 
 Execution milestone 6 implements the local-client workflow on Godot 4.8-beta1.
 Maps remain independent documents, addressed by stable IDs. A link is an

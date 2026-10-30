@@ -1,7 +1,7 @@
 # Campaign Data Model and Persistence
 
 > [!important] Existing representation, pending model decisions
-> This describes the implementation, not the revised canvas contract. [[E-002]] and [[E-006]] record the confirmed shared-board/artwork-LOD/local-object direction; [[E-003]] and [[E-SAVE]] track model and persistence cleanup. Existing dictionary helpers are under investigation in [[T-029]]. Completion is tracked in [[Index]].
+> This describes the implementation, not the revised canvas contract. [[E-002]] and [[E-006]] record the shared board, separately authored artwork LOD and retirement of battlemats; [[E-007]] owns projection framing. [[E-003]] and [[E-SAVE]] track model and persistence cleanup. Existing dictionary helpers are under investigation in [[T-029]]. Completion is tracked in [[Index]].
 
 **Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, locally verified on Godot 4.8-beta1. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
 
