@@ -24,7 +24,7 @@
 - [x] [[T-007|T-007 · Compact recognizable icon controls]]
 - [x] [[T-008|T-008 · Toolbar-opened grid settings popup]]
 - [ ] [[T-009|T-009 · Search and world discovery purpose]]
-- [ ] [[T-010|T-010 · Smooth pen turns]]
+- [x] [[T-010|T-010 · Smooth pen turns]]
 - [ ] [[T-011|T-011 · Mouse-wheel pen width]]
 - [ ] [[T-012|T-012 · Replace battlemats with authored local detail]]
 - [ ] [[T-014|T-014 · Retire battlemat creation controls]]

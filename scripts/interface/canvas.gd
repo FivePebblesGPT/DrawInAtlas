@@ -442,10 +442,19 @@ func _draw_grid(item: Node2D) -> void:
 
 
 func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
-	if stroke.points.size() > 1:
-		item.draw_polyline(stroke.points, stroke.color, stroke.width, true)
-	for point: Vector2 in stroke.points:
-		item.draw_circle(point, stroke.width * 0.5, stroke.color)
+	var centers: PackedVector2Array = AtlasStrokeGeometry.centers(stroke.points)
+	if centers.size() == 1:
+		item.draw_circle(centers[0], stroke.width * 0.5, stroke.color, true, -1.0, true)
+	elif centers.size() > 1:
+		var outlines: Array[PackedVector2Array] = AtlasStrokeGeometry.outline(centers, stroke.width)
+		if outlines.size() == 1 and outlines[0].size() >= 3:
+			item.draw_colored_polygon(outlines[0], stroke.color)
+		else:
+			# Closed or looping paths can have holes; polygon fills cannot cut them.
+			# Keep the old outline drawing in that case rather than fill a shape.
+			item.draw_polyline(centers, stroke.color, stroke.width, true)
+			for point: Vector2 in centers:
+				item.draw_circle(point, stroke.width * 0.5, stroke.color)
 
 
 func _append_stroke_point(local_position: Vector2) -> void:
