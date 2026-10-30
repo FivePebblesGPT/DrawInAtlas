@@ -10,6 +10,7 @@ const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 const BROWSER_SCENE: PackedScene = preload("res://prefab/campaign_browser.tscn")
 const LAYER_PANEL_SCENE: PackedScene = preload("res://prefab/layer_panel.tscn")
 const OVERVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/overview_panel.tscn")
+const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn")
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
@@ -22,6 +23,7 @@ var store_io: AtlasStoreIO
 var browser: AtlasCampaignBrowser
 var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
+var tool_palette: AtlasToolPalette
 
 @onready var canvas: AtlasCanvas = $Shell/CanvasAndInspector/Canvas
 @onready var inspector: AtlasInspector = $Shell/CanvasAndInspector/InspectorPanel
@@ -38,7 +40,6 @@ var _link_choices: Array[String] = []
 
 # Keep existing menu/test integrations pointing at the scene-owned controls.
 # These references never own another copy of the form or its state.
-@onready var tool_picker: OptionButton = inspector.tool_picker
 @onready var preview_picker: OptionButton = inspector.preview_picker
 @onready var angle_spinner: SpinBox = inspector.angle_spinner
 @onready var lock_checkbox: CheckBox = inspector.lock_checkbox
@@ -128,7 +129,7 @@ func _ready() -> void:
 	canvas.references = map_references
 	_mount_sidebar_views()
 	_connect_workspace()
-	_on_tool_changed(tool_picker.selected)
+	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
 	if load_saved_on_startup:
 		restored = AtlasCampaignStore.load_result(save_path, store_io)
@@ -174,6 +175,9 @@ func _mount_sidebar_views() -> void:
 	layer_panel.automatic_detail_toggled.connect(_on_automatic_detail_toggled)
 	layer_panel.show_editing_detail_requested.connect(_show_editing_detail)
 	layer_panel.import_requested.connect(raster_importer.request_import)
+	tool_palette = TOOL_PALETTE_SCENE.instantiate() as AtlasToolPalette
+	sidebar.get_view_content(&"Tools").add_child(tool_palette)
+	tool_palette.tool_selected.connect(_on_tool_changed)
 
 
 func _connect_workspace() -> void:
@@ -210,7 +214,6 @@ func _connect_workspace() -> void:
 	canvas.interaction_finished.connect(_queue_lod_refresh)
 	canvas.view_region_changed.connect(_queue_lod_refresh)
 	edits.changed.connect(_rebuild_lod)
-	inspector.tool_selected.connect(_on_tool_changed)
 	inspector.floor_selected.connect(switch_floor)
 	inspector.floor_created.connect(create_floor)
 	inspector.floor_renamed.connect(rename_floor)
@@ -595,12 +598,13 @@ func _choose_link(index: int) -> void:
 
 
 func _choose_tool(tool: AtlasCanvas.Tool) -> void:
-	tool_picker.select(tool)
 	_on_tool_changed(tool)
 
 
 func _on_tool_changed(index: int) -> void:
 	artwork.choose_tool(index as AtlasCanvas.Tool)
+	if tool_palette != null:
+		tool_palette.sync_tool(index)
 	if index == AtlasCanvas.Tool.BATTLEMAP and campaign != null and canvas.map != null:
 		linked_maps.prepare_drag()
 	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)

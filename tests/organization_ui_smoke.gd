@@ -283,8 +283,7 @@ func _overview_ui() -> bool:
 		and open_button.disabled and focus_button.disabled,
 		"CELL without selection explains empty results and disables both actions")
 	# Select through the real tool picker and viewport, not by setting cell state.
-	editor.tool_picker.select(AtlasCanvas.Tool.SELECT)
-	editor.tool_picker.item_selected.emit(AtlasCanvas.Tool.SELECT)
+	editor.tool_palette.button_for(AtlasCanvas.Tool.SELECT).pressed.emit()
 	_click(canvas, canvas.document_to_local(center))
 	_check(canvas.has_selected_cell and canvas.selected_cell == cell,
 		"native SELECT click converts camera pixels through rotated/translated board grid")

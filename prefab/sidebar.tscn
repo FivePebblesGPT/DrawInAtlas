@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://dnrg664tb23pq" path="res://img/sidebar/search.svg" id="4"]
 [ext_resource type="Texture2D" uid="uid://chnsm0ck5kkdr" path="res://img/sidebar/layers.svg" id="5"]
 [ext_resource type="Texture2D" uid="uid://c2ca8t5oy2ch2" path="res://img/sidebar/panel.svg" id="6"]
+[ext_resource type="Texture2D" path="res://img/sidebar/tools.svg" id="7"]
 
 [sub_resource type="InputEventKey" id="ToggleKey"]
 command_or_control_autoremap = true
@@ -66,6 +67,17 @@ mouse_default_cursor_shape = 2
 theme_type_variation = &"ActivityButton"
 toggle_mode = true
 icon = ExtResource("5")
+icon_alignment = 1
+
+[node name="ToolsButton" type="Button" parent="ActivityRail/Activities"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+tooltip_text = "Drawing tools"
+mouse_default_cursor_shape = 2
+theme_type_variation = &"ActivityButton"
+toggle_mode = true
+icon = ExtResource("7")
 icon_alignment = 1
 
 [node name="Spacer" type="Control" parent="ActivityRail/Activities" unique_id=1226900126]
@@ -192,3 +204,10 @@ layout_mode = 2
 theme_type_variation = &"MutedLabel"
 text = "Select a map to see its floors and layers."
 autowrap_mode = 3
+
+[node name="Tools" type="VBoxContainer" parent="ViewPanel/Layout/Scroll/ContentMargin/Views"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10

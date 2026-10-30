@@ -45,8 +45,8 @@ func _run() -> void:
 
 	_check(editor.inspector.scene_file_path == "res://prefab/inspector.tscn",
 		"fixed inspector is independently scene-authored")
-	_check(editor.tool_picker.owner == editor.inspector and editor.floor_picker.owner == editor.inspector,
-		"public controls reference the inspector's nodes")
+	_check(editor.tool_palette.get_parent() == editor.sidebar.get_view_content(&"Tools") and editor.floor_picker.owner == editor.inspector,
+		"palette is mounted in sidebar and floor controls remain inspector-owned")
 	_check(editor.browser.scene_file_path == "res://prefab/campaign_browser.tscn"
 		and editor.map_name_input.owner == editor.browser, "map form is independently scene-authored")
 	_check(editor.navigator.views == editor.view_session and editor.navigator.history == editor.history,

@@ -2,7 +2,6 @@ class_name AtlasInspector
 extends PanelContainer
 ## Keep form state local so editor commands remain the only document-edit boundary.
 
-signal tool_selected(index: int)
 signal floor_selected(id: String)
 signal floor_created(name: String)
 signal floor_renamed(name: String)
@@ -25,7 +24,6 @@ signal back_requested
 signal reference_source_changed(link_id: String, floor_id: String)
 signal reference_freeze_toggled(enabled: bool)
 
-@onready var tool_picker: OptionButton = %ToolPicker
 @onready var preview_picker: OptionButton = %PreviewPicker
 @onready var angle_spinner: SpinBox = %AngleSpinner
 @onready var lock_checkbox: CheckBox = %LockCheckbox
@@ -59,6 +57,8 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var reference_floor_picker: OptionButton = %ReferenceFloorPicker
 @onready var freeze_checkbox: CheckBox = %FreezeReference
 
+@onready var _active_tool_label: Label = %ActiveToolLabel
+
 var _floor_ids: Array[String] = []
 var _reference_ids: Array[String] = []
 var _reference_floors: Array[String] = []
@@ -67,7 +67,6 @@ var _automatic_reference: String = ""
 
 
 func _ready() -> void:
-	tool_picker.item_selected.connect(tool_selected.emit)
 	floor_picker.item_selected.connect(_on_floor_selected)
 	floor_name_input.text_submitted.connect(func(_text: String) -> void: floor_renamed.emit(floor_name_input.text))
 	_floor_add.pressed.connect(func() -> void: floor_created.emit(floor_name_input.text))
@@ -119,6 +118,7 @@ func refresh_floors(map: AtlasMapDocument, floor: AtlasFloor) -> void:
 
 
 func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
+	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
 		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.FILL]

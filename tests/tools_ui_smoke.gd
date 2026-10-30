@@ -181,8 +181,7 @@ func _run() -> void:
 
 
 func _tool(editor: AtlasEditor, tool: AtlasCanvas.Tool) -> void:
-	editor.tool_picker.select(tool)
-	editor._on_tool_changed(tool)
+	editor._choose_tool(tool)
 
 
 func _button(canvas: AtlasCanvas, position: Vector2, pressed: bool) -> void:

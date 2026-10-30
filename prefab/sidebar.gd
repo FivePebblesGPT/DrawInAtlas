@@ -11,11 +11,12 @@ var active_view: StringName = &"Maps"
 @onready var _panel: PanelContainer = %ViewPanel
 @onready var _title: Label = %ViewTitle
 @onready var _search: LineEdit = %SearchInput
-@onready var _buttons: Array[Button] = [%MapsButton, %SearchButton, %LayersButton]
+@onready var _buttons: Array[Button] = [%MapsButton, %SearchButton, %LayersButton, %ToolsButton]
 @onready var _views: Dictionary[StringName, Control] = {
 	&"Maps": %Maps,
 	&"Search": %Search,
 	&"Layers": %Layers,
+	&"Tools": %Tools,
 }
 
 
