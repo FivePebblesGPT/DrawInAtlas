@@ -17,7 +17,7 @@
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]
-- [ ] [[T-003|T-003 · Aligned transparent detail previews]]
+- [x] [[T-003|T-003 · Aligned transparent detail previews]]
 - [x] [[T-004|T-004 · Viewport-appropriate zoom and artwork LOD]]
 - [ ] [[T-005|T-005 · Automatic artwork LOD on by default]]
 - [ ] [[T-006|T-006 · Categorized sidebar drawing palette]]

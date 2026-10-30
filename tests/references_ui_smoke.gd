@@ -184,7 +184,7 @@ func _freeze_and_sources() -> bool:
 	await _frames(14)
 	_check(editor.map_references.source_link_id == "symbolic-door", "explicitly choose another parent entrance")
 	_check(_color_at(point, AtlasCanvas.EMPTY_COLOR), "symbolic reference does not claim physical alignment")
-	_check(_screen_color(Vector2(84, 76), Color.GREEN), "symbolic source appears as an unregistered read-only thumbnail")
+	_check(not _screen_color(Vector2(84, 76), Color.GREEN), "symbolic source cannot float an unregistered picture on the editor")
 	_check(campaign.to_dict() == before, "source/floor/opacity preferences do not edit documents")
 	return true
 
@@ -201,10 +201,15 @@ func _child_previews() -> bool:
 	await _frames(18)
 	var source: Vector2 = Vector2(-30, -10)
 	_check(_color_at(source, Color.MAGENTA.lerp(Color.BLUE, 0.7)), "spatial child overlay includes raster art with the exact rotated footprint mapping")
+	var strong_color: Color = root.get_texture().get_image().get_pixelv(
+		Vector2i(canvas.global_position + canvas.document_to_local(source)))
 	editor.preview_picker.select(AtlasCanvas.Preview.THUMBNAILS)
 	editor.preview_picker.item_selected.emit(AtlasCanvas.Preview.THUMBNAILS)
 	await _frames(14)
-	_check(not _color_at(source, Color.MAGENTA.lerp(Color.BLUE, 0.7)), "thumbnail mode does not silently keep an aligned overlay")
+	var faint_color: Color = root.get_texture().get_image().get_pixelv(
+		Vector2i(canvas.global_position + canvas.document_to_local(source)))
+	_check(faint_color.r > strong_color.r + 0.08 and faint_color.b > 0.90,
+		"faint preview remains spatially aligned with reduced opacity")
 	editor.open_map("other")
 	canvas.camera_center = Vector2(3040, 3030)
 	canvas.camera_zoom = 1.0
@@ -214,8 +219,8 @@ func _child_previews() -> bool:
 	_check(_color_at(Vector2(3010, 3010), AtlasCanvas.EMPTY_COLOR.lerp(Color(0.24, 0.70, 0.82), 0.15)),
 		"symbolic footprint shows its marker, not falsely aligned child pixels")
 	var records: Dictionary = editor.map_references.get("_children")
-	_check(records.has("symbolic-door") and not records["symbolic-door"].spatial,
-		"overlay mode falls back to a pinned thumbnail for symbolic links")
+	_check(not records.has("symbolic-door"),
+		"symbolic link is marker-only: no fabricated registration or expensive capture")
 	DirAccess.make_dir_recursive_absolute("user://validation")
 	_check(root.get_texture().get_image().save_png("user://validation/linked-map-references.png") == OK, "save native milestone-6 preview evidence")
 	return true
@@ -250,8 +255,8 @@ func _preview_budget() -> bool:
 		_check(editor.edits.execute(AtlasLinkEdit.new("parent", null, link)), "visible marker setup %d" % index)
 	await _frames(40)
 	var records: Dictionary = editor.map_references.get("_children")
-	_check(records.size() <= AtlasMapReferences.MAX_CHILD_PREVIEWS and editor.map_references.omitted_count >= 2,
-		"only eight visible children capture; other entrances remain markers")
+	_check(records.size() <= AtlasMapReferences.MAX_CHILD_PREVIEWS and editor.map_references.omitted_count == 0,
+		"unplaced entrances stay markers and consume no preview capture budget")
 	_check(editor.map_references.cache.entry_count() <= 16, "reference image cache stays bounded across crops, floors and links")
 	return true
 

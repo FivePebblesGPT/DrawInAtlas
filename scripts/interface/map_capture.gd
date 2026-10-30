@@ -11,7 +11,7 @@ var _generation: int = 0
 
 
 func capture(campaign: AtlasCampaign, document: AtlasMapDocument, floor_id: String,
-		bounds: Rect2, size: Vector2i) -> Image:
+		bounds: Rect2, size: Vector2i, transparent_background: bool = false, detail_level: int = 0) -> Image:
 	cancel()
 	var request_generation: int = _generation
 	var driver: String = RenderingServer.get_current_rendering_driver_name()
@@ -20,7 +20,9 @@ func capture(campaign: AtlasCampaign, document: AtlasMapDocument, floor_id: Stri
 	if document == null or document.floor_by_id(floor_id) == null or not bounds.has_area() or size.x < 1 or size.y < 1:
 		return null
 	_ensure_renderer()
-	if not _frame_document(campaign, document, floor_id, bounds, size):
+	viewport.transparent_bg = transparent_background
+	canvas.transparent_background = transparent_background
+	if not _frame_document(campaign, document, floor_id, bounds, size, detail_level):
 		return null
 	var expected_source_signature: String = AtlasPreviewCache.new().signature(document, floor_id)
 	canvas.queue_redraw()
@@ -69,10 +71,12 @@ func _ensure_renderer() -> void:
 
 
 func _frame_document(campaign: AtlasCampaign, document: AtlasMapDocument, floor_id: String,
-		bounds: Rect2, size: Vector2i) -> bool:
+		bounds: Rect2, size: Vector2i, detail_level: int) -> bool:
 	viewport.size = size
 	canvas.size = Vector2(size)
 	if not canvas.set_document(document, campaign, floor_id):
+		return false
+	if not canvas.set_presented_detail_level(detail_level):
 		return false
 	canvas.camera_center = bounds.get_center()
 	canvas.camera_zoom = minf(size.x / bounds.size.x, size.y / bounds.size.y)

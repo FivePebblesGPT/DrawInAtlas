@@ -4,7 +4,6 @@ extends Node
 ## renderer in a private world; no reference can recursively capture another.
 
 const MAX_CHILD_PREVIEWS: int = 8
-const THUMB_SIZE: Vector2i = Vector2i(192, 128)
 
 class CaptureRequest extends RefCounted:
 	var document: AtlasMapDocument
@@ -114,6 +113,9 @@ func _prepare_parent_request() -> CaptureRequest:
 	var spatial: bool = placement != null and not placement.symbolic
 	if not _parent_context_matches(link, floor_id, spatial):
 		_parent.clear()
+	if not spatial:
+		_parent.clear()
+		return null
 	if not _canvas.show_reference:
 		if not frozen:
 			_parent.clear()
@@ -141,7 +143,9 @@ func _child_requests() -> Array[CaptureRequest]:
 		if document == null or document.floor_by_id(link.target_floor_id) == null:
 			continue
 		var placement: AtlasPlacement = _placement(link)
-		if not link.placement_id.is_empty() and placement == null:
+		# Without a real placement there is no board-space registration.
+		# Such links retain their markers and sidebar discovery, not floating pictures.
+		if placement == null or placement.symbolic:
 			continue
 		if not _visible(link, placement):
 			continue
@@ -154,22 +158,17 @@ func _child_requests() -> Array[CaptureRequest]:
 
 func _child_request(link: AtlasMapLink, document: AtlasMapDocument, placement: AtlasPlacement) -> CaptureRequest:
 	var request: CaptureRequest = CaptureRequest.new(document, link.target_floor_id, link.id)
-	request.spatial = placement != null and not placement.symbolic and _canvas.preview == AtlasCanvas.Preview.OVERLAY
-	if request.spatial:
-		request.bounds = placement.child_bounds()
-	else:
-		request.bounds = AtlasPreviewPanel.artwork_bounds(document, document.floor_by_id(link.target_floor_id)).grow(2.0)
-	if not request.bounds.has_area():
-		request.bounds = Rect2(Vector2(-1, -1), Vector2(2, 2))
-	request.size = _capture_size(request.bounds) if request.spatial else THUMB_SIZE
+	request.spatial = true
+	request.bounds = placement.child_bounds()
+	request.size = _capture_size(request.bounds)
 	return request
 
 
 func _render_request(request: CaptureRequest, generation: int) -> Dictionary:
-	var crop_cache_key: String = "editor-reference:" + var_to_str(request.bounds)
+	var crop_cache_key: String = "editor-reference:alpha:" + var_to_str(request.bounds)
 	var image: Image = cache.get_image(request.document, request.floor_id, request.size, crop_cache_key)
 	if image == null:
-		image = await _capture.capture(_canvas.campaign, request.document, request.floor_id, request.bounds, request.size)
+		image = await _capture.capture(_canvas.campaign, request.document, request.floor_id, request.bounds, request.size, true)
 		if not _request_is_current(generation) or image == null:
 			return {}
 		cache.put_image(request.document, request.floor_id, request.size, image, crop_cache_key)
@@ -215,17 +214,15 @@ func _parent_request(link: AtlasMapLink) -> CaptureRequest:
 	var placement: AtlasPlacement = _placement(link)
 	var request: CaptureRequest = CaptureRequest.new(document, floor_id, link.id)
 	request.is_parent = true
-	request.spatial = placement != null and not placement.symbolic
-	if request.spatial:
-		request.bounds = placement.child_to_parent() * placement.child_bounds()
-	else:
-		request.bounds = AtlasPreviewPanel.artwork_bounds(document, document.floor_by_id(floor_id)).grow(2.0)
+	if placement == null or placement.symbolic:
+		return null
+	request.spatial = true
+	request.bounds = placement.child_to_parent() * placement.child_bounds()
 	if not request.bounds.has_area():
 		return null
-	request.size = _capture_size(request.bounds) if request.spatial else THUMB_SIZE
-	if request.spatial:
-		request.child_vertices = _rect_points(placement.child_bounds())
-		request.parent_sample_points = placement.child_to_parent() * request.child_vertices
+	request.size = _capture_size(request.bounds)
+	request.child_vertices = _rect_points(placement.child_bounds())
+	request.parent_sample_points = placement.child_to_parent() * request.child_vertices
 	return request
 
 
@@ -253,37 +250,22 @@ func draw_parent(item: CanvasItem) -> void:
 
 
 func draw_children(item: Node2D) -> void:
-	var stacks: Dictionary[String, int] = {}
 	for link: AtlasMapLink in _canvas.campaign.outgoing_links(_canvas.map.id, _canvas.floor.id):
 		if not _child_previews_enabled() or not _children.has(link.id):
 			continue
-		_draw_child(item, link, _children[link.id], stacks)
-	_draw_parent_thumbnail(item)
+		_draw_child(item, link, _children[link.id])
 	_draw_budget_hint(item)
 
 
-func _draw_child(item: Node2D, link: AtlasMapLink, image: Dictionary, stacks: Dictionary[String, int]) -> void:
+func _draw_child(item: Node2D, link: AtlasMapLink, image: Dictionary) -> void:
 	var placement: AtlasPlacement = _canvas.campaign.placement_by_id(link.placement_id)
-	if image.spatial and placement != null and not placement.symbolic:
-		item.draw_polygon(placement.corners(), PackedColorArray([Color(1, 1, 1, 0.7)]),
-			_uvs(_rect_points(placement.child_bounds()), image.rect), image.texture)
+	if not image.spatial or placement == null or placement.symbolic:
 		return
-	var point: Vector2 = placement.origin if placement != null else link.anchor
-	var key: String = var_to_str(point)
-	var offset: int = stacks.get(key, 0)
-	stacks[key] = offset + 1
-	var size: Vector2 = Vector2(96, 64) / _canvas.camera_zoom
-	item.draw_texture_rect(image.texture, Rect2(point + Vector2(24, 18 + offset * 68) / _canvas.camera_zoom, size), false)
-
-
-func _draw_parent_thumbnail(item: Node2D) -> void:
-	if _parent.is_empty() or _parent.spatial or not _canvas.show_reference:
-		return
-	var position: Vector2 = _canvas.local_to_document(Vector2(12, 28))
-	item.draw_texture_rect(_parent.texture, Rect2(position, Vector2(144, 96) / _canvas.camera_zoom), false,
-		Color(1, 1, 1, _canvas.reference_opacity))
-	item.draw_string(ThemeDB.fallback_font, _canvas.local_to_document(Vector2(12, 22)),
-		"Parent preview · unregistered", HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(8, roundi(12 / _canvas.camera_zoom)))
+	# Both preview strengths use the same registered footprint and transparent
+	# pixels. Camera and grid transforms never rescale the source coordinates.
+	var opacity: float = 0.35 if _canvas.preview == AtlasCanvas.Preview.THUMBNAILS else 0.7
+	item.draw_polygon(placement.corners(), PackedColorArray([Color(1, 1, 1, opacity)]),
+		_uvs(_rect_points(placement.child_bounds()), image.rect), image.texture)
 
 
 func _draw_budget_hint(item: Node2D) -> void:

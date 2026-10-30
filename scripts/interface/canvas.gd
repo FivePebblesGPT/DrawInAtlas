@@ -55,7 +55,9 @@ func editing_target_is_presented() -> bool:
 var selection: AtlasSelection = AtlasSelection.new()
 var edit_scope: AtlasEditScope = AtlasEditScope.new()
 var tool: Tool = Tool.PEN
-var preview: Preview = Preview.THUMBNAILS
+var preview: Preview = Preview.OVERLAY
+## Private capture only: retain source alpha instead of painting the editor board.
+var transparent_background: bool = false
 
 var camera_center: Vector2 = Vector2.ZERO:
 	set(value):
@@ -281,7 +283,8 @@ func document_to_local(position: Vector2) -> Vector2:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), EMPTY_COLOR)
+	if not transparent_background:
+		draw_rect(Rect2(Vector2.ZERO, size), EMPTY_COLOR)
 	if map == null or floor == null:
 		return
 
