@@ -41,7 +41,7 @@
 - [ ] [[T-026|T-026 · Editable open/closed wall paths]]
 - [ ] [[T-027|T-027 · Editable text and small-text culling]]
 - [ ] [[T-028|T-028 · Ink representation decision]]
-- [ ] [[T-029|T-029 · Dictionary conversion audit and cleanup]]
+- [x] [[T-029|T-029 · Dictionary conversion audit and cleanup]]
 - [ ] [[T-030|T-030 · Raster import/chunk conversion clarity]]
 - [ ] [[T-031|T-031 · Tile-layer naming and type authority]]
 - [ ] [[T-032|T-032 · Field encodings and invariants]]

@@ -145,6 +145,13 @@ jobs:
           godot --headless --path . --script res://tests/legacy_migration_audit_smoke.gd 2>&1 | tee /tmp/godot-legacy-migration-audit.log
           grep -q 'ATLAS_LEGACY_MIGRATION_AUDIT_PASSED' /tmp/godot-legacy-migration-audit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-legacy-migration-audit.log; then exit 1; fi
+      - name: Verify dictionary adapter responsibilities and resource validation (T-029)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/dictionary_conversion_audit_smoke.gd 2>&1 | tee /tmp/godot-dictionary-audit.log
+          grep -q 'ATLAS_DICTIONARY_CONVERSION_PASSED' /tmp/godot-dictionary-audit.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-dictionary-audit.log; then exit 1; fi
       - name: Audit ink and raster representation contracts (T-028 investigation)
         shell: bash
         run: |

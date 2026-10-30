@@ -1,6 +1,6 @@
 class_name AtlasData
 extends RefCounted
-## Validation at JSON boundaries; ordinary model code stays statically typed.
+## Validation of untyped dictionary boundaries (clipboard, cloning, native integrity).
 
 
 static func number(value: Variant) -> bool:

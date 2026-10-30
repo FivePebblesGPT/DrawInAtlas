@@ -84,16 +84,28 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	return layer
 
 
-static func clone(layer: AtlasLayer) -> AtlasLayer:
+## Validate a live Resource against the existing dictionary codec without copying
+## its decoded raster pixels. The codec remains the single metadata validator.
+## Check the live chunk keys/images too: dictionary reconstruction alone cannot
+## detect a stale in-memory dictionary key or malformed decoded Image.
+static func _validated_metadata(layer: AtlasLayer) -> AtlasLayer:
 	if layer == null:
 		return null
-	var copy: AtlasLayer = from_dict(layer.to_dict())
+	if layer is AtlasRasterLayer:
+		for key: String in layer.chunks:
+			var chunk: AtlasRasterChunk = layer.chunks[key]
+			if chunk == null or not chunk.is_valid() or key != "%d,%d" % [chunk.coord.x, chunk.coord.y]:
+				return null
+	var metadata: AtlasLayer = from_dict(layer.to_dict())
+	return metadata
+
+
+static func clone(layer: AtlasLayer) -> AtlasLayer:
+	var copy: AtlasLayer = _validated_metadata(layer)
 	if copy is AtlasRasterLayer and layer is AtlasRasterLayer:
 		for key: String in layer.chunks:
-			if not layer.chunks[key].is_valid():
-				return null
 			if layer.chunks[key].image != null:
-				copy.chunks[key].image = layer.chunks[key].image.duplicate()
+				(copy as AtlasRasterLayer).chunks[key].image = layer.chunks[key].image.duplicate()
 	return copy
 
 
@@ -110,7 +122,7 @@ static func clone_all(layers: Array[AtlasLayer]) -> Array[AtlasLayer]:
 static func valid_collection(layers: Array[AtlasLayer]) -> bool:
 	var ids: Dictionary[String, bool] = {}
 	for layer: AtlasLayer in layers:
-		if layer == null or ids.has(layer.id) or clone(layer) == null:
+		if layer == null or ids.has(layer.id) or _validated_metadata(layer) == null:
 			return false
 		ids[layer.id] = true
 	return true
