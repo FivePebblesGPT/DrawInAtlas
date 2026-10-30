@@ -99,6 +99,20 @@ boundaries*, even when the outer variable is declared as `Dictionary`.
 Validate their values with `is`, use explicit conversion at the boundary,
 and avoid using `Variant` for values whose concrete types are known.
 
+## Readable function steps (project convention)
+
+When a GDScript function mixes validation, coordinate conversion, iteration,
+editing and result construction, separate **meaningful phases** with blank
+lines and short `#` comments before non-obvious blocks. Explain the invariant
+or intent (`# Cap candidate work before scanning sparse chunks`), not syntax
+(`# Loop over pixels`). Keep locals near their use. Prefer cohesive named
+helpers for real subalgorithms over many single-line wrappers. Small functions
+do not need ceremony, and clarity must not change behavior or bypass checks.
+Continue to use **explicit** types everywhere, including local variables.
+
+For the full convention and the representative `AtlasRasterBrush.paint()`
+example, see [Code readability](../../../docs/CODE_READIBILITY.md).
+
 ## Official Godot Demo Projects
 
 For practical examples of how Godot features work together, consult the

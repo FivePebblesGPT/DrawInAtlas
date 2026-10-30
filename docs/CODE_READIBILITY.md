@@ -99,15 +99,53 @@ Changing a label, section layout or default is now a scene edit, rather than a
 change to that command workflow.
 
 
-## Explain algorithms, not syntax
+## Function steps: explain algorithms, not syntax (T-037)
 
-- Name phases clearly, use guard clauses when helpful and separate meaningful
-  algorithm steps with a blank line. Preserve behavior rather than minimizing
-  line count.
-- Comment why a lifecycle, coordinate, rendering or persistence invariant is
-  needed; do not narrate obvious assignments.
-- Type public API inputs/outputs and follow existing file indentation until
-  formatting is intentionally standardized.
+Use **intent-named, commented phases** in a function that handles several
+responsibilities (especially coordinates, traversal, mutation and result
+construction). A phase is a cohesive block of work with an identifiable
+input/output or safety invariant, not an arbitrary number of lines.
+
+1. **Guard and normalize** inputs before expensive or mutating work.
+2. **Establish the working space and bounds**, naming conversions and units
+   where they could be confused (for example, board units versus raster pixels).
+3. **Traverse or compute**, stating eligibility, scope and termination/limit
+   rules at the block where they matter.
+4. **Stage changes**, keeping partial results separate from canonical source
+   state until all relevant checks can succeed.
+5. **Construct and return** the result at the end of a successful operation.
+
+Not every function needs all five phases or any phase comments: short cohesive
+helpers should stay short. When the phases are present, put a blank line and a
+brief `#` comment **before** each non-obvious block. Name the phase by what it
+ensures or produces (rather than numbering `Step 1`, `Step 2`, etc.). Explain
+*why* an ordering, coordinate conversion, limit, or ownership rule matters;
+do not narrate obvious assignments or individual `if` statements. Keep useful
+local variables adjacent to the code they explain. Extract a named helper when
+its transformation or subalgorithm has a clear contract, can be understood on
+its own, or is reused; avoid fragmentation into trivial one-line wrappers.
+Preserve explicit types on all declarations, including locals, and follow the
+file's existing indentation style.
+
+**Representative paint example:** `AtlasRasterBrush.paint()` in
+`scripts/editing/raster_brush.gd` now uses these boundaries without rewriting
+its algorithm:
+
+- Validate the layer, color and path before any candidate work.
+- Enclose the board-space sweep and transform its bounds into raster pixels,
+  accounting for the layer's transform.
+- Cap candidate work before scanning, even over empty raster chunks.
+- Test pixel centers and edit-mask quads, recording changes against the
+  original layer (not once per path sample).
+- Build a detached snapshot only after the entire scan succeeds.
+
+The source already has meaningful `_touches()`, `_source_over()` and
+`AtlasFill._paint_pixel_colors()` helpers; keep them instead of making the
+main flow a series of one-line calls. This demonstration adds only comments
+and phase spacing. It **does not** preempt the broader brush refactor in
+[[T-034]], or the dedicated fill/geometry/eraser passes in [[T-033]],
+[[T-035]] and [[T-036]]. Those tickets must apply the same convention while
+keeping each module's behavior intact.
 
 ## Validation
 

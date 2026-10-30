@@ -9,6 +9,7 @@ extends RefCounted
 static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Color,
 		width: float, erase: bool, scope: AtlasEditScope = null,
 		limit: int = 1048576) -> AtlasFillResult:
+	# Validate the layer and gesture before computing any candidate pixels.
 	var error: String = AtlasFill._raster_error(layer)
 	if not error.is_empty():
 		return AtlasFill._failure(error)
@@ -19,6 +20,9 @@ static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Colo
 	for point: Vector2 in path:
 		if not point.is_finite():
 			return AtlasFill._failure("Brush path must be finite.")
+
+	# Enclose the board-space sweep, then transform all four corners to
+	# raster-space bounds (the layer may be rotated or skewed).
 	var radius: float = width * 0.5
 	var bounds: Rect2 = Rect2(path[0], Vector2.ZERO)
 	for point: Vector2 in path:
@@ -44,13 +48,17 @@ static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Colo
 	var top: int = floori(pixel_bounds.position.y)
 	var right: int = ceili(pixel_bounds.end.x)
 	var bottom: int = ceili(pixel_bounds.end.y)
-	# Bound work before scanning or allocating, even for a mostly empty eraser.
+
+	# Cap candidate work *before* scanning, including pixels in empty chunks.
 	var columns: int = right - left
 	var rows: int = bottom - top
 	if columns <= 0 or rows <= 0:
 		return AtlasFill._failure("Brush covers no pixel centers.")
 	if columns > limit or rows > limit or columns > limit / rows:
 		return AtlasFill._failure("Brush exceeds the candidate pixel limit.")
+
+	# Test each pixel center and edit-mask quad against the sweep; stage only
+	# changes from the original layer, never incremental writes per path sample.
 	var replacement: Color = Color(0.0, 0.0, 0.0, 0.0) if erase else AtlasFill._canonical_color(color)
 	var changes: Dictionary[Vector2i, Color] = {}
 	for y: int in range(top, bottom):
@@ -75,6 +83,8 @@ static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Colo
 			var next: Color = replacement if erase else _source_over(replacement, previous)
 			if previous != next:
 				changes[pixel] = next
+
+	# Produce a detached layer only after every candidate has been checked.
 	return AtlasFill._paint_pixel_colors(layer, changes)
 
 
