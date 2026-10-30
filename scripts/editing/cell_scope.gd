@@ -48,16 +48,22 @@ func clip_strokes(strokes: Array[AtlasStroke]) -> Array[AtlasStroke]:
 	for stroke: AtlasStroke in strokes:
 		if stroke == null or not stroke.is_valid():
 			continue
+		# Text stays a semantic object: either its whole glyph envelope fits,
+		# or it is excluded. Ordinary line segments are clipped below.
 		if stroke.is_text():
 			if contains_rect(AtlasTextLayout.bounds(stroke)):
 				result.append(stroke.copy())
 			continue
+		# Remove adjacent duplicate vertices before offsetting the convex scope.
+		# The inset reserves half the stroke diameter on *both* sides.
 		var centerline: PackedVector2Array = PackedVector2Array()
 		for point: Vector2 in stroke.points:
 			if centerline.is_empty() or point != centerline[-1]:
 				centerline.append(point)
 		var insets: Array[PackedVector2Array] = Geometry2D.offset_polygon(
 			polygon, -stroke.width * 0.5, Geometry2D.JOIN_MITER)
+		# A dot uses point containment; a polyline may yield several detached
+		# fragments. These new strokes retain the source's color and width.
 		for inset: PackedVector2Array in insets:
 			if centerline.size() == 1:
 				if Geometry2D.is_point_in_polygon(centerline[0], inset):

@@ -519,10 +519,13 @@ func _paste_raster(source: AtlasRasterLayer, anchor: Vector2) -> bool:
 
 
 func _paste_tiles(payload: AtlasClipboardData, target: AtlasTerrainLayer, anchor: Vector2) -> bool:
+	# 1. Confirm compatible cell geometry; do not silently convert grid units.
 	var basis: AtlasGrid = target.grid if target.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
 	if basis.kind != payload.grid.kind or basis.cell_size != payload.grid.cell_size or basis.rotation != payload.grid.rotation:
 		message.emit("Tile paste needs matching grid shape, spacing and rotation; no implicit conversion.")
 		return false
+	# 2. Stage every destination cell and verify its complete selection footprint
+	#    before creating a command. A failed cell rejects the whole paste.
 	var origin: Vector2i = basis.document_to_cell(anchor)
 	var cells: Dictionary = target.terrain.duplicate()
 	for key: String in payload.tiles:
@@ -535,6 +538,7 @@ func _paste_tiles(payload: AtlasClipboardData, target: AtlasTerrainLayer, anchor
 		if not scope().allows_polygon(basis.cell_polygon(cell)):
 			return false
 		cells["%d,%d" % [cell.x, cell.y]] = payload.tiles[key]
+	# 3. Commit one atomic, undoable terrain snapshot.
 	var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, target.id, target.terrain, cells)
 	if _edits.execute(command):
 		_canvas.queue_redraw()

@@ -12,6 +12,7 @@ func _initialize() -> void:
 func _run_suite() -> void:
 	_test_ink()
 	_test_raster()
+	_test_multiple_raster_assets()
 	_test_tiles()
 	_test_invalid_envelopes()
 	_test_json_syntax()
@@ -162,6 +163,37 @@ func _test_raster() -> void:
 	var reshaped: Image = Image.create_from_data(2, 3, false, Image.FORMAT_RGBA8, pixels)
 	_check(AtlasRasterChunk.image_hash(reshaped) != AtlasRasterChunk.image_hash(_pixels()),
 		"pixel identity includes dimensions")
+
+
+## A clipboard may reference distinct content hashes and repeat one of them.
+## All buffers must be verified before any mutable chunk is exposed to paste.
+func _test_multiple_raster_assets() -> void:
+	var source: AtlasRasterLayer = _raster()
+	var different_pixels: Image = _pixels().duplicate() as Image
+	different_pixels.set_pixel(1, 1, Color(0.25, 0.75, 0.5, 1.0))
+	source.chunks["7,-1"] = AtlasRasterChunk.new(Vector2i(7, -1), different_pixels)
+	var encoded: String = AtlasClipboard.encode_raster(source, Vector2.ZERO)
+	_check(not encoded.is_empty(), "mixed raster clipboard encodes")
+	var wire: Dictionary = JSON.parse_string(encoded)
+	_check(wire.assets.size() == 2, "mixed clipboard embeds one buffer per unique pixel hash")
+	var decoded: AtlasClipboardData = AtlasClipboard.decode(encoded)
+	_check(decoded != null and decoded.raster.chunks.size() == 3,
+		"mixed clipboard decodes every chunk")
+	if decoded == null:
+		return
+	for key: String in source.chunks:
+		_check(decoded.raster.chunks[key].image.get_data() == source.chunks[key].image.get_data(),
+			"mixed asset pixels roundtrip at " + key)
+	decoded.raster.chunks["-3,2"].image.fill(Color.RED)
+	_check(decoded.raster.chunks["1,-4"].image.get_data() == source.chunks["1,-4"].image.get_data(),
+		"duplicate content-addressed chunk has independent writable pixels")
+	decoded.raster.chunks["7,-1"].image.fill(Color.BLUE)
+	_check(source.chunks["7,-1"].image.get_data() == different_pixels.get_data(),
+		"unique asset decode is also detached from the source")
+	var bad_asset: Dictionary = wire.duplicate(true)
+	var broken_name: String = source.chunks["7,-1"].asset_id + ".webp"
+	bad_asset.assets[broken_name] = "!!!!!"
+	_reject(bad_asset, "one invalid embedded asset rejects the whole multi-asset payload")
 
 
 func _test_tiles() -> void:

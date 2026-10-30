@@ -144,6 +144,9 @@ static func _decode_ink(data: Dictionary) -> AtlasClipboardData:
 
 
 static func _decode_raster(data: Dictionary) -> AtlasClipboardData:
+	# 1. Validate the closed clipboard envelope and the layer metadata before
+	#    touching any binary buffer. The layer codec rejects malformed transforms,
+	#    chunk coordinates, dimensions, duplicate coordinates and asset names.
 	if not _has_keys(data, ["format", "version", "kind", "raster", "assets"]):
 		return null
 	var metadata: Variant = data["raster"]
@@ -159,46 +162,69 @@ static func _decode_raster(data: Dictionary) -> AtlasClipboardData:
 	for raw: Variant in chunks:
 		if not raw is Dictionary or not _has_keys(raw, ["coord", "width", "height", "asset"]):
 			return null
-	# The layer codec validates all primitives, transforms, coordinates, dimensions,
-	# asset names and duplicate coordinates before any embedded buffer is decoded.
 	var layer: AtlasRasterLayer = AtlasLayerCodec.from_dict(metadata) as AtlasRasterLayer
 	if layer == null:
 		return null
-	var refs: Dictionary[String, Vector2i] = {}
-	for chunk: AtlasRasterChunk in layer.chunks.values():
-		var ref: String = chunk.asset_id + ".webp"
-		var dimensions: Vector2i = Vector2i(chunk.width, chunk.height)
-		if refs.has(ref) and refs[ref] != dimensions:
-			return null
-		refs[ref] = dimensions
-	if assets.size() != refs.size():
+
+	# 2. Check the exact set of content-addressed assets, then verify their
+	#    canonical base64, lossless WebP dimensions and pixel-derived hashes.
+	var dimensions_by_asset: Dictionary[String, Vector2i] = _raster_asset_dimensions(layer)
+	if dimensions_by_asset.is_empty() or assets.size() != dimensions_by_asset.size():
 		return null
-	for ref: String in refs:
-		if not assets.has(ref) or not assets[ref] is String or not _valid_base64(assets[ref]):
-			return null
-	var images: Dictionary[String, Image] = {}
-	for ref: String in refs:
-		var encoded: String = assets[ref]
-		var bytes: PackedByteArray = Marshalls.base64_to_raw(encoded)
-		var padding: int = 2 if encoded.ends_with("==") else (1 if encoded.ends_with("=") else 0)
-		if bytes.size() != (encoded.length() >> 2) * 3 - padding \
-				or Marshalls.raw_to_base64(bytes) != encoded:
-			return null
-		var dimensions: Vector2i = refs[ref]
-		var image: Image = AtlasWebPStore.decode_lossless(bytes, dimensions.x, dimensions.y)
-		if image == null or image.get_width() != dimensions.x or image.get_height() != dimensions.y \
-				or AtlasRasterChunk.image_hash(image) != ref.trim_suffix(".webp"):
-			return null
-		images[ref] = image
+	var images_by_asset: Dictionary[String, Image] = _decode_raster_assets(assets, dimensions_by_asset)
+	if images_by_asset.size() != dimensions_by_asset.size():
+		return null
+
+	# 3. Install detached pixel buffers, one per chunk even when several chunks
+	#    share an asset hash, and normalize clipboard content for editing.
 	for chunk: AtlasRasterChunk in layer.chunks.values():
-		# Chunks sharing a content address still own separate mutable images.
-		chunk.image = images[chunk.asset_id + ".webp"].duplicate() as Image
+		chunk.image = images_by_asset[chunk.asset_id + ".webp"].duplicate() as Image
 	layer.visible = true
 	layer.locked = false
 	var result: AtlasClipboardData = AtlasClipboardData.new()
 	result.kind = "RASTER"
 	result.raster = layer
 	return result
+
+
+## Clipboard assets are keyed by pixel content address, not chunk coordinate.
+## A reused address must describe the same dimensions in every chunk.
+static func _raster_asset_dimensions(layer: AtlasRasterLayer) -> Dictionary[String, Vector2i]:
+	var dimensions_by_asset: Dictionary[String, Vector2i] = {}
+	for chunk: AtlasRasterChunk in layer.chunks.values():
+		var asset_name: String = chunk.asset_id + ".webp"
+		var size: Vector2i = Vector2i(chunk.width, chunk.height)
+		if dimensions_by_asset.has(asset_name) and dimensions_by_asset[asset_name] != size:
+			return {}
+		dimensions_by_asset[asset_name] = size
+	return dimensions_by_asset
+
+
+## Return an empty table if *any* referenced asset fails verification; no
+## caller-visible layer receives partially decoded or untrusted pixel content.
+static func _decode_raster_assets(assets: Dictionary,
+		dimensions_by_asset: Dictionary[String, Vector2i]) -> Dictionary[String, Image]:
+	var images_by_asset: Dictionary[String, Image] = {}
+	# Check every reference before decoding any bytes. An extra asset is
+	# rejected by the caller's count check and a missing one fails here.
+	for asset_name: String in dimensions_by_asset:
+		if not assets.has(asset_name) or not assets[asset_name] is String \
+				or not _valid_base64(assets[asset_name]):
+			return {}
+	for asset_name: String in dimensions_by_asset:
+		var encoded: String = assets[asset_name]
+		var bytes: PackedByteArray = Marshalls.base64_to_raw(encoded)
+		var padding: int = 2 if encoded.ends_with("==") else (1 if encoded.ends_with("=") else 0)
+		if bytes.size() != (encoded.length() >> 2) * 3 - padding \
+				or Marshalls.raw_to_base64(bytes) != encoded:
+			return {}
+		var dimensions: Vector2i = dimensions_by_asset[asset_name]
+		var image: Image = AtlasWebPStore.decode_lossless(bytes, dimensions.x, dimensions.y)
+		if image == null or image.get_width() != dimensions.x or image.get_height() != dimensions.y \
+				or AtlasRasterChunk.image_hash(image) != asset_name.trim_suffix(".webp"):
+			return {}
+		images_by_asset[asset_name] = image
+	return images_by_asset
 
 
 static func _decode_tiles(data: Dictionary) -> AtlasClipboardData:
