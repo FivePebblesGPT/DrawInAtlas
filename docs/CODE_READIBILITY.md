@@ -143,8 +143,8 @@ The source already has meaningful `_touches()`, `_source_over()` and
 `AtlasFill._paint_pixel_colors()` helpers; keep them instead of making the
 main flow a series of one-line calls. The T-037 demonstration added only
 comments and spacing; the later [[T-034]] implementation extracted a cohesive
-pixel-staging scan. The geometry cleanup [[T-035]] is now complete; the eraser
-pass [[T-036]] remains separate and must preserve its module's behavior.
+pixel-staging scan. The geometry cleanups [[T-035]] and [[T-036]] are now complete;
+future representation decisions remain separate under [[T-028]].
 
 **Raster brush application (T-034):** `AtlasRasterBrush.paint()` now validates and
 maps the board-space sweep to a raster candidate rectangle, checks the
@@ -178,6 +178,18 @@ orthogonal scaling and scales stroke widths; raster composes affine placement
 without resampling pixels. Both paths require complete source and destination
 footprints inside an enabled edit mask. Helpers mutate only the detached
 snapshot, never the live layer; a rejected edit discards it.
+
+**Vector eraser application (T-036):** `AtlasStrokeEraser.erase()` validates
+board-unit gesture coordinates and diameter before modifying any result. It
+checks text, filled polygons and editable wall paths as semantic whole objects
+using `_touches_whole_object()`; only ordinary strokes reach the intersecting
+centerline fast path. `_retained_centerline_parts()` applies round sweep
+capsules sequentially to detached vertices, preserving multi-cut fragment
+ordering. Single-point strokes/gestures and the 32-sided tap cap are explicit;
+fragment constructors retain source RGBA and width while misses clone full
+source metadata. Mask eligibility, editor preview/commit and exact undo/redo
+remain at the existing call sites. No conversion of vector ink to raster was
+performed here; [[T-028]] owns that design decision.
 
 ## Validation
 

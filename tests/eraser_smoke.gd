@@ -72,6 +72,65 @@ func _vector_geometry() -> void:
 		"invalid/empty active mask cannot remove ink")
 
 
+## T-036: the readability split must preserve geometric edge cases, semantic
+## objects and detached results, not just the common straight-line gesture.
+func _vector_readability_edges() -> void:
+	var color: Color = Color(0.3, 0.6, 0.9, 0.45)
+	var line: AtlasStroke = AtlasStroke.new(PackedVector2Array([
+		Vector2(-55, 0), Vector2(55, 0)]), color, 6.0)
+	var two_cuts: Array[AtlasStroke] = AtlasStrokeEraser.erase([line], PackedVector2Array([
+		Vector2(-20, -20), Vector2(-20, 20), Vector2(20, 20),
+		Vector2(20, -20)]), 2.0)
+	_check(two_cuts.size() == 3, "ordered multi-segment sweep retains three separate centerline parts")
+	var source_untouched: bool = line.points == PackedVector2Array([Vector2(-55, 0), Vector2(55, 0)])
+	for fragment: AtlasStroke in two_cuts:
+		source_untouched = source_untouched and fragment != line and fragment.width == line.width \
+			and fragment.color == line.color and not fragment.filled
+	_check(source_untouched, "split fragments keep alpha/diameter without aliasing source")
+
+	var filled: AtlasStroke = AtlasShapes.polygon(PackedVector2Array([
+		Vector2(-30, -30), Vector2(30, -30), Vector2(30, 30), Vector2(-30, 30)]),
+		color, 4.0, true)
+	var wall: AtlasStroke = AtlasEditablePath.make(PackedVector2Array([
+		Vector2(50, 50), Vector2(110, 50), Vector2(110, 110)]), color, 3.0, true)
+	var label: AtlasStroke = AtlasTextLayout.make(Vector2(100, -70), "Gate", "Serif", 18.0,
+		color, true, false)
+	_check(filled != null and wall != null and label != null, "semantic eraser fixtures are valid")
+	if filled == null or wall == null or label == null:
+		return
+	var semantic: Array[AtlasStroke] = [filled, wall, label]
+	var untouched: Array[AtlasStroke] = AtlasStroke.clone_all(semantic)
+	var missed: Array[AtlasStroke] = AtlasStrokeEraser.erase(semantic,
+		PackedVector2Array([Vector2(300, 300)]), 8.0)
+	_check(AtlasStroke.same_artwork(missed, semantic) and missed.size() == 3
+		and missed[0] != filled and missed[1] != wall and missed[2] != label,
+		"missed filled, wall and text objects retain their own metadata and copy ownership")
+	_check(AtlasStrokeEraser.erase([filled], PackedVector2Array([Vector2.ZERO]), 1.0).is_empty(),
+		"eraser tap inside a solid polygon removes the whole filled shape")
+	_check(AtlasStrokeEraser.erase([wall], PackedVector2Array([Vector2(80, 80)]), 8.0).is_empty(),
+		"eraser at rendered closed wall edge removes whole editable object")
+	var label_bounds: Rect2 = AtlasTextLayout.bounds(label)
+	_check(AtlasStrokeEraser.erase([label], PackedVector2Array([
+			label_bounds.position - Vector2(30, 0),
+			Vector2(label_bounds.end.x + 30, label_bounds.position.y + label_bounds.size.y * 0.5)]),
+		8.0).is_empty(), "text eraser segment crossing glyph box removes whole label")
+
+	for invalid: PackedVector2Array in [PackedVector2Array(), PackedVector2Array([Vector2.INF]),
+			PackedVector2Array([Vector2(NAN, 0)])]:
+		var no_op: Array[AtlasStroke] = AtlasStrokeEraser.erase(semantic, invalid, 5.0)
+		_check(AtlasStroke.same_artwork(no_op, semantic) and no_op[0] != semantic[0],
+			"empty/nonfinite sweep is a detached value no-op")
+	for invalid_width: float in [0.0, -1.0, NAN, INF]:
+		var no_op: Array[AtlasStroke] = AtlasStrokeEraser.erase(semantic,
+			PackedVector2Array([Vector2.ZERO]), invalid_width)
+		_check(AtlasStroke.same_artwork(no_op, semantic) and no_op[0] != semantic[0],
+			"nonpositive/nonfinite eraser width is a detached value no-op")
+	missed[0].color = Color.RED
+	missed[1].points[0] = Vector2(999, 999)
+	_check(AtlasStroke.same_artwork(semantic, untouched),
+		"mutating detached results cannot change source objects or undo snapshots")
+
+
 func _raster_pixels() -> void:
 	var image: Image = Image.create_empty(4, 3, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.7, 0.2, 0.3, 0.4))
@@ -242,6 +301,7 @@ func _editor_contract() -> void:
 
 func _run() -> void:
 	_vector_geometry()
+	_vector_readability_edges()
 	_raster_pixels()
 	await _editor_contract()
 	print("ATLAS_ERASER_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])
