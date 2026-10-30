@@ -483,7 +483,7 @@ func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
 				item.draw_circle(point, stroke.width * 0.5, stroke.color)
 
 
-func _append_stroke_point(local_position: Vector2) -> void:
+func _append_stroke_point(local_position: Vector2, shift_pressed: bool = false, alt_pressed: bool = false) -> void:
 	if not Rect2(Vector2.ZERO, size).has_point(local_position):
 		_stroke_left_canvas = true
 	if (_draft_stroke == null and _shape_kind.is_empty()) or _stroke_left_canvas:
@@ -492,7 +492,11 @@ func _append_stroke_point(local_position: Vector2) -> void:
 	if not _shape_kind.is_empty():
 		if _gesture_snap:
 			point = AtlasGridSnap.point(map.grid, point)
-		_draft_stroke = AtlasShapes.stroke(_shape_kind, _gesture_start, point, brush_color, brush_width)
+		if _shape_kind == "LINE":
+			var endpoints: PackedVector2Array = AtlasShapes.line_endpoints(_gesture_start, point, shift_pressed, alt_pressed)
+			_draft_stroke = AtlasShapes.stroke(_shape_kind, endpoints[0], endpoints[1], brush_color, brush_width)
+		else:
+			_draft_stroke = AtlasShapes.stroke(_shape_kind, _gesture_start, point, brush_color, brush_width)
 		queue_redraw()
 		return
 	if _draft_stroke.points[-1].distance_squared_to(point) >= 0.01:
@@ -555,6 +559,10 @@ func _gui_input(event: InputEvent) -> void:
 		_handle_mouse_button(event)
 	elif event is InputEventMouseMotion:
 		_handle_mouse_motion(event)
+	elif event is InputEventKey and _shape_kind == "LINE" and _draft_stroke != null:
+		var key: InputEventKey = event as InputEventKey
+		if key.keycode in [KEY_SHIFT, KEY_ALT] and not key.echo:
+			_append_stroke_point(_brush_cursor_local, key.shift_pressed, key.alt_pressed)
 
 
 func _handle_gesture(event: InputEvent) -> bool:
@@ -622,6 +630,7 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_shape_kind = Tool.keys()[tool]
 				_gesture_snap = snap_to_grid
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+				_brush_cursor_local = mouse.position
 				_stroke_left_canvas = false
 				_draft_stroke = AtlasShapes.stroke("LINE", _gesture_start, _gesture_start, brush_color, brush_width)
 		Tool.MOVE:
@@ -714,7 +723,7 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		_update_manipulation(local_to_document(mouse.position))
 		_finish_manipulation()
 	elif is_editing():
-		_append_stroke_point(mouse.position)
+		_append_stroke_point(mouse.position, mouse.shift_pressed, mouse.alt_pressed)
 		commit_edit()
 
 
@@ -734,7 +743,7 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 	elif tool == Tool.PAINT and _tile_painting:
 		_request_cell_paint(local_to_document(motion.position))
 	elif is_editing():
-		_append_stroke_point(motion.position)
+		_append_stroke_point(motion.position, motion.shift_pressed, motion.alt_pressed)
 	else:
 		return
 	accept_event()

@@ -50,6 +50,7 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var _ink_heading: Label = $Scroll/Margin/Sections/InkSection/Heading
 @onready var _ink_color_label: Label = $Scroll/Margin/Sections/InkSection/ColorLabel
 @onready var _eraser_hint: Label = %EraserHint
+@onready var _line_hint: Label = %LineHint
 @onready var _terrain_section: VBoxContainer = %TerrainSection
 @onready var _selection_section: VBoxContainer = %SelectionSection
 @onready var _transform_button: Button = %TransformButton
@@ -146,6 +147,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	fill_tolerance_spinner.visible = not terrain_active
 	fill_global_checkbox.visible = not terrain_active
 	_eraser_hint.visible = erasing
+	_line_hint.visible = tool == AtlasCanvas.Tool.LINE
 	_ink_color_label.visible = not erasing
 	brush_color_picker.visible = not erasing
 	brush_color_picker.disabled = erasing
