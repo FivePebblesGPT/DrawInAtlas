@@ -171,6 +171,8 @@ func _mount_sidebar_views() -> void:
 	layer_panel = LAYER_PANEL_SCENE.instantiate() as AtlasLayerPanel
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)
+	layer_panel.object_selected.connect(_select_hierarchy_object)
+	layer_panel.link_action_requested.connect(_on_hierarchy_link_action)
 	layer_panel.layers_changed.connect(apply_layers)
 	layer_panel.presented_detail_selected.connect(_on_presented_detail_selected)
 	layer_panel.automatic_detail_toggled.connect(_on_automatic_detail_toggled)
@@ -290,6 +292,8 @@ func _refresh_layers(preferred_id: String = "") -> void:
 		if ink == null and not canvas.floor.layers.is_empty():
 			canvas.active_layer_id = canvas.floor.layers[-1].id
 	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
+	layer_panel.set_navigation_context(campaign, canvas.map)
+	layer_panel.sync_object_selection(canvas.selection)
 
 
 func _on_presented_detail_selected(level: int) -> void:
@@ -376,6 +380,7 @@ func _on_documents_changed() -> void:
 	if campaign.get_map(canvas.map.id) == canvas.map and canvas.map.floor_by_id(canvas.floor.id) != null:
 		browser.refresh(campaign)
 		linked_maps.refresh()
+		layer_panel.set_navigation_context(campaign, canvas.map)
 
 
 func _message(value: String) -> void:
@@ -619,6 +624,8 @@ func _on_tool_changed(index: int) -> void:
 
 func _on_selection_changed() -> void:
 	inspector.refresh_selection(canvas.selection, can_modify_selection())
+	if layer_panel != null:
+		layer_panel.sync_object_selection(canvas.selection)
 
 
 func _on_scope_toggled(enabled: bool) -> void:
@@ -685,6 +692,37 @@ func _on_pointer_moved(local_position: Vector2) -> void:
 
 func select_layer(id: String) -> void:
 	artwork.select_layer(id)
+
+
+func _select_hierarchy_object(layer_id: String, stroke_index: int) -> void:
+	var layer: AtlasLayer = canvas.floor.layer_by_id(layer_id)
+	if layer == null or not layer.visible:
+		return
+	if canvas.active_layer_id != layer_id:
+		select_layer(layer_id)
+	# Selection is transient, scoped to the active layer and current presentation.
+	if not canvas.editing_target_is_presented():
+		return
+	var indices: Array[int] = []
+	if stroke_index >= 0:
+		indices.append(stroke_index)
+	canvas.selection = AtlasSelectionGeometry.select_indices(layer, indices)
+	canvas.selection_changed.emit()
+	canvas.queue_redraw()
+
+
+func _on_hierarchy_link_action(id: String, action: StringName) -> void:
+	if action == &"edit":
+		canvas.selected_link_id = id
+		linked_maps.open()
+		return
+	var link: AtlasMapLink = campaign.link_by_id(id)
+	if link == null or link.source_map_id != canvas.map.id or link.source_floor_id != canvas.floor.id:
+		return
+	if action == &"focus":
+		linked_maps.focus(id)
+	elif action == &"enter":
+		linked_maps.enter(id)
 
 
 func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:

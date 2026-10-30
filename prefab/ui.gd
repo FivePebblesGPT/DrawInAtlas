@@ -48,7 +48,7 @@ func _build_menus() -> void:
 	_view_menu.add_check_item("Grid overlay", ViewAction.GRID)
 	_view_menu.add_separator()
 	_view_menu.add_item("Back to previous map", ViewAction.BACK)
-	_view_menu.add_item("Linked maps…", ViewAction.LINKS)
+	_view_menu.add_item("Map links (Layers)", ViewAction.LINKS)
 	# Display accelerator hints; existing context-aware handlers retain text-input undo.
 	%MenuBar.set_disable_shortcuts(true)
 
@@ -106,7 +106,7 @@ func _on_view_menu(id: int) -> void:
 		ViewAction.BACK:
 			_editor._on_back()
 		ViewAction.LINKS:
-			_editor.linked_maps.open()
+			_sidebar.select_view(&"Layers")
 	_sync_menus()
 
 

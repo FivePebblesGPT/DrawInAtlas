@@ -162,13 +162,13 @@ func _check_sidebar_expansion(editor: AtlasEditor) -> void:
 	editor.sidebar.select_view(&"Layers")
 	for frame: int in range(6):
 		await process_frame
-	var layers_height: float = editor.layer_panel.layer_list.size.y
+	var layers_height: float = editor.layer_panel.hierarchy.size.y
 	root.content_scale_size.y += 200
 	root.size = root.content_scale_size
 	for frame: int in range(6):
 		await process_frame
-	_check(editor.layer_panel.layer_list.size.y > layers_height + 100,
-		"Layers list expands into additional sidebar height")
+	_check(editor.layer_panel.hierarchy.size.y > layers_height + 100,
+		"Layer hierarchy expands into additional sidebar height")
 	root.content_scale_size = previous_scale
 	root.size = previous_size
 	editor.sidebar.select_view(&"Maps")
