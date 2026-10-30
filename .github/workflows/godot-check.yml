@@ -145,6 +145,13 @@ jobs:
           godot --headless --path . --script res://tests/legacy_migration_audit_smoke.gd 2>&1 | tee /tmp/godot-legacy-migration-audit.log
           grep -q 'ATLAS_LEGACY_MIGRATION_AUDIT_PASSED' /tmp/godot-legacy-migration-audit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-legacy-migration-audit.log; then exit 1; fi
+      - name: Audit ink and raster representation contracts (T-028 investigation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/ink_representation_smoke.gd 2>&1 | tee /tmp/godot-ink-representation.log
+          grep -q 'ATLAS_INK_REPRESENTATION_PASSED' /tmp/godot-ink-representation.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-ink-representation.log; then exit 1; fi
       - name: Verify Brush tool opacity, stroke and raster behavior (T-020)
         shell: bash
         run: |
