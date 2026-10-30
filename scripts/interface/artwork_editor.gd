@@ -542,7 +542,7 @@ func _paste_tiles(payload: AtlasClipboardData, target: AtlasTileLayer, anchor: V
 
 
 func import_raster(image: Image) -> bool:
-	var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(image)
+	var layer: AtlasRasterLayer = AtlasRasterLayer.from_image_chunks(image)
 	if layer == null:
 		message.emit("Could not create a raster layer from that image.")
 		return false
