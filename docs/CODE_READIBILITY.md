@@ -144,8 +144,18 @@ The source already has meaningful `_touches()`, `_source_over()` and
 main flow a series of one-line calls. This demonstration adds only comments
 and phase spacing. It **does not** preempt the broader brush refactor in
 [[T-034]], or the dedicated fill/geometry/eraser passes in [[T-033]],
-[[T-035]] and [[T-036]]. Those tickets must apply the same convention while
+[[T-035]] and [[T-036]]. Those tickets apply the same convention while
 keeping each module's behavior intact.
+
+**Fill application (T-033):** `AtlasFill.tiles()` now makes the terrain-key
+validation, finite background bound, cell eligibility, bounded traversal and
+copy-on-success steps visible. `AtlasFill.raster()` separates document-to-pixel
+seed conversion from two named scans: a four-connected seed-color flood and a
+sorted stored-chunk scan for global mode. Each scan returns at most `limit + 1`
+eligible pixels; the caller rejects overflow before asking the shared snapshot
+writer to clone and edit any image. Masking uses whole transformed pixel quads;
+even transparent pixels must be stored. The shared writer can also grow partial
+chunks for brush edits, while fills never select those unstored areas.
 
 ## Validation
 
