@@ -126,7 +126,7 @@ func _ready() -> void:
 	_mount_sidebar_views()
 	text_editor = AtlasTextEditorPopup.new()
 	add_child(text_editor)
-	text_editor.text_confirmed.connect(artwork.edit_text)
+	text_editor.text_confirmed.connect(_confirm_text_edit)
 	_connect_workspace()
 	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
@@ -752,7 +752,17 @@ func _open_text_editor(anchor: Vector2, index: int) -> void:
 		return
 	if index >= 0 and index < layer.strokes.size():
 		original = layer.strokes[index]
-	text_editor.open_editor(anchor, original, index, canvas.brush_color)
+	text_editor.open_editor(anchor, original, index, canvas.brush_color,
+		canvas.map.id, canvas.floor.id, canvas.active_layer_id)
+
+
+func _confirm_text_edit(index: int, expected: AtlasStroke, replacement: AtlasStroke,
+		map_id: String, floor_id: String, layer_id: String) -> void:
+	if artwork.edit_text_in_context(index, expected, replacement, map_id, floor_id, layer_id):
+		text_editor.close_editor()
+	else:
+		text_editor.show_error("Text was not applied. The target, original text, layer protection, "
+			+ "detail level or edit mask changed. Cancel and reopen the editor if needed.")
 
 
 func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:

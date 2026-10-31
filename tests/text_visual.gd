@@ -74,6 +74,21 @@ func _run() -> void:
 	await _frames(5)
 	var ink: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(ink.strokes.size() == 1 and ink.strokes[0].is_text(), "native placement and editable metadata")
+	# A refused commit stays in the native editor with readable feedback.
+	canvas._begin_text_edit(anchor + Vector2(240, 150))
+	editor.text_editor.text_input.text = "Pending native label"
+	ink.locked = true
+	editor.text_editor.confirm_text()
+	await _frames(4)
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and editor.text_editor.error_label.text.contains("not applied")
+		and editor.text_editor.text_input.text == "Pending native label" and ink.strokes.size() == 1,
+		"native refused placement keeps the modal and its draft")
+	_check(root.get_texture().get_image().save_png("user://validation/text-editor-rejected.png") == OK,
+		"native rejected submission screenshot")
+	ink.locked = false
+	editor.text_editor.close_editor()
+	await _frames(3)
 	canvas.camera_center = anchor + Vector2(80, 6)
 	canvas.camera_zoom = 0.4
 	canvas.queue_redraw()

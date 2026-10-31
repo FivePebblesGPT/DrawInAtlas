@@ -2,7 +2,8 @@ class_name AtlasTextEditorPopup
 extends Control
 ## In-editor modal: keyboard input never leaks into canvas tool shortcuts.
 
-signal text_confirmed(index: int, expected: AtlasStroke, replacement: AtlasStroke)
+signal text_confirmed(index: int, expected: AtlasStroke, replacement: AtlasStroke,
+	map_id: String, floor_id: String, layer_id: String)
 
 var text_input: TextEdit
 var family_picker: OptionButton
@@ -11,10 +12,14 @@ var bold_toggle: CheckBox
 var italic_toggle: CheckBox
 var color_picker: ColorPickerButton
 var apply_button: Button
+var error_label: Label
 var _panel: PanelContainer
 var _index: int = -1
 var _original: AtlasStroke
 var _anchor: Vector2
+var _map_id: String = ""
+var _floor_id: String = ""
+var _layer_id: String = ""
 
 
 func _ready() -> void:
@@ -69,6 +74,12 @@ func _ready() -> void:
 	color_picker.custom_minimum_size = Vector2(40, 26)
 	color_picker.tooltip_text = "Text color and opacity"
 	style.add_child(color_picker)
+	error_label = Label.new()
+	error_label.add_theme_color_override("font_color", Color(1.0, 0.65, 0.5))
+	error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	error_label.custom_minimum_size.x = 1.0
+	stack.add_child(error_label)
+	error_label.hide()
 	var foot: HBoxContainer = HBoxContainer.new()
 	foot.alignment = BoxContainer.ALIGNMENT_END
 	stack.add_child(foot)
@@ -94,10 +105,15 @@ func _layout_panel() -> void:
 
 
 func open_editor(anchor: Vector2, original: AtlasStroke = null, index: int = -1,
-		default_color: Color = Color.WHITE) -> void:
+		default_color: Color = Color.WHITE, map_id: String = "", floor_id: String = "",
+		layer_id: String = "") -> void:
 	_index = index
 	_original = original.copy() if original != null else null
 	_anchor = original.points[0] if original != null else anchor
+	_map_id = map_id
+	_floor_id = floor_id
+	_layer_id = layer_id
+	error_label.hide()
 	text_input.text = original.text if original != null else ""
 	family_picker.select(AtlasTextLayout.FAMILIES.find(original.font_family) if original != null else 0)
 	size_input.value = original.width if original != null else 20.0
@@ -116,18 +132,29 @@ func confirm_text() -> void:
 		AtlasTextLayout.FAMILIES[family_picker.selected], float(size_input.value), color_picker.color,
 		bold_toggle.button_pressed, italic_toggle.button_pressed)
 	if next == null:
+		show_error("Enter 1–2048 characters of nonblank text with a valid font and size.")
 		text_input.grab_focus()
 		return
 	if _original != null:
 		next.text_rotation = _original.text_rotation
-	text_confirmed.emit(_index, _original, next)
-	close_editor()
+	# The owner closes this dialog only after the history command succeeds.
+	# An obsolete target or rejected mask must not silently discard the draft.
+	text_confirmed.emit(_index, _original, next, _map_id, _floor_id, _layer_id)
+
+
+func show_error(message: String) -> void:
+	error_label.text = message
+	error_label.show()
 
 
 func close_editor() -> void:
 	hide()
 	_original = null
 	_index = -1
+	_map_id = ""
+	_floor_id = ""
+	_layer_id = ""
+	error_label.hide()
 
 
 func _input(event: InputEvent) -> void:

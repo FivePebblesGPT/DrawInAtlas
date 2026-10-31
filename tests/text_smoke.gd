@@ -107,6 +107,61 @@ func _run() -> void:
 	_check(active.strokes.size() == 1 and active.strokes[0].text == "Revised label", "revision changes existing object")
 	_check(editor.edits.undo() and active.strokes[0].text == "A persistent label", "revision undo")
 	_check(editor.edits.redo() and active.strokes[0].text == "Revised label", "revision redo")
+	# The modal never discards typed text when a target or history guard fails.
+	canvas._begin_text_edit(origin + Vector2(250, 100))
+	editor.text_editor.text_input.text = "  "
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and active.strokes.size() == 1, "invalid content preserves the draft and history")
+	editor.text_editor.close_editor()
+	canvas._begin_text_edit(origin + Vector2(4, 4))
+	var external_original: AtlasStroke = active.strokes[0].copy()
+	var external_update: AtlasStroke = external_original.copy()
+	external_update.text = "A newer revision"
+	_check(editor.artwork.edit_text(0, external_original, external_update), "interleaved text change commits")
+	editor.text_editor.text_input.text = "Uncommitted draft"
+	editor.text_editor.confirm_text()
+	_check(active.strokes[0].text == "A newer revision" and editor.text_editor.visible
+		and editor.text_editor.error_label.visible and editor.text_editor.text_input.text == "Uncommitted draft",
+		"stale revision cannot overwrite later history or lose the draft")
+	editor.text_editor.close_editor()
+	_check(editor.edits.undo() and active.strokes[0].text == "Revised label",
+		"rejected revision created no extra undo command")
+	canvas._begin_text_edit(origin + Vector2(250, 100))
+	editor.text_editor.text_input.text = "Wrong target"
+	var initial_layer_id: String = canvas.active_layer_id
+	editor.layer_panel._add_objects()
+	var alternate: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
+	_check(alternate != null and canvas.active_layer_id != initial_layer_id, "layer changed during modal")
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and alternate.strokes.is_empty() and active.strokes.size() == 1,
+		"pending placement cannot move to a different Objects layer")
+	editor.text_editor.close_editor()
+	editor.select_layer(initial_layer_id)
+	active = canvas.floor.layer_by_id(initial_layer_id) as AtlasObjectsLayer
+	editor._choose_tool(AtlasCanvas.Tool.TEXT)
+	canvas._begin_text_edit(origin + Vector2(250, 100))
+	editor.text_editor.text_input.text = "Retry when unlocked"
+	active.locked = true
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and active.strokes.size() == 1, "locked target rejects placement without closing")
+	active.locked = false
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and active.strokes.size() == 2
+		and active.strokes[-1].text == "Retry when unlocked", "retry applies preserved text once unlocked")
+	_check(editor.edits.undo() and active.strokes.size() == 1, "recovery placement undo")
+	var unchanged_cursor: int = editor.edits._cursor
+	canvas._begin_text_edit(origin + Vector2(4, 4))
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and editor.edits._cursor == unchanged_cursor,
+		"unchanged text closes without making a redundant history command")
+	var wrong_floor_text: AtlasStroke = AtlasTextLayout.make(origin + Vector2(260, 100),
+		"Wrong floor", "Sans", 18, Color.WHITE)
+	_check(not editor.artwork.edit_text_in_context(-1, null, wrong_floor_text,
+		canvas.map.id, "another-floor", active.id) and active.strokes.size() == 1,
+		"modal submission rejects a different floor even with the same layer id")
 	canvas._begin_text_edit(origin + Vector2(4, 4))
 	editor.text_editor.close_editor()
 	_check(active.strokes[0].text == "Revised label", "cancel never alters artwork")
@@ -145,6 +200,19 @@ func _run() -> void:
 	var both: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
 	var persisted: AtlasObjectsLayer = both.get_map(canvas.map.id).floor_by_id(canvas.floor.id).layer_by_id(detail_id) as AtlasObjectsLayer if both != null else null
 	_check(persisted != null and persisted.strokes.size() == 1 and persisted.strokes[0].text == "Street name", "D1 native save preserves text")
+	# A map change can reuse an object index: the modal must still bind to its source map.
+	editor._choose_tool(AtlasCanvas.Tool.TEXT)
+	canvas._begin_text_edit(origin + Vector2(280, 160))
+	editor.text_editor.text_input.text = "Never place on another board"
+	var previous_map_id: String = canvas.map.id
+	_check(editor.create_board("Another text board", AtlasGrid.new(AtlasGrid.Kind.GRIDLESS))
+		and canvas.map.id != previous_map_id, "switch boards with text editor open")
+	editor.text_editor.confirm_text()
+	var other_layer: AtlasObjectsLayer = canvas.floor.objects_layer()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and (other_layer == null or other_layer.strokes.is_empty()),
+		"pending text cannot be placed in another map")
+	editor.text_editor.close_editor()
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_TEXT_PASSED checks=%d failures=%d" % [checks, failures])
