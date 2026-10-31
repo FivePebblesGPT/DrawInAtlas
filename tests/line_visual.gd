@@ -100,6 +100,39 @@ func _run() -> void:
 	canvas.cancel_edit()
 	_button(end_ui, false, true)
 	_check(reference.layer.to_dict() == canvas.floor.raster_layer().to_dict(), "Escape cancellation does not paint a second stroke")
+	# Native-framebuffer contract: inspector styling repaints an in-progress
+	# Line without another pointer move, and the released raster matches it.
+	_button(start_ui, true)
+	_motion(end_ui, true, true)
+	await _frames(5)
+	var before_restyle_image: Image = root.get_texture().get_image()
+	var changed_color: Color = Color(1.0, 0.3, 0.2, 0.95)
+	var changed_width: float = 18.0
+	editor.inspector.brush_width_spinner.value = changed_width
+	editor.inspector.brush_color_picker.color = changed_color
+	editor.inspector.brush_color_changed.emit(changed_color)
+	await _frames(5)
+	var expected_restyle: AtlasFillResult = AtlasRasterBrush.paint(canvas.floor.raster_layer(), expected,
+		changed_color, changed_width, false)
+	_check(canvas.brush_width == changed_width and canvas.brush_color == changed_color,
+		"native inspector forwards restyled Line width and color")
+	_check(expected_restyle.ok and canvas._preview_layer != null
+		and canvas._preview_layer.to_dict() == expected_restyle.layer.to_dict(),
+		"native stationary preview updates its detached raster pixels")
+	var restyled_image: Image = root.get_texture().get_image()
+	var restyled_pixels: int = 0
+	for y: int in range(24, int(canvas.size.y) - 24, 3):
+		for x: int in range(14, int(canvas.size.x) - 14, 3):
+			if before_restyle_image.get_pixel(origin.x + x, origin.y + y) != restyled_image.get_pixel(origin.x + x, origin.y + y):
+				restyled_pixels += 1
+	_check(restyled_pixels > 15, "native Line framebuffer changes before release without pointer movement")
+	_button(end_ui, false, true, true)
+	await _frames(5)
+	_check(expected_restyle.ok and canvas.floor.raster_layer().to_dict() == expected_restyle.layer.to_dict(),
+		"native release matches restyled preview")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().to_dict() == reference.layer.to_dict(),
+		"restyled native Line is one undoable raster edit")
+
 	root.size = Vector2i(800, 600)
 	root.content_scale_size = root.size
 	await _frames(8)

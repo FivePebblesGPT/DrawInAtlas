@@ -90,10 +90,16 @@ var show_grid: bool:
 		if map != null:
 			map.grid.visible = value
 		queue_redraw()
-var brush_color: Color = Color("#f5b545")
+var brush_color: Color = Color("#f5b545"):
+	set(value):
+		brush_color = value
+		_refresh_line_style()
 ## Brush/eraser/line diameter in document units; pointer ring converts with
 ## camera_zoom. Never store a screen-pixel width in a stroke.
-var brush_width: float = 8.0
+var brush_width: float = 8.0:
+	set(value):
+		brush_width = value
+		_refresh_line_style()
 ## Session-only; grid changes never rewrite existing artwork.
 var snap_to_grid: bool = false
 var polygon_solid_fill: bool = false
@@ -641,6 +647,18 @@ func _clear_ink_masks() -> void:
 	for id: String in _layer_drawers:
 		if floor != null and floor.layer_by_id(id) is AtlasObjectsLayer:
 			_render_states.erase(id)
+
+
+## Color and width controls remain live during a Line drag, even if the
+## pointer stays still. Brush/eraser sessions deliberately keep the style they
+## captured on press; only the Line preview is reconstructed for each change.
+func _refresh_line_style() -> void:
+	if _shape_kind != "LINE" or _draft_stroke == null:
+		return
+	_draft_stroke.color = brush_color
+	_draft_stroke.width = brush_width
+	_preview_dirty = true
+	queue_redraw()
 
 
 func _append_stroke_point(local_position: Vector2, shift_pressed: bool = false, alt_pressed: bool = false) -> void:
