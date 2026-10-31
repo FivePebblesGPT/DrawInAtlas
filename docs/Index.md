@@ -40,7 +40,7 @@
 - [ ] [[T-025|T-025 · Polygon]]
 - [ ] [[T-026|T-026 · Editable open/closed wall paths]]
 - [ ] [[T-027|T-027 · Editable text and small-text culling]]
-- [ ] [[T-028|T-028 · Ink representation decision]]
+- [x] [[T-028|T-028 · Ink representation decision]]
 - [x] [[T-029|T-029 · Dictionary conversion audit and cleanup]]
 - [x] [[T-030|T-030 · Raster import/chunk conversion clarity]]
 - [x] [[T-031|T-031 · Tile-layer naming and type authority]]
@@ -51,6 +51,7 @@
 - [x] [[T-036|T-036 · Stroke eraser readability]]
 - [x] [[T-037|T-037 · Commented function-step convention]]
 - [ ] [[T-038|T-038 · Broader code-only review]]
+- [ ] [[T-049|T-049 · Raster-first authoring defaults and semantic-vector tools]]
 
 ## After core usability
 - [ ] [[T-017|T-017 · Revisit floor-link authoring/testing]]

@@ -1,6 +1,6 @@
-# T-028 — Ink representation audit and proposed decision
+# T-028 — Ink representation audit and approved decision
 
-**Status:** implementation-free investigation; **owner decision pending**. This is a proposal, **not** a migration authorization or a completed acceptance ticket. See [[T-028]] and [[Index]].
+**Status:** owner decision **approved on 2026-10-31**. This comparison records the decision; editor defaults and UI changes are separate implementation work under [[T-049]]. See [[T-028]] and [[Index]].
 
 ## Question and what the code actually owns
 
@@ -38,16 +38,28 @@ The question in [[ManualReview_2026-10-30#Code review|Code review, item 1]] is w
 
 `godot --headless --path . --script res://tests/ink_representation_smoke.gd` verifies the current ownership differences and defensive copies: editable vector object kinds, per-object selection, geometry erasing, separate history snapshots, raster partial chunks, premultiplied-alpha brush, transparent erasing, whole-layer raster selection and independent decoded pixel copies. It is a **semantic test, not a timing/memory benchmark**. Existing `brush_smoke`, `eraser_smoke`, `selection_interactions_smoke`, `storage_smoke`, `text_smoke`, `wall_paths_smoke` and historical benchmark fixtures provide further regression evidence. These tests do not replace human judgment about stroke feel or representative real-map profiling.
 
-## Proposed decision (requires explicit owner approval)
+## Approved decision — raster-dominant, semantic vector
 
-**Retain the typed hybrid**: `AtlasInkLayer` continues to own individually editable vector ink/shapes/wall paths/text; `AtlasRasterLayer` continues to own exact RGBA8 pixel artwork. Both share the same document-coordinate canvas and authored-detail levels. Never auto-flatten existing objects, synthesize vectors from a raster image or silently switch a layer's representation. Preserve the user's explicit active-layer choice; expose the distinction and eraser/fill consequences in the UI (potential scope for [[T-018]] and future usability review).
+**Owner approval (2026-10-31):** Raster is the **primary type for ordinary freehand artwork**. Vector is retained primarily for **specialized, individually editable semantic objects**, including wall paths, polygons/shapes, lines, and text. This is **not** an all-raster conversion or a ban on the existing ink representation: the runtime remains typed and supports both `AtlasRasterLayer` and `AtlasInkLayer` on the same board and at every authored detail level.
 
-Why this recommendation: the project **already** needs post-save editable text/walls/shape transforms *and* pixel-local brush/fill. A universal raster format would sacrifice source edits; a universal vector format would need a new raster-paint/fill simulation. The present split is not proof the current implementation scales well or that the UX is accepted.
+The policy establishes:
 
-### What changes after a decision?
+1. **Raster-first authoring:** new boards and normal painting flows should lead to a raster editing target. Pen/brush, pixel eraser and RGBA Bucket should have discoverable raster paths; grid terrain remains its own separate layer type. Where raster chunks do not yet exist, painting must create them safely and the Bucket's finite/eligible area must be clear to users.
+2. **Semantic vector objects:** editable paths/walls, line and shape geometry, and text retain their typed control points or metadata. They must not be silently flattened into pixels merely because raster is primary. Existing vector freehand strokes remain supported in stored fixtures and explicitly selected ink layers, but are not the normal suggested authoring route.
+3. **Explicit target and visible tool semantics:** switching tools or zoom/LOD must not silently overwrite the user's explicitly selected layer or convert representation. If a tool requires another layer type, make the need clear, offer an understandable path to that layer and preserve the previous editing context. The raster versus vector eraser, fill, selection and transform differences must be discoverable.
+4. **No representation migration:** no real user artwork exists to migrate, and this approval does not authorize a legacy-data conversion workflow. Retired battlemat migration work is likewise unnecessary by separate owner direction. Keep native save fidelity and existing regression fixtures intact while changing defaults; do not rewrite saved pixels, vector metadata, or edit history on load.
+5. **Performance and fidelity:** raster chunk storage, pixel resolution, alpha, undo memory and browser performance still require measurement on representative content. Raster is the preferred user experience **by design**, not because unmeasured performance superiority has been established. Pixel-region selection is currently missing and should not be claimed as implemented.
 
-- **If the hybrid is approved:** T-028 may be marked accepted. No artwork migration or schema rewrite is implied. Follow-ups should be scoped independently around observed bottlenecks: (1) representative beta2 native-render and save profiling on user-like campaigns; (2) incremental history/delta snapshots instead of full-layer clones where proven necessary; (3) spatial indexing/culling if frame-time evidence demonstrates it; (4) explicit layer-mode/help in the UI. Coordinate with [[T-029]], [[T-033]], [[T-034]], [[T-035]] and [[T-036]] rather than extending T-028 into their implementation.
-- **If all-raster is chosen:** create a separate *approved* conversion specification and migration ticket before changing production storage. Preserve originals, vector precision, text/wall editing metadata, layers, detail levels, links and undo; define what stays editable versus what is irreversibly flattened, with visual comparison, crash-safe recovery, version handling and no silent upgrades. Reverify [[E-SAVE]] and Web export.
-- **If all-vector is chosen:** separately design pixel-paint, bucket/tolerance, imported image, alpha, texture and large-area display support; define whether pixel source layers remain as referenced assets. No automatic conversion until fidelity and ownership criteria are accepted.
+### Current implementation versus approved target
 
-**Owner decision requested:** Approve the existing **hybrid**, choose all-raster, or choose all-vector (with explicit exceptions). Until then, this audit is a review candidate, **T-028 remains unchecked**, and no production representation or save format changes are authorized.
+The repository already has separately typed lossless chunked raster layers, raster brush/erase/fill, vector semantic objects and native persistence. However, `scripts/campaign/floor.gd` currently constructs terrain + ink for a new floor, `scripts/interface/canvas.gd` starts with `active_layer_id = "ink"`, `scripts/interface/editor.gd::_refresh_layers()` prefers ink as a fallback, and `scripts/interface/artwork_editor.gd::choose_tool()` falls back to ink for Pen/Eraser. These are **implementation gaps**, not evidence that the approval has already been applied.
+
+### Work following this decision
+
+- [[T-049]]: implement and verify raster-first defaults and tool/layer affordances while retaining explicit layer choice, semantic-vector workflows, undo and native saves.
+- [[T-018]]: align the layer hierarchy and its user-facing labels/actions with raster as the ordinary painting target; owner usability acceptance stays separate.
+- [[T-023]]–[[T-027]]: check the approved raster/semantic-vector separation against Bucket, shapes, paths and text interaction policies before closing those tickets.
+- [[T-038]]: continue independent source-only review and owner acceptance; tests cannot substitute for that review.
+- Defer any delta-undo, spatial indexing, raster-region selection, or performance optimization to measured, scoped work; none is silently approved as part of the representation decision.
+
+**T-028 acceptance is complete as an architecture decision.** No runtime behavior, persisted schema, or user artwork has been changed by recording it. T-049 and the separate usability reviews remain open.
