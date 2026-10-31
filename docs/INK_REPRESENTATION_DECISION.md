@@ -44,7 +44,7 @@ The question in [[ManualReview_2026-10-30#Code review|Code review, item 1]] is w
 
 The policy establishes:
 
-1. **Raster-first authoring:** new boards and normal painting flows should lead to a raster editing target. Pen/brush, pixel eraser and RGBA Bucket should have discoverable raster paths; grid terrain remains its own separate layer type. Where raster chunks do not yet exist, painting must create them safely and the Bucket's finite/eligible area must be clear to users.
+1. **Raster-first authoring:** new boards and normal painting flows should lead to a raster editing target. Pen/brush, pixel eraser and RGBA Bucket should have discoverable raster paths. Palette-cell terrain painting was subsequently approved for retirement under [[TERRAIN_LAYER_DECISION]] and [[T-050]]; it is **not** a permanent third artwork type. Where raster chunks do not yet exist, painting must create them safely and the Bucket's finite/eligible area must be clear to users.
 2. **Semantic vector objects:** editable paths/walls, line and shape geometry, and text retain their typed control points or metadata. They must not be silently flattened into pixels merely because raster is primary. Existing vector freehand strokes remain supported in stored fixtures and explicitly selected ink layers, but are not the normal suggested authoring route.
 3. **Explicit target and visible tool semantics:** switching tools or zoom/LOD must not silently overwrite the user's explicitly selected layer or convert representation. If a tool requires another layer type, make the need clear, offer an understandable path to that layer and preserve the previous editing context. The raster versus vector eraser, fill, selection and transform differences must be discoverable.
 4. **No representation migration:** no real user artwork exists to migrate, and this approval does not authorize a legacy-data conversion workflow. Retired battlemat migration work is likewise unnecessary by separate owner direction. Keep native save fidelity and existing regression fixtures intact while changing defaults; do not rewrite saved pixels, vector metadata, or edit history on load.
@@ -56,7 +56,8 @@ The repository already has separately typed lossless chunked raster layers, rast
 
 ### Work following this decision
 
-- [[T-049]]: implement and verify raster-first defaults and tool/layer affordances while retaining explicit layer choice, semantic-vector workflows, undo and native saves.
+- [[T-050]]: remove the obsolete palette-cell TerrainLayer without altering the board grid or independent region metadata. Future 5-foot tilemap PCG and brush-authored type masks are distinct possible systems, not implementations in this ticket.
+- [[T-049]]: after T-050, implement and verify raster-first defaults and tool/layer affordances while retaining explicit layer choice, semantic-vector workflows, undo and native saves.
 - [[T-018]]: align the layer hierarchy and its user-facing labels/actions with raster as the ordinary painting target; owner usability acceptance stays separate.
 - [[T-023]]–[[T-027]]: check the approved raster/semantic-vector separation against Bucket, shapes, paths and text interaction policies before closing those tickets.
 - [[T-038]]: continue independent source-only review and owner acceptance; tests cannot substitute for that review.

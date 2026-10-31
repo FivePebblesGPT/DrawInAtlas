@@ -16,6 +16,7 @@ The development engine is **Godot 4.8-beta2**, standard build. Application code 
 - Retire the battlemat/battlemap concept: closer local-map views are authored detail, not separate documents or movable containers.
 - A projector framing object on the GM board matches the output aspect ratio. Moving/resizing it pans/zooms the player view without transforming artwork; physical calibration is separate.
 - Paint.net is the primary tool-interaction reference. Selection defaults to the active layer; editable open/closed wall paths and persistent editable text with small-text culling are explicit requirements.
+- Raster is the approved primary drawing type; vector is for specialized editable objects. The palette-cell TerrainLayer is approved for removal, **not yet removed**. Grid/hex-region properties stay independent; future 5-foot tilemap PCG and type-mask brushes are separate ideas. See [the Terrain decision](docs/TERRAIN_LAYER_DECISION.md) and [T-050](docs/Tickets/T-050.md).
 - The target model and existing implementation differ. See the epic notes and checklist for pending work; local table/projector and collaboration remain later milestones.
 
 ## Run and test the existing implementation
