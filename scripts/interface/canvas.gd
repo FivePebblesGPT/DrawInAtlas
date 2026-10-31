@@ -33,7 +33,7 @@ enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 var campaign: AtlasCampaign
 var map: AtlasMapDocument
 var floor: AtlasFloor
-var active_layer_id: String = "ink"
+var active_layer_id: String = "raster"
 ## Presentation only: never changes the authored layer, floor, map or camera.
 ## Automatic LOD (T-004/T-005) must use set_presented_detail_level so an
 ## in-progress gesture cannot be redirected or visually interrupted.
@@ -107,16 +107,26 @@ var _pending_wheel_fraction: float = 0.0
 var _wheel_dispatch_direction: int = 0
 var _last_wheel_dispatch_ms: int = -1
 var _draft_stroke: AtlasStroke
+const CoverageMask = preload("res://scripts/interface/coverage_mask.gd")
+var _raster_brush: AtlasRasterBrush
+var _preview_samples: int = 0
+var _preview_dirty: bool = false
+var _restore_accumulated_input: bool = true
+var _capturing_freehand: bool = false
 var _erasing: bool = false
 var _stroke_left_canvas: bool = false
 var _brush_cursor_local: Vector2 = Vector2.ZERO
 var _brush_cursor_inside: bool = false
-var _erase_preview: Array[AtlasStroke] = []
 ## Derived per-layer render nodes keyed by stable layer ID; never saved as art.
 var _layer_groups: Dictionary[String, CanvasGroup] = {}
 var _layer_drawers: Dictionary[String, Node2D] = {}
+var _render_states: Dictionary[String, Array] = {}
+var _ink_masks: Dictionary[AtlasStroke, CoverageMask] = {}
+var _ink_mask_view: Array = []
 ## Rebuildable GPU cache; raster pixel ownership remains with AtlasRasterChunk.
 var _raster_textures: Dictionary[String, ImageTexture] = {}
+var _preview_textures: Dictionary[String, ImageTexture] = {}
+var _prop_textures: Dictionary[String, ImageTexture] = {}
 var _overlay: Node2D
 var _manipulation: Manipulation = Manipulation.NONE
 ## Transient gesture endpoints in board units, not raw pointer pixels.
@@ -172,7 +182,9 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	campaign = current_campaign
 	floor = selected_floor
 	presented_detail_level = 0
-	_raster_textures.clear()
+	_clear_raster_textures()
+	_prop_textures.clear()
+	_clear_ink_masks()
 	clear_selection()
 	has_selected_cell = false
 	selected_link_id = ""
@@ -191,11 +203,11 @@ func is_editing() -> bool:
 
 
 func cancel_edit() -> void:
+	_end_freehand()
 	if _fill_pending:
 		_fill_pending = false
 		fill_cancel_requested.emit()
 	_draft_stroke = null
-	_erase_preview.clear()
 	_panning = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
@@ -211,7 +223,6 @@ func cancel_edit() -> void:
 	_wheel_dispatch_direction = 0
 	_last_wheel_dispatch_ms = -1
 	_moving_link_id = ""
-	_raster_textures.clear()
 	queue_redraw()
 	interaction_finished.emit()
 
@@ -227,6 +238,9 @@ func commit_edit() -> void:
 		var shape: AtlasStroke = AtlasShapes.polygon(_polygon_vertices, brush_color, brush_width, polygon_solid_fill)
 		_polygon_vertices.clear()
 		_draft_stroke = null
+		_preview_layer = null
+		_preview_dirty = false
+		_clear_raster_textures()
 		_gesture_snap = false
 		if shape != null:
 			stroke_requested.emit(shape, false)
@@ -253,11 +267,11 @@ func commit_edit() -> void:
 		return
 	var stroke: AtlasStroke = _draft_stroke.copy()
 	var erasing: bool = _erasing
+	_end_freehand()
 	_draft_stroke = null
-	_erase_preview.clear()
 	_shape_kind = ""
 	_preview_layer = null
-	_raster_textures.clear()
+	_clear_raster_textures()
 	stroke_requested.emit(stroke, erasing)
 	queue_redraw()
 	interaction_finished.emit()
@@ -266,7 +280,7 @@ func commit_edit() -> void:
 func restyle_selected_wall() -> void:
 	if floor == null or not editing_target_is_presented() or _wall_selected_index < 0:
 		return
-	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable() or _wall_selected_index >= layer.strokes.size():
 		return
 	var original: AtlasStroke = layer.strokes[_wall_selected_index]
@@ -283,7 +297,8 @@ func clear_selection() -> void:
 
 func select_all_artwork() -> void:
 	cancel_edit()
-	selection = AtlasSelectionGeometry.select_all(floor.layer_by_id(active_layer_id)) if editing_target_is_presented() else AtlasSelection.new()
+	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+	selection = AtlasSelectionGeometry.select_all(layer) if editing_target_is_presented() and layer is AtlasObjectsLayer else AtlasSelection.new()
 	selection_changed.emit()
 	queue_redraw()
 
@@ -357,13 +372,19 @@ func _draw() -> void:
 ## stable layer ID so ordering/undo reuses drawers and deleted layers are freed.
 ## This dynamic tree should NOT be duplicated as dozens of static scene nodes.
 func _sync_layer_renderers() -> void:
+	var view: Array = [size, camera_center, camera_zoom]
+	if _ink_mask_view != view:
+		_clear_ink_masks()
+		_ink_mask_view = view
 	var present: Dictionary[String, bool] = {}
+	var present_strokes: Dictionary[AtlasStroke, bool] = {}
 	for index: int in range(floor.layers.size()):
 		var layer: AtlasLayer = floor.layers[index]
 		present[layer.id] = true
 		if not _layer_groups.has(layer.id):
 			var group: CanvasGroup = CanvasGroup.new()
 			var drawer: Node2D = Node2D.new()
+			drawer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 			drawer.draw.connect(_draw_content_layer.bind(drawer, layer.id))
 			group.add_child(drawer)
 			add_child(group)
@@ -375,13 +396,34 @@ func _sync_layer_renderers() -> void:
 		group.scale = Vector2.ONE * camera_zoom
 		group.self_modulate = Color(1, 1, 1, layer.opacity)
 		group.visible = layer.visible and layer.opacity > 0.0 and layer.detail_level == presented_detail_level
-		_layer_drawers[layer.id].queue_redraw()
+		# Retain completed artwork draw commands while only the pointer/draft changes.
+		var state: Array = [layer, _preview_layer if layer.id == active_layer_id else null, view]
+		if layer is AtlasObjectsLayer:
+			for stroke: AtlasStroke in layer.strokes:
+				present_strokes[stroke] = true
+			state.append(layer.strokes.duplicate())
+			if layer.id == active_layer_id:
+				state.append_array([_wall_preview,
+					_wall_vertices.duplicate(), _wall_pointer, tool])
+		elif layer is AtlasRasterLayer:
+			state.append_array([layer.transform, layer.pixels_per_unit, layer.chunks.duplicate()])
+		if _render_states.get(layer.id, []) != state:
+			_render_states[layer.id] = state
+			_layer_drawers[layer.id].queue_redraw()
+	for stroke: AtlasStroke in [_draft_stroke, _wall_preview]:
+		if stroke != null:
+			present_strokes[stroke] = true
+	for stroke: AtlasStroke in _ink_masks.keys():
+		if not present_strokes.has(stroke):
+			_ink_masks[stroke].queue_free()
+			_ink_masks.erase(stroke)
 	for id: String in _layer_groups.keys():
 		if not present.has(id):
 			_layer_groups[id].hide()
 			_layer_groups[id].queue_free()
 			_layer_groups.erase(id)
 			_layer_drawers.erase(id)
+			_render_states.erase(id)
 	_overlay.position = size * 0.5 - camera_center * camera_zoom
 	_overlay.scale = Vector2.ONE * camera_zoom
 	_overlay.queue_redraw()
@@ -393,9 +435,8 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 	var layer: AtlasLayer = floor.layer_by_id(id)
 	if id == active_layer_id and _preview_layer != null:
 		layer = _preview_layer
-	if layer is AtlasInkLayer:
-		var previewing: bool = _draft_stroke != null and active_layer_id == id
-		var artwork: Array[AtlasStroke] = _erase_preview if previewing and _erasing else layer.strokes
+	if layer is AtlasObjectsLayer:
+		var artwork: Array[AtlasStroke] = layer.strokes
 		for index: int in range(artwork.size()):
 			var stroke: AtlasStroke = artwork[index]
 			_draw_stroke(_wall_preview if id == active_layer_id and _wall_preview != null and index == _wall_selected_index else stroke, item)
@@ -405,24 +446,18 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 				guide.append(_wall_pointer)
 			if guide.size() > 1:
 				item.draw_polyline(guide, Color(0.96, 0.72, 0.32, 0.65), brush_width, true)
-		if previewing and not _erasing:
-			if _draft_stroke.filled:
-				if edit_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(_draft_stroke)):
-					_draw_stroke(_draft_stroke, item)
-			else:
-				for stroke: AtlasStroke in edit_scope.clip_strokes([_draft_stroke]):
-					_draw_stroke(stroke, item)
 	elif layer is AtlasRasterLayer:
 		item.draw_set_transform_matrix(layer.transform)
+		var textures: Dictionary[String, ImageTexture] = _preview_textures if layer == _preview_layer else _raster_textures
 		for chunk: AtlasRasterChunk in layer.chunks.values():
 			if chunk.image == null:
 				continue
 			var asset: String = chunk.asset_id
-			if not _raster_textures.has(asset):
-				_raster_textures[asset] = ImageTexture.create_from_image(chunk.image)
+			if not textures.has(asset):
+				textures[asset] = ImageTexture.create_from_image(chunk.image)
 			var origin: Vector2 = Vector2(chunk.coord) * AtlasRasterChunk.SIZE / layer.pixels_per_unit
 			var dimensions: Vector2 = Vector2(chunk.width, chunk.height) / layer.pixels_per_unit
-			item.draw_texture_rect(_raster_textures[asset], Rect2(origin, dimensions), false)
+			item.draw_texture_rect(textures[asset], Rect2(origin, dimensions), false)
 
 
 func _draw_overlays(item: Node2D) -> void:
@@ -469,7 +504,7 @@ func _draw_overlays(item: Node2D) -> void:
 		for vertex: Vector2 in _polygon_vertices:
 			item.draw_circle(vertex, 3.0 / camera_zoom, Color("#f9cc65"))
 	if tool == Tool.WALL_PATH and editing_target_is_presented():
-		var active: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+		var active: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 		if active != null and _wall_selected_index >= 0 and _wall_selected_index < active.strokes.size():
 			var wall: AtlasStroke = _wall_preview if _wall_preview != null else active.strokes[_wall_selected_index]
 			if wall.editable_path:
@@ -487,7 +522,7 @@ func _draw_brush_cursor(item: Node2D) -> void:
 	if not _brush_cursor_inside or tool not in [Tool.PEN, Tool.ERASER] or not editing_target_is_presented():
 		return
 	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-	if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
+	if not layer is AtlasRasterLayer or not layer.is_editable():
 		return
 	var center: Vector2 = local_to_document(_brush_cursor_local)
 	var radius: float = brush_width * 0.5
@@ -540,6 +575,20 @@ func _draw_grid(item: Node2D) -> void:
 
 
 func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
+	if stroke.is_prop():
+		var hash: HashingContext = HashingContext.new()
+		hash.start(HashingContext.HASH_SHA256)
+		hash.update(stroke.prop_webp)
+		var key: String = hash.finish().hex_encode()
+		if not _prop_textures.has(key):
+			var image: Image = AtlasWebPStore.decode_lossless(stroke.prop_webp, stroke.prop_size.x, stroke.prop_size.y)
+			if image == null:
+				return
+			_prop_textures[key] = ImageTexture.create_from_image(image)
+		item.draw_set_transform(stroke.points[0], stroke.prop_rotation)
+		item.draw_texture_rect(_prop_textures[key], Rect2(Vector2.ZERO, stroke.prop_dimensions()), false, stroke.color)
+		item.draw_set_transform_matrix(Transform2D.IDENTITY)
+		return
 	if stroke.is_text():
 		if AtlasTextLayout.readable(stroke, camera_zoom):
 			item.draw_set_transform(stroke.points[0], stroke.text_rotation)
@@ -556,15 +605,42 @@ func _draw_stroke(stroke: AtlasStroke, item: Node2D) -> void:
 	if centers.size() == 1:
 		item.draw_circle(centers[0], stroke.width * 0.5, stroke.color, true, -1.0, true)
 	elif centers.size() > 1:
+		if centers.size() > 128:
+			_draw_ink_mask(stroke, item)
+			return
 		var outlines: Array[PackedVector2Array] = AtlasStrokeGeometry.outline(centers, stroke.width)
 		if outlines.size() == 1 and outlines[0].size() >= 3:
 			item.draw_colored_polygon(outlines[0], stroke.color)
 		else:
-			# Closed or looping paths can have holes; polygon fills cannot cut them.
-			# Keep the old outline drawing in that case rather than fill a shape.
-			item.draw_polyline(centers, stroke.color, stroke.width, true)
-			for point: Vector2 in centers:
-				item.draw_circle(point, stroke.width * 0.5, stroke.color)
+			# A coverage mask preserves holes and composites self-overlaps only once.
+			_draw_ink_mask(stroke, item)
+
+
+func _draw_ink_mask(stroke: AtlasStroke, item: Node2D) -> void:
+	if not _ink_masks.has(stroke):
+		var bounds: Rect2 = AtlasSelectionGeometry.stroke_bounds(stroke).grow(2.0 / camera_zoom)
+		var pixels: Rect2 = Rect2(document_to_local(bounds.position), bounds.size * camera_zoom).intersection(Rect2(Vector2.ZERO, size))
+		if not pixels.has_area():
+			return
+		pixels = Rect2(pixels.position.floor(), pixels.end.ceil() - pixels.position.floor())
+		var mask: CoverageMask = CoverageMask.new()
+		add_child(mask)
+		mask.configure(pixels.size, camera_zoom, local_to_document(pixels.get_center()))
+		var coverage: AtlasStroke = stroke.copy()
+		if stroke.editable_path:
+			coverage.points = AtlasEditablePath.render_points(stroke)
+		mask.update_stroke(coverage, AtlasEditScope.new())
+		_ink_masks[stroke] = mask
+	item.draw_texture_rect(_ink_masks[stroke].texture(), _ink_masks[stroke].document_rect, false, stroke.color)
+
+
+func _clear_ink_masks() -> void:
+	for mask: CoverageMask in _ink_masks.values():
+		mask.queue_free()
+	_ink_masks.clear()
+	for id: String in _layer_drawers:
+		if floor != null and floor.layer_by_id(id) is AtlasObjectsLayer:
+			_render_states.erase(id)
 
 
 func _append_stroke_point(local_position: Vector2, shift_pressed: bool = false, alt_pressed: bool = false) -> void:
@@ -581,18 +657,59 @@ func _append_stroke_point(local_position: Vector2, shift_pressed: bool = false, 
 			_draft_stroke = AtlasShapes.stroke(_shape_kind, endpoints[0], endpoints[1], brush_color, brush_width)
 		else:
 			_draft_stroke = AtlasShapes.stroke(_shape_kind, _gesture_start, point, brush_color, brush_width)
+		_preview_dirty = true
 		queue_redraw()
 		return
 	if _draft_stroke.points[-1].distance_squared_to(point) >= 0.01:
 		_draft_stroke.points.append(point)
-	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-	if layer is AtlasInkLayer and _erasing:
-		_erase_preview = edit_scope.erase(layer.strokes, _draft_stroke.points, _draft_stroke.width)
-	elif layer is AtlasRasterLayer:
-		var result: AtlasFillResult = AtlasRasterBrush.paint(layer, _draft_stroke.points, _draft_stroke.color,
-			_draft_stroke.width, _erasing, edit_scope)
-		_preview_layer = result.layer if result.ok else null
+		_preview_dirty = true
+	elif _preview_samples == 0:
+		_preview_dirty = true
 	queue_redraw()
+
+
+func _process(_delta: float) -> void:
+	if not _preview_dirty or _draft_stroke == null:
+		return
+	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+	var samples: PackedVector2Array = _draft_stroke.points.slice(_preview_samples)
+	if layer is AtlasRasterLayer:
+		var result: AtlasFillResult = (_raster_brush.append(samples) if _raster_brush != null
+			else AtlasRasterBrush.paint_stroke(layer, _draft_stroke, false, edit_scope))
+		_preview_layer = result.layer if result.ok else null
+		# Preview images mutate in their detached session; never retain old texture generations.
+		_preview_textures.clear()
+	_preview_samples = _draft_stroke.points.size()
+	# Raster sessions mutate in place, so identity alone cannot invalidate their drawer.
+	if layer is AtlasRasterLayer:
+		_render_states.erase(layer.id)
+	_preview_dirty = false
+	queue_redraw()
+
+
+func _end_freehand() -> void:
+	if _capturing_freehand:
+		Input.use_accumulated_input = _restore_accumulated_input
+	_capturing_freehand = false
+	_preview_dirty = false
+	_preview_samples = 0
+	_raster_brush = null
+	_preview_textures.clear()
+	_render_states.erase(active_layer_id)
+
+
+func _clear_raster_textures() -> void:
+	_raster_textures.clear()
+	_preview_textures.clear()
+	# Retained draw commands contain RIDs, not owning references to ImageTexture.
+	# Releasing a texture requires rebuilding every drawer that used that RID.
+	for id: String in _layer_drawers:
+		if floor != null and floor.layer_by_id(id) is AtlasRasterLayer:
+			_render_states.erase(id)
+
+
+func _exit_tree() -> void:
+	_end_freehand()
 
 
 func _draw_links(item: Node2D) -> void:
@@ -729,29 +846,38 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			if not editing_target_is_presented():
 				return
 			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-			if not (layer is AtlasInkLayer or layer is AtlasRasterLayer) or not layer.is_editable():
+			if not layer is AtlasRasterLayer or not layer.is_editable():
 				return
 			_erasing = tool == Tool.ERASER
+			_restore_accumulated_input = Input.use_accumulated_input
+			Input.use_accumulated_input = false
+			_capturing_freehand = true
+			_preview_samples = 0
+			_raster_brush = AtlasRasterBrush.new(layer, brush_color, brush_width, _erasing, edit_scope)
 			_stroke_left_canvas = false
 			_draft_stroke = AtlasStroke.new(PackedVector2Array([position]), brush_color, brush_width)
 			_append_stroke_point(mouse.position)
 		Tool.LINE, Tool.RECTANGLE, Tool.ELLIPSE:
 			if not editing_target_is_presented():
 				return
-			var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+			var layer: AtlasRasterLayer = floor.layer_by_id(active_layer_id) as AtlasRasterLayer
 			if layer != null and layer.is_editable():
+				_erasing = false
 				_shape_kind = Tool.keys()[tool]
 				_gesture_snap = snap_to_grid
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_brush_cursor_local = mouse.position
 				_stroke_left_canvas = false
 				_draft_stroke = AtlasShapes.stroke("LINE", _gesture_start, _gesture_start, brush_color, brush_width)
+				_preview_dirty = true
 		Tool.MOVE:
 			_begin_artwork_move(position)
 		Tool.ART_SELECT:
 			if not editing_target_is_presented():
 				return
 			var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+			if not layer is AtlasObjectsLayer:
+				return
 			_gesture_start = position
 			_gesture_snap = snap_to_grid
 			_gesture_end = position
@@ -781,7 +907,7 @@ func _begin_artwork_move(position: Vector2) -> void:
 	if not editing_target_is_presented():
 		return
 	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-	if layer == null or not (layer is AtlasInkLayer or layer is AtlasRasterLayer):
+	if not layer is AtlasObjectsLayer:
 		return
 	if selection.is_empty() or not selection.matches(layer) or not selection.bounds.has_point(position):
 		selection = AtlasSelectionGeometry.select_point(layer, position, 5.0 / camera_zoom)
@@ -819,7 +945,7 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		_fill_pending = false
 		fill_requested.emit()
 		_preview_layer = null
-		_raster_textures.clear()
+		_clear_raster_textures()
 		queue_redraw()
 		interaction_finished.emit()
 	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:
@@ -887,7 +1013,7 @@ func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void
 func _begin_text_edit(position: Vector2) -> void:
 	if not editing_target_is_presented():
 		return
-	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable():
 		return
 	for index: int in range(layer.strokes.size() - 1, -1, -1):
@@ -907,7 +1033,7 @@ func _begin_text_edit(position: Vector2) -> void:
 func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 	if not editing_target_is_presented():
 		return
-	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable():
 		return
 	if not _wall_vertices.is_empty():
@@ -1029,10 +1155,11 @@ func _handle_wall_key(event: InputEventKey) -> void:
 func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> void:
 	if not editing_target_is_presented():
 		return
-	var layer: AtlasInkLayer = floor.layer_by_id(active_layer_id) as AtlasInkLayer
+	var layer: AtlasRasterLayer = floor.layer_by_id(active_layer_id) as AtlasRasterLayer
 	if layer == null or not layer.is_editable():
 		return
 	if _polygon_vertices.is_empty():
+		_erasing = false
 		_gesture_snap = snap_to_grid
 	var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
 	if mouse.double_click:
@@ -1060,5 +1187,13 @@ func _update_polygon_preview(local_position: Vector2) -> void:
 	# preview; the pointer's next edge remains a gold guide, not a phantom fill.
 	if candidates.size() < 3 and candidates[-1].distance_squared_to(_polygon_pointer) > 0.0001:
 		candidates.append(_polygon_pointer)
-	_draft_stroke = AtlasShapes.polygon(candidates, brush_color, brush_width, polygon_solid_fill)
+	var next: AtlasStroke = AtlasShapes.polygon(candidates, brush_color, brush_width, polygon_solid_fill)
+	if next == null or _draft_stroke == null or next.points != _draft_stroke.points \
+			or next.filled != _draft_stroke.filled or next.color != _draft_stroke.color or next.width != _draft_stroke.width:
+		_draft_stroke = next
+		_preview_dirty = next != null
+		if next == null:
+			_preview_layer = null
+			_preview_textures.clear()
+			_render_states.erase(active_layer_id)
 	queue_redraw()

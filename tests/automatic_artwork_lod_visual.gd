@@ -37,7 +37,7 @@ func _run() -> void:
 	canvas.preview = AtlasCanvas.Preview.OFF
 	canvas.show_reference = false
 	canvas.render_grid = false
-	var overview: AtlasInkLayer = canvas.floor.ink_layer()
+	var overview: AtlasObjectsLayer = canvas.floor.objects_layer()
 	var points: PackedVector2Array = PackedVector2Array([Vector2(-45, 0), Vector2(45, 0)])
 	editor._on_stroke(AtlasStroke.new(points, Color.RED, 12.0), false)
 	var detail: AtlasInkLayer = AtlasInkLayer.new("detail", "D1 interior")

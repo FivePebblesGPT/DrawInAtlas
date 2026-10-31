@@ -33,7 +33,7 @@ func _check(value: bool, description: String) -> void:
 
 
 func _test_crossing_ink(board: AtlasMapDocument) -> void:
-	var ink: AtlasInkLayer = board.floors[0].ink_layer()
+	var ink: AtlasObjectsLayer = board.floors[0].objects_layer()
 	var first: Vector2 = board.grid.cell_to_document(Vector2i(-1, 0))
 	var last: Vector2 = board.grid.cell_to_document(Vector2i(2, 0))
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([first, last]), Color.RED, 4.0))
@@ -135,8 +135,8 @@ func _test_detail_and_navigation(board: AtlasMapDocument, campaign: AtlasCampaig
 	var navigation: AtlasMapNavigator = AtlasMapNavigator.new(canvas)
 	navigation.reset(campaign)
 	_check(navigation.show_map(board), "open continuous board")
-	canvas.active_layer_id = "ink"
-	_check(canvas.set_presented_detail_level(1) and canvas.active_layer_id == "ink",
+	canvas.active_layer_id = "objects"
+	_check(canvas.set_presented_detail_level(1) and canvas.active_layer_id == "objects",
 		"switching presented detail never retargets the selected editing layer")
 	_check(not canvas.editing_target_is_presented(), "hidden editing target is detected")
 	var edits: AtlasEditHistory = AtlasEditHistory.new(campaign)
@@ -155,14 +155,20 @@ func _test_detail_and_navigation(board: AtlasMapDocument, campaign: AtlasCampaig
 	artwork.refresh_scope()
 	var center: Vector2 = board.grid.cell_to_document(Vector2i.ZERO)
 	var adjacent: Vector2 = board.grid.cell_to_document(Vector2i(1, 0))
+	canvas.active_layer_id = "raster"
+	var raster_before: Dictionary = board.floors[0].raster_layer().to_dict()
 	artwork.stroke(AtlasStroke.new(PackedVector2Array([center, adjacent]), Color.WHITE, 3.0), false)
-	_check(board.floors[0].ink_layer().strokes.size() > original_count,
-		"editor paints within selected-hex scope on the original ink layer")
-	for index: int in range(original_count, board.floors[0].ink_layer().strokes.size()):
-		var clipped: AtlasStroke = board.floors[0].ink_layer().strokes[index]
-		_check(clipped.points[-1].distance_to(center) < center.distance_to(adjacent),
-			"editor clips crossing ink to active cell, no coordinate rebase")
-	_check(edits.undo() and board.floors[0].ink_layer().strokes.size() == original_count,
+	_check(board.floors[0].raster_layer().to_dict() != raster_before,
+		"editor paints raster within selected-hex scope")
+	var raster: AtlasRasterLayer = board.floors[0].raster_layer()
+	var contained: bool = true
+	for chunk: AtlasRasterChunk in raster.chunks.values():
+		for y: int in range(chunk.height):
+			for x: int in range(chunk.width):
+				if chunk.image.get_pixel(x, y).a > 0:
+					contained = contained and AtlasFill._allows_pixel(raster, chunk.coord * AtlasRasterChunk.SIZE + Vector2i(x, y), artwork.scope())
+	_check(contained, "every painted pixel fits the active cell without coordinate rebasing")
+	_check(edits.undo() and board.floors[0].raster_layer().to_dict() == raster_before,
 		"undo restores the shared original layer after cell-mask editing")
 	artwork.locked_to_cell = false
 	artwork.refresh_scope()
@@ -193,7 +199,7 @@ func _test_round_trip(campaign: AtlasCampaign) -> void:
 	if loaded == null:
 		return
 	var floor: AtlasFloor = loaded.get_map("shared").floors[0]
-	_check(floor.layer_by_id("ink").detail_level == 0 and floor.layer_by_id("detail").detail_level == 1,
+	_check(floor.layer_by_id("objects").detail_level == 0 and floor.layer_by_id("detail").detail_level == 1,
 		"legacy default and explicit detail levels survive dictionary validation")
 	_check(floor.ink_layer().strokes.size() == 1 and floor.layer_by_id("detail") is AtlasInkLayer,
 		"cross-hex stroke and local detail survive serialization independently")

@@ -72,13 +72,12 @@ func _run() -> void:
 	editor.layer_panel.auto_detail_checkbox.button_pressed = false
 	editor._choose_tool(AtlasCanvas.Tool.POLYGON)
 	var canvas: AtlasCanvas = editor.canvas
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-	_check(ink != null and editor.inspector.polygon_fill_checkbox.visible, "polygon picker and inspector controls")
+	_check(canvas.floor.raster_layer() != null and editor.inspector.polygon_fill_checkbox.visible, "polygon picker and inspector controls")
 	canvas.camera_center = Vector2(30, 25)
 	canvas.camera_zoom = 1.5
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
-	_check(canvas.is_editing() and ink.strokes.is_empty(), "multiple clicks leave source unchanged")
+	_check(canvas.is_editing() and canvas.floor.raster_layer().chunks.is_empty(), "multiple clicks leave source unchanged")
 	_check(canvas._draft_stroke != null or canvas._polygon_vertices.size() == 3, "draft is held outside history")
 	var motion: InputEventMouseMotion = InputEventMouseMotion.new()
 	motion.position = canvas.document_to_local(Vector2(70, 60))
@@ -86,10 +85,10 @@ func _run() -> void:
 	_check(canvas._draft_stroke != null and canvas._draft_stroke.points == AtlasShapes.polygon(triangle, canvas.brush_color, canvas.brush_width, false).points,
 		"pending fourth vertex never changes the Enter-to-commit preview")
 	_key(canvas, KEY_ENTER)
-	_check(not canvas.is_editing() and ink.strokes.size() == 1, "Enter commits one closed polygon")
-	_check(not ink.strokes[0].filled and ink.strokes[0].points[0] == ink.strokes[0].points[-1], "default outline persisted")
-	_check(editor.edits.undo() and ink.strokes.is_empty(), "outline is one undo")
-	_check(editor.edits.redo() and ink.strokes.size() == 1, "outline redo")
+	_check(not canvas.is_editing() and not canvas.floor.raster_layer().chunks.is_empty(), "Enter commits raster polygon")
+	_check(_matches(canvas, triangle, false), "default outline pixels persisted")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().chunks.is_empty(), "outline is one undo")
+	_check(editor.edits.redo() and not canvas.floor.raster_layer().chunks.is_empty(), "outline redo")
 	_check(editor.edits.undo(), "clear before next test")
 
 	# Fill control is wired to the canvas and stored in one shape, not a raster island.
@@ -99,39 +98,39 @@ func _run() -> void:
 		_vertex(canvas, point)
 	_mouse(canvas, triangle[0], true)
 	_mouse(canvas, triangle[0], false)
-	_check(ink.strokes.size() == 1 and ink.strokes[0].filled and not canvas.is_editing(), "close by first vertex")
-	_check(AtlasSelectionGeometry.select_point(ink, Vector2(30, 20), 1).stroke_indices == [0], "interior hit test on live ink")
+	_check(_matches(canvas, triangle, true) and not canvas.is_editing(), "close by first vertex paints solid raster")
+	_check(canvas.floor.objects_layer().strokes.is_empty(), "polygon does not create an editable object")
 	var saved: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
 	_check(loaded != null and loaded.to_dict() == saved, "filled polygon native-save round-trip")
-	var stored: AtlasInkLayer = loaded.get_map(canvas.map.id).floor_by_id(canvas.floor.id).layer_by_id(ink.id) as AtlasInkLayer if loaded != null else null
-	_check(stored != null and stored.strokes.size() == 1 and stored.strokes[0].filled, "native file keeps filled style")
-	_check(editor.edits.undo() and ink.strokes.is_empty(), "filled polygon one undo")
+	var stored: AtlasRasterLayer = loaded.get_map(canvas.map.id).floor_by_id(canvas.floor.id).raster_layer() if loaded != null else null
+	_check(stored != null and stored.to_dict() == canvas.floor.raster_layer().to_dict(), "native file keeps exact filled pixels")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().chunks.is_empty(), "filled polygon one undo")
 
 	# Esc, Backspace and failed geometry produce no partial history commands.
 	_vertex(canvas, triangle[0])
 	_vertex(canvas, triangle[1])
 	_key(canvas, KEY_ENTER)
-	_check(ink.strokes.is_empty(), "invalid two-point shape cannot commit")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "invalid two-point shape cannot commit")
 	_vertex(canvas, triangle[0])
 	_vertex(canvas, triangle[1]); _vertex(canvas, triangle[2])
 	_key(canvas, KEY_BACKSPACE)
 	_check(canvas._polygon_vertices.size() == 2, "Backspace removes last vertex")
 	_key(canvas, KEY_ESCAPE)
-	_check(not canvas.is_editing() and ink.strokes.is_empty(), "Escape cancels without mutation")
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().chunks.is_empty(), "Escape cancels without mutation")
 
-	ink.locked = true
+	canvas.floor.raster_layer().locked = true
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
 	_key(canvas, KEY_ENTER)
-	_check(ink.strokes.is_empty(), "locked target blocks every vertex")
-	ink.locked = false
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "locked target blocks every vertex")
+	canvas.floor.raster_layer().locked = false
 	_check(canvas.set_presented_detail_level(1), "hide editing detail")
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
 	_key(canvas, KEY_ENTER)
-	_check(ink.strokes.is_empty(), "hidden detail blocks polygons")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "hidden detail blocks polygons")
 	_check(canvas.set_presented_detail_level(0), "show editing detail")
 
 	canvas.has_selected_cell = true
@@ -140,13 +139,13 @@ func _run() -> void:
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
 	_key(canvas, KEY_ENTER)
-	_check(ink.strokes.is_empty(), "cell mask rejects filled polygon outside mask")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "cell mask rejects filled polygon outside mask")
 	editor._on_scope_toggled(false)
 	# Clicking twice on final vertex should not create a duplicate invalid edge.
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
 	_mouse(canvas, triangle[2], true, true)
-	_check(ink.strokes.size() == 1, "double click finishes without duplicated vertex")
+	_check(_matches(canvas, triangle, true), "double click finishes without duplicated vertex")
 	_check(editor.edits.undo(), "double click shape undo")
 
 	# A rotated board grid snaps every new vertex and freezes the snap choice
@@ -166,7 +165,7 @@ func _run() -> void:
 	editor.inspector.snap_checkbox.button_pressed = false
 	_check(canvas._gesture_snap and canvas._polygon_vertices == snapped, "gesture keeps its snap mode while controls change")
 	_key(canvas, KEY_ENTER)
-	_check(ink.strokes.size() == 1 and ink.strokes[-1].points[0] == snapped[0], "snapped polygon stored without shifting earlier vertices")
+	_check(_matches(canvas, snapped, true), "snapped polygon pixels match authored vertices")
 	_check(editor.edits.undo(), "snapped polygon undo")
 
 	root.remove_child(scene)
@@ -174,6 +173,12 @@ func _run() -> void:
 	_remove(folder)
 	print("ATLAS_POLYGON_%s checks=%d failures=%d" % ["PASSED" if failures == 0 else "FAILED", checks, failures])
 	quit(1 if failures > 0 else 0)
+
+
+func _matches(canvas: AtlasCanvas, vertices: PackedVector2Array, filled: bool) -> bool:
+	var shape: AtlasStroke = AtlasShapes.polygon(vertices, canvas.brush_color, canvas.brush_width, filled)
+	var expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(AtlasRasterLayer.paint_layer(), shape)
+	return expected.ok and expected.layer.to_dict() == canvas.floor.raster_layer().to_dict()
 
 
 func _ink_with(stroke: AtlasStroke) -> AtlasInkLayer:

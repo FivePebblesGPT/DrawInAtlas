@@ -85,7 +85,7 @@ func _run() -> void:
 	var canvas: AtlasCanvas = editor.canvas
 	canvas.camera_zoom = 1.4
 	canvas.camera_center = Vector2(35, 30)
-	var live: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var live: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(live != null and editor.inspector._wall_controls.visible, "tool has ink inspector options")
 	_click(canvas, a)
 	_click(canvas, b)

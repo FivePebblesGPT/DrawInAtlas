@@ -17,6 +17,7 @@ var _pending_fill: AtlasFillResult
 var _pending_fill_layer_id: String = ""
 var _canvas: AtlasCanvas
 var _edits: AtlasEditHistory
+var _routing_tool: bool = false
 
 
 func _init(canvas: AtlasCanvas, edits: AtlasEditHistory) -> void:
@@ -41,17 +42,56 @@ func choose_tool(tool: AtlasCanvas.Tool) -> void:
 		locked_to_cell = false
 	if tool not in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]:
 		_canvas.clear_selection()
-	if _canvas.floor != null:
-		var current: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
-		if tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH] and not current is AtlasInkLayer:
-			var ink: AtlasInkLayer = _canvas.floor.ink_layer()
-			if ink != null:
-				select_layer(ink.id)
-		elif tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER] and not (current is AtlasInkLayer or current is AtlasRasterLayer):
-			var ink: AtlasInkLayer = _canvas.floor.ink_layer()
-			if ink != null:
-				select_layer(ink.id)
+	_route_tool(tool, tool not in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE])
 	refresh_scope()
+
+
+static func tool_layer_kind(tool: AtlasCanvas.Tool) -> String:
+	if tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.FILL,
+			AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON]:
+		return "RASTER"
+	if tool in [AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]:
+		return "OBJECTS"
+	return ""
+
+
+func _route_tool(tool: AtlasCanvas.Tool, create: bool = true) -> void:
+	if _canvas.floor == null or tool_layer_kind(tool).is_empty():
+		return
+	var kind: String = tool_layer_kind(tool)
+	var level: int = _canvas.presented_detail_level
+	var target: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
+	if not _eligible_target(target, kind, level):
+		target = null
+		for candidate: AtlasLayer in _canvas.floor.layers:
+			if _eligible_target(candidate, kind, level):
+				target = candidate
+	if target == null and not create:
+		_canvas.clear_selection()
+		message.emit("There are no editable Objects on this detail level.")
+		return
+	_routing_tool = true
+	if target == null:
+		var id: String = kind.to_lower() + "-" + Crypto.new().generate_random_bytes(16).hex_encode()
+		target = AtlasRasterLayer.paint_layer(id) if kind == "RASTER" else AtlasObjectsLayer.new(id)
+		target.detail_level = level
+		var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
+		layers.append(target)
+		apply_layers(layers, target.id)
+	elif target is AtlasRasterLayer and target.pixels_per_unit < AtlasRasterLayer.PAINT_PIXELS_PER_UNIT:
+		var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
+		var upgraded: AtlasRasterLayer = target.at_paint_density()
+		if upgraded != null:
+			layers[_canvas.floor.layers.find(target)] = upgraded
+			apply_layers(layers, target.id)
+	if _canvas.active_layer_id != target.id:
+		select_layer(target.id)
+	_routing_tool = false
+
+
+static func _eligible_target(layer: AtlasLayer, kind: String, level: int) -> bool:
+	return (layer != null and layer.is_editable() and layer.detail_level == level
+		and ((layer is AtlasRasterLayer) if kind == "RASTER" else (layer is AtlasObjectsLayer)))
 
 
 func select_layer(id: String) -> void:
@@ -64,6 +104,13 @@ func select_layer(id: String) -> void:
 	# updates never perform this operation or change the editing target.
 	_canvas.set_presented_detail_level(_canvas.floor.layer_by_id(id).detail_level)
 	layers_changed.emit(id)
+	if not _routing_tool:
+		var layer: AtlasLayer = _canvas.floor.layer_by_id(id)
+		var required: String = tool_layer_kind(_canvas.tool)
+		if required == "OBJECTS" and layer is AtlasRasterLayer:
+			tool_requested.emit(AtlasCanvas.Tool.PEN)
+		elif required == "RASTER" and layer is AtlasObjectsLayer:
+			tool_requested.emit(AtlasCanvas.Tool.ART_SELECT)
 	message.emit("Selected layer: %s" % _canvas.floor.layer_by_id(id).display_name)
 
 
@@ -77,9 +124,8 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 		return false
 	layers_changed.emit(selected_id)
 	var selected: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
-	if new_layer and ((selected is AtlasInkLayer and selected.strokes.is_empty())
-			or (selected is AtlasRasterLayer and selected.chunks.is_empty())):
-		tool_requested.emit(AtlasCanvas.Tool.PEN)
+	if new_layer and not _routing_tool:
+		tool_requested.emit(AtlasCanvas.Tool.ART_SELECT if selected is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
 	_canvas.queue_redraw()
 	if not _canvas.editing_target_is_presented():
 		message.emit("Layer changed. Editing target is in D%d, but D%d is displayed; select its detail level before drawing." % [
@@ -98,7 +144,7 @@ func stroke(stroke: AtlasStroke, erasing: bool) -> void:
 	_canvas.clear_selection()
 	var target: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if target is AtlasRasterLayer:
-		var result: AtlasFillResult = AtlasRasterBrush.paint(target, stroke.points, stroke.color, stroke.width, erasing, scope())
+		var result: AtlasFillResult = AtlasRasterBrush.paint_stroke(target, stroke, erasing, scope())
 		if not result.ok:
 			message.emit(result.message)
 			return
@@ -106,29 +152,7 @@ func stroke(stroke: AtlasStroke, erasing: bool) -> void:
 		layers[_canvas.floor.layers.find(target)] = result.layer
 		apply_layers(layers, target.id)
 		return
-	var layer: AtlasInkLayer = target as AtlasInkLayer
-	if layer == null or not layer.is_editable():
-		message.emit("Select visible, unlocked ink or raster content to draw.")
-		return
-	var before: Array[AtlasStroke] = layer.strokes
-	var after: Array[AtlasStroke]
-	if erasing:
-		after = scope().erase(before, stroke.points, stroke.width)
-	else:
-		after = AtlasStroke.clone_all(before)
-		if stroke.filled:
-			# A solid fill must never spill outside a cell mask. Reject the entire
-			# polygon rather than splitting its interior into unrelated strokes.
-			if not scope().contains_rect(AtlasSelectionGeometry.stroke_bounds(stroke)):
-				message.emit("Polygon is outside the selected-cell edit mask.")
-				return
-			after.append(stroke.copy())
-		else:
-			after.append_array(scope().clip_strokes([stroke]))
-	var command: AtlasStrokeEdit = AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, before, after, layer.id)
-	if _edits.execute(command):
-		_canvas.queue_redraw()
-		message.emit("Erased ink. One gesture = one undo." if erasing else "Stroke added in board coordinates.")
+	message.emit("Drawing tools paint raster. Use object tools to create or edit Objects.")
 
 
 ## A path is a separately editable stroke object; all changes use a guarded
@@ -136,7 +160,7 @@ func stroke(stroke: AtlasStroke, erasing: bool) -> void:
 func edit_path(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> void:
 	if not _canvas.editing_target_is_presented():
 		return
-	var layer: AtlasInkLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable() or replacement == null or not replacement.editable_path or not replacement.is_valid():
 		return
 	if index < -1 or index >= layer.strokes.size():
@@ -166,7 +190,7 @@ func edit_path(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> v
 func edit_text(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> void:
 	if not _canvas.editing_target_is_presented():
 		return
-	var layer: AtlasInkLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable() or replacement == null or not replacement.is_text() or not replacement.is_valid():
 		return
 	if index < -1 or index >= layer.strokes.size():
@@ -320,7 +344,7 @@ func copy_selection() -> bool:
 		return false
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	var encoded: String = ""
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		encoded = AtlasClipboard.encode_ink(layer.strokes, _canvas.selection.stroke_indices, _canvas.selection.bounds.position)
 	elif layer is AtlasRasterLayer:
 		encoded = AtlasClipboard.encode_raster(layer, _canvas.selection.bounds.position)
@@ -342,11 +366,11 @@ func delete_selection() -> bool:
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
 	var index: int = _canvas.floor.layers.find(layer)
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		var indices: Array[int] = _canvas.selection.stroke_indices.duplicate()
 		indices.sort()
 		indices.reverse()
-		var ink: AtlasInkLayer = layers[index] as AtlasInkLayer
+		var ink: AtlasObjectsLayer = layers[index] as AtlasObjectsLayer
 		for stroke_index: int in indices:
 			ink.strokes.remove_at(stroke_index)
 	else:
@@ -365,7 +389,7 @@ func paste_selection() -> bool:
 		if _system_clipboard_enabled() and DisplayServer.clipboard_has_image():
 			var image: Image = DisplayServer.clipboard_get_image()
 			if image != null:
-				return import_raster(image)
+				return import_prop(image)
 		message.emit("Clipboard has no supported artwork.")
 		return false
 	var anchor: Vector2 = _canvas.camera_center + Vector2.ONE * float(20 * _paste_count)
@@ -378,8 +402,15 @@ func paste_selection() -> bool:
 func paste_payload(payload: AtlasClipboardData, anchor: Vector2) -> bool:
 	if payload == null or not anchor.is_finite() or not _canvas.editing_target_is_presented():
 		return false
+	if payload.kind == "INK":
+		for object: AtlasStroke in payload.strokes:
+			if not (object.editable_path or object.is_text() or object.is_prop()):
+				message.emit("Ordinary vector drawing is retired; clipboard objects must be walls, text or props.")
+				return false
+		_route_tool(AtlasCanvas.Tool.ART_SELECT)
+		choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	var target: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
-	if payload.kind == "INK" and target is AtlasInkLayer and target.is_editable():
+	if payload.kind == "INK" and target is AtlasObjectsLayer and target.is_editable():
 		return _paste_ink(payload, target, anchor)
 	if payload.kind == "RASTER" and payload.raster != null:
 		return _paste_raster(payload.raster, anchor)
@@ -387,7 +418,7 @@ func paste_payload(payload: AtlasClipboardData, anchor: Vector2) -> bool:
 	return false
 
 
-func _paste_ink(payload: AtlasClipboardData, target: AtlasInkLayer, anchor: Vector2) -> bool:
+func _paste_ink(payload: AtlasClipboardData, target: AtlasObjectsLayer, anchor: Vector2) -> bool:
 	var pasted: Array[AtlasStroke] = AtlasStroke.clone_all(payload.strokes)
 	for stroke: AtlasStroke in pasted:
 		for point: int in range(stroke.points.size()):
@@ -424,13 +455,12 @@ func _paste_raster(source: AtlasRasterLayer, anchor: Vector2) -> bool:
 	layers.append(raster)
 	if not apply_layers(layers, raster.id):
 		return false
-	select_all_artwork()
-	message.emit("Pasted raster asset. Drag it or use the corner handle to place it.")
+	message.emit("Pasted raster artwork. Drawing tools target this raster layer.")
 	return true
 
 
 func import_raster(image: Image) -> bool:
-	var layer: AtlasRasterLayer = AtlasRasterLayer.from_image_chunks(image)
+	var layer: AtlasRasterLayer = AtlasRasterLayer.from_image_chunks(image, AtlasRasterLayer.PAINT_PIXELS_PER_UNIT)
 	if layer == null:
 		message.emit("Could not create a raster layer from that image.")
 		return false
@@ -445,6 +475,36 @@ func import_raster(image: Image) -> bool:
 	layers.append(layer)
 	if not apply_layers(layers, layer.id):
 		return false
-	select_all_artwork()
-	message.emit("Imported raster asset. Drag it or use the corner handle to place it.")
+	message.emit("Imported raster artwork. Drawing tools target this raster layer.")
+	return true
+
+
+func import_prop(image: Image) -> bool:
+	if image == null or image.is_empty() or image.get_width() > 4096 or image.get_height() > 4096:
+		return false
+	var bytes: PackedByteArray = AtlasWebPStore.encode_lossless(image)
+	if bytes.is_empty():
+		message.emit("Could not encode the prop as lossless WebP.")
+		return false
+	_route_tool(AtlasCanvas.Tool.ART_SELECT)
+	choose_tool(AtlasCanvas.Tool.ART_SELECT)
+	var layer: AtlasObjectsLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasObjectsLayer
+	if layer == null or not layer.is_editable():
+		return false
+	var object: AtlasStroke = AtlasStroke.new(PackedVector2Array([_canvas.camera_center]), Color.WHITE,
+		float(image.get_width()) / AtlasRasterLayer.PAINT_PIXELS_PER_UNIT)
+	object.prop_webp = bytes
+	object.prop_size = image.get_size()
+	object.points[0] -= object.prop_dimensions() * 0.5
+	if not object.is_valid() or not scope().contains_rect(AtlasSelectionGeometry.stroke_bounds(object)):
+		message.emit("The image prop does not fit the current edit mask.")
+		return false
+	var after: Array[AtlasStroke] = AtlasStroke.clone_all(layer.strokes)
+	after.append(object)
+	if not _edits.execute(AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, layer.strokes, after, layer.id)):
+		return false
+	_canvas.selection = AtlasSelectionGeometry.select_indices(_canvas.floor.layer_by_id(layer.id), [after.size() - 1])
+	_canvas.selection_changed.emit()
+	_canvas.queue_redraw()
+	message.emit("Placed image prop on Objects. Drag to move; the corner handle scales it.")
 	return true

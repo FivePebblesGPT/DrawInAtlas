@@ -90,10 +90,7 @@ func _run() -> void:
 				_check(canvas._draft_stroke != null and canvas._draft_stroke.points == expected,
 					"preview exact geometry for modifiers and zoom")
 				_button(canvas, pointer, false, shift, centered)
-				var ink: AtlasInkLayer = canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
-				_check(ink.strokes[-1].points == expected, "committed endpoints match preview")
-				_check(ink.strokes[-1].width == 13.5 and ink.strokes[-1].color == canvas.brush_color,
-					"stroke retains width and RGBA")
+				_check(_matches(canvas, expected), "committed pixels match preview endpoints, width and RGBA")
 				_check(editor.edits.undo(), "line is one undo")
 				_check(editor.edits.redo(), "line is one redo")
 				_check(editor.edits.undo(), "restore source for next gesture")
@@ -131,15 +128,14 @@ func _run() -> void:
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false, true, true)
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
-	_check(ink.strokes[-1].points == AtlasShapes.line_endpoints(anchor, pointer, true, true),
+	_check(_matches(canvas, AtlasShapes.line_endpoints(anchor, pointer, true, true)),
 		"release modifier state recomputes final preview before commit")
 	_check(editor.edits.undo(), "modified release undo")
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer, true)
 	canvas.cancel_edit()
 	_button(canvas, pointer, false, true)
-	_check(ink.strokes.is_empty(), "Escape cancels draft without history")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "Escape cancels draft without history")
 
 	var grid: AtlasGrid = canvas.map.grid.copy()
 	grid.rotation = deg_to_rad(32.0)
@@ -154,22 +150,21 @@ func _run() -> void:
 	_check(canvas._draft_stroke != null and canvas._draft_stroke.points == expected_snapped,
 		"grid snaps raw endpoints first, angular and center modifiers then apply")
 	_button(canvas, pointer, false, true, true)
-	ink = canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
-	_check(ink.strokes[-1].points == expected_snapped, "snapped preview equals stored line")
+	_check(_matches(canvas, expected_snapped), "snapped preview equals stored pixels")
 	_check(editor.edits.undo(), "snapped line undo")
 
 	# Active layer, presentation, and edit-mask rules remain command-owned.
-	ink.locked = true
+	canvas.floor.raster_layer().locked = true
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false)
-	_check(ink.strokes.is_empty(), "locked layer rejects line")
-	ink.locked = false
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "locked layer rejects line")
+	canvas.floor.raster_layer().locked = false
 	_check(canvas.set_presented_detail_level(1), "switch to absent authored detail")
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false)
-	_check(ink.strokes.is_empty(), "hidden detail rejects line")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "hidden detail rejects line")
 	_check(canvas.set_presented_detail_level(0), "restore visible detail")
 	editor.inspector.snap_checkbox.button_pressed = false
 	canvas.has_selected_cell = true
@@ -178,13 +173,12 @@ func _run() -> void:
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false)
-	_check(ink.strokes.is_empty(), "masked outside-area line cannot be committed")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "masked outside-area line cannot be committed")
 	editor._on_scope_toggled(false)
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false)
-	ink = canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
-	_check(ink.strokes.size() == 1, "unmasked valid line commits")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "unmasked valid line commits pixels")
 	var saved: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
@@ -194,6 +188,12 @@ func _run() -> void:
 	_remove(folder)
 	print("ATLAS_LINE_%s checks=%d failures=%d" % ["PASSED" if failures == 0 else "FAILED", checks, failures])
 	quit(1 if failures > 0 else 0)
+
+
+func _matches(canvas: AtlasCanvas, endpoints: PackedVector2Array) -> bool:
+	var expected: AtlasFillResult = AtlasRasterBrush.paint(AtlasRasterLayer.paint_layer(), endpoints,
+		canvas.brush_color, canvas.brush_width, false)
+	return expected.ok and expected.layer.to_dict() == canvas.floor.raster_layer().to_dict()
 
 
 func _remove(path: String) -> void:

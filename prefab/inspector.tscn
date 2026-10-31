@@ -165,7 +165,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 visible = false
-text = "Erases only the active layer: cuts ink strokes or clears raster pixels to transparency. Not maps, links, or other layers. One drag = one undo."
+text = "Clears raster pixels to transparency. The raster target is selected automatically. Select and Delete removes Objects. One drag = one undo."
 autowrap_mode = 3
 
 [node name="ColorLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=1830986059]

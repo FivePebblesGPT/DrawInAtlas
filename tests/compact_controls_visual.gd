@@ -69,7 +69,7 @@ func _run() -> void:
 			"%s stays in the sidebar" % button.name)
 	var floor: AtlasFloor = editor.canvas.floor
 	var starting_layers: int = floor.layers.size()
-	await _click(actions.get_node("NewInkButton"))
+	await _click(actions.get_node("NewObjectsButton"))
 	_check(floor.layers.size() == starting_layers + 1, "native pointer triggers add ink")
 	await _frames(4)
 	var image: Image = root.get_texture().get_image()

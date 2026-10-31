@@ -43,9 +43,9 @@ func _run() -> void:
 		"hidden edit-target recovery retains explicit text")
 	var floor: AtlasFloor = editor.canvas.floor
 	var original_layers: int = floor.layers.size()
-	panel.get_node("Order/NewInkButton").pressed.emit()
-	_check(floor.layers.size() == original_layers + 1 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasInkLayer,
-		"new ink icon creates and selects an ink layer")
+	panel.get_node("Order/NewObjectsButton").pressed.emit()
+	_check(floor.layers.size() == original_layers + 1 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasObjectsLayer,
+		"new Objects icon creates and selects an Objects layer")
 	panel.get_node("Order/NewRasterButton").pressed.emit()
 	_check(floor.layers.size() == original_layers + 2 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasRasterLayer,
 		"new raster icon retains its original command")

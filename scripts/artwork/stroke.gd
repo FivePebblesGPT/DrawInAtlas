@@ -1,6 +1,6 @@
 class_name AtlasStroke
 extends Resource
-## Editable ink in continuous document coordinates, independent of any grid.
+## Document-space object records and transient raster drawing drafts.
 
 ## Canonical ordered vertices in document/board units. A text object has one
 ## anchor; a filled polygon repeats its first vertex at the end. Copies own
@@ -8,7 +8,7 @@ extends Resource
 @export_storage var points: PackedVector2Array
 ## Unpremultiplied RGBA for drawing and saving; alpha is not layer opacity.
 @export_storage var color: Color
-## Diameter in board units for ink, but font size in board units for text.
+## Board-space brush diameter, text font size, or image-prop display width.
 ## Must be finite and positive; text additionally obeys AtlasTextLayout limits.
 @export_storage var width: float
 ## Solid polygon shape, as opposed to a round-ended centerline stroke.
@@ -24,6 +24,10 @@ extends Resource
 ## Text-only rotation in radians about the single document-space anchor.
 ## Non-text strokes must keep all text-style fields at their defaults.
 @export_storage var text_rotation: float = 0.0
+## Image props are independently movable objects with embedded lossless pixels.
+@export_storage var prop_webp: PackedByteArray = PackedByteArray()
+@export_storage var prop_size: Vector2i = Vector2i.ZERO
+@export_storage var prop_rotation: float = 0.0
 
 
 func _init(path: PackedVector2Array = PackedVector2Array(), ink: Color = Color.BLACK,
@@ -43,11 +47,22 @@ func copy() -> AtlasStroke:
 	result.text_bold = text_bold
 	result.text_italic = text_italic
 	result.text_rotation = text_rotation
+	result.prop_webp = prop_webp
+	result.prop_size = prop_size
+	result.prop_rotation = prop_rotation
 	return result
 
 
 func is_text() -> bool:
 	return not text.is_empty()
+
+
+func is_prop() -> bool:
+	return not prop_webp.is_empty()
+
+
+func prop_dimensions() -> Vector2:
+	return Vector2(width, width * float(prop_size.y) / prop_size.x)
 
 
 func is_valid() -> bool:
@@ -58,6 +73,14 @@ func is_valid() -> bool:
 	for point: Vector2 in points:
 		if not point.is_finite():
 			return false
+	if is_prop():
+		return (points.size() == 1 and not filled and not editable_path and not closed_path
+			and not is_text() and is_finite(prop_rotation) and prop_size.x > 0 and prop_size.y > 0
+			and prop_size.x <= 4096 and prop_size.y <= 4096 and font_family == "Sans"
+			and not text_bold and not text_italic and text_rotation == 0.0
+			and AtlasWebPStore.decode_lossless(prop_webp, prop_size.x, prop_size.y) != null)
+	if prop_size != Vector2i.ZERO or prop_rotation != 0.0:
+		return false
 	if is_text():
 		return points.size() == 1 and not filled and not editable_path and not closed_path \
 			and text.strip_edges() != "" and text.length() <= AtlasTextLayout.MAX_CHARS \
@@ -86,6 +109,10 @@ func to_dict() -> Dictionary:
 	for point: Vector2 in points:
 		path.append([point.x, point.y])
 	var data: Dictionary = {"points": path, "color": [color.r, color.g, color.b, color.a], "width": width}
+	if is_prop():
+		data["prop_webp"] = Marshalls.raw_to_base64(prop_webp)
+		data["prop_size"] = [prop_size.x, prop_size.y]
+		data["prop_rotation"] = prop_rotation
 	if filled:
 		data["filled"] = true
 	if is_text():
@@ -140,6 +167,20 @@ static func from_dict(data: Dictionary) -> AtlasStroke:
 	result.text_bold = raw_bold
 	result.text_italic = raw_italic
 	result.text_rotation = float(raw_rotation)
+	if data.has("prop_webp"):
+		var bytes: Variant = data.get("prop_webp")
+		var dimensions: Variant = data.get("prop_size")
+		var rotation: Variant = data.get("prop_rotation", 0.0)
+		if not bytes is String or bytes.is_empty() or not dimensions is Array or dimensions.size() != 2 \
+				or not AtlasData.integer(dimensions[0]) or not AtlasData.integer(dimensions[1]) or not _is_number(rotation):
+			return null
+		result.prop_webp = Marshalls.base64_to_raw(bytes)
+		if Marshalls.raw_to_base64(result.prop_webp) != bytes:
+			return null
+		result.prop_size = Vector2i(int(dimensions[0]), int(dimensions[1]))
+		result.prop_rotation = float(rotation)
+	elif data.has("prop_size") or data.has("prop_rotation"):
+		return null
 	return result if result.is_valid() else null
 
 
@@ -159,6 +200,9 @@ static func same_artwork(first: Array[AtlasStroke], second: Array[AtlasStroke]) 
 				or first[index].text != second[index].text or first[index].font_family != second[index].font_family \
 				or first[index].text_bold != second[index].text_bold or first[index].text_italic != second[index].text_italic \
 				or first[index].text_rotation != second[index].text_rotation:
+			return false
+		if first[index].prop_webp != second[index].prop_webp or first[index].prop_size != second[index].prop_size \
+				or first[index].prop_rotation != second[index].prop_rotation:
 			return false
 		if first[index].width != second[index].width:
 			return false

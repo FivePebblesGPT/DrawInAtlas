@@ -236,7 +236,15 @@ static func _paint_pixel_colors(layer: AtlasRasterLayer,
 	var snapshot: AtlasRasterLayer = AtlasLayerCodec.clone(layer) as AtlasRasterLayer
 	if snapshot == null:
 		return _failure("Could not clone the raster layer.")
+	_write_pixel_colors(snapshot, changes)
+	var result: AtlasFillResult = AtlasFillResult.new()
+	result.ok = true
+	result.layer = snapshot
+	return result
 
+
+## Mutates only a detached edit snapshot, never a document/history layer.
+static func _write_pixel_colors(snapshot: AtlasRasterLayer, changes: Dictionary[Vector2i, Color]) -> void:
 	# Apply staged pixels to the snapshot only. Brush may create chunks or grow
 	# partial imported edge chunks; fill itself selects existing pixels only.
 	for point: Vector2i in changes:
@@ -258,9 +266,3 @@ static func _paint_pixel_colors(layer: AtlasRasterLayer,
 			chunk.width = AtlasRasterChunk.SIZE
 			chunk.height = AtlasRasterChunk.SIZE
 		chunk.image.set_pixelv(local, changes[point])
-
-	# The caller decides when to install this complete edit and record history.
-	var result: AtlasFillResult = AtlasFillResult.new()
-	result.ok = true
-	result.layer = snapshot
-	return result

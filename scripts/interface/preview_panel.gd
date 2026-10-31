@@ -104,7 +104,7 @@ static func artwork_bounds(document: AtlasMapDocument, floor: AtlasFloor, detail
 		if not layer.visible or layer.opacity <= 0.0 or layer.detail_level != detail_level:
 			continue
 		var pieces: Array[Rect2] = []
-		if layer is AtlasInkLayer:
+		if layer is AtlasObjectsLayer:
 			for stroke: AtlasStroke in layer.strokes:
 				if stroke.points.is_empty() or stroke.color.a <= 0.0:
 					continue

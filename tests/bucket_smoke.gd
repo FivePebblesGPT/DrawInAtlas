@@ -168,9 +168,8 @@ func _editor_preview() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot))
 	# No implicit fallback to a palette-cell layer when an incompatible target is chosen.
 	editor.select_layer(canvas.floor.ink_layer().id)
-	_check(canvas.tool == AtlasCanvas.Tool.FILL and editor.inspector._bucket_section.visible
-		and editor.inspector.fill_global_checkbox.visible,
-		"Bucket inspector remains raster-only when selecting semantic ink")
+	_check(canvas.tool == AtlasCanvas.Tool.ART_SELECT and not editor.inspector._bucket_section.visible,
+		"selecting Objects switches to object tools without offering Bucket")
 	var ink_before: Dictionary = canvas.floor.ink_layer().to_dict()
 	editor.artwork.preview_fill(Vector2(0.5, 0.5))
 	_check(editor.artwork._pending_fill != null and not editor.artwork._pending_fill.ok

@@ -50,8 +50,8 @@ func clip_strokes(strokes: Array[AtlasStroke]) -> Array[AtlasStroke]:
 			continue
 		# Text stays a semantic object: either its whole glyph envelope fits,
 		# or it is excluded. Ordinary line segments are clipped below.
-		if stroke.is_text():
-			if contains_rect(AtlasTextLayout.bounds(stroke)):
+		if stroke.is_text() or stroke.is_prop() or stroke.editable_path:
+			if contains_rect(AtlasSelectionGeometry.stroke_bounds(stroke)):
 				result.append(stroke.copy())
 			continue
 		# Remove adjacent duplicate vertices before offsetting the convex scope.

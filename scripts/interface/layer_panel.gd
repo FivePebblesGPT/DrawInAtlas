@@ -66,7 +66,7 @@ func _ready() -> void:
 	show_editing_detail.pressed.connect(show_editing_detail_requested.emit)
 	_up.pressed.connect(_move.bind(1))
 	_down.pressed.connect(_move.bind(-1))
-	$Order/NewInkButton.pressed.connect(_add_ink)
+	$Order/NewObjectsButton.pressed.connect(_add_objects)
 	$Order/NewRasterButton.pressed.connect(_add_raster)
 	$Order/ImportButton.pressed.connect(import_requested.emit)
 
@@ -157,13 +157,13 @@ func _move(direction: int) -> void:
 	layers_changed.emit(layers, _selected)
 
 
-func _add_ink() -> void:
-	var layer: AtlasInkLayer = AtlasInkLayer.new("ink-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Ink")
+func _add_objects() -> void:
+	var layer: AtlasObjectsLayer = AtlasObjectsLayer.new("objects-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Objects")
 	_add(layer)
 
 
 func _add_raster() -> void:
-	var layer: AtlasRasterLayer = AtlasRasterLayer.new("raster-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Raster")
+	var layer: AtlasRasterLayer = AtlasRasterLayer.paint_layer("raster-" + Crypto.new().generate_random_bytes(16).hex_encode(), "Raster")
 	_add(layer)
 
 
@@ -257,18 +257,21 @@ func _rebuild_hierarchy() -> void:
 				badges += " [locked]"
 			if not layer.visible:
 				badges += " [hidden]"
-			var entry: TreeItem = _make_row(group, "%s · %s%s" % [layer.display_name,
-				layer.kind.to_lower(), badges], {"kind": "layer", "id": layer.id},
+			var entry: TreeItem = _make_row(group, "%s · %s%s" % [
+				"Objects" if layer is AtlasObjectsLayer and layer.display_name == "Ink" else layer.display_name,
+				"objects" if layer is AtlasObjectsLayer else "raster", badges], {"kind": "layer", "id": layer.id},
 				"%s · D%d · %s\nSelect to edit on the continuous board." % [layer.display_name, level, layer.kind])
 			_layer_rows[layer.id] = entry
 			entry.add_button(0, ICON_EDIT, LAYER_SETTINGS, false, "Select layer and open its settings")
 			entry.collapsed = _collapsed.get("layer:" + layer.id, true)
-			if layer is AtlasInkLayer:
-				var ink: AtlasInkLayer = layer as AtlasInkLayer
+			if layer is AtlasObjectsLayer:
+				var ink: AtlasObjectsLayer = layer as AtlasObjectsLayer
 				for stroke_index: int in range(mini(ink.strokes.size(), MAX_STROKE_ROWS)):
 					var stroke: AtlasStroke = ink.strokes[stroke_index]
 					var title: String
-					if stroke.is_text():
+					if stroke.is_prop():
+						title = "Image prop %d" % (stroke_index + 1)
+					elif stroke.is_text():
 						title = "Text %d · %s" % [stroke_index + 1, stroke.text.replace("\n", " ").substr(0, 22)]
 					elif stroke.editable_path:
 						title = "Wall path %d%s · %d pts" % [stroke_index + 1,
@@ -326,19 +329,20 @@ func _on_hierarchy_selected() -> void:
 	if row == null:
 		return
 	var data: Dictionary = row.get_metadata(0) if row.get_metadata(0) is Dictionary else {}
+	# Selection listeners can rebuild this Tree, which Godot forbids during mouse events.
 	match str(data.get("kind", "")):
 		"layer":
-			layer_selected.emit(str(data.get("id", "")))
+			layer_selected.emit.call_deferred(str(data.get("id", "")))
 		"stroke":
-			object_selected.emit(str(data.get("id", "")), int(data.get("index", -1)))
+			object_selected.emit.call_deferred(str(data.get("id", "")), int(data.get("index", -1)))
 		"raster":
-			object_selected.emit(str(data.get("id", "")), -1)
+			object_selected.emit.call_deferred(str(data.get("id", "")), -1)
 
 
 func _on_hierarchy_button(item: TreeItem, _column: int, id: int, _mouse_button_index: int) -> void:
 	var data: Dictionary = item.get_metadata(0) if item.get_metadata(0) is Dictionary else {}
 	if data.get("kind") == "layer" and id == LAYER_SETTINGS:
-		layer_selected.emit(str(data.get("id", "")))
+		layer_selected.emit.call_deferred(str(data.get("id", "")))
 		_settings_open = true
 		_update_layer_settings()
 		return

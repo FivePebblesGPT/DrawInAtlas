@@ -30,7 +30,7 @@ func _run() -> void:
 		"automatic presentation is labeled and manual spinner is locked until disabled")
 	var board: AtlasMapDocument = canvas.map
 	var center: Vector2 = board.grid.cell_to_document(Vector2i(2, 0))
-	var overview: AtlasInkLayer = canvas.floor.ink_layer()
+	var overview: AtlasObjectsLayer = canvas.floor.objects_layer()
 	var d1: AtlasInkLayer = AtlasInkLayer.new("local-d1", "Streets")
 	d1.detail_level = 1
 	d1.strokes.append(AtlasStroke.new(PackedVector2Array([center + Vector2(-90, -80), center + Vector2(90, 80)]), Color.GREEN, 5.0))

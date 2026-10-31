@@ -22,7 +22,7 @@ func rebuild(document: AtlasMapDocument, floor: AtlasFloor) -> void:
 		if layer.detail_level <= 0 or not layer.visible or layer.opacity <= 0.0:
 			continue
 		var pieces: Array[Rect2] = []
-		if layer is AtlasInkLayer:
+		if layer is AtlasObjectsLayer:
 			for stroke: AtlasStroke in layer.strokes:
 				if stroke.points.is_empty() or stroke.color.a <= 0.0:
 					continue

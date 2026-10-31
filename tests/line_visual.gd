@@ -80,8 +80,8 @@ func _run() -> void:
 	_check(draft_image.get_width() >= 960 and draft_image.get_height() >= 660, "native framebuffer available")
 	_button(end_ui, false, true, true)
 	await _frames(6)
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-	_check(ink.strokes.size() == 1 and ink.strokes[0].points == expected,
+	var reference: AtlasFillResult = AtlasRasterBrush.paint(AtlasRasterLayer.paint_layer(), expected, canvas.brush_color, canvas.brush_width, false)
+	_check(reference.ok and reference.layer.to_dict() == canvas.floor.raster_layer().to_dict(),
 		"native release commits exact preview geometry")
 	var committed_image: Image = root.get_texture().get_image()
 	var differences: int = 0
@@ -99,7 +99,7 @@ func _run() -> void:
 	_check(canvas._draft_stroke != null, "second native preview starts")
 	canvas.cancel_edit()
 	_button(end_ui, false, true)
-	_check(ink.strokes.size() == 1, "Escape cancellation does not create second stroke")
+	_check(reference.layer.to_dict() == canvas.floor.raster_layer().to_dict(), "Escape cancellation does not paint a second stroke")
 	root.size = Vector2i(800, 600)
 	root.content_scale_size = root.size
 	await _frames(8)

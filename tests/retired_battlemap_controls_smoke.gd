@@ -46,11 +46,11 @@ func _run() -> void:
 	for level: int in [0, 1, 2]:
 		editor.layer_panel.view_detail_spinner.value = level
 		if level > 0:
-			editor.layer_panel._add_ink()
-		var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+			editor.layer_panel._add_raster()
+		var layer: AtlasRasterLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasRasterLayer
 		_check(layer != null and layer.detail_level == level, "editing target belongs to D%d" % level)
 		editor._choose_tool(AtlasCanvas.Tool.PEN)
-		var before_strokes: int = layer.strokes.size() if layer != null else 0
+		var before_pixels: Dictionary = layer.to_dict() if layer != null else {}
 		var down: InputEventMouseButton = InputEventMouseButton.new()
 		down.button_index = MOUSE_BUTTON_LEFT
 		down.pressed = true
@@ -63,14 +63,14 @@ func _run() -> void:
 		up.button_index = MOUSE_BUTTON_LEFT
 		up.position = move.position
 		canvas._gui_input(up)
-		_check(layer != null and layer.strokes.size() == before_strokes + 1,
-			"D%d pointer drag draws ordinary ink" % level)
+		_check(layer != null and canvas.floor.layer_by_id(layer.id).to_dict() != before_pixels,
+			"D%d pointer drag paints raster" % level)
 		_check(canvas.map == board and editor.campaign.maps.size() == maps_before
 			and editor.campaign.links.size() == links_before and editor.campaign.placements.size() == placements_before,
 			"D%d gesture introduces no new map, link, or footprint" % level)
 		if layer != null:
 			editor._on_undo()
-			_check(layer.strokes.size() == before_strokes, "D%d stroke undo is unchanged" % level)
+			_check(canvas.floor.layer_by_id(layer.id).to_dict() == before_pixels, "D%d stroke undo is unchanged" % level)
 
 	editor.linked_maps.open()
 	var dialog: AtlasLinkDialog = editor.link_dialog

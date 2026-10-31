@@ -202,7 +202,7 @@ func _editor_contract() -> void:
 	var path: PackedVector2Array = PackedVector2Array([Vector2(-35, 0), Vector2(35, 0)])
 	var color: Color = Color(0.8, 0.1, 0.5, 0.4)
 	editor._on_stroke(AtlasStroke.new(path, color, 5.0), false)
-	var saved: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	var saved: Dictionary = canvas.floor.raster_layer().to_dict()
 	var independent: AtlasMapDocument = AtlasMapDocument.new("eraser-destination", "Protected destination")
 	editor.campaign.add_map(independent)
 	_check(editor.campaign.get_map(independent.id) != null, "created independent reference destination")
@@ -220,13 +220,13 @@ func _editor_contract() -> void:
 		"distant vector erase does not create a history entry")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([
 		Vector2(0, -15), Vector2(0, 15)]), color, 8.0), true)
-	_check(canvas.floor.strokes.size() == 2, "editor erases vector geometry in one gesture")
-	var after: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	_check(_pixel(canvas.floor.raster_layer(), Vector2i.ZERO).a == 0.0, "editor erases raster pixels in one gesture")
+	var after: Dictionary = canvas.floor.raster_layer().to_dict()
 	editor._on_undo()
-	_check(AtlasStroke.same_artwork(canvas.floor.strokes, saved),
+	_check(canvas.floor.raster_layer().to_dict() == saved,
 		"undo restores full vector geometry and original alpha")
 	editor._on_redo()
-	_check(AtlasStroke.same_artwork(canvas.floor.strokes, after),
+	_check(canvas.floor.raster_layer().to_dict() == after,
 		"redo restores exact split geometry")
 	var slot: String = "user://validation/t021-roundtrip.scn"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://validation"))
@@ -235,23 +235,23 @@ func _editor_contract() -> void:
 	var loaded: AtlasStoreResult = AtlasCampaignStore.load_result(slot)
 	var restored: AtlasMapDocument = loaded.campaign.get_map(canvas.map.id) if loaded.campaign != null else null
 	var floor: AtlasFloor = restored.floor_by_id(canvas.floor.id) if restored != null else null
-	_check(floor != null and AtlasStroke.same_artwork(floor.strokes, after),
+	_check(floor != null and floor.raster_layer().to_dict() == after,
 		"native load retains erased vector segments and RGBA")
-	var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var layer: AtlasRasterLayer = canvas.floor.raster_layer()
 	layer.locked = true
 	previous = editor.edits.get_undo_command()
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO]), color, 60.0), true)
-	_check(editor.edits.get_undo_command() == previous and AtlasStroke.same_artwork(canvas.floor.strokes, after),
+	_check(editor.edits.get_undo_command() == previous and _pixel(canvas.floor.raster_layer(), Vector2i.ZERO).a == 0.0,
 		"locked ink refuses erasure and preserves history")
 	layer.locked = false
 	layer.visible = false
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO]), color, 60.0), true)
-	_check(editor.edits.get_undo_command() == previous and AtlasStroke.same_artwork(canvas.floor.strokes, after),
+	_check(editor.edits.get_undo_command() == previous and _pixel(canvas.floor.raster_layer(), Vector2i.ZERO).a == 0.0,
 		"hidden ink refuses erasure and preserves history")
 	layer.visible = true
 	canvas.set_presented_detail_level(1)
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO]), color, 60.0), true)
-	_check(editor.edits.get_undo_command() == previous and AtlasStroke.same_artwork(canvas.floor.strokes, after),
+	_check(editor.edits.get_undo_command() == previous and canvas.floor.raster_layer().to_dict() == after,
 		"non-presented detail refuses erasure")
 	canvas.set_presented_detail_level(0)
 	_check(editor.campaign.link_by_id(link.id).to_dict() == link_before

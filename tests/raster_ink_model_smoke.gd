@@ -24,8 +24,8 @@ func _run() -> void:
 	campaign.add_map(board)
 	var floor: AtlasFloor = board.floors[0]
 	_check(floor.layers.size() == 2 and floor.layers[0] is AtlasRasterLayer
-		and floor.layers[1] is AtlasInkLayer, "new floors contain raster and editable ink")
-	var ink: AtlasInkLayer = floor.ink_layer()
+		and floor.layers[1] is AtlasObjectsLayer, "new floors contain raster and editable objects")
+	var ink: AtlasObjectsLayer = floor.objects_layer()
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([Vector2(1, 2), Vector2(3, 4)])))
 	var ink_before: Dictionary = ink.to_dict()
 	var raster: AtlasRasterLayer = floor.layer_by_id("raster") as AtlasRasterLayer

@@ -1,6 +1,8 @@
 class_name AtlasRasterLayer
 extends AtlasLayer
 
+const PAINT_PIXELS_PER_UNIT: float = 4.0
+
 ## Positive density of raster pixels per *local* board unit. A local pixel at
 ## (x, y) maps to (x, y) / pixels_per_unit before applying transform.
 @export_storage var pixels_per_unit: float = 1.0
@@ -19,6 +21,33 @@ func _init(layer_id: String = "raster", layer_name: String = "Raster") -> void:
 
 func layer_kind() -> String:
 	return "RASTER"
+
+
+static func paint_layer(layer_id: String = "raster", layer_name: String = "Raster") -> AtlasRasterLayer:
+	var layer: AtlasRasterLayer = AtlasRasterLayer.new(layer_id, layer_name)
+	layer.pixels_per_unit = PAINT_PIXELS_PER_UNIT
+	return layer
+
+
+## Increase pixel density with exact nearest-neighbor replication, preserving
+## document size, placement, signed chunk addresses and the source snapshot.
+func at_paint_density() -> AtlasRasterLayer:
+	var copy: AtlasRasterLayer = AtlasLayerCodec.clone(self) as AtlasRasterLayer
+	if copy == null:
+		return null
+	var factor: int = maxi(1, ceili(PAINT_PIXELS_PER_UNIT / pixels_per_unit))
+	if factor == 1:
+		return copy
+	copy.pixels_per_unit *= factor
+	copy.chunks.clear()
+	for original: AtlasRasterChunk in chunks.values():
+		var image: Image = original.image.duplicate()
+		image.resize(original.width * factor, original.height * factor, Image.INTERPOLATE_NEAREST)
+		var tiles: AtlasRasterLayer = from_image_chunks(image, copy.pixels_per_unit)
+		for chunk: AtlasRasterChunk in tiles.chunks.values():
+			chunk.coord += original.coord * factor
+			copy.chunks["%d,%d" % [chunk.coord.x, chunk.coord.y]] = chunk
+	return copy
 
 func to_dict() -> Dictionary:
 	var data: Dictionary = super.to_dict()

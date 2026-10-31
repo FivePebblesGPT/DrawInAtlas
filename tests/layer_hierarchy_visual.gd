@@ -44,6 +44,23 @@ func _run() -> void:
 		"hierarchy is confined to sidebar")
 	_check(not panel.name_input.visible, "metadata controls don't crowd default hierarchy")
 	_check(panel.hierarchy.get_root().get_child_count() >= 2, "detail and navigation groups drawn")
+	var layer_row: TreeItem = panel.hierarchy.get_root().get_first_child().get_first_child()
+	var rect: Rect2 = panel.hierarchy.get_item_area_rect(layer_row, 0)
+	var point: Vector2 = panel.hierarchy.global_position + rect.position + Vector2(50, rect.size.y / 2)
+	var press: InputEventMouseButton = InputEventMouseButton.new()
+	press.position = point
+	press.global_position = point
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	root.push_input(press, true)
+	var release: InputEventMouseButton = press.duplicate()
+	release.pressed = false
+	root.push_input(release, true)
+	await _frames(2)
+	_check(editor.canvas.active_layer_id == "objects", "mouse click selects Objects layer")
+	var selected: TreeItem = panel.hierarchy.get_selected()
+	_check(not panel._building and selected != null and selected.get_metadata(0).get("id") == "objects",
+		"mouse selection completes and rebuilds the hierarchy")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://validation"))
 	_check(root.get_texture().get_image().save_png("user://validation/layer-hierarchy-960.png") == OK,
 		"native normal-width screenshot")

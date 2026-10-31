@@ -107,6 +107,87 @@ func _transformed_partial_chunk() -> void:
 		"candidate overflow rejects the entire transformed gesture atomically")
 
 
+func _incremental_raster() -> void:
+	var image: Image = Image.create_empty(7, 9, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.2, 0.4, 0.8, 0.6))
+	for erase: bool in [false, true]:
+		for transformed: bool in [false, true]:
+			var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(image)
+			if transformed:
+				layer.transform = Transform2D(Vector2(0.8, 0.4), Vector2(-0.2, 1.2), Vector2(-3, 5))
+			var scope: AtlasEditScope = AtlasEditScope.new(PackedVector2Array([
+				Vector2(-20, -20), Vector2(25, -20), Vector2(25, 25), Vector2(-20, 25)]), true)
+			var path: PackedVector2Array = PackedVector2Array([
+				Vector2(-8, 2), Vector2(12, 2), Vector2(2, 12), Vector2(2, -8), Vector2(-8, 2)])
+			var color: Color = Color(0.9, 0.2, 0.1, 0.4)
+			# Reference: the old whole-path scan, including self-overlap and mask checks.
+			var changes: Dictionary[Vector2i, Color] = {}
+			var covered: Dictionary[Vector2i, bool] = {}
+			AtlasRasterBrush._stage_pixel_changes(layer, path, 2.0,
+				Color(0, 0, 0, 0) if erase else AtlasFill._canonical_color(color), erase, scope,
+				Vector2i(-50, -50), Vector2i(50, 50), changes, covered)
+			var expected: AtlasFillResult = AtlasFill._paint_pixel_colors(layer, changes)
+			var session: AtlasRasterBrush = AtlasRasterBrush.new(layer, color, 4.0, erase, scope)
+			var actual: AtlasFillResult
+			for point: Vector2 in path:
+				actual = session.append(PackedVector2Array([point]))
+			var equal: bool = actual.ok and expected.ok and actual.layer.chunks.size() == expected.layer.chunks.size()
+			if equal:
+				for key: String in expected.layer.chunks:
+					equal = equal and actual.layer.chunks.has(key) and actual.layer.chunks[key].asset_id == expected.layer.chunks[key].asset_id
+			_check(equal, "incremental paint/erase is byte-exact to whole-path coverage (transformed=%s erase=%s)" % [transformed, erase])
+			_check(layer.chunks["0,0"].image.get_data() == image.get_data(), "incremental preview never mutates its source")
+
+
+func _sampled_path(waypoints: PackedVector2Array, step: float) -> PackedVector2Array:
+	var dense: PackedVector2Array = PackedVector2Array([waypoints[0]])
+	for corner: int in range(1, waypoints.size()):
+		var from: Vector2 = dense[dense.size() - 1]
+		var to: Vector2 = waypoints[corner]
+		var span: float = from.distance_to(to)
+		var pieces: int = maxi(1, ceili(span / step))
+		for piece: int in range(1, pieces + 1):
+			dense.append(from.lerp(to, float(piece) / float(pieces)))
+	return dense
+
+
+func _grand_freehand_loop() -> void:
+	# A looped freehand gesture denser than one board quadrant must keep painting
+	# and must commit, instead of vanishing when it closes at the start y level.
+	var ink: Color = Color(0.1, 0.4, 0.9, 1.0)
+	var loop: PackedVector2Array = _sampled_path(PackedVector2Array([
+		Vector2(0, 0), Vector2(240, 0), Vector2(240, 220),
+		Vector2(-240, 220), Vector2(-240, 12), Vector2(-120, 0)]), 20.0)
+	var seam: int = 0
+	for index: int in range(loop.size()):
+		if loop[index].y >= 219.0:
+			seam = index
+			break
+	var descent: PackedVector2Array = loop.slice(0, seam)
+	var closure: PackedVector2Array = loop.slice(seam)
+	var session: AtlasRasterBrush = AtlasRasterBrush.new(
+		AtlasRasterLayer.paint_layer(), ink, 8.0, false)
+	var walk: AtlasFillResult = session.append(descent)
+	_check(walk.ok, "in-bounds descent batch keeps the brush session alive")
+	if walk.ok and closure.size() > 0:
+		var closure_result: AtlasFillResult = session.append(closure)
+		_check(closure_result.ok and closure_result.layer != null,
+			"looped closure reaching the start y level keeps painting")
+		if closure_result.ok and closure_result.layer != null:
+			_check(_pixel(closure_result.layer, Vector2i(-120, 0) * 4).a > 0.9,
+				"the closing stroke reaches the same y level with pixels")
+	var committed: AtlasFillResult = AtlasRasterBrush.paint(
+		AtlasRasterLayer.paint_layer(), loop, ink, 8.0, false)
+	_check(committed.ok and committed.layer != null,
+		"commit re-paint of the complete looped gesture succeeds")
+	if committed.ok and committed.layer != null:
+		_check(_pixel(committed.layer, Vector2i(240, 220) * 4).a > 0.9,
+			"committed loop keeps pixels at every waypoint")
+	_check(AtlasRasterBrush.paint(AtlasRasterLayer.paint_layer(),
+		PackedVector2Array([Vector2(0, 0), Vector2(10000, 0)]), ink, 8.0, false).ok,
+		"a single straight sweep longer than one pixel window splits instead of failing")
+
+
 func _editor_gesture() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
@@ -131,31 +212,28 @@ func _editor_gesture() -> void:
 	var path: PackedVector2Array = PackedVector2Array([
 		Vector2(-30, 0), Vector2(0, 0), Vector2(30, 0)])
 	editor._on_stroke(AtlasStroke.new(path, canvas.brush_color, canvas.brush_width), false)
-	_check(canvas.floor.strokes.size() == 1 and canvas.floor.strokes[0].points == path,
-		"one vector brush gesture stores the complete continuous path")
-	_check(canvas.floor.strokes[0].color.is_equal_approx(source)
-		and canvas.floor.strokes[0].width == 16.0,
-		"vector stroke retains exact RGBA and board-unit diameter")
+	_check(not canvas.floor.raster_layer().chunks.is_empty() and canvas.floor.objects_layer().strokes.is_empty(),
+		"one brush gesture paints raster without creating vector objects")
+	_check(absf(_pixel(canvas.floor.raster_layer(), Vector2i.ZERO).a - source.a) < 0.005,
+		"raster brush retains selected alpha")
 	editor._on_undo()
-	_check(canvas.floor.strokes.is_empty(), "one undo removes the whole stroke")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "one undo removes the whole stroke")
 	editor._on_redo()
-	_check(canvas.floor.strokes.size() == 1 and canvas.floor.strokes[0].color.is_equal_approx(source),
-		"redo restores the RGBA stroke")
-	var old_points: PackedVector2Array = canvas.floor.strokes[0].points.duplicate()
+	_check(absf(_pixel(canvas.floor.raster_layer(), Vector2i.ZERO).a - source.a) < 0.005,
+		"redo restores raster RGBA")
+	var old_pixels: Dictionary = canvas.floor.raster_layer().to_dict()
 	canvas.camera_zoom = 2.5
 	canvas.camera_center = Vector2(110, -80)
-	_check(canvas.floor.strokes[0].points == old_points,
-		"camera zoom and pan do not alter stored stroke coordinates")
+	_check(canvas.floor.raster_layer().to_dict() == old_pixels,
+		"camera zoom and pan do not alter raster pixels or placement")
 	var slot: String = "user://validation/t020-roundtrip.scn"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://validation"))
 	_check(AtlasCampaignStore.save_campaign(editor.campaign, slot) == OK, "native brush save succeeded")
 	var loaded: AtlasStoreResult = AtlasCampaignStore.load_result(slot)
 	var restored: AtlasMapDocument = loaded.campaign.get_map(canvas.map.id) if loaded.campaign != null else null
 	var floor: AtlasFloor = restored.floor_by_id(canvas.floor.id) if restored != null else null
-	var ink: AtlasInkLayer = floor.layer_by_id("ink") as AtlasInkLayer if floor != null else null
-	_check(ink != null and ink.strokes.size() == 1 and ink.strokes[0].color.is_equal_approx(source)
-		and ink.strokes[0].width == 16.0 and ink.strokes[0].points == old_points,
-		"native save roundtrip preserves source RGBA, width and geometry")
+	_check(floor != null and floor.raster_layer().to_dict() == old_pixels,
+		"native save roundtrip preserves raster RGBA, density and placement")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot))
 	# A second, raster authoring target must use the same controls and history,
 	# without replacing the vector stroke or altering the saved board grid.
@@ -194,6 +272,8 @@ func _editor_gesture() -> void:
 func _run() -> void:
 	_raster_color()
 	_transformed_partial_chunk()
+	_incremental_raster()
+	_grand_freehand_loop()
 	await _editor_gesture()
 	print("ATLAS_BRUSH_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])
 	quit(0 if failures == 0 else 1)

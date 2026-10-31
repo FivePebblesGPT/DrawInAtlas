@@ -72,7 +72,7 @@ func _run() -> void:
 	_check(root.get_texture().get_image().save_png("user://validation/text-editor-960.png") == OK, "editor modal screenshot")
 	editor.text_editor.confirm_text()
 	await _frames(5)
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var ink: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(ink.strokes.size() == 1 and ink.strokes[0].is_text(), "native placement and editable metadata")
 	canvas.camera_center = anchor + Vector2(80, 6)
 	canvas.camera_zoom = 0.4
@@ -92,8 +92,8 @@ func _run() -> void:
 	_check(root.get_texture().get_image().save_png("user://validation/text-native-960.png") == OK, "readable text screenshot")
 	# Independently authored detail uses the same font-space readability rule.
 	editor.layer_panel.view_detail_spinner.value = 1
-	editor.layer_panel._add_ink()
-	var local_layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	editor.layer_panel._add_objects()
+	var local_layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(local_layer != null and local_layer.detail_level == 1, "D1 text layer")
 	editor._choose_tool(AtlasCanvas.Tool.TEXT)
 	canvas._begin_text_edit(anchor)

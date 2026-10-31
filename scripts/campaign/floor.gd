@@ -5,14 +5,15 @@ extends Resource
 @export_storage var display_name: String = "Ground"
 ## Canonical back-to-front ordered layer resources. A detail level is a layer
 ## property, not a separate board or a child document.
-@export_storage var layers: Array[AtlasLayer] = [AtlasRasterLayer.new(), AtlasInkLayer.new()]
+@export_storage var layers: Array[AtlasLayer] = [AtlasRasterLayer.paint_layer(), AtlasObjectsLayer.new()]
 
+## Legacy accessor for default Objects records; raster tools never write here.
 var strokes: Array[AtlasStroke]:
 	get:
-		var layer: AtlasInkLayer = ink_layer()
+		var layer: AtlasObjectsLayer = objects_layer()
 		return layer.strokes if layer != null else []
 	set(value):
-		var layer: AtlasInkLayer = ink_layer()
+		var layer: AtlasObjectsLayer = objects_layer()
 		if layer != null:
 			layer.strokes = value
 
@@ -24,9 +25,21 @@ func layer_by_id(layer_id: String) -> AtlasLayer:
 	return null
 
 
-func ink_layer() -> AtlasInkLayer:
+## Deprecated prototype accessor; current authoring uses objects_layer().
+func ink_layer() -> AtlasObjectsLayer:
+	return objects_layer()
+
+
+func objects_layer() -> AtlasObjectsLayer:
 	for layer: AtlasLayer in layers:
-		if layer is AtlasInkLayer:
+		if layer is AtlasObjectsLayer:
+			return layer
+	return null
+
+
+func raster_layer() -> AtlasRasterLayer:
+	for layer: AtlasLayer in layers:
+		if layer is AtlasRasterLayer:
 			return layer
 	return null
 

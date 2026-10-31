@@ -50,10 +50,11 @@ func _run() -> void:
 	editor.create_board("Native selection", AtlasGrid.new(AtlasGrid.Kind.HEX_POINTY, 45.0))
 	editor.layer_panel.auto_detail_checkbox.button_pressed = false
 	var canvas: AtlasCanvas = editor.canvas
+	editor._choose_tool(AtlasCanvas.Tool.WALL_PATH)
 	var original_id: String = canvas.active_layer_id
 	for local: Vector2 in [Vector2(68, 105), Vector2(200, 105)]:
 		var start: Vector2 = canvas.local_to_document(local)
-		editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([start, start + Vector2(24, 0)]), Color.WHITE, 3), false)
+		editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([start, start + Vector2(24, 0)]), Color.WHITE, 3, false))
 	editor._choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	await _frames(7)
 	var image_before: Image = root.get_texture().get_image()

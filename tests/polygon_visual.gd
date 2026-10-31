@@ -68,8 +68,8 @@ func _run() -> void:
 	_check(draft != before, "preview renders transparent filled polygon interior")
 	await _click(canvas, triangle[0])
 	await _frames(6)
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-	_check(ink.strokes.size() == 1 and ink.strokes[0].filled and not canvas.is_editing(), "native close click commits fill")
+	_check(not canvas.floor.raster_layer().chunks.is_empty() and canvas.floor.objects_layer().strokes.is_empty()
+		and not canvas.is_editing(), "native close click commits raster fill")
 	var after: Image = root.get_texture().get_image()
 	var committed: Color = after.get_pixelv(interior)
 	_check(draft.is_equal_approx(committed), "filled preview and committed interior match")

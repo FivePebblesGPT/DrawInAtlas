@@ -97,10 +97,8 @@ func _run() -> void:
 	await _button(canvas, start, true)
 	await _move(canvas, end, true)
 	await _button(canvas, end, false)
-	_check(canvas.floor.strokes.size() == 1, "real pointer press/drag/release commits one brush gesture")
-	_check(canvas.floor.strokes[0].color.is_equal_approx(Color(1, 1, 1, 0.45))
-		and canvas.floor.strokes[0].width == 40.0,
-		"gesture preserves selected alpha and width")
+	_check(not canvas.floor.raster_layer().chunks.is_empty() and canvas.floor.objects_layer().strokes.is_empty(),
+		"real pointer gesture paints raster without creating vector objects")
 	await _move(canvas, center)
 	await RenderingServer.frame_post_draw
 	var painted: Image = root.get_texture().get_image()
@@ -112,9 +110,9 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://validation"))
 	_check(painted.save_png(slot) == OK, "saved native brush witness")
 	editor._on_undo()
-	_check(canvas.floor.strokes.is_empty(), "one undo removes the pointer gesture")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "one undo removes the pointer gesture")
 	editor._on_redo()
-	_check(canvas.floor.strokes.size() == 1, "redo restores pointer gesture")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "redo restores pointer gesture")
 	editor.artwork.choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	await _frames(4)
 	_check(not canvas._brush_cursor_inside or canvas.tool != AtlasCanvas.Tool.PEN,

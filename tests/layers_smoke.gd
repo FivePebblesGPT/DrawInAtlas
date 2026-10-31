@@ -158,7 +158,7 @@ func _content_edits() -> void:
 		item.locked = true
 	_check(history.undo() and (floor.layer_by_id("second") as AtlasInkLayer).strokes.is_empty(), "undo uses original layer ID despite selection and flags")
 	_check(campaign.get_map("other").floors[0].strokes.is_empty() and campaign.get_map("m").floors[1].strokes.is_empty(), "other targets untouched")
-	_check(AtlasStrokeEdit.new("m", "ground", [], [_stroke()]).layer_id == "ink", "default ink target remains explicit")
+	_check(AtlasStrokeEdit.new("m", "ground", [], [_stroke()]).layer_id == "objects", "default object target remains explicit")
 
 func _raster() -> void:
 	var image: Image = Image.create_empty(513, 257, true, Image.FORMAT_RGB8)

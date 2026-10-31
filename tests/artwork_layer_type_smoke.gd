@@ -19,7 +19,7 @@ func _run() -> void:
     campaign.add_map(map)
     var floor: AtlasFloor = map.floors[0]
     _check(floor.layers.size() == 2 and floor.layers[0] is AtlasRasterLayer
-        and floor.layers[1] is AtlasInkLayer, "new floors have raster and semantic ink")
+        and floor.layers[1] is AtlasObjectsLayer, "new floors have raster and semantic objects")
     for layer: AtlasLayer in floor.layers:
         _check(layer.kind == layer.layer_kind() and layer.has_valid_type_marker(),
             "runtime class owns type marker " + layer.kind)

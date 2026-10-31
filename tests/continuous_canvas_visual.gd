@@ -27,7 +27,7 @@ func _run() -> void:
 	board.grid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 48.0)
 	board.grid.visible = false
 	var floor: AtlasFloor = board.floors[0]
-	var overview: AtlasInkLayer = floor.ink_layer()
+	var overview: AtlasObjectsLayer = floor.objects_layer()
 	var detail: AtlasInkLayer = AtlasInkLayer.new("detail", "Separately authored")
 	detail.detail_level = 1
 	floor.layers.append(detail)
@@ -45,7 +45,7 @@ func _run() -> void:
 	campaign.root_map_id = board.id
 	campaign.add_map(board)
 	_check(canvas.set_document(board, campaign), "opens a single shared board")
-	canvas.active_layer_id = "ink"
+	canvas.active_layer_id = "objects"
 	canvas.camera_center = first.lerp(last, 0.5)
 	canvas.preview = AtlasCanvas.Preview.OFF
 	canvas.render_grid = false
@@ -68,7 +68,7 @@ func _run() -> void:
 		var pixel: Vector2i = Vector2i(canvas.position + canvas.document_to_local(point))
 		_check(pixels.get_pixelv(pixel).is_equal_approx(Color.GREEN),
 			"D1 line uses identical board coordinates at %s" % str(point))
-	_check(canvas.active_layer_id == "ink" and not canvas.editing_target_is_presented(),
+	_check(canvas.active_layer_id == "objects" and not canvas.editing_target_is_presented(),
 		"presented detail changed, explicit ink edit target stayed D0")
 	_check(pixels.save_png(path.path_join("continuous-hex-d1.png")) == OK,
 		"local detail framebuffer witness saved")

@@ -196,7 +196,7 @@ func _fixture(kind: String) -> AtlasCampaign:
 				map.floors.append(floor)
 			var ink_layers: int = 32 if kind == "ink" else 1
 			for layer_index: int in range(ink_layers):
-				var ink: AtlasInkLayer = floor.ink_layer() if layer_index == 0 else AtlasInkLayer.new("ink-%d" % layer_index)
+				var ink: AtlasObjectsLayer = floor.objects_layer() if layer_index == 0 else AtlasObjectsLayer.new("objects-%d" % layer_index)
 				if layer_index > 0:
 					floor.layers.append(ink)
 				var stroke_count: int = 64 if kind == "ink" else 40

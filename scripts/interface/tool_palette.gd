@@ -6,21 +6,23 @@ signal tool_selected(index: int)
 
 const CATEGORIES: Array[Dictionary] = [
 	{"title": "DRAW & ERASE", "tools": [
-		{"id": AtlasCanvas.Tool.PEN, "name": "Brush", "key": "B", "icon": "pen", "hint": "Drag or tap to paint on the active ink or raster layer; width and opacity in the inspector"},
-		{"id": AtlasCanvas.Tool.ERASER, "name": "Eraser", "key": "E", "icon": "eraser", "hint": "Cut ink segments or clear raster pixels on the active layer; width in inspector"},
+		{"id": AtlasCanvas.Tool.PEN, "name": "Brush", "key": "B", "icon": "pen", "hint": "Paint raster pixels; the raster target is selected automatically; width and opacity in the inspector"},
+		{"id": AtlasCanvas.Tool.ERASER, "name": "Eraser", "key": "E", "icon": "eraser", "hint": "Clear raster pixels; delete editable objects with Select and Delete"},
 		{"id": AtlasCanvas.Tool.FILL, "name": "Fill", "key": "F", "icon": "fill", "hint": "Preview contiguous/global RGBA fill on raster with tolerance. Release to apply; Esc cancels"},
 	]},
-	{"title": "SHAPES", "tools": [
-		{"id": AtlasCanvas.Tool.TEXT, "name": "Text", "key": "T", "icon": "text", "hint": "Click to place persistent editable text; click existing text to edit; font and style in the editor"},
-		{"id": AtlasCanvas.Tool.LINE, "name": "Line", "key": "L", "icon": "line", "hint": "Drag to draw a straight line"},
-		{"id": AtlasCanvas.Tool.WALL_PATH, "name": "Wall path", "key": "W", "icon": "wall-path", "hint": "Click vertices, Enter finish open, right-click close; drag nodes, Shift insert, Alt delete; restyle from inspector"},
+	{"title": "RASTER SHAPES", "tools": [
+		{"id": AtlasCanvas.Tool.LINE, "name": "Line", "key": "L", "icon": "line", "hint": "Paint a straight line on raster; target selected automatically"},
 		{"id": AtlasCanvas.Tool.POLYGON, "name": "Polygon", "key": "P", "icon": "polygon", "hint": "Click to place vertices, Enter/right-click/double-click to close; outline or solid fill in inspector"},
 		{"id": AtlasCanvas.Tool.RECTANGLE, "name": "Rectangle", "key": "R", "icon": "rectangle", "hint": "Drag a rectangle outline"},
 		{"id": AtlasCanvas.Tool.ELLIPSE, "name": "Ellipse", "key": "O", "icon": "ellipse", "hint": "Drag an ellipse outline"},
 	]},
-	{"title": "SELECT", "tools": [
-		{"id": AtlasCanvas.Tool.ART_SELECT, "name": "Select artwork", "key": "V", "icon": "select", "hint": "Active-layer objects: drag/select, Ctrl+drag add, Alt+drag subtract; Ctrl+D deselect"},
-		{"id": AtlasCanvas.Tool.MOVE, "name": "Move artwork", "key": "M", "icon": "move", "hint": "Pick an object or drag the existing active-layer selection; grid snapping optional; Escape cancels"},
+	{"title": "OBJECTS", "tools": [
+		{"id": AtlasCanvas.Tool.WALL_PATH, "name": "Wall path", "key": "W", "icon": "wall-path", "hint": "Objects layer selected automatically. Click vertices, Enter finish, right-click close; drag nodes, Shift insert, Alt delete"},
+		{"id": AtlasCanvas.Tool.TEXT, "name": "Text", "key": "T", "icon": "text", "hint": "Place editable text on Objects; click existing text to edit"},
+		{"id": AtlasCanvas.Tool.ART_SELECT, "name": "Select objects", "key": "V", "icon": "select", "hint": "Objects layer selected automatically. Drag/select, Ctrl add, Alt subtract; Delete removes objects"},
+		{"id": AtlasCanvas.Tool.MOVE, "name": "Move objects", "key": "M", "icon": "move", "hint": "Objects layer selected automatically. Pick an object or drag its selection; Escape cancels"},
+	]},
+	{"title": "GRID", "tools": [
 		{"id": AtlasCanvas.Tool.SELECT, "name": "Select grid cell", "key": "", "icon": "cell", "hint": "Choose the cell used by the edit-scope mask"},
 	]},
 ]

@@ -10,6 +10,8 @@ extends RefCounted
 ## A stroke's selectable envelope includes half its line width. Text uses its
 ## laid-out glyph bounds instead of treating the anchor as a stroked polyline.
 static func stroke_bounds(stroke: AtlasStroke) -> Rect2:
+	if stroke.is_prop():
+		return transformed_rect(Rect2(Vector2.ZERO, stroke.prop_dimensions()), Transform2D(stroke.prop_rotation, stroke.points[0]))
 	if stroke.is_text():
 		return AtlasTextLayout.bounds(stroke)
 	var bounds: Rect2 = Rect2(stroke.points[0], Vector2.ZERO)
@@ -52,7 +54,7 @@ static func select_indices(layer: AtlasLayer, indices: Array[int] = []) -> Atlas
 	result.layer_id = layer.id
 	result.source = layer.to_dict().duplicate(true)
 
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		var first: bool = true
 		for index: int in indices:
 			if index < 0 or index >= layer.strokes.size() or result.stroke_indices.has(index):
@@ -81,7 +83,7 @@ static func combined(layer: AtlasLayer, current: AtlasSelection, incoming: Atlas
 	if layer == null or not layer.visible:
 		return AtlasSelection.new()
 
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		# Keep the current selection's ordering, then add/remove incoming indices.
 		# Stale snapshots are ignored independently on both sides of the operation.
 		var indices: Array[int] = []
@@ -106,7 +108,7 @@ static func combined(layer: AtlasLayer, current: AtlasSelection, incoming: Atlas
 
 static func select_all(layer: AtlasLayer) -> AtlasSelection:
 	var indices: Array[int] = []
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		for index: int in range(layer.strokes.size()):
 			indices.append(index)
 	return select_indices(layer, indices)
@@ -118,7 +120,7 @@ static func select_all(layer: AtlasLayer) -> AtlasSelection:
 static func select_point(layer: AtlasLayer, point: Vector2, tolerance: float) -> AtlasSelection:
 	if layer == null or not layer.visible:
 		return AtlasSelection.new()
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		for index: int in range(layer.strokes.size() - 1, -1, -1):
 			if _hits_stroke(layer.strokes[index], point, tolerance):
 				return select_indices(layer, [index])
@@ -134,6 +136,9 @@ static func select_point(layer: AtlasLayer, point: Vector2, tolerance: float) ->
 ## paths use rendered points rather than their authoring/control handles.
 static func _hits_stroke(stroke: AtlasStroke, point: Vector2, tolerance: float) -> bool:
 	var radius: float = stroke.width * 0.5 + tolerance
+	if stroke.is_prop():
+		var local: Vector2 = Transform2D(stroke.prop_rotation, stroke.points[0]).affine_inverse() * point
+		return Rect2(Vector2.ZERO, stroke.prop_dimensions()).grow(tolerance).has_point(local)
 	if stroke.is_text():
 		return stroke_bounds(stroke).grow(tolerance).has_point(point)
 	if stroke.filled and Geometry2D.is_point_in_polygon(point, stroke.points):
@@ -151,7 +156,7 @@ static func _hits_stroke(stroke: AtlasStroke, point: Vector2, tolerance: float) 
 ## rather than merely overlapping a centerline, polygon, or transformed quad.
 static func select_rect(layer: AtlasLayer, rectangle: Rect2) -> AtlasSelection:
 	var indices: Array[int] = []
-	if layer is AtlasInkLayer:
+	if layer is AtlasObjectsLayer:
 		for index: int in range(layer.strokes.size()):
 			if rectangle.encloses(stroke_bounds(layer.strokes[index])):
 				indices.append(index)
@@ -180,8 +185,8 @@ static func transformed(layer: AtlasLayer, selection: AtlasSelection, transform:
 	# Apply the operation to a detached layer. Any failed transform or mask
 	# check discards it, leaving source strokes and raster pixels untouched.
 	var result: AtlasLayer = AtlasLayerCodec.clone(layer)
-	if result is AtlasInkLayer:
-		if not _transform_ink(result as AtlasInkLayer, selection.stroke_indices, transform, scope):
+	if result is AtlasObjectsLayer:
+		if not _transform_ink(result as AtlasObjectsLayer, selection.stroke_indices, transform, scope):
 			return null
 	elif result is AtlasRasterLayer:
 		if not _transform_raster(result as AtlasRasterLayer, selection.bounds, transform, scope):
@@ -197,7 +202,7 @@ static func transformed(layer: AtlasLayer, selection: AtlasSelection, transform:
 ## Transform selected ink positions in document space. Only uniform,
 ## orthogonal scaling is supported for ink: line width scales with geometry,
 ## and text orientation tracks rotation. Unselected strokes stay on the clone.
-static func _transform_ink(layer: AtlasInkLayer, indices: Array[int], transform: Transform2D,
+static func _transform_ink(layer: AtlasObjectsLayer, indices: Array[int], transform: Transform2D,
 		scope: AtlasEditScope) -> bool:
 	var scale: float = transform.x.length()
 	if scale <= 0.0 or not is_equal_approx(scale, transform.y.length()) or not is_zero_approx(transform.x.dot(transform.y)):
@@ -212,6 +217,8 @@ static func _transform_ink(layer: AtlasInkLayer, indices: Array[int], transform:
 		original.width *= scale
 		if original.is_text():
 			original.text_rotation += transform.get_rotation()
+		elif original.is_prop():
+			original.prop_rotation += transform.get_rotation()
 		if not original.is_valid() or (scope != null and not scope.contains_rect(stroke_bounds(original))):
 			return false
 	return true

@@ -17,10 +17,11 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 		return null
 	var layer: AtlasLayer
 	match data.get("kind"):
-		"INK":
+		"OBJECTS", "INK":
 			if _has_any(data, ["terrain", "grid", "chunks", "pixels_per_unit", "transform"]):
 				return null
-			var ink: AtlasInkLayer = AtlasInkLayer.new(data.id, data.name)
+			var ink: AtlasObjectsLayer = (AtlasObjectsLayer.new(data.id, data.name)
+				if data.get("kind") == "OBJECTS" else AtlasInkLayer.new(data.id, data.name))
 			var strokes: Variant = data.get("strokes", [])
 			if not strokes is Array:
 				return null

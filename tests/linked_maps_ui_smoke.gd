@@ -193,17 +193,17 @@ func _retired_creation() -> bool:
 	editor._choose_tool(AtlasCanvas.Tool.PEN)
 	var start: Vector2 = canvas.document_to_local(Vector2(-20, -10))
 	var finish: Vector2 = canvas.document_to_local(Vector2(30, 10))
-	var original_count: int = canvas.floor.strokes.size()
+	var original: Dictionary = canvas.floor.raster_layer().to_dict()
 	_button(start, true)
 	_motion(finish)
 	_button(finish, false)
-	_check(canvas.floor.strokes.size() == original_count + 1,
+	_check(canvas.floor.raster_layer().to_dict() != original,
 		"pointer drag continues drawing on the same authored board")
 	_check(canvas.map.id == old_map and editor.campaign.maps.size() == map_count
 		and editor.campaign.placements.size() == placement_count and editor.campaign.links.size() == link_count,
 		"ordinary drawing never creates nested maps or footprints")
 	editor._on_undo()
-	_check(canvas.floor.strokes.size() == original_count, "ordinary drawing remains undoable")
+	_check(canvas.floor.raster_layer().to_dict() == original, "ordinary drawing remains undoable")
 	return true
 
 

@@ -31,7 +31,7 @@ func _run() -> void:
 	board.grid.rotation = deg_to_rad(37.0)
 	board.grid.visible = false
 	var center: Vector2 = board.grid.cell_to_document(Vector2i(2, -1))
-	var overview: AtlasInkLayer = board.floors[0].ink_layer()
+	var overview: AtlasObjectsLayer = board.floors[0].objects_layer()
 	var detail: AtlasInkLayer = AtlasInkLayer.new("local", "Local authored artwork")
 	detail.detail_level = 1
 	board.floors[0].layers.append(detail)

@@ -204,7 +204,7 @@ func _viewer() -> void:
 	var input: AtlasViewState = AtlasViewState.new("m", "ground", Vector2(1, 2), 0.75, "gone")
 	session.remember(input)
 	input.zoom = 99.0
-	_check(session.resolve(campaign, "m").zoom == 0.75 and session.resolve(campaign, "m").layer_id == "ink", "remember detached/missing layer fallback")
+	_check(session.resolve(campaign, "m").zoom == 0.75 and session.resolve(campaign, "m").layer_id == "raster", "remember detached/missing layer fallback")
 	_check(session.resolve(campaign, "missing") == null and session.resolve(campaign, "m", "missing") == null and session.resolve(null, "m") == null, "invalid explicit targets")
 	_check(session.resolve(campaign, "other", "", Vector2(NAN, 0), 1.0) == null, "invalid fallback focus rejected")
 	for zoom: float in [0.0, -1.0, INF, NAN]:
@@ -220,7 +220,7 @@ func _viewer() -> void:
 	_check(session.resolve(campaign, "m", "ground", Vector2(4, 5), 3.0).zoom == 3.0, "prune deleted floor state")
 	map.floors[0].layers.remove_at(1)
 	session.remember(AtlasViewState.new("m", "upper", Vector2.ZERO, 1.0, "gone"))
-	_check(session.resolve(campaign, "m").layer_id == "image", "missing ink selects last valid layer")
+	_check(session.resolve(campaign, "m").layer_id == "raster", "missing layer falls back to raster drawing")
 	campaign.maps.erase("m")
 	session.prune(campaign)
 	campaign.add_map(AtlasMapDocument.new("m", "Replacement"))

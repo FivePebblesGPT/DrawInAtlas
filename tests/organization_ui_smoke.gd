@@ -42,9 +42,9 @@ func _run() -> void:
 		"first visit inherits camera for aligned floors")
 	canvas.camera_center = Vector2(140, -75)
 	canvas.camera_zoom = 2.3
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var upper_layer: String = canvas.active_layer_id
-	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-1.25, 0.5), Vector2(24.125, 12.75)])), false)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([Vector2(-1.25, 0.5), Vector2(24.125, 12.75)]), Color.WHITE, 2.0, false))
 	editor.edits.mark_saved()
 	var canonical: Dictionary = editor.campaign.to_dict()
 	_check(editor.switch_floor("ground"), "existing floor activates")
@@ -52,8 +52,8 @@ func _run() -> void:
 		and canvas.camera_zoom == 1.7, "ground camera is restored exactly")
 	_check(editor.campaign.to_dict() == canonical and not editor.edits.is_dirty(), "floor navigation never dirties canonical data")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO]), Color.RED), false)
-	_check((world.floor_by_id(upper_id).layer_by_id(upper_layer) as AtlasInkLayer).strokes.size() == 1
-		and world.floor_by_id("ground").strokes.size() == 1, "artwork edit targets only the active floor")
+	_check((world.floor_by_id(upper_id).layer_by_id(upper_layer) as AtlasObjectsLayer).strokes.size() == 1
+		and not world.floor_by_id("ground").raster_layer().chunks.is_empty(), "artwork edit targets only the active floor")
 	_check(editor.switch_floor(upper_id) and canvas.camera_center == Vector2(140, -75)
 		and canvas.camera_zoom == 2.3 and canvas.active_layer_id == upper_layer, "return restores floor camera and layer preference")
 	editor.floor_name_input.text = "Tower top"

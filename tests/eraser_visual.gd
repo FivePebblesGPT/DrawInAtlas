@@ -95,12 +95,14 @@ func _run() -> void:
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([
 		canvas.local_to_document(left), canvas.local_to_document(right)]),
 		Color(1, 1, 1, 0.55), 16.0), false)
-	_check(canvas.floor.strokes.size() == 1, "seeded a translucent vector stroke")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "seeded a translucent raster stroke")
+	var original: Dictionary = canvas.floor.raster_layer().to_dict()
 	var hit: Vector2 = (left + right) * 0.5
 	await _button(canvas, hit + Vector2(0, -45), true)
 	await _move(canvas, hit + Vector2(0, 45), true)
 	await _button(canvas, hit + Vector2(0, 45), false)
-	_check(canvas.floor.strokes.size() == 2, "real mouse drag splits the vector stroke")
+	_check(canvas.floor.raster_layer().to_dict() != original, "real mouse drag clears raster stroke pixels")
+	var after: Dictionary = canvas.floor.raster_layer().to_dict()
 	await _move(canvas, center)
 	await RenderingServer.frame_post_draw
 	var erased: Image = root.get_texture().get_image()
@@ -111,9 +113,9 @@ func _run() -> void:
 	_check(erased.save_png("user://validation/eraser-native.png") == OK,
 		"saved native eraser witness")
 	editor._on_undo()
-	_check(canvas.floor.strokes.size() == 1, "one undo restores unsplit ink")
+	_check(canvas.floor.raster_layer().to_dict() == original, "one undo restores exact pixels")
 	editor._on_redo()
-	_check(canvas.floor.strokes.size() == 2, "redo restores complete pointer erase")
+	_check(canvas.floor.raster_layer().to_dict() == after, "redo restores complete pointer erase")
 	editor._choose_tool(AtlasCanvas.Tool.PEN)
 	_check(not editor.inspector._eraser_hint.visible and editor.inspector.brush_color_picker.visible,
 		"switching to Brush restores RGBA controls")

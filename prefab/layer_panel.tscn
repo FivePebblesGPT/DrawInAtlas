@@ -4,7 +4,7 @@
 
 [ext_resource type="Texture2D" path="res://img/controls/raise.svg" id="2"]
 [ext_resource type="Texture2D" path="res://img/controls/lower.svg" id="3"]
-[ext_resource type="Texture2D" path="res://img/controls/ink-layer.svg" id="4"]
+[ext_resource type="Texture2D" path="res://img/controls/objects-layer.svg" id="4"]
 [ext_resource type="Texture2D" path="res://img/controls/raster-layer.svg" id="6"]
 [ext_resource type="Texture2D" path="res://img/controls/import.svg" id="7"]
 
@@ -47,7 +47,7 @@ text = "Automatic artwork detail (zoom)"
 custom_minimum_size = Vector2(115, 0)
 layout_mode = 2
 autowrap_mode = 3
-text = "Viewing D0 · Editing Ink"
+text = "Viewing D0 · Editing Raster"
 
 [node name="ShowEditingDetail" type="Button" parent="."]
 layout_mode = 2
@@ -120,12 +120,12 @@ accessibility_name = "Lower selected layer"
 icon = ExtResource("3")
 icon_alignment = 1
 
-[node name="NewInkButton" type="Button" parent="Order" unique_id=51415105]
+[node name="NewObjectsButton" type="Button" parent="Order" unique_id=51415105]
 custom_minimum_size = Vector2(32, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-tooltip_text = "New ink layer (vector strokes)"
-accessibility_name = "New ink layer"
+tooltip_text = "New Objects layer (editable walls, text and placed objects)"
+accessibility_name = "New Objects layer"
 icon = ExtResource("4")
 icon_alignment = 1
 
@@ -142,7 +142,7 @@ icon_alignment = 1
 custom_minimum_size = Vector2(32, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-tooltip_text = "Import image into a raster layer…"
-accessibility_name = "Import image"
+tooltip_text = "Place image prop on Objects (PNG, JPEG or WebP)…"
+accessibility_name = "Place image prop"
 icon = ExtResource("7")
 icon_alignment = 1

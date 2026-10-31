@@ -61,9 +61,10 @@ func _run() -> void:
 	canvas.camera_center = Vector2.ZERO
 	canvas.camera_zoom = 1.0
 	var start: Vector2 = canvas.local_to_document(Vector2(100, 110))
-	editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([start, start + Vector2(35, 0)]), Color.WHITE, 7), false)
+	editor._choose_tool(AtlasCanvas.Tool.WALL_PATH)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([start, start + Vector2(35, 0)]), Color.WHITE, 7, false))
 	var ink_id: String = canvas.active_layer_id
-	var before: Dictionary = (canvas.floor.layer_by_id(ink_id) as AtlasInkLayer).to_dict().duplicate(true)
+	var before: Dictionary = (canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer).to_dict().duplicate(true)
 	var shortcut: InputEventKey = InputEventKey.new()
 	shortcut.keycode = KEY_M
 	shortcut.pressed = true
@@ -79,10 +80,10 @@ func _run() -> void:
 	var draft: Image = root.get_texture().get_image()
 	await _button(canvas, Vector2(153, 131), false)
 	await _frames(6)
-	var moved: AtlasInkLayer = canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
+	var moved: AtlasObjectsLayer = canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer
 	_check(moved.strokes[0].points[0].distance_to(start + Vector2(41, 21)) < 0.01,
 		"release commits same pointer movement")
-	_check(editor.edits.undo() and (canvas.floor.layer_by_id(ink_id) as AtlasInkLayer).to_dict() == before,
+	_check(editor.edits.undo() and (canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer).to_dict() == before,
 		"native move undo restores exact original")
 	_check(editor.edits.redo(), "native move redo")
 	editor.sidebar.select_view(&"Tools")

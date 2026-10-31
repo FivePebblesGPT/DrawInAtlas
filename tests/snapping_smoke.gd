@@ -64,30 +64,30 @@ func _run() -> void:
 			var last: Vector2 = AtlasGridSnap.point(grid, finish)
 			var local_start: Vector2 = canvas.document_to_local(start)
 			var local_finish: Vector2 = canvas.document_to_local(finish)
+			var before: AtlasRasterLayer = canvas.floor.raster_layer()
 			_button(canvas, local_start, true)
 			_motion(canvas, local_finish)
 			_check(canvas._draft_stroke != null and canvas._draft_stroke.points[0].distance_to(first) < 0.01
 				and canvas._draft_stroke.points[-1].distance_to(last) < 0.01, "snapped preview matches board grid at zoom %s and quadrant %s" % [zoom, quadrant])
 			_button(canvas, local_finish, false)
-			var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-			var saved: AtlasStroke = ink.strokes[-1]
-			_check(saved.points == PackedVector2Array([first, last]), "committed endpoints exactly match draft")
+			_check(_matches(canvas, before, AtlasStroke.new(PackedVector2Array([first, last]), canvas.brush_color, canvas.brush_width)), "committed raster exactly matches draft endpoints")
 	# The raw pointer is preserved when toggled off, at the same zoom/grid.
 	toggle.button_pressed = false
 	var free_start: Vector2 = grid.cell_to_document(Vector2i(0, 0)) + Vector2(6, 9)
 	var free_end: Vector2 = free_start + Vector2(14, 12)
 	canvas.camera_center = (free_start + free_end) * 0.5
+	var before: AtlasRasterLayer = canvas.floor.raster_layer()
 	_button(canvas, canvas.document_to_local(free_start), true)
 	_motion(canvas, canvas.document_to_local(free_end))
 	_check(canvas._draft_stroke != null and canvas._draft_stroke.points[-1].distance_to(free_end) < 0.01,
 		"free preview preserves arbitrary board coordinates")
 	_button(canvas, canvas.document_to_local(free_end), false)
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-	_check(ink.strokes[-1].points[-1].distance_to(free_end) < 0.01, "free commit matches preview")
+	_check(_matches(canvas, before, AtlasStroke.new(PackedVector2Array([free_start, free_end]), canvas.brush_color, canvas.brush_width)), "free commit matches preview")
 	# Changing the checkbox during an unfinished gesture must not retarget
 	# the draft or make its final release use another snapping mode.
 	toggle.button_pressed = true
 	canvas.camera_center = (free_start + free_end) * 0.5
+	before = canvas.floor.raster_layer()
 	_button(canvas, canvas.document_to_local(free_start), true)
 	_motion(canvas, canvas.document_to_local(free_end))
 	var locked_end: Vector2 = AtlasGridSnap.point(grid, free_end)
@@ -95,8 +95,7 @@ func _run() -> void:
 		"snap-on gesture previews snapped end")
 	toggle.button_pressed = false
 	_button(canvas, canvas.document_to_local(free_end), false)
-	ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-	_check(ink.strokes[-1].points[-1].distance_to(locked_end) < 0.01,
+	_check(_matches(canvas, before, AtlasStroke.new(PackedVector2Array([AtlasGridSnap.point(grid, free_start), locked_end]), canvas.brush_color, canvas.brush_width)),
 		"snap mode is frozen through final release")
 	# A rotated hex grid uses axial centers, not the square-grid formula.
 	grid.kind = AtlasGrid.Kind.HEX_POINTY
@@ -133,12 +132,13 @@ func _run() -> void:
 	canvas.camera_zoom = 2.5
 	toggle.button_pressed = true
 	editor._choose_tool(AtlasCanvas.Tool.ART_SELECT)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([free_start, free_end]), Color.WHITE, 2.0, false))
 	_check(toggle.is_visible_in_tree() and toggle.button_pressed, "selection move exposes the same opt-in snap state")
-	ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var ink: AtlasObjectsLayer = canvas.floor.objects_layer()
 	var index: int = ink.strokes.size() - 1
 	var initial: Dictionary = ink.to_dict().duplicate(true)
 	for quadrant: Vector2 in [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]:
-		ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+		ink = canvas.floor.objects_layer()
 		canvas.selection = AtlasSelectionGeometry.select_indices(ink, [index])
 		var start: Vector2 = canvas.selection.bounds.get_center()
 		var finish: Vector2 = start + quadrant * 34.0
@@ -148,15 +148,15 @@ func _run() -> void:
 		_motion(canvas, canvas.document_to_local(finish))
 		_check(canvas._manipulation == AtlasCanvas.Manipulation.MOVE and canvas._gesture_transform.origin.distance_to(expected) < 0.01,
 			"selection move preview uses snapped lattice displacement")
-		var preview: AtlasInkLayer = canvas._preview_layer as AtlasInkLayer
+		var preview: AtlasObjectsLayer = canvas._preview_layer as AtlasObjectsLayer
 		_check(preview != null and preview.strokes[index].points[0].distance_to(ink.strokes[index].points[0] + expected) < 0.01,
 			"preview geometry matches selected move transform")
 		_button(canvas, canvas.document_to_local(finish), false)
-		ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+		ink = canvas.floor.objects_layer()
 		_check(ink.strokes[index].points[0].distance_to(Vector2(initial["strokes"][index]["points"][0][0], initial["strokes"][index]["points"][0][1]) + expected) < 0.01,
 			"committed move matches preview geometry")
 		_check(editor.edits.undo(), "snapped move is undoable")
-		ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+		ink = canvas.floor.objects_layer()
 		_check(ink.to_dict() == initial, "undo restores unsnapped source exactly")
 	# Mask rejection: the transformed object must not leak beyond the selected cell.
 	canvas.selection = AtlasSelectionGeometry.select_indices(ink, [index])
@@ -169,7 +169,7 @@ func _run() -> void:
 	_button(canvas, canvas.document_to_local(source), true)
 	_motion(canvas, canvas.document_to_local(source + Vector2(34, 34)))
 	_button(canvas, canvas.document_to_local(source + Vector2(34, 34)), false)
-	ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	ink = canvas.floor.objects_layer()
 	_check(ink.to_dict() == initial, "edit mask prevents snapped object escaping its scope")
 	editor.locked_to_cell = false
 	editor.artwork.refresh_scope()
@@ -185,13 +185,13 @@ func _run() -> void:
 			var shape_name: String = AtlasCanvas.Tool.keys()[kind]
 			var expected: AtlasStroke = AtlasShapes.stroke(shape_name, AtlasGridSnap.point(grid, start),
 				AtlasGridSnap.point(grid, finish), canvas.brush_color, canvas.brush_width)
+			before = canvas.floor.raster_layer()
 			_button(canvas, canvas.document_to_local(start), true)
 			_motion(canvas, canvas.document_to_local(finish))
 			_check(expected != null and canvas._draft_stroke != null and canvas._draft_stroke.points == expected.points,
 				"%s preview snaps both opposite endpoints" % shape_name)
 			_button(canvas, canvas.document_to_local(finish), false)
-			ink = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-			_check(ink.strokes[-1].points == expected.points, "%s committed shape matches preview" % shape_name)
+			_check(_matches(canvas, before, expected), "%s committed pixels match preview" % shape_name)
 	# Gridless boards cannot snap even when an earlier board had snap enabled.
 	var saved_grid: AtlasGrid = canvas.map.grid.copy()
 	var gridless: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.GRIDLESS)
@@ -208,10 +208,12 @@ func _run() -> void:
 	var pen_start: Vector2 = Vector2(5.34, 8.29)
 	var pen_end: Vector2 = Vector2(15.82, 17.15)
 	canvas.camera_center = (pen_start + pen_end) * 0.5
+	before = canvas.floor.raster_layer()
 	_button(canvas, canvas.document_to_local(pen_start), true)
 	_motion(canvas, canvas.document_to_local(pen_end))
+	_check(canvas._draft_stroke.points[-1].distance_to(pen_end) < 0.01, "pen draft never snaps")
 	_button(canvas, canvas.document_to_local(pen_end), false)
-	_check(ink.strokes[-1].points[-1].distance_to(pen_end) < 0.01, "pen never snaps")
+	_check(_matches(canvas, before, AtlasStroke.new(PackedVector2Array([pen_start, pen_end]), canvas.brush_color, canvas.brush_width)), "pen paints unsnapped samples")
 	# Grid edits change only the grid; existing strokes remain in board coordinates.
 	var original: Dictionary = ink.to_dict()
 	grid.rotation = deg_to_rad(77.0)
@@ -222,3 +224,10 @@ func _run() -> void:
 	scene.free()
 	print("ATLAS_SNAPPING_%s checks=%d failures=%d" % ["PASSED" if failures == 0 else "FAILED", checks, failures])
 	quit(1 if failures > 0 else 0)
+
+
+func _matches(canvas: AtlasCanvas, before: AtlasRasterLayer, shape: AtlasStroke) -> bool:
+	var expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(before, shape)
+	if not expected.ok and expected.message == "Edit would not change any pixels.":
+		return canvas.floor.raster_layer().to_dict() == before.to_dict()
+	return expected.ok and canvas.floor.raster_layer().to_dict() == expected.layer.to_dict()

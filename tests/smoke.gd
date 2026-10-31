@@ -207,9 +207,9 @@ func _test_editor_workflow() -> void:
 		"legacy rotation retained")
 
 	# Child edits do not create palette-cell terrain or modify parent artwork.
-	editor.select_layer("ink")
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(2, 3)])), false)
-	_check(canvas.floor.strokes.size() == 1, "child ink remains independently editable")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "child raster remains independently editable")
 	_check(city.to_dict() == parent_before, "painting child does not change parent")
 
 	canvas.camera_zoom = 0.5
@@ -275,36 +275,36 @@ func _test_drawing_input() -> void:
 	var expected_start: Vector2 = canvas.local_to_document(start)
 	_pointer_button(canvas, start, true)
 	_pointer_motion(canvas, middle)
-	_check(canvas.floor.strokes.is_empty(), "in-flight drawing is preview only")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "in-flight drawing is preview only")
 	_check(not editor.edits.is_dirty(), "preview alone does not dirty the document")
 	_pointer_motion(canvas, finish)
 	_pointer_button(canvas, finish, false)
-	_check(canvas.floor.strokes.size() == 1, "one full input gesture commits one stroke")
-	if canvas.floor.strokes.is_empty():
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "one full input gesture commits raster pixels")
+	if canvas.floor.raster_layer().chunks.is_empty():
 		root.remove_child(scene)
 		scene.free()
 		return
-	_check(canvas.floor.strokes[0].points[0].is_equal_approx(expected_start),
+	_check(_pixel(canvas.floor.raster_layer(), expected_start).a > 0,
 		"input is transformed into continuous negative document coordinates")
 	_check(canvas.floor.layers[0] is AtlasRasterLayer, "gridless drawing retains independent raster support")
-	var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	var original: Dictionary = canvas.floor.raster_layer().to_dict()
 	_check(editor.edits.is_dirty(), "drawing marks unsaved work")
 	_check(not edit_menu.is_item_disabled(0) and edit_menu.is_item_disabled(1),
 		"Edit menu reflects current drawing history")
 	_check(editor.title_label.text.begins_with("* "), "single menubar title shows unsaved work")
 	editor.brush_width_spinner.get_line_edit().grab_focus()
 	_key(KEY_Z, true)
-	_check(AtlasStroke.same_artwork(original, canvas.floor.strokes),
+	_check(canvas.floor.raster_layer().to_dict() == original,
 		"menu accelerator hints do not steal undo from a focused numeric input")
 	canvas.grab_focus()
 	_key(KEY_Z, true)
-	_check(canvas.floor.strokes.is_empty() and not editor.edits.is_dirty(),
+	_check(canvas.floor.raster_layer().chunks.is_empty() and not editor.edits.is_dirty(),
 		"Ctrl+Z undoes entire gesture back to clean state")
 	_key(KEY_Z, true, true)
-	_check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "Ctrl+Shift+Z restores exact artwork")
+	_check(canvas.floor.raster_layer().to_dict() == original, "Ctrl+Shift+Z restores exact artwork")
 	_pointer_button(canvas, Vector2(90, 80), true)
 	_pointer_button(canvas, Vector2(90, 80), false)
-	_check(canvas.floor.strokes.size() == 2 and canvas.floor.strokes[-1].points.size() == 1,
+	_check(canvas.floor.raster_layer().to_dict() != original and _pixel(canvas.floor.raster_layer(), canvas.local_to_document(Vector2(90, 80))).a > 0,
 		"a click without motion commits an undoable ink dot")
 	editor._on_undo()
 	_key(KEY_E)
@@ -312,14 +312,14 @@ func _test_drawing_input() -> void:
 	_pointer_button(canvas, Vector2(140, 60), true)
 	_pointer_motion(canvas, Vector2(140, 140))
 	_pointer_button(canvas, Vector2(140, 140), false)
-	_check(canvas.floor.strokes.size() == 2, "eraser gesture cuts a real gap into ink")
+	_check(_pixel(canvas.floor.raster_layer(), canvas.local_to_document(middle)).a == 0, "eraser gesture cuts a real gap into raster")
 	edit_menu.id_pressed.emit(0)
-	_check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "eraser undo restores unsplit ink")
+	_check(canvas.floor.raster_layer().to_dict() == original, "eraser undo restores exact pixels")
 	edit_menu.id_pressed.emit(1)
 	file_menu.id_pressed.emit(0)
 	_check(not editor.edits.is_dirty(), "successful Save establishes a clean checkpoint")
 	_check(not editor.title_label.text.begins_with("* "), "File Save clears the global dirty marker")
-	var saved: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	var saved: Dictionary = canvas.floor.raster_layer().to_dict()
 	editor._on_undo()
 	_check(editor.edits.is_dirty(), "undo away from saved state is dirty")
 	editor.store_io = FailedSaveIO.new()
@@ -328,7 +328,7 @@ func _test_drawing_input() -> void:
 	editor.store_io = null
 	file_menu.id_pressed.emit(1)
 	_check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "Load starts a fresh clean history")
-	_check(AtlasStroke.same_artwork(saved, canvas.floor.strokes), "Save/Load preserves erased vector geometry")
+	_check(canvas.floor.raster_layer().to_dict() == saved, "Save/Load preserves erased pixels")
 	_key(KEY_B)
 	_pointer_button(canvas, start, true)
 	_pointer_motion(canvas, finish)
@@ -342,13 +342,14 @@ func _test_drawing_input() -> void:
 		"wheel zoom cannot distort an in-flight document-space stroke")
 	_key(KEY_ESCAPE)
 	_pointer_button(canvas, finish, false)
-	_check(AtlasStroke.same_artwork(saved, canvas.floor.strokes) and not editor.edits.is_dirty(),
+	_check(canvas.floor.raster_layer().to_dict() == saved and not editor.edits.is_dirty(),
 		"Escape cancels a preview without adding history")
+	canvas.brush_color = Color.BLUE
+	var chrome_start: Vector2 = canvas.local_to_document(start)
 	_pointer_button(canvas, start, true)
 	_pointer_motion(canvas, Vector2(canvas.size.x + 20, 100))
 	_pointer_button(canvas, Vector2(canvas.size.x + 20, 100), false)
-	_check(canvas.floor.strokes.size() == saved.size() + 1
-		and canvas.floor.strokes[-1].points.size() == 1,
+	_check(canvas.floor.raster_layer().to_dict() != saved and _pixel(canvas.floor.raster_layer(), chrome_start).b > 0.9,
 		"dragging into editor chrome never records off-canvas points")
 	editor._on_undo()
 	_pointer_button(canvas, start, true)
@@ -356,11 +357,18 @@ func _test_drawing_input() -> void:
 	var original_floor: AtlasFloor = canvas.floor
 	editor._show_map(editor.campaign.get_map("greyhaven"))
 	_pointer_button(canvas, finish, false)
-	_check(AtlasStroke.same_artwork(saved, original_floor.strokes) and canvas.floor.strokes.is_empty(),
+	_check(original_floor.raster_layer().to_dict() == saved and canvas.floor.raster_layer().chunks.is_empty(),
 		"map switch cancels pending ink instead of committing into another document")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.save_path))
 	root.remove_child(scene)
 	scene.free()
+
+
+func _pixel(layer: AtlasRasterLayer, position: Vector2) -> Color:
+	var pixel: Vector2i = Vector2i((position * layer.pixels_per_unit).floor())
+	var coord: Vector2i = AtlasRasterLayer.pixel_to_chunk(pixel)
+	var chunk: AtlasRasterChunk = layer.chunks.get("%d,%d" % [coord.x, coord.y])
+	return chunk.image.get_pixelv(pixel - coord * AtlasRasterChunk.SIZE) if chunk != null else Color(0, 0, 0, 0)
 
 
 func _pointer_button(canvas: AtlasCanvas, local_position: Vector2, pressed: bool) -> void:
@@ -433,7 +441,7 @@ func _test_board_workflow() -> void:
 	_check(editor.canvas.map.id == id and editor.canvas.map.grid.same_as(grid),
 		"redo creation restores the same board identity and configuration")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-10.125, 3.25), Vector2(45.5, -30.75)])), false)
-	var ink_before: Array[AtlasStroke] = AtlasStroke.clone_all(editor.canvas.floor.strokes)
+	var ink_before: Dictionary = editor.canvas.floor.raster_layer().to_dict()
 	editor.open_grid_settings()
 	editor.grid_controls.size_spinner.value = 120.0
 	editor.grid_controls.rotation_spinner.value = 37.0
@@ -451,7 +459,7 @@ func _test_board_workflow() -> void:
 		"popup edits grid shape, spacing, origin and rotation")
 	_check(updated.distance_per_cell == 2.5 and updated.distance_unit == "km" and not updated.visible,
 		"native units and visibility belong to this board")
-	_check(AtlasStroke.same_artwork(ink_before, editor.canvas.floor.strokes), "grid controls never rescale ink")
+	_check(editor.canvas.floor.raster_layer().to_dict() == ink_before, "grid controls never rescale raster")
 	_check(editor.campaign.get_map("world").to_dict() == source_before, "grid editing leaves source artwork and units untouched")
 	var saved_grid: AtlasGrid = updated.copy()
 	editor._on_save()
@@ -459,7 +467,7 @@ func _test_board_workflow() -> void:
 	var restored: AtlasMapDocument = editor.campaign.get_map(id)
 	_check(restored != null and restored.grid.same_as(saved_grid), "board identity and all grid settings survive Save/Load")
 	if restored != null:
-		_check(AtlasStroke.same_artwork(restored.floors[0].strokes, ink_before), "board artwork survives grid configuration roundtrip")
+		_check(restored.floors[0].raster_layer().to_dict() == ink_before, "board artwork survives grid configuration roundtrip")
 	_check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "loading starts a clean board history")
 	editor.open_board_dialog()
 	editor.board_dialog.hide()

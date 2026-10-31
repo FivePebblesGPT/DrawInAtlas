@@ -193,7 +193,7 @@ func _connect_workspace() -> void:
 	link_chooser.id_pressed.connect(_choose_link)
 	board_dialog.theme = sidebar.theme
 	board_dialog.board_requested.connect(_on_board_requested)
-	raster_importer.image_ready.connect(import_raster)
+	raster_importer.image_ready.connect(artwork.import_prop)
 	raster_importer.failed.connect(_message)
 	canvas.stroke_requested.connect(artwork.stroke)
 	canvas.path_edit_requested.connect(artwork.edit_path)
@@ -267,6 +267,7 @@ func _on_view_changed() -> void:
 	_rebuild_lod()
 	_refresh_layers()
 	_refresh_grid_controls()
+	_choose_tool(canvas.tool)
 	locked_to_cell = false
 	lock_checkbox.button_pressed = false
 	inspector.refresh_floors(canvas.map, canvas.floor)
@@ -294,10 +295,18 @@ func _refresh_layers(preferred_id: String = "") -> void:
 	if not preferred_id.is_empty():
 		canvas.active_layer_id = preferred_id
 	if canvas.floor.layer_by_id(canvas.active_layer_id) == null:
-		var ink: AtlasInkLayer = canvas.floor.ink_layer()
-		canvas.active_layer_id = ink.id if ink != null else ""
-		if ink == null and not canvas.floor.layers.is_empty():
+		var raster: AtlasRasterLayer = canvas.floor.raster_layer()
+		canvas.active_layer_id = raster.id if raster != null else ""
+		if raster == null and not canvas.floor.layers.is_empty():
 			canvas.active_layer_id = canvas.floor.layers[-1].id
+	var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+	var required: String = AtlasArtworkEditor.tool_layer_kind(canvas.tool)
+	if target is AtlasRasterLayer and required == "OBJECTS":
+		canvas.choose_tool(AtlasCanvas.Tool.PEN)
+	elif target is AtlasObjectsLayer and required == "RASTER":
+		canvas.choose_tool(AtlasCanvas.Tool.ART_SELECT)
+	if tool_palette != null:
+		tool_palette.sync_tool(canvas.tool)
 	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
 	layer_panel.set_navigation_context(campaign, canvas.map)
 	layer_panel.sync_object_selection(canvas.selection)
@@ -738,7 +747,7 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 
 func _open_text_editor(anchor: Vector2, index: int) -> void:
 	var original: AtlasStroke
-	var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable():
 		return
 	if index >= 0 and index < layer.strokes.size():

@@ -52,6 +52,7 @@ func _sample(canvas: AtlasCanvas, document_point: Vector2) -> Color:
 
 
 func _pixel(layer: AtlasRasterLayer, point: Vector2i) -> Color:
+	point = Vector2i(Vector2(point) * layer.pixels_per_unit)
 	var coord: Vector2i = AtlasRasterLayer.pixel_to_chunk(point)
 	var chunk: AtlasRasterChunk = layer.chunks.get("%d,%d" % [coord.x, coord.y])
 	return chunk.image.get_pixelv(point - coord * 256)

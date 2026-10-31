@@ -64,7 +64,7 @@ func _run() -> void:
 		"B shortcut updates palette and canvas")
 	editor._choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	_check(editor.canvas.tool == AtlasCanvas.Tool.ART_SELECT and palette.button_for(AtlasCanvas.Tool.ART_SELECT).button_pressed
-		and editor.inspector.get_node("%ActiveToolLabel").text.contains("Select artwork (V)"),
+		and editor.inspector.get_node("%ActiveToolLabel").text.contains("Select objects (V)"),
 		"programmatic changes update active icon and inspector")
 	_check(editor.sidebar.active_view == &"Tools", "choosing a tool does not switch the sidebar tab")
 	root.remove_child(scene)

@@ -53,7 +53,7 @@ func _run() -> void:
 	var child: AtlasMapDocument = campaign.get_map("greyhaven")
 	child.kind = "BATTLEMAP"
 	child.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 32.0)
-	var ink: AtlasInkLayer = child.floors[0].ink_layer()
+	var ink: AtlasObjectsLayer = child.floors[0].objects_layer()
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([
 		Vector2(-25, 12), Vector2(19, 47)]), Color(0.3, 0.5, 0.7, 0.4), 3.0))
 	var image: Image = Image.create(3, 3, false, Image.FORMAT_RGBA8)
@@ -136,7 +136,7 @@ func _run() -> void:
 	_check(layer_found, "raster chunk keys, pixel scale, and transform are inventoried")
 	var ink_found: bool = false
 	for layer: Dictionary in layers:
-		if layer["kind"] == "INK" and layer["stroke_count"] == ink.strokes.size():
+		if layer["kind"] == "OBJECTS" and layer["stroke_count"] == ink.strokes.size():
 			ink_found = true
 	_check(ink_found, "ink count is inventoried")
 

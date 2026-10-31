@@ -194,6 +194,13 @@ jobs:
           godot --headless --path . --script res://tests/eraser_smoke.gd 2>&1 | tee /tmp/godot-eraser.log
           grep -q 'ATLAS_ERASER_PASSED' /tmp/godot-eraser.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^ERASER FAILED:' /tmp/godot-eraser.log; then exit 1; fi
+      - name: Verify raster drawing and designated Objects workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/raster_objects_smoke.gd 2>&1 | tee /tmp/godot-raster-objects.log
+          grep -q 'ATLAS_RASTER_OBJECTS_PASSED' /tmp/godot-raster-objects.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-objects.log; then exit 1; fi
       - name: Verify Bucket tolerance, bounds, previews and saving (T-023)
         shell: bash
         run: |
@@ -302,7 +309,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
+          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
             xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
           done
@@ -315,6 +322,8 @@ jobs:
           grep -q 'ATLAS_COMPACT_CONTROLS_VISUAL_PASSED' /tmp/godot-compact_controls_visual.log
           grep -q 'ATLAS_GRID_SETTINGS_VISUAL_PASSED' /tmp/godot-grid_settings_visual.log
           grep -q 'ATLAS_BRUSH_VISUAL_PASSED' /tmp/godot-brush_visual.log
+          grep -q 'ATLAS_RASTER_RENDERING_PASSED' /tmp/godot-raster_rendering_visual.log
+          grep -q 'ATLAS_DRAWING_PERFORMANCE_PASSED' /tmp/godot-drawing_performance_visual.log
           grep -q 'ATLAS_ERASER_VISUAL_PASSED' /tmp/godot-eraser_visual.log
           grep -q 'ATLAS_MOVE_VISUAL_PASSED' /tmp/godot-move_visual.log
           grep -q 'ATLAS_BUCKET_VISUAL_PASSED' /tmp/godot-bucket_visual.log

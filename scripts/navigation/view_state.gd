@@ -13,7 +13,7 @@ var zoom: float
 var layer_id: String
 
 
-func _init(target_map: String = "", target_floor: String = "", camera_focus: Vector2 = Vector2.ZERO, camera_zoom: float = 1.0, selected_layer: String = "ink") -> void:
+func _init(target_map: String = "", target_floor: String = "", camera_focus: Vector2 = Vector2.ZERO, camera_zoom: float = 1.0, selected_layer: String = "raster") -> void:
 	map_id = target_map
 	floor_id = target_floor
 	focus = camera_focus

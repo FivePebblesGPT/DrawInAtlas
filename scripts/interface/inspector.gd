@@ -179,10 +179,10 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 func refresh_selection(selection: AtlasSelection, can_modify: bool) -> void:
 	selection_label.text = ("Move: click an object and drag; V selects groups. Escape cancels."
 		if _current_tool == AtlasCanvas.Tool.MOVE else
-		"Active layer only. Drag or click; Ctrl add, Alt subtract, Ctrl+D clear. Raster selects the whole layer.")
+		"Objects: drag or click; Ctrl add, Alt subtract, Ctrl+D clear, Delete removes selected objects.")
 	if not selection.is_empty():
 		var count: int = selection.stroke_indices.size()
-		var object_name: String = "Raster asset" if selection.raster_selected else "%d ink stroke%s" % [count, "" if count == 1 else "s"]
+		var object_name: String = "Raster asset" if selection.raster_selected else "%d object%s" % [count, "" if count == 1 else "s"]
 		selection_label.text = ("%s selected · drag to move" % object_name
 			if _current_tool == AtlasCanvas.Tool.MOVE else "%s selected" % object_name)
 	move_x_spinner.set_value_no_signal(0.0)

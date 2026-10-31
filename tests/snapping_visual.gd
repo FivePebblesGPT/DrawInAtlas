@@ -76,8 +76,8 @@ func _run() -> void:
 	var image_draft: Image = root.get_texture().get_image()
 	_button(canvas.global_position + canvas.document_to_local(finish), false)
 	await _frames(6)
-	var layer: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
-	_check(layer.strokes.size() == 1 and layer.strokes[0].points == PackedVector2Array([snapped_start, snapped_finish]),
+	var reference: AtlasFillResult = AtlasRasterBrush.paint(AtlasRasterLayer.paint_layer(), PackedVector2Array([snapped_start, snapped_finish]), canvas.brush_color, canvas.brush_width, false)
+	_check(reference.ok and reference.layer.to_dict() == canvas.floor.raster_layer().to_dict(),
 		"native release commits identical line")
 	var image_final: Image = root.get_texture().get_image()
 	var differences: int = 0

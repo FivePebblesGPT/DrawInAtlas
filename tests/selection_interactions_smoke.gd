@@ -65,13 +65,14 @@ func _run() -> void:
 	_check(editor.create_board("Selection board", AtlasGrid.new(AtlasGrid.Kind.SQUARE, 160.0)), "create board")
 	var canvas: AtlasCanvas = editor.canvas
 	editor.layer_panel.auto_detail_checkbox.button_pressed = false
+	editor._choose_tool(AtlasCanvas.Tool.WALL_PATH)
 	var ink_id: String = canvas.active_layer_id
 	var first: Vector2 = Vector2(85, 95)
 	var second: Vector2 = Vector2(190, 95)
 	var third: Vector2 = Vector2(290, 95)
 	for location: Vector2 in [first, second, third]:
 		var start: Vector2 = canvas.local_to_document(location)
-		editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([start, start + Vector2(20, 0)]), Color.WHITE, 3), false)
+		editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([start, start + Vector2(20, 0)]), Color.WHITE, 3, false))
 	_check(canvas.floor.strokes.size() == 3, "three separated editable objects")
 	editor._choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	_click(canvas, first + Vector2(10, 0))
@@ -106,24 +107,24 @@ func _run() -> void:
 
 	# A second authored ink layer at the same screen coordinates must never
 	# enter the initial layer's object selection or cut/copy scope.
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var top_id: String = canvas.active_layer_id
 	_check(top_id != ink_id and canvas.selection.is_empty(), "layer change clears selection")
 	var top_start: Vector2 = canvas.local_to_document(first)
-	editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([top_start, top_start + Vector2(20, 0)]), Color.CYAN, 3), false)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([top_start, top_start + Vector2(20, 0)]), Color.CYAN, 3, false))
 	editor._choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	_click(canvas, first + Vector2(10, 0))
 	_check(canvas.selection.layer_id == top_id and canvas.selection.stroke_indices == [0], "selection uses active layer at overlapping coordinates")
 	_check(editor.copy_selection() and not editor.clipboard_text.is_empty(), "copy reads active layer only")
 	_check(editor.cut_selection(), "cut deletes selected active-layer object")
-	_check((canvas.floor.layer_by_id(top_id) as AtlasInkLayer).strokes.is_empty()
-		and (canvas.floor.layer_by_id(ink_id) as AtlasInkLayer).strokes.size() == 3, "cut preserves other layer")
-	_check(editor.edits.undo() and (canvas.floor.layer_by_id(top_id) as AtlasInkLayer).strokes.size() == 1, "undo restores exact cut layer")
-	_check(editor.edits.redo() and (canvas.floor.layer_by_id(top_id) as AtlasInkLayer).strokes.is_empty(), "redo reapplies cut atomically")
+	_check((canvas.floor.layer_by_id(top_id) as AtlasObjectsLayer).strokes.is_empty()
+		and (canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer).strokes.size() == 3, "cut preserves other layer")
+	_check(editor.edits.undo() and (canvas.floor.layer_by_id(top_id) as AtlasObjectsLayer).strokes.size() == 1, "undo restores exact cut layer")
+	_check(editor.edits.redo() and (canvas.floor.layer_by_id(top_id) as AtlasObjectsLayer).strokes.is_empty(), "redo reapplies cut atomically")
 	editor.select_layer(ink_id)
 	_check(canvas.active_layer_id == ink_id and canvas.selection.is_empty(), "switching back cannot reuse another layer selection")
 	_click(canvas, first + Vector2(10, 0))
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
+	var ink: AtlasObjectsLayer = canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer
 	var original: Dictionary = ink.to_dict().duplicate(true)
 	ink.locked = true
 	canvas.selection = AtlasSelectionGeometry.select_indices(ink, [0])
@@ -144,7 +145,7 @@ func _run() -> void:
 	editor._on_scope_toggled(false)
 	_check(editor.transform_selection(canvas.selection, Transform2D(0.0, Vector2(500, 0))), "unmasked transform can move artwork across grid boundaries")
 	_check(editor.edits.undo(), "transform undo")
-	_check((canvas.floor.layer_by_id(ink_id) as AtlasInkLayer).to_dict() == original, "undo exactly restores board-space positions")
+	_check((canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer).to_dict() == original, "undo exactly restores board-space positions")
 
 	# Camera, rotated-grid and authored-detail presentation changes must not
 	# reinterpret coordinates or select hidden artwork.
@@ -165,11 +166,11 @@ func _run() -> void:
 	rotated.origin = Vector2(23, -19)
 	editor.apply_grid(rotated)
 	_check(canvas.map.grid.same_geometry(rotated), "apply rotated world hex grid")
-	_check((canvas.floor.layer_by_id(ink_id) as AtlasInkLayer).to_dict() == original, "rotating overlay does not move artwork")
+	_check((canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer).to_dict() == original, "rotating overlay does not move artwork")
 	_click(canvas, selectable)
 	_check(canvas.selection.stroke_indices == [0], "selection stays in board coordinates across rotated hex grid")
 	_check(editor.edits.undo(), "undo grid overlay change")
-	_check((canvas.floor.layer_by_id(ink_id) as AtlasInkLayer).to_dict() == original, "undo overlay leaves ink unchanged")
+	_check((canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer).to_dict() == original, "undo overlay leaves objects unchanged")
 	var state: Dictionary = editor.campaign.to_dict()
 	editor._on_save()
 	_check(FileAccess.file_exists(editor.save_path), "native save selection campaign")

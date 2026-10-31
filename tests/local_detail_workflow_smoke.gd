@@ -28,7 +28,7 @@ func _run() -> void:
 	var canvas: AtlasCanvas = editor.canvas
 	var board: AtlasMapDocument = canvas.map
 	var floor: AtlasFloor = canvas.floor
-	var overview: AtlasInkLayer = floor.ink_layer()
+	var overview: AtlasObjectsLayer = floor.objects_layer()
 	var map_count: int = editor.campaign.maps.size()
 	var link_count: int = editor.campaign.links.size()
 	var placement_count: int = editor.campaign.placements.size()
@@ -42,35 +42,35 @@ func _run() -> void:
 	editor.layer_panel.view_detail_spinner.value = 1
 	_check(canvas.presented_detail_level == 1 and not editor.automatic_artwork_lod,
 		"manual inspection can enter an empty local level without map navigation")
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var street_id: String = canvas.active_layer_id
-	var streets: AtlasInkLayer = floor.layer_by_id(street_id) as AtlasInkLayer
+	var streets: AtlasObjectsLayer = floor.layer_by_id(street_id) as AtlasObjectsLayer
 	_check(streets != null and streets.detail_level == 1,
 		"new ink is owned by D1 on the active board and selected for editing")
 	if streets != null:
 		editor.layer_panel._rename("Streets")
-		editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([
-			center + Vector2(-35, -5), center + Vector2(35, 5)]), Color.ORANGE, 3.0), false)
-		streets = floor.layer_by_id(street_id) as AtlasInkLayer
+		editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([
+			center + Vector2(-35, -5), center + Vector2(35, 5)]), Color.ORANGE, 3.0, false))
+		streets = floor.layer_by_id(street_id) as AtlasObjectsLayer
 		_check(streets != null and streets.strokes.size() == 1, "D1 accepts continuous authored ink")
 
 	# Another detail level can independently describe the same place, including
 	# drawing far from any registered map or previously painted world cell.
 	editor.layer_panel.view_detail_spinner.value = 2
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var room_id: String = canvas.active_layer_id
-	var rooms: AtlasInkLayer = floor.layer_by_id(room_id) as AtlasInkLayer
+	var rooms: AtlasObjectsLayer = floor.layer_by_id(room_id) as AtlasObjectsLayer
 	_check(rooms != null and rooms.detail_level == 2 and room_id != street_id,
 		"D2 is an independent layer, not nested in D1")
 	if rooms != null:
 		editor.layer_panel._rename("Rooms")
-		editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([
-			center + Vector2(-8, -7), center + Vector2(8, 7)]), Color.CYAN, 2.0), false)
-		editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([
-			faraway, faraway + Vector2(4, 6)]), Color.CYAN, 2.0), false)
-		rooms = floor.layer_by_id(room_id) as AtlasInkLayer
+		editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([
+			center + Vector2(-8, -7), center + Vector2(8, 7)]), Color.CYAN, 2.0, false))
+		editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([
+			faraway, faraway + Vector2(4, 6)]), Color.CYAN, 2.0, false))
+		rooms = floor.layer_by_id(room_id) as AtlasObjectsLayer
 		_check(rooms != null and rooms.strokes.size() == 2, "D2 can author near and distant content on one canvas")
-	streets = floor.layer_by_id(street_id) as AtlasInkLayer
+	streets = floor.layer_by_id(street_id) as AtlasObjectsLayer
 	_check(floor.ink_layer().strokes.size() == overview_count and streets != null and streets.strokes.size() == 1,
 		"D2 edits do not rewrite D0 or D1")
 	_check(editor.campaign.maps.size() == map_count and editor.campaign.links.size() == link_count
@@ -131,8 +131,8 @@ func _run() -> void:
 	if restored != null:
 		var restored_board: AtlasMapDocument = restored.get_map(board.id)
 		var saved_floor: AtlasFloor = restored_board.floor_by_id(floor.id) if restored_board != null else null
-		var saved_d1: AtlasInkLayer = saved_floor.layer_by_id(street_id) as AtlasInkLayer if saved_floor != null else null
-		var saved_d2: AtlasInkLayer = saved_floor.layer_by_id(room_id) as AtlasInkLayer if saved_floor != null else null
+		var saved_d1: AtlasObjectsLayer = saved_floor.layer_by_id(street_id) as AtlasObjectsLayer if saved_floor != null else null
+		var saved_d2: AtlasObjectsLayer = saved_floor.layer_by_id(room_id) as AtlasObjectsLayer if saved_floor != null else null
 		_check(saved_d1 != null and saved_d1.detail_level == 1 and saved_d1.strokes.size() == 1,
 			"native save retains separately authored D1")
 		_check(saved_d2 != null and saved_d2.detail_level == 2 and saved_d2.strokes.size() == 2,

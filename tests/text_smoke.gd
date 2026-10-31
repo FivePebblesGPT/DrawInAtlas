@@ -95,7 +95,7 @@ func _run() -> void:
 	editor.text_editor.text_input.text = "A persistent label"
 	editor.text_editor.size_input.value = 19
 	editor.text_editor.confirm_text()
-	var active: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var active: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(active.strokes.size() == 1 and active.strokes[0].text == "A persistent label", "placement creates one object")
 	_check(not editor.text_editor.visible, "editor closed after commit")
 	_check(editor.edits.undo() and active.strokes.is_empty(), "placement undo")
@@ -114,7 +114,7 @@ func _run() -> void:
 	var restored: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
 	_check(restored != null and restored.get_map(canvas.map.id) != null, "native campaign save and reload")
 	var native_map: AtlasMapDocument = restored.get_map(canvas.map.id) if restored != null else null
-	var native_ink: AtlasInkLayer = native_map.floor_by_id(canvas.floor.id).layer_by_id(active.id) as AtlasInkLayer if native_map != null else null
+	var native_ink: AtlasObjectsLayer = native_map.floor_by_id(canvas.floor.id).layer_by_id(active.id) as AtlasObjectsLayer if native_map != null else null
 	_check(native_ink != null and native_ink.strokes.size() == 1 and native_ink.strokes[0].text == "Revised label", "native save preserves editable content")
 	if native_ink != null and not native_ink.strokes.is_empty():
 		editor.text_editor.open_editor(native_ink.strokes[0].points[0], native_ink.strokes[0], 0)
@@ -123,14 +123,14 @@ func _run() -> void:
 		editor.text_editor.close_editor()
 	var saved: AtlasMapDocument = AtlasMapDocument.from_dict(canvas.map.to_dict()) if canvas.map.has_method("to_dict") else null
 	_check(saved != null and saved.floor_by_id(canvas.floor.id) != null and
-		saved.floor_by_id(canvas.floor.id).layer_by_id(active.id) is AtlasInkLayer, "map dictionary retains layer")
-	var saved_text: AtlasInkLayer = saved.floor_by_id(canvas.floor.id).layer_by_id(active.id) as AtlasInkLayer if saved != null else null
+		saved.floor_by_id(canvas.floor.id).layer_by_id(active.id) is AtlasObjectsLayer, "map dictionary retains layer")
+	var saved_text: AtlasObjectsLayer = saved.floor_by_id(canvas.floor.id).layer_by_id(active.id) as AtlasObjectsLayer if saved != null else null
 	_check(saved_text != null and saved_text.strokes[0].text == "Revised label", "dictionary roundtrip retains text")
 	# D1 authors another independent label at the same board coordinates.
 	editor.layer_panel.view_detail_spinner.value = 1
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var detail_id: String = canvas.active_layer_id
-	var detail: AtlasInkLayer = canvas.floor.layer_by_id(detail_id) as AtlasInkLayer
+	var detail: AtlasObjectsLayer = canvas.floor.layer_by_id(detail_id) as AtlasObjectsLayer
 	_check(detail != null and detail.detail_level == 1 and canvas.editing_target_is_presented(),
 		"D1 has its own editable text destination")
 	canvas._begin_text_edit(origin)
@@ -143,7 +143,7 @@ func _run() -> void:
 	_check(canvas.presented_detail_level == 1 and detail.strokes[0].is_text(), "returning to D1 restores text editability")
 	_check(AtlasCampaignStore.save_campaign(editor.campaign, editor.save_path) == OK, "D1 save")
 	var both: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
-	var persisted: AtlasInkLayer = both.get_map(canvas.map.id).floor_by_id(canvas.floor.id).layer_by_id(detail_id) as AtlasInkLayer if both != null else null
+	var persisted: AtlasObjectsLayer = both.get_map(canvas.map.id).floor_by_id(canvas.floor.id).layer_by_id(detail_id) as AtlasObjectsLayer if both != null else null
 	_check(persisted != null and persisted.strokes.size() == 1 and persisted.strokes[0].text == "Street name", "D1 native save preserves text")
 	root.remove_child(scene)
 	scene.free()

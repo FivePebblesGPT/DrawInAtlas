@@ -21,7 +21,7 @@ func _run() -> void:
 	board.grid = AtlasGrid.new(AtlasGrid.Kind.HEX_POINTY, 45.0)
 	board.grid.origin = Vector2(-35, 19)
 	board.grid.rotation = deg_to_rad(37.0)
-	var overview: AtlasInkLayer = board.floors[0].ink_layer()
+	var overview: AtlasObjectsLayer = board.floors[0].objects_layer()
 	var neighbor_a: Vector2 = board.grid.cell_to_document(Vector2i(0, 0))
 	var neighbor_b: Vector2 = board.grid.cell_to_document(Vector2i(1, 0))
 	overview.strokes.append(AtlasStroke.new(PackedVector2Array([neighbor_a, neighbor_b]), Color.RED, 8.0))

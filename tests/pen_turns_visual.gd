@@ -92,7 +92,7 @@ func _run() -> void:
 	await _trace(canvas, quick)
 	await _trace(canvas, hairpin)
 	await _trace(canvas, PackedVector2Array([Vector2(420, 500)]))
-	_check(canvas.floor.strokes.size() == 4, "slow, fast, tight U-turn and tap gestures committed")
+	_check(not canvas.floor.raster_layer().chunks.is_empty() and canvas.floor.strokes.is_empty(), "slow, fast, tight U-turn and tap gestures paint raster")
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()
 	var s_straight: Color = _sample(image, canvas, Vector2(140, 160))
@@ -112,16 +112,15 @@ func _run() -> void:
 	_check(absf(hairpin_straight.r - hairpin_turn.r) < 0.07,
 		"tight U-turn has no dark or sharp corner")
 	_check(absf(dot.r - s_straight.r) < 0.07, "single pointer tap has correct opacity")
-	var saved_path: PackedVector2Array = canvas.floor.strokes[0].points.duplicate()
-	var saved_color: Color = canvas.floor.strokes[0].color
+	var saved_pixels: Dictionary = canvas.floor.raster_layer().to_dict()
 	editor._on_undo()
-	_check(canvas.floor.strokes.size() == 3, "single tap undo is one transaction")
+	_check(canvas.floor.raster_layer().to_dict() != saved_pixels, "single tap undo is one transaction")
+	var before_hairpin: Dictionary = canvas.floor.raster_layer().to_dict()
 	editor._on_undo()
-	_check(canvas.floor.strokes.size() == 2, "tight U-turn undo is one transaction")
+	_check(canvas.floor.raster_layer().to_dict() != before_hairpin, "tight U-turn undo is one transaction")
 	editor._on_redo()
 	editor._on_redo()
-	_check(canvas.floor.strokes.size() == 4 and canvas.floor.strokes[0].points == saved_path
-		and canvas.floor.strokes[0].color == saved_color,
+	_check(canvas.floor.raster_layer().to_dict() == saved_pixels,
 		"redo restores exact sampled path and transparency")
 	# A closed shape must keep its hollow center; offset outlines may contain holes.
 	var rect: PackedVector2Array = PackedVector2Array([

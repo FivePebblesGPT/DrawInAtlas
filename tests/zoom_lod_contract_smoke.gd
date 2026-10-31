@@ -53,7 +53,7 @@ func _test_shared_camera_and_detail() -> void:
 	board.grid.origin = Vector2(17, -31)
 	board.grid.rotation = deg_to_rad(37.0)
 	var center: Vector2 = board.grid.cell_to_document(Vector2i(2, -1))
-	var overview: AtlasInkLayer = board.floors[0].ink_layer()
+	var overview: AtlasObjectsLayer = board.floors[0].objects_layer()
 	var local: AtlasInkLayer = AtlasInkLayer.new("local", "Local detail")
 	local.detail_level = 1
 	board.floors[0].layers.append(local)

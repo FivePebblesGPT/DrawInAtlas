@@ -56,15 +56,15 @@ func _run() -> void:
 	overlay.cell_size = 90.0
 	overlay.rotation = deg_to_rad(37)
 	editor.apply_grid(overlay)
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var id: String = editor.canvas.active_layer_id
-	_check(id != "ink" and floor.layer_by_id(id) is AtlasInkLayer, "new ink becomes the explicit edit target")
+	_check(id != "objects" and floor.layer_by_id(id) is AtlasObjectsLayer, "new Objects layer becomes the explicit edit target")
 	_check(editor.canvas.map.grid.cell_polygon(Vector2i.ZERO) != basis,
 		"editing the overlay changes only grid polygons")
-	var stroke: AtlasStroke = AtlasStroke.new(PackedVector2Array([Vector2(-3.125, 0.25), Vector2(30.5, 10.75)]))
-	editor._on_stroke(stroke, false)
-	_check((floor.layer_by_id(id) as AtlasInkLayer).strokes.size() == 1 and floor.strokes.is_empty(),
-		"ink goes only into the selected layer")
+	var stroke: AtlasStroke = AtlasEditablePath.make(PackedVector2Array([Vector2(-3.125, 0.25), Vector2(30.5, 10.75)]), Color.WHITE, 2.0, false)
+	editor.artwork.edit_path(-1, null, stroke)
+	_check((floor.layer_by_id(id) as AtlasObjectsLayer).strokes.size() == 1 and floor.strokes.is_empty(),
+		"wall object goes only into the selected Objects layer")
 	# Presentation is a view choice; assigning a layer to a different authored
 	# detail group is history-backed metadata, not a new document or transform.
 	editor.layer_panel.layer_detail_spinner.value = 1
@@ -80,15 +80,15 @@ func _run() -> void:
 		"editor can return to overview editing without another map")
 	editor.layer_panel.lock_checkbox.button_pressed = true
 	var command: AtlasEditCommand = editor.edits.get_undo_command()
-	editor._on_stroke(stroke, false)
-	_check((floor.layer_by_id(id) as AtlasInkLayer).strokes.size() == 1
+	editor.artwork.edit_path(-1, null, stroke)
+	_check((floor.layer_by_id(id) as AtlasObjectsLayer).strokes.size() == 1
 		and editor.edits.get_undo_command() == command, "locked edit is rejected without adding history")
 	editor._on_undo()
 	_check(not floor.layer_by_id(id).locked, "undo unlocks the correct layer")
 	editor.layer_panel.visibility_checkbox.button_pressed = false
 	command = editor.edits.get_undo_command()
-	editor._on_stroke(stroke, true)
-	_check((floor.layer_by_id(id) as AtlasInkLayer).strokes.size() == 1
+	editor.artwork.edit_path(-1, null, stroke)
+	_check((floor.layer_by_id(id) as AtlasObjectsLayer).strokes.size() == 1
 		and editor.edits.get_undo_command() == command, "hidden layer cannot be erased")
 	editor._on_undo()
 	editor.layer_panel.opacity_spinner.value = 0.5
@@ -104,16 +104,16 @@ func _run() -> void:
 	var raster_id: String = editor.canvas.active_layer_id
 	var raster: AtlasRasterLayer = floor.layer_by_id(raster_id) as AtlasRasterLayer
 	_check(raster != null and raster.chunks.size() == 1, "import creates a typed chunked raster layer")
-	editor.select_layer("ink")
+	editor.select_layer("objects")
 	command = editor.edits.get_undo_command()
-	_check(editor.canvas.floor.layer_by_id(editor.canvas.active_layer_id) is AtlasInkLayer,
-		"selecting semantic ink is explicit even with raster active")
+	_check(editor.canvas.floor.layer_by_id(editor.canvas.active_layer_id) is AtlasObjectsLayer,
+		"selecting Objects switches to object tools")
 	_check(editor.edits.get_undo_command() == command, "layer selection is not an edit command")
 	editor._on_save()
 	var checkpoint: Dictionary = editor.campaign.to_dict()
 	_check(not editor.edits.is_dirty(), "validated save clears dirty state")
 	editor.select_layer(id)
-	editor.layer_panel._rename("Renamed ink")
+	editor.layer_panel._rename("Renamed Objects")
 	editor._on_save()
 	var basename: String = editor.save_path.trim_suffix(".scn")
 	_check(FileAccess.file_exists(basename + ".bak.scn"), "second save retains the previous checkpoint")

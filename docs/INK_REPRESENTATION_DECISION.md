@@ -40,6 +40,12 @@ The question in [[ManualReview_2026-10-30#Code review|Code review, item 1]] is w
 
 ## Approved decision — raster-dominant, semantic vector
 
+**2026-10-31 owner clarification:** ordinary Ink drawing is deprecated. Lines,
+rectangles, ellipses and polygons are raster drawing tools. Designated **Objects**
+layers hold editable walls, text and placed image props. Tool choice determines
+the target type automatically. This clarification supersedes the earlier tool
+and layer-selection wording below; see [[RASTER_OBJECTS_WORKFLOW]].
+
 **Owner approval (2026-10-31):** Raster is the **primary type for ordinary freehand artwork**. Vector is retained primarily for **specialized, individually editable semantic objects**, including wall paths, polygons/shapes, lines, and text. This is **not** an all-raster conversion or a ban on the existing ink representation: the runtime remains typed and supports both `AtlasRasterLayer` and `AtlasInkLayer` on the same board and at every authored detail level.
 
 The policy establishes:

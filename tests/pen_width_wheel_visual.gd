@@ -117,7 +117,9 @@ func _run() -> void:
 	await _button(board_point - Vector2(35, 0), true)
 	await _motion(board_point + Vector2(35, 0))
 	await _button(board_point + Vector2(35, 0), false)
-	_check(canvas.floor.strokes.size() == 1 and canvas.floor.strokes[0].width == 18.0,
+	var reference: AtlasFillResult = AtlasRasterBrush.paint(AtlasRasterLayer.paint_layer(), PackedVector2Array([
+		canvas.local_to_document(Vector2(125, 180)), canvas.local_to_document(Vector2(195, 180))]), canvas.brush_color, 18.0, false)
+	_check(reference.ok and canvas.floor.raster_layer().to_dict() == reference.layer.to_dict(),
 		"next real pen stroke uses displayed wheel-adjusted width")
 	var width_before: float = spinner.value
 	await _wheel(board_point, true)

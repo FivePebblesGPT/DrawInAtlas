@@ -53,7 +53,8 @@ func resolve(campaign: AtlasCampaign, map_id: String, floor_id: String = "", fal
 	if not _valid_state(state):
 		return null
 	if floor.layer_by_id(state.layer_id) == null:
-		state.layer_id = "ink" if floor.layer_by_id("ink") != null else ""
+		var raster: AtlasRasterLayer = floor.raster_layer()
+		state.layer_id = raster.id if raster != null else ""
 		if state.layer_id.is_empty() and not floor.layers.is_empty():
 			state.layer_id = floor.layers.back().id
 	remember(state)

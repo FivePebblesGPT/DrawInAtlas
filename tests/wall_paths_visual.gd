@@ -66,7 +66,7 @@ func _run() -> void:
 	key.pressed = true
 	editor._unhandled_key_input(key)
 	await _frames(5)
-	var ink: AtlasInkLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasInkLayer
+	var ink: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(ink.strokes.size() == 1 and ink.strokes[0].editable_path, "Enter finalizes one editable wall")
 	var after: Image = root.get_texture().get_image()
 	_check(after.get_pixelv(sample).a > 0.5, "committed wall visible in framebuffer")

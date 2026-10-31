@@ -39,8 +39,8 @@ static func inspect(campaign: AtlasCampaign) -> Dictionary:
 					"detail_level": layer.detail_level, "visible": layer.visible,
 					"locked": layer.locked, "opacity": layer.opacity
 				}
-				if layer is AtlasInkLayer:
-					layer_record["stroke_count"] = (layer as AtlasInkLayer).strokes.size()
+				if layer is AtlasObjectsLayer:
+					layer_record["stroke_count"] = (layer as AtlasObjectsLayer).strokes.size()
 				elif layer is AtlasRasterLayer:
 					var raster: AtlasRasterLayer = layer as AtlasRasterLayer
 					var chunk_keys: Array[String] = raster.chunks.keys()

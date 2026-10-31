@@ -26,7 +26,7 @@ func _run() -> void:
 	editor.use_system_clipboard = false
 	second.use_system_clipboard = false
 	var payload: String = AtlasClipboard.encode_ink(
-		[AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(10, 5)]))], [0], Vector2.ZERO)
+		[AtlasEditablePath.make(PackedVector2Array([Vector2.ZERO, Vector2(10, 5)]), Color.WHITE, 2.0, false)], [0], Vector2.ZERO)
 	editor.clipboard_text = payload
 	editor.locked_to_cell = true
 	_check(editor.clipboard_text == payload and editor.locked_to_cell,
@@ -90,7 +90,8 @@ func _run() -> void:
 
 	var blank: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.GRIDLESS, 64.0)
 	_check(editor.create_board("Module sketch", blank), "create a blank editing target")
-	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(20, 10)])), false)
+	editor._choose_tool(AtlasCanvas.Tool.WALL_PATH)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([Vector2.ZERO, Vector2(20, 10)]), Color.WHITE, 2.0, false))
 	editor.select_all_artwork()
 	var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
 	editor.move_x_spinner.value = 30.0

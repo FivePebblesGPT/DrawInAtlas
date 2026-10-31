@@ -70,14 +70,14 @@ func _roundtrip(editor: AtlasEditor) -> void:
 		Vector2(-100, 0), Vector2(-50, 0), Vector2(0, 0), Vector2(0, -60)])
 	var stroke: AtlasStroke = AtlasStroke.new(path, ink, canvas.brush_width)
 	editor._on_stroke(stroke, false)
-	_check(canvas.floor.strokes.size() == 1, "one complete gesture creates one stroke")
-	_check(canvas.floor.strokes[0].points == path and canvas.floor.strokes[0].color == ink
-		and canvas.floor.strokes[0].width == 24.0, "drawing preserves exact path/color/width")
-	var retained: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "one complete gesture paints raster")
+	var expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(AtlasRasterLayer.paint_layer(), stroke)
+	_check(expected.ok and expected.layer.to_dict() == canvas.floor.raster_layer().to_dict(), "drawing rasterizes the exact path/color/width")
+	var retained: Dictionary = canvas.floor.raster_layer().to_dict()
 	editor._on_undo()
-	_check(canvas.floor.strokes.is_empty(), "one undo removes entire joined stroke")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "one undo removes entire joined stroke")
 	editor._on_redo()
-	_check(AtlasStroke.same_artwork(canvas.floor.strokes, retained), "redo restores untouched path and alpha")
+	_check(canvas.floor.raster_layer().to_dict() == retained, "redo restores exact pixels and alpha")
 	var slot: String = "user://validation/t010-roundtrip.scn"
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://validation"))
 	_check(AtlasCampaignStore.save_campaign(editor.campaign, slot) == OK, "native scene save")
@@ -86,8 +86,8 @@ func _roundtrip(editor: AtlasEditor) -> void:
 	if result.campaign != null:
 		var restored: AtlasMapDocument = result.campaign.get_map(canvas.map.id)
 		var restored_floor: AtlasFloor = restored.floor_by_id(canvas.floor.id) if restored != null else null
-		var restored_ink: AtlasInkLayer = restored_floor.layer_by_id("ink") as AtlasInkLayer if restored_floor != null else null
-		_check(restored_ink != null and AtlasStroke.same_artwork(restored_ink.strokes, retained),
+		var restored_raster: AtlasRasterLayer = restored_floor.raster_layer() if restored_floor != null else null
+		_check(restored_raster != null and restored_raster.to_dict() == retained,
 			"save roundtrip retains point data, width and alpha")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot))
 

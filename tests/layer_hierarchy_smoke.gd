@@ -58,25 +58,27 @@ func _run() -> void:
 	var raster_row: TreeItem = _find(panel.hierarchy.get_root(), "layer", "raster")
 	if raster_row != null:
 		panel._on_hierarchy_button(raster_row, 0, AtlasLayerPanel.LAYER_SETTINGS, 1)
+		await process_frame
 		_check(editor.canvas.active_layer_id == "raster" and panel.name_input.visible,
 			"inline layer-settings action selects correct editing target")
 		panel.layer_settings_button.pressed.emit()
 	var map_count: int = editor.campaign.maps.size()
 	var link_count: int = editor.campaign.links.size()
 	var ink_id: String = editor.canvas.active_layer_id
-	var ink: AtlasInkLayer = editor.canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
+	var ink: AtlasObjectsLayer = editor.canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer
 	if ink == null:
-		editor.layer_panel._add_ink()
+		editor.layer_panel._add_objects()
 		ink_id = editor.canvas.active_layer_id
-		ink = editor.canvas.floor.layer_by_id(ink_id) as AtlasInkLayer
+		ink = editor.canvas.floor.layer_by_id(ink_id) as AtlasObjectsLayer
 	var before_strokes: int = ink.strokes.size()
 	var position: Vector2 = Vector2(-30, 55)
-	editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([position, position + Vector2(60, 0)])), false)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([position, position + Vector2(60, 0)]), Color.WHITE, 2.0, false))
 	var stroke: TreeItem = _find(panel.hierarchy.get_root(), "stroke", ink_id)
 	_check(stroke != null and ink.strokes.size() == before_strokes + 1, "new editable object is listed under layer")
 	if stroke != null:
 		stroke.select(0)
 		panel._on_hierarchy_selected()
+		await process_frame
 		_check(editor.canvas.selection.layer_id == ink_id and not editor.canvas.selection.stroke_indices.is_empty(),
 			"choosing object selects only the current layer's ink")
 	_check(editor.campaign.maps.size() == map_count and editor.campaign.links.size() == link_count,
