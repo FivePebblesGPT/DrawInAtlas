@@ -108,7 +108,81 @@ func _run() -> void:
 				"edit opens the existing native-safe link form for this relationship")
 			editor.link_dialog.hide()
 	_check(editor.campaign.maps.size() == map_count, "link actions never synthesize map documents")
+	_test_large_object_layer(editor, panel)
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_LAYER_HIERARCHY_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])
 	quit(0 if failures == 0 else 1)
+
+
+## A large Objects layer should still show its newest items. Canvas selections in
+## the omitted middle must surface a transient row without expanding the whole list.
+func _test_large_object_layer(editor: AtlasEditor, panel: AtlasLayerPanel) -> void:
+	var before_maps: int = editor.campaign.maps.size()
+	panel._add_objects()
+	var layer_id: String = editor.canvas.active_layer_id
+	var layer: AtlasObjectsLayer = editor.canvas.floor.layer_by_id(layer_id) as AtlasObjectsLayer
+	_check(layer != null, "large-object witness has a live Objects layer")
+	if layer == null:
+		return
+	for index: int in range(110):
+		var x: float = float(index) * 4.0
+		layer.strokes.append(AtlasStroke.new(PackedVector2Array([
+			Vector2(x, 200.0), Vector2(x + 2.0, 200.0)]), Color.WHITE, 1.0))
+	editor._refresh_layers()
+	var first_key: String = "%s:0" % layer_id
+	var last_key: String = "%s:109" % layer_id
+	var middle_key: String = "%s:55" % layer_id
+	_check(panel._stroke_rows.has(first_key) and panel._stroke_rows.has(last_key),
+		"oldest and newly added objects both appear beyond the row limit")
+	_check(_count_layer_strokes(panel, layer_id) == AtlasLayerPanel.MAX_STROKE_ROWS and
+		not panel._stroke_rows.has(middle_key), "large layer stays bounded with a middle gap")
+	var layer_row: TreeItem = panel._layer_rows[layer_id]
+	var child: TreeItem = layer_row.get_first_child()
+	var omitted: int = 0
+	while child != null:
+		var data: Variant = child.get_metadata(0)
+		if data is Dictionary and data.get("kind") == "summary":
+			omitted += 1
+		child = child.get_next()
+	_check(omitted == 1, "omitted objects are explained by a nonselectable gap row")
+
+	editor.canvas.selection = AtlasSelectionGeometry.select_indices(layer, [55])
+	editor.canvas.selection_changed.emit()
+	var selected: TreeItem = panel.hierarchy.get_selected()
+	_check(panel._stroke_rows.has(middle_key) and _count_layer_strokes(panel, layer_id) == 81,
+		"a canvas-selected middle object gets one temporary row")
+	_check(selected != null and selected.get_metadata(0).get("kind") == "stroke"
+		and selected.get_metadata(0).get("index") == 55,
+		"middle object is highlighted with its canonical stroke index")
+	_check(editor.canvas.active_layer_id == layer_id and editor.campaign.maps.size() == before_maps,
+		"showing the middle row never changes the editing target or map registry")
+	editor._refresh_layers()
+	selected = panel.hierarchy.get_selected()
+	_check(selected != null and selected.get_metadata(0).get("index") == 55,
+		"selected middle object survives an ordinary hierarchy redraw")
+
+	editor.canvas.clear_selection()
+	selected = panel.hierarchy.get_selected()
+	_check(not panel._stroke_rows.has(middle_key) and _count_layer_strokes(panel, layer_id) == 80,
+		"deselection removes the temporary row and restores the bound")
+	_check(selected != null and selected.get_metadata(0).get("kind") == "layer",
+		"clearing the canvas selection highlights the editing layer")
+
+	editor.canvas.selection = AtlasSelectionGeometry.select_indices(layer, [55])
+	editor.canvas.selection_changed.emit()
+	layer.strokes[55].width = 3.0
+	panel.sync_object_selection(editor.canvas.selection)
+	selected = panel.hierarchy.get_selected()
+	_check(not panel._stroke_rows.has(middle_key) and selected != null
+		and selected.get_metadata(0).get("kind") == "layer",
+		"stale object snapshots do not leave a misleading hierarchy selection")
+	editor.canvas.clear_selection()
+
+
+func _count_layer_strokes(panel: AtlasLayerPanel, layer_id: String) -> int:
+	var count: int = 0
+	for key: String in panel._stroke_rows:
+		if key.begins_with(layer_id + ":"):
+			count += 1
+	return count

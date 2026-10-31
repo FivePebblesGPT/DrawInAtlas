@@ -71,6 +71,27 @@ func _run() -> void:
 	_check(panel.hierarchy.size.x > 80.0, "tree retains usable horizontal width")
 	_check(root.get_texture().get_image().save_png("user://validation/layer-hierarchy-800.png") == OK,
 		"native compact-width screenshot")
+	# A large layer must keep recently authored objects accessible; selecting an
+	# omitted middle object should scroll its temporary row into the Tree view.
+	panel._add_objects()
+	var layer: AtlasObjectsLayer = editor.canvas.floor.layer_by_id(editor.canvas.active_layer_id) as AtlasObjectsLayer
+	for index: int in range(110):
+		var x: float = float(index) * 4.0
+		layer.strokes.append(AtlasStroke.new(PackedVector2Array([
+			Vector2(x, 200.0), Vector2(x + 2.0, 200.0)]), Color.WHITE, 1.0))
+	editor._refresh_layers()
+	editor.canvas.selection = AtlasSelectionGeometry.select_indices(layer, [55])
+	editor.canvas.selection_changed.emit()
+	await _frames(5)
+	var focused: TreeItem = panel.hierarchy.get_selected()
+	_check(focused != null and focused.get_metadata(0).get("index") == 55,
+		"native tree highlights the omitted object selected on canvas")
+	if focused != null:
+		var focused_rect: Rect2 = panel.hierarchy.get_item_area_rect(focused, 0)
+		_check(focused_rect.position.y >= 0.0 and focused_rect.end.y <= panel.hierarchy.size.y,
+			"selected object scrolls within the compact hierarchy viewport")
+	_check(root.get_texture().get_image().save_png("user://validation/layer-hierarchy-overflow-800.png") == OK,
+		"native large-layer selection screenshot")
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_LAYER_HIERARCHY_VISUAL_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])

@@ -43,6 +43,8 @@ var _building: bool = false
 var _settings_open: bool = false
 var _layer_rows: Dictionary[String, TreeItem] = {}
 var _stroke_rows: Dictionary[String, TreeItem] = {}
+var _pinned_stroke_layer: String = ""
+var _pinned_stroke_index: int = -1
 
 
 func _ready() -> void:
@@ -183,27 +185,42 @@ func set_navigation_context(campaign: AtlasCampaign, map: AtlasMapDocument) -> v
 
 
 func sync_object_selection(selection: AtlasSelection) -> void:
-	# A cleared or multi-object selection must not leave one stale stroke highlighted.
-	if selection == null or selection.is_empty() or selection.stroke_indices.size() != 1:
+	var layer: AtlasLayer = _floor.layer_by_id(selection.layer_id) if _floor != null and selection != null else null
+	var single_stroke: bool = (selection != null and selection.stroke_indices.size() == 1
+		and not selection.is_empty() and layer is AtlasObjectsLayer and selection.matches(layer))
+	var index: int = selection.stroke_indices[0] if single_stroke else -1
+	var layer_id: String = selection.layer_id if single_stroke else ""
+	var key: String = "%s:%d" % [layer_id, index]
+
+	# The extra row is only needed while its exact live object is selected.
+	# Dropping it on deselect or a stale snapshot prevents false highlights.
+	if _pinned_stroke_index >= 0 and (_pinned_stroke_layer != layer_id or _pinned_stroke_index != index):
+		_pinned_stroke_layer = ""
+		_pinned_stroke_index = -1
+		_rebuild_hierarchy()
+	if not single_stroke:
 		if _layer_rows.has(_selected):
 			_building = true
 			(_layer_rows[_selected] as TreeItem).select(0)
 			_building = false
 		return
-	var key: String = "%s:%d" % [selection.layer_id, selection.stroke_indices[0]]
+	if not _stroke_rows.has(key):
+		_pinned_stroke_layer = layer_id
+		_pinned_stroke_index = index
+		_rebuild_hierarchy()
 	if not _stroke_rows.has(key):
 		return
+
 	var row: TreeItem = _stroke_rows[key]
 	_building = true
 	var layer_row: TreeItem = row.get_parent()
 	var group: TreeItem = layer_row.get_parent()
 	group.collapsed = false
 	layer_row.collapsed = false
-	_collapsed["layer:" + selection.layer_id] = false
-	var selected_layer: AtlasLayer = _floor.layer_by_id(selection.layer_id)
-	if selected_layer != null:
-		_collapsed["detail:%d" % selected_layer.detail_level] = false
+	_collapsed["layer:" + layer_id] = false
+	_collapsed["detail:%d" % layer.detail_level] = false
 	row.select(0)
+	hierarchy.scroll_to_item(row)
 	_building = false
 
 
@@ -226,6 +243,23 @@ func _make_row(parent: TreeItem, label: String, metadata: Dictionary, tooltip: S
 	if not tooltip.is_empty():
 		row.set_tooltip_text(0, tooltip)
 	return row
+
+
+func _visible_stroke_indices(total: int, layer_id: String) -> Array[int]:
+	# Keep the hierarchy bounded while showing both old and newly added objects.
+	# A canvas-selected object in the omitted middle gets one temporary row.
+	var indices: Array[int] = []
+	var head: int = mini(total, MAX_STROKE_ROWS / 2)
+	var tail_start: int = maxi(head, total - (MAX_STROKE_ROWS - head))
+	for index: int in range(head):
+		indices.append(index)
+	for index: int in range(tail_start, total):
+		indices.append(index)
+	if _pinned_stroke_layer == layer_id and _pinned_stroke_index >= head \
+			and _pinned_stroke_index < tail_start:
+		indices.append(_pinned_stroke_index)
+		indices.sort()
+	return indices
 
 
 func _rebuild_hierarchy() -> void:
@@ -266,7 +300,14 @@ func _rebuild_hierarchy() -> void:
 			entry.collapsed = _collapsed.get("layer:" + layer.id, true)
 			if layer is AtlasObjectsLayer:
 				var ink: AtlasObjectsLayer = layer as AtlasObjectsLayer
-				for stroke_index: int in range(mini(ink.strokes.size(), MAX_STROKE_ROWS)):
+				var previous_index: int = -1
+				for stroke_index: int in _visible_stroke_indices(ink.strokes.size(), layer.id):
+					if stroke_index > previous_index + 1:
+						var omitted: int = stroke_index - previous_index - 1
+						var summary: TreeItem = _make_row(entry, "… %d objects (select on canvas)" % omitted,
+							{"kind": "summary"})
+						summary.set_selectable(0, false)
+					previous_index = stroke_index
 					var stroke: AtlasStroke = ink.strokes[stroke_index]
 					var title: String
 					if stroke.is_prop():
@@ -281,10 +322,7 @@ func _rebuild_hierarchy() -> void:
 					var item: TreeItem = _make_row(entry, title, {"kind": "stroke", "id": layer.id,
 						"index": stroke_index}, "Select this object for whole-object edits")
 					_stroke_rows["%s:%d" % [layer.id, stroke_index]] = item
-				if ink.strokes.size() > MAX_STROKE_ROWS:
-					var more: TreeItem = _make_row(entry, "… %d more strokes (use Select tool)" %
-						(ink.strokes.size() - MAX_STROKE_ROWS), {"kind": "summary"})
-					more.set_selectable(0, false)
+				# Omitted middle objects remain selectable directly on the canvas.
 			elif layer is AtlasRasterLayer:
 				var raster: AtlasRasterLayer = layer as AtlasRasterLayer
 				if not raster.chunks.is_empty():
