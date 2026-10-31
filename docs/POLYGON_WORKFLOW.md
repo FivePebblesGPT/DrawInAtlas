@@ -1,30 +1,29 @@
-# Polygon shape — T-025 review contract
+# Polygon tool — T-025 review contract
 
-**Status:** Implementation candidate; interaction and style acceptance still requires the project owner's agreement. The authoritative completion tracker remains `docs/Index.md`.
+**Status:** Working raster-first implementation candidate; interaction acceptance still requires the project owner's agreement. `docs/Index.md` is the completion tracker.
 
 ## User interaction
 
-- Choose **Shapes → Polygon (P)**. Polygon works on the currently selected visible, unlocked **ink** layer, and selects an existing ink layer when switching from terrain/raster. It does not create a child map, raster layer, or independent document.
-- **Click** to place individual vertices. The pointer previews the possible next edge, and after three valid fixed vertices the renderer shows the closed outline or interior of exactly those fixed vertices. Pending pointer motion does **not** add a fourth vertex to an Enter-committed polygon.
-- **Close** by clicking the first vertex within an 8-screen-pixel radius, double-clicking after at least three vertices are fixed, pressing Enter, or right-clicking. Backspace removes the last vertex; Escape or switching tools cancels the entire gesture. Mouse release alone does not commit.
-- **Style:** Inspector toggles between a round-stroked solid-color **outline** (default, brush width applies) and a **solid fill with no separate outline** (the chosen RGBA color fills the interior). This deliberately does not implement independent outline and fill colors, dashed edges, or per-point editing. The `PolygonFill` state is session-only until a shape is created.
-- **Snap:** Optional grid snapping applies to *each vertex* in canonical document coordinates. The choice is frozen at the start of each polygon gesture; camera zoom and grid rotation don't change the stored coordinates.
+- Choose **Shapes → Polygon (P)**. The tool targets a visible, unlocked **Raster** layer in the displayed authored detail level. Tool routing selects an existing editable Raster layer or creates one through history if needed. It never makes a child map or an independently movable Objects shape.
+- **Click** to fix vertices in document coordinates. Until three vertices are fixed, the pointer may suggest a candidate polygon; after the third vertex, the translucent/outlined preview represents **exactly the fixed vertices**. Pointer movement draws a possible next edge as a separate guide; Enter never commits an unclicked fourth vertex.
+- **Close** by clicking within 8 screen pixels of the first vertex, double-clicking after at least three vertices are fixed, pressing Enter, or right-clicking. **Backspace** removes the last vertex; **Escape**, switching tools, or losing window focus cancels the draft. Mouse release does not commit.
+- **Style:** The inspector toggles between a solid-color round-stroked **outline** (default; brush width applies) and **solid fill** (one fill color, no independent outline). Brush color and width remain live during vertex placement: changing them repaints the detached draft even with a stationary pointer. Freehand Brush and Eraser deliberately retain their press-time styles instead. Style settings are session-only until pixels are committed.
+- **Snap:** Optional grid snapping applies to each newly clicked vertex in board coordinates; the snap setting is frozen at the start of the gesture. Zoom and grid rotation do not alter already fixed vertices.
 
-Unlike Paint.NET's current Shapes tool, which uses preset drag-created polygons and a temporary post-drag edit mode, this implementation uses point-by-point vertex placement. That deliberate variation follows this ticket's arbitrary polygon requirement and does not pre-implement T-026's independently **editable open/closed wall paths**. The default outline/solid-fill styling and Enter-to-finish behavior take their cues from [Paint.NET's Shapes tool](https://paint.net/doc/latest/ShapeTools.html) and its [toolbar Finish convention](https://paint.net/doc/latest/Toolbar.html).
+Unlike Paint.NET's drag-created polygon presets with a post-drag editing mode, this proposal uses point-by-point placement for arbitrary shapes. It remains separate from T-026's independently editable wall paths. The outline/fill styles and Finish key follow [Paint.NET Shapes](https://paint.net/doc/latest/ShapeTools.html) and [toolbar Finish](https://paint.net/doc/latest/Toolbar.html) as interaction references, not an exact behavior claim.
 
-## Data and editing contract
+## Raster data and editing contract
 
-- A valid polygon has 3–256 finite, nonrepeated neighboring vertices, nonzero area, and no nonadjacent edge intersection. Invalid or incomplete gestures produce **no history entry** and no stored artwork.
-- The model is a single closed `AtlasStroke`. Outline mode remains the existing closed centerline stroke; solid-fill mode stores the optional `filled: true` flag. Omission defaults to false, so older serialized strokes and native saves remain compatible. All transforms, clipboard operations and history snapshots copy that flag.
-- Filled interiors render as one colored polygon, avoiding doubled alpha along the border. An outline's normal width is retained. Filled shapes can be selected by clicking anywhere inside. The Eraser removes a touched filled shape as a whole object rather than silently splitting it into open line fragments.
-- Edit scope, visibility, locks, and authored-detail presentation remain enforced by the history command. Outline shapes use the existing centerline clipping policy; filled polygons must fit **entirely** inside the active cell-mask bounding constraint, including their width margin, or are rejected without partially filling outside the mask. This conservative choice intentionally does not synthesize partial/triangulated fill fragments.
-- Existing polygon geometry is *not* point-editable after commit. Selection/Move transformations still operate on the whole shape; point handles belong to T-026's separate path model.
+- Geometry validation uses temporary `AtlasStroke` data: 3–256 finite, nonrepeated adjacent vertices, nonzero area, and no nonadjacent edge intersection. Degenerate/incomplete input produces no history entry or pixel edits.
+- The draft is painted on a **detached Raster preview** using `AtlasRasterBrush.paint_stroke()`. Commit emits the validated temporary shape and applies the resulting raster chunks through a single `AtlasLayerEdit` history command. Native saves persist pixels at the layer's pixel density (normally 4 px/board unit), **not** a persistent Polygon/Ink stroke. No save schema was added for Polygon.
+- Outlines use the swept, round-ended brush; filled shapes paint their interior once, with no separately stroked border. Alpha is composited into existing pixels. Undo/redo restore the raster-layer snapshot. The preview and committed image use the same shape painter and mask logic.
+- **Raster edit masks clip pixels**, requiring each transformed pixel quad to fit inside the scope; a polygon may be partially painted when it crosses the selected cell boundary. Visibility, active-target editability and authored-detail restrictions apply at both preview and commit.
+- A committed Polygon is **raster artwork**. It is not a whole-object selection target and cannot be moved, vertex-edited, or whole-shape erased independently by Objects selection tools. Raster Eraser removes pixels, while Bucket works with existing allocated raster chunks. Use Wall Path or Text to author independently editable semantic Objects.
 
 ## Verification evidence
 
-- `tests/polygon_smoke.gd`: geometry, concavity, invalid/degenerate input, outline/fill, preview/commit, close/cancel/backspace, locks, masks, selection, eraser, undo/redo and native saves.
-- `tests/polygon_visual.gd`: real native pointer clicks, visible fill interior at preview and commit, palette/inspector and compact viewport.
-- Both suites are run in `.github/workflows/godot-check.yml` and require explicit passing markers.
-- Legacy headless, native frame, Web export and source/pack save interoperability checks are required alongside these focused regressions.
+- `tests/polygon_smoke.gd`: geometry, invalid input, outline/fill, detached preview, live inspector restyling with a stationary pointer, preview/commit pixel equality, close/cancel/backspace, masks, locks, detail visibility, undo/redo, rotated-grid snap and native saves. Historical `AtlasInkLayer` selection/eraser checks verify legacy representations only.
+- `tests/polygon_visual.gd`: native pointer clicks, filled preview before release, live color change verified in the framebuffer, exact preview/commit interior, inspector and 800×600 layout.
+- Both tests run in `.github/workflows/godot-check.yml`. Parser/typing, neighboring tool regressions and native save/export checks remain separate gates.
 
-**Open acceptance decision:** Approve the point-by-point closure shortcuts, outline versus single-color solid fill, whole-shape erasure and conservative whole-fill masking before T-025 is checked in `docs/Index.md`.
+**Open acceptance decision:** The owner must approve point-by-point placement and closure shortcuts, outline versus single-color fill, raster pixel editing (instead of whole-object erasure or post-commit vertex editing), and per-pixel edit-mask clipping before T-025 is checked complete.

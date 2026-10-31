@@ -84,18 +84,48 @@ func _run() -> void:
 	canvas._gui_input(motion)
 	_check(canvas._draft_stroke != null and canvas._draft_stroke.points == AtlasShapes.polygon(triangle, canvas.brush_color, canvas.brush_width, false).points,
 		"pending fourth vertex never changes the Enter-to-commit preview")
+	canvas._process(0.0)
+	var old_preview: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	var restyled_color: Color = Color(0.15, 0.85, 0.35, 0.8)
+	var restyled_width: float = 15.0
+	# Inspector events must repaint a fixed polygon without adding a fourth vertex.
+	editor.inspector.brush_width_spinner.value = restyled_width
+	editor.inspector.brush_color_changed.emit(restyled_color)
+	_check(canvas._polygon_vertices == triangle and canvas._draft_stroke != null and
+		canvas._draft_stroke.color == restyled_color and canvas._draft_stroke.width == restyled_width,
+		"stationary outline draft follows live color and width")
+	canvas._process(0.0)
+	var outline_expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(
+		AtlasRasterLayer.paint_layer(), AtlasShapes.polygon(triangle, restyled_color, restyled_width, false))
+	_check(outline_expected.ok and canvas._preview_layer != null and
+		canvas._preview_layer.to_dict() == outline_expected.layer.to_dict(),
+		"outline preview repaints exact styled pixels without pointer motion")
+	_check(canvas._preview_layer.to_dict() != old_preview and canvas.floor.raster_layer().chunks.is_empty(),
+		"restyling changes only detached preview, not artwork")
 	_key(canvas, KEY_ENTER)
 	_check(not canvas.is_editing() and not canvas.floor.raster_layer().chunks.is_empty(), "Enter commits raster polygon")
-	_check(_matches(canvas, triangle, false), "default outline pixels persisted")
+	_check(_matches(canvas, triangle, false), "restyled outline pixels persisted")
 	_check(editor.edits.undo() and canvas.floor.raster_layer().chunks.is_empty(), "outline is one undo")
 	_check(editor.edits.redo() and not canvas.floor.raster_layer().chunks.is_empty(), "outline redo")
 	_check(editor.edits.undo(), "clear before next test")
 
-	# Fill control is wired to the canvas and stored in one shape, not a raster island.
+	# Fill style is live as well, and must leave exactly the fixed vertices.
 	editor.inspector.polygon_fill_checkbox.button_pressed = true
 	_check(canvas.polygon_solid_fill, "inspector fill mode connects to input")
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
+	canvas._process(0.0)
+	var fill_before: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	var fill_color: Color = Color(0.8, 0.25, 0.8, 0.65)
+	editor.inspector.brush_color_changed.emit(fill_color)
+	canvas._process(0.0)
+	var fill_expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(
+		AtlasRasterLayer.paint_layer(), AtlasShapes.polygon(triangle, fill_color, restyled_width, true))
+	_check(canvas._polygon_vertices == triangle and canvas._draft_stroke != null and canvas._draft_stroke.filled,
+		"stationary filled polygon retains fixed vertices and fill mode")
+	_check(fill_expected.ok and canvas._preview_layer != null and canvas._preview_layer.to_dict() == fill_expected.layer.to_dict(),
+		"filled preview repaints exact live color before close")
+	_check(canvas._preview_layer.to_dict() != fill_before, "filled preview no longer shows the old color")
 	_mouse(canvas, triangle[0], true)
 	_mouse(canvas, triangle[0], false)
 	_check(_matches(canvas, triangle, true) and not canvas.is_editing(), "close by first vertex paints solid raster")
@@ -167,6 +197,27 @@ func _run() -> void:
 	_key(canvas, KEY_ENTER)
 	_check(_matches(canvas, snapped, true), "snapped polygon pixels match authored vertices")
 	_check(editor.edits.undo(), "snapped polygon undo")
+
+	# A first polygon on another authored detail uses a separate raster target.
+	_check(canvas.set_presented_detail_level(1), "present D1 for Polygon")
+	editor._choose_tool(AtlasCanvas.Tool.POLYGON)
+	var detail_raster: AtlasRasterLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasRasterLayer
+	_check(detail_raster != null and detail_raster.detail_level == 1 and detail_raster.pixels_per_unit == 4.0,
+		"Polygon routing selects a paint-density D1 raster")
+	for point: Vector2 in triangle:
+		_vertex(canvas, point)
+	canvas._process(0.0)
+	var detail_expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(detail_raster,
+		AtlasShapes.polygon(triangle, canvas.brush_color, canvas.brush_width, true))
+	_check(detail_expected.ok and canvas._preview_layer != null and
+		canvas._preview_layer.to_dict() == detail_expected.layer.to_dict(),
+		"D1 Polygon preview paints only the selected detail raster")
+	_key(canvas, KEY_ENTER)
+	_check(detail_expected.ok and canvas.floor.layer_by_id(detail_raster.id).to_dict() == detail_expected.layer.to_dict(),
+		"D1 polygon commit equals isolated preview")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "D1 polygon leaves D0 pixels unchanged")
+	_check(editor.edits.undo() and canvas.floor.layer_by_id(detail_raster.id).to_dict() == detail_raster.to_dict(),
+		"D1 polygon undo restores its original target")
 
 	root.remove_child(scene)
 	scene.free()

@@ -93,13 +93,13 @@ var show_grid: bool:
 var brush_color: Color = Color("#f5b545"):
 	set(value):
 		brush_color = value
-		_refresh_line_style()
-## Brush/eraser/line diameter in document units; pointer ring converts with
+		_refresh_shape_style()
+## Brush/eraser/shape diameter in document units; pointer ring converts with
 ## camera_zoom. Never store a screen-pixel width in a stroke.
 var brush_width: float = 8.0:
 	set(value):
 		brush_width = value
-		_refresh_line_style()
+		_refresh_shape_style()
 ## Session-only; grid changes never rewrite existing artwork.
 var snap_to_grid: bool = false
 var polygon_solid_fill: bool = false
@@ -649,10 +649,12 @@ func _clear_ink_masks() -> void:
 			_render_states.erase(id)
 
 
-## Color and width controls remain live during a Line drag, even if the
-## pointer stays still. Brush/eraser sessions deliberately keep the style they
-## captured on press; only the Line preview is reconstructed for each change.
-func _refresh_line_style() -> void:
+## Line and Polygon previews follow live style controls without pointer motion.
+## Freehand Brush/Eraser instead retain the style captured at gesture start.
+func _refresh_shape_style() -> void:
+	if tool == Tool.POLYGON and not _polygon_vertices.is_empty():
+		_update_polygon_preview(_brush_cursor_local)
+		return
 	if _shape_kind != "LINE" or _draft_stroke == null:
 		return
 	_draft_stroke.color = brush_color
