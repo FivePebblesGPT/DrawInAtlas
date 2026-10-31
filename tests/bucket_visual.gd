@@ -144,6 +144,23 @@ func _run() -> void:
 	editor._on_undo()
 	_check(_pixel(canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer, Vector2i(6, 2)).r > 0.8,
 		"global fill undo restores disconnected region in one step")
+	# A live history replacement between press and release cannot be overwritten
+	# by the older detached framebuffer preview.
+	await _button(canvas, canvas.document_to_local(target), true)
+	_check(canvas._fill_pending and editor.artwork._pending_fill != null
+		and editor.artwork._pending_fill.ok, "native press stages stale-commit witness")
+	var newer_layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+	var updated: AtlasRasterLayer = newer_layers[canvas.floor.layers.find(canvas.floor.layer_by_id(raster.id))] as AtlasRasterLayer
+	updated.chunks["0,0"].image.set_pixel(2, 2, Color(0.5, 0.1, 0.8, 1))
+	var next_command: AtlasLayerEdit = AtlasLayerEdit.new(canvas.map.id, canvas.floor.id,
+		canvas.floor.layers, newer_layers)
+	_check(editor.edits.execute(next_command), "interleaved history edit accepted")
+	var expected_bytes: PackedByteArray = (canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data()
+	await _button(canvas, canvas.document_to_local(target), false)
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == expected_bytes
+		and editor.edits.get_undo_command() == next_command
+		and editor.artwork._pending_fill == null,
+		"native release rejects stale preview and leaves interleaved edit intact")
 	# Exiting the board cancels an in-flight fill without needing release on canvas.
 	await _button(canvas, canvas.document_to_local(target), true)
 	canvas._clear_brush_cursor()
