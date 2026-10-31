@@ -155,7 +155,7 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
 	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "TEXT COLOR" if tool == AtlasCanvas.Tool.TEXT else "BRUSH & STROKE")
 	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
-	_bucket_hint.text = "Raster: active layer's stored pixels only. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode."
+	_bucket_hint.text = "Raster: stored pixels on the active layer only. A blank raster has nothing to fill. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode."
 	_bucket_tolerance_label.visible = true
 	fill_tolerance_spinner.visible = true
 	fill_global_checkbox.visible = true

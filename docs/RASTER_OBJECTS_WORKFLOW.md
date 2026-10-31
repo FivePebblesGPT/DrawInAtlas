@@ -19,6 +19,13 @@ not depend on remembering which layer type supports a tool. Selecting a layer
 also switches an incompatible tool to Brush or Select Objects. Zoom alone never
 redirects an in-progress gesture.
 
+A new floor/board starts with an empty, **allocated-on-first-stroke** raster
+layer and a separate Objects layer; the default editing target is Raster.
+Bucket matches pixels **inside already allocated raster chunks only**. It
+cannot create a region from an otherwise blank canvas or fill the infinite
+transparent background. Transparent pixels *inside* allocated chunks remain
+eligible. The inspector explains this when Fill is selected.
+
 ## Resolution and edges
 
 Painting layers start at **4 px per board unit**, quadrupling width and height

@@ -29,6 +29,61 @@ func _run() -> void:
 	_check(canvas.floor.raster_layer().pixels_per_unit == 4.0, "painting resolution is quadrupled on both axes")
 	_check(canvas.floor.layer_by_id("objects") is AtlasObjectsLayer and canvas.floor.objects_layer().kind == "OBJECTS",
 		"designated Objects replaces the authored Ink layer")
+	# A fresh floor should not inherit a previous floor's Objects edit target.
+	# Revisiting either floor must still restore its independently chosen layer.
+	editor.select_layer("objects")
+	_check(canvas.active_layer_id == "objects" and canvas.tool == AtlasCanvas.Tool.ART_SELECT,
+		"explicit Objects selection switches to object manipulation")
+	_check(editor.create_floor("Upper raster floor"), "create a fresh floor from Objects editing")
+	var raster_floor_id: String = canvas.floor.id
+	_check(canvas.active_layer_id == "raster" and canvas.tool == AtlasCanvas.Tool.PEN,
+		"fresh floors default to raster Brush even when previous floor used Objects")
+	_check(canvas.floor.raster_layer().chunks.is_empty() and canvas.floor.objects_layer().strokes.is_empty(),
+		"new floor starts with independent empty pixel and object layers")
+	var empty_raster: Dictionary = canvas.floor.raster_layer().to_dict()
+	var history_before_fill: AtlasEditCommand = editor.edits.get_undo_command()
+	editor._choose_tool(AtlasCanvas.Tool.FILL)
+	_check(not editor.artwork.fill_at(Vector2(-65, -65))
+		and canvas.floor.raster_layer().to_dict() == empty_raster
+		and editor.edits.get_undo_command() == history_before_fill,
+		"Bucket cannot grow a blank raster or leave a partial history mutation")
+	var bucket_hint: Label = editor.inspector.get_node(
+		"Scroll/Margin/Sections/BucketSection/BucketHint") as Label
+	_check(bucket_hint.text.contains("blank raster"),
+		"Bucket help explicitly explains the finite stored-pixel limit")
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
+	editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([Vector2(-65, -65)]), Color(0.2, 0.7, 1.0, 0.5), 2.0), false)
+	var painted_raster: Dictionary = canvas.floor.raster_layer().to_dict()
+	_check(canvas.floor.raster_layer().chunks.has("-2,-2") and painted_raster != empty_raster,
+		"first translucent brush mark allocates signed raster chunks on demand")
+	editor._on_undo()
+	_check(canvas.floor.raster_layer().to_dict() == empty_raster,
+		"undo removes the initial raster pixels without retaining empty chunks")
+	editor._on_redo()
+	_check(canvas.floor.raster_layer().to_dict() == painted_raster,
+		"redo exactly restores first translucent raster pixels")
+	var d0_target: String = canvas.active_layer_id
+	editor._on_presented_detail_selected(1)
+	_check(canvas.active_layer_id == d0_target and not canvas.editing_target_is_presented(),
+		"changing the viewed detail never silently switches the editing target")
+	editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([Vector2(12, 9)]), Color.RED, 2.0), false)
+	_check(canvas.floor.raster_layer().to_dict() == painted_raster,
+		"drawing with a hidden D0 target cannot modify its pixels")
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
+	var d1_layer: AtlasRasterLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasRasterLayer
+	_check(d1_layer != null and d1_layer.detail_level == 1 and d1_layer.id != d0_target,
+		"explicit painting intent creates an independent raster at viewed D1")
+	editor.artwork.stroke(AtlasStroke.new(PackedVector2Array([Vector2(12, 9)]), Color.RED, 2.0), false)
+	_check(not (canvas.floor.layer_by_id(d1_layer.id) as AtlasRasterLayer).chunks.is_empty()
+		and (canvas.floor.layer_by_id(d0_target) as AtlasRasterLayer).to_dict() == painted_raster,
+		"D1 paint is independent and leaves D0 pixel bytes unchanged")
+	_check(editor.switch_floor("ground") and canvas.active_layer_id == "objects",
+		"original floor restores explicitly selected Objects layer")
+	_check(editor.switch_floor(raster_floor_id) and canvas.active_layer_id == d1_layer.id
+		and canvas.presented_detail_level == 1,
+		"revisited floor restores its explicit D1 raster target and presented detail")
+	_check(editor.switch_floor("ground"), "return to original raster/Objects board")
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
 	for tool: AtlasCanvas.Tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.FILL,
 			AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON]:
 		canvas.active_layer_id = "objects"

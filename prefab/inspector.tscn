@@ -236,7 +236,7 @@ text = "BUCKET FILL"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
-text = "Active layer only. Press to preview, release to fill; Esc cancels. Transparent or empty areas must be bounded."
+text = "Raster: stored pixels on the active layer only. A blank raster has nothing to fill. Press to preview, release to apply; Esc cancels."
 autowrap_mode = 3
 
 [node name="FillToleranceLabel" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
