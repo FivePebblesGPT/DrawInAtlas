@@ -1,10 +1,93 @@
 # Technical Architecture
 
-**Status:** proposed application architecture, not implemented code. Based on the repository's Godot 4.8 project and minimal scene. `project.godot` currently has a .NET assembly name, but this document does **not** assume C# versus GDScript has been finalized.
+> [!important] Reference implementation and earlier design
+> [[Index]] is the active backlog. The user confirmed a continuous chunked board with separately authored artwork LOD and an explicit editing target: see [[E-002]] and [[E-006]]. The battlemat concept is retired; projector framing belongs to [[E-007]]. **Raster is the approved primary ordinary-painting representation; vector remains for editable semantic objects** (see [[T-028]], [[INK_REPRESENTATION_DECISION]]). Palette-cell `AtlasTerrainLayer` artwork was removed in [[T-050]] ([[TERRAIN_LAYER_DECISION]]), without removing the independent grid or region metadata. A future 5-foot PCG tilemap tool is a separate design. The editor-default implementation is still open under [[T-049]]. Earlier independent-document/footprint assumptions below are superseded where they conflict. This document is not current usability acceptance.
+
+**Status:** earlier target architecture plus implementation reference. The development baseline is **Godot 4.8-beta2**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [archived implementation notes](Archive/2026-10-30/IMPLEMENTATION_NOTES.md) for historical checks.
+
+## What runs today
+
+The first sections below describe the long-term target architecture. The
+**current implementation** (Godot 4.8-beta2) follows this simpler route:
+
+```text
+main.tscn
+└── prefab/ui.tscn              Menu bar, sidebar, workspace and inspector
+    └── scripts/interface/editor.gd          AtlasEditor: composes the workspace/session
+        ├── prefab/inspector.tscn            AtlasInspector: forms emit typed intents
+        ├── prefab/campaign_browser.tscn     AtlasCampaignBrowser: discovery and previews
+        ├── scripts/interface/artwork_editor.gd  Scoped edits, selections and clipboard
+        ├── prefab/link_dialog.tscn             Scene-owned entrance/footprint drafts
+        ├── scripts/interface/linked_maps.gd    Parent-owned graph edit commands
+        ├── scripts/interface/map_references.gd Bounded derived references/previews
+        ├── scripts/interface/map_capture.gd    Shared private artwork renderer
+        ├── scripts/navigation/map_navigator.gd Cameras, floor memory and Back
+        ├── scripts/interface/canvas.gd      AtlasCanvas: draw and emit gestures
+        ├── scripts/editing/                 Scope, tools, selection, clipboard
+        │   ├── commands/                    Reversible operations on the graph
+        │   └── history.gd                   Undo/redo/savepoint state IDs
+        ├── scripts/campaign/                Campaign → map → floor → layers
+        ├── scripts/artwork/                 Stroke and raster data
+        ├── scripts/navigation/              Per-floor view, linked navigation
+        └── scripts/persistence/             Native .scn + embedded lossless WebP
+```
+
+**Editing flow:** a pointer gesture reaches `AtlasCanvas`, which emits an
+intent such as `stroke_requested`. The workspace wires it directly to
+`AtlasArtworkEditor`, which resolves the active floor/layer and scope and asks
+a typed command or service to validate it. `AtlasEditHistory` applies reversible changes to the in-memory
+`AtlasCampaign` graph. The `changed` signal refreshes panels and the canvas.
+The canvas is a view of document data; its runtime `CanvasGroup` nodes are
+not the model and their count is determined by the current layers.
+
+**Navigation flow:** `AtlasMapLink` is a directed edge. A marker-only link
+uses an anchor and `hit_radius` measured in the SOURCE map's continuous board
+coordinates, not screen pixels. A link with a placement uses the rotated
+`AtlasPlacement` footprint instead. `AtlasMapNavigator` owns `AtlasViewSession`
+and Back history for one workspace. The view session preserves each map/floor's
+camera and selected layer without dirtying persisted artwork.
+`AtlasZoomGate` requires three further wheel steps at the zoom boundary.
+Ambiguous candidates open the scene-owned chooser and do not accumulate steps.
+`AtlasLinkEdit` applies/reverts an entrance, its footprint and an optional new
+document atomically. Stale geometry/endpoints and out-of-scope edits are rejected;
+unlinking preserves independent destinations and shared footprints.
+
+**Reference flow:** `AtlasMapReferences` schedules bounded floor/crop images via
+`AtlasMapCapture`, shared with sidebar previews. Only the private artwork canvas
+renders, with references/grid/link overlays and input disabled. Generation tokens,
+content signatures and an LRU protect against stale captures. Spatial crops map
+through the placement transform; symbolic links stay unregistered thumbnails.
+Reference source/floor, opacity, freeze and captures are viewer state. See
+[linked maps](LINKED_MAPS.md) for budgets, registration and current limitations.
+
+**Authoring vs saving:** `examples/northern_marches.tres` is an Inspector-
+editable shipped `Resource` fixture containing two map presets, two
+`AtlasGrid` resources and a link resource. `AtlasCampaign.sample()` creates
+independent runtime objects from that immutable asset. User-edited work is
+persisted through `AtlasCampaignStore` as one compressed binary **`.scn`**,
+with embedded Resource-backed domain data and lossless WebP chunks, a semantic
+digest, staged verification and an adjacent verified **`.bak.scn`**. It is not
+written back over the bundled `.tres`. A minimal data-only scene root owns map
+document nodes; their stable IDs reconstruct the runtime registry. No standalone
+`.res` or raster assets are required. Transient workspace controls, camera state
+and preview renderers remain separate from saved data. Legacy JSON user saves
+are neither imported nor deleted. See [native saves](Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.md)
+for validation boundaries and [benchmarks](Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md) for the
+measured whole-file save/load costs.
+
+**Where to begin:** to change a form, edit `prefab/*.tscn` and its
+`scripts/interface/` controller. To change document rules, start with
+`scripts/campaign/` and `scripts/artwork/` and add smoke-test cases. To
+change an edit gesture, follow the canvas signal to `AtlasArtworkEditor` and
+then `scripts/editing/commands/`. See [Code readability](CODE_READIBILITY.md)
+for the concrete module ownership table.
+
+---
 
 ## 1. Architectural goals
 
 - Local-first and projector-first: a campaign must function without hosting a server.
+- Drawing-board-first: artwork lives in continuous document coordinates; grids and optional linked maps must not dictate the drawing's scale or force navigation.
 - Map content, navigation links, renderers, and editor state are separate concerns.
 - Preserve independently editable maps at every semantic scale and elevation.
 - Support sparse, chunked storage for large canvases.
@@ -103,7 +186,7 @@ Has stable ID, metadata, bounds or infinite-canvas policy, default grid, floors,
 
 ### MapFloor vs MapLayer
 
-A floor is an elevation grouping (basement, ground, upper floors), each with an ordered set of layers. A layer is an editable/renderable data plane (sparse tile cells, raster chunks, vector geometry, props, tokens, annotations). Floors do not represent zoom levels. Layers and floors have separate visibility and locking semantics.
+A floor is an elevation grouping (basement, ground, upper floors), each with an ordered set of layers. A layer is an editable/renderable data plane (sparse tile cells, WebP raster chunks, vector geometry, props, tokens, annotations). Floors do not represent zoom levels. Layers and floors have separate visibility and locking semantics.
 
 ### MapLink and BattlemapPlacement
 
@@ -212,6 +295,6 @@ Initial collaboration can be host-sequenced commands with conflict rejection or 
 
 ## 10. Recommended implementation conventions
 
-The current project has Godot 4.8 feature metadata and a .NET assembly-name setting. The implementation language is an open decision; prefer a single primary domain-language to avoid duplicating command and document models. Whether C# or GDScript is chosen, keep runtime Nodes at the edges and use typed services/data models at the core.
+Use typed **GDScript** for the domain and all core features. GDExtensions may be optional accelerators only with WebAssembly builds and fallback paths; no mandatory native-only library, OS-specific file API or threads in the core. Godot Compatibility renderer / single-thread web export is the baseline. Canonical raster payloads use lossless **WebP** embedded in the campaign scene; derived thumbnails may be lossy.
 
-See [Maps and grids](MAPS_AND_GRIDS.md) for geometry and editing constraints; [Semantic zoom](SEMANTIC_ZOOM.md) for navigation state; [Implementation plan](IMPLEMENTATION_PLAN.md) for staged validation.
+See [Maps and grids](MAPS_AND_GRIDS.md) for reference geometry and [Semantic zoom](SEMANTIC_ZOOM.md) for the previous navigation model. Current work/acceptance is tracked in [[Index]]; the [previous implementation plan](Archive/2026-10-30/IMPLEMENTATION_PLAN.md) is archived.

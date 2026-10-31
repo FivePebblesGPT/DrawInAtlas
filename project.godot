@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="DrawInAtlas"
+run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.8", "GL Compatibility")
 config/icon="res://img/icon.svg"
+
+[autoload]
+
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]
 
@@ -29,7 +34,7 @@ project/assembly_name="DrawInAtlas"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/at-icons/plugin.cfg", "res://addons/gdUnit4/plugin.cfg")
+enabled=PackedStringArray("res://addons/at-icons/plugin.cfg", "res://addons/gdUnit4/plugin.cfg", "res://addons/godot_ai/plugin.cfg")
 
 [gui]
 

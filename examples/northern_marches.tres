@@ -1,0 +1,44 @@
+[gd_resource type="Resource" script_class="AtlasExampleCampaign" format=3 uid="uid://cgkxmp8oo56d4"]
+
+[ext_resource type="Script" uid="uid://b0lj3qi34ur65" path="res://scripts/examples/campaign_preset.gd" id="1"]
+[ext_resource type="Script" uid="uid://fictj8d7ieki" path="res://scripts/examples/map_preset.gd" id="2"]
+[ext_resource type="Script" uid="uid://6ikvhh1mrjcf" path="res://scripts/campaign/grid.gd" id="3"]
+[ext_resource type="Script" uid="uid://dcatajsll0dtg" path="res://scripts/campaign/map_link.gd" id="4"]
+
+[sub_resource type="Resource" id="CityGrid"]
+script = ExtResource("3")
+kind = 1
+distance_per_cell = 10.0
+distance_unit = "ft"
+
+[sub_resource type="Resource" id="City"]
+script = ExtResource("2")
+document_id = "greyhaven"
+display_name = "Greyhaven"
+kind = "CITY"
+grid = SubResource("CityGrid")
+
+[sub_resource type="Resource" id="Entrance"]
+script = ExtResource("4")
+id = "enter-greyhaven"
+source_map_id = "world"
+target_map_id = "greyhaven"
+hit_radius = 44.0
+
+[sub_resource type="Resource" id="WorldGrid"]
+script = ExtResource("3")
+cell_size = 45.0
+distance_per_cell = 3.0
+
+[sub_resource type="Resource" id="World"]
+script = ExtResource("2")
+document_id = "world"
+display_name = "Northern Marches"
+kind = "WORLD"
+grid = SubResource("WorldGrid")
+
+[resource]
+script = ExtResource("1")
+world = SubResource("World")
+city = SubResource("City")
+entrance = SubResource("Entrance")

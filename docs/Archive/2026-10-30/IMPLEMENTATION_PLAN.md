@@ -1,15 +1,63 @@
+---
+type: archive
+archived: 2026-10-30
+original_path: docs/IMPLEMENTATION_PLAN.md
+---
+
+> [!info] Superseded roadmap
+> This preserves both the execution milestones and older 0–5 feature groupings. Active epic notes use execution milestones 1–8 plus the native-save gate. Review-driven acceptance and confirmed changes are tracked through [[Index]], [[E-002]] and [[E-006]].
+
+<!-- Original report; relative links rebased only. -->
 # Implementation Plan and Decision Log
 
-**Status:** proposal for future development, based on current minimal Godot 4.8 project. No milestone is claimed complete.
+**Status:** execution milestones **1–6** and the intervening native-save migration are verified locally on Godot **4.8-beta1**. Milestones **7–8** remain open. Native-save PR #4 was squash-merged as `eb877d7` after green checks. The older feature groupings below are historical reference. See [implementation notes](IMPLEMENTATION_NOTES.md) for verified behavior.
 
 ## 1. Principle: vertical slices before feature breadth
 
-The risky part is **independent maps with different coordinate systems linked by semantic navigation**. Prove that before expanding into dozens of tools. Build in increments that can be demonstrated with a wilderness hex, a symbolic city, and a 37-degree battlemap.
+The main product is a **drawing board with optional grids and map links**, not a recursively subdivided battlemap. The imported scaffold proves several geometry/navigation ideas, but must not dictate feature priority. Normal zoom stays on the current map; automatic navigation is explicitly opt-in.
+
+### Current execution milestones (1–8)
+
+The integration checkpoint is complete. The following execution sequence supersedes the priority of the original feature groupings below. Work and verify **one milestone per turn**, with native checks and a local commit after verification. Keep Web export compatible; browser smoke is deferred per user direction.
+
+| Milestone | Scope | State |
+| --- | --- | --- |
+| 1 | Document-space pen/eraser, stroke-level undo/redo, dirty/save checkpoints | Implemented and tested; see implementation notes |
+| 2 | Blank board creation; independent grid overlay geometry and per-map native units | Implemented and tested; see implementation notes |
+| 3 | Typed layers and reliable/versioned/recoverable persistence; lossless WebP raster artwork | Implemented and verified for the local client; Web smoke deferred |
+| 4 | Drawing/selection tools, fill, move/resize, clipboard and assets | Implemented and verified for the local client |
+| 5 | Floors and map organization/overview/previews | Implemented and verified for the local client |
+| Native-save gate | One embedded `.scn`, adjacent backup, Resource isolation, codec benchmarks | Verified and squash-merged as `eb877d7`; see [native saves](NATIVE_SAVE_IMPLEMENTATION.md) and [AD-10](NATIVE_SAVE_BENCHMARKS.md) |
+| 6 | Linked-map workflow refinement, placement/reference/navigation controls | Implemented and verified locally; [usage and limits](../../LINKED_MAPS.md) |
+| 7 | Local table/projector mode, tokens/fog, privacy-filtered player output and Web fallback | Pending |
+| 8 | Host-authoritative collaboration, permissions and reconnect | Pending |
+
+The following milestone storage descriptions are historical. Native format v1 now replaces JSON user checkpoints; legacy JSON saves are left untouched, with no importer. In-memory compatibility dictionaries and clipboard formats remain separate APIs.
+
+Milestone 1 stores editable vector strokes as JSON in schema v2 and reads legacy v1 campaigns. Raster artwork/chunks are not introduced in this slice; their canonical format remains lossless WebP. Undo covers pen/eraser gestures, while legacy terrain/metadata actions are marked dirty but await command conversion.
+
+Milestone 2 upgrades the runtime schema to v3, reads v1/v2, and adds reversible board creation/grid configuration. Legacy terrain geometry is preserved separately from the editable overlay. Native/Web and live-session checks validate creation; framebuffer tests verify zero terrain pixels moved after an overlay change. Typed layers and recoverable saves are still milestone 3.
+
+Milestone 3 upgrades to v4 ordered tile/ink/raster layers, native image import and lossless WebP chunks. Saves stage/verify assets and metadata, preserve a validated backup, and atomically replace the head. Native failure-injection, migration, layer/input and framebuffer checks are the gate. The user has prioritized the local client and postponed Web smoke tests; browser import/recovery validation is explicitly deferred rather than claimed complete.
+
+Milestone 4 adds vector outlines, raster pen/eraser and bounded bucket fill, active-layer selection with proportional transforms, typed self-contained clipboard data and central selected-cell scope. Schema v5 persists raster placement transforms and reads v1–v4. Native service/input/framebuffer and live-session checks are the gate; no new Web smoke was run.
+
+Milestone 5 adds reversible floor/metadata controls, per-workspace floor/camera/layer memory, bounded graph overview with four filters, tags and read-only cached previews. Visible-area results track pan/zoom/resize through coalesced notifications. Its historical runtime checkpoint v6 recorded tags and source/target floor identity. The subsequent native-save migration uses one binary `.scn` with embedded Resources: the workspace continues through the store API, and viewer state/private preview scenes remain outside canonical saved content. See [data model](../../DATA_MODEL.md) for the current storage contract.
+
+Milestone 6 adds reversible, source-owned entrances/footprints and optional new
+documents, a scene-owned linked-map form, native drag/numeric editing, explicit
+overlap selection and floor/camera-aware navigation. All-layer parent references
+and child previews share bounded, cancellable artwork captures; symbolic links
+stay unregistered. Viewer choices/frozen images are not saved. Native v1 remains
+unchanged; source/exported-pack interoperability, headless and framebuffer checks
+are the gate. Browser smoke remains deferred.
+
+### Original feature groupings (reference)
 
 ### Milestone 0 — Editor shell and document skeleton
 
 **Deliverables**
-- Choose implementation language: C#/.NET or GDScript (repository has a .NET assembly-name setting, but no implementation language decision yet).
+- **Use GDScript only** (mandatory). Godot 4.8-beta1 standard, Compatibility renderer, Web export baseline. Optional GDExtensions require graceful GDScript fallback.
 - Godot editor shell, central canvas with `Camera2D`, pan, geometric zoom, zoom limits, input routing.
 - Domain types: `Campaign`, `MapDocument`, `GridDefinition`, `MapLink`, `MapFloor`, `MapLayer`.
 - Open/save a minimal versioned campaign, stable IDs and schema roundtrip tests.
@@ -46,7 +94,7 @@ The risky part is **independent maps with different coordinate systems linked by
 - Linked-map marker, thumbnail and spatial overlay preview modes.
 - Map Overview with visible-area, selected-cell and whole-map filtering, name/tag search, safe recursive traversal.
 - Cached previews with invalidation; nonaligned children shown as thumbnails, not falsely transformed overlays.
-- Raster painting chunks, clipboard (cut/copy/paste), selection/move/resize, placed objects/assets.
+- Lossless WebP raster painting chunks, clipboard (cut/copy/paste), selection/move/resize, placed objects/assets.
 - Multiple vertical floors per document and floor controls, including tower use case.
 - Autosave/checkpoint, recoverable edits, import/export baseline.
 
@@ -128,11 +176,15 @@ The risky part is **independent maps with different coordinate systems linked by
 | Optional selected-cell edit lock (off by default) | Accepted design | Constrain changes while permitting roads across neighbors |
 | Floors distinct from layers and map scale | Accepted design | Tower/basement support |
 | Host-authoritative networking | Proposed | Simpler permission enforcement and session consistency |
-| Canonical chunk sizes and formats | Open | Benchmark first |
-| Godot scripting language | Open | Check intended .NET usage and toolchain |
-| Default reference refresh: live vs frozen | Open | UX/performance tradeoff |
+| Canonical raster chunks | Decided / measured | 256-pixel RGBA8 chunks, embedded lossless WebP; see AD-10 benchmark report |
+| Godot scripting language | **Decided** | GDScript mandatory; no C#/.NET dependency |
+| Native campaign persistence | **Implemented / locally verified** | One binary `.scn` with embedded Resources, adjacent `.bak.scn`, store boundary retained |
+| Drawing-board-first editing | Accepted clarification | Continuous artwork; grids are overlays, links are optional |
+| Native measurement units per map | Accepted clarification | DM chooses distance/unit; no automatic conversion or harmonization |
+| Automatic map navigation default | Off / opt-in | Ordinary drawing-board zoom must not change maps |
+| Default reference refresh: live vs frozen | Implemented | Live by default, with explicit viewer-only freeze; see linked-map capture budgets |
 | Trackpad normalization/timeouts | Open defaults | Test with actual devices; preserve 3-step semantics |
-| Exact storage container (directory/package) | Open | Prefer first testing versioned directory |
+| Exact storage container | Decided | One binary `.scn` primary; no standalone Resource or artwork sidecars |
 | Optional auto-exit on minimum zoom | Accepted design with condition | Only when a navigation-history return target exists |
 
 ## 5. Risk register
@@ -151,10 +203,9 @@ The risky part is **independent maps with different coordinate systems linked by
 
 ## 6. Suggested next engineering task
 
-Create a small Godot test scene that loads two independently serialized maps (world hex and city) and demonstrates:
-- pointer-centered geometric zoom with explicit min/max bounds,
-- one abstract link with manual entry,
-- navigation-history camera restoration, and
-- unit-tested three-step semantic boundary input handling.
-
-Add the rotated battlemap placement immediately afterward. This will test the hardest design assumptions before building the full painting engine.
+Proceed with execution milestone 7: local table/projector mode, tokens/fog and
+privacy-filtered player output with a Web-compatible fallback. Preserve one
+editable document per workspace, independent native units, source-owned commands
+and native saves. Editor reference captures are not player-safe projections:
+permission filtering must be designed and tested at the output boundary. Keep
+browser smoke deferred unless the user changes that priority.

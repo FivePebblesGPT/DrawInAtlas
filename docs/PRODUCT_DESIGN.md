@@ -1,5 +1,8 @@
 # Product Design Specification
 
+> [!important] Earlier proposal — current decisions take precedence
+> The manual review and subsequent decisions supersede conflicting assumptions here. Hexes share a continuous chunked board; automatic zoom presents separately authored artwork LOD with an explicit editing target. Battlemats are retired, and a projector framing object controls the player view. Paint.net is the primary interaction reference. See [[E-002]], [[E-006]], [[E-007]], [[E-TOOLS]], [[ManualReview_2026-10-30]] and [[Index]].
+
 **Status:** proposed design, October 2026. Nothing here implies that the feature is already implemented.
 
 ## 1. Purpose and audience
@@ -14,7 +17,7 @@ Primary user: a GM preparing and running a local table with a projector. Seconda
 2. **Map scale is not the same as floor elevation.** A tower's floors are contained in a map, not represented by repeatedly zooming geographically.
 3. **Links need not imply physical correspondence.** A city symbol inside one six-mile hex may link to a freeform city map of unrelated dimensions. Geographically aligned links are optional.
 4. **Any map can host battlemap placements.** The user draws and rotates a footprint to instantiate a child battlemap with its own workspace, layers, grid, and objects.
-5. **Automatic semantic zoom uses a three-wheel-step buffer** at both maximum (enter child) and minimum (return) zoom boundaries. The wheel input that first reaches a boundary does not count.
+5. **Automatic semantic zoom is opt-in and off by default.** When enabled it uses a three-wheel-step buffer at both maximum (enter child) and minimum (return) zoom boundaries. The wheel input that first reaches a boundary does not count. Ordinary drawing-board zoom never changes maps by default.
 6. **Child maps are discoverable without visiting them.** Provide markers, thumbnails, spatial previews where meaningful, and a searchable overview of child maps.
 7. **Tile editing is unrestricted by default.** An optional selected-cell lock clips edits to one hex/square, while allowing camera navigation and selection outside it.
 8. **The projector never exposes GM-only layers or unrevealed previews.** Player presentation and editor state are different views.

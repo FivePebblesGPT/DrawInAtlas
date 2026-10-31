@@ -1,6 +1,9 @@
 # Semantic Zoom, Navigation and Cross-Map Previews
 
-**Status:** proposed behavior. Semantic zoom is navigation between documents, not automatically resampling the same drawing.
+> [!important] Linked-document reference, not requested artwork LOD
+> The user clarified that automatic “layer zoom” means artwork-layer LOD on the continuous board, not document switching. The three-step linked-document navigation described below is existing/earlier behavior, not an inherited requirement for [[T-004]] or [[T-005]]. Current decisions: [[E-002]], [[E-006]]; completion: [[Index]].
+
+**Status:** the local client implements explicit navigation, the opt-in three-step gate, reversible entrances/placements and read-only artwork references; see [current linked-map workflows](LINKED_MAPS.md). Animated transitions, richer clustering and player-authorized previews below remain design targets. Semantic zoom is navigation between documents, not automatically resampling the same drawing.
 
 ## 1. Geometric versus semantic zoom
 
@@ -8,6 +11,7 @@
 - **Semantic zoom:** follow a `MapLink` to a different document. Each document has its own grid, layers, floors and camera defaults.
 - **Manual navigation:** click/double-click a location, search result, breadcrumb, or explicit Enter/Back action. It bypasses the wheel buffer.
 - **Automatic navigation:** at a geometric zoom boundary, three **additional, consecutive logical wheel steps** in the same direction are required before entering/exiting.
+- **Default:** automatic navigation is **off**. Normal wheel input stays on the current drawing board, including at zoom limits. The user may explicitly enable automatic linked-map zoom; its three-step gate then applies in both directions.
 
 Inward transitions prefer the child link beneath the zoom focus/pointer. Outward transitions prefer the immediate navigation-history source, restoring the saved camera. Only one map document is editable at a time.
 

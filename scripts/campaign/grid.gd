@@ -1,0 +1,167 @@
+class_name AtlasGrid
+extends Resource
+
+## Grid geometry is expressed in the document's native board units, not screen pixels.
+## A grid can be reused as an Inspector-editable preset; editors copy it before mutation.
+enum Kind { GRIDLESS, SQUARE, HEX_POINTY, HEX_FLAT }
+
+@export var kind: Kind = Kind.HEX_POINTY
+## Positive document units per square side or hex center-to-corner radius.
+@export var cell_size: float = 48.0
+## Board-space grid origin; cell indices are relative to this point.
+@export var origin: Vector2 = Vector2.ZERO
+## Grid orientation in radians (not degrees); stored independently of artwork.
+@export var rotation: float = 0.0
+## Native measurement metadata, NOT a conversion of cell_size or screen zoom.
+## Positive distance represented by one cell, labeled using distance_unit.
+@export var distance_per_cell: float = 6.0
+@export var distance_unit: String = "mi"
+@export var visible: bool = true
+
+
+func _init(grid_kind: Kind = Kind.HEX_POINTY, size: float = 48.0) -> void:
+	kind = grid_kind
+	cell_size = maxf(size, 0.001)
+
+
+func copy() -> AtlasGrid:
+	var result: AtlasGrid = AtlasGrid.new(kind, cell_size)
+	result.cell_size = cell_size
+	result.origin = origin
+	result.rotation = rotation
+	result.distance_per_cell = distance_per_cell
+	result.distance_unit = distance_unit
+	result.visible = visible
+	return result
+
+
+func is_valid() -> bool:
+	return (kind in Kind.values() and is_finite(cell_size) and cell_size > 0.0
+		and origin.is_finite() and is_finite(rotation)
+		and is_finite(distance_per_cell) and distance_per_cell > 0.0
+		and not distance_unit.strip_edges().is_empty())
+
+
+func same_as(other: AtlasGrid) -> bool:
+	return (same_geometry(other)
+		and distance_per_cell == other.distance_per_cell and distance_unit == other.distance_unit
+		and visible == other.visible)
+
+
+func same_geometry(other: AtlasGrid) -> bool:
+	return (other != null and kind == other.kind and cell_size == other.cell_size
+		and origin == other.origin and rotation == other.rotation)
+
+
+## Convert an axial hex coordinate or square cell index into document-space units.
+## Hex coordinates are axial (q, r); the pointy/flat formulas intentionally differ.
+func cell_to_document(cell: Vector2i) -> Vector2:
+	var local: Vector2 = Vector2.ZERO
+	match kind:
+		Kind.SQUARE:
+			local = Vector2(cell) * cell_size + Vector2.ONE * cell_size * 0.5
+		Kind.HEX_POINTY:
+			local = Vector2(sqrt(3.0) * (float(cell.x) + float(cell.y) * 0.5), 1.5 * float(cell.y)) * cell_size
+		Kind.HEX_FLAT:
+			local = Vector2(1.5 * float(cell.x), sqrt(3.0) * (float(cell.y) + float(cell.x) * 0.5)) * cell_size
+	return origin + local.rotated(rotation)
+
+
+func document_to_cell(position: Vector2) -> Vector2i:
+	var local: Vector2 = (position - origin).rotated(-rotation) / cell_size
+	match kind:
+		Kind.SQUARE:
+			return Vector2i(floori(local.x), floori(local.y))
+		Kind.HEX_POINTY:
+			return _round_axial((sqrt(3.0) / 3.0) * local.x - local.y / 3.0, (2.0 / 3.0) * local.y)
+		Kind.HEX_FLAT:
+			return _round_axial((2.0 / 3.0) * local.x, -local.x / 3.0 + (sqrt(3.0) / 3.0) * local.y)
+	return Vector2i.ZERO
+
+
+func cell_polygon(cell: Vector2i) -> PackedVector2Array:
+	var result: PackedVector2Array = PackedVector2Array()
+	if kind == Kind.GRIDLESS:
+		return result
+	var center: Vector2 = cell_to_document(cell)
+	if kind == Kind.SQUARE:
+		for corner in [Vector2(-0.5, -0.5), Vector2(0.5, -0.5), Vector2(0.5, 0.5), Vector2(-0.5, 0.5)]:
+			result.append(center + (corner * cell_size).rotated(rotation))
+	else:
+		var offset: float = -PI / 6.0 if kind == Kind.HEX_POINTY else 0.0
+		for side in range(6):
+			var angle: float = offset + float(side) * TAU / 6.0 + rotation
+			result.append(center + Vector2.RIGHT.rotated(angle) * cell_size)
+	return result
+
+
+func neighbors(cell: Vector2i) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if kind == Kind.GRIDLESS:
+		return result
+	var offsets: Array[Vector2i] = [
+		Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)
+	]
+	if kind == Kind.HEX_POINTY or kind == Kind.HEX_FLAT:
+		offsets.append(Vector2i(1, -1))
+		offsets.append(Vector2i(-1, 1))
+	for offset in offsets:
+		result.append(cell + offset)
+	return result
+
+
+func to_dict() -> Dictionary:
+	return {
+		"kind": kind, "cell_size": cell_size,
+		"origin": [origin.x, origin.y], "rotation": rotation,
+		"distance_per_cell": distance_per_cell, "distance_unit": distance_unit, "visible": visible
+	}
+
+
+static func from_dict(data: Dictionary) -> AtlasGrid:
+	var raw_kind: Variant = data.get("kind", Kind.HEX_POINTY)
+	var raw_size: Variant = data.get("cell_size", 48.0)
+	var p: Variant = data.get("origin", [0.0, 0.0])
+	var raw_rotation: Variant = data.get("rotation", 0.0)
+	var raw_distance: Variant = data.get("distance_per_cell", 6.0)
+	var raw_unit: Variant = data.get("distance_unit", "mi")
+	var raw_visible: Variant = data.get("visible", true)
+	if not _is_number(raw_kind) or float(raw_kind) != int(raw_kind) or int(raw_kind) not in Kind.values():
+		return null
+	if not _is_number(raw_size) or float(raw_size) <= 0.0:
+		return null
+	if not p is Array or p.size() != 2 or not _is_number(p[0]) or not _is_number(p[1]):
+		return null
+	if not _is_number(raw_rotation) or not _is_number(raw_distance):
+		return null
+	if not raw_unit is String or not raw_visible is bool:
+		return null
+	var result: AtlasGrid = AtlasGrid.new(int(raw_kind), float(raw_size))
+	# Do not clamp a loaded value: validation must preserve or reject, never silently rescale.
+	result.cell_size = float(raw_size)
+	result.origin = Vector2(float(p[0]), float(p[1]))
+	result.rotation = float(raw_rotation)
+	result.distance_per_cell = float(raw_distance)
+	result.distance_unit = raw_unit
+	result.visible = raw_visible
+	return result if result.is_valid() else null
+
+
+static func _is_number(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value))
+
+
+## Cube-coordinate rounding preserves q + r + s = 0 after rounding each axis.
+static func _round_axial(q: float, r: float) -> Vector2i:
+	var s: float = -q - r
+	var rq: int = roundi(q)
+	var rr: int = roundi(r)
+	var rs: int = roundi(s)
+	var q_error: float = absf(float(rq) - q)
+	var r_error: float = absf(float(rr) - r)
+	var s_error: float = absf(float(rs) - s)
+	if q_error > r_error and q_error > s_error:
+		rq = -rr - rs
+	elif r_error > s_error:
+		rr = -rq - rs
+	return Vector2i(rq, rr)
