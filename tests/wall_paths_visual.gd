@@ -61,6 +61,15 @@ func _run() -> void:
 	var before: Image = root.get_texture().get_image()
 	var sample: Vector2i = Vector2i(canvas.global_position) + Vector2i(120, 150)
 	_check(before.get_pixelv(sample).a > 0.5, "draft visible in native framebuffer")
+	# The saved wall and the confirmed draft edges must use the same renderer.
+	# This is a fixed pointer: the style setters alone must invalidate the cache.
+	canvas.brush_color = Color(0.12, 0.85, 0.2, 1.0)
+	canvas.brush_width = 14.0
+	await _frames(5)
+	var styled: Color = root.get_texture().get_image().get_pixelv(sample)
+	var original: Color = before.get_pixelv(sample)
+	_check(styled.g > styled.r and absf(styled.g - original.g) > 0.1,
+		"stationary draft visibly updates to green instead of old gold")
 	var key: InputEventKey = InputEventKey.new()
 	key.keycode = KEY_ENTER
 	key.pressed = true
@@ -70,6 +79,9 @@ func _run() -> void:
 	_check(ink.strokes.size() == 1 and ink.strokes[0].editable_path, "Enter finalizes one editable wall")
 	var after: Image = root.get_texture().get_image()
 	_check(after.get_pixelv(sample).a > 0.5, "committed wall visible in framebuffer")
+	var saved_color: Color = after.get_pixelv(sample)
+	_check(absf(saved_color.r - styled.r) + absf(saved_color.g - styled.g)
+		+ absf(saved_color.b - styled.b) < 0.05, "draft and committed wall match at a filled stroke pixel")
 	await _click(canvas, b, true)
 	_check(canvas._wall_drag_vertex == 1, "native hit finds wall vertex")
 	var moved: InputEventMouseMotion = InputEventMouseMotion.new()

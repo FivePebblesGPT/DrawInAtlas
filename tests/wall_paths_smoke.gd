@@ -90,8 +90,26 @@ func _run() -> void:
 	_click(canvas, a)
 	_click(canvas, b)
 	_check(live.strokes.is_empty() and canvas.is_editing(), "unfinished path never changes document")
+	_check(canvas._wall_draft != null and canvas._wall_draft.points.size() == 2
+		and canvas._wall_draft.points[0].distance_to(a) < 0.001
+		and canvas._wall_draft.points[1].distance_to(b) < 0.001,
+		"completed draft edges are a typed wall before commit")
+	var original_color: Color = canvas.brush_color
+	var original_width: float = canvas.brush_width
+	var old_draft: AtlasStroke = canvas._wall_draft
+	canvas.brush_color = Color(0.2, 0.85, 0.3, 0.7)
+	canvas.brush_width = 13.0
+	_check(canvas._wall_draft != old_draft and canvas._wall_draft.color == canvas.brush_color
+		and canvas._wall_draft.width == canvas.brush_width,
+		"stationary pointer restyles confirmed wall draft edges")
+	_check(live.strokes.is_empty(), "preview restyling does not commit or mutate the layer")
+	var final_draft: Dictionary = canvas._wall_draft.to_dict()
 	_key(canvas, KEY_ENTER)
 	_check(live.strokes.size() == 1 and live.strokes[0].editable_path and not live.strokes[0].closed_path, "Enter finishes open wall in one command")
+	_check(live.strokes[0].to_dict() == final_draft and canvas._wall_draft == null,
+		"committed open path exactly matches its styled draft and clears the preview")
+	canvas.brush_color = original_color
+	canvas.brush_width = original_width
 	_check(editor.edits.undo() and live.strokes.is_empty(), "open creation undo")
 	_check(editor.edits.redo() and live.strokes.size() == 1, "open creation redo")
 	_check(editor.edits.undo(), "clear path before closed test")
@@ -134,8 +152,13 @@ func _run() -> void:
 	# Cancellation, layer protections and scope denial must not create history.
 	canvas.cancel_edit()
 	_click(canvas, Vector2(-40, -20))
+	_click(canvas, Vector2(-10, -20))
+	_check(canvas._wall_draft != null, "two pending vertices produce a draft")
+	_key(canvas, KEY_BACKSPACE)
+	_check(canvas._wall_draft == null and canvas._wall_vertices.size() == 1,
+		"Backspace invalidates committed-edge preview after removing a vertex")
 	_key(canvas, KEY_ESCAPE)
-	_check(live.strokes.size() == 1, "Escape cancels construction")
+	_check(canvas._wall_draft == null and live.strokes.size() == 1, "Escape cancels construction and preview")
 	live.locked = true
 	_click(canvas, Vector2(-40, -20)); _click(canvas, Vector2(-10, -20)); _key(canvas, KEY_ENTER)
 	_check(live.strokes.size() == 1, "locked ink denies new paths")

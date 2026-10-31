@@ -146,6 +146,8 @@ var _polygon_pointer: Vector2 = Vector2.ZERO
 ## Session-only vertex editing; resources remain in the ink layer and history.
 var _wall_vertices: PackedVector2Array = PackedVector2Array()
 var _wall_pointer: Vector2 = Vector2.ZERO
+## Completed draft edges use the same vector renderer as saved wall paths.
+var _wall_draft: AtlasStroke
 var _wall_selected_index: int = -1
 var _wall_drag_vertex: int = -1
 var _wall_drag_origin: Vector2 = Vector2.ZERO
@@ -219,6 +221,7 @@ func cancel_edit() -> void:
 	_shape_kind = ""
 	_polygon_vertices.clear()
 	_wall_vertices.clear()
+	_wall_draft = null
 	_wall_drag_vertex = -1
 	_wall_before = null
 	_wall_preview = null
@@ -409,14 +412,14 @@ func _sync_layer_renderers() -> void:
 				present_strokes[stroke] = true
 			state.append(layer.strokes.duplicate())
 			if layer.id == active_layer_id:
-				state.append_array([_wall_preview,
+				state.append_array([_wall_preview, _wall_draft,
 					_wall_vertices.duplicate(), _wall_pointer, tool])
 		elif layer is AtlasRasterLayer:
 			state.append_array([layer.transform, layer.pixels_per_unit, layer.chunks.duplicate()])
 		if _render_states.get(layer.id, []) != state:
 			_render_states[layer.id] = state
 			_layer_drawers[layer.id].queue_redraw()
-	for stroke: AtlasStroke in [_draft_stroke, _wall_preview]:
+	for stroke: AtlasStroke in [_draft_stroke, _wall_preview, _wall_draft]:
 		if stroke != null:
 			present_strokes[stroke] = true
 	for stroke: AtlasStroke in _ink_masks.keys():
@@ -447,11 +450,13 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 			var stroke: AtlasStroke = artwork[index]
 			_draw_stroke(_wall_preview if id == active_layer_id and _wall_preview != null and index == _wall_selected_index else stroke, item)
 		if id == active_layer_id and tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
-			var guide: PackedVector2Array = _wall_vertices.duplicate()
-			if guide[-1].distance_squared_to(_wall_pointer) > 0.0001:
-				guide.append(_wall_pointer)
-			if guide.size() > 1:
-				item.draw_polyline(guide, Color(0.96, 0.72, 0.32, 0.65), brush_width, true)
+			# Completed edges match the actual committed wall rendering, including
+			# round joins and RGBA. Only the uncommitted pointer leg is a guide.
+			if _wall_draft != null:
+				_draw_stroke(_wall_draft, item)
+			var last: Vector2 = _wall_vertices[-1]
+			if last.distance_squared_to(_wall_pointer) > 0.0001:
+				item.draw_line(last, _wall_pointer, Color("#f9cc65"), 1.5 / camera_zoom, true)
 	elif layer is AtlasRasterLayer:
 		item.draw_set_transform_matrix(layer.transform)
 		var textures: Dictionary[String, ImageTexture] = _preview_textures if layer == _preview_layer else _raster_textures
@@ -649,9 +654,12 @@ func _clear_ink_masks() -> void:
 			_render_states.erase(id)
 
 
-## Line and Polygon previews follow live style controls without pointer motion.
+## Shape and wall previews follow live style controls without pointer motion.
 ## Freehand Brush/Eraser instead retain the style captured at gesture start.
 func _refresh_shape_style() -> void:
+	if tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+		_refresh_wall_draft()
+		return
 	if tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 		_update_polygon_preview(_brush_cursor_local)
 		return
@@ -1066,6 +1074,7 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 			return
 		if _wall_vertices.size() < AtlasEditablePath.MAX_VERTICES and point.distance_squared_to(_wall_vertices[-1]) > 0.0001:
 			_wall_vertices.append(point)
+			_refresh_wall_draft()
 		_update_wall_pointer(mouse.position)
 		return
 	var radius: float = 8.0 / camera_zoom
@@ -1103,7 +1112,13 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 	_wall_before = null
 	_gesture_snap = snap_to_grid
 	_wall_vertices = PackedVector2Array([AtlasGridSnap.point(map.grid, position) if _gesture_snap else position])
+	_refresh_wall_draft()
 	_update_wall_pointer(mouse.position)
+
+
+func _refresh_wall_draft() -> void:
+	_wall_draft = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width) if _wall_vertices.size() >= 2 else null
+	queue_redraw()
 
 
 func _update_wall_pointer(local_position: Vector2) -> void:
@@ -1116,6 +1131,7 @@ func _update_wall_pointer(local_position: Vector2) -> void:
 func _finish_wall_path(closed: bool) -> void:
 	var path: AtlasStroke = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width, closed)
 	_wall_vertices.clear()
+	_wall_draft = null
 	_wall_before = null
 	_gesture_snap = false
 	if path != null:
@@ -1163,6 +1179,7 @@ func _handle_wall_key(event: InputEventKey) -> void:
 			if _wall_vertices.is_empty():
 				cancel_edit()
 			else:
+				_refresh_wall_draft()
 				_update_wall_pointer(_brush_cursor_local)
 			accept_event()
 		KEY_ESCAPE:
