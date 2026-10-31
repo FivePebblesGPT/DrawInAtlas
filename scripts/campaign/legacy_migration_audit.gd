@@ -27,7 +27,7 @@ static func inspect(campaign: AtlasCampaign) -> Dictionary:
 			"id": document.id, "name": document.display_name,
 			"kind": document.kind, "tags": document.tags.duplicate(),
 			"default_floor_id": document.default_floor_id,
-			"grid": document.grid.to_dict(), "terrain_grid": document.get_terrain_grid().to_dict(),
+			"grid": document.grid.to_dict(),
 			"floors": [], "incoming_link_ids": [], "outgoing_link_ids": [],
 			"placement_ids": []
 		}
@@ -41,10 +41,6 @@ static func inspect(campaign: AtlasCampaign) -> Dictionary:
 				}
 				if layer is AtlasInkLayer:
 					layer_record["stroke_count"] = (layer as AtlasInkLayer).strokes.size()
-				elif layer is AtlasTerrainLayer:
-					var tiles: AtlasTerrainLayer = layer as AtlasTerrainLayer
-					layer_record["cell_count"] = tiles.terrain.size()
-					layer_record["grid"] = tiles.grid.to_dict() if tiles.grid != null else document.get_terrain_grid(floor.id).to_dict()
 				elif layer is AtlasRasterLayer:
 					var raster: AtlasRasterLayer = layer as AtlasRasterLayer
 					var chunk_keys: Array[String] = raster.chunks.keys()

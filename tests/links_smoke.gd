@@ -32,7 +32,9 @@ func _campaign() -> AtlasCampaign:
 	child.floors.append(upper)
 	var image: Image = Image.create(9, 7, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.2, 0.4, 0.7, 0.5))
-	child.floors[0].layers.append(AtlasRasterLayer.from_image(image))
+	var painted: AtlasRasterLayer = AtlasRasterLayer.from_image(image)
+	painted.id = "painted"
+	child.floors[0].layers.append(painted)
 	campaign.add_map(parent)
 	campaign.add_map(child)
 	return campaign
@@ -120,7 +122,7 @@ func _editing() -> bool:
 	var native: PackedScene = AtlasNativeScene.pack_campaign(campaign)
 	var io: AtlasStoreIO = AtlasStoreIO.new()
 	var restored: AtlasCampaign = AtlasNativeScene.unpack_campaign(io.decode_scene(io.encode_scene(native)))
-	_check(restored != null and restored.to_dict() == campaign.to_dict(), "native v1 roundtrip retains entrance/floor/placement edits")
+	_check(restored != null and restored.to_dict() == campaign.to_dict(), "native current-version roundtrip retains entrance/floor/placement edits")
 	_check(edit.revert(campaign), "undo restores original placement and arrival")
 	var stale: AtlasLinkEdit = AtlasLinkEdit.new("parent", campaign.links[0], next, campaign.placements[0], resized)
 	campaign.links[0].hit_radius += 1.0

@@ -5,7 +5,6 @@ extends Control
 ## truth. The static editor shell lives in .tscn; per-layer draw nodes are
 ## runtime-created because their count/order depends on the open document.
 
-signal paint_requested(cell: Vector2i)
 signal selection_requested(cell: Vector2i)
 signal wheel_step(direction: int, local_position: Vector2)
 signal enter_requested(link: AtlasMapLink)
@@ -27,7 +26,7 @@ signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
 
-enum Tool { PEN, ERASER, PAINT, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT }
+enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 
@@ -103,7 +102,6 @@ var fill_tolerance: float = 0.0
 var fill_global: bool = false
 
 var _panning: bool = false
-var _tile_painting: bool = false
 var _fill_pending: bool = false
 var _pending_wheel_fraction: float = 0.0
 var _wheel_dispatch_direction: int = 0
@@ -147,10 +145,6 @@ var _link_move_start: Vector2
 var _link_move_end: Vector2
 
 const EMPTY_COLOR: Color = Color("#212c34")
-const TERRAIN_COLORS: Array[Color] = [
-	Color("#36434b"), Color("#68846b"), Color("#94a47c"), Color("#ac8f68"),
-	Color("#62798d"), Color("#bac3a0")
-]
 
 
 func _ready() -> void:
@@ -193,7 +187,7 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _draft_stroke != null or _tile_painting or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
+	return not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
@@ -203,7 +197,6 @@ func cancel_edit() -> void:
 	_draft_stroke = null
 	_erase_preview.clear()
 	_panning = false
-	_tile_painting = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
 	_polygon_vertices.clear()
@@ -339,7 +332,7 @@ func _on_resized() -> void:
 
 
 ## Screen pixels are converted to stable document units via the editor camera.
-## Brush widths, link hit radii and terrain coordinates all use document units.
+## Brush widths and link hit radii use document units.
 func local_to_document(local_position: Vector2) -> Vector2:
 	return camera_center + (local_position - size * 0.5) / camera_zoom
 
@@ -400,14 +393,7 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 	var layer: AtlasLayer = floor.layer_by_id(id)
 	if id == active_layer_id and _preview_layer != null:
 		layer = _preview_layer
-	if layer is AtlasTerrainLayer:
-		var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
-		for key: String in layer.terrain:
-			var xy: PackedStringArray = key.split(",")
-			var cell: Vector2i = Vector2i(int(xy[0]), int(xy[1]))
-			if layer.terrain[key] != 0:
-				item.draw_colored_polygon(grid.cell_polygon(cell), _terrain_color(layer.terrain[key]))
-	elif layer is AtlasInkLayer:
+	if layer is AtlasInkLayer:
 		var previewing: bool = _draft_stroke != null and active_layer_id == id
 		var artwork: Array[AtlasStroke] = _erase_preview if previewing and _erasing else layer.strokes
 		for index: int in range(artwork.size()):
@@ -642,12 +628,6 @@ func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, it
 	item.draw_polyline(outline, color, width, true)
 
 
-func _terrain_color(palette: int) -> Color:
-	if palette < 0 or palette >= TERRAIN_COLORS.size():
-		return TERRAIN_COLORS[0]
-	return TERRAIN_COLORS[palette]
-
-
 func _gui_input(event: InputEvent) -> void:
 	if map == null:
 		return
@@ -789,10 +769,6 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			if editing_target_is_presented():
 				_fill_pending = true
 				fill_preview_requested.emit(position, mouse.shift_pressed)
-		Tool.PAINT:
-			if editing_target_is_presented():
-				_tile_painting = true
-				_request_cell_paint(position)
 		Tool.SELECT:
 			selection_requested.emit(map.grid.document_to_cell(position))
 
@@ -854,9 +830,6 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 		# Vertices are placed by clicks; mouse release never finishes a shape.
 		_update_polygon_preview(mouse.position)
-	elif _tile_painting:
-		_tile_painting = false
-		interaction_finished.emit()
 	elif not _moving_link_id.is_empty():
 		_link_move_end = local_to_document(mouse.position)
 		commit_edit()
@@ -887,22 +860,11 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 		_update_wall_pointer(motion.position)
 	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
 		_update_polygon_preview(motion.position)
-	elif tool == Tool.PAINT and _tile_painting:
-		_request_cell_paint(local_to_document(motion.position))
 	elif is_editing():
 		_append_stroke_point(motion.position, motion.shift_pressed, motion.alt_pressed)
 	else:
 		return
 	accept_event()
-
-
-func _request_cell_paint(position: Vector2) -> void:
-	var layer: AtlasTerrainLayer = floor.layer_by_id(active_layer_id) as AtlasTerrainLayer
-	if layer == null:
-		return
-	var grid: AtlasGrid = layer.grid if layer.grid != null else map.get_terrain_grid(floor.id)
-	if grid.kind != AtlasGrid.Kind.GRIDLESS:
-		paint_requested.emit(grid.document_to_cell(position))
 
 
 func _consume_wheel(direction: int, magnitude: float, position: Vector2) -> void:

@@ -206,7 +206,6 @@ func _test_vector_persistence() -> void:
 	var floor: AtlasFloor = campaign.get_map("world").floor_by_id("ground")
 	var expected: Array[AtlasStroke] = [_line(), _dot()]
 	floor.strokes = _copies(expected)
-	floor.paint(Vector2i(-2, 3), 7)
 	var floor_data: Dictionary = floor.to_dict()
 	_check(floor_data.has("layers"), "floor persists typed ordered layers")
 	_check(_json_value(floor_data), "floor artwork is canonical JSON vector data")
@@ -230,33 +229,20 @@ func _test_vector_persistence() -> void:
 	_check(loaded != null, "artwork campaign retains original floor")
 	if loaded != null:
 		_check(_same_strokes(loaded.strokes, expected), "campaign JSON preserves full vector artwork")
-		_check(loaded.get_terrain(Vector2i(-2, 3)) == 7, "artwork persistence retains terrain")
+		_check(loaded.layers[0] is AtlasRasterLayer, "artwork persistence retains raster layer")
 	_check(restored.get_map("other").floors[0].strokes.is_empty(),
 		"empty artwork on another map remains empty")
 
 
 func _test_legacy_campaign() -> void:
-	var legacy_floor: Dictionary = {"id": "ground", "name": "Ground", "terrain": {"-2,3": 7}}
-	var floor: AtlasFloor = AtlasFloor.from_dict(legacy_floor)
-	_check(floor != null, "legacy floor without strokes loads")
-	if floor != null:
-		_check(floor.strokes.is_empty(), "legacy floor defaults to empty artwork")
-		_check(floor.get_terrain(Vector2i(-2, 3)) == 7, "legacy floor retains terrain")
-	var legacy: Dictionary = {
-		"schema_version": 1, "name": "Legacy v1", "root_map_id": "world",
-		"maps": [{"id": "world", "name": "Legacy world", "kind": "WORLD",
-			"grid": {}, "floors": [legacy_floor], "default_floor_id": "ground"}],
-		"links": [], "placements": []
-	}
-	var restored: AtlasCampaign = AtlasCampaign.from_dict(legacy)
-	_check(restored != null, "legacy v1 campaign without artwork loads")
-	if restored != null:
-		var map: AtlasMapDocument = restored.get_map("world")
-		_check(map != null, "legacy campaign retains root map")
-		if map != null:
-			_check(map.floors[0].strokes.is_empty(), "legacy campaign has empty artwork")
-
-
+	var retired: Dictionary = {"id": "ground", "name": "Ground", "terrain": {"-2,3": 7}}
+	_check(AtlasFloor.from_dict(retired) == null, "obsolete palette-cell floor rejected")
+	var legacy: Dictionary = _campaign().to_dict()
+	legacy.schema_version = 6
+	_check(AtlasCampaign.from_dict(legacy) == null, "retired prototype schema version rejected")
+	legacy.schema_version = AtlasCampaign.SCHEMA_VERSION
+	legacy.maps[0].floors[0] = retired
+	_check(AtlasCampaign.from_dict(legacy) == null, "old terrain payload rejected even at current version")
 func _centerline_contains(strokes: Array[AtlasStroke], point: Vector2) -> bool:
 	for stroke: AtlasStroke in strokes:
 		if stroke == null or stroke.points.is_empty():

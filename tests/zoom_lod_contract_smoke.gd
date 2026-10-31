@@ -28,12 +28,21 @@ func _test_sample_scale() -> void:
 		return
 	var world: AtlasMapDocument = preset.world.create_document()
 	var city: AtlasMapDocument = preset.city.create_document()
+	# The sample grid is spatial metadata, not a painted 13-by-9 tilemap.
+	var city_empty_bounds: Rect2 = AtlasPreviewPanel.artwork_bounds(city, city.floors[0])
+	var swatch: Image = Image.create(624, 432, false, Image.FORMAT_RGBA8)
+	swatch.fill(Color.GREEN)
+	var layer: AtlasRasterLayer = AtlasRasterLayer.from_image(swatch)
+	layer.id = "scale-witness"
+	layer.transform.origin = Vector2(-288, -192)
+	city.floors[0].layers.append(layer)
 	var city_bounds: Rect2 = AtlasPreviewPanel.artwork_bounds(city, city.floors[0])
 	_check(is_equal_approx(world.grid.cell_size, 45.0) and is_equal_approx(city.grid.cell_size, 48.0),
 		"sample retains distinct 45-unit world radius and 48-unit city cell size")
+	_check(not city_empty_bounds.has_area(), "blank sample content has no implied painted terrain")
 	_check(city_bounds.position.is_equal_approx(Vector2(-288, -192))
 		and city_bounds.size.is_equal_approx(Vector2(624, 432)),
-		"Greyhaven's 13 by 9 tiles cover 624 by 432 board units")
+		"explicit raster artwork covers 624 by 432 independent board units")
 	_check(is_equal_approx(city_bounds.size.x / (2.0 * world.grid.cell_size), 624.0 / 90.0),
 		"unrelated document camera scales create the approximately 6.93x width mismatch")
 

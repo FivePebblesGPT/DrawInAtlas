@@ -5,7 +5,7 @@ extends Resource
 ## navigation edge; an optional placement describes a spatial battlemap footprint.
 ## AtlasCampaignStore owns saving/loading; callers do not choose its serializer.
 
-const SCHEMA_VERSION: int = 6
+const SCHEMA_VERSION: int = 7
 
 @export_storage var display_name: String = "West Marches"
 @export_storage var root_map_id: String = "world"
@@ -111,7 +111,7 @@ func to_dict() -> Dictionary:
 ## so the overview can report them rather than destroying user content.
 static func from_dict(data: Dictionary) -> AtlasCampaign:
 	var version: Variant = data.get("schema_version")
-	if not AtlasData.integer(version) or int(version) < 1 or int(version) > SCHEMA_VERSION:
+	if not AtlasData.integer(version) or int(version) != SCHEMA_VERSION:
 		return null
 	var raw_maps: Variant = data.get("maps")
 	var raw_links: Variant = data.get("links", [])

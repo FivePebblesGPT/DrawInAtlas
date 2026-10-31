@@ -152,22 +152,10 @@ func _run() -> void:
 	overlay.cell_size = 42.0
 	overlay.rotation = deg_to_rad(37.0)
 	editor.apply_grid(overlay)
-	_tool(editor, AtlasCanvas.Tool.PAINT)
-	editor.palette_id = 2
-	var tile_center: Vector2 = canvas.document_to_local(Vector2(150, 50))
-	_drag(canvas, tile_center, tile_center)
-	_check(canvas.floor.terrain.get("1,0") == 2, "terrain pointer uses its fixed content grid, not the changed overlay")
-	editor.palette_id = 3
-	_check(editor.fill_at(Vector2(150, 50)) and canvas.floor.terrain.get("1,0") == 3,
-		"terrain fill also resolves the content grid independently")
-	var tile_layer: AtlasTerrainLayer = canvas.floor.terrain_layer()
-	var payload: AtlasClipboardData = AtlasClipboard.decode(AtlasClipboard.encode_tiles(tile_layer.grid, {"1,0": 3}, Vector2i(1, 0)))
-	_check(editor.paste_payload(payload, Vector2(250, 50)) and canvas.floor.terrain.get("2,0") == 3,
-		"typed tile paste resolves destination content coordinates")
-	var cells_before: Dictionary = canvas.floor.terrain.duplicate()
-	payload.grid.kind = AtlasGrid.Kind.HEX_POINTY
-	_check(not editor.paste_payload(payload, Vector2(350, 50)) and canvas.floor.terrain == cells_before,
-		"tile paste rejects incompatible grids atomically")
+	# Updating the spatial overlay cannot rasterize artwork or change pixel bytes.
+	var previous: PackedByteArray = raster.chunks["-1,-1"].image.get_data().duplicate()
+	_check(canvas.map.grid.same_as(overlay) and raster.chunks["-1,-1"].image.get_data() == previous,
+		"grid is a spatial reference independent of raster artwork")
 	var saved: Dictionary = editor.campaign.to_dict()
 	editor._on_save()
 	editor._on_load()

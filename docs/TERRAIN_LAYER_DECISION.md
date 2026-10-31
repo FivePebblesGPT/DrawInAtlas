@@ -1,6 +1,6 @@
 # Terrain artwork retirement and future procedural map tools
 
-**Owner decision (2026-10-31):** DrawInAtlas is a digital substitute for a traditionally drawn map. **Retire the palette-cell `AtlasTerrainLayer` (`TILES` in the current wire format) from the target artwork architecture.** The grid and hex-region properties are separate concerns (some region-property workflows remain future work). Raster is primary for painting the visual map, while vector is retained for editable semantic objects. The implementation remains pending under [[T-050]].
+**Owner decision (2026-10-31):** DrawInAtlas is a digital substitute for a traditionally drawn map. **Retire the palette-cell `AtlasTerrainLayer` (`TILES` in the former wire format) from the target artwork architecture.** The grid and hex-region properties are separate concerns (some region-property workflows remain future work). Raster is primary for painting the visual map, while vector is retained for editable semantic objects. Implementation completed under [[T-050]]; raster-first *authoring defaults* remain pending under [[T-049]].
 
 ## Distinct responsibilities
 
@@ -11,13 +11,13 @@
 | Hex/region properties | A separate semantic data model; artwork neither requires nor silently changes these properties |
 | Navigation, biome classifications and other type masks | Future explicit semantic masks / brush-authored classifications; not equivalent to reading RGBA colors and not yet implemented |
 | 5-foot map tilemaps / procedural content generation | Possible future **local-scale** tool or intermediate representation; can produce raster art, editable objects and/or semantic data, without requiring a general terrain-artwork layer |
-| Existing `AtlasTerrainLayer` | Obsolete palette-ID cell painting model; remove deliberately under [[T-050]] |
+| Retired `AtlasTerrainLayer` | Obsolete palette-ID cell painting model, removed in [[T-050]] |
 
 A type-aware texture brush could later paint pixels and a separate classification mask in one user action. Whether its mask is brush-authored, object-based, or derived from a generator needs its own design. **Do not infer movement or biome type solely from the color of pixels**; an illustration is not authoritative gameplay metadata. No auto-tiling, PCG, 5-foot grid behavior or semantic-mask schema is approved by this decision.
 
-## What exists today (before T-050)
+## Historical inventory (before T-050; no longer executable)
 
-`scripts/artwork/terrain_layer.gd` defines `AtlasTerrainLayer`, whose sparse cell values are integer palette IDs. It is integrated with floor defaults, type-specific brush/fill/eraser and edit commands, selection, clipboard, layer UI, tests and persistence. That means documentation alone does **not** remove the layer. [[T-031]] recorded its previous naming/type consistency and still describes the pre-removal runtime; its earlier verification remains historical evidence, not a reason to retain terrain artwork.
+`scripts/artwork/terrain_layer.gd` defined `AtlasTerrainLayer`, whose sparse cell values were integer palette IDs. It was integrated with floor defaults, type-specific brush/fill/eraser and edit commands, selection, clipboard, layer UI, tests and persistence. The T-050 implementation removed these palette-cell paths rather than retaining a legacy compatibility shim. [[T-031]] recorded its previous naming/type consistency and still describes the pre-removal runtime; its earlier verification remains historical evidence, not a reason to retain terrain artwork.
 
 ## Removal boundary
 
@@ -28,8 +28,8 @@ A type-aware texture brush could later paint pixels and a separate classificatio
 
 ## Work sequencing
 
-1. [[T-050]] removes current palette-cell artwork and revalidates editing, history, clipping, exports and native saves. This is a substantial code change; **not done by this decision record**.
+1. [[T-050]] completed the removal and revalidated editing, history, clipping, exports and native saves. Native save version 2 and dictionary schema 7 intentionally reject older palette-cell prototype saves.
 2. [[T-049]] then implements raster-first defaults and semantic-vector tool affordances without a terrain fallback. This can be coordinated in the same design but remains a separate ticket with its own testing and acceptance.
 3. [[T-018]] ensures layer UI emphasizes raster/vector rather than an obsolete terrain layer. Later, if needed, spec a dedicated type-mask/5-foot PCG workflow; do not silently attach it to T-050.
 
-This supersedes older architectural prose that treats `TILES`/`AtlasTerrainLayer` as a permanent third artwork representation. It does not retroactively change completed test evidence or the current executable behavior.
+This supersedes older architectural prose treating `TILES`/`AtlasTerrainLayer` as a third artwork representation. Archived tickets retain historical test evidence; the current runtime supports raster and ink only.

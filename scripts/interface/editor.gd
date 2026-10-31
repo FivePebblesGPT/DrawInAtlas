@@ -104,11 +104,6 @@ var use_system_clipboard: bool = true:
 		use_system_clipboard = value
 		if artwork != null:
 			artwork.use_system_clipboard = value
-var palette_id: int = 2:
-	set(value):
-		palette_id = value
-		if artwork != null:
-			artwork.palette_id = value
 var automatic_artwork_lod: bool = true
 var artwork_lod: AtlasArtworkLOD = AtlasArtworkLOD.new()
 var _lod_refresh_queued: bool = false
@@ -125,7 +120,6 @@ func _ready() -> void:
 	artwork.locked_to_cell = _startup_scope_locked
 	_startup_clipboard = ""
 	artwork.use_system_clipboard = use_system_clipboard
-	artwork.palette_id = palette_id
 	navigator.automatic_navigation = automatic_navigation
 	map_references.bind(canvas)
 	canvas.references = map_references
@@ -201,7 +195,6 @@ func _connect_workspace() -> void:
 	board_dialog.board_requested.connect(_on_board_requested)
 	raster_importer.image_ready.connect(import_raster)
 	raster_importer.failed.connect(_message)
-	canvas.paint_requested.connect(artwork.paint)
 	canvas.stroke_requested.connect(artwork.stroke)
 	canvas.path_edit_requested.connect(artwork.edit_path)
 	canvas.text_requested.connect(_open_text_editor)
@@ -245,7 +238,6 @@ func _connect_workspace() -> void:
 	inspector.brush_width_changed.connect(func(width: float) -> void: canvas.brush_width = width)
 	inspector.fill_tolerance_changed.connect(func(value: float) -> void: canvas.fill_tolerance = value)
 	inspector.fill_global_changed.connect(func(enabled: bool) -> void: canvas.fill_global = enabled)
-	inspector.palette_selected.connect(func(index: int) -> void: palette_id = index)
 	inspector.preview_changed.connect(func(index: int) -> void:
 		canvas.preview = index as AtlasCanvas.Preview
 		map_references.refresh()
@@ -309,10 +301,8 @@ func _refresh_layers(preferred_id: String = "") -> void:
 	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
 	layer_panel.set_navigation_context(campaign, canvas.map)
 	layer_panel.sync_object_selection(canvas.selection)
-	# Active layer changes can change Bucket's target plane without changing
-	# the selected tool (terrain palette versus raster RGBA/tolerance).
-	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS,
-		canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTerrainLayer)
+	# Fill requires raster pixels; the grid remains independent of artwork.
+	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 
 
 func _on_presented_detail_selected(level: int) -> void:
@@ -382,7 +372,7 @@ func _refresh_grid_controls() -> void:
 		canvas.clear_selection()
 	grid_controls.set_grid(canvas.map.grid)
 	lock_checkbox.disabled = canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS
-	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS, canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTerrainLayer)
+	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	artwork.refresh_scope()
 
 
@@ -435,7 +425,6 @@ func create_floor(name: String) -> bool:
 	var floor: AtlasFloor = AtlasFloor.new()
 	floor.id = "floor-" + Crypto.new().generate_random_bytes(16).hex_encode()
 	floor.display_name = name.strip_edges()
-	floor.terrain_layer().grid = canvas.map.grid.copy()
 	var after: Array[AtlasFloor] = _clone_floors()
 	after.append(floor)
 	if not _apply_floors(after, canvas.map.default_floor_id):
@@ -515,7 +504,6 @@ func create_board(board_name: String, grid: AtlasGrid) -> bool:
 	var document: AtlasMapDocument = AtlasMapDocument.new(id, name)
 	document.kind = "BOARD"
 	document.grid = grid.copy()
-	document.terrain_grid = grid.copy()
 	var command: AtlasCreateMap = AtlasCreateMap.new(canvas.map.id, document)
 	if not edits.execute(command):
 		_message("Board creation failed; the campaign was not replaced.")
@@ -634,7 +622,7 @@ func _on_tool_changed(index: int) -> void:
 	artwork.choose_tool(index as AtlasCanvas.Tool)
 	if tool_palette != null:
 		tool_palette.sync_tool(index)
-	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS, canvas.floor != null and canvas.floor.layer_by_id(canvas.active_layer_id) is AtlasTerrainLayer)
+	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	if not locked_to_cell:
 		lock_checkbox.set_pressed_no_signal(false)
 	zoom_gate.reset()

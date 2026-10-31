@@ -8,7 +8,6 @@ signal layers_changed(preferred_id: String)
 signal tool_requested(tool: AtlasCanvas.Tool)
 
 var locked_to_cell: bool = false
-var palette_id: int = 2
 var use_system_clipboard: bool = true
 var clipboard_text: String = ""
 var _paste_count: int = 0
@@ -16,7 +15,6 @@ var _paste_count: int = 0
 ## or history entry until release, and switching layers cancels the candidate.
 var _pending_fill: AtlasFillResult
 var _pending_fill_layer_id: String = ""
-var _pending_fill_is_terrain: bool = false
 var _canvas: AtlasCanvas
 var _edits: AtlasEditHistory
 
@@ -45,11 +43,7 @@ func choose_tool(tool: AtlasCanvas.Tool) -> void:
 		_canvas.clear_selection()
 	if _canvas.floor != null:
 		var current: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
-		if tool == AtlasCanvas.Tool.PAINT and not current is AtlasTerrainLayer:
-			var tiles: AtlasTerrainLayer = _canvas.floor.terrain_layer()
-			if tiles != null:
-				select_layer(tiles.id)
-		elif tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH] and not current is AtlasInkLayer:
+		if tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH] and not current is AtlasInkLayer:
 			var ink: AtlasInkLayer = _canvas.floor.ink_layer()
 			if ink != null:
 				select_layer(ink.id)
@@ -76,16 +70,6 @@ func select_layer(id: String) -> void:
 func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	_canvas.cancel_edit()
 	_canvas.clear_selection()
-	for layer: AtlasLayer in layers:
-		if layer is AtlasTerrainLayer and layer.grid == null:
-			if _canvas.floor.layer_by_id(layer.id) != null:
-				layer.grid = _canvas.map.get_terrain_grid(_canvas.floor.id).copy()
-			elif _canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS:
-				message.emit("Choose a square or hex grid before creating a terrain layer.")
-				layers_changed.emit("")
-				return false
-			else:
-				layer.grid = _canvas.map.grid.copy()
 	var new_layer: bool = _canvas.floor.layer_by_id(selected_id) == null
 	var command: AtlasLayerEdit = AtlasLayerEdit.new(_canvas.map.id, _canvas.floor.id, _canvas.floor.layers, layers)
 	if not _edits.execute(command):
@@ -206,34 +190,6 @@ func edit_text(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> v
 		message.emit("Editable text updated.")
 
 
-func paint(cell: Vector2i) -> void:
-	if not _canvas.editing_target_is_presented():
-		message.emit("Select the editing layer's detail level before painting.")
-		return
-	var layer: AtlasTerrainLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasTerrainLayer
-	if layer == null or not layer.is_editable():
-		message.emit("Select a visible, unlocked terrain layer to paint.")
-		return
-	var basis: AtlasGrid = layer.grid if layer.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-	if basis.kind == AtlasGrid.Kind.GRIDLESS:
-		message.emit("This terrain layer has no content grid.")
-		return
-	if not scope().allows_polygon(basis.cell_polygon(cell)):
-		message.emit("Edit blocked by selected-cell lock.")
-		return
-	var key: String = "%d,%d" % [cell.x, cell.y]
-	if int(layer.terrain.get(key, 0)) == palette_id:
-		return
-	var after: Dictionary = layer.terrain.duplicate()
-	if palette_id == 0:
-		after.erase(key)
-	else:
-		after[key] = palette_id
-	var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, layer.id, layer.terrain, after)
-	if _edits.execute(command):
-		_canvas.queue_redraw()
-
-
 func _compute_fill(point: Vector2, inverted_global: bool = false) -> AtlasFillResult:
 	if not _canvas.editing_target_is_presented():
 		var hidden: AtlasFillResult = AtlasFillResult.new()
@@ -242,16 +198,13 @@ func _compute_fill(point: Vector2, inverted_global: bool = false) -> AtlasFillRe
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if layer == null or not layer.is_editable():
 		var blocked: AtlasFillResult = AtlasFillResult.new()
-		blocked.message = "Fill needs visible, unlocked raster or terrain content."
+		blocked.message = "Fill needs a visible, unlocked raster layer."
 		return blocked
 	if layer is AtlasRasterLayer:
 		return AtlasFill.raster(layer, point, _canvas.brush_color, scope(), 262144,
 			_canvas.fill_tolerance, _canvas.fill_global == inverted_global)
-	if layer is AtlasTerrainLayer:
-		var basis: AtlasGrid = layer.grid if layer.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-		return AtlasFill.tiles(basis, layer.terrain, basis.document_to_cell(point), palette_id, scope())
 	var unsupported: AtlasFillResult = AtlasFillResult.new()
-	unsupported.message = "Select raster pixels or terrain cells; ink outlines are not fill boundaries."
+	unsupported.message = "Select raster pixels; ink outlines are not fill boundaries."
 	return unsupported
 
 
@@ -260,18 +213,11 @@ func _compute_fill(point: Vector2, inverted_global: bool = false) -> AtlasFillRe
 func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
 	cancel_preview_fill()
 	_pending_fill_layer_id = _canvas.active_layer_id
-	_pending_fill_is_terrain = _canvas.floor.layer_by_id(_pending_fill_layer_id) is AtlasTerrainLayer
 	_pending_fill = _compute_fill(point, inverted_global)
 	if not _pending_fill.ok:
 		message.emit(_pending_fill.message)
 		return
-	if _pending_fill_is_terrain:
-		var original: AtlasTerrainLayer = _canvas.floor.layer_by_id(_pending_fill_layer_id) as AtlasTerrainLayer
-		var preview: AtlasTerrainLayer = AtlasLayerCodec.clone(original) as AtlasTerrainLayer
-		preview.terrain = _pending_fill.terrain
-		_canvas._preview_layer = preview
-	else:
-		_canvas._preview_layer = _pending_fill.layer
+	_canvas._preview_layer = _pending_fill.layer
 	_canvas._raster_textures.clear()
 	_canvas.queue_redraw()
 	message.emit("Fill preview — release to apply, Escape to cancel.")
@@ -280,7 +226,6 @@ func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
 func cancel_preview_fill() -> void:
 	_pending_fill = null
 	_pending_fill_layer_id = ""
-	_pending_fill_is_terrain = false
 	_canvas._preview_layer = null
 	_canvas._raster_textures.clear()
 	_canvas.queue_redraw()
@@ -291,10 +236,9 @@ func commit_preview_fill() -> void:
 		return
 	var result: AtlasFillResult = _pending_fill
 	var id: String = _pending_fill_layer_id
-	var is_terrain: bool = _pending_fill_is_terrain
 	cancel_preview_fill()
 	if result.ok:
-		_apply_fill_result(result, id, is_terrain)
+		_apply_fill_result(result, id)
 
 
 func fill_at(point: Vector2) -> bool:
@@ -303,27 +247,16 @@ func fill_at(point: Vector2) -> bool:
 	if not result.ok:
 		message.emit(result.message)
 		return false
-	return _apply_fill_result(result, _canvas.active_layer_id,
-		_canvas.floor.layer_by_id(_canvas.active_layer_id) is AtlasTerrainLayer)
+	return _apply_fill_result(result, _canvas.active_layer_id)
 
 
-func _apply_fill_result(result: AtlasFillResult, id: String, is_terrain: bool) -> bool:
+func _apply_fill_result(result: AtlasFillResult, id: String) -> bool:
 	_canvas.clear_selection()
 	var current: AtlasLayer = _canvas.floor.layer_by_id(id)
 	if current == null or not current.is_editable() or not _canvas.editing_target_is_presented():
 		message.emit("Fill target changed; nothing applied.")
 		return false
-	if is_terrain:
-		var tiles: AtlasTerrainLayer = current as AtlasTerrainLayer
-		if tiles == null:
-			return false
-		var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, id,
-			tiles.terrain, result.terrain)
-		if _edits.execute(command):
-			_canvas.queue_redraw()
-			message.emit("Filled terrain cells in one undoable action.")
-			return true
-	elif current is AtlasRasterLayer and result.layer != null:
+	if current is AtlasRasterLayer and result.layer != null:
 		var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
 		layers[_canvas.floor.layers.find(current)] = result.layer
 		if apply_layers(layers, id):
@@ -365,10 +298,6 @@ func can_copy_selection() -> bool:
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if layer == null or not layer.visible:
 		return false
-	if layer is AtlasTerrainLayer:
-		var basis: AtlasGrid = layer.grid if layer.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-		var key: String = "%d,%d" % [_canvas.selected_cell.x, _canvas.selected_cell.y]
-		return _canvas.has_selected_cell and basis.same_geometry(_canvas.map.grid) and layer.terrain.has(key)
 	return not _canvas.selection.is_empty() and _canvas.selection.matches(layer)
 
 
@@ -378,9 +307,6 @@ func can_modify_selection() -> bool:
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if not layer.is_editable():
 		return false
-	if layer is AtlasTerrainLayer:
-		var basis: AtlasGrid = layer.grid if layer.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-		return scope().allows_polygon(basis.cell_polygon(_canvas.selected_cell))
 	return scope().contains_rect(_canvas.selection.bounds)
 
 
@@ -398,11 +324,6 @@ func copy_selection() -> bool:
 		encoded = AtlasClipboard.encode_ink(layer.strokes, _canvas.selection.stroke_indices, _canvas.selection.bounds.position)
 	elif layer is AtlasRasterLayer:
 		encoded = AtlasClipboard.encode_raster(layer, _canvas.selection.bounds.position)
-	elif layer is AtlasTerrainLayer:
-		var basis: AtlasGrid = layer.grid if layer.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-		var key: String = "%d,%d" % [_canvas.selected_cell.x, _canvas.selected_cell.y]
-		var cells: Dictionary = {key: layer.terrain[key]}
-		encoded = AtlasClipboard.encode_tiles(basis, cells, _canvas.selected_cell)
 	if encoded.is_empty():
 		message.emit("Selection is invalid or too large for the artwork clipboard.")
 		return false
@@ -419,14 +340,6 @@ func delete_selection() -> bool:
 		message.emit("Delete rejected: locked/hidden selection or footprint outside edit scope.")
 		return false
 	var layer: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
-	if layer is AtlasTerrainLayer:
-		var after: Dictionary = layer.terrain.duplicate()
-		after.erase("%d,%d" % [_canvas.selected_cell.x, _canvas.selected_cell.y])
-		var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, layer.id, layer.terrain, after)
-		if _edits.execute(command):
-			_canvas.queue_redraw()
-			return true
-		return false
 	var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
 	var index: int = _canvas.floor.layers.find(layer)
 	if layer is AtlasInkLayer:
@@ -470,8 +383,6 @@ func paste_payload(payload: AtlasClipboardData, anchor: Vector2) -> bool:
 		return _paste_ink(payload, target, anchor)
 	if payload.kind == "RASTER" and payload.raster != null:
 		return _paste_raster(payload.raster, anchor)
-	if payload.kind == "TILES" and target is AtlasTerrainLayer and target.is_editable():
-		return _paste_tiles(payload, target, anchor)
 	message.emit("Select a compatible, visible and unlocked destination layer.")
 	return false
 
@@ -516,35 +427,6 @@ func _paste_raster(source: AtlasRasterLayer, anchor: Vector2) -> bool:
 	select_all_artwork()
 	message.emit("Pasted raster asset. Drag it or use the corner handle to place it.")
 	return true
-
-
-func _paste_tiles(payload: AtlasClipboardData, target: AtlasTerrainLayer, anchor: Vector2) -> bool:
-	# 1. Confirm compatible cell geometry; do not silently convert grid units.
-	var basis: AtlasGrid = target.grid if target.grid != null else _canvas.map.get_terrain_grid(_canvas.floor.id)
-	if basis.kind != payload.grid.kind or basis.cell_size != payload.grid.cell_size or basis.rotation != payload.grid.rotation:
-		message.emit("Tile paste needs matching grid shape, spacing and rotation; no implicit conversion.")
-		return false
-	# 2. Stage every destination cell and verify its complete selection footprint
-	#    before creating a command. A failed cell rejects the whole paste.
-	var origin: Vector2i = basis.document_to_cell(anchor)
-	var cells: Dictionary = target.terrain.duplicate()
-	for key: String in payload.tiles:
-		var xy: PackedStringArray = key.split(",")
-		var x: int = origin.x + int(xy[0])
-		var y: int = origin.y + int(xy[1])
-		if abs(x) > 2147483647 or abs(y) > 2147483647:
-			return false
-		var cell: Vector2i = Vector2i(x, y)
-		if not scope().allows_polygon(basis.cell_polygon(cell)):
-			return false
-		cells["%d,%d" % [cell.x, cell.y]] = payload.tiles[key]
-	# 3. Commit one atomic, undoable terrain snapshot.
-	var command: AtlasTileEdit = AtlasTileEdit.new(_canvas.map.id, _canvas.floor.id, target.id, target.terrain, cells)
-	if _edits.execute(command):
-		_canvas.queue_redraw()
-		return true
-	message.emit("Select a compatible, visible and unlocked destination layer.")
-	return false
 
 
 func import_raster(image: Image) -> bool:

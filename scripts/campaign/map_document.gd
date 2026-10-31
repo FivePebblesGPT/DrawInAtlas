@@ -2,8 +2,7 @@ class_name AtlasMapDocument
 extends Resource
 
 ## One independently editable board. Floors own ordered artwork layers.
-## grid is the adjustable display overlay; terrain_grid (or a tile layer's
-## explicit grid) preserves legacy cell geometry after the overlay is edited.
+## The grid is a spatial reference and edit-mask basis, independent of artwork.
 
 @export_storage var id: String = ""
 @export_storage var display_name: String = ""
@@ -12,9 +11,6 @@ extends Resource
 @export_storage var tags: Array[String] = []
 ## Mutable display/grid-settings overlay, with no authority to move ink pixels.
 @export_storage var grid: AtlasGrid = AtlasGrid.new()
-## Historical cell basis used if a terrain layer has no explicit grid. This is
-## canonical for interpreting legacy terrain, not a second visible grid overlay.
-@export_storage var terrain_grid: AtlasGrid
 ## Canonical ordered floor contents; each floor independently owns its layers.
 @export_storage var floors: Array[AtlasFloor] = []
 ## Saved default floor ID; opening a different floor is session-only view state.
@@ -34,27 +30,13 @@ func floor_by_id(floor_id: String) -> AtlasFloor:
 	return null
 
 
-## Grid precedence is important for old saves: per-layer snapshot, legacy
-## document terrain grid, then the current adjustable overlay.
-func get_terrain_grid(floor_id: String = "") -> AtlasGrid:
-	var selected_id: String = default_floor_id if floor_id.is_empty() else floor_id
-	var floor: AtlasFloor = floor_by_id(selected_id)
-	if floor != null and floor.terrain_layer() != null and floor.terrain_layer().grid != null:
-		return floor.terrain_layer().grid
-	return terrain_grid if terrain_grid != null else grid
-
-
 func to_dict() -> Dictionary:
 	var saved_floors: Array[Dictionary] = []
-	for floor in floors:
-		var saved: Dictionary = floor.to_dict()
-		for layer: Dictionary in saved.layers:
-			if layer.kind == "TILES" and layer.grid == null:
-				layer.grid = get_terrain_grid(floor.id).to_dict()
-		saved_floors.append(saved)
+	for floor: AtlasFloor in floors:
+		saved_floors.append(floor.to_dict())
 	return {
 		"id": id, "name": display_name, "kind": kind, "tags": tags.duplicate(),
-		"grid": grid.to_dict(), "terrain_grid": get_terrain_grid().to_dict(), "floors": saved_floors,
+		"grid": grid.to_dict(), "floors": saved_floors,
 		"default_floor_id": default_floor_id
 	}
 
@@ -77,13 +59,11 @@ static func from_dict(data: Dictionary) -> AtlasMapDocument:
 		seen_tags[value.to_lower()] = true
 		map.tags.append(value)
 	var raw_grid: Variant = data.get("grid", {})
-	var raw_terrain_grid: Variant = data.get("terrain_grid", raw_grid)
-	var raw_floors: Variant = data.get("floors", [{"id": "ground", "name": "Ground"}])
-	if not raw_grid is Dictionary or not raw_terrain_grid is Dictionary or not raw_floors is Array:
+	var raw_floors: Variant = data.get("floors", [AtlasFloor.new().to_dict()])
+	if not raw_grid is Dictionary or not raw_floors is Array or data.has("terrain_grid"):
 		return null
 	map.grid = AtlasGrid.from_dict(raw_grid)
-	map.terrain_grid = AtlasGrid.from_dict(raw_terrain_grid)
-	if map.grid == null or map.terrain_grid == null:
+	if map.grid == null:
 		return null
 	map.floors.clear()
 	var floor_ids: Dictionary[String, bool] = {}
@@ -94,9 +74,6 @@ static func from_dict(data: Dictionary) -> AtlasMapDocument:
 		if floor == null or floor_ids.has(floor.id):
 			return null
 		floor_ids[floor.id] = true
-		for layer: AtlasLayer in floor.layers:
-			if layer is AtlasTerrainLayer and layer.grid == null:
-				layer.grid = map.terrain_grid.copy()
 		map.floors.append(floor)
 	if map.floors.is_empty():
 		return null

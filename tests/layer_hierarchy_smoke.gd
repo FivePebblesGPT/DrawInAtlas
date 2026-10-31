@@ -55,10 +55,10 @@ func _run() -> void:
 		"selected layer settings are available in a compact disclosure")
 	panel.layer_settings_button.pressed.emit()
 	_check(not panel.name_input.visible, "layer disclosure closes without mutating data")
-	var terrain_row: TreeItem = _find(panel.hierarchy.get_root(), "layer", "terrain")
-	if terrain_row != null:
-		panel._on_hierarchy_button(terrain_row, 0, AtlasLayerPanel.LAYER_SETTINGS, 1)
-		_check(editor.canvas.active_layer_id == "terrain" and panel.name_input.visible,
+	var raster_row: TreeItem = _find(panel.hierarchy.get_root(), "layer", "raster")
+	if raster_row != null:
+		panel._on_hierarchy_button(raster_row, 0, AtlasLayerPanel.LAYER_SETTINGS, 1)
+		_check(editor.canvas.active_layer_id == "raster" and panel.name_input.visible,
 			"inline layer-settings action selects correct editing target")
 		panel.layer_settings_button.pressed.emit()
 	var map_count: int = editor.campaign.maps.size()

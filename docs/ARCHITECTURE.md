@@ -1,7 +1,7 @@
 # Technical Architecture
 
 > [!important] Reference implementation and earlier design
-> [[Index]] is the active backlog. The user confirmed a continuous chunked board with separately authored artwork LOD and an explicit editing target: see [[E-002]] and [[E-006]]. The battlemat concept is retired; projector framing belongs to [[E-007]]. **Raster is the approved primary ordinary-painting representation; vector remains for editable semantic objects** (see [[T-028]], [[INK_REPRESENTATION_DECISION]]). Palette-cell `AtlasTerrainLayer` artwork is approved for retirement ([[TERRAIN_LAYER_DECISION]], [[T-050]]), without removing the independent grid or region metadata. A future 5-foot PCG tilemap tool is a separate design. The editor-default implementation is still open under [[T-049]]. Earlier independent-document/footprint assumptions below are superseded where they conflict. This document is not current usability acceptance.
+> [[Index]] is the active backlog. The user confirmed a continuous chunked board with separately authored artwork LOD and an explicit editing target: see [[E-002]] and [[E-006]]. The battlemat concept is retired; projector framing belongs to [[E-007]]. **Raster is the approved primary ordinary-painting representation; vector remains for editable semantic objects** (see [[T-028]], [[INK_REPRESENTATION_DECISION]]). Palette-cell `AtlasTerrainLayer` artwork was removed in [[T-050]] ([[TERRAIN_LAYER_DECISION]]), without removing the independent grid or region metadata. A future 5-foot PCG tilemap tool is a separate design. The editor-default implementation is still open under [[T-049]]. Earlier independent-document/footprint assumptions below are superseded where they conflict. This document is not current usability acceptance.
 
 **Status:** earlier target architecture plus implementation reference. The development baseline is **Godot 4.8-beta2**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [archived implementation notes](Archive/2026-10-30/IMPLEMENTATION_NOTES.md) for historical checks.
 
@@ -27,7 +27,7 @@ main.tscn
         │   ├── commands/                    Reversible operations on the graph
         │   └── history.gd                   Undo/redo/savepoint state IDs
         ├── scripts/campaign/                Campaign → map → floor → layers
-        ├── scripts/artwork/                 Stroke, terrain and raster data
+        ├── scripts/artwork/                 Stroke and raster data
         ├── scripts/navigation/              Per-floor view, linked navigation
         └── scripts/persistence/             Native .scn + embedded lossless WebP
 ```

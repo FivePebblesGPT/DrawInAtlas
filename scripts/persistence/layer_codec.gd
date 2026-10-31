@@ -32,23 +32,6 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 					return null
 				ink.strokes.append(stroke)
 			layer = ink
-		"TILES":
-			if _has_any(data, ["strokes", "chunks", "pixels_per_unit", "transform"]):
-				return null
-			var tiles: AtlasTerrainLayer = AtlasTerrainLayer.new(data.id, data.name)
-			var cells: Variant = data.get("terrain", {})
-			var grid: Variant = data.get("grid")
-			if not cells is Dictionary or (grid != null and not grid is Dictionary):
-				return null
-			for key: Variant in cells:
-				if not AtlasData.coordinate_key(key) or not AtlasData.integer(cells[key]) or int(cells[key]) < 0:
-					return null
-				tiles.terrain[key] = int(cells[key])
-			if grid != null:
-				tiles.grid = AtlasGrid.from_dict(grid)
-				if tiles.grid == null:
-					return null
-			layer = tiles
 		"RASTER":
 			if _has_any(data, ["strokes", "terrain", "grid"]):
 				return null

@@ -109,19 +109,6 @@ static func artwork_bounds(document: AtlasMapDocument, floor: AtlasFloor, detail
 				if stroke.points.is_empty() or stroke.color.a <= 0.0:
 					continue
 				pieces.append(AtlasSelectionGeometry.stroke_bounds(stroke))
-		elif layer is AtlasTerrainLayer:
-			var grid: AtlasGrid = layer.grid if layer.grid != null else document.get_terrain_grid(floor.id)
-			if grid == null:
-				continue
-			for key: String in layer.terrain:
-				if layer.terrain[key] == 0:
-					continue
-				var xy: PackedStringArray = key.split(",")
-				if xy.size() != 2:
-					continue
-				var polygon: PackedVector2Array = grid.cell_polygon(Vector2i(int(xy[0]), int(xy[1])))
-				if not polygon.is_empty():
-					pieces.append(_point_bounds(polygon))
 		elif layer is AtlasRasterLayer:
 			for chunk: AtlasRasterChunk in layer.chunks.values():
 				if chunk.image == null or chunk.image.is_empty() or layer.pixels_per_unit <= 0.0:

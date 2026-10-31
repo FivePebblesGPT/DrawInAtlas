@@ -122,7 +122,6 @@ func _campaign(seed: int = 0) -> AtlasCampaign:
 	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	upper.display_name = "Upper floor"
-	upper.terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 37.5)
 	upper.strokes.append(AtlasStroke.new(PackedVector2Array([
 		Vector2(-3.125, 0.25), Vector2(17.75, -40.5)]), Color(0.25, 0.5, 0.75, 0.5), 1.2345678901234567))
 	map.floors.append(upper)

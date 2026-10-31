@@ -26,7 +26,7 @@ func _run() -> void:
 	var panel: AtlasLayerPanel = editor.layer_panel
 	var actions: HBoxContainer = panel.get_node("Order")
 	var floor_actions: HBoxContainer = editor.inspector.get_node("Scroll/Margin/Sections/FloorSection/FloorActions")
-	_check(actions.get_child_count() == 6, "six layer commands share one toolbar")
+	_check(actions.get_child_count() == 5, "five layer commands share one toolbar")
 	_check(floor_actions.get_child_count() == 4, "four floor commands share one toolbar")
 	for group: HBoxContainer in [actions, floor_actions]:
 		for child: Node in group.get_children():
@@ -46,11 +46,8 @@ func _run() -> void:
 	panel.get_node("Order/NewInkButton").pressed.emit()
 	_check(floor.layers.size() == original_layers + 1 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasInkLayer,
 		"new ink icon creates and selects an ink layer")
-	panel.get_node("Order/NewTerrainButton").pressed.emit()
-	_check(floor.layers.size() == original_layers + 2 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasTerrainLayer,
-		"new terrain icon retains its original command")
 	panel.get_node("Order/NewRasterButton").pressed.emit()
-	_check(floor.layers.size() == original_layers + 3 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasRasterLayer,
+	_check(floor.layers.size() == original_layers + 2 and floor.layer_by_id(editor.canvas.active_layer_id) is AtlasRasterLayer,
 		"new raster icon retains its original command")
 	var selected: String = editor.canvas.active_layer_id
 	_check(panel.get_node("Order/RaiseButton").disabled and not panel.get_node("Order/LowerButton").disabled, "layer toolbar reflects topmost selection bounds")

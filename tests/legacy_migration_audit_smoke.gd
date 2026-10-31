@@ -56,9 +56,6 @@ func _run() -> void:
 	var ink: AtlasInkLayer = child.floors[0].ink_layer()
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([
 		Vector2(-25, 12), Vector2(19, 47)]), Color(0.3, 0.5, 0.7, 0.4), 3.0))
-	var tile: AtlasTerrainLayer = child.floors[0].terrain_layer()
-	tile.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 15.0)
-	tile.terrain["-3,4"] = 2
 	var image: Image = Image.create(3, 3, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.4, 0.2, 0.7, 0.5))
 	var raster: AtlasRasterLayer = AtlasRasterLayer.new("legacy-raster", "Legacy transparent pixels")
@@ -138,13 +135,10 @@ func _run() -> void:
 				and layer["pixels_per_unit"] == 2.0 and layer["transform"].size() == 6)
 	_check(layer_found, "raster chunk keys, pixel scale, and transform are inventoried")
 	var ink_found: bool = false
-	var terrain_found: bool = false
 	for layer: Dictionary in layers:
 		if layer["kind"] == "INK" and layer["stroke_count"] == ink.strokes.size():
 			ink_found = true
-		if layer["kind"] == "TILES" and layer["cell_count"] == tile.terrain.size() and layer["grid"]["cell_size"] == 15.0:
-			terrain_found = true
-	_check(ink_found and terrain_found, "ink count and independent tile grid are inventoried")
+	_check(ink_found, "ink count is inventoried")
 
 	var spatial_record: Dictionary = _placement_record(report, "spatial")
 	_check(spatial_record["link_ids"].size() == 3 and spatial_record["child_units_per_cell"] == 64.0,

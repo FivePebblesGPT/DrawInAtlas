@@ -107,6 +107,7 @@ func _fixture() -> AtlasCampaign:
 	var base: Image = Image.create(512, 512, false, Image.FORMAT_RGBA8)
 	base.fill(Color.GREEN)
 	var base_raster: AtlasRasterLayer = AtlasRasterLayer.from_image(base)
+	base_raster.id = "base-background"
 	base_raster.transform.origin = Vector2(-256, -256)
 	world.floors[0].layers.append(base_raster)
 	var d1: AtlasInkLayer = AtlasInkLayer.new("fine-ink", "Continuous detail")
@@ -119,7 +120,9 @@ func _fixture() -> AtlasCampaign:
 	var alpha: Image = Image.create(256, 192, false, Image.FORMAT_RGBA8)
 	alpha.fill(Color.TRANSPARENT)
 	alpha.fill_rect(Rect2i(120, 88, 16, 16), Color.BLUE)
-	child.floors[0].layers.append(AtlasRasterLayer.from_image(alpha))
+	var preview_source: AtlasRasterLayer = AtlasRasterLayer.from_image(alpha)
+	preview_source.id = "preview-source"
+	child.floors[0].layers.append(preview_source)
 	result.add_map(world)
 	result.add_map(child)
 	placement = AtlasPlacement.new()

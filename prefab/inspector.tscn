@@ -165,7 +165,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 visible = false
-text = "Erases only the active layer: cuts ink strokes or clears raster pixels to transparency. Not maps, links, or terrain. One drag = one undo."
+text = "Erases only the active layer: cuts ink strokes or clears raster pixels to transparency. Not maps, links, or other layers. One drag = one undo."
 autowrap_mode = 3
 
 [node name="ColorLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=1830986059]
@@ -329,43 +329,6 @@ max_value = 180.0
 unique_name_in_owner = true
 layout_mode = 2
 text = "Apply transform"
-
-[node name="TerrainSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=1868315659]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Scroll/Margin/Sections/TerrainSection" unique_id=348581874]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 11
-text = "TERRAIN"
-autowrap_mode = 3
-
-[node name="PaletteLabel" type="Label" parent="Scroll/Margin/Sections/TerrainSection" unique_id=2030587706]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-text = "Palette"
-autowrap_mode = 3
-
-[node name="PalettePicker" type="OptionButton" parent="Scroll/Margin/Sections/TerrainSection" unique_id=1063314913]
-unique_name_in_owner = true
-layout_mode = 2
-selected = 2
-item_count = 6
-popup/item_0/text = "Erase"
-popup/item_0/id = 0
-popup/item_1/text = "Grass"
-popup/item_1/id = 1
-popup/item_2/text = "Forest"
-popup/item_2/id = 2
-popup/item_3/text = "Road"
-popup/item_3/id = 3
-popup/item_4/text = "Water"
-popup/item_4/id = 4
-popup/item_5/text = "Stone"
-popup/item_5/id = 5
 
 [node name="MapSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=709914055]
 layout_mode = 2

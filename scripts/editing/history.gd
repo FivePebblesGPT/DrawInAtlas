@@ -100,7 +100,7 @@ func mark_saved() -> void:
 
 
 func mark_external_change() -> void:
-	# Legacy terrain/metadata edits are dirty even though their undo is a later slice.
+	# External metadata edits are dirty even when not represented by commands.
 	_discard_redo()
 	_external_revision += 1
 	changed.emit()

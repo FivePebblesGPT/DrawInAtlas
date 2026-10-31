@@ -213,7 +213,6 @@ func _editor_contract() -> void:
 	link.anchor = Vector2(0, 0)
 	_check(AtlasLinkEdit.new(canvas.map.id, null, link).apply(editor.campaign),
 		"created a link directly under the vector eraser sweep")
-	var terrain_before: Dictionary = canvas.floor.terrain.duplicate()
 	var link_before: Dictionary = editor.campaign.link_by_id(link.id).to_dict()
 	var previous: AtlasEditCommand = editor.edits.get_undo_command()
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(300, 300)]), color, 8.0), true)
@@ -255,10 +254,9 @@ func _editor_contract() -> void:
 	_check(editor.edits.get_undo_command() == previous and AtlasStroke.same_artwork(canvas.floor.strokes, after),
 		"non-presented detail refuses erasure")
 	canvas.set_presented_detail_level(0)
-	_check(canvas.floor.terrain == terrain_before
-		and editor.campaign.link_by_id(link.id).to_dict() == link_before
+	_check(editor.campaign.link_by_id(link.id).to_dict() == link_before
 		and editor.campaign.get_map(independent.id) != null,
-		"eraser cannot create/remove terrain, links or referenced documents")
+		"eraser cannot create/remove links or referenced documents")
 	# Exercise raster edits through the same editor command boundary, not only the brush service.
 	var next_layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
 	next_layers.append(AtlasRasterLayer.new("eraser-raster", "Eraser raster"))

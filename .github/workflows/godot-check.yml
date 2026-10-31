@@ -159,13 +159,20 @@ jobs:
           godot --headless --path . --script res://tests/raster_import_chunks_smoke.gd 2>&1 | tee /tmp/godot-raster-import.log
           grep -q 'ATLAS_RASTER_IMPORT_CHUNKS_PASSED' /tmp/godot-raster-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-import.log; then exit 1; fi
-      - name: Verify terrain-layer class authority and legacy native tags (T-031)
+      - name: Verify raster/ink type authority and retired terrain kind (T-050)
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/tile_layer_type_smoke.gd 2>&1 | tee /tmp/godot-layer-type.log
+          godot --headless --path . --script res://tests/artwork_layer_type_smoke.gd 2>&1 | tee /tmp/godot-layer-type.log
           grep -q 'ATLAS_LAYER_TYPE_PASSED' /tmp/godot-layer-type.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^LAYER TYPE FAILED:' /tmp/godot-layer-type.log; then exit 1; fi
+      - name: Verify raster/ink model, grid independence and native fidelity (T-050)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/raster_ink_model_smoke.gd 2>&1 | tee /tmp/godot-raster-ink-model.log
+          grep -q 'ATLAS_RASTER_INK_MODEL_PASSED' /tmp/godot-raster-ink-model.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-ink-model.log; then exit 1; fi
       - name: Audit ink and raster representation contracts (T-028 investigation)
         shell: bash
         run: |

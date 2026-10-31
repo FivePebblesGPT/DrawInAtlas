@@ -28,7 +28,7 @@ func _run() -> void:
 		"tool palette uses the existing sidebar content pane")
 	_check(editor.inspector.find_child("ToolPicker", true, false) == null,
 		"large inspector selector has been removed")
-	_check(palette.get_child_count() >= 8, "categorized tool groups and active settings hint exist")
+	_check(palette.get_child_count() == AtlasToolPalette.CATEGORIES.size() * 2 + 1, "categorized tool groups and active settings hint exist")
 	var all_tools: Array[int] = []
 	for category: Dictionary in AtlasToolPalette.CATEGORIES:
 		_check(not String(category["title"]).is_empty(), "category has a readable heading")

@@ -99,14 +99,14 @@ func _run() -> void:
 	_check(canvas.presented_detail_level == 0, "finished transform refreshes deferred presentation")
 	canvas.camera_zoom = 14.0
 	await process_frame
-	canvas._tile_painting = true
+	canvas._draft_stroke = AtlasStroke.new(PackedVector2Array([center, center + Vector2(1, 1)]))
 	canvas.camera_zoom = 1.0
 	await process_frame
-	_check(canvas.presented_detail_level == 2, "held terrain paint gesture defers presentation")
-	canvas._tile_painting = false
+	_check(canvas.presented_detail_level == 2, "held raster/ink brush gesture defers presentation")
+	canvas.cancel_edit()
 	canvas.interaction_finished.emit()
 	await process_frame
-	_check(canvas.presented_detail_level == 0, "released terrain paint refreshes presentation")
+	_check(canvas.presented_detail_level == 0, "released brush refreshes presentation")
 	canvas.camera_zoom = 14.0
 	await process_frame
 	editor.layer_panel.show_editing_detail.pressed.emit()

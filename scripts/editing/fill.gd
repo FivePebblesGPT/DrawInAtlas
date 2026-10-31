@@ -1,8 +1,8 @@
 class_name AtlasFill
 extends RefCounted
-## Atomic tile and existing-pixel flood fills. Scope boundaries stop traversal.
+## Atomic existing-pixel flood fills. Scope boundaries stop traversal.
 
-## Four-connected INTEGER pixel-space offsets (not terrain grid neighbors).
+## Four-connected integer pixel-space offsets.
 ## A raster fill never traverses an unstored chunk or leaves its edit scope.
 const PIXEL_NEIGHBORS: Array[Vector2i] = [
 	Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP
@@ -12,63 +12,6 @@ const PIXEL_NEIGHBORS: Array[Vector2i] = [
 ## Leave room for neighbor arithmetic and float32 pixel-to-document conversion.
 const PIXEL_MIN: int = -2147483000
 const PIXEL_MAX: int = 2147483000
-
-
-## Terrain uses string "x,y" (square) or "q,r" (axial hex) -> palette ID.
-## Palette 0 denotes the absent/background cell; the result owns a deep copy.
-static func tiles(grid: AtlasGrid, terrain: Dictionary, start: Vector2i, palette: int,
-		scope: AtlasEditScope = null, limit: int = 8192) -> AtlasFillResult:
-	# Validate the terrain map and fill request before traversing or copying cells.
-	if grid == null or not grid.is_valid() or grid.kind == AtlasGrid.Kind.GRIDLESS:
-		return _failure("Fill requires a valid square or hex grid.")
-	if palette < 0 or limit <= 0:
-		return _failure("Invalid palette or fill limit.")
-	for key: Variant in terrain:
-		if not AtlasData.coordinate_key(key) or not terrain[key] is int or int(terrain[key]) < 0:
-			return _failure("Invalid terrain data.")
-
-	# A missing key is background. Filling background requires a finite scope;
-	# scope eligibility covers the *entire* grid cell polygon, not its center.
-	var seed_palette: int = int(terrain.get(_key(start), 0))
-	if seed_palette == palette:
-		return _failure("Fill would not change any cells.")
-	if seed_palette == 0 and (scope == null or not scope.enabled):
-		return _failure("Background fill requires a finite selection scope.")
-	if scope != null and not scope.allows_polygon(grid.cell_polygon(start)):
-		return _failure("Starting cell is outside the edit scope.")
-
-	# Breadth-first over grid neighbors (four square / six axial hex). Visit each
-	# candidate once, but count only matching, in-scope cells toward the limit.
-	var pending_cells: Array[Vector2i] = [start]
-	var visited_cells: Dictionary[Vector2i, bool] = {start: true}
-	var affected_cells: Array[Vector2i] = []
-	var next_index: int = 0
-	while next_index < pending_cells.size():
-		var cell: Vector2i = pending_cells[next_index]
-		next_index += 1
-		if int(terrain.get(_key(cell), 0)) != seed_palette:
-			continue
-		if scope != null and not scope.allows_polygon(grid.cell_polygon(cell)):
-			continue
-		affected_cells.append(cell)
-		if affected_cells.size() > limit:
-			return _failure("Tile fill exceeds the cell limit.")
-		for neighbor: Vector2i in grid.neighbors(cell):
-			if not visited_cells.has(neighbor):
-				visited_cells[neighbor] = true
-				pending_cells.append(neighbor)
-
-	# Stage edits on a detached terrain copy only after all eligibility and
-	# limit checks pass; an overflowing fill never partially changes the source.
-	var result: AtlasFillResult = AtlasFillResult.new()
-	result.terrain = terrain.duplicate(true)
-	for cell: Vector2i in affected_cells:
-		if palette == 0:
-			result.terrain.erase(_key(cell))
-		else:
-			result.terrain[_key(cell)] = palette
-	result.ok = true
-	return result
 
 
 ## document_point is in board units; traversal uses integer RGBA8 pixel

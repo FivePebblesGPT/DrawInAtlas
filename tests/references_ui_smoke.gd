@@ -55,9 +55,8 @@ func _fixture() -> AtlasCampaign:
 	var parent: AtlasMapDocument = AtlasMapDocument.new("parent", "City source")
 	parent.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 40.0)
 	parent.grid.visible = false
-	for x: int in range(-3, 4):
-		for y: int in range(-3, 4):
-			parent.floors[0].paint(Vector2i(x, y), 4)
+	# A colored raster swatch replaces obsolete palette-cell floor painting.
+	parent.floors[0].layers.append(_raster(Color.SANDY_BROWN, Vector2.ZERO, Vector2i(40, 40)))
 	parent_raster = _raster(Color.RED, Vector2(-80, -80), Vector2i(79, 160))
 	parent.floors[0].layers.append(parent_raster)
 	var ink: AtlasInkLayer = AtlasInkLayer.new("top-ink", "Top ink")
@@ -124,7 +123,7 @@ func _spatial_parent() -> bool:
 	_check(editor.map_references.source_link_id == "spatial-door", "actual entrance disambiguates multiple parents")
 	_check(_color_at(placement.parent_point_to_child(Vector2(-30, -10)), Color.RED), "rotated reference contains parent raster artwork")
 	_check(_color_at(placement.parent_point_to_child(Vector2(-10, 10)), Color.GREEN), "reference contains top ink in canonical layer order")
-	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), AtlasCanvas.TERRAIN_COLORS[4]), "reference contains terrain using source content geometry")
+	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), Color.SANDY_BROWN), "reference contains raster artwork independently of grid")
 	_check(_color_at(Vector2(-20, -10), AtlasCanvas.EMPTY_COLOR), "reference is cropped at the child footprint boundary")
 	var before: Dictionary = campaign.get_map("parent").to_dict()
 	var bytes: PackedByteArray = parent_raster.chunks["0,0"].image.get_data()
@@ -141,7 +140,7 @@ func _spatial_parent() -> bool:
 	editor.inspector.reference_checkbox.button_pressed = true
 	editor.inspector.opacity_slider.value = 0.5
 	await _frames(14)
-	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), AtlasCanvas.EMPTY_COLOR.lerp(AtlasCanvas.TERRAIN_COLORS[4], 0.5)), "reference opacity composites once over board background")
+	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), AtlasCanvas.EMPTY_COLOR.lerp(Color.SANDY_BROWN, 0.5)), "reference opacity composites once over board background")
 	editor.inspector.opacity_slider.value = 1.0
 	return true
 

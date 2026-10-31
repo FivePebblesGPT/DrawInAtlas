@@ -96,7 +96,7 @@ func _selection() -> void:
 		indices.assign(raw)
 		_check(G.select_indices(layer, indices).is_empty(), "invalid index selection rejects atomically: " + str(raw))
 	_check(G.select_indices(layer, []).is_empty() and G.select_all(AtlasInkLayer.new()).is_empty(), "empty ink selection")
-	_check(G.select_all(null).is_empty() and G.select_all(AtlasTerrainLayer.new()).is_empty(), "null/tiles have no artwork selection")
+	_check(G.select_all(null).is_empty() and G.select_all(AtlasRasterLayer.new()).is_empty(), "null/tiles have no artwork selection")
 	layer.strokes[0].points[0] = Vector2(9, 9)
 	_check(selection.source.strokes[0].points[0] == [-1.75, -0.75] and not selection.matches(layer), "snapshot is detached and detects stale geometry")
 	_check(G.transformed(layer, selection, Transform2D.IDENTITY) == null, "stale transform rejected")
@@ -283,7 +283,7 @@ func _store() -> void:
 	campaign.add_map(AtlasMapDocument.new("world", "Selection persistence"))
 	campaign.get_map("world").floors[0].layers = [moved, placed]
 	var path: String = "user://selection_smoke_%d_%d.scn" % [OS.get_process_id(), Time.get_ticks_usec()]
-	_check(AtlasCampaign.SCHEMA_VERSION == 6 and placed.to_dict().transform.size() == 6, "schema6 serializes six affine floats")
+	_check(AtlasCampaign.SCHEMA_VERSION == 7 and placed.to_dict().transform.size() == 6, "current schema serializes six affine floats")
 	_check(AtlasCampaignStore.save_campaign(campaign, path) == OK, "real store saves shapes/transforms/WebP")
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(path)
 	_check(loaded != null and loaded.to_dict() == campaign.to_dict(), "real store roundtrips geometry, style, order, placement")

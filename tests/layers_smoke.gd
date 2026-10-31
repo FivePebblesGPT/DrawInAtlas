@@ -35,36 +35,12 @@ func _reject(base: Dictionary, patches: Array[Dictionary], decode: Callable, lab
 		_check(decode.call(candidate) == null, "%s rejects %s" % [label, str(patch)])
 
 func _migration() -> void:
-	for version: int in [1, 2, 3]:
-		var board: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 31.0)
-		board.origin = Vector2(8, -9)
-		board.rotation = 0.3
-		var frozen: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 17.0)
-		frozen.origin = Vector2(-5, 13)
-		var map_data: Dictionary = {"id": "m", "name": "Map", "grid": board.to_dict(), "default_floor_id": "up", "floors": [{"id": "up", "name": "Upper", "terrain": {"-2,3": 4}, "strokes": [_stroke().to_dict()]}]}
-		if version == 3:
-			map_data.terrain_grid = frozen.to_dict()
-		var campaign: AtlasCampaign = AtlasCampaign.from_dict({"schema_version": version, "root_map_id": "m", "maps": [map_data]})
-		_check(campaign != null, "v%d migrates" % version)
-		if campaign == null:
-			continue
-		var document: AtlasMapDocument = campaign.get_map("m")
-		var floor: AtlasFloor = document.floor_by_id("up")
-		_check(document.id == "m" and floor != null and floor.display_name == "Upper", "migration retains map/floor identity")
-		if floor == null:
-			continue
-		_check(floor.layers.size() == 2 and floor.layers[0] is AtlasTerrainLayer and floor.layers[1] is AtlasInkLayer, "ordered typed legacy layers")
-		_check(floor.layers[0].id == "terrain" and floor.layers[1].id == "ink", "stable migration layer IDs")
-		_check(floor.terrain == {"-2,3": 4} and floor.strokes[0].to_dict() == _stroke().to_dict(), "legacy content retained")
-		var geometry: AtlasGrid = frozen if version == 3 else board
-		_check(floor.terrain_layer().grid.same_as(geometry), "legacy tile geometry retained")
-		document.grid.cell_size = 999.0
-		_check(floor.terrain_layer().grid.same_as(geometry), "tile geometry independent of board edits")
-		var saved: Dictionary = campaign.to_dict()
-		var saved_floor: Dictionary = saved.maps[0].floors[0]
-		_check(saved.schema_version == AtlasCampaign.SCHEMA_VERSION and saved_floor.has("layers") and not saved_floor.has("terrain") and not saved_floor.has("strokes"), "canonical floors serialize only layers")
-		var loaded: AtlasCampaign = AtlasCampaign.from_dict(saved)
-		_check(loaded != null and loaded.get_map("m").floor_by_id("up").to_dict() == floor.to_dict(), "canonical round trip")
+	for version: int in [1, 2, 3, 4, 5, 6]:
+		var old: Dictionary = _campaign().to_dict()
+		old.schema_version = version
+		_check(AtlasCampaign.from_dict(old) == null, "retired prototype schema rejected v%d" % version)
+	var canonical: Dictionary = _campaign().to_dict()
+	_check(AtlasCampaign.from_dict(canonical) != null, "current schema accepted")
 
 func _validation() -> void:
 	var ink: Dictionary = AtlasInkLayer.new().to_dict()
@@ -74,7 +50,7 @@ func _validation() -> void:
 		var edge: Dictionary = ink.duplicate(true)
 		edge.opacity = opacity
 		_check(AtlasLayerCodec.from_dict(edge) != null, "opacity boundary accepted")
-	_reject(AtlasTerrainLayer.new().to_dict(), [{"terrain": {"x,y": 1}}, {"terrain": {"0,0": -1}}, {"terrain": {"0,0": 1.5}}, {"grid": []}], AtlasLayerCodec.from_dict, "tile payload")
+	_check(AtlasLayerCodec.from_dict({"id": "terrain", "name": "Old", "kind": "TILES", "terrain": {"0,0": 1}}) == null, "retired tile kind rejected")
 	var ref_data: Dictionary = {"coord": [-1, 2], "width": 256, "height": 1, "asset": "a".repeat(64) + ".webp"}
 	var raster: Dictionary = AtlasRasterLayer.new().to_dict()
 	raster.chunks = [ref_data]
@@ -99,8 +75,6 @@ func _layer_edits() -> void:
 	var campaign: AtlasCampaign = _campaign()
 	var floor: AtlasFloor = campaign.get_map("m").floors[0]
 	floor.ink_layer().strokes.append(_stroke())
-	floor.terrain_layer().terrain["1,2"] = 3
-	floor.terrain_layer().grid = AtlasGrid.new()
 	var history: AtlasEditHistory = AtlasEditHistory.new(campaign)
 	history.active_map_id = "m"
 	for operation: String in ["add", "reorder", "name", "opacity", "visibility", "lock"]:
@@ -119,9 +93,6 @@ func _layer_edits() -> void:
 		for source: AtlasLayer in before + after:
 			if source is AtlasInkLayer and not source.strokes.is_empty():
 				source.strokes[0].points[0] = Vector2(888, 888)
-			if source is AtlasTerrainLayer:
-				source.terrain["1,2"] = 99
-				source.grid.origin = Vector2(777, 777)
 		before[0].display_name = "mutated input"
 		after[0].display_name = "mutated input"
 		history.mark_saved()
@@ -132,6 +103,7 @@ func _layer_edits() -> void:
 		_check(history.undo() and history.is_dirty() and history.redo() and not history.is_dirty(), operation + " saved redo checkpoint")
 	var canonical: AtlasFloor = AtlasFloor.from_dict(floor.to_dict())
 	_check(canonical != null and canonical.to_dict() == floor.to_dict(), "canonical order, IDs, metadata and content round trip")
+	floor.layers[0].locked = true
 	var snapshot: Dictionary = floor.to_dict()
 	_check(not history.execute(AtlasLayerEdit.new("m", "ground", floor.layers, floor.layers)) and floor.to_dict() == snapshot and not history.is_dirty(), "no-op transaction rejected")
 	var next: Array[AtlasLayer] = AtlasLayerCodec.clone_all(floor.layers)
@@ -140,7 +112,12 @@ func _layer_edits() -> void:
 	next.append(next[0])
 	_check(not history.execute(AtlasLayerEdit.new("m", "ground", floor.layers, next)) and floor.to_dict() == snapshot, "invalid collection atomic rejection")
 	var protected: Array[AtlasLayer] = AtlasLayerCodec.clone_all(floor.layers)
-	(protected[0] as AtlasInkLayer).strokes.append(_stroke())
+	if protected[0] is AtlasInkLayer:
+		(protected[0] as AtlasInkLayer).strokes.append(_stroke())
+	else:
+		var image: Image = Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+		image.fill(Color.RED)
+		(protected[0] as AtlasRasterLayer).chunks["0,0"] = AtlasRasterChunk.new(Vector2i.ZERO, image)
 	_check(not history.execute(AtlasLayerEdit.new("m", "ground", floor.layers, protected))
 		and floor.to_dict() == snapshot, "generic layer transaction cannot overwrite hidden/locked content")
 	protected = AtlasLayerCodec.clone_all(floor.layers)
@@ -156,43 +133,32 @@ func _content_edits() -> void:
 	campaign.get_map("m").floors[1].id = "upper"
 	var history: AtlasEditHistory = AtlasEditHistory.new(campaign)
 	history.active_map_id = "m"
-	for tiles: bool in [false, true]:
-		var layer: AtlasLayer = floor.terrain_layer() if tiles else floor.layer_by_id("second")
-		for guard: String in ["hidden", "locked", "wrong type", "missing", "wrong map"]:
-			layer.visible = guard != "hidden"
-			layer.locked = guard == "locked"
-			var target: String = layer.id
-			if guard == "wrong type":
-				target = "second" if tiles else "terrain"
-			elif guard == "missing":
-				target = "missing"
-			history.active_map_id = "other" if guard == "wrong map" else "m"
-			var command: AtlasEditCommand = AtlasTileEdit.new("m", "ground", target, {}, {"-1,2": 4}) if tiles else AtlasStrokeEdit.new("m", "ground", [], [_stroke()], target)
-			var saved: Dictionary = floor.to_dict()
-			_check(not history.execute(command) and floor.to_dict() == saved and not history.can_undo(), "content guard %s tiles=%s" % [guard, tiles])
-		layer.visible = true
-		layer.locked = false
+	var layer: AtlasInkLayer = floor.layer_by_id("second") as AtlasInkLayer
+	for guard: String in ["hidden", "locked", "wrong type", "missing", "wrong map"]:
+		layer.visible = guard != "hidden"
+		layer.locked = guard == "locked"
+		var target: String = "raster" if guard == "wrong type" else "missing" if guard == "missing" else "second"
+		history.active_map_id = "other" if guard == "wrong map" else "m"
+		var command: AtlasStrokeEdit = AtlasStrokeEdit.new("m", "ground", [], [_stroke()], target)
+		var saved: Dictionary = floor.to_dict()
+		_check(not history.execute(command) and floor.to_dict() == saved and not history.can_undo(), "content guard " + guard)
+	layer.visible = true
+	layer.locked = false
 	history.active_map_id = "m"
 	var strokes: Array[AtlasStroke] = [_stroke()]
 	var ink_edit: AtlasStrokeEdit = AtlasStrokeEdit.new("m", "ground", [], strokes, "second")
 	strokes[0].points[0] = Vector2(999, 999)
 	_check(history.execute(ink_edit) and (floor.layer_by_id("second") as AtlasInkLayer).strokes[0].to_dict() == _stroke().to_dict() and floor.ink_layer().strokes.is_empty(), "explicit ink target and input snapshot")
-	var terrain: Dictionary = {"-1,2": 4}
-	var tile_edit: AtlasTileEdit = AtlasTileEdit.new("m", "ground", "terrain", {}, terrain)
-	terrain["-1,2"] = 99
-	_check(history.execute(tile_edit) and floor.terrain["-1,2"] == 4, "tile input snapshot")
-	_check(not history.execute(tile_edit) and not history.execute(ink_edit), "stale content edits rejected")
-	_check(not history.execute(AtlasTileEdit.new("m", "ground", "terrain", floor.terrain, floor.terrain)), "tile no-op rejected")
+	_check(not history.execute(ink_edit), "stale ink content edit rejected")
 	_check(not history.execute(AtlasStrokeEdit.new("m", "ground", [], [])), "ink no-op rejected")
-	_check(not history.execute(AtlasTileEdit.new("m", "ground", "terrain", floor.terrain, {"0,0": -1})) and floor.terrain == {"-1,2": 4}, "invalid tile edit atomic rejection")
 	history.active_map_id = "other"
 	floor.layers.reverse()
-	for layer: AtlasLayer in floor.layers:
-		layer.visible = false
-		layer.locked = true
-	_check(history.undo() and floor.terrain.is_empty() and history.undo() and (floor.layer_by_id("second") as AtlasInkLayer).strokes.is_empty(), "undo uses original map/floor/layer IDs despite selection and flags")
-	_check(campaign.get_map("other").floors[0].strokes.is_empty() and campaign.get_map("m").floors[1].terrain.is_empty(), "other targets untouched")
-	_check(AtlasStrokeEdit.new("m", "ground", [], [_stroke()]).layer_id == "ink", "four-argument ink compatibility")
+	for item: AtlasLayer in floor.layers:
+		item.visible = false
+		item.locked = true
+	_check(history.undo() and (floor.layer_by_id("second") as AtlasInkLayer).strokes.is_empty(), "undo uses original layer ID despite selection and flags")
+	_check(campaign.get_map("other").floors[0].strokes.is_empty() and campaign.get_map("m").floors[1].strokes.is_empty(), "other targets untouched")
+	_check(AtlasStrokeEdit.new("m", "ground", [], [_stroke()]).layer_id == "ink", "default ink target remains explicit")
 
 func _raster() -> void:
 	var image: Image = Image.create_empty(513, 257, true, Image.FORMAT_RGB8)
@@ -216,13 +182,14 @@ func _raster() -> void:
 	var campaign: AtlasCampaign = _campaign()
 	var floor: AtlasFloor = campaign.get_map("m").floors[0]
 	var after: Array[AtlasLayer] = AtlasLayerCodec.clone_all(floor.layers)
+	copy.id = "imported"
 	after.append(copy)
 	var edit: AtlasLayerEdit = AtlasLayerEdit.new("m", "ground", floor.layers, after)
 	copy.chunks["0,0"].image.fill(Color.GREEN)
-	_check(edit.apply(campaign) and (floor.layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.get_pixel(0, 0) == Color.RED, "raster command snapshots caller images")
+	_check(edit.apply(campaign) and (floor.layer_by_id("imported") as AtlasRasterLayer).chunks["0,0"].image.get_pixel(0, 0) == Color.RED, "raster command snapshots caller images")
 	copy.chunks["0,0"].image.fill(Color.BLUE)
-	_check((floor.layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.get_pixel(0, 0) == Color.RED, "post-apply caller edits remain isolated")
-	(floor.layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.BLUE)
+	_check((floor.layer_by_id("imported") as AtlasRasterLayer).chunks["0,0"].image.get_pixel(0, 0) == Color.RED, "post-apply caller edits remain isolated")
+	(floor.layer_by_id("imported") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.BLUE)
 	_check(not edit.revert(campaign), "raster stale pixel data rejected")
-	(floor.layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.RED)
-	_check(edit.revert(campaign) and edit.apply(campaign) and (floor.layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.get_pixel(0, 0) == Color.RED, "applied images do not alias command redo snapshot")
+	(floor.layer_by_id("imported") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.RED)
+	_check(edit.revert(campaign) and edit.apply(campaign) and (floor.layer_by_id("imported") as AtlasRasterLayer).chunks["0,0"].image.get_pixel(0, 0) == Color.RED, "applied images do not alias command redo snapshot")

@@ -1,11 +1,11 @@
 # Campaign Data Model and Persistence
 
-> [!important] Existing representation, pending model decisions
+> [!important] Current representation and explicitly archived earlier schema designs
 > This describes the implementation, not the revised canvas contract. [[E-002]] and [[E-006]] record the shared board, separately authored artwork LOD and retirement of battlemats; [[E-007]] owns projection framing. [[E-003]] and [[E-SAVE]] track model and persistence cleanup. Existing dictionary helpers are under investigation in [[T-029]]. Completion is tracked in [[Index]].
 
-**Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, locally verified on Godot 4.8-beta1. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
+**Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, verified on Godot 4.8-beta2. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
 
-## Current native checkpoint contract (native v1)
+## Current native checkpoint contract (native v2; T-050)
 
 Keep native resource/scene serialization behind `AtlasCampaignStore`. Floor,
 overview and editing code operate on typed runtime objects and stable IDs;
@@ -20,7 +20,7 @@ Preview images are derived data, never substitutes for the original artwork.
 The data-only save root owns map-document nodes whose embedded Resources supply
 the map registry. Map IDs, rather than child order, are canonical; floor/layer
 array order remains significant. The binary `.scn` embeds every map and lossless
-WebP chunk and uses whole-scene ResourceSaver compression. Native version **1**,
+WebP chunk and uses whole-scene ResourceSaver compression. Native version **2**,
 domain validation, exact RGBA8 hashes and a deterministic semantic digest gate
 activation. No user artwork sidecars or JSON schema are written inside the file.
 
@@ -42,36 +42,41 @@ See [archived native-save report](Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.
 portability evidence. Browser smoke remains deferred; Windows/macOS replacement
 and physical-media power-loss durability are not claimed.
 
-Milestone 6 uses the existing link/placement fields and native format v1 without
-adding a schema. `AtlasLinkEdit` atomically changes one source-owned entrance,
+Milestone 6 originally used native format v1; T-050 subsequently advanced the supported native format to v2 with no terrain artwork. `AtlasLinkEdit` atomically changes one source-owned entrance,
 its footprint and an optional new independent document. Reference sources,
 frozen images, preview crops and traversed-entrance history are viewer state,
 not extra Resources in the campaign file. See [linked maps](LINKED_MAPS.md).
 
-### Historical JSON checkpoint / retained in-memory dictionary schema (v6)
+### Current dictionary validation schema (v7; not a native file format)
 
 Before native saves, the store wrote a checksummed JSON head, `.bak` and immutable
 `.assets/<pixel-sha256>.webp` chunks. That user-file path has been retired, not
-converted. The following v1–v6 rules still describe the compatibility dictionaries
-used by validation, cloning and tests; they are not the native container schema.
+converted. Only v7 is accepted by the current in-memory dictionary decoder used for validation, cloning and tests; it is not the native container schema. Versions 1–6 are historical and intentionally unsupported. No prototype-data migration is implemented.
 
-Each floor owns an ordered `layers` array (back to front): `TILES` has sparse terrain plus its own geometry, `INK` has vector strokes, and `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths.
+Each floor owns an ordered `layers` array (back to front): `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration; `INK` contains editable vector strokes and semantic objects. The obsolete `TILES` type is rejected. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths.
 
-Versions 1–3 migrate their single terrain/ink payloads into typed layers; v4 raster layers default to identity placement. V5 records each raster layer's affine `transform` as six finite numbers (basis X, basis Y, origin) and rejects singular transforms. Moving/scaling/rotating an asset does not rewrite chunk pixels or their hashes. The frozen terrain basis is preserved. Old floor `terrain`/`strokes` properties are compatibility views, not duplicate serialized authorities. Full-precision JSON/checksums preserve numeric settings; raster hashes include normalized RGBA8 bytes and dimensions.
+Raster affine `transform` is recorded as six finite numbers (basis X, basis Y, origin) and singular transforms are rejected. Moving/scaling/rotating an asset does not rewrite chunk pixels or their hashes. A floor has no terrain palette or frozen terrain basis. Grid geometry is independent map metadata; cell-scoped editing uses this grid without making it an artwork layer. The `strokes` access helper refers to the existing ink layer only. Raster hashes cover canonical RGBA8 bytes and dimensions.
 
-V6 adds map `tags` and a link's `source_floor_id`; `target_floor_id` remains
-explicit. Missing legacy floor fields resolve to each endpoint map's saved
-default. Floor order and `default_floor_id` are persistent metadata, while the
+The current schema retains map `tags` and explicit `source_floor_id` and
+`target_floor_id` fields on links. When missing, link floor IDs default to
+`ground` during dictionary decoding. Floor order and `default_floor_id` are persistent metadata, while the
 currently viewed floor/camera/layer are workspace state. Renaming/reordering or
-choosing a default never rebases artwork, tile geometry or native measurement
+choosing a default never rebases artwork, grid geometry or native measurement
 units. Missing target map/floor/placement references remain representable for
 overview placeholders and source Focus actions.
 
-Clipboard payloads use a separate `drawinatlas.clipboard` v1 envelope, not campaign IDs or file paths. Ink coordinates are relative to the copied bounds; raster chunks carry self-contained verified lossless WebP bytes; tile cells carry explicit grid metadata and relative coordinates. Paste assigns fresh raster layer IDs and does not harmonize native units. Viewer selections, gesture previews and edit scopes remain transient and are never saved as artwork.
+Clipboard payloads use a separate `drawinatlas.clipboard` v1 envelope, not campaign IDs or file paths. Ink coordinates are relative to the copied bounds; raster chunks carry self-contained verified lossless WebP bytes. Obsolete `TILES` clipboard payloads are rejected. Paste assigns fresh raster layer IDs and does not harmonize native units. Viewer selections, gesture previews and edit scopes remain transient and are never saved as artwork.
 
 Neither the historical checkpoint nor the native replacement implements a full
 journal or autosave. Native recovery retains one complete previous generation;
 artwork is embedded rather than stored as immutable sidecars.
+
+## Historical conceptual schemas (not supported runtime formats)
+
+The following early sketches predate native saves and the removal of battlemats
+and palette-cell terrain artwork. They are retained for design history only.
+`TILES`, `BattlemapPlacement` and other examples below must **not** be used
+as current API or persistence documentation.
 
 ## 1. Identity and relationships
 
@@ -278,7 +283,7 @@ Keep the following in workspace/user-specific preferences or transient runtime s
 - Editor-only parent-reference opacity and preview modes (some reference defaults may live in placement metadata).
 - GM/projector/client camera, visible panels, follow-GM preference.
 
-Store deliberate persistent document metadata separately: actual layers, floors, terrain, placements, links, tags, permission flags and chosen default previews.
+Store deliberate persistent document metadata separately: actual raster/ink layers, floors, placements, links, tags, permission flags and chosen default previews.
 
 ## 9. Indexes, cache keys and migrations
 

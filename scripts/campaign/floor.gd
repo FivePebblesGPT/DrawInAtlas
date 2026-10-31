@@ -5,17 +5,8 @@ extends Resource
 @export_storage var display_name: String = "Ground"
 ## Canonical back-to-front ordered layer resources. A detail level is a layer
 ## property, not a separate board or a child document.
-@export_storage var layers: Array[AtlasLayer] = [AtlasTerrainLayer.new(), AtlasInkLayer.new()]
+@export_storage var layers: Array[AtlasLayer] = [AtlasRasterLayer.new(), AtlasInkLayer.new()]
 
-# Compatibility views for the original terrain/ink APIs; ordered layers own the data.
-var terrain: Dictionary:
-	get:
-		var layer: AtlasTerrainLayer = terrain_layer()
-		return layer.terrain if layer != null else {}
-	set(value):
-		var layer: AtlasTerrainLayer = terrain_layer()
-		if layer != null:
-			layer.terrain.assign(value)
 var strokes: Array[AtlasStroke]:
 	get:
 		var layer: AtlasInkLayer = ink_layer()
@@ -40,21 +31,6 @@ func ink_layer() -> AtlasInkLayer:
 	return null
 
 
-func terrain_layer() -> AtlasTerrainLayer:
-	for layer: AtlasLayer in layers:
-		if layer is AtlasTerrainLayer:
-			return layer
-	return null
-
-
-func paint(cell: Vector2i, palette_id: int) -> void:
-	terrain["%d,%d" % [cell.x, cell.y]] = palette_id
-
-
-func get_terrain(cell: Vector2i) -> int:
-	return int(terrain.get("%d,%d" % [cell.x, cell.y], 0))
-
-
 func to_dict() -> Dictionary:
 	var saved: Array[Dictionary] = []
 	for layer: AtlasLayer in layers:
@@ -70,25 +46,17 @@ static func from_dict(data: Dictionary) -> AtlasFloor:
 		return null
 	floor.id = floor_id
 	floor.display_name = floor_name
-	if data.has("layers"):
-		if not data.layers is Array or data.has("terrain") or data.has("strokes"):
-			return null
-		floor.layers.clear()
-		var ids: Dictionary[String, bool] = {}
-		for raw: Variant in data.layers:
-			if not raw is Dictionary:
-				return null
-			var layer: AtlasLayer = AtlasLayerCodec.from_dict(raw)
-			if layer == null or ids.has(layer.id):
-				return null
-			ids[layer.id] = true
-			floor.layers.append(layer)
-		return floor
-	var legacy_ink: Dictionary = {"id": "ink", "name": "Ink", "kind": "INK", "strokes": data.get("strokes", [])}
-	var legacy_tiles: Dictionary = {"id": "terrain", "name": "Terrain", "kind": "TILES", "terrain": data.get("terrain", {})}
-	var ink: AtlasLayer = AtlasLayerCodec.from_dict(legacy_ink)
-	var tiles: AtlasLayer = AtlasLayerCodec.from_dict(legacy_tiles)
-	if ink == null or tiles == null:
+	if not data.has("layers") or not data["layers"] is Array \
+			or data.has("terrain") or data.has("strokes"):
 		return null
-	floor.layers = [tiles, ink]
+	floor.layers.clear()
+	var ids: Dictionary[String, bool] = {}
+	for raw: Variant in data["layers"]:
+		if not raw is Dictionary:
+			return null
+		var layer: AtlasLayer = AtlasLayerCodec.from_dict(raw)
+		if layer == null or ids.has(layer.id):
+			return null
+		ids[layer.id] = true
+		floor.layers.append(layer)
 	return floor

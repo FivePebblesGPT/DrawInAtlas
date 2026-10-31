@@ -38,6 +38,19 @@ func _click(button: Button) -> void:
 	root.push_input(up, true)
 
 
+# Compare actual framebuffer changes within the popup footprint rather than
+# assuming one specific theme color at two hardcoded screen pixels.
+func _changed_pixels(before: Image, after: Image, region: Rect2) -> int:
+	var rectangle: Rect2i = Rect2i(Vector2i(region.position), Vector2i(region.size))
+	rectangle = rectangle.intersection(Rect2i(Vector2i.ZERO, before.get_size()))
+	var changed: int = 0
+	for y: int in range(rectangle.position.y, rectangle.end.y, 4):
+		for x: int in range(rectangle.position.x, rectangle.end.x, 4):
+			if not before.get_pixel(x, y).is_equal_approx(after.get_pixel(x, y)):
+				changed += 1
+	return changed
+
+
 func _run() -> void:
 	if DisplayServer.get_name() == "headless":
 		_check(false, "native framebuffer is required")
@@ -55,6 +68,7 @@ func _run() -> void:
 	var button: Button = editor.grid_settings_button
 	_check(editor.canvas.size.x >= 394, "no canvas width lost to grid controls")
 	_check(button.size.x >= 50 and button.size.y >= 24, "toolbar action has a usable target")
+	var closed_frame: Image = root.get_texture().get_image()
 	await _click(button)
 	_check(popup.visible, "actual mouse click opens grid popup")
 	_check(popup.panel.position.y >= 32, "popup opens below top toolbar")
@@ -70,13 +84,14 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://validation"))
 	_check(image.save_png("user://validation/grid-settings-960.png") == OK,
 		"960-wide screenshot captured")
-	_check(image.get_pixel(500, 210).r < 0.3 and image.get_pixel(520, 210).g > 0.3,
-		"rendered popup is actually in front of the board")
+	_check(_changed_pixels(closed_frame, image, popup.panel.get_global_rect()) > 25,
+		"rendered popup changes framebuffer within its panel")
 	await _click(popup.done_button)
 	_check(not popup.visible, "Done responds to real mouse input")
 	root.size = Vector2i(800, 600)
 	root.content_scale_size = root.size
 	await _frames(7)
+	var compact_closed_frame: Image = root.get_texture().get_image()
 	_check(editor.canvas.size.x >= 234, "800-wide canvas retains T-007 compact layout")
 	await _click(button)
 	_check(popup.visible, "popup reopens from toolbar at 800-wide")
@@ -89,7 +104,7 @@ func _run() -> void:
 	var compact_image: Image = root.get_texture().get_image()
 	_check(compact_image.save_png("user://validation/grid-settings-800.png") == OK,
 		"800-wide screenshot captured")
-	_check(compact_image.get_pixel(500, 210).r < 0.3 and compact_image.get_pixel(520, 210).g > 0.3,
+	_check(_changed_pixels(compact_closed_frame, compact_image, popup.panel.get_global_rect()) > 25,
 		"popup actually renders at 800-wide")
 	var escape: InputEventKey = InputEventKey.new()
 	escape.keycode = KEY_ESCAPE

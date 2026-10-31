@@ -13,12 +13,10 @@ func _run_suite() -> void:
 	_test_ink()
 	_test_raster()
 	_test_multiple_raster_assets()
-	_test_tiles()
 	_test_invalid_envelopes()
 	_test_json_syntax()
 	_test_invalid_ink()
 	_test_invalid_raster()
-	_test_invalid_tiles()
 	_test_size_limits()
 	if failures == 0:
 		print("ATLAS_CLIPBOARD_PASSED (%d checks)" % checks)
@@ -77,20 +75,6 @@ func _raster_wire() -> Dictionary:
 	return parsed if parsed is Dictionary else {}
 
 
-func _grid() -> AtlasGrid:
-	var grid: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 17.125)
-	grid.origin = Vector2(-3.25, 7.875)
-	grid.rotation = 0.325
-	grid.distance_per_cell = 2.75
-	grid.distance_unit = "km"
-	grid.visible = false
-	return grid
-
-
-func _tiles_wire() -> Dictionary:
-	return JSON.parse_string(AtlasClipboard.encode_tiles(_grid(), {"-4,2": 3, "1,-3": 5}, Vector2i(-3, 2)))
-
-
 func _test_ink() -> void:
 	var strokes: Array[AtlasStroke] = _ink()
 	var before: Array[AtlasStroke] = AtlasStroke.clone_all(strokes)
@@ -102,8 +86,8 @@ func _test_ink() -> void:
 	_check(decoded != null, "ink decodes")
 	if decoded == null:
 		return
-	_check(decoded.kind == "INK" and decoded.strokes.size() == 2 and decoded.raster == null
-		and decoded.tiles.is_empty() and decoded.grid == null, "ink has typed isolated payload")
+	_check(decoded.kind == "INK" and decoded.strokes.size() == 2 and decoded.raster == null,
+		"ink has typed isolated payload")
 	for index: int in range(decoded.strokes.size()):
 		var source: AtlasStroke = before[1 - index]
 		var pasted: AtlasStroke = decoded.strokes[index]
@@ -135,8 +119,7 @@ func _test_raster() -> void:
 	if decoded == null:
 		return
 	var copy: AtlasRasterLayer = decoded.raster
-	_check(decoded.kind == "RASTER" and copy != null and decoded.strokes.is_empty()
-		and decoded.tiles.is_empty() and decoded.grid == null, "raster result has typed payload")
+	_check(decoded.kind == "RASTER" and copy != null and decoded.strokes.is_empty(), "raster result has typed payload")
 	_check(copy.visible and not copy.locked and copy.opacity == layer.opacity
 		and copy.pixels_per_unit == layer.pixels_per_unit and copy.display_name == layer.display_name,
 		"pasted raster is editable/visible and preserves opacity, scale, name")
@@ -196,30 +179,6 @@ func _test_multiple_raster_assets() -> void:
 	_reject(bad_asset, "one invalid embedded asset rejects the whole multi-asset payload")
 
 
-func _test_tiles() -> void:
-	var grid: AtlasGrid = _grid()
-	var cells: Dictionary = {"-4,2": 3, "1,-3": 5, "-3,2": 0}
-	var before: Dictionary = cells.duplicate(true)
-	var decoded: AtlasClipboardData = AtlasClipboard.decode(AtlasClipboard.encode_tiles(grid, cells, Vector2i(-3, 2)))
-	_check(decoded != null, "tiles roundtrip")
-	_check(cells == before and grid.same_as(_grid()), "tile encoding preserves source cells/grid")
-	if decoded == null:
-		return
-	_check(decoded.kind == "TILES" and decoded.tiles == {"-1,0": 3, "4,-5": 5, "0,0": 0},
-		"tile coordinates normalized around anchor, palette IDs preserved")
-	_check(decoded.tiles["-1,0"] is int, "decoded palettes are integers")
-	_check(decoded.grid != grid and decoded.grid.same_as(grid), "all explicit grid metadata preserved for compatibility")
-	_check(decoded.strokes.is_empty() and decoded.raster == null, "tile payload excludes other artwork")
-	decoded.tiles["-1,0"] = 1
-	decoded.grid.origin = Vector2.ZERO
-	_check(cells == before and grid.same_as(_grid()), "decoded cells and grid detached from source")
-	for kind: int in AtlasGrid.Kind.values():
-		var example: AtlasGrid = _grid()
-		example.kind = kind
-		var result: AtlasClipboardData = AtlasClipboard.decode(AtlasClipboard.encode_tiles(example, cells, Vector2i.ZERO))
-		_check(result != null and result.grid.same_as(example), "grid kind %d preserved" % kind)
-
-
 func _test_invalid_envelopes() -> void:
 	for text: String in ["", "plain user text", "{", "[]", "null", "true", "42", "\"hello\"", "{}"]:
 		_check(AtlasClipboard.decode(text) == null, "invalid/nonclipboard text rejected: " + text)
@@ -236,6 +195,9 @@ func _test_invalid_envelopes() -> void:
 	var extra: Dictionary = valid.duplicate(true)
 	extra["path"] = "res://external.webp"
 	_reject(extra, "unknown external reference field rejected")
+	var old_tiles: Dictionary = {"format": AtlasClipboard.FORMAT, "version": 1, "kind": "TILES",
+		"tiles": {"0,0": 3}, "grid": AtlasGrid.new().to_dict()}
+	_reject(old_tiles, "retired TILES clipboard kind is rejected")
 	var reordered: Dictionary = {"strokes": valid.strokes, "kind": "INK", "version": 1, "format": AtlasClipboard.FORMAT}
 	_check(AtlasClipboard.decode(JSON.stringify(reordered, "", false, true)) != null,
 		"top marker recognition independent of JSON key ordering")
@@ -280,14 +242,15 @@ func _test_json_syntax() -> void:
 		_check(AtlasClipboard.decode(valid.replace("13.125", bad)) == null, "invalid/nonfinite numeric token rejected: " + bad)
 	for good: String in ["1", "1.0", "1e0", "1E+0", "1.125e-3"]:
 		_check(AtlasClipboard.decode(valid.replace("13.125", good)) != null, "standard JSON number accepted: " + good)
-	var tiles: String = JSON.stringify(_tiles_wire())
+	var raster_text: String = JSON.stringify(_raster_wire())
+	var name_token: String = JSON.stringify("Detached image α")
 	for escaped: String in ["\\\"", "\\\\", "\\/", "\\b", "\\f", "\\n", "\\r", "\\t", "\\u03b1", "\\ud83d\\uddfa"]:
-		var text: String = tiles.replace('"km"', '"unit' + escaped + '"')
+		var text: String = raster_text.replace(name_token, '"unit' + escaped + '"')
 		_check(AtlasClipboard.decode(text) != null, "valid JSON string escape accepted: " + escaped)
 	for escaped: String in ["\\q", "\\x41", "\\u123", "\\uZZZZ", "\\u+123", "\\u-123", "\\ud800", "\\udc00", "\\ud800\\u0061", "\\u0000", "\n", "\t", String.chr(1)]:
-		var text: String = tiles.replace('"km"', '"unit' + escaped + '"')
+		var text: String = raster_text.replace(name_token, '"unit' + escaped + '"')
 		_check(AtlasClipboard.decode(text) == null, "malformed string/control/surrogate rejected")
-	var punctuation: String = tiles.replace('"km"', JSON.stringify('Escaped "quote", \\slash },] and emoji 🗺'))
+	var punctuation: String = raster_text.replace(name_token, JSON.stringify('Escaped "quote", \\slash },] and emoji 🗺'))
 	_check(AtlasClipboard.decode(punctuation) != null, "punctuation inside strings does not affect syntax precheck")
 	_check(AtlasClipboard.decode(valid.replace('"points":[[', '"points":[,[')) == null,
 		"leading array comma rejected")
@@ -411,63 +374,10 @@ func _test_invalid_raster() -> void:
 		"decode also normalizes pasted visibility and locking")
 
 
-func _test_invalid_tiles() -> void:
-	_check(AtlasClipboard.encode_tiles(null, {"0,0": 1}, Vector2i.ZERO).is_empty(), "null grid rejected")
-	_check(AtlasClipboard.encode_tiles(_grid(), {}, Vector2i.ZERO).is_empty(), "empty tile selection rejected")
-	var invalid: Array[Dictionary] = [
-		{Vector2i.ZERO: 1}, {"01,0": 1}, {"-0,0": 1}, {"+1,0": 1}, {"1, 0": 1},
-		{"1": 1}, {"1,2,3": 1}, {"2147483648,0": 1}, {"-2147483649,0": 1},
-		{"999999999999999999999999999999,0": 1}, {"0,0": -1}, {"0,0": 1.5},
-		{"0,0": true}, {"0,0": "1"}, {"0,0": null}, {"0,0": []}, {"0,0": {}}, {"0,0": 2147483648}
-	]
-	var valid: Dictionary = _tiles_wire()
-	for cells: Dictionary in invalid:
-		_check(AtlasClipboard.encode_tiles(_grid(), cells, Vector2i.ZERO).is_empty(), "invalid source tile key/palette rejected")
-		if cells.keys()[0] is String:
-			var data: Dictionary = valid.duplicate(true)
-			data["tiles"] = cells
-			_reject(data, "invalid decoded tile key/palette rejected")
-	_check(AtlasClipboard.encode_tiles(_grid(), {"2147483647,0": 1}, Vector2i(-1, 0)).is_empty(),
-		"relative tile coordinate overflow rejected before Vector2i conversion")
-	for key: String in ["tiles", "grid"]:
-		for bad: Variant in [null, true, 7, "bad", [], {}]:
-			var data: Dictionary = valid.duplicate(true)
-			data[key] = bad
-			_reject(data, "wrong tile envelope type " + key)
-	for key: String in AtlasClipboard.GRID_KEYS:
-		var missing: Dictionary = valid.duplicate(true)
-		missing.grid.erase(key)
-		_reject(missing, "grid metadata must be explicit: " + key)
-		for bad: Variant in [null, [], {}]:
-			var data: Dictionary = valid.duplicate(true)
-			data.grid[key] = bad
-			_reject(data, "wrong grid metadata type " + key)
-	for patch: Dictionary in [
-		{"kind": 99}, {"kind": true}, {"kind": 1.5}, {"cell_size": 0}, {"cell_size": -1},
-		{"origin": [1e100, 0]}, {"origin": [0, "0"]}, {"distance_per_cell": 0},
-		{"distance_unit": " "}, {"visible": 1}, {"rotation": "0"}, {"path": "../grid"}
-	]:
-		var data: Dictionary = valid.duplicate(true)
-		data.grid.merge(patch, true)
-		_reject(data, "invalid grid primitive/range/extra reference rejected")
-	for bad: float in [INF, -INF, NAN]:
-		var grid: AtlasGrid = _grid()
-		grid.rotation = bad
-		_check(AtlasClipboard.encode_tiles(grid, {"0,0": 1}, Vector2i.ZERO).is_empty(), "nonfinite source grid rejected")
-
-
 func _test_size_limits() -> void:
 	_check(AtlasClipboard.MAX_TEXT_BYTES == 16 * 1024 * 1024, "clipboard text limit is 16 MiB")
 	_check(AtlasClipboard.decode(" ".repeat(AtlasClipboard.MAX_TEXT_BYTES + 1)) == null, "oversized ASCII payload rejected")
 	_check(AtlasClipboard.decode("α".repeat(AtlasClipboard.MAX_TEXT_BYTES / 2 + 1)) == null, "limit counts UTF-8 bytes")
-	var boundary: Dictionary = _tiles_wire()
-	boundary.grid["distance_unit"] = ""
-	var overhead: int = JSON.stringify(boundary).to_utf8_buffer().size()
-	boundary.grid["distance_unit"] = "x".repeat(AtlasClipboard.MAX_TEXT_BYTES - overhead)
-	var exact: String = JSON.stringify(boundary)
-	_check(exact.to_utf8_buffer().size() == AtlasClipboard.MAX_TEXT_BYTES, "exact text boundary fixture")
-	_check(AtlasClipboard.decode(exact) != null, "exactly 16 MiB valid payload accepted")
-	_check(AtlasClipboard.decode(exact + " ") == null, "valid JSON one byte above limit rejected")
 	var source: AtlasRasterLayer = _raster()
 	var valid: Dictionary = _raster_wire()
 	if valid.is_empty():
@@ -488,6 +398,6 @@ func _test_size_limits() -> void:
 	_reject(valid, "257 chunks rejected before decoding")
 	source.chunks["256,-1"] = AtlasRasterChunk.new(Vector2i(256, -1), _pixels())
 	_check(AtlasClipboard.encode_raster(source, Vector2.ZERO).is_empty(), "encoder rejects 257 chunks")
-	var large: AtlasGrid = _grid()
-	large.distance_unit = "α".repeat(AtlasClipboard.MAX_TEXT_BYTES / 2)
-	_check(AtlasClipboard.encode_tiles(large, {"0,0": 1}, Vector2i.ZERO).is_empty(), "encoder bounds serialized UTF-8 size")
+	var oversized: AtlasRasterLayer = _raster()
+	oversized.display_name = "α".repeat(AtlasClipboard.MAX_TEXT_BYTES / 2)
+	_check(AtlasClipboard.encode_raster(oversized, Vector2.ZERO).is_empty(), "raster encoder bounds serialized UTF-8 size")

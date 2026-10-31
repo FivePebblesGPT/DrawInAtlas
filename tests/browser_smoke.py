@@ -65,7 +65,6 @@ def floor_content(floor: dict[str, Any]) -> dict[str, Any]:
     """Read legacy test expectations through the authoritative typed layers."""
     return {
         "strokes": next((layer["strokes"] for layer in floor["layers"] if layer["kind"] == "INK"), []),
-        "terrain": next((layer["terrain"] for layer in floor["layers"] if layer["kind"] == "TILES"), {}),
     }
 
 
@@ -117,7 +116,7 @@ def check_board_creation(page: Page, output: Path, source: dict[str, Any]) -> di
     assert board["grid"]["kind"] == 2 and board["grid"]["cell_size"] == 96.0
     assert board["grid"]["distance_per_cell"] == 3.0 and board["grid"]["distance_unit"] == "mi"
     assert board["grid"]["origin"] == [12.5, -20.25]
-    assert floor_content(board["floors"][0]) == {"terrain": {}, "strokes": []}
+    assert floor_content(board["floors"][0]) == {"strokes": []}
     assert created["campaign"]["links"] == source["campaign"]["links"]
     for item in documents:
         if item["id"] in original_maps:
@@ -317,7 +316,6 @@ def main() -> None:
         erased: dict[str, Any] = save_snapshot(page)
         erased_ink: list[dict[str, Any]] = world_floor(erased)["strokes"]
         assert len(erased_ink) == 2 and erased_ink != original_ink
-        assert world_floor(erased)["terrain"] == world_floor(drawn)["terrain"]
         page.screenshot(path=str(output / "erased.png"))
         page.keyboard.press("Control+z")
         assert world_floor(save_snapshot(page))["strokes"] == original_ink

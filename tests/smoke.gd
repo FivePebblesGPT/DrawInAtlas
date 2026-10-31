@@ -93,7 +93,7 @@ func _test_campaign_roundtrip() -> void:
 	var world: AtlasMapDocument = restored.get_map("world")
 	var anchor: Vector2 = world.grid.cell_to_document(Vector2i(2, 0))
 	_check(restored.find_links_at("world", anchor).size() == 1, "city link index works")
-	_check(world.floors[0].get_terrain(Vector2i.ZERO) > 0, "tile paint survives JSON")
+	_check(world.floors[0].layers[0] is AtlasRasterLayer and world.floors[0].ink_layer() != null, "raster and semantic ink survive JSON")
 	_check(AtlasCampaign.from_dict({"schema_version": 999}) == null, "version mismatch fails")
 	var city: AtlasMapDocument = restored.get_map("greyhaven")
 	city.grid.distance_per_cell = 7.5
@@ -176,7 +176,7 @@ func _test_editor_workflow() -> void:
 	_check(city_units == "ft", "sample maps start with independent native units")
 
 	var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
-	var parent_before: String = JSON.stringify(city.floors[0].terrain)
+	var parent_before: Dictionary = city.to_dict().duplicate(true)
 	# Import a historical battlemap graph via the low-level command; the UI no
 	# longer offers creation, but old saves must remain navigable and editable.
 	var legacy_child: AtlasMapDocument = AtlasMapDocument.new("legacy-encounter", "Saved encounter")
@@ -206,15 +206,11 @@ func _test_editor_workflow() -> void:
 	_check(is_equal_approx(rad_to_deg(editor.campaign.placements[0].rotation), 37.0),
 		"legacy rotation retained")
 
-	editor._on_tool_changed(AtlasCanvas.Tool.PAINT)
-	editor._on_select(Vector2i(0, 0))
-	editor.locked_to_cell = true
-	editor._on_paint(Vector2i(1, 0))
-	_check(canvas.floor.get_terrain(Vector2i(1, 0)) == 0, "cell lock blocks neighbor edit")
-	editor._on_paint(Vector2i(0, 0))
-	_check(canvas.floor.get_terrain(Vector2i(0, 0)) == editor.palette_id, "cell lock permits selected cell")
-	_check(JSON.stringify(city.floors[0].terrain) == parent_before,
-		"painting child does not change parent")
+	# Child edits do not create palette-cell terrain or modify parent artwork.
+	editor.select_layer("ink")
+	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(2, 3)])), false)
+	_check(canvas.floor.strokes.size() == 1, "child ink remains independently editable")
+	_check(city.to_dict() == parent_before, "painting child does not change parent")
 
 	canvas.camera_zoom = 0.5
 	pointer = canvas.size * 0.5
@@ -247,7 +243,6 @@ func _test_drawing_input() -> void:
 		await process_frame
 	var canvas: AtlasCanvas = editor.canvas
 	canvas.map.grid.kind = AtlasGrid.Kind.GRIDLESS
-	canvas.floor.terrain.clear()
 	canvas.camera_center = Vector2(-100.25, 50.125)
 	canvas.camera_zoom = 2.0
 	editor.edits.reset(editor.campaign, true)
@@ -291,7 +286,7 @@ func _test_drawing_input() -> void:
 		return
 	_check(canvas.floor.strokes[0].points[0].is_equal_approx(expected_start),
 		"input is transformed into continuous negative document coordinates")
-	_check(canvas.floor.terrain.is_empty(), "gridless drawing never fabricates a terrain cell")
+	_check(canvas.floor.layers[0] is AtlasRasterLayer, "gridless drawing retains independent raster support")
 	var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
 	_check(editor.edits.is_dirty(), "drawing marks unsaved work")
 	_check(not edit_menu.is_item_disabled(0) and edit_menu.is_item_disabled(1),
@@ -428,7 +423,7 @@ func _test_board_workflow() -> void:
 	_check(editor.campaign.maps.size() == 3 and editor.canvas.map.display_name == "Exploration",
 		"dialog creates and opens a named independent board")
 	_check(editor.canvas.map.grid.same_as(grid) and editor.canvas.floor.strokes.is_empty()
-		and editor.canvas.floor.terrain.is_empty(), "new board keeps chosen grid/units without copying artwork")
+		and (editor.canvas.floor.layers[0] as AtlasRasterLayer).chunks.is_empty(), "new board keeps chosen grid/units without copying artwork")
 	_check(editor.campaign.links.size() == 1 and editor.campaign.placements.is_empty(),
 		"blank board creation does not invent links or placements")
 	editor._on_undo()

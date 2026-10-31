@@ -5,7 +5,7 @@ extends RefCounted
 ## Disabled = unrestricted edits; enabled with an empty polygon = deny all.
 var enabled: bool = false
 ## Board-space convex cell footprint copied from the active edit-mask grid.
-## This is transient eligibility geometry, not the editable terrain shape.
+## This transient eligibility geometry is independent of artwork content.
 var polygon: PackedVector2Array = PackedVector2Array()
 
 

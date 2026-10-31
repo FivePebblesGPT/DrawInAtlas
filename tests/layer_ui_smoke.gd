@@ -51,7 +51,7 @@ func _run() -> void:
 	_check_wrapped_labels(scene)
 
 	var floor: AtlasFloor = editor.canvas.floor
-	var basis: PackedVector2Array = editor.canvas.map.get_terrain_grid().cell_polygon(Vector2i.ZERO)
+	var basis: PackedVector2Array = editor.canvas.map.grid.cell_polygon(Vector2i.ZERO)
 	var overlay: AtlasGrid = editor.canvas.map.grid.copy()
 	overlay.cell_size = 90.0
 	overlay.rotation = deg_to_rad(37)
@@ -59,8 +59,8 @@ func _run() -> void:
 	editor.layer_panel._add_ink()
 	var id: String = editor.canvas.active_layer_id
 	_check(id != "ink" and floor.layer_by_id(id) is AtlasInkLayer, "new ink becomes the explicit edit target")
-	_check(editor.canvas.map.get_terrain_grid().cell_polygon(Vector2i.ZERO) == basis,
-		"adding a layer after an overlay change never rebases existing terrain")
+	_check(editor.canvas.map.grid.cell_polygon(Vector2i.ZERO) != basis,
+		"editing the overlay changes only grid polygons")
 	var stroke: AtlasStroke = AtlasStroke.new(PackedVector2Array([Vector2(-3.125, 0.25), Vector2(30.5, 10.75)]))
 	editor._on_stroke(stroke, false)
 	_check((floor.layer_by_id(id) as AtlasInkLayer).strokes.size() == 1 and floor.strokes.is_empty(),
@@ -104,10 +104,11 @@ func _run() -> void:
 	var raster_id: String = editor.canvas.active_layer_id
 	var raster: AtlasRasterLayer = floor.layer_by_id(raster_id) as AtlasRasterLayer
 	_check(raster != null and raster.chunks.size() == 1, "import creates a typed chunked raster layer")
-	editor.select_layer("terrain")
+	editor.select_layer("ink")
 	command = editor.edits.get_undo_command()
-	editor._on_stroke(stroke, false)
-	_check(editor.edits.get_undo_command() == command, "pen cannot treat terrain cells as ink")
+	_check(editor.canvas.floor.layer_by_id(editor.canvas.active_layer_id) is AtlasInkLayer,
+		"selecting semantic ink is explicit even with raster active")
+	_check(editor.edits.get_undo_command() == command, "layer selection is not an edit command")
 	editor._on_save()
 	var checkpoint: Dictionary = editor.campaign.to_dict()
 	_check(not editor.edits.is_dirty(), "validated save clears dirty state")

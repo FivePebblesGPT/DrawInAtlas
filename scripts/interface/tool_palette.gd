@@ -8,7 +8,7 @@ const CATEGORIES: Array[Dictionary] = [
 	{"title": "DRAW & ERASE", "tools": [
 		{"id": AtlasCanvas.Tool.PEN, "name": "Brush", "key": "B", "icon": "pen", "hint": "Drag or tap to paint on the active ink or raster layer; width and opacity in the inspector"},
 		{"id": AtlasCanvas.Tool.ERASER, "name": "Eraser", "key": "E", "icon": "eraser", "hint": "Cut ink segments or clear raster pixels on the active layer; width in inspector"},
-		{"id": AtlasCanvas.Tool.FILL, "name": "Fill", "key": "F", "icon": "fill", "hint": "Raster: preview contiguous/global RGBA fill with tolerance; terrain: contiguous palette cells. Release to apply; Esc cancels"},
+		{"id": AtlasCanvas.Tool.FILL, "name": "Fill", "key": "F", "icon": "fill", "hint": "Preview contiguous/global RGBA fill on raster with tolerance. Release to apply; Esc cancels"},
 	]},
 	{"title": "SHAPES", "tools": [
 		{"id": AtlasCanvas.Tool.TEXT, "name": "Text", "key": "T", "icon": "text", "hint": "Click to place persistent editable text; click existing text to edit; font and style in the editor"},
@@ -22,9 +22,6 @@ const CATEGORIES: Array[Dictionary] = [
 		{"id": AtlasCanvas.Tool.ART_SELECT, "name": "Select artwork", "key": "V", "icon": "select", "hint": "Active-layer objects: drag/select, Ctrl+drag add, Alt+drag subtract; Ctrl+D deselect"},
 		{"id": AtlasCanvas.Tool.MOVE, "name": "Move artwork", "key": "M", "icon": "move", "hint": "Pick an object or drag the existing active-layer selection; grid snapping optional; Escape cancels"},
 		{"id": AtlasCanvas.Tool.SELECT, "name": "Select grid cell", "key": "", "icon": "cell", "hint": "Choose the cell used by the edit-scope mask"},
-	]},
-	{"title": "TERRAIN", "tools": [
-		{"id": AtlasCanvas.Tool.PAINT, "name": "Paint cells", "key": "", "icon": "paint", "hint": "Paint terrain in selected grid cells"},
 	]},
 ]
 

@@ -20,11 +20,12 @@ func _check(condition: bool, label: String) -> void:
 func _floor(id: String) -> AtlasFloor:
 	var floor: AtlasFloor = AtlasFloor.new()
 	floor.id = id
-	floor.terrain["-2,3"] = 4
 	floor.strokes.append(AtlasStroke.new(PackedVector2Array([Vector2(-3, 4), Vector2(7, 9)]), Color.BLUE, 2.5))
 	var image: Image = Image.create_empty(2, 3, false, Image.FORMAT_RGBA8)
 	image.fill(Color.RED)
-	floor.layers.append(AtlasRasterLayer.from_image(image, 2.5))
+	var image_layer: AtlasRasterLayer = AtlasRasterLayer.from_image(image, 2.5)
+	image_layer.id = "image"
+	floor.layers.append(image_layer)
 	return floor
 
 func _copy(floors: Array[AtlasFloor]) -> Array[AtlasFloor]:
@@ -43,10 +44,7 @@ func _campaign() -> AtlasCampaign:
 	var map: AtlasMapDocument = AtlasMapDocument.new("m", "Map")
 	map.tags = ["City"]
 	map.grid.distance_unit = "ft"
-	map.terrain_grid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 23.0)
-	map.terrain_grid.distance_unit = "km"
 	map.floors = [_floor("ground"), _floor("upper")]
-	map.floors[1].terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 17.0)
 	campaign.add_map(map)
 	campaign.add_map(AtlasMapDocument.new("other", "Other"))
 	return campaign
@@ -57,7 +55,6 @@ func _floors() -> void:
 	var history: AtlasEditHistory = AtlasEditHistory.new(campaign)
 	history.active_map_id = "m"
 	var board: AtlasGrid = map.grid
-	var legacy: AtlasGrid = map.terrain_grid
 	var original_art: Array[AtlasLayer] = AtlasLayerCodec.clone_all(map.floors[1].layers)
 	for operation: String in ["create", "name", "reorder", "default", "delete"]:
 		var saved: Dictionary = campaign.to_dict()
@@ -75,10 +72,7 @@ func _floors() -> void:
 		for source: AtlasFloor in before + after:
 			source.display_name = "Caller mutation"
 			source.strokes[0].points[0] = Vector2(999, 999)
-			source.terrain["-2,3"] = 99
-			if source.terrain_layer().grid != null:
-				source.terrain_layer().grid.cell_size = 888.0
-			(source.layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.BLUE)
+			(source.layer_by_id("image") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.BLUE)
 		history.mark_saved()
 		_check(history.execute(command) and history.is_dirty() and map.default_floor_id == next_default, operation + " executes")
 		for index: int in range(expected.size()):
@@ -86,10 +80,8 @@ func _floors() -> void:
 		var applied: Dictionary = campaign.to_dict()
 		_check(history.undo() and not history.is_dirty() and campaign.to_dict() == saved, operation + " undo")
 		_check(history.redo() and history.is_dirty() and campaign.to_dict() == applied, operation + " redo")
-		_check(map.grid == board and map.terrain_grid == legacy and map.tags == ["City"] and campaign.links.is_empty(), operation + " preserves map fields")
-		_check(AtlasLayerCodec.same_layers(map.floor_by_id("upper").layers, original_art), operation + " preserves artwork/grid/scale")
-		if map.floor_by_id("ground") != null:
-			_check(map.floor_by_id("ground").terrain_layer().grid == null and map.get_terrain_grid("ground") == legacy, "null grid uses legacy, never another floor")
+		_check(map.grid == board and map.tags == ["City"] and campaign.links.is_empty(), operation + " preserves map fields")
+		_check(AtlasLayerCodec.same_layers(map.floor_by_id("upper").layers, original_art), operation + " preserves artwork and raster scale")
 	_check(not history.execute(AtlasFloorEdit.new("m", map.floors, map.floors, "upper", "upper")), "floor no-op")
 
 func _guards() -> void:
@@ -125,9 +117,9 @@ func _guards() -> void:
 			"id": after[0].id = ""
 			"default": next_default = "missing"
 			"layer": after[0].layers.append(after[0].layers[0])
-			"content": after[0].terrain["0,0"] = 7
-			"grid": after[0].terrain_layer().grid = AtlasGrid.new()
-			"pixels": (after[0].layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.GREEN)
+			"content": after[0].strokes.append(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2.ONE])))
+			"grid": after[0].layers[0].opacity = -1.0
+			"pixels": (after[0].layer_by_id("image") as AtlasRasterLayer).chunks["0,0"].image.fill(Color.GREEN)
 		_check(not AtlasFloorEdit.new("m", map.floors, after, "ground", next_default).apply(campaign) and campaign.to_dict() == saved, invalid + " atomic rejection")
 	map.default_floor_id = "upper"
 	_check(not remove.apply(campaign), "stale default rejected")
@@ -147,7 +139,7 @@ func _guards() -> void:
 	map.floors[1].layers[0].locked = true
 	_check(not create.revert(campaign), "undo creation protects newly locked floor")
 	map.floors[1].layers[0].locked = false
-	var pixels: Image = (map.floors[1].layer_by_id("raster") as AtlasRasterLayer).chunks["0,0"].image
+	var pixels: Image = (map.floors[1].layer_by_id("image") as AtlasRasterLayer).chunks["0,0"].image
 	pixels.fill(Color.BLUE)
 	_check(not create.revert(campaign), "undo creation rejects stale pixels")
 	pixels.fill(Color.RED)
@@ -171,13 +163,13 @@ func _metadata() -> void:
 	_check(campaign.to_dict() == expected, "metadata mutates only name/tags")
 	_check(history.undo() and not history.is_dirty() and campaign.to_dict() == saved and history.redo(), "metadata history undo/redo")
 	var loaded: AtlasCampaign = AtlasCampaign.from_dict(campaign.to_dict())
-	_check(AtlasCampaign.SCHEMA_VERSION == 6 and loaded != null and loaded.to_dict() == campaign.to_dict(), "v6 tags roundtrip")
+	_check(AtlasCampaign.SCHEMA_VERSION == 7 and loaded != null and loaded.to_dict() == campaign.to_dict(), "v7 tags roundtrip")
 	for version: int in [1, 2, 3, 4, 5]:
 		var legacy: Dictionary = saved.duplicate(true)
 		legacy.schema_version = version
 		legacy.maps[0].erase("tags")
 		loaded = AtlasCampaign.from_dict(legacy)
-		_check(loaded != null and loaded.get_map("m").tags.is_empty(), "legacy v%d tags default empty" % version)
+		_check(loaded == null, "legacy v%d campaign requires explicit replacement" % version)
 	var too_many: Array[String] = []
 	for index: int in range(129): too_many.append(str(index))
 	var boundary: Array[String] = too_many.duplicate()
@@ -228,7 +220,7 @@ func _viewer() -> void:
 	_check(session.resolve(campaign, "m", "ground", Vector2(4, 5), 3.0).zoom == 3.0, "prune deleted floor state")
 	map.floors[0].layers.remove_at(1)
 	session.remember(AtlasViewState.new("m", "upper", Vector2.ZERO, 1.0, "gone"))
-	_check(session.resolve(campaign, "m").layer_id == "raster", "missing ink selects last valid layer")
+	_check(session.resolve(campaign, "m").layer_id == "image", "missing ink selects last valid layer")
 	campaign.maps.erase("m")
 	session.prune(campaign)
 	campaign.add_map(AtlasMapDocument.new("m", "Replacement"))

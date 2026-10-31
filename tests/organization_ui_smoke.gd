@@ -37,7 +37,7 @@ func _run() -> void:
 	var upper_id: String = canvas.floor.id
 	_check(world.default_floor_id == "ground" and upper_id != "ground" and world.floors.size() == 2,
 		"adding/activating floor does not change document default")
-	_check(canvas.floor.strokes.is_empty() and canvas.floor.terrain.is_empty(), "new floor copies no artwork")
+	_check(canvas.floor.strokes.is_empty() and (canvas.floor.layers[0] as AtlasRasterLayer).chunks.is_empty(), "new floor copies no artwork")
 	_check(canvas.camera_center == Vector2(-20.5, 14.25) and canvas.camera_zoom == 1.7,
 		"first visit inherits camera for aligned floors")
 	canvas.camera_center = Vector2(140, -75)
@@ -65,9 +65,8 @@ func _run() -> void:
 	_check(editor.move_floor(-1) and world.floors[0].id == upper_id and canvas.floor.id == upper_id,
 		"floor reorder keeps the viewer on the same stable identity")
 	_check(editor.make_floor_default() and world.default_floor_id == upper_id, "default floor changes only on explicit action")
-	_check(world.get_terrain_grid("ground").kind == AtlasGrid.Kind.HEX_POINTY
-		and world.get_terrain_grid("ground").cell_size == 45.0
-		and world.get_terrain_grid(upper_id).cell_size == 80.0, "default/reorder never rebase legacy terrain geometry")
+	_check(world.grid.kind == AtlasGrid.Kind.SQUARE and world.grid.cell_size == 80.0,
+		"default/reorder retain independent board overlay")
 	_check(world.grid.cell_size == 80.0 and world.grid.distance_unit == "mi" and world.grid.distance_per_cell == 3.0,
 		"floor controls never change board grid or exploration scale")
 	_check(editor.open_map("greyhaven") and editor.create_floor("Roof"), "another board has its own floor set")

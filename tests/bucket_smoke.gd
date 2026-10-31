@@ -1,5 +1,5 @@
 extends SceneTree
-## T-023: raster/terrain Bucket boundaries, tolerance, atomic previews and native persistence.
+## T-023: raster Bucket boundaries, tolerance, atomic previews and native persistence.
 
 var checks: int = 0
 var failures: int = 0
@@ -166,37 +166,17 @@ func _editor_preview() -> void:
 	_check(saved != null and _pixel(saved, Vector2i(0, 0)) == canvas.brush_color,
 		"native save roundtrips filled RGBA bytes")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot))
-	# Terrain always uses palette adjacency, independently of raster tolerance.
-	editor.select_layer(canvas.floor.terrain_layer().id)
-	# Keep F selected: the inspector must update when the selected layer changes.
-	_check(canvas.tool == AtlasCanvas.Tool.FILL
-		and editor.inspector._bucket_section.visible and not editor.inspector.fill_global_checkbox.visible
-		and editor.inspector._terrain_section.visible,
-		"switching layers while Bucket stays active refreshes terrain-only controls")
-	var terrain: AtlasTerrainLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTerrainLayer
-	var terrain_before: Dictionary = terrain.terrain.duplicate(true)
-	var grid: AtlasGrid = terrain.grid if terrain.grid != null else canvas.map.grid
-	var point: Vector2 = grid.cell_to_document(Vector2i.ZERO)
-	editor.artwork.preview_fill(point)
+	# No implicit fallback to a palette-cell layer when an incompatible target is chosen.
+	editor.select_layer(canvas.floor.ink_layer().id)
+	_check(canvas.tool == AtlasCanvas.Tool.FILL and editor.inspector._bucket_section.visible
+		and editor.inspector.fill_global_checkbox.visible,
+		"Bucket inspector remains raster-only when selecting semantic ink")
+	var ink_before: Dictionary = canvas.floor.ink_layer().to_dict()
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
 	_check(editor.artwork._pending_fill != null and not editor.artwork._pending_fill.ok
-		and terrain.terrain == terrain_before,
-		"unbounded terrain background rejects without mutation")
+		and canvas.floor.ink_layer().to_dict() == ink_before,
+		"fill refuses ink without changing source")
 	editor.artwork.cancel_preview_fill()
-	# A finite cell edit scope makes the same empty-area fill safe.
-	canvas.has_selected_cell = true
-	canvas.selected_cell = Vector2i.ZERO
-	editor._on_scope_toggled(true)
-	editor.palette_id = 3
-	editor.artwork.preview_fill(point)
-	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok
-		and canvas._preview_layer is AtlasTerrainLayer and terrain.terrain == terrain_before,
-		"bounded terrain fill produces detached preview")
-	editor.artwork.commit_preview_fill()
-	_check((canvas.floor.layer_by_id(terrain.id) as AtlasTerrainLayer).terrain.get("0,0") == 3,
-		"bounded terrain fill commits one cell with correct palette")
-	editor._on_undo()
-	_check((canvas.floor.layer_by_id(terrain.id) as AtlasTerrainLayer).terrain == terrain_before,
-		"terrain preview commit is atomically undoable")
 	root.remove_child(scene)
 	scene.free()
 

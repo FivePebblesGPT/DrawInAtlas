@@ -17,7 +17,6 @@ signal fill_global_changed(enabled: bool)
 signal grid_snapping_toggled(enabled: bool)
 signal polygon_fill_toggled(enabled: bool)
 signal wall_restyle_requested
-signal palette_selected(index: int)
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
 signal reference_opacity_changed(value: float)
@@ -55,7 +54,6 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var _line_hint: Label = %LineHint
 @onready var _polygon_hint: Label = %PolygonHint
 @onready var polygon_fill_checkbox: CheckBox = %PolygonFill
-@onready var _terrain_section: VBoxContainer = %TerrainSection
 @onready var _selection_section: VBoxContainer = %SelectionSection
 @onready var _transform_button: Button = %TransformButton
 @onready var _floor_add: Button = %FloorAdd
@@ -64,7 +62,6 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var _floor_down: Button = %FloorDown
 @onready var _floor_remove: Button = %FloorRemove
 @onready var _floor_default: Button = %FloorDefault
-@onready var _palette_picker: OptionButton = %PalettePicker
 @onready var _navigation_toggle: CheckBox = %NavigationToggle
 @onready var reference_source_picker: OptionButton = %ReferenceSourcePicker
 @onready var reference_floor_picker: OptionButton = %ReferenceFloorPicker
@@ -114,7 +111,6 @@ func _ready() -> void:
 	# SpinBox has an inner LineEdit; both it and the arrows receive wheel input separately.
 	brush_width_spinner.gui_input.connect(_on_brush_width_wheel)
 	brush_width_spinner.get_line_edit().gui_input.connect(_on_brush_width_wheel)
-	_palette_picker.item_selected.connect(palette_selected.emit)
 	preview_picker.item_selected.connect(preview_changed.emit)
 	reference_checkbox.toggled.connect(reference_toggled.emit)
 	opacity_slider.value_changed.connect(reference_opacity_changed.emit)
@@ -150,21 +146,19 @@ func refresh_floors(map: AtlasMapDocument, floor: AtlasFloor) -> void:
 	_floor_default.disabled = floor.id == map.default_floor_id
 
 
-func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: bool = false) -> void:
+func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	_current_tool = tool
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT] or (tool == AtlasCanvas.Tool.FILL and not terrain_active)
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT] or tool == AtlasCanvas.Tool.FILL
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
 	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "TEXT COLOR" if tool == AtlasCanvas.Tool.TEXT else "BRUSH & STROKE")
 	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
-	_bucket_hint.text = ("Terrain: contiguous equal-palette cells on the active terrain grid. No tolerance; empty regions need a cell edit mask. Press/release fills; Esc cancels."
-		if tool == AtlasCanvas.Tool.FILL and terrain_active else
-		"Raster: active layer's stored pixels only. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode.")
-	_bucket_tolerance_label.visible = not terrain_active
-	fill_tolerance_spinner.visible = not terrain_active
-	fill_global_checkbox.visible = not terrain_active
+	_bucket_hint.text = "Raster: active layer's stored pixels only. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode."
+	_bucket_tolerance_label.visible = true
+	fill_tolerance_spinner.visible = true
+	fill_global_checkbox.visible = true
 	_eraser_hint.visible = erasing
 	_line_hint.visible = tool == AtlasCanvas.Tool.LINE
 	_wall_controls.visible = tool == AtlasCanvas.Tool.WALL_PATH
@@ -176,7 +170,6 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool, terrain_active: 
 	brush_width_spinner.editable = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
 	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
 	brush_width_spinner.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
-	_terrain_section.visible = tool == AtlasCanvas.Tool.PAINT or (tool == AtlasCanvas.Tool.FILL and terrain_active)
 	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
 		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]

@@ -50,7 +50,7 @@ func _run_suite() -> void:
 	canvas.show_grid = false
 	await process_frame
 	await RenderingServer.frame_post_draw
-	var terrain_before: Image = root.get_texture().get_image()
+	var artwork_before: Image = root.get_texture().get_image()
 	var overlay: AtlasGrid = canvas.map.grid.copy()
 	overlay.kind = AtlasGrid.Kind.SQUARE
 	overlay.cell_size = 80.0
@@ -59,14 +59,14 @@ func _run_suite() -> void:
 	editor.apply_grid(overlay)
 	await process_frame
 	await RenderingServer.frame_post_draw
-	var terrain_after: Image = root.get_texture().get_image()
-	var terrain_moved: int = 0
+	var artwork_after: Image = root.get_texture().get_image()
+	var artwork_moved: int = 0
 	for y: int in range(int(bounds.position.y), int(bounds.end.y), 4):
 		for x: int in range(int(bounds.position.x), int(bounds.end.x), 4):
-			if not terrain_before.get_pixel(x, y).is_equal_approx(terrain_after.get_pixel(x, y)):
-				terrain_moved += 1
-	passed = passed and terrain_moved == 0
-	passed = passed and terrain_after.save_png(directory.path_join("independent-grid.png")) == OK
+			if not artwork_before.get_pixel(x, y).is_equal_approx(artwork_after.get_pixel(x, y)):
+				artwork_moved += 1
+	passed = passed and artwork_moved == 0
+	passed = passed and artwork_after.save_png(directory.path_join("independent-grid.png")) == OK
 	editor._on_undo()
 	var blank_grid: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.GRIDLESS, 64.0)
 	blank_grid.distance_per_cell = 1.0
@@ -76,7 +76,6 @@ func _run_suite() -> void:
 	canvas.camera_zoom = 1.0
 	canvas.preview = AtlasCanvas.Preview.OFF
 	canvas.show_reference = false
-	canvas.floor.terrain.clear()
 	var ink: Color = Color("#f5b545")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([
 		Vector2(-140, 0), Vector2(140, 0)
@@ -224,7 +223,7 @@ func _run_suite() -> void:
 	])
 	print("ATLAS_INK_PIXELS gap=%s surviving_ink=%s undo=%s" % [real_gap, surviving_ink, restored_ink])
 	print("ATLAS_COMPACT_LAYOUT %s" % compact_layout)
-	print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [terrain_moved, compact_dialog])
+	print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [artwork_moved, compact_dialog])
 	print("ATLAS_LAYER_PIXELS grouped_alpha=%s raster_top=%s order=%s hidden=%s raster_alpha=%s" % [
 		group_opacity, raster_on_top, layer_order, hidden_raster, raster_opacity])
 	print("ATLAS_TOOL_PIXELS move=%s scale=%s asset_unchanged=%s shape=%s fill=%s undo_fill=%s" % [

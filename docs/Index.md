@@ -51,7 +51,7 @@
 - [x] [[T-036|T-036 · Stroke eraser readability]]
 - [x] [[T-037|T-037 · Commented function-step convention]]
 - [ ] [[T-038|T-038 · Broader code-only review]]
-- [ ] [[T-050|T-050 · Retire palette-cell TerrainLayer artwork]]
+- [x] [[T-050|T-050 · Retire palette-cell TerrainLayer artwork]]
 - [ ] [[T-049|T-049 · Raster-first authoring defaults and semantic-vector tools]]
 
 ## After core usability

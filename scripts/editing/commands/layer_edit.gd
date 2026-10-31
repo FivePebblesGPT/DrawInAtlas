@@ -42,16 +42,14 @@ func _replace(campaign: AtlasCampaign, expected: Array[AtlasLayer], replacement:
 				if candidate.id == old.id:
 					found = candidate
 					break
-			if found == null or _content(old, document) != _content(found, document):
+			if found == null or _content(old) != _content(found):
 				return false
 	floor.layers = AtlasLayerCodec.clone_all(replacement)
 	return true
 
 
-func _content(layer: AtlasLayer, document: AtlasMapDocument) -> Dictionary:
+func _content(layer: AtlasLayer) -> Dictionary:
 	var data: Dictionary = layer.to_dict()
 	for key: String in ["id", "name", "visible", "locked", "opacity", "detail_level"]:
 		data.erase(key)
-	if layer is AtlasTerrainLayer and layer.grid == null:
-		data.grid = document.get_terrain_grid(floor_id).to_dict()
 	return data

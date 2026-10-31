@@ -24,10 +24,7 @@ func signature(document: AtlasMapDocument, floor_id: String) -> String:
 		if not layer.visible or layer.opacity <= 0.0:
 			continue
 		var saved: Dictionary = layer.to_dict()
-		if layer is AtlasTerrainLayer:
-			var grid: AtlasGrid = layer.grid if layer.grid != null else document.get_terrain_grid(floor_id)
-			saved["grid"] = grid.to_dict() if grid != null else null
-		elif layer is AtlasRasterLayer:
+		if layer is AtlasRasterLayer:
 			# Asset hashes cover in-place pixel edits; residency affects what can be drawn.
 			var resident: Array[bool] = []
 			var keys: Array[String] = layer.chunks.keys()

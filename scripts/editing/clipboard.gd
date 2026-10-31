@@ -6,9 +6,6 @@ const FORMAT: String = "drawinatlas.clipboard"
 const VERSION: int = 1
 const MAX_TEXT_BYTES: int = 16 * 1024 * 1024
 const MAX_RASTER_CHUNKS: int = 256
-const GRID_KEYS: Array[String] = [
-	"kind", "cell_size", "origin", "rotation", "distance_per_cell", "distance_unit", "visible"
-]
 const RASTER_KEYS: Array[String] = [
 	"id", "name", "kind", "visible", "locked", "opacity", "pixels_per_unit", "transform", "chunks",
 	"detail_level"
@@ -48,7 +45,7 @@ static func encode_raster(layer: AtlasRasterLayer, anchor: Vector2) -> String:
 		return ""
 	for key: String in layer.chunks:
 		var chunk: AtlasRasterChunk = layer.chunks[key]
-		if not _coordinate_key(key) or chunk == null or not chunk.is_valid(true) \
+		if chunk == null or not chunk.is_valid(true) \
 				or key != "%d,%d" % [chunk.coord.x, chunk.coord.y]:
 			return ""
 	var copy: AtlasRasterLayer = AtlasLayerCodec.clone(layer) as AtlasRasterLayer
@@ -80,24 +77,6 @@ static func encode_raster(layer: AtlasRasterLayer, anchor: Vector2) -> String:
 	return _serialize(data)
 
 
-static func encode_tiles(grid: AtlasGrid, cells: Dictionary, anchor: Vector2i) -> String:
-	if grid == null or not grid.is_valid() or not _valid_cells(cells):
-		return ""
-	var relative: Dictionary[String, int] = {}
-	for key: String in cells:
-		var parts: PackedStringArray = key.split(",")
-		# Subtract as 64-bit integers before checking Vector2i's bounds.
-		var x: int = int(parts[0]) - anchor.x
-		var y: int = int(parts[1]) - anchor.y
-		if not AtlasData.integer(x) or not AtlasData.integer(y):
-			return ""
-		relative["%d,%d" % [x, y]] = int(cells[key])
-	var data: Dictionary = _envelope("TILES")
-	data["tiles"] = relative
-	data["grid"] = grid.copy().to_dict()
-	return _serialize(data)
-
-
 static func decode(text: String) -> AtlasClipboardData:
 	if text.is_empty() or text.length() > MAX_TEXT_BYTES \
 			or text.to_utf8_buffer().size() > MAX_TEXT_BYTES:
@@ -117,8 +96,6 @@ static func decode(text: String) -> AtlasClipboardData:
 			return _decode_ink(data)
 		"RASTER":
 			return _decode_raster(data)
-		"TILES":
-			return _decode_tiles(data)
 	return null
 
 
@@ -225,41 +202,6 @@ static func _decode_raster_assets(assets: Dictionary,
 			return {}
 		images_by_asset[asset_name] = image
 	return images_by_asset
-
-
-static func _decode_tiles(data: Dictionary) -> AtlasClipboardData:
-	if not _has_keys(data, ["format", "version", "kind", "tiles", "grid"]):
-		return null
-	var cells: Variant = data["tiles"]
-	var raw_grid: Variant = data["grid"]
-	if not cells is Dictionary or not _valid_cells(cells) or not raw_grid is Dictionary \
-			or not _has_keys(raw_grid, GRID_KEYS):
-		return null
-	var grid: AtlasGrid = AtlasGrid.from_dict(raw_grid)
-	if grid == null:
-		return null
-	var result: AtlasClipboardData = AtlasClipboardData.new()
-	result.kind = "TILES"
-	for key: String in cells:
-		result.tiles[key] = int(cells[key])
-	result.grid = grid
-	return result
-
-
-static func _valid_cells(cells: Dictionary) -> bool:
-	if cells.is_empty():
-		return false
-	for key: Variant in cells:
-		if not _coordinate_key(key) or not AtlasData.integer(cells[key]) or int(cells[key]) < 0:
-			return false
-	return true
-
-
-static func _coordinate_key(key: Variant) -> bool:
-	if not key is String or key.length() > 23 or not AtlasData.coordinate_key(key):
-		return false
-	var parts: PackedStringArray = key.split(",")
-	return AtlasData.integer(int(parts[0])) and AtlasData.integer(int(parts[1]))
 
 
 static func _valid_base64(value: String) -> bool:

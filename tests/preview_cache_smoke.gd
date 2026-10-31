@@ -33,7 +33,6 @@ func _signatures() -> void:
 	var floor: AtlasFloor = map.floors[0]
 	var stroke: AtlasStroke = AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(10, 20)]))
 	floor.strokes.append(stroke)
-	floor.paint(Vector2i.ZERO, 1)
 	var raster: AtlasRasterLayer = AtlasRasterLayer.from_image(_image(Vector2i(2, 3)))
 	floor.layers.append(raster)
 	var baseline: Dictionary = map.to_dict().duplicate(true)
@@ -43,21 +42,15 @@ func _signatures() -> void:
 	_check(cache.get_image(map, floor.id) != null, "unchanged content hits")
 	_check(map.to_dict() == baseline and raster.chunks["0,0"].image.get_data() == original_pixels,
 		"signature, put and get never mutate canonical content or fallback grid")
-	_check(floor.terrain_layer().grid == null and map.terrain_grid == null,
-		"signature does not materialize fallback grids")
 	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	map.floors.append(upper)
-	upper.paint(Vector2i.ZERO, 5)
+	upper.strokes.append(stroke.copy())
 	_check(cache.signature(map, floor.id) == initial, "unselected floor edits do not invalidate")
 	_check(cache.signature(map, upper.id) != initial, "floors have distinct signatures")
 	var changes: Array[Callable] = [
 		func() -> void: stroke.points[0] = Vector2(5, 6),
-		func() -> void: floor.paint(Vector2i(2, 3), 4),
-		func() -> void: map.grid.cell_size += 1,
-		func() -> void: map.terrain_grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 31),
-		func() -> void: floor.terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.HEX_FLAT, 22),
-		func() -> void: floor.terrain_layer().grid.origin += Vector2.ONE,
+		func() -> void: floor.ink_layer().detail_level = 2,
 		func() -> void: raster.chunks["0,0"].image.set_pixel(0, 0, Color.BLUE),
 		func() -> void: raster.chunks["0,0"].coord += Vector2i.ONE,
 		func() -> void: raster.transform.origin += Vector2(4, 9),
@@ -76,13 +69,9 @@ func _signatures() -> void:
 	stroke.width += 1
 	raster.chunks["0,0"].image.fill(Color.GREEN)
 	_check(cache.signature(map, floor.id) == hidden, "hidden artwork edits do not invalidate")
-	upper.terrain_layer().grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 7)
-	var fallback: AtlasTerrainLayer = AtlasTerrainLayer.new("extra", "Extra")
-	fallback.terrain["0,0"] = 1
-	upper.layers.append(fallback)
 	var before: String = cache.signature(map, upper.id)
-	upper.terrain_layer().grid.rotation = 0.7
-	_check(cache.signature(map, upper.id) != before, "selected floor effective fallback grid is hashed")
+	upper.ink_layer().opacity = 0.8
+	_check(cache.signature(map, upper.id) != before, "selected floor art metadata is hashed")
 
 
 func _isolation() -> void:
@@ -100,7 +89,7 @@ func _isolation() -> void:
 	cache.put_image(second, "階", SIZE, _image(SIZE, Color.BLUE))
 	_check(cache.get_image(first, "階").get_pixel(0, 0) == Color.RED, "same floor IDs across maps independent")
 	_check(cache.get_image(second, "階").get_pixel(0, 0) == Color.BLUE, "second map same floor ID independent")
-	second.floors[0].paint(Vector2i.ZERO, 3)
+	second.floors[0].strokes.append(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2.ONE])))
 	_check(cache.get_image(second, "階") == null and cache.get_image(first, "階") != null,
 		"second map edit invalidates only that map")
 	cache.put_image(second, "階", SIZE, _image(SIZE, Color.BLUE))
