@@ -47,6 +47,8 @@ var _link_choices: Array[String] = []
 @onready var opacity_slider: HSlider = inspector.opacity_slider
 @onready var grid_settings_popup: AtlasGridSettingsPopup = get_node("../../GridSettingsPopup") as AtlasGridSettingsPopup
 @onready var grid_settings_button: Button = get_node("../../Chrome/Layout/GridSettingsButton") as Button
+@onready var projector_frame_button: Button = get_node("../../Chrome/Layout/ProjectorFrameButton") as Button
+@onready var projector_aspect_picker: OptionButton = get_node("../../Chrome/Layout/ProjectorAspect") as OptionButton
 @onready var grid_controls: AtlasGridControls = get_node("../../GridSettingsPopup/Panel/Margin/Layout/Scroll/GridControls") as AtlasGridControls
 @onready var distance_spinner: SpinBox = grid_controls.distance_spinner
 @onready var unit_picker: OptionButton = grid_controls.unit_picker
@@ -128,6 +130,11 @@ func _ready() -> void:
 	add_child(text_editor)
 	text_editor.text_confirmed.connect(_confirm_text_edit)
 	_connect_workspace()
+	projector_aspect_picker.add_item("16:9")
+	projector_aspect_picker.add_item("4:3")
+	projector_aspect_picker.add_item("1:1")
+	projector_frame_button.toggled.connect(_toggle_projector_frame)
+	projector_aspect_picker.item_selected.connect(_choose_projector_aspect)
 	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
 	if load_saved_on_startup:
@@ -260,6 +267,7 @@ func _connect_workspace() -> void:
 
 
 func _on_view_changed() -> void:
+	projector_frame_button.set_pressed_no_signal(false)
 	link_dialog.hide()
 	link_chooser.hide()
 	map_references.select_source(navigator.active_entrance_id)
@@ -623,11 +631,28 @@ func _choose_link(index: int) -> void:
 		navigator.enter_link(campaign.link_by_id(_link_choices[index]))
 
 
+## Presentation setup only. The active output does not exist until T-040;
+## these presets describe intended proportions, not pixels-per-grid-cell.
+func _choose_projector_aspect(index: int) -> void:
+	var sizes: Array[Vector2i] = [Vector2i(1920, 1080), Vector2i(1600, 1200), Vector2i(1000, 1000)]
+	if index >= 0 and index < sizes.size():
+		canvas.configure_projector_output_size(sizes[index])
+
+
+func _toggle_projector_frame(active: bool) -> void:
+	canvas.set_projector_frame_active(active)
+	projector_frame_button.set_pressed_no_signal(canvas.projector_frame_active)
+	if active and canvas.projector_frame_active:
+		_message("GM-only frame: drag inside to pan, yellow corner to resize; Esc cancels drag. No player image is published.")
+
+
 func _choose_tool(tool: AtlasCanvas.Tool) -> void:
 	_on_tool_changed(tool)
 
 
 func _on_tool_changed(index: int) -> void:
+	canvas.set_projector_frame_active(false)
+	projector_frame_button.set_pressed_no_signal(false)
 	artwork.choose_tool(index as AtlasCanvas.Tool)
 	if tool_palette != null:
 		tool_palette.sync_tool(index)
@@ -885,6 +910,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_ENTER and canvas.tool == AtlasCanvas.Tool.ART_SELECT:
 		canvas.clear_selection()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ESCAPE and canvas.projector_frame_active:
+		if canvas._frame_drag != AtlasCanvas.FrameDrag.NONE:
+			canvas.cancel_projector_frame_drag()
+		else:
+			canvas.set_projector_frame_active(false)
+			projector_frame_button.set_pressed_no_signal(false)
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_ESCAPE:
 		zoom_gate.reset()

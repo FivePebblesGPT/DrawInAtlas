@@ -25,10 +25,12 @@ signal fill_requested
 signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
+signal projector_frame_changed
 
 enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
+enum FrameDrag { NONE, MOVE, RESIZE }
 
 var campaign: AtlasCampaign
 var map: AtlasMapDocument
@@ -106,6 +108,15 @@ var polygon_solid_fill: bool = false
 ## Session-only normalized [0, 1] premultiplied-RGBA fill tolerance.
 var fill_tolerance: float = 0.0
 var fill_global: bool = false
+
+## Opt-in GM chrome, never placed in artwork layers or editor captures.
+var projector_frame: AtlasProjectorFrame = AtlasProjectorFrame.new()
+var projector_frame_active: bool = false
+var _frame_drag: FrameDrag = FrameDrag.NONE
+var _frame_drag_start: Vector2 = Vector2.ZERO
+var _frame_original_center: Vector2 = Vector2.ZERO
+var _frame_original_width: float = 0.0
+var _frame_resize_anchor: Vector2 = Vector2.ZERO
 
 var _panning: bool = false
 var _fill_pending: bool = false
@@ -186,6 +197,8 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	if selected_floor == null:
 		return false
 	cancel_edit()
+	# Frames are not persistent or transferable to a different map/floor.
+	projector_frame_active = false
 	map = value
 	campaign = current_campaign
 	floor = selected_floor
@@ -207,10 +220,11 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
+	return _frame_drag != FrameDrag.NONE or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
+	cancel_projector_frame_drag()
 	_end_freehand()
 	if _fill_pending:
 		_fill_pending = false
@@ -524,7 +538,10 @@ func _draw_overlays(item: Node2D) -> void:
 		if not _wall_vertices.is_empty():
 			for vertex: Vector2 in _wall_vertices:
 				item.draw_circle(vertex, 3.5 / camera_zoom, Color("#f9cc65"))
-	_draw_brush_cursor(item)
+	if projector_frame_active:
+		_draw_projector_frame(item)
+	else:
+		_draw_brush_cursor(item)
 
 
 ## A pointer ring shows the active Brush or Eraser diameter at any zoom.
@@ -773,8 +790,117 @@ func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, it
 	item.draw_polyline(outline, color, width, true)
 
 
+## T-013 framing mode deliberately supersedes artwork hit-testing. The frame
+## is a local GM overlay; no player output is published by these operations.
+func set_projector_frame_active(active: bool) -> void:
+	if active == projector_frame_active:
+		return
+	cancel_edit()
+	projector_frame_active = active and map != null
+	if projector_frame_active:
+		var initial_width: float = clampf(size.x * 0.7 / maxf(camera_zoom, 0.0001),
+			AtlasProjectorFrame.MIN_WIDTH, AtlasProjectorFrame.MAX_WIDTH)
+		projector_frame.set_view(camera_center, initial_width)
+		projector_frame_changed.emit()
+	_overlay.queue_redraw()
+
+
+func configure_projector_output_size(dimensions: Vector2i) -> bool:
+	cancel_projector_frame_drag()
+	if not projector_frame.set_output_size(dimensions):
+		return false
+	_overlay.queue_redraw()
+	projector_frame_changed.emit()
+	return true
+
+
+func cancel_projector_frame_drag() -> void:
+	if _frame_drag == FrameDrag.NONE:
+		return
+	projector_frame.set_view(_frame_original_center, _frame_original_width)
+	_frame_drag = FrameDrag.NONE
+	_overlay.queue_redraw()
+
+
+func _draw_projector_frame(item: Node2D) -> void:
+	var bounds: Rect2 = projector_frame.bounds()
+	var line_width: float = 2.0 / camera_zoom
+	var color: Color = Color("#5ee1ff")
+	item.draw_rect(bounds, Color(0.1, 0.75, 0.95, 0.08), true)
+	item.draw_rect(bounds, Color(0.03, 0.08, 0.12, 0.8), false, 4.0 / camera_zoom)
+	item.draw_rect(bounds, color, false, line_width)
+	var handle_size: float = 10.0 / camera_zoom
+	item.draw_rect(Rect2(bounds.end - Vector2.ONE * handle_size * 0.5,
+		Vector2.ONE * handle_size), Color("#ffd276"))
+	item.draw_line(bounds.get_center() - Vector2(7.0, 0.0) / camera_zoom,
+		bounds.get_center() + Vector2(7.0, 0.0) / camera_zoom, color, line_width)
+	item.draw_line(bounds.get_center() - Vector2(0.0, 7.0) / camera_zoom,
+		bounds.get_center() + Vector2(0.0, 7.0) / camera_zoom, color, line_width)
+	var tag: String = "GM frame · %d:%d" % [projector_frame.output_size.x, projector_frame.output_size.y]
+	item.draw_string(ThemeDB.fallback_font, bounds.position + Vector2(8.0, -6.0) / camera_zoom,
+		tag, HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(12.0 / camera_zoom)), color)
+
+
+func _handle_projector_frame_input(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		var key: InputEventKey = event as InputEventKey
+		if key.pressed and key.keycode == KEY_ESCAPE and _frame_drag != FrameDrag.NONE:
+			cancel_projector_frame_drag()
+			accept_event()
+			return true
+		return false
+	if event is InputEventMouseButton:
+		var button: InputEventMouseButton = event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_LEFT:
+			if button.pressed:
+				grab_focus()
+				var position: Vector2 = local_to_document(button.position)
+				var bounds: Rect2 = projector_frame.bounds()
+				var handle_radius: float = 11.0 / camera_zoom
+				if position.distance_to(bounds.end) <= handle_radius:
+					_frame_drag = FrameDrag.RESIZE
+					_frame_resize_anchor = bounds.position
+				elif bounds.has_point(position):
+					_frame_drag = FrameDrag.MOVE
+				_frame_drag_start = position
+				_frame_original_center = projector_frame.center
+				_frame_original_width = projector_frame.width
+				if _frame_drag != FrameDrag.NONE:
+					interaction_started.emit()
+			else:
+				if _frame_drag != FrameDrag.NONE:
+					_update_projector_frame_drag(local_to_document(button.position))
+					_frame_drag = FrameDrag.NONE
+					projector_frame_changed.emit()
+					interaction_finished.emit()
+			accept_event()
+			return true
+		if button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
+			cancel_projector_frame_drag()
+			accept_event()
+			return true
+		# Middle drag and wheel retain their ordinary GM navigation behavior.
+		return false
+	if event is InputEventMouseMotion and _frame_drag != FrameDrag.NONE:
+		_update_projector_frame_drag(local_to_document(event.position))
+		accept_event()
+		return true
+	return false
+
+
+func _update_projector_frame_drag(position: Vector2) -> void:
+	if _frame_drag == FrameDrag.MOVE:
+		projector_frame.set_view(_frame_original_center + position - _frame_drag_start,
+			_frame_original_width)
+	elif _frame_drag == FrameDrag.RESIZE:
+		projector_frame.resize_from_top_left(_frame_resize_anchor, position)
+	_overlay.queue_redraw()
+
+
 func _gui_input(event: InputEvent) -> void:
 	if map == null:
+		return
+	if projector_frame_active and _handle_projector_frame_input(event):
 		return
 	if _handle_gesture(event):
 		return
