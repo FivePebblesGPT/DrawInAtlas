@@ -19,3 +19,6 @@ The single-file native save implementation was previously verified and merged. I
 
 ## Historical evidence
 [[Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION|Native-save report]] · [[Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS|AD-10 measurements]]. Completion: [[Index]].
+
+## Later save-scope decision — 2026-11-01
+The owner confirmed **no historical user saves require migration**. The architecture work in [[E-009]] is therefore **not** blocked by loading old prototype .scn schemas or preserving prior serialized Resource paths. Preserve high-integrity **new-format** roundtrips, identity, recovery, atomic write and corruption-detection behavior. Past native-save tests remain useful engineering evidence but old-save compatibility is not an acceptance gate. Keep the eventual Drawing standalone/Atlas project format choice explicit under [[T-051]].

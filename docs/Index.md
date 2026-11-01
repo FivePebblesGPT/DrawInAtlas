@@ -16,16 +16,18 @@
 ## First priority
 - [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
 
-## Architecture split — owner direction confirmed, interface decisions pending
-- [ ] [[T-051|T-051 · Approve Drawing / Atlas boundaries and contracts]]
-- [ ] [[T-052|T-052 · Extract campaign-independent Drawing core]]
-- [ ] [[T-053|T-053 · Standalone Drawing workspace and viewport]]
-- [ ] [[T-054|T-054 · Drawing edits and integrated undo history]]
-- [ ] [[T-055|T-055 · Embed Drawing in Atlas through adapters]]
-- [ ] [[T-056|T-056 · New-save/UX/regression gate and cleanup]]
-- [ ] [[T-057|T-057 · Native map LOD/rendering feasibility benchmark]]
-- [ ] [[T-058|T-058 · Editable text layers and rasterization]]
+## Architecture split — Round 3 decisions recorded; contracts pending
+- [ ] [[T-051|T-051 · Finalize shared/copy, coordinates and project contracts]]
+- [ ] [[T-052|T-052 · Independent Drawing core and generic layer groups]]
+- [ ] [[T-053|T-053 · Independent Drawing Godot project in monorepo]]
+- [ ] [[T-054|T-054 · Global history navigates to edit origin]]
+- [ ] [[T-055|T-055 · Compose Drawing in Atlas, input and previews]]
+- [ ] [[T-056|T-056 · Validate isolation, shared assets, LOD and saves]]
+- [ ] [[T-057|T-057 · Native map rendering/LOD feasibility spike]]
+- [ ] [[T-058|T-058 · One text object per editable layer and rasterization]]
 - [ ] [[T-059|T-059 · Drawing feature inventory and UX criteria]]
+- [ ] [[T-060|T-060 · Linked versus copied Drawing assets]]
+- [ ] [[T-061|T-061 · Floor layer groups, world coordinates and blank LOD]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]
