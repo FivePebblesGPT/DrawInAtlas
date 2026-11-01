@@ -51,13 +51,23 @@ conversion; simply assigning square-grid cells to parent hex-cell keys loses dat
 It inventories:
 
 - Every document ID/kind/name, floor and layer ID/order, type, `detail_level`,
-  visibility/lock/opacity, effective terrain grid and native grid metadata.
-- Stroke counts, terrain cell counts, raster chunk keys (including signed keys),
-  pixels-per-unit and raster transform **metadata**, without copying pixel bytes
-  into a report. Raw raster pixels remain in the original native save.
+  visibility/lock/opacity and each map's native grid metadata.
+- Stroke/object counts (including text, image props and editable wall paths),
+  token counts and per-floor fog state; raster chunk keys (including signed
+  keys), pixels-per-unit and raster transform **metadata**. Historical terrain
+  terrain-layer migration is a separate approval concern; new authoring no
+  longer creates palette-cell terrain layers (T-050). Pixel bytes are not copied into
+  the report. Raw raster pixels remain in the original native save.
 - Every source/target link and arrival setting, placement geometry/units/symbolic
   state, candidate spatial transform, shared/orphaned placement and mismatched
   or missing references. It also flags old `BATTLEMAP` kinds **even if unplaced**.
+- For **nonsymbolic** placements, conservative per-floor/layer/object warnings
+  when semantic strokes or nontransparent raster-pixel rectangles extend outside
+  the stored child-coordinate crop. Signed chunks, raster density and affine
+  transforms are accounted for. Empty-alpha chunks do not count as painted art.
+  Rotated rectangular extents can produce warnings without actual clipped pixels;
+  text/props, fog and tokens are deliberately escalated for separate review,
+  not treated as automatically portable. Warnings never authorize conversion.
 
 The report contains facts for human review, not a conversion queue or an
 assumption that every map with a placement belongs inside its parent. Call it
@@ -65,7 +75,7 @@ on a *separately loaded* campaign for a dry-run inventory. It is not an
 interactive migration UI and does not save or rewrite any campaign.
 
 `tests/legacy_migration_audit_smoke.gd` covers separate maps with multiple floors,
-ink, square terrain, signed raster chunks and alpha; shared, symbolic, orphaned,
+ink, square-grid metadata, signed raster chunks and alpha; shared, symbolic, orphaned,
 conflicting and missing placements; repeatability, no side effects, native-save
 roundtrip and exact decoded raster pixel preservation. It only writes to a
 private `user://atlas_legacy_audit/fixture.scn` slot, never the editor save.
