@@ -187,5 +187,76 @@ func _editor_checks() -> void:
 	_check(detail_layer.tokens.size() == 1 and detail_layer.tokens[0].label == "D1 only" \
 		and (canvas.floor.layer_by_id(layer_id) as AtlasTokenLayer).tokens.size() == 1,
 		"creating D1 token never edits or relocates D0 tokens")
+
+	# Drag eligibility must be frozen at mouse-down. Merely rechecking the
+	# currently selected cell at mouse-up would accept an expanded mask, or
+	# could target a replaced layer containing an identically named token.
+	editor.apply_grid(AtlasGrid.new(AtlasGrid.Kind.SQUARE, 300.0))
+	canvas.snap_to_grid = false
+	canvas.token_radius = 15.0
+	canvas.token_label = "Guarded token"
+	var start: Vector2 = Vector2(95, 110)
+	canvas._begin_token_press(start)
+	var guarded: AtlasToken = detail_layer.tokens[-1].copy()
+	_check(guarded.position == start, "guarded D1 token placed at an editable cell center")
+	var rejected: Array[String] = []
+	var submitted: Array[int] = [0]
+	canvas.token_rejected.connect(func(reason: String) -> void: rejected.append(reason))
+	canvas.token_edit_requested.connect(func(_before: AtlasToken, _after: AtlasToken) -> void: submitted[0] += 1)
+	editor._on_select(Vector2i.ZERO)
+	editor._on_scope_toggled(true)
+	var drag_cursor: int = editor.edits._cursor
+	canvas._begin_token_press(start)
+	canvas._update_token_drag(Vector2(145, 110))
+	_check(canvas._token_drag_preview != null and canvas._token_drag_preview.position == Vector2(145, 110),
+		"masked drag previews without mutating the source")
+	editor._on_select(Vector2i(1, 0))
+	canvas._update_token_drag(Vector2(150, 110))
+	_check(canvas._token_drag_before == null and canvas._token_drag_preview == null,
+		"changed cell immediately rejects the old pointer preview")
+	canvas._finish_token_drag(Vector2(150, 110))
+	_check(detail_layer.tokens[-1].to_dict() == guarded.to_dict() and editor.edits._cursor == drag_cursor
+		and submitted[0] == 0 and not rejected.is_empty(),
+		"stale drag emits no edit or undo command and reports rejection")
+	editor._on_select(Vector2i.ZERO)
+	canvas._begin_token_press(start)
+	canvas._finish_token_drag(Vector2(145, 110))
+	_check(detail_layer.tokens[-1].position == Vector2(145, 110) and submitted[0] == 1
+		and editor.edits._cursor == drag_cursor + 1,
+		"new drag under the current cell commits exactly once")
+	# Editing the source or locking its layer after mouse-down also rejects
+	# the preview before the editor can emit a mutation request.
+	var moved: Vector2 = Vector2(145, 110)
+	canvas._begin_token_press(moved)
+	detail_layer.locked = true
+	canvas._finish_token_drag(Vector2(160, 110))
+	_check(detail_layer.tokens[-1].position == moved and canvas._token_drag_before == null
+		and submitted[0] == 1, "locking the press-time token layer invalidates a drag")
+	detail_layer.locked = false
+	# An old layer reference must not authorize a different replacement layer,
+	# even when that replacement reuses the same ID and token data.
+	canvas._begin_token_press(moved)
+	var layer_index: int = canvas.floor.layers.find(detail_layer)
+	var impostor: AtlasTokenLayer = AtlasLayerCodec.clone(detail_layer) as AtlasTokenLayer
+	canvas.floor.layers[layer_index] = impostor
+	canvas._finish_token_drag(Vector2(160, 110))
+	_check(submitted[0] == 1 and canvas._token_drag_preview == null
+		and impostor.tokens[-1].position == moved,
+		"replacement token layer with reused identifiers cannot receive stale movement")
+	canvas.floor.layers[layer_index] = detail_layer
+	canvas._begin_token_press(moved)
+	var old_label: String = detail_layer.tokens[-1].label
+	detail_layer.tokens[-1].label = "Externally changed"
+	canvas._finish_token_drag(Vector2(160, 110))
+	_check(detail_layer.tokens[-1].position == moved and submitted[0] == 1
+		and canvas._token_drag_before == null, "concurrent source revision invalidates a token drag")
+	detail_layer.tokens[-1].label = old_label
+	# With the mask disabled, a selected-cell change does not affect eligibility.
+	editor._on_scope_toggled(false)
+	canvas._begin_token_press(moved)
+	editor._on_select(Vector2i(1, 0))
+	canvas._finish_token_drag(Vector2(170, 110))
+	_check(detail_layer.tokens[-1].position == Vector2(170, 110) and submitted[0] == 2,
+		"unrestricted drag ignores a harmless change of selected cell")
 	root.remove_child(scene)
 	scene.free()

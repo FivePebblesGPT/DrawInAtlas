@@ -7,7 +7,7 @@
 1. In the **Tools** sidebar, choose **GM token (K)**. This creates or selects an editable `TOKENS` layer on the *presented* authored detail level of the current floor. Token layers are separate from raster paint and semantic Objects; default existing saves are unchanged until the tool is used.
 2. In the right inspector, choose a color, label (1–48 printable characters), and radius (3–128 board units). Click an empty board area to place a circular labeled token. The document position may be negative or fractional. **Snap to grid** is optional and uses the existing grid snapping policy.
 3. Click an existing token to select it; drag to preview a new position, release to commit one history command. Click **Update selected token** in the inspector to apply label, radius and color changes. **Delete/Backspace** removes a selected token. Escape cancels a pending drag. Ctrl+Z/Ctrl+Y undo/redo these edits.
-4. Layer visibility, locks, opacity, floor and detail level work like other typed layers. A cell edit mask requires the **whole token's circular bounding square** to fit within the allowed cell for placement, movement, restyling or deletion. Invisible, locked, mismatched LOD, stale-state and invalid-target edits fail without changing stored tokens.
+4. Layer visibility, locks, opacity, floor and detail level work like other typed layers. A cell edit mask requires the **whole token's circular bounding square** to fit within the allowed cell for placement, movement, restyling or deletion. A token drag freezes the press-time map, floor, layer instance, source-token revision, selected-cell mask, and snap toggle. Changing the edit mask or replacing/locking the target during the drag rejects the preview before any movement is requested, clears the preview, and explains the rejection. A fresh drag under the current mask works normally; choosing a different cell with masking disabled is harmless. Invisible, locked, mismatched LOD, stale-state and invalid-target edits fail without changing stored tokens.
 5. **Native Save** embeds token Resources in the same validated `.scn` campaign. Each token has a stable ID, board-space center/radius, label and tint. The token layer owns the map/floor/detail context and order. Saves, backups, exact semantic digest, and LFS/Web source-to-pack portability still apply.
 
 ## Privacy and limitations
@@ -19,6 +19,6 @@
 
 ## Verification
 
-- `godot --headless --path . --script res://tests/token_smoke.gd` checks identity, malformed data, stable movement, edit masks, locking, undo/redo, styling, detail level isolation, native save/reload and fail-closed player projection.
-- `xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/token_visual.gd` checks GM native frame pixels, live drag preview and commit.
+- `godot --headless --path . --script res://tests/token_smoke.gd` checks identity, malformed data, stable movement, press-time mask/target checks, stale source rejection, safe retries, locking, undo/redo, styling, detail level isolation, native save/reload and fail-closed player projection.
+- `xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/token_visual.gd` checks GM native frame pixels, live drag preview and commit, plus native framebuffer cleanup on stale-mask rejection.
 - `tests/storage_smoke.gd` now includes a GM token Resource in its normal, backup and source/Web-pack portable fixtures.

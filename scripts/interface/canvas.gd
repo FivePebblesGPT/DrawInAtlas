@@ -30,6 +30,7 @@ signal fill_cancel_requested
 signal view_region_changed
 signal projector_frame_changed
 signal token_edit_requested(before: AtlasToken, after: AtlasToken)
+signal token_rejected(reason: String)
 signal fog_edit_requested(bounds: Rect2, reveal: bool)
 
 enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG }
@@ -130,6 +131,13 @@ var selected_token_id: String = ""
 var _token_drag_before: AtlasToken
 var _token_drag_preview: AtlasToken
 var _token_drag_start: Vector2 = Vector2.ZERO
+## A token's pointer drag is authorized by its press-time layer instance,
+## source revision and effective cell mask, not whatever is selected at release.
+var _token_scope_at_press: AtlasEditScope
+var _token_map_at_press: AtlasMapDocument
+var _token_floor_at_press: AtlasFloor
+var _token_layer_at_press: AtlasTokenLayer
+var _token_snap_at_press: bool = false
 ## GM-only rectangle draft; not a saved artwork layer or captured overlay.
 var _fog_drag_active: bool = false
 var _fog_start: Vector2 = Vector2.ZERO
@@ -267,8 +275,7 @@ func is_editing() -> bool:
 
 func cancel_edit() -> void:
 	_fog_drag_active = false
-	_token_drag_before = null
-	_token_drag_preview = null
+	_clear_token_drag_context()
 	cancel_projector_frame_drag()
 	_end_freehand()
 	if _fill_pending:
@@ -582,6 +589,38 @@ func delete_selected_token() -> bool:
 	return true
 
 
+func _clear_token_drag_context() -> void:
+	_token_drag_before = null
+	_token_drag_preview = null
+	_token_scope_at_press = null
+	_token_map_at_press = null
+	_token_floor_at_press = null
+	_token_layer_at_press = null
+	_token_snap_at_press = false
+
+
+func _token_drag_context_matches() -> bool:
+	if _token_scope_at_press == null or _token_drag_before == null or map == null or floor == null:
+		return false
+	if map != _token_map_at_press or floor != _token_floor_at_press \
+			or floor.layer_by_id(active_layer_id) != _token_layer_at_press \
+			or not _token_layer_at_press.is_editable() or not editing_target_is_presented():
+		return false
+	if edit_scope.enabled != _token_scope_at_press.enabled \
+			or edit_scope.polygon != _token_scope_at_press.polygon:
+		return false
+	var current: AtlasToken = _token_layer_at_press.token_by_id(_token_drag_before.id)
+	return current != null and current.to_dict() == _token_drag_before.to_dict()
+
+
+func _reject_stale_token_drag() -> void:
+	_clear_token_drag_context()
+	selected_token_id = ""
+	queue_redraw()
+	interaction_finished.emit()
+	token_rejected.emit("Token target, source or edit mask changed during drag; nothing moved.")
+
+
 func _begin_token_press(position: Vector2) -> void:
 	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
 	if layer == null or not editing_target_is_presented() or not layer.is_editable():
@@ -596,6 +635,11 @@ func _begin_token_press(position: Vector2) -> void:
 			_token_drag_before = candidate.copy()
 			_token_drag_preview = candidate.copy()
 			_token_drag_start = position
+			_token_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+			_token_map_at_press = map
+			_token_floor_at_press = floor
+			_token_layer_at_press = layer
+			_token_snap_at_press = snap_to_grid
 			queue_redraw()
 			return
 	if layer.tokens.size() >= AtlasTokenLayer.MAX_TOKENS or token_label.strip_edges().is_empty():
@@ -615,8 +659,11 @@ func _begin_token_press(position: Vector2) -> void:
 func _update_token_drag(position: Vector2) -> void:
 	if _token_drag_before == null:
 		return
+	if not _token_drag_context_matches():
+		_reject_stale_token_drag()
+		return
 	var target: Vector2 = _token_drag_before.position + position - _token_drag_start
-	_token_drag_preview.position = AtlasGridSnap.point(map.grid, target) if snap_to_grid else target
+	_token_drag_preview.position = AtlasGridSnap.point(map.grid, target) if _token_snap_at_press else target
 	queue_redraw()
 
 
@@ -624,10 +671,12 @@ func _finish_token_drag(position: Vector2) -> void:
 	if _token_drag_before == null:
 		return
 	_update_token_drag(position)
+	# Updating the preview may have rejected a changed mask or source token.
+	if _token_drag_before == null:
+		return
 	var before: AtlasToken = _token_drag_before
 	var after: AtlasToken = _token_drag_preview
-	_token_drag_before = null
-	_token_drag_preview = null
+	_clear_token_drag_context()
 	if before.position != after.position:
 		token_edit_requested.emit(before, after)
 	queue_redraw()

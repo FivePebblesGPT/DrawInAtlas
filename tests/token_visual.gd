@@ -87,6 +87,43 @@ func _run() -> void:
 	_check(layer.tokens[0].position == end and _red(_pixel(canvas, end)),
 		"release commits same visible position")
 	_check(not _red(_pixel(canvas, start)), "old position has no residual painted token")
+	# A real pointer preview must disappear from the framebuffer when another
+	# edit cell becomes selected before release. The original token stays put.
+	editor.apply_grid(AtlasGrid.new(AtlasGrid.Kind.SQUARE, 1000.0))
+	canvas.camera_center = Vector2(450, 450)
+	var guarded_start: Vector2 = canvas.local_to_document(Vector2(115, 140))
+	var guarded_end: Vector2 = guarded_start + Vector2(75, 0)
+	var guarded_start_local: Vector2 = canvas.document_to_local(guarded_start)
+	var guarded_end_local: Vector2 = canvas.document_to_local(guarded_end)
+	canvas.token_label = "Native guard"
+	canvas.token_radius = 16.0
+	editor._on_select(Vector2i.ZERO)
+	editor._on_scope_toggled(true)
+	_mouse(canvas, guarded_start_local, true)
+	_mouse(canvas, guarded_start_local, false)
+	await _frames()
+	layer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTokenLayer
+	var guard_id: String = layer.tokens[-1].id
+	var history_before: int = editor.edits._cursor
+	_mouse(canvas, guarded_start_local, true)
+	var drag: InputEventMouseMotion = InputEventMouseMotion.new()
+	drag.position = guarded_end_local
+	drag.relative = guarded_end_local - guarded_start_local
+	canvas._gui_input(drag)
+	await _frames()
+	_check(_red(_pixel(canvas, guarded_end)) and layer.token_by_id(guard_id).position == guarded_start,
+		"pending token drag visibly previews its target without moving the source")
+	editor._on_select(Vector2i(1, 0))
+	canvas._gui_input(drag)
+	await _frames()
+	_check(canvas._token_drag_preview == null and not _red(_pixel(canvas, guarded_end)),
+		"invalidated token preview disappears from native framebuffer")
+	_mouse(canvas, guarded_end_local, false)
+	await _frames()
+	_check(layer.token_by_id(guard_id).position == guarded_start and _red(_pixel(canvas, guarded_start))
+		and editor.edits._cursor == history_before,
+		"stale pointer release leaves token pixels and history unchanged")
+	editor._on_scope_toggled(false)
 	var path: String = "user://validation/token-gm-native.png"
 	DirAccess.make_dir_recursive_absolute("user://validation")
 	_check(root.get_texture().get_image().save_png(path) == OK, "native proof screenshot saved")

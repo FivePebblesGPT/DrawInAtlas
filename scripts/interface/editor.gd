@@ -217,6 +217,7 @@ func _connect_workspace() -> void:
 	canvas.wall_rejected.connect(_message)
 	canvas.path_edit_requested.connect(artwork.edit_path)
 	canvas.token_edit_requested.connect(_edit_token)
+	canvas.token_rejected.connect(_message)
 	canvas.fog_edit_requested.connect(_edit_fog)
 	canvas.text_requested.connect(_open_text_editor)
 	canvas.transform_requested.connect(artwork.transform_selection)
