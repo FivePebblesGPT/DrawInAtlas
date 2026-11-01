@@ -26,8 +26,10 @@
 - [ ] [[T-057|T-057 · Native map rendering/LOD feasibility spike]]
 - [ ] [[T-058|T-058 · One text object per editable layer and rasterization]]
 - [ ] [[T-059|T-059 · Drawing feature inventory and UX criteria]]
-- [ ] [[T-060|T-060 · Linked versus copied Drawing assets]]
+- [ ] [[T-060|T-060 · Reusable Object Assets and linked instances]]
 - [ ] [[T-061|T-061 · Floor layer groups, world coordinates and blank LOD]]
+- [ ] [[T-062|T-062 · Object Editor, Save and Save As]]
+- [ ] [[T-063|T-063 · Compact Drawing UI and BarDivider overflow]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]

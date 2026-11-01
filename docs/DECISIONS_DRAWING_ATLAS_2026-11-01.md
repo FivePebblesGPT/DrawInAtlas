@@ -62,3 +62,34 @@ One repository
 
 ## Scope control
 Historical migration work is waived. Source/test cleanup may still be necessary, and fresh formats must roundtrip. No mandatory third-party native LOD engine before [[T-057]] produces measurements. No presumed UX acceptance.
+
+## Round 4 clarification — Object Editor, exact group hierarchy and contextual undo (2026-11-01)
+
+**Authoritative correction to the earlier ambiguous phrase “linked artwork”:**
+- The owner imagines a **reusable object asset**, authored in an **Object Editor**, and placed as an **object instance** on Atlas maps. **This is not primarily a live link to a whole map DrawingDocument.** Keep background/map surface authoring separate from reusable object authoring.
+- Editing an object's **source asset** and choosing **Save** updates that source and therefore its linked Atlas instances. **Save As** creates an independent new asset/copy. Whether Save As automatically rebinds the currently selected Atlas instance is **unanswered**.
+- Object assets may contain generic Drawing raster/vector/text layers, as agreed in the Object Editor design. A placed instance has its own transform and selection identity. Atlas must not silently mutate the source when moving or rotating an instance. Need to decide whether per-instance edit overrides exist and whether objects can contain other object instances.
+- Confirmed exact hierarchy: **Map → Floor group → Detail group → Layers**. These groups are organized by Atlas through generic Drawing layer/group constructs; detail content shares map-world coordinates. Missing high-detail drawing remains blank.
+- Global undo should feel **Blender-like** by following the affected selection and restoring/switching into the relevant editing **mode**, in addition to returning to the originating map. Capture stable edit context in commands; on undo/redo, switch to the affected map/floor/detail, select the affected object/layer and restore a valid mode as appropriate. It is **not yet decided** whether ordinary selection-only or mode-only changes themselves push undo steps, whether each past tool is restored, or which camera position is used. Do not claim Blender-specific behavior as an exact contract.
+- The uploaded `DrawInAtlas — Draw Module UI Specification` is preserved as the **proposed** [[DRAW_MODULE_UI_SPEC]]. Its one-row top bar, `BarDivider`, tab/rail/dock/status layout and overflow behavior are tracked in [[T-063]] and linked from [[T-059]]. This is not a complete tool feature inventory nor a signed-off final UI.
+
+### Boundary sketch
+```text
+Drawing reusable engine / standalone editor
+  - world/surface drawing: raster + object + text layers and layer groups
+  - reusable Object Asset editor: asset-local editable layers + save/save-as
+Atlas
+  - Map -> Floor group -> Detail group -> Layers
+  - object instance registry: (source_asset_id, instance_id, world transform)
+  - object placement/selection and link resolution
+  - one chronological history + selection/mode/context restoration
+```
+
+### New risk cases to test
+1. Edit asset source through instance A; linked instances B/C refresh. Undo should restore source once and select/focus the relevant origin without confusing source vs instance selection.
+2. Save As copied asset; original stays unchanged. User must know whether instance A still references original or is rebound.
+3. Transform instance without touching source; undo selects that instance and restores appropriate instance/placement mode.
+4. Undo an edit after changing to another map/mode, with stale or deleted selection. Restoration must be safe and not create another history entry.
+5. Asset editor UI and Atlas-embedded Drawing share one canonical engine but can expose different workspace commands; the compact Draw UI spec remains proposed.
+
+See [[T-060]], [[T-062]], [[T-054]], [[T-063]] and the remaining questions in [[T-051]].
