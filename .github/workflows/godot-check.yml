@@ -349,6 +349,13 @@ jobs:
           godot --headless --path . --script res://tests/authoritative_session_smoke.gd 2>&1 | tee /tmp/godot-authoritative-session.log
           grep -q 'ATLAS_AUTHORITATIVE_SESSION_PASSED' /tmp/godot-authoritative-session.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|SESSION FAILED:' /tmp/godot-authoritative-session.log; then exit 1; fi
+      - name: Verify host-bound roles and privacy-filtered replication (T-046)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/filtered_replication_smoke.gd 2>&1 | tee /tmp/godot-filtered-replication.log
+          grep -q 'ATLAS_FILTERED_REPLICATION_PASSED' /tmp/godot-filtered-replication.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FILTERED REPLICATION FAILED:' /tmp/godot-filtered-replication.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
       - name: Verify editable text and screen-space culling (T-027)

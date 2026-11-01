@@ -1,6 +1,6 @@
 class_name AtlasSessionClient
 extends RefCounted
-## Trusted GM-only in-process mirror. No mutable campaign or host Token is
+## Role-bound in-process mirror. No mutable campaign or host Token is
 ## retained; all mirrored state is detached primitive dictionaries.
 
 var peer_id: String = ""
@@ -8,6 +8,7 @@ var session_id: String = ""
 var revision: int = -1
 var _host: AtlasHostSession
 var _tokens: Array[Dictionary] = []
+var _artwork: Dictionary = {}
 var _next_request: int = 0
 var _needs_sync: bool = false
 var _last_request: Dictionary = {}
@@ -20,6 +21,14 @@ func _init(host: AtlasHostSession, peer: String) -> void:
 
 func token_records() -> Array[Dictionary]:
 	return _tokens.duplicate(true)
+
+
+func artwork_record() -> Dictionary:
+	return _artwork.duplicate(true)
+
+
+func _clear_public_artwork() -> void:
+	_artwork.clear()
 
 
 func move_token(token_id: String, position: Vector2) -> Dictionary:
@@ -50,12 +59,16 @@ func resync() -> bool:
 func _receive_snapshot(snapshot: Dictionary) -> void:
 	session_id = snapshot["session_id"]
 	revision = (snapshot["revision"] as String).to_int()
-	_tokens = (snapshot["tokens"] as Array).duplicate(true)
+	_tokens.clear()
+	for record: Dictionary in snapshot.get("tokens", []):
+		_tokens.append(record.duplicate(true))
+	_artwork = (snapshot.get("artwork", {}) as Dictionary).duplicate(true)
 	_needs_sync = false
 
 
 func _receive_update(snapshot: Dictionary) -> void:
 	if _needs_sync or snapshot["session_id"] != session_id or snapshot["revision"] != str(revision + 1):
 		_needs_sync = true
+		_clear_public_artwork()
 		return
 	_receive_snapshot(snapshot)

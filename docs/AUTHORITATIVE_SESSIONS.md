@@ -53,11 +53,11 @@ object creation, player audience grants or the rest of the campaign graph.
 
 ## Trust limits and decisions still required
 
-This is a **GM-only**, single-process prototype. All connected peers see the
-bound **GM token layer**, potentially containing secrets. **Never attach a
-player/spectator client to it.** T-046 must introduce host-enforced roles,
-permission-filtered replication, explicit object/chunk/fog policies and
-validated publication according to T-039. This prototype must not be wired
+This is a **GM-only**, single-process prototype. In the original T-045 checkpoint all peers received the
+bound **GM token layer**, potentially containing secrets. The T-046 extension
+now adds explicit host-bound viewer roles that **never** receive that token
+layer. These viewer roles remain an isolated proof, and the T-039 policy still
+requires owner acceptance before production publication. This prototype must not be wired
 into the unapproved player-output surface.
 
 A production implementation additionally requires authenticated transport,
@@ -76,3 +76,13 @@ The suite demonstrates two independent clients, JSON round-tripping, host
 validation and history, idempotent retries, revision conflicts, edit masks,
 mirrored token agreement, local undo divergence, resync and shutdown. No new
 native-save fields are introduced, and no editor UI or live network is wired.
+
+## T-046 incremental role-filtered replication proof
+
+T-046 adds separate host-held `gm`, `player`, and `spectator` role assignments.
+The T-045 GM token flow is unchanged; player/spectator mirrors receive only
+explicit sanitized raster grants from the existing T-039 boundary and cannot
+edit. Revocation, outbound image bytes, serialized fog and failure behavior are
+specified and regression-tested in [ROLE_FILTERED_REPLICATION](ROLE_FILTERED_REPLICATION.md).
+The original GM-only protocol above still applies to **GM peers only**;
+viewer clients must not be given the GM join capability across a network.
