@@ -14,6 +14,7 @@
 
 - The active ink layer must be visible, unlocked and currently presented. No tool action targets another layer/detail level, even when an object is visible elsewhere.
 - Creating/editing a path checks the **entire stroked bounding rectangle** against the active cell mask; unlike ordinary freehand strokes, wall vertices are not clipped into fragments that would lose editability. Both original and replacement extents must be permitted for modifications. An invalid or disallowed action is a no-op.
+- The initial point of an unfinished wall, or the press on an existing vertex, freezes the **map, floor, Objects layer instance and effective selected-cell mask**. Changing the selected cell while the mask is active, changing the editing target, or locking the original layer before completion rejects the pending path/drag, clears its preview and shows a reason; no artwork or history is changed. Right-click closure, Enter, double-click and vertex release all obey the same check. A new gesture can retry under the current mask. If masking is off, changing only cell focus does not invalidate the gesture.
 - Selection, Move, uniform transform, hierarchy and clipboard retain path identity. The vector eraser removes a **whole touched path**, rather than splitting it into non-editable ink fragments. The eraser never rasterizes the path. All successful changes are one history command.
 - No pressure, per-edge styling, Bezier controls, stroke dashes, or point handles for unrelated Polygon shapes in this ticket.
 

@@ -19,6 +19,7 @@ signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 signal line_rejected(reason: String)
 signal polygon_rejected(reason: String)
+signal wall_rejected(reason: String)
 signal path_edit_requested(index: int, expected: AtlasStroke, replacement: AtlasStroke)
 signal text_requested(anchor: Vector2, index: int)
 signal selection_changed
@@ -192,6 +193,13 @@ var _wall_drag_vertex: int = -1
 var _wall_drag_origin: Vector2 = Vector2.ZERO
 var _wall_before: AtlasStroke
 var _wall_preview: AtlasStroke
+## The first vertex/press fixes both the Objects target and the effective edit
+## mask for the entire path draft or vertex drag. A later mask change cannot
+## silently authorize a different whole-path edit at finish/release.
+var _wall_scope_at_start: AtlasEditScope
+var _wall_map_at_start: AtlasMapDocument
+var _wall_floor_at_start: AtlasFloor
+var _wall_layer_at_start: AtlasObjectsLayer
 ## Detached candidate rendered during editing; history owns the actual commit.
 var _preview_layer: AtlasLayer
 ## Selection transform in board units, not a camera or raster-pixel transform.
@@ -278,6 +286,7 @@ func cancel_edit() -> void:
 	_wall_drag_vertex = -1
 	_wall_before = null
 	_wall_preview = null
+	_clear_wall_context()
 	_wall_selected_index = -1
 	_gesture_snap = false
 	_preview_layer = null
@@ -297,6 +306,10 @@ func commit_edit() -> void:
 	if not _polygon_vertices.is_empty() and not _polygon_context_matches():
 		_reject_stale_polygon()
 		return
+	if not _wall_vertices.is_empty() or _wall_drag_vertex >= 0:
+		if not _wall_context_matches():
+			_reject_stale_wall()
+			return
 	if not _wall_vertices.is_empty():
 		_finish_wall_path(false)
 		return
@@ -864,6 +877,34 @@ func _reject_stale_polygon() -> void:
 	polygon_rejected.emit("Polygon target or edit mask changed since first vertex; nothing painted.")
 
 
+func _capture_wall_context(layer: AtlasObjectsLayer) -> void:
+	_wall_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+	_wall_map_at_start = map
+	_wall_floor_at_start = floor
+	_wall_layer_at_start = layer
+
+
+func _clear_wall_context() -> void:
+	_wall_scope_at_start = null
+	_wall_map_at_start = null
+	_wall_floor_at_start = null
+	_wall_layer_at_start = null
+
+
+func _wall_context_matches() -> bool:
+	return _wall_scope_at_start != null and map != null and floor != null \
+		and map == _wall_map_at_start and floor == _wall_floor_at_start \
+		and floor.layer_by_id(active_layer_id) == _wall_layer_at_start \
+		and _wall_layer_at_start.is_editable() and editing_target_is_presented() \
+		and edit_scope.enabled == _wall_scope_at_start.enabled \
+		and edit_scope.polygon == _wall_scope_at_start.polygon
+
+
+func _reject_stale_wall() -> void:
+	cancel_edit()
+	wall_rejected.emit("Wall path target or edit mask changed during editing; nothing changed.")
+
+
 ## Shape and wall previews follow live style controls without pointer motion.
 ## Freehand Brush/Eraser instead retain the style captured at gesture start.
 func _refresh_shape_style() -> void:
@@ -1321,7 +1362,9 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		interaction_finished.emit()
 	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:
 		_update_wall_drag(local_to_document(mouse.position))
-		_finish_wall_drag()
+		# Updating the preview can reject a stale gesture and clear its context.
+		if _wall_drag_vertex >= 0:
+			_finish_wall_drag()
 	elif tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
 		_update_wall_pointer(mouse.position)
 	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
@@ -1413,6 +1456,9 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 	if layer == null or not layer.is_editable():
 		return
 	if not _wall_vertices.is_empty():
+		if not _wall_context_matches():
+			_reject_stale_wall()
+			return
 		var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
 		if mouse.double_click:
 			_finish_wall_path(false)
@@ -1449,6 +1495,7 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 				path_edit_requested.emit(index, path.copy(), inserted)
 			_wall_before = null
 		elif vertex >= 0:
+			_capture_wall_context(layer)
 			_wall_drag_origin = position
 			_wall_drag_vertex = vertex
 			_wall_preview = path.copy()
@@ -1458,6 +1505,7 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 		return
 	_wall_selected_index = -1
 	_wall_before = null
+	_capture_wall_context(layer)
 	_gesture_snap = snap_to_grid
 	_wall_vertices = PackedVector2Array([AtlasGridSnap.point(map.grid, position) if _gesture_snap else position])
 	_refresh_wall_draft()
@@ -1465,11 +1513,17 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 
 
 func _refresh_wall_draft() -> void:
+	if not _wall_vertices.is_empty() and not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	_wall_draft = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width) if _wall_vertices.size() >= 2 else null
 	queue_redraw()
 
 
 func _update_wall_pointer(local_position: Vector2) -> void:
+	if not _wall_vertices.is_empty() and not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	_wall_pointer = local_to_document(local_position)
 	if _gesture_snap:
 		_wall_pointer = AtlasGridSnap.point(map.grid, _wall_pointer)
@@ -1477,10 +1531,14 @@ func _update_wall_pointer(local_position: Vector2) -> void:
 
 
 func _finish_wall_path(closed: bool) -> void:
+	if not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	var path: AtlasStroke = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width, closed)
 	_wall_vertices.clear()
 	_wall_draft = null
 	_wall_before = null
+	_clear_wall_context()
 	_gesture_snap = false
 	if path != null:
 		path_edit_requested.emit(-1, null, path)
@@ -1489,6 +1547,9 @@ func _finish_wall_path(closed: bool) -> void:
 
 
 func _update_wall_drag(position: Vector2) -> void:
+	if _wall_drag_vertex >= 0 and not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	if _wall_before == null:
 		return
 	# A simple click selects a vertex. It must not snap an existing off-grid
@@ -1503,12 +1564,16 @@ func _update_wall_drag(position: Vector2) -> void:
 
 
 func _finish_wall_drag() -> void:
+	if not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	var index: int = _wall_selected_index
 	var before: AtlasStroke = _wall_before
 	var after: AtlasStroke = _wall_preview
 	_wall_drag_vertex = -1
 	_wall_before = null
 	_wall_preview = null
+	_clear_wall_context()
 	if before != null and after != null and before.to_dict() != after.to_dict():
 		path_edit_requested.emit(index, before, after)
 	queue_redraw()
@@ -1517,6 +1582,10 @@ func _finish_wall_drag() -> void:
 
 func _handle_wall_key(event: InputEventKey) -> void:
 	if not event.pressed or event.echo:
+		return
+	if event.keycode != KEY_ESCAPE and not _wall_context_matches():
+		_reject_stale_wall()
+		accept_event()
 		return
 	match event.keycode:
 		KEY_ENTER, KEY_KP_ENTER:
