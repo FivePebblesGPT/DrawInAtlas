@@ -25,6 +25,12 @@ var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
 var tool_palette: AtlasToolPalette
 var text_editor: AtlasTextEditorPopup
+## A text dialog retains the exact authorization it opened under, even when
+## another editor action changes the selected cell, grid or underlying layer.
+var _text_scope_at_open: AtlasEditScope
+var _text_map_at_open: AtlasMapDocument
+var _text_floor_at_open: AtlasFloor
+var _text_layer_at_open: AtlasObjectsLayer
 
 @onready var canvas: AtlasCanvas = $Shell/CanvasAndInspector/Canvas
 @onready var inspector: AtlasInspector = $Shell/CanvasAndInspector/InspectorPanel
@@ -129,6 +135,7 @@ func _ready() -> void:
 	text_editor = AtlasTextEditorPopup.new()
 	add_child(text_editor)
 	text_editor.text_confirmed.connect(_confirm_text_edit)
+	text_editor.visibility_changed.connect(_on_text_editor_visibility_changed)
 	_connect_workspace()
 	projector_aspect_picker.add_item("16:9")
 	projector_aspect_picker.add_item("4:3")
@@ -851,6 +858,17 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	return artwork.apply_layers(layers, selected_id)
 
 
+## Release detached modal authorization when dismissed, including on Escape.
+## Otherwise a closed editor can pin an old map/layer in memory indefinitely.
+func _on_text_editor_visibility_changed() -> void:
+	if text_editor.visible:
+		return
+	_text_scope_at_open = null
+	_text_map_at_open = null
+	_text_floor_at_open = null
+	_text_layer_at_open = null
+
+
 func _open_text_editor(anchor: Vector2, index: int) -> void:
 	var original: AtlasStroke
 	var layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
@@ -858,12 +876,25 @@ func _open_text_editor(anchor: Vector2, index: int) -> void:
 		return
 	if index >= 0 and index < layer.strokes.size():
 		original = layer.strokes[index]
+	_text_scope_at_open = artwork.scope()
+	_text_map_at_open = canvas.map
+	_text_floor_at_open = canvas.floor
+	_text_layer_at_open = layer
 	text_editor.open_editor(anchor, original, index, canvas.brush_color,
 		canvas.map.id, canvas.floor.id, canvas.active_layer_id)
 
 
 func _confirm_text_edit(index: int, expected: AtlasStroke, replacement: AtlasStroke,
 		map_id: String, floor_id: String, layer_id: String) -> void:
+	var current_scope: AtlasEditScope = artwork.scope()
+	if _text_scope_at_open == null or canvas.map != _text_map_at_open \
+			or canvas.floor != _text_floor_at_open \
+			or canvas.floor == null or canvas.floor.layer_by_id(layer_id) != _text_layer_at_open \
+			or current_scope.enabled != _text_scope_at_open.enabled \
+			or current_scope.polygon != _text_scope_at_open.polygon:
+		text_editor.show_error("Text was not applied: its target or selected-cell edit mask "
+			+ "changed while the editor was open. Cancel and reopen to use the new scope.")
+		return
 	if artwork.edit_text_in_context(index, expected, replacement, map_id, floor_id, layer_id):
 		text_editor.close_editor()
 	else:
