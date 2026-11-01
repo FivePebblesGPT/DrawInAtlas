@@ -52,3 +52,43 @@ latter saves a native framebuffer witness to `user://validation/player-privacy-t
 The tests cover private rooms/labels/tokens, D0/D1, re-hiding, preview cache
 poisoning, freeze/revocation, and mid-capture edits. These checks do **not**
 validate a live production GM-to-player session or a physical projector.
+
+## T-044 — Single-window/Web-compatible fallback (isolated proof)
+
+`AtlasPlayerOutputSession.open_embedded(host)` is a presentation *surface*,
+not a second OS window. A trusted caller supplies a **visible, empty, dedicated
+Control** sized to the player viewport (normally the whole Web app). Missing,
+pre-populated, zero-sized or oversized hosts are rejected. The session adds an
+opaque black input-blocking backdrop and a texture-only display, using exactly
+the same `AtlasPlayerProjection.build_capture_input` sanitizer and private
+`AtlasMapCapture` as the native output. No GM canvas or canonical campaign is
+parented into this player host. The host must remain reserved for player
+content; embedding into a live GM sidebar or adding editor overlays is **not**
+a safe fallback. Production GM/player screen switching is not wired.
+
+Output begins blank. A trusted GM caller must explicitly provide layer grants
+and a matching camera frame before `publish()`. Missing or stale grants,
+render errors, mid-capture revocation, resize, aspect mismatch and host hiding
+all leave the surface blank; resized output requires a new matching frame.
+Follow/freeze changes only the player camera. A future trusted controller must
+call `invalidate()` on every publication-policy, fog and source-art revision,
+even while frozen. This isolated proof does **not** automatically subscribe to
+production editor changes. `close_output()` and removal of the session from the
+scene tree release the embedded surface. Superseded asynchronous callbacks do
+not invalidate a newer output.
+
+**Limitations:** This fallback displays a player screen *instead of* the GM
+editor in one viewport, not concurrently on a physical second monitor. Fullscreen,
+second-display selection and screen sharing belong to the browser/OS and are
+not implemented here. No native-only window API, DOM/JS bridge, network client,
+threads, or clipboard are required by this fallback; the rendering path uses
+Godot Control, SubViewport and Compatibility-renderer image readback.
+
+`tests/player_web_fallback_smoke.gd` checks headless host constraints, camera,
+resize, visibility and teardown; `player_web_fallback_visual.gd` uses a native
+harness window with an empty presentation Control to inspect the actual display
+framebuffer before, during and after authorized capture/revocation. This proves
+**native X11 Compatibility rendering**, not runtime Web behavior. The Web export
+build is a separate compilation check. Browser-runtime testing was deferred by
+the user and remains unperformed, alongside real player/GM privacy approval,
+production UI integration and owner acceptance. Keep `docs/Index.md` open.
