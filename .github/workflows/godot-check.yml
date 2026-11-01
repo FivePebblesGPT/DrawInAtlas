@@ -269,6 +269,13 @@ jobs:
           godot --headless --path . --script res://tests/snapping_smoke.gd 2>&1 | tee /tmp/godot-snapping.log
           grep -q 'ATLAS_SNAPPING_PASSED' /tmp/godot-snapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-snapping.log; then exit 1; fi
+      - name: Reject stale Search navigation results (T-009)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/search_stale_actions_smoke.gd 2>&1 | tee /tmp/godot-search-stale.log
+          grep -q 'ATLAS_SEARCH_STALE_PASSED' /tmp/godot-search-stale.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|SEARCH STALE FAILED:' /tmp/godot-search-stale.log; then exit 1; fi
       - name: Run workspace composition and organization tests
         shell: bash
         run: |

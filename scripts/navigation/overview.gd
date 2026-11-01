@@ -127,6 +127,7 @@ static func _append(result: AtlasOverviewResult, entry: AtlasOverviewEntry, limi
 
 static func _destination(campaign: AtlasCampaign, map_id: String, floor_id: String) -> AtlasOverviewEntry:
 	var entry: AtlasOverviewEntry = AtlasOverviewEntry.new()
+	entry.campaign_instance_id = campaign.get_instance_id()
 	entry.map_id = map_id
 	entry.floor_id = floor_id
 	var map: AtlasMapDocument = campaign.get_map(map_id)
@@ -134,7 +135,10 @@ static func _destination(campaign: AtlasCampaign, map_id: String, floor_id: Stri
 		entry.broken_reason = "Missing map: " + map_id
 		entry.caption = "Missing map: %s / %s" % [map_id, floor_id]
 	else:
+		entry.target_map_instance_id = map.get_instance_id()
 		var floor: AtlasFloor = map.floor_by_id(floor_id)
+		if floor != null:
+			entry.target_floor_instance_id = floor.get_instance_id()
 		var floor_name: String = floor.display_name if floor != null else floor_id
 		entry.caption = "%s · %s · %s · %d floors" % [map.display_name, map.kind, floor_name, map.floors.size()]
 		if not map.tags.is_empty():
@@ -151,6 +155,22 @@ static func _link_entry(campaign: AtlasCampaign, link: AtlasMapLink,
 	entry.source_map_id = link.source_map_id
 	entry.source_floor_id = link.source_floor_id
 	entry.link_id = link.id
+	entry.link_snapshot = link.to_dict().duplicate(true)
+	entry.placement_snapshot = placement.to_dict().duplicate(true) if placement != null else {}
+	entry.source_label_snapshot = _label(campaign, link.source_map_id, link.source_floor_id)
+	var source_map: AtlasMapDocument = campaign.get_map(link.source_map_id)
+	if source_map != null:
+		entry.source_map_instance_id = source_map.get_instance_id()
+		var source_floor: AtlasFloor = source_map.floor_by_id(link.source_floor_id)
+		if source_floor != null:
+			entry.source_floor_instance_id = source_floor.get_instance_id()
+	entry.path_snapshots = parent.path_snapshots.duplicate(true)
+	entry.path_snapshots.append({
+		"id": entry.link_id, "link": entry.link_snapshot, "placement": entry.placement_snapshot,
+		"source_map": entry.source_map_instance_id, "source_floor": entry.source_floor_instance_id,
+		"target_map": entry.target_map_instance_id, "target_floor": entry.target_floor_instance_id,
+		"source_label": entry.source_label_snapshot, "target_caption": entry.caption
+	})
 	entry.depth = parent.depth + 1
 	entry.breadcrumb = parent.breadcrumb + " → " + entry.breadcrumb
 	entry.source_focus = link.anchor
@@ -163,6 +183,64 @@ static func _link_entry(campaign: AtlasCampaign, link: AtlasMapLink,
 	if not link.placement_id.is_empty() and placement == null:
 		entry.broken_reason = _reason(entry.broken_reason, "Missing or mismatched placement: " + link.placement_id)
 	return entry
+
+
+## Reject stale UI actions even when a link retains its ID after being moved,
+## retargeted, replaced or associated with a changed legacy footprint.
+## This only validates existing overview results; it does not define a future
+## place-search ontology or change persistent data.
+static func entry_is_current(campaign: AtlasCampaign, entry: AtlasOverviewEntry) -> bool:
+	if campaign == null or entry == null or entry.campaign_instance_id != campaign.get_instance_id():
+		return false
+	# A descendant result is also stale if any ancestor entrance on its
+	# discovered path disappeared, moved, or was replaced.
+	for step: Dictionary in entry.path_snapshots:
+		var edge: AtlasMapLink = campaign.link_by_id(str(step["id"]))
+		if edge == null or edge.to_dict() != step["link"]:
+			return false
+		var source_map: AtlasMapDocument = campaign.get_map(edge.source_map_id)
+		var source_floor: AtlasFloor = source_map.floor_by_id(edge.source_floor_id) if source_map != null else null
+		var target_map: AtlasMapDocument = campaign.get_map(edge.target_map_id)
+		var target_level: AtlasFloor = target_map.floor_by_id(edge.target_floor_id) if target_map != null else null
+		var placement: AtlasPlacement = _owned_placement(campaign, edge)
+		var placement_state: Dictionary = placement.to_dict() if placement != null else {}
+		if (_instance_id(source_map) != step["source_map"]
+				or _instance_id(source_floor) != step["source_floor"]
+				or _instance_id(target_map) != step["target_map"]
+				or _instance_id(target_level) != step["target_floor"]
+				or _label(campaign, edge.source_map_id, edge.source_floor_id) != step["source_label"]
+				or _destination(campaign, edge.target_map_id, edge.target_floor_id).caption != step["target_caption"]
+				or placement_state != step["placement"]):
+			return false
+	var target: AtlasMapDocument = campaign.get_map(entry.map_id)
+	if _destination(campaign, entry.map_id, entry.floor_id).caption != entry.caption:
+		return false
+	if _instance_id(target) != entry.target_map_instance_id:
+		return false
+	var target_floor: AtlasFloor = target.floor_by_id(entry.floor_id) if target != null else null
+	if _instance_id(target_floor) != entry.target_floor_instance_id:
+		return false
+	if entry.link_id.is_empty():
+		return target_floor != null
+	var link: AtlasMapLink = campaign.link_by_id(entry.link_id)
+	if link == null or link.to_dict() != entry.link_snapshot:
+		return false
+	if (link.source_map_id != entry.source_map_id or link.source_floor_id != entry.source_floor_id
+			or link.target_map_id != entry.map_id or link.target_floor_id != entry.floor_id):
+		return false
+	var source: AtlasMapDocument = campaign.get_map(entry.source_map_id)
+	if _instance_id(source) != entry.source_map_instance_id:
+		return false
+	var floor: AtlasFloor = source.floor_by_id(entry.source_floor_id) if source != null else null
+	if _instance_id(floor) != entry.source_floor_instance_id:
+		return false
+	var placement: AtlasPlacement = _owned_placement(campaign, link)
+	var current_placement: Dictionary = placement.to_dict() if placement != null else {}
+	return current_placement == entry.placement_snapshot
+
+
+static func _instance_id(object: Object) -> int:
+	return object.get_instance_id() if object != null else 0
 
 
 static func _reason(previous: String, next: String) -> String:
