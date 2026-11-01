@@ -92,6 +92,21 @@ func _run() -> void:
 			"selected object scrolls within the compact hierarchy viewport")
 	_check(root.get_texture().get_image().save_png("user://validation/layer-hierarchy-overflow-800.png") == OK,
 		"native large-layer selection screenshot")
+	# Link buttons operate on the displayed snapshot, never a silently changed
+	# destination. The rejected button must refresh the native Tree row.
+	var link: AtlasMapLink = editor.campaign.links[0] if not editor.campaign.links.is_empty() else null
+	var link_group: TreeItem = panel.hierarchy.get_root().get_child(panel.hierarchy.get_root().get_child_count() - 1)
+	var link_row: TreeItem = link_group.get_first_child() if link_group != null else null
+	_check(link != null and link_row != null, "native link row exists")
+	if link != null and link_row != null:
+		var center: Vector2 = editor.canvas.camera_center
+		link.anchor += Vector2(83.0, -29.0)
+		panel._on_hierarchy_button(link_row, 0, AtlasLayerPanel.LINK_FOCUS, 1)
+		_check(editor.canvas.camera_center == center, "stale native link button cannot move the camera")
+		await _frames(3)
+		link_row = panel.hierarchy.get_root().get_child(panel.hierarchy.get_root().get_child_count() - 1).get_first_child()
+		_check(link_row != null and str(link_row.get_tooltip_text(0)).contains(str(link.anchor)),
+			"native link row refreshes after rejected click")
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_LAYER_HIERARCHY_VISUAL_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])

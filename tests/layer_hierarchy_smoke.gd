@@ -109,6 +109,7 @@ func _run() -> void:
 			editor.link_dialog.hide()
 	_check(editor.campaign.maps.size() == map_count, "link actions never synthesize map documents")
 	_test_large_object_layer(editor, panel)
+	await _test_stale_link_rows(editor, panel)
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_LAYER_HIERARCHY_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])
@@ -186,3 +187,106 @@ func _count_layer_strokes(panel: AtlasLayerPanel, layer_id: String) -> int:
 		if key.begins_with(layer_id + ":"):
 			count += 1
 	return count
+
+
+## A hierarchy row can outlive an edited entrance. No button may act on the
+## new link/placement/target using the old row, even if the IDs are unchanged.
+func _test_stale_link_rows(editor: AtlasEditor, panel: AtlasLayerPanel) -> void:
+	var link: AtlasMapLink = editor.campaign.links[0] if not editor.campaign.links.is_empty() else null
+	_check(link != null and link.source_map_id == editor.canvas.map.id,
+		"stale-link witness has an entrance on the active map")
+	if link == null or link.source_map_id != editor.canvas.map.id:
+		return
+	var actions: Array[StringName] = []
+	panel.link_action_requested.connect(func(_id: String, action: StringName) -> void:
+		actions.append(action))
+	panel.set_navigation_context(editor.campaign, editor.canvas.map)
+	var row: TreeItem = _find(panel.hierarchy.get_root(), "link", link.id)
+	_check(row != null, "entrance has an actionable hierarchy row")
+	if row == null:
+		return
+	var before_camera: Vector2 = editor.canvas.camera_center
+	var original_anchor: Vector2 = link.anchor
+	link.anchor += Vector2(187.0, -53.0)
+	panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_FOCUS, 1)
+	_check(actions.is_empty() and editor.canvas.camera_center == before_camera,
+		"old entrance row cannot focus a moved anchor")
+	await process_frame
+	row = _find(panel.hierarchy.get_root(), "link", link.id)
+	_check(row != null and str(row.get_tooltip_text(0)).contains(str(link.anchor)),
+		"rejected action refreshes the row to show the new anchor")
+	panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_FOCUS, 1)
+	_check(actions.size() == 1 and actions[0] == &"focus",
+		"fresh entrance row can focus after explicit retry")
+	link.anchor = original_anchor
+	panel.set_navigation_context(editor.campaign, editor.canvas.map)
+
+	row = _find(panel.hierarchy.get_root(), "link", link.id)
+	var target: AtlasMapDocument = editor.campaign.get_map(link.target_map_id)
+	_check(target != null, "link has a destination for stale-label test")
+	if target != null:
+		var original_name: String = target.display_name
+		target.display_name += " (changed)"
+		panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_EDIT, 1)
+		_check(actions.size() == 1 and not editor.link_dialog.visible,
+			"stale destination label cannot open an outdated edit dialog")
+		await process_frame
+		var refreshed: TreeItem = _find(panel.hierarchy.get_root(), "link", link.id)
+		_check(refreshed != null and refreshed.get_text(0).contains("(changed)"),
+			"destination label refreshes before another action")
+		target.display_name = original_name
+		panel.set_navigation_context(editor.campaign, editor.canvas.map)
+
+	# A legacy footprint can change without changing the link resource itself.
+	var original_placement_id: String = link.placement_id
+	var placement: AtlasPlacement = editor.campaign.placement_by_id(link.placement_id)
+	var temporary_placement: bool = placement == null
+	if temporary_placement:
+		placement = AtlasPlacement.new()
+		placement.id = "hierarchy-stale-footprint"
+		placement.parent_map_id = link.source_map_id
+		placement.child_map_id = link.target_map_id
+		link.placement_id = placement.id
+		editor.campaign.placements.append(placement)
+	panel.set_navigation_context(editor.campaign, editor.canvas.map)
+	row = _find(panel.hierarchy.get_root(), "link", link.id)
+	var original_origin: Vector2 = placement.origin
+	placement.origin += Vector2(25, 75)
+	panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_ENTER, 1)
+	_check(actions.size() == 1 and editor.canvas.map.id == link.source_map_id,
+		"old entrance row cannot enter after its footprint changes")
+	await process_frame
+	placement.origin = original_origin
+	if temporary_placement:
+		editor.campaign.placements.erase(placement)
+		link.placement_id = original_placement_id
+	panel.set_navigation_context(editor.campaign, editor.canvas.map)
+
+	row = _find(panel.hierarchy.get_root(), "link", link.id)
+	var original_focus: Vector2 = link.target_focus
+	link.target_focus += Vector2(8.0, 21.0)
+	panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_ENTER, 1)
+	_check(actions.size() == 1 and editor.canvas.map.id == link.source_map_id,
+		"old entrance row cannot enter after its arrival camera changes")
+	await process_frame
+	link.target_focus = original_focus
+	panel.set_navigation_context(editor.campaign, editor.canvas.map)
+
+	row = _find(panel.hierarchy.get_root(), "link", link.id)
+	var link_index: int = editor.campaign.links.find(link)
+	_check(link_index >= 0, "current link is still registered for stale-ID checks")
+	if link_index >= 0:
+		var replacement: AtlasMapLink = AtlasMapLink.from_dict(link.to_dict())
+		editor.campaign.links[link_index] = replacement
+		panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_EDIT, 1)
+		_check(actions.size() == 1 and not editor.link_dialog.visible,
+			"replacing an entrance with the same ID cannot activate its old row")
+		await process_frame
+		row = _find(panel.hierarchy.get_root(), "link", link.id)
+		editor.campaign.links.remove_at(link_index)
+		panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_FOCUS, 1)
+		_check(actions.size() == 1 and editor.canvas.map.id == link.source_map_id,
+			"deleted entrance cannot navigate from a leftover row")
+		await process_frame
+		editor.campaign.links.insert(link_index, link)
+		panel.set_navigation_context(editor.campaign, editor.canvas.map)

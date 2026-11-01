@@ -9,6 +9,7 @@ signal automatic_detail_toggled(enabled: bool)
 signal show_editing_detail_requested
 signal object_selected(layer_id: String, stroke_index: int)
 signal link_action_requested(link_id: String, action: StringName)
+signal link_action_rejected
 
 const LINK_FOCUS: int = 1
 const LINK_EDIT: int = 2
@@ -342,10 +343,22 @@ func _rebuild_hierarchy() -> void:
 	heading.collapsed = _collapsed.get(links_key, false)
 	for link: AtlasMapLink in links:
 		var target: AtlasMapDocument = _campaign.get_map(link.target_map_id)
+		var target_floor: AtlasFloor = target.floor_by_id(link.target_floor_id) if target != null else null
+		var placement: AtlasPlacement = (
+			_campaign.placement_by_id(link.placement_id) if not link.placement_id.is_empty() else null)
 		var label: String = "%s / %s" % [target.display_name if target != null else "Missing destination",
 			link.target_floor_id]
-		var row: TreeItem = _make_row(heading, label,
-			{"kind": "link", "id": link.id}, "Independent destination: %s / %s\nEntrance at %s\nLinks navigate documents; they are not detail layers" % [target.display_name if target != null else "Missing map", link.target_floor_id, link.anchor])
+		# Tree rows survive until the next refresh, but their destinations may not.
+		# Save immutable values and source identities so a stale click cannot act
+		# on a different entrance or map with the same IDs.
+		var snapshot: Dictionary = {"kind": "link", "id": link.id,
+			"campaign": _campaign, "map": _map, "floor": _floor,
+			"link_ref": link, "link": link.to_dict().duplicate(true),
+			"placement_ref": placement, "placement": placement.to_dict().duplicate(true) if placement != null else {},
+			"target": target, "target_floor": target_floor,
+			"target_name": target.display_name if target != null else ""}
+		var row: TreeItem = _make_row(heading, label, snapshot,
+			"Independent destination: %s / %s\nEntrance at %s\nLinks navigate documents; they are not detail layers" % [target.display_name if target != null else "Missing map", link.target_floor_id, link.anchor])
 		row.add_button(0, ICON_FOCUS, LINK_FOCUS, false, "Locate on this board")
 		row.add_button(0, ICON_EDIT, LINK_EDIT, false, "Edit link")
 		row.add_button(0, ICON_ENTER, LINK_ENTER, target == null or target.floor_by_id(link.target_floor_id) == null, "Enter destination map")
@@ -381,6 +394,32 @@ func _on_hierarchy_selected() -> void:
 			object_selected.emit.call_deferred(str(data.get("id", "")), -1)
 
 
+## Link rows are action handles, not authority to navigate. The document and
+## destination can change while the Tree is on screen, even without a redraw.
+func _link_row_is_current(data: Dictionary) -> bool:
+	if _campaign == null or _map == null or _floor == null or data.get("campaign") != _campaign \
+			or data.get("map") != _map or data.get("floor") != _floor:
+		return false
+	if _campaign.get_map(_map.id) != _map or _map.floor_by_id(_floor.id) != _floor:
+		return false
+	var link: AtlasMapLink = _campaign.link_by_id(str(data.get("id", "")))
+	if link == null or link != data.get("link_ref") or link.source_map_id != _map.id \
+			or link.source_floor_id != _floor.id or link.to_dict() != data.get("link"):
+		return false
+	var placement: AtlasPlacement = (
+		_campaign.placement_by_id(link.placement_id) if not link.placement_id.is_empty() else null)
+	if placement != data.get("placement_ref") \
+			or (placement.to_dict() if placement != null else {}) != data.get("placement"):
+		return false
+	var target: AtlasMapDocument = _campaign.get_map(link.target_map_id)
+	if target != data.get("target"):
+		return false
+	if target != null:
+		return target.display_name == data.get("target_name") \
+			and target.floor_by_id(link.target_floor_id) == data.get("target_floor")
+	return data.get("target_name") == "" and data.get("target_floor") == null
+
+
 func _on_hierarchy_button(item: TreeItem, _column: int, id: int, _mouse_button_index: int) -> void:
 	var data: Dictionary = item.get_metadata(0) if item.get_metadata(0) is Dictionary else {}
 	if data.get("kind") == "layer" and id == LAYER_SETTINGS:
@@ -389,6 +428,11 @@ func _on_hierarchy_button(item: TreeItem, _column: int, id: int, _mouse_button_i
 		_update_layer_settings()
 		return
 	if data.get("kind") != "link":
+		return
+	if not _link_row_is_current(data):
+		# Rebuilding inside a Tree button signal can invalidate the clicked item.
+		_rebuild_hierarchy.call_deferred()
+		link_action_rejected.emit()
 		return
 	var link_id: String = str(data.get("id", ""))
 	match id:

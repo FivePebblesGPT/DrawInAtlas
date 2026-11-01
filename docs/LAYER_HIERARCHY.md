@@ -16,6 +16,14 @@ The Layers sidebar now contains a single compact expandable Tree with D-group he
 
 Long object lists remain bounded to **80 regular object rows per Objects layer**: the oldest 40 and newest 40 are shown when there are more than 80. The skipped middle is explicitly summarized. When a middle object is selected on the canvas, a single temporary row appears in canonical index order and scrolls into view; it is removed on deselection, multi-selection or a stale object snapshot. The 80-row limit does not restrict the actual artwork or canvas selection. Expansion state survives layer-model redraws, but is a transient UI preference, not persisted in campaign saves.
 
+The `MAP LINKS` rows are also **snapshot-bound action handles**. Focus, Edit and Enter
+must refer to the same source document/floor, link revision, optional placement,
+and destination shown in that row. If any of these change before the click,
+the action is rejected, the hierarchy refreshes on the next frame, and the GM
+receives a message to select the refreshed entry. This prevents navigating from
+an outdated inline entry (including after deletion or reuse of a stable ID)
+without altering persisted links, destination maps or save schemas.
+
 ## Evidence and acceptance gate
 
 `tests/layer_hierarchy_smoke.gd` demonstrates authored grouping, object selection, link actions, disclosure, unaffected campaign identity, bounded large-object grouping and temporary selection rows. `tests/layer_hierarchy_visual.gd` verifies rendering, canvas clearance and selected-row visibility at 960×660 and 800×600 using real X11/Mesa framebuffer output. Screenshots are recorded in the ticket's execution evidence.

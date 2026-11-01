@@ -185,6 +185,8 @@ func _mount_sidebar_views() -> void:
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.object_selected.connect(_select_hierarchy_object)
 	layer_panel.link_action_requested.connect(_on_hierarchy_link_action)
+	layer_panel.link_action_rejected.connect(func() -> void:
+		_message("Map link changed. Select its refreshed hierarchy row before continuing."))
 	layer_panel.layers_changed.connect(apply_layers)
 	layer_panel.presented_detail_selected.connect(_on_presented_detail_selected)
 	layer_panel.automatic_detail_toggled.connect(_on_automatic_detail_toggled)
