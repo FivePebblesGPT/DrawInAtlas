@@ -342,6 +342,13 @@ jobs:
           godot --headless --path . --script res://tests/player_web_fallback_smoke.gd 2>&1 | tee /tmp/godot-player-web-fallback.log
           grep -q 'ATLAS_PLAYER_WEB_FALLBACK_PASSED' /tmp/godot-player-web-fallback.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|WEB FALLBACK FAILED:' /tmp/godot-player-web-fallback.log; then exit 1; fi
+      - name: Verify authoritative GM session and revision proof (T-045)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/authoritative_session_smoke.gd 2>&1 | tee /tmp/godot-authoritative-session.log
+          grep -q 'ATLAS_AUTHORITATIVE_SESSION_PASSED' /tmp/godot-authoritative-session.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|SESSION FAILED:' /tmp/godot-authoritative-session.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
       - name: Verify editable text and screen-space culling (T-027)
