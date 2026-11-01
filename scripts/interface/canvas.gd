@@ -17,6 +17,7 @@ signal pointer_moved(local_position: Vector2)
 signal interaction_started
 signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
+signal line_rejected(reason: String)
 signal path_edit_requested(index: int, expected: AtlasStroke, replacement: AtlasStroke)
 signal text_requested(anchor: Vector2, index: int)
 signal selection_changed
@@ -166,6 +167,12 @@ var _gesture_end: Vector2
 ## Frozen at gesture start so a toggle cannot desynchronize draft and commit.
 var _gesture_snap: bool = false
 var _shape_kind: String = ""
+## A Line draft is valid only for its original floor, raster and edit-mask
+## footprint. Release must not silently paint under a different authorization.
+var _line_scope_at_press: AtlasEditScope
+var _line_map_at_press: String = ""
+var _line_floor_at_press: String = ""
+var _line_layer_at_press: String = ""
 var _polygon_vertices: PackedVector2Array = PackedVector2Array()
 var _polygon_pointer: Vector2 = Vector2.ZERO
 ## Session-only vertex editing; resources remain in the ink layer and history.
@@ -256,6 +263,7 @@ func cancel_edit() -> void:
 	_panning = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
+	_clear_line_context()
 	_polygon_vertices.clear()
 	_wall_vertices.clear()
 	_wall_draft = null
@@ -274,6 +282,10 @@ func cancel_edit() -> void:
 
 
 func commit_edit() -> void:
+	if _shape_kind == "LINE" and not _line_context_matches():
+		cancel_edit()
+		line_rejected.emit("Line target or edit mask changed since preview; nothing painted.")
+		return
 	if not _wall_vertices.is_empty():
 		_finish_wall_path(false)
 		return
@@ -316,6 +328,7 @@ func commit_edit() -> void:
 	_end_freehand()
 	_draft_stroke = null
 	_shape_kind = ""
+	_clear_line_context()
 	_preview_layer = null
 	_clear_raster_textures()
 	stroke_requested.emit(stroke, erasing)
@@ -798,6 +811,24 @@ func _clear_ink_masks() -> void:
 			_render_states.erase(id)
 
 
+## Clear authorization captured for this unfinished Line on commit or cancel.
+func _clear_line_context() -> void:
+	_line_scope_at_press = null
+	_line_map_at_press = ""
+	_line_floor_at_press = ""
+	_line_layer_at_press = ""
+
+
+## Compare the current editable target and effective mask with the press-time
+## copy. An unlocked mask is always an empty polygon, regardless of cell focus.
+func _line_context_matches() -> bool:
+	return _line_scope_at_press != null and map != null and floor != null \
+		and map.id == _line_map_at_press and floor.id == _line_floor_at_press \
+		and active_layer_id == _line_layer_at_press \
+		and edit_scope.enabled == _line_scope_at_press.enabled \
+		and edit_scope.polygon == _line_scope_at_press.polygon
+
+
 ## Shape and wall previews follow live style controls without pointer motion.
 ## Freehand Brush/Eraser instead retain the style captured at gesture start.
 func _refresh_shape_style() -> void:
@@ -1153,6 +1184,11 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			if layer != null and layer.is_editable():
 				_erasing = false
 				_shape_kind = Tool.keys()[tool]
+				if tool == Tool.LINE:
+					_line_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+					_line_map_at_press = map.id
+					_line_floor_at_press = floor.id
+					_line_layer_at_press = active_layer_id
 				_gesture_snap = snap_to_grid
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_brush_cursor_local = mouse.position

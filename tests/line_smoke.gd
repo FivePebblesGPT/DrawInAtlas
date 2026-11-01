@@ -234,11 +234,50 @@ func _run() -> void:
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false)
 	_check(canvas.floor.raster_layer().chunks.is_empty(), "masked outside-area line cannot be committed")
+	# A mid-drag cell change must not reuse pixels previewed under the previous
+	# cell mask. Unlike a valid Line, rejection creates no undo entry.
+	var active_cell: Vector2i = canvas.map.grid.document_to_cell(canvas.camera_center)
+	var masked_center: Vector2 = canvas.map.grid.cell_to_document(active_cell)
+	var masked_start: Vector2 = masked_center - Vector2(4.0, 0.0)
+	var masked_finish: Vector2 = masked_center + Vector2(4.0, 0.0)
+	canvas.selected_cell = active_cell
+	canvas.has_selected_cell = true
+	editor.artwork.refresh_scope()
+	var pixels_before: Dictionary = canvas.floor.raster_layer().to_dict()
+	var undo_before: int = editor.edits._cursor
+	_button(canvas, masked_start, true)
+	_motion(canvas, masked_finish)
+	await process_frame
+	_check(canvas._preview_layer != null and canvas._preview_layer.to_dict() != pixels_before,
+		"masked Line preview draws eligible pixels before release")
+	editor._on_select(active_cell + Vector2i(3, 0))
+	_button(canvas, masked_finish, false)
+	_check(canvas.floor.raster_layer().to_dict() == pixels_before
+		and editor.edits._cursor == undo_before,
+		"changed selected cell rejects stale Line without pixels or history")
+	_check(not canvas.is_editing() and canvas._preview_layer == null
+		and "edit mask changed" in editor.status_label.text,
+		"rejected Line clears its preview and explains the mask conflict")
+
+	# An unchanged authorized mask still paints. A changed selected cell while
+	# masking is OFF must not invalidate a valid freehand Line.
+	editor._on_select(active_cell)
+	_button(canvas, masked_start, true)
+	_motion(canvas, masked_finish)
+	_button(canvas, masked_finish, false)
+	_check(canvas.floor.raster_layer().to_dict() != pixels_before
+		and editor.edits._cursor == undo_before + 1,
+		"fresh Line in restored cell commits exactly once")
+	_check(editor.edits.undo(), "masked Line can be undone")
+	_check(canvas.floor.raster_layer().to_dict() == pixels_before,
+		"masked Line undo restores source pixels")
 	editor._on_scope_toggled(false)
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
+	editor._on_select(active_cell + Vector2i(5, 5))
 	_button(canvas, pointer, false)
-	_check(not canvas.floor.raster_layer().chunks.is_empty(), "unmasked valid line commits pixels")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(),
+		"cell selection with masking disabled does not block a Line")
 	var saved: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)

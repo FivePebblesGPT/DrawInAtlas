@@ -133,6 +133,33 @@ func _run() -> void:
 	_check(editor.edits.undo() and canvas.floor.raster_layer().to_dict() == reference.layer.to_dict(),
 		"restyled native Line is one undoable raster edit")
 
+	# Native pointer events must not paint a Line whose allowed cell changes
+	# after the preview was rendered, even when the pointer is still held.
+	canvas.brush_width = 6.0
+	var cell: Vector2i = canvas.map.grid.document_to_cell(canvas.camera_center)
+	editor._on_select(cell)
+	editor._on_scope_toggled(true)
+	var center: Vector2 = canvas.map.grid.cell_to_document(cell)
+	var cell_start_ui: Vector2 = canvas.global_position + canvas.document_to_local(center - Vector2(4, 0))
+	var cell_end_ui: Vector2 = canvas.global_position + canvas.document_to_local(center + Vector2(4, 0))
+	var layer_before: Dictionary = canvas.floor.raster_layer().to_dict()
+	var history_before: int = editor.edits._cursor
+	_button(cell_start_ui, true)
+	_motion(cell_end_ui)
+	await _frames(5)
+	_check(canvas._preview_layer != null and canvas._preview_layer.to_dict() != layer_before,
+		"native selected-cell Line preview paints eligible pixels")
+	editor._on_select(cell + Vector2i(3, 0))
+	_button(cell_end_ui, false)
+	await _frames(4)
+	_check(canvas.floor.raster_layer().to_dict() == layer_before
+		and editor.edits._cursor == history_before,
+		"native release rejects a Line preview after its edit cell changes")
+	_check(canvas._preview_layer == null and not canvas.is_editing()
+		and "edit mask changed" in editor.status_label.text,
+		"rejected native Line clears the draft and explains the conflict")
+	editor._on_scope_toggled(false)
+
 	root.size = Vector2i(800, 600)
 	root.content_scale_size = root.size
 	await _frames(8)
