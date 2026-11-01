@@ -16,13 +16,16 @@
 ## First priority
 - [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
 
-## Architecture split — proposed, design approval required
+## Architecture split — owner direction confirmed, interface decisions pending
 - [ ] [[T-051|T-051 · Approve Drawing / Atlas boundaries and contracts]]
 - [ ] [[T-052|T-052 · Extract campaign-independent Drawing core]]
 - [ ] [[T-053|T-053 · Standalone Drawing workspace and viewport]]
 - [ ] [[T-054|T-054 · Drawing edits and integrated undo history]]
 - [ ] [[T-055|T-055 · Embed Drawing in Atlas through adapters]]
-- [ ] [[T-056|T-056 · Save/UX/regression gate and compatibility cleanup]]
+- [ ] [[T-056|T-056 · New-save/UX/regression gate and cleanup]]
+- [ ] [[T-057|T-057 · Native map LOD/rendering feasibility benchmark]]
+- [ ] [[T-058|T-058 · Editable text layers and rasterization]]
+- [ ] [[T-059|T-059 · Drawing feature inventory and UX criteria]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]
@@ -37,7 +40,7 @@
 - [x] [[T-011|T-011 · Mouse-wheel pen width]]
 - [x] [[T-012|T-012 · Replace battlemats with authored local detail]]
 - [x] [[T-014|T-014 · Retire battlemat creation controls]]
-- [ ] [[T-015|T-015 · Retire the old model while preserving artwork]]
+- [ ] [[T-015|T-015 · Remove obsolete model code (save migration waived)]]
 - [x] [[T-016|T-016 · Coherent detail-editing snapping]]
 - [ ] [[T-018|T-018 · Compact layer/object/link hierarchy]]
 - [x] [[T-019|T-019 · Selection and selection masks]]
