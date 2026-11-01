@@ -1,6 +1,7 @@
 # Index
 
 ## Epics
+- [ ] [[E-009|E-009 · Drawing / Atlas capability separation]]
 - [ ] [[E-001|E-001 · Drawing, erasing and edit history]]
 - [ ] [[E-002|E-002 · Continuous chunked board and grid masks]]
 - [ ] [[E-003|E-003 · Typed artwork model and persistence]]
@@ -14,6 +15,14 @@
 
 ## First priority
 - [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
+
+## Architecture split — proposed, design approval required
+- [ ] [[T-051|T-051 · Approve Drawing / Atlas boundaries and contracts]]
+- [ ] [[T-052|T-052 · Extract campaign-independent Drawing core]]
+- [ ] [[T-053|T-053 · Standalone Drawing workspace and viewport]]
+- [ ] [[T-054|T-054 · Drawing edits and integrated undo history]]
+- [ ] [[T-055|T-055 · Embed Drawing in Atlas through adapters]]
+- [ ] [[T-056|T-056 · Save/UX/regression gate and compatibility cleanup]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]
