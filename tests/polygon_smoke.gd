@@ -170,7 +170,84 @@ func _run() -> void:
 		_vertex(canvas, point)
 	_key(canvas, KEY_ENTER)
 	_check(canvas.floor.raster_layer().chunks.is_empty(), "cell mask rejects filled polygon outside mask")
+	# T-025: a multi-click Polygon may only close in the scope where its
+	# first vertex was placed. No later cell selection may retarget its fill.
+	var active_cell: Vector2i = Vector2i(2, 2)
+	editor._on_select(active_cell)
+	var masked_center: Vector2 = canvas.map.grid.cell_to_document(active_cell)
+	var masked_triangle: PackedVector2Array = PackedVector2Array([
+		masked_center + Vector2(-8, -8), masked_center + Vector2(8, -8),
+		masked_center + Vector2(0, 7)])
+	var before_masked: Dictionary = canvas.floor.raster_layer().to_dict()
+	var before_history: int = editor.edits._cursor
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	canvas._process(0.0)
+	_check(canvas._preview_layer != null and canvas._polygon_scope_at_start != null
+		and canvas._polygon_scope_at_start.enabled, "Polygon preview records its first selected-cell mask")
+	editor._on_select(active_cell + Vector2i(3, 0))
+	_key(canvas, KEY_ENTER)
+	_check(canvas.floor.raster_layer().to_dict() == before_masked and editor.edits._cursor == before_history,
+		"changed cell rejects Polygon without raster or undo mutation")
+	_check(not canvas.is_editing() and canvas._preview_layer == null
+		and canvas._polygon_scope_at_start == null and "edit mask changed" in editor.status_label.text,
+		"rejected Polygon clears preview and reports changed mask")
+
+	# Changing eligibility between vertex clicks must reject the entire draft,
+	# not silently accept the next vertex under a new selection.
+	editor._on_select(active_cell)
+	_vertex(canvas, masked_triangle[0]); _vertex(canvas, masked_triangle[1])
+	editor._on_select(active_cell + Vector2i(1, 0))
+	_vertex(canvas, masked_triangle[2])
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().to_dict() == before_masked
+		and editor.edits._cursor == before_history, "stale next vertex cancels the Polygon atomically")
+
+	# Same selected cell, different rotated-grid polygon is a different mask.
+	editor._on_select(active_cell)
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	var original_rotation: float = canvas.map.grid.rotation
+	canvas.map.grid.rotation += deg_to_rad(17.0)
+	editor.artwork.refresh_scope()
+	_key(canvas, KEY_ENTER)
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().to_dict() == before_masked
+		and editor.edits._cursor == before_history, "rotated edit-mask rejects pending Polygon")
+	canvas.map.grid.rotation = original_rotation
+	editor.artwork.refresh_scope()
+
+	# An active-layer switch outside the tool also must not redirect the draft.
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	var raster_id: String = canvas.active_layer_id
+	canvas.active_layer_id = canvas.floor.objects_layer().id
+	_key(canvas, KEY_ENTER)
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().to_dict() == before_masked
+		and editor.edits._cursor == before_history, "changed layer rejects pending Polygon")
+	canvas.active_layer_id = raster_id
+
+	# A new gesture with a current, unchanged mask still commits once.
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	canvas._process(0.0)
+	var authorized_preview: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	_key(canvas, KEY_ENTER)
+	_check(canvas.floor.raster_layer().to_dict() == authorized_preview
+		and canvas.floor.raster_layer().to_dict() != before_masked
+		and editor.edits._cursor == before_history + 1, "fresh Polygon commits only authorized preview pixels")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().to_dict() == before_masked,
+		"masked Polygon undo restores unchanged source")
+
 	editor._on_scope_toggled(false)
+	# Changing the highlighted cell while masking is OFF is not a veto.
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	editor._on_select(active_cell + Vector2i(5, 5))
+	_key(canvas, KEY_ENTER)
+	_check(canvas.floor.raster_layer().to_dict() != before_masked
+		and editor.edits._cursor == before_history + 1,
+		"unlocked cell selection does not reject an unmasked Polygon")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().to_dict() == before_masked,
+		"unmasked Polygon undo restores source")
 	# Clicking twice on final vertex should not create a duplicate invalid edge.
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)

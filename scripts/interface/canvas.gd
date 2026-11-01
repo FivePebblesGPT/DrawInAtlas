@@ -18,6 +18,7 @@ signal interaction_started
 signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
 signal line_rejected(reason: String)
+signal polygon_rejected(reason: String)
 signal path_edit_requested(index: int, expected: AtlasStroke, replacement: AtlasStroke)
 signal text_requested(anchor: Vector2, index: int)
 signal selection_changed
@@ -173,6 +174,12 @@ var _line_scope_at_press: AtlasEditScope
 var _line_map_at_press: String = ""
 var _line_floor_at_press: String = ""
 var _line_layer_at_press: String = ""
+## The Polygon is a multi-click gesture; its first vertex freezes the exact
+## editable target and cell mask until a valid close or explicit cancellation.
+var _polygon_scope_at_start: AtlasEditScope
+var _polygon_map_at_start: AtlasMapDocument
+var _polygon_floor_at_start: AtlasFloor
+var _polygon_layer_at_start: AtlasRasterLayer
 var _polygon_vertices: PackedVector2Array = PackedVector2Array()
 var _polygon_pointer: Vector2 = Vector2.ZERO
 ## Session-only vertex editing; resources remain in the ink layer and history.
@@ -264,6 +271,7 @@ func cancel_edit() -> void:
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
 	_clear_line_context()
+	_clear_polygon_context()
 	_polygon_vertices.clear()
 	_wall_vertices.clear()
 	_wall_draft = null
@@ -286,6 +294,9 @@ func commit_edit() -> void:
 		cancel_edit()
 		line_rejected.emit("Line target or edit mask changed since preview; nothing painted.")
 		return
+	if not _polygon_vertices.is_empty() and not _polygon_context_matches():
+		_reject_stale_polygon()
+		return
 	if not _wall_vertices.is_empty():
 		_finish_wall_path(false)
 		return
@@ -295,6 +306,7 @@ func commit_edit() -> void:
 	if not _polygon_vertices.is_empty():
 		var shape: AtlasStroke = AtlasShapes.polygon(_polygon_vertices, brush_color, brush_width, polygon_solid_fill)
 		_polygon_vertices.clear()
+		_clear_polygon_context()
 		_draft_stroke = null
 		_preview_layer = null
 		_preview_dirty = false
@@ -827,6 +839,29 @@ func _line_context_matches() -> bool:
 		and active_layer_id == _line_layer_at_press \
 		and edit_scope.enabled == _line_scope_at_press.enabled \
 		and edit_scope.polygon == _line_scope_at_press.polygon
+
+
+## Do not allow a multi-click Polygon to silently change its target or
+## eligibility mask between the first vertex and closure.
+func _clear_polygon_context() -> void:
+	_polygon_scope_at_start = null
+	_polygon_map_at_start = null
+	_polygon_floor_at_start = null
+	_polygon_layer_at_start = null
+
+
+func _polygon_context_matches() -> bool:
+	return _polygon_scope_at_start != null and map != null and floor != null \
+		and map == _polygon_map_at_start and floor == _polygon_floor_at_start \
+		and floor.layer_by_id(active_layer_id) == _polygon_layer_at_start \
+		and _polygon_layer_at_start.is_editable() and editing_target_is_presented() \
+		and edit_scope.enabled == _polygon_scope_at_start.enabled \
+		and edit_scope.polygon == _polygon_scope_at_start.polygon
+
+
+func _reject_stale_polygon() -> void:
+	cancel_edit()
+	polygon_rejected.emit("Polygon target or edit mask changed since first vertex; nothing painted.")
 
 
 ## Shape and wall previews follow live style controls without pointer motion.
@@ -1503,6 +1538,9 @@ func _handle_wall_key(event: InputEventKey) -> void:
 ## Each click fixes a vertex. Click near the first point, double-click, Enter,
 ## or right-click to close. Backspace removes the last vertex; Escape cancels.
 func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> void:
+	if not _polygon_vertices.is_empty() and not _polygon_context_matches():
+		_reject_stale_polygon()
+		return
 	if not editing_target_is_presented():
 		return
 	var layer: AtlasRasterLayer = floor.layer_by_id(active_layer_id) as AtlasRasterLayer
@@ -1511,6 +1549,10 @@ func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> v
 	if _polygon_vertices.is_empty():
 		_erasing = false
 		_gesture_snap = snap_to_grid
+		_polygon_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+		_polygon_map_at_start = map
+		_polygon_floor_at_start = floor
+		_polygon_layer_at_start = layer
 	var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
 	if mouse.double_click:
 		if _polygon_vertices.size() >= 3:
@@ -1528,6 +1570,9 @@ func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> v
 
 func _update_polygon_preview(local_position: Vector2) -> void:
 	if _polygon_vertices.is_empty():
+		return
+	if not _polygon_context_matches():
+		_reject_stale_polygon()
 		return
 	_polygon_pointer = local_to_document(local_position)
 	if _gesture_snap:

@@ -204,6 +204,7 @@ func _connect_workspace() -> void:
 	raster_importer.failed.connect(_message)
 	canvas.stroke_requested.connect(artwork.stroke)
 	canvas.line_rejected.connect(_message)
+	canvas.polygon_rejected.connect(_message)
 	canvas.path_edit_requested.connect(artwork.edit_path)
 	canvas.token_edit_requested.connect(_edit_token)
 	canvas.fog_edit_requested.connect(_edit_fog)
