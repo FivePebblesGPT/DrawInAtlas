@@ -72,7 +72,7 @@ undo invalidation, and session close.
 
 Still required for T-046 acceptance: owner-approved publication granularity
 (T-039), object/token ownership and permissions, safe semantic-object/fog
-replication, authenticated server-side identity binding, reconnect epochs
-(T-047), network message budgets, rekeying and replay limits, real transport,
+replication, authenticated server-side identity binding and real reconnect epochs
+(T-047 only provides trusted in-process reconnect), network message budgets, rekeying and replay limits, real transport,
 and production end-to-end privacy review. Do **not** mark T-046 complete in
 `docs/Index.md` based on this proof.

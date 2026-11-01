@@ -12,6 +12,7 @@ var _artwork: Dictionary = {}
 var _next_request: int = 0
 var _needs_sync: bool = false
 var _last_request: Dictionary = {}
+var _online: bool = true
 
 
 func _init(host: AtlasHostSession, peer: String) -> void:
@@ -31,7 +32,24 @@ func _clear_public_artwork() -> void:
 	_artwork.clear()
 
 
+## A retired handle cannot accept late updates or resync, even if a sender
+## still has a reference to it. Player-facing pixels are purged immediately.
+func _on_disconnected() -> void:
+	_online = false
+	_clear_public_artwork()
+
+
+## Called only by the trusted host while making a replacement connection.
+## Preserve request IDs for explicit lost-ack retry, never enqueue them for
+## automatic execution when a new connection opens.
+func _inherit_request_state(previous: AtlasSessionClient) -> void:
+	_next_request = previous._next_request
+	_last_request = previous._last_request.duplicate(true)
+
+
 func move_token(token_id: String, position: Vector2) -> Dictionary:
+	if not _online:
+		return {"ok": false, "code": "NOT_CONNECTED"}
 	if _needs_sync or revision < 0:
 		return {"ok": false, "code": "SYNC_REQUIRED"}
 	_next_request += 1
@@ -43,12 +61,16 @@ func move_token(token_id: String, position: Vector2) -> Dictionary:
 
 
 func retry_last() -> Dictionary:
+	if not _online:
+		return {"ok": false, "code": "NOT_CONNECTED"}
 	if _last_request.is_empty():
 		return {"ok": false, "code": "NO_REQUEST"}
 	return _host.receive(self, _last_request.duplicate(true))
 
 
 func resync() -> bool:
+	if not _online:
+		return false
 	var snapshot: Dictionary = _host.snapshot_for(self)
 	if snapshot.is_empty():
 		return false
@@ -57,6 +79,8 @@ func resync() -> bool:
 
 
 func _receive_snapshot(snapshot: Dictionary) -> void:
+	if not _online:
+		return
 	session_id = snapshot["session_id"]
 	revision = (snapshot["revision"] as String).to_int()
 	_tokens.clear()
@@ -67,6 +91,8 @@ func _receive_snapshot(snapshot: Dictionary) -> void:
 
 
 func _receive_update(snapshot: Dictionary) -> void:
+	if not _online:
+		return
 	if _needs_sync or snapshot["session_id"] != session_id or snapshot["revision"] != str(revision + 1):
 		_needs_sync = true
 		_clear_public_artwork()

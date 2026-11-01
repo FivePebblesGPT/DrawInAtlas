@@ -1,10 +1,9 @@
 class_name AtlasHostSession
 extends RefCounted
-## T-045: trusted, in-process GM collaboration proof. Only this host owns the
-## mutable campaign and edit history. No socket, player authorization or
-## arbitrary client-provided EditCommand/Resource deserialization is allowed.
-## Viewer publications are explicit, host-filtered DTOs (T-046). No transport
-## authentication or production publishing integration is implied.
+## T-045/T-047: trusted, in-process authoritative collaboration proof. Only
+## this host owns the mutable campaign and edit history. Arbitrary client
+## commands/Resources are forbidden; viewer DTOs are host-filtered (T-046).
+## Handle-based reconnect is not network authentication or live publishing.
 
 const MAX_PEERS: int = 16
 const MAX_REQUESTS_PER_PEER: int = 256
@@ -26,7 +25,8 @@ var _baseline: Dictionary = {}
 var _document_baseline: Dictionary = {}
 var _roles: Dictionary = {} # host-owned peer ID -> gm/player/spectator
 var _publication: Dictionary = {} # viewer peer ID -> {grants, detail_level}
-var _connections: Dictionary = {} # peer ID -> AtlasSessionClient
+var _connections: Dictionary = {} # currently connected peer ID -> handle
+var _registered: Dictionary = {} # peer ID -> most recent trusted handle, even when offline
 var _requests: Dictionary = {} # peer ID -> request ID -> original payload and response
 var _invalidated: bool = false
 var _own_history_change: bool = false
@@ -74,7 +74,7 @@ func join(peer_id: String) -> AtlasSessionClient:
 func join_as(peer_id: String, role: String, grants: Array[String] = [],
 		detail_level: int = 0) -> AtlasSessionClient:
 	if not is_ready() or not _identity_valid(peer_id) or _requests.has(peer_id) \
-			or _connections.size() >= MAX_PEERS or not _source_unchanged():
+			or _registered.size() >= MAX_PEERS or not _source_unchanged():
 		return null
 	if role != "gm" and role != "player" and role != "spectator":
 		return null
@@ -87,9 +87,37 @@ func join_as(peer_id: String, role: String, grants: Array[String] = [],
 	if role != "gm":
 		_publication[peer_id] = {"grants": grants.duplicate(), "detail_level": detail_level}
 	_connections[peer_id] = client
+	_registered[peer_id] = client
 	_requests[peer_id] = {}
 	client._receive_snapshot(_snapshot_for(client))
 	return client
+
+
+## Trusted controller disconnect: keep the peer's role, permissions and
+## deduplication ledger, but revoke this handle's access immediately. Viewer
+## bytes are cleared locally, even when publication was previously frozen.
+func disconnect_peer(client: AtlasSessionClient) -> bool:
+	if not _connected(client):
+		return false
+	_connections.erase(client.peer_id)
+	client._on_disconnected()
+	return true
+
+
+## Trusted controller reconnect: the original handle is the local proof of
+## identity. A peer string alone must never resume a role or publication grant.
+## Always send a fresh full snapshot filtered by the CURRENT host policy;
+## never replay missed deltas or queued edits. The old handle stays retired.
+func reconnect(previous: AtlasSessionClient) -> AtlasSessionClient:
+	if previous == null or _registered.get(previous.peer_id) != previous \
+			or _connections.has(previous.peer_id) or not _source_unchanged():
+		return null
+	var replacement: AtlasSessionClient = AtlasSessionClient.new(self, previous.peer_id)
+	replacement._inherit_request_state(previous)
+	_registered[previous.peer_id] = replacement
+	_connections[previous.peer_id] = replacement
+	replacement._receive_snapshot(_snapshot_for(replacement))
+	return replacement
 
 
 func snapshot_for(client: AtlasSessionClient) -> Dictionary:
@@ -146,6 +174,8 @@ func close() -> void:
 	## GM mirrors retain detached token snapshots; player/spectator imagery is
 	## cleared. No peer may submit or resync, and IDs cannot be recycled.
 	_invalidate()
+	for recipient: AtlasSessionClient in _registered.values():
+		recipient._on_disconnected()
 	_connections.clear()
 	if _history != null and _history.changed.is_connected(_on_history_changed):
 		_history.changed.disconnect(_on_history_changed)

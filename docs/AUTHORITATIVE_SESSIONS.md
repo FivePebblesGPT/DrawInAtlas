@@ -61,8 +61,8 @@ requires owner acceptance before production publication. This prototype must not
 into the unapproved player-output surface.
 
 A production implementation additionally requires authenticated transport,
-connection ownership, bounded message size and rate limits, reconnection,
-replay handling across transport epochs, permission-aware snapshots, persistence
+connection ownership, bounded message size and rate limits, authenticated
+network reconnection, replay handling across transport epochs, persistence
 of revision/session semantics if desired, host/editor mutual exclusion and a
 policy for local undo/rebase. The prototype's snapshot comparison detects
 out-of-band changes **to the bound layer** (and replacement of map/floor/layer
@@ -86,3 +86,14 @@ edit. Revocation, outbound image bytes, serialized fog and failure behavior are
 specified and regression-tested in [ROLE_FILTERED_REPLICATION](ROLE_FILTERED_REPLICATION.md).
 The original GM-only protocol above still applies to **GM peers only**;
 viewer clients must not be given the GM join capability across a network.
+
+## T-047 trusted reconnect/resync proof
+
+A disconnected peer now has a retired handle. A trusted local controller can
+replace it with a fresh handle and a full host-filtered current-revision
+snapshot, while retaining the peer's deduplication ledger. GM requests are
+never automatically replayed; uncertain outcomes require an explicit retry
+using the original request ID. Offline viewer bytes are immediately purged,
+and reconnect authorization is reevaluated against *current* grants. See
+[RECONNECT_RESYNCHRONIZATION](RECONNECT_RESYNCHRONIZATION.md) for the precise
+in-process contract and the remaining authentication/transport limitations.
