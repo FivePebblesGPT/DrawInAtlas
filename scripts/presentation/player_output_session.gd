@@ -101,6 +101,11 @@ func publish(source: AtlasMapDocument, floor_id: String, detail_level: int,
 	var generation: int = _generation
 	if window == null or _capture == null or not _frame_set:
 		return false
+	# Capture runs asynchronously: a fog edit during GPU readback must invalidate
+	# the detached snapshot, even if the caller forgot to revoke its grant.
+	var fog_signature: String = _fog_signature(source, floor_id)
+	if fog_signature.is_empty():
+		return false
 	var sanitized: AtlasCampaign = AtlasPlayerProjection.build_capture_input(
 		source, floor_id, detail_level, granted_layer_ids)
 	if sanitized == null:
@@ -110,7 +115,9 @@ func publish(source: AtlasMapDocument, floor_id: String, detail_level: int,
 	var bounds: Rect2 = Rect2(camera_center - dimensions * 0.5, dimensions)
 	var image: Image = await _capture.capture(sanitized, board, board.default_floor_id,
 		bounds, output_size, false, detail_level)
-	if generation != _generation or image == null or display == null:
+	if generation != _generation or image == null or display == null \
+			or _fog_signature(source, floor_id) != fog_signature:
+		invalidate()
 		return false
 	display.texture = ImageTexture.create_from_image(image)
 	return true
@@ -128,3 +135,18 @@ func _on_output_resized() -> void:
 
 func _exit_tree() -> void:
 	invalidate()
+
+
+## Compare only the fog authorization, not editor layer visibility. A complete
+## production revocation controller (including frozen output) is T-043 work.
+func _fog_signature(document: AtlasMapDocument, floor_id: String) -> String:
+	var floor: AtlasFloor = document.floor_by_id(floor_id) if document != null else null
+	if floor == null or not floor.valid_fog():
+		return ""
+	var operations: Array[Dictionary] = []
+	for region: AtlasFogRegion in floor.fog_regions:
+		operations.append(region.to_dict())
+	return JSON.stringify({"map_instance": document.get_instance_id(),
+		"floor_instance": floor.get_instance_id(), "enabled": floor.fog_enabled,
+		"regions": operations},
+		"", true, true).sha256_text()

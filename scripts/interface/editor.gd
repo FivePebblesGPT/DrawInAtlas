@@ -205,6 +205,7 @@ func _connect_workspace() -> void:
 	canvas.stroke_requested.connect(artwork.stroke)
 	canvas.path_edit_requested.connect(artwork.edit_path)
 	canvas.token_edit_requested.connect(_edit_token)
+	canvas.fog_edit_requested.connect(_edit_fog)
 	canvas.text_requested.connect(_open_text_editor)
 	canvas.transform_requested.connect(artwork.transform_selection)
 	canvas.fill_requested.connect(artwork.commit_preview_fill)
@@ -410,6 +411,7 @@ func _on_documents_changed() -> void:
 		browser.refresh(campaign)
 		linked_maps.refresh()
 		layer_panel.set_navigation_context(campaign, canvas.map)
+		canvas._overlay.queue_redraw()
 
 
 func _message(value: String) -> void:
@@ -423,6 +425,8 @@ func _clone_floors() -> Array[AtlasFloor]:
 		copy.id = floor.id
 		copy.display_name = floor.display_name
 		copy.layers = AtlasLayerCodec.clone_all(floor.layers)
+		copy.fog_enabled = floor.fog_enabled
+		copy.fog_regions = AtlasFloor.clone_fog(floor.fog_regions)
 		result.append(copy)
 	return result
 
@@ -722,6 +726,21 @@ func _edit_token(before: AtlasToken, after: AtlasToken) -> void:
 	_refresh_layers(layer.id)
 
 
+## Fog is floor-owned GM state, not an editable raster/Objects layer.
+## The command records original map/floor identities, scope and exact snapshots.
+func _edit_fog(bounds: Rect2, reveal: bool) -> void:
+	if canvas.map == null or canvas.floor == null:
+		return
+	var region: AtlasFogRegion = AtlasFogRegion.new(bounds, reveal)
+	var command: AtlasFogEdit = AtlasFogEdit.new(canvas.map, canvas.floor, region, artwork.scope())
+	if not edits.execute(command):
+		_message("Fog edit rejected: invalid rectangle, edit mask or stale floor.")
+		return
+	canvas.queue_redraw()
+	canvas._overlay.queue_redraw()
+	_message("Fog %s on this floor (all detail levels). Undo with Ctrl+Z." % ("revealed" if reveal else "hidden"))
+
+
 func _on_selection_changed() -> void:
 	inspector.refresh_selection(canvas.selection, can_modify_selection())
 	if layer_panel != null:
@@ -990,9 +1009,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		else:
 			delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T, KEY_K]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T, KEY_K, KEY_G]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
 			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT, KEY_K: AtlasCanvas.Tool.TOKEN}
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT, KEY_K: AtlasCanvas.Tool.TOKEN, KEY_G: AtlasCanvas.Tool.FOG}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

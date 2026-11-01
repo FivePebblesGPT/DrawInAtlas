@@ -304,3 +304,15 @@ Store deliberate persistent document metadata separately: actual raster/ink laye
 - How to package/share assets without violating their licenses.
 
 These are implementation experiments, not blockers for defining document and link IDs now.
+
+
+## GM fog (T-042 engineering checkpoint)
+
+A floor additionally owns `fog_enabled: bool` and ordered `fog_regions:
+Array[AtlasFogRegion]`. Each region is a finite board-space `Rect2` and a
+reveal/hide operation; latest covering operation wins. This state is shared by
+all authored detail levels on that floor, independent of layers and tokens.
+Legacy saves default to fog disabled. The native scene validator/digest checks
+that the complete operation list is bounded and well-formed. The isolated
+player projection removes hidden raster pixels and disallows semantic-object
+grants when fog is active; this is not an approved production publication policy.

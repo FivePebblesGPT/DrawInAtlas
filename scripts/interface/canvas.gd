@@ -27,8 +27,9 @@ signal fill_cancel_requested
 signal view_region_changed
 signal projector_frame_changed
 signal token_edit_requested(before: AtlasToken, after: AtlasToken)
+signal fog_edit_requested(bounds: Rect2, reveal: bool)
 
-enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN }
+enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 enum FrameDrag { NONE, MOVE, RESIZE }
@@ -126,6 +127,11 @@ var selected_token_id: String = ""
 var _token_drag_before: AtlasToken
 var _token_drag_preview: AtlasToken
 var _token_drag_start: Vector2 = Vector2.ZERO
+## GM-only rectangle draft; not a saved artwork layer or captured overlay.
+var _fog_drag_active: bool = false
+var _fog_start: Vector2 = Vector2.ZERO
+var _fog_end: Vector2 = Vector2.ZERO
+var _fog_reveal: bool = true
 var _panning: bool = false
 var _fill_pending: bool = false
 var _pending_wheel_fraction: float = 0.0
@@ -231,10 +237,14 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return _token_drag_before != null or _frame_drag != FrameDrag.NONE or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
+	return _fog_drag_active or _token_drag_before != null or _frame_drag != FrameDrag.NONE \
+		or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending \
+		or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() \
+		or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
+	_fog_drag_active = false
 	_token_drag_before = null
 	_token_drag_preview = null
 	cancel_projector_frame_drag()
@@ -597,6 +607,14 @@ func _draw_overlays(item: Node2D) -> void:
 	if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
 		var outline: PackedVector2Array = map.grid.cell_polygon(selected_cell)
 		_stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
+	if tool == Tool.FOG:
+		for region: AtlasFogRegion in floor.fog_regions:
+			item.draw_rect(region.bounds, Color(0.2, 0.9, 0.85, 0.16) if region.reveal else Color(1, 0.3, 0.3, 0.2))
+			item.draw_rect(region.bounds, Color("#63d9d1") if region.reveal else Color("#f07474"), false, 1.0 / camera_zoom)
+		if _fog_drag_active:
+			var candidate: Rect2 = Rect2(_fog_start, _fog_end - _fog_start).abs()
+			item.draw_rect(candidate, Color(0.2, 0.9, 0.85, 0.27) if _fog_reveal else Color(1, 0.3, 0.3, 0.27))
+			item.draw_rect(candidate, Color("#63d9d1") if _fog_reveal else Color("#f07474"), false, 2.0 / camera_zoom)
 	if not _moving_link_id.is_empty():
 		var link: AtlasMapLink = campaign.link_by_id(_moving_link_id)
 		if link != null:
@@ -1099,6 +1117,12 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	if _begin_link_press(mouse, position):
 		return
 	match tool:
+		Tool.FOG:
+			_fog_start = position
+			_fog_end = position
+			_fog_reveal = not mouse.shift_pressed
+			_fog_drag_active = true
+			_overlay.queue_redraw()
 		Tool.TEXT:
 			_begin_text_edit(position)
 		Tool.TOKEN:
@@ -1206,7 +1230,16 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 
 
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
-	if _token_drag_before != null:
+	if _fog_drag_active:
+		_fog_end = local_to_document(mouse.position)
+		var bounds: Rect2 = Rect2(_fog_start, _fog_end - _fog_start).abs()
+		var reveal: bool = _fog_reveal
+		_fog_drag_active = false
+		_overlay.queue_redraw()
+		if bounds.size.x > 0.001 and bounds.size.y > 0.001:
+			fog_edit_requested.emit(bounds, reveal)
+		interaction_finished.emit()
+	elif _token_drag_before != null:
 		_finish_token_drag(local_to_document(mouse.position))
 	elif _fill_pending:
 		_fill_pending = false
@@ -1245,6 +1278,9 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 	elif not _moving_link_id.is_empty():
 		_link_move_end = local_to_document(motion.position)
 		queue_redraw()
+	elif _fog_drag_active:
+		_fog_end = local_to_document(motion.position)
+		_overlay.queue_redraw()
 	elif _token_drag_before != null:
 		_update_token_drag(local_to_document(motion.position))
 	elif _manipulation != Manipulation.NONE:

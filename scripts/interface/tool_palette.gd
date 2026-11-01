@@ -23,6 +23,9 @@ const CATEGORIES: Array[Dictionary] = [
 		{"id": AtlasCanvas.Tool.ART_SELECT, "name": "Select objects", "key": "V", "icon": "select", "hint": "Objects layer selected automatically. Drag/select, Ctrl add, Alt subtract; Delete removes objects"},
 		{"id": AtlasCanvas.Tool.MOVE, "name": "Move objects", "key": "M", "icon": "move", "hint": "Objects layer selected automatically. Pick an object or drag its selection; Escape cancels"},
 	]},
+	{"title": "PLAYER VISIBILITY (GM ONLY)", "tools": [
+		{"id": AtlasCanvas.Tool.FOG, "name": "Fog reveal/hide", "key": "G", "icon": "fog", "hint": "Drag to reveal a rectangle; Shift-drag to hide it again. First edit enables deny-by-default fog on this floor, across every detail level. Esc cancels; Ctrl+Z undoes. No live player publication."},
+	]},
 	{"title": "GRID", "tools": [
 		{"id": AtlasCanvas.Tool.SELECT, "name": "Select grid cell", "key": "", "icon": "cell", "hint": "Choose the cell used by the edit-scope mask"},
 	]},

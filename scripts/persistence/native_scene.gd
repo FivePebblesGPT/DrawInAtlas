@@ -121,7 +121,7 @@ static func _valid_live_layer_types(campaign: AtlasCampaign) -> bool:
 			return false
 		var document: AtlasMapDocument = value as AtlasMapDocument
 		for floor: AtlasFloor in document.floors:
-			if floor == null or not AtlasLayerCodec.valid_collection(floor.layers):
+			if floor == null or not floor.valid_fog() or not AtlasLayerCodec.valid_collection(floor.layers):
 				return false
 	return true
 

@@ -8,6 +8,9 @@ extends RefCounted
 const BOARD_ID: String = "player-board"
 const FLOOR_ID: String = "player-floor"
 const MAX_GRANTED_LAYERS: int = 256
+## Budget decoded pixels before constructing masked player resources.
+const MAX_FOG_FILTER_PIXELS: int = 16777216
+const MAX_FOG_MASK_TESTS: int = 67108864
 
 
 ## Preferred boundary for renderers: the returned campaign has one sanitized map,
@@ -43,7 +46,7 @@ static func build_artwork_view(document: AtlasMapDocument, floor_id: String,
 			or granted_layer_ids.size() > MAX_GRANTED_LAYERS:
 		return null
 	var source_floor: AtlasFloor = document.floor_by_id(floor_id)
-	if source_floor == null:
+	if source_floor == null or not source_floor.valid_fog():
 		return null
 
 	# Reject duplicate, missing or stale IDs rather than silently widening scope.
@@ -76,6 +79,7 @@ static func build_artwork_view(document: AtlasMapDocument, floor_id: String,
 	player_floor.layers.clear()
 
 	# The source stack owns the compositing order, not user-supplied grant order.
+	var masked_pixels: int = 0
 	for source: AtlasLayer in source_floor.layers:
 		if not grants.has(source.id):
 			continue
@@ -83,14 +87,33 @@ static func build_artwork_view(document: AtlasMapDocument, floor_id: String,
 			return null
 		if not (source is AtlasRasterLayer or source is AtlasObjectsLayer):
 			return null
+		# Semantic objects cannot be clipped safely by this proof's rectangle
+		# mask. Deny an entire grant instead of leaking vector paths or labels.
+		if source_floor.fog_enabled and source is AtlasObjectsLayer:
+			return null
 		if source is AtlasRasterLayer:
-			# Never expose a lazy source asset reference to the player renderer.
+			# Never expose lazy assets. Budget before cloning source images;
+			# malformed/massive masks fail before allocating player resources.
 			for chunk: AtlasRasterChunk in (source as AtlasRasterLayer).chunks.values():
 				if chunk == null or chunk.image == null:
 					return null
+				if source_floor.fog_enabled:
+					masked_pixels += chunk.width * chunk.height
+					if masked_pixels > MAX_FOG_FILTER_PIXELS or (masked_pixels \
+							* maxi(1, source_floor.fog_regions.size())) > MAX_FOG_MASK_TESTS:
+						return null
 		var copy: AtlasLayer = AtlasLayerCodec.clone(source)
 		if copy == null:
 			return null
+		if source_floor.fog_enabled:
+			var public_raster: AtlasRasterLayer = copy as AtlasRasterLayer
+			public_raster.chunks.clear()
+			for key: String in (source as AtlasRasterLayer).chunks:
+				var chunk: AtlasRasterChunk = (source as AtlasRasterLayer).chunks[key]
+				var sanitized: AtlasRasterChunk = _mask_chunk(source as AtlasRasterLayer,
+					chunk, source_floor)
+				if sanitized != null:
+					public_raster.chunks[key] = sanitized
 		copy.id = "art-%d" % player_floor.layers.size()
 		copy.display_name = "Artwork"
 		copy.locked = true
@@ -98,3 +121,24 @@ static func build_artwork_view(document: AtlasMapDocument, floor_id: String,
 
 	output.floors.append(player_floor)
 	return output
+
+
+## Construct new pixel resources from scratch. Hidden pixels (and their source
+## hashes/encoded bytes) never reach a player-facing capture input, including
+## when a raster transform has negative coordinates or fractional density.
+static func _mask_chunk(layer: AtlasRasterLayer, chunk: AtlasRasterChunk,
+		floor: AtlasFloor) -> AtlasRasterChunk:
+	var pixels: Image = Image.create(chunk.width, chunk.height, false, Image.FORMAT_RGBA8)
+	pixels.fill(Color.TRANSPARENT)
+	var retained: bool = false
+	var origin: Vector2i = chunk.coord * AtlasRasterChunk.SIZE
+	for y: int in range(chunk.height):
+		for x: int in range(chunk.width):
+			var local: Vector2 = Vector2(origin + Vector2i(x, y)) + Vector2(0.5, 0.5)
+			var board: Vector2 = layer.transform * (local / layer.pixels_per_unit)
+			if floor.fog_allows(board):
+				var color: Color = chunk.image.get_pixel(x, y)
+				if color.a > 0.0:
+					pixels.set_pixel(x, y, color)
+					retained = true
+	return AtlasRasterChunk.new(chunk.coord, pixels) if retained else null
