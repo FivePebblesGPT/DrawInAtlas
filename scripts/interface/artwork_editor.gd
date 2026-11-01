@@ -20,6 +20,9 @@ var _pending_fill_layer_id: String = ""
 var _pending_fill_map_id: String = ""
 var _pending_fill_floor_id: String = ""
 var _pending_fill_source: Dictionary = {}
+## An edit mask is part of a fill candidate's authorization. Selecting a new
+## cell or changing the grid while the preview is staged must not broaden it.
+var _pending_fill_scope: AtlasEditScope
 var _canvas: AtlasCanvas
 var _edits: AtlasEditHistory
 var _routing_tool: bool = false
@@ -278,6 +281,8 @@ func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
 	_pending_fill_map_id = _canvas.map.id
 	_pending_fill_floor_id = _canvas.floor.id
 	_pending_fill_source = _canvas.floor.layer_by_id(_pending_fill_layer_id).to_dict()
+	var mask: AtlasEditScope = scope()
+	_pending_fill_scope = AtlasEditScope.new(mask.polygon, mask.enabled)
 	_canvas._preview_layer = _pending_fill.layer
 	_canvas._raster_textures.clear()
 	_canvas.queue_redraw()
@@ -290,6 +295,7 @@ func cancel_preview_fill() -> void:
 	_pending_fill_map_id = ""
 	_pending_fill_floor_id = ""
 	_pending_fill_source.clear()
+	_pending_fill_scope = null
 	_canvas._preview_layer = null
 	_canvas._raster_textures.clear()
 	_canvas.queue_redraw()
@@ -301,6 +307,10 @@ func commit_preview_fill() -> void:
 	var result: AtlasFillResult = _pending_fill
 	var id: String = _pending_fill_layer_id
 	var source: Dictionary = _pending_fill_source.duplicate(true)
+	var mask: AtlasEditScope = scope()
+	var same_scope: bool = (_pending_fill_scope != null
+		and mask.enabled == _pending_fill_scope.enabled
+		and mask.polygon == _pending_fill_scope.polygon)
 	var same_context: bool = (_canvas.map != null and _canvas.floor != null
 		and _canvas.map.id == _pending_fill_map_id
 		and _canvas.floor.id == _pending_fill_floor_id
@@ -311,6 +321,9 @@ func commit_preview_fill() -> void:
 	var current: AtlasLayer = _canvas.floor.layer_by_id(id) if same_context else null
 	if current == null or current.to_dict() != source:
 		message.emit("Fill target changed since preview; nothing applied.")
+		return
+	if not same_scope:
+		message.emit("Fill edit mask changed since preview; nothing applied.")
 		return
 	_apply_fill_result(result, id)
 

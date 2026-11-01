@@ -17,3 +17,14 @@ Paint.NET is the primary tool reference: [Paint Bucket](https://paint.net/doc/la
 - `tests/bucket_visual.gd`: native framebuffer pointer press/release, visible preview, Escape rollback, undo/redo, an interleaved history edit during a real pointer gesture, color-boundary isolation and compact 800×600 layout.
 - Both tests run in `.github/workflows/godot-check.yml`, including strict engine-error-log checks. The rest of the domain, native, Web export and portability gates remain unchanged.
 - **Review request:** confirm whether active-layer-only sampling, seed-matched premultiplied tolerance, alpha *replacement* rather than compositing, and the release-to-commit gesture match intended Bucket behavior. Other Paint.NET capabilities (live drag-to-reseed, composite sampling, global terrain fill, straight-alpha matching, pattern/blend-mode fills) are deliberately not assumed. Source-only readability simplification remains [[T-033]], not part of the behavioral change.
+
+## Mask changes during a preview (2026-11-01)
+
+The pixel candidate is authorized for the **edit mask that existed at press**.
+A selected-cell change, enabling/disabling its lock, or rotating/changing its
+grid footprint before release invalidates that candidate. Release clears it
+without a history command, leaves source pixels unchanged, and reports that
+the edit mask changed. Changing the highlighted cell while cell lock is off
+is harmless and does not invalidate an unrestricted preview. Start a new
+press to fill using the new mask. This safety rule does not add a selection or
+mask to the persisted campaign format.

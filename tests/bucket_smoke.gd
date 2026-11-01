@@ -239,6 +239,62 @@ func _editor_preview() -> void:
 		and source_floor.layer_by_id(objects_id).display_name == "Objects renamed during fill"
 		and editor.edits.get_undo_command() != rename_command,
 		"valid Bucket commit preserves interleaved edits to other layers")
+	# The preview was computed under a specific mask. Changing the selection
+	# while the mouse is held must not apply pixels outside the new cell.
+	canvas.brush_color = Color(0.1, 0.3, 0.95, 1.0)
+	editor.artwork.locked_to_cell = true
+	canvas.selected_cell = Vector2i.ZERO
+	canvas.has_selected_cell = true
+	editor.artwork.refresh_scope()
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"selected-cell mask allows a valid pending Bucket preview")
+	var mask_source: PackedByteArray = (canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data()
+	var mask_undo: AtlasEditCommand = editor.edits.get_undo_command()
+	editor._on_select(Vector2i(2, 0))
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == mask_source
+		and editor.edits.get_undo_command() == mask_undo
+		and editor.artwork._pending_fill == null,
+		"changing the selected cell rejects a staged fill without history mutation")
+	# Changing grid geometry also changes the mask footprint, even when the
+	# selected cell ID and raster source remain identical.
+	canvas.selected_cell = Vector2i.ZERO
+	editor.artwork.refresh_scope()
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"grid-change case starts from a valid selected-cell preview")
+	var old_rotation: float = canvas.map.grid.rotation
+	canvas.map.grid.rotation = 0.15
+	editor.artwork.refresh_scope()
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == mask_source
+		and editor.edits.get_undo_command() == mask_undo,
+		"rotating the cell mask rejects a preview even with unchanged raster bytes")
+	canvas.map.grid.rotation = old_rotation
+	editor.artwork.refresh_scope()
+	# A fresh preview under the restored mask still commits normally.
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"fresh preview under the restored mask is valid")
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() != mask_source
+		and editor.edits.get_undo_command() != mask_undo,
+		"valid masked Bucket fill commits one history command after retry")
+	editor.artwork.locked_to_cell = false
+	editor.artwork.refresh_scope()
+	# With the mask disabled, moving the highlighted grid cell must not
+	# invalidate a fill: no eligibility boundary has changed.
+	canvas.brush_color = Color(0.92, 0.18, 0.3, 1.0)
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"unrestricted Bucket preview is valid")
+	editor._on_select(Vector2i(3, 0))
+	var unrestricted_before: AtlasEditCommand = editor.edits.get_undo_command()
+	editor.artwork.commit_preview_fill()
+	_check(editor.edits.get_undo_command() != unrestricted_before
+		and _pixel(canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer, Vector2i(2, 2)).r > 0.9,
+		"highlighted-cell changes do not reject unrestricted fills")
 	# No implicit fallback to a palette-cell layer when an incompatible target is chosen.
 	editor.select_layer(canvas.floor.ink_layer().id)
 	_check(canvas.tool == AtlasCanvas.Tool.ART_SELECT and not editor.inspector._bucket_section.visible,

@@ -71,7 +71,7 @@ func _run() -> void:
 	editor.load_saved_on_startup = false
 	root.add_child(scene)
 	await _frames(12)
-	_check(editor.create_board("Bucket visual", AtlasGrid.new(AtlasGrid.Kind.GRIDLESS, 64)),
+	_check(editor.create_board("Bucket visual", AtlasGrid.new(AtlasGrid.Kind.SQUARE, 64)),
 		"isolated board created")
 	var canvas: AtlasCanvas = editor.canvas
 	canvas.show_grid = false
@@ -161,6 +161,23 @@ func _run() -> void:
 		and editor.edits.get_undo_command() == next_command
 		and editor.artwork._pending_fill == null,
 		"native release rejects stale preview and leaves interleaved edit intact")
+	# Changing a live selected-cell mask must invalidate the detached preview
+	# even though the raster layer and its pixels have not changed.
+	editor._on_select(Vector2i.ZERO)
+	editor._on_scope_toggled(true)
+	await _button(canvas, canvas.document_to_local(target), true)
+	_check(canvas._fill_pending and editor.artwork._pending_fill != null
+		and editor.artwork._pending_fill.ok,
+		"native press starts a valid cell-masked Bucket preview")
+	var scoped_bytes: PackedByteArray = (canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data()
+	var scoped_undo: AtlasEditCommand = editor.edits.get_undo_command()
+	editor._on_select(Vector2i(2, 0))
+	await _button(canvas, canvas.document_to_local(target), false)
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == scoped_bytes
+		and editor.edits.get_undo_command() == scoped_undo
+		and editor.artwork._pending_fill == null,
+		"native release cannot paint beyond a changed selected-cell mask")
+	editor._on_scope_toggled(false)
 	# Exiting the board cancels an in-flight fill without needing release on canvas.
 	await _button(canvas, canvas.document_to_local(target), true)
 	canvas._clear_brush_cursor()
