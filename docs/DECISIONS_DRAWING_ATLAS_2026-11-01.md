@@ -16,7 +16,7 @@
 
 ## Accepted Round 3 decisions (2026-11-01)
 11. **Monorepo:** independent Drawing Godot project and reusable Drawing package in the **same repository** as Atlas. Do not create a separate Git repository by default.
-12. **Both reuse modes:** reuse artwork as a **linked live shared asset** or make an **independent copy**. The user-facing operation must make this distinction clear.
+12. **Both reuse modes:** principally **Object Assets** authored in an Object Editor, reused through linked Atlas instances or duplicated as independent source assets. Earlier wording about linked whole-map drawings was ambiguous; see Round 4 clarification.
 13. **Floor = layer group:** one logical Atlas floor maps to a Drawing layer group. Atlas owns floor metadata and mapping, not Drawing.
 14. **Missing authored LOD = blank:** display **no lower-detail artwork underneath** an empty higher-detail level. Atlas can show an explicit empty-detail status/navigation UI; it must not fabricate lower-level art.
 15. **Shared world-coordinate reference:** all authored detail levels of a given map align to one continuous world coordinate system. Detail levels may have different raster pixel densities.
