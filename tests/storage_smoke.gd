@@ -124,6 +124,12 @@ func _campaign(seed: int = 0) -> AtlasCampaign:
 	upper.display_name = "Upper floor"
 	upper.strokes.append(AtlasStroke.new(PackedVector2Array([
 		Vector2(-3.125, 0.25), Vector2(17.75, -40.5)]), Color(0.25, 0.5, 0.75, 0.5), 1.2345678901234567))
+	var markers: AtlasTokenLayer = AtlasTokenLayer.new("native-gm-tokens", "GM only")
+	var token: AtlasToken = AtlasToken.new("native-token-1", Vector2(-17.5, 123.25), "Hidden ranger")
+	token.radius = 18.5
+	token.tint = Color(0.2, 0.4, 0.7, 0.9)
+	markers.tokens.append(token)
+	upper.layers.append(markers)
 	map.floors.append(upper)
 	map.default_floor_id = upper.id
 	var reverse: AtlasMapLink = AtlasMapLink.from_dict(result.links[0].to_dict())
@@ -195,6 +201,11 @@ func _roundtrip() -> bool:
 		second.get_map("world").floors[1].strokes[0].width = 99.0
 		_check(result.campaign.get_map("world").floors[1].strokes[0].width != 99.0,
 			"nested floor/stroke Resources do not alias")
+		var second_marker: AtlasTokenLayer = second.get_map("world").floors[1].layer_by_id("native-gm-tokens") as AtlasTokenLayer
+		second_marker.tokens[0].position = Vector2(900, 900)
+		var first_marker: AtlasTokenLayer = result.campaign.get_map("world").floors[1].layer_by_id("native-gm-tokens") as AtlasTokenLayer
+		_check(first_marker.tokens[0].position == Vector2(-17.5, 123.25),
+			"native token Resources do not alias across independent loads")
 		_raster(second).chunks["-2,-1"].image.set_pixel(0, 0, Color.MAGENTA)
 		_check(actual.chunks["-2,-1"].image.get_data() == expected.chunks["-2,-1"].image.get_data(),
 			"decoded raster Images do not alias across loads or the source")

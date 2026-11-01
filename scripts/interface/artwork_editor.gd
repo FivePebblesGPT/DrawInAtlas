@@ -57,6 +57,8 @@ static func tool_layer_kind(tool: AtlasCanvas.Tool) -> String:
 		return "RASTER"
 	if tool in [AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]:
 		return "OBJECTS"
+	if tool == AtlasCanvas.Tool.TOKEN:
+		return "TOKENS"
 	return ""
 
 
@@ -78,7 +80,10 @@ func _route_tool(tool: AtlasCanvas.Tool, create: bool = true) -> void:
 	_routing_tool = true
 	if target == null:
 		var id: String = kind.to_lower() + "-" + Crypto.new().generate_random_bytes(16).hex_encode()
-		target = AtlasRasterLayer.paint_layer(id) if kind == "RASTER" else AtlasObjectsLayer.new(id)
+		match kind:
+			"RASTER": target = AtlasRasterLayer.paint_layer(id)
+			"TOKENS": target = AtlasTokenLayer.new(id)
+			"OBJECTS": target = AtlasObjectsLayer.new(id)
 		target.detail_level = level
 		var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
 		layers.append(target)
@@ -95,8 +100,13 @@ func _route_tool(tool: AtlasCanvas.Tool, create: bool = true) -> void:
 
 
 static func _eligible_target(layer: AtlasLayer, kind: String, level: int) -> bool:
-	return (layer != null and layer.is_editable() and layer.detail_level == level
-		and ((layer is AtlasRasterLayer) if kind == "RASTER" else (layer is AtlasObjectsLayer)))
+	if layer == null or not layer.is_editable() or layer.detail_level != level:
+		return false
+	match kind:
+		"RASTER": return layer is AtlasRasterLayer
+		"OBJECTS": return layer is AtlasObjectsLayer
+		"TOKENS": return layer is AtlasTokenLayer
+	return false
 
 
 func select_layer(id: String) -> void:
@@ -112,10 +122,9 @@ func select_layer(id: String) -> void:
 	if not _routing_tool:
 		var layer: AtlasLayer = _canvas.floor.layer_by_id(id)
 		var required: String = tool_layer_kind(_canvas.tool)
-		if required == "OBJECTS" and layer is AtlasRasterLayer:
-			tool_requested.emit(AtlasCanvas.Tool.PEN)
-		elif required == "RASTER" and layer is AtlasObjectsLayer:
-			tool_requested.emit(AtlasCanvas.Tool.ART_SELECT)
+		if not _eligible_target(layer, required, layer.detail_level) and not required.is_empty():
+			tool_requested.emit(AtlasCanvas.Tool.TOKEN if layer is AtlasTokenLayer else
+				AtlasCanvas.Tool.ART_SELECT if layer is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
 	message.emit("Selected layer: %s" % _canvas.floor.layer_by_id(id).display_name)
 
 
@@ -130,9 +139,12 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	layers_changed.emit(selected_id)
 	var selected: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if new_layer and not _routing_tool:
-		tool_requested.emit(AtlasCanvas.Tool.ART_SELECT if selected is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
+		tool_requested.emit(AtlasCanvas.Tool.TOKEN if selected is AtlasTokenLayer else
+			AtlasCanvas.Tool.ART_SELECT if selected is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
 	_canvas.queue_redraw()
-	if not _canvas.editing_target_is_presented():
+	if _routing_tool and selected is AtlasTokenLayer:
+		message.emit("GM Token layer ready. Tokens are private until explicitly authorized by a future player-output policy.")
+	elif not _canvas.editing_target_is_presented():
 		message.emit("Layer changed. Editing target is in D%d, but D%d is displayed; select its detail level before drawing." % [
 			_canvas.floor.layer_by_id(_canvas.active_layer_id).detail_level, _canvas.presented_detail_level])
 	else:

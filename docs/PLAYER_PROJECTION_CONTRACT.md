@@ -10,7 +10,7 @@
 | Local player/projector | Only an explicitly granted, independently copied output **for the selected board, floor and authored detail level** | Unapproved raster chunks, objects, text, image props, other floors/LOD groups, references, secret map names/tags, links, selections, drafts, cached editor thumbnails, private tokens, unrevealed imagery |
 | Future remote player | Same output boundary, plus host-side role/operation authorization | Canonical campaign/resources/serialized GM graph or unfiltered network events |
 
-These are **proposed grants**, not stored user permissions. There is currently **no player audience field, public/private layer flag, per-object stable ID, token model or fog model**. In particular, editor `layer.visible` is **not** publication authorization, and `AtlasPreviewCache`'s `audience` string only separates cache keys; it does not filter pixels or data. A plugin or renderer must never treat `get_image(..., "player")` as permission to publish the returned image.
+These are **proposed grants**, not stored user permissions. There is currently **no player audience field, public/private layer flag, approved per-object publishing policy or fog model**. T-041 now supplies stable, persisted GM-only `AtlasToken` records in `TOKENS` layers, but **no permission to publish them**: the T-039 capture boundary excludes ungranted tokens and explicitly denies a grant for a token layer. In particular, editor `layer.visible` is **not** publication authorization, and `AtlasPreviewCache`'s `audience` string only separates cache keys; it does not filter pixels or data. A plugin or renderer must never treat `get_image(..., "player")` as permission to publish the returned image.
 
 ## Implemented, isolated proof boundary
 

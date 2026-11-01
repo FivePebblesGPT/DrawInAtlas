@@ -26,8 +26,9 @@ signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
 signal projector_frame_changed
+signal token_edit_requested(before: AtlasToken, after: AtlasToken)
 
-enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT }
+enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 enum FrameDrag { NONE, MOVE, RESIZE }
@@ -118,6 +119,13 @@ var _frame_original_center: Vector2 = Vector2.ZERO
 var _frame_original_width: float = 0.0
 var _frame_resize_anchor: Vector2 = Vector2.ZERO
 
+## Selected GM token and uncommitted drag. No source resource is changed until release.
+var token_label: String = "Token"
+var token_radius: float = 16.0
+var selected_token_id: String = ""
+var _token_drag_before: AtlasToken
+var _token_drag_preview: AtlasToken
+var _token_drag_start: Vector2 = Vector2.ZERO
 var _panning: bool = false
 var _fill_pending: bool = false
 var _pending_wheel_fraction: float = 0.0
@@ -197,6 +205,7 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	if selected_floor == null:
 		return false
 	cancel_edit()
+	selected_token_id = ""
 	# Frames are not persistent or transferable to a different map/floor.
 	projector_frame_active = false
 	map = value
@@ -215,15 +224,19 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 
 func choose_tool(value: Tool) -> void:
 	cancel_edit()
+	if value != Tool.TOKEN:
+		selected_token_id = ""
 	tool = value
 	_overlay.queue_redraw()
 
 
 func is_editing() -> bool:
-	return _frame_drag != FrameDrag.NONE or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
+	return _token_drag_before != null or _frame_drag != FrameDrag.NONE or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
+	_token_drag_before = null
+	_token_drag_preview = null
 	cancel_projector_frame_drag()
 	_end_freehand()
 	if _fill_pending:
@@ -428,6 +441,11 @@ func _sync_layer_renderers() -> void:
 			if layer.id == active_layer_id:
 				state.append_array([_wall_preview, _wall_draft,
 					_wall_vertices.duplicate(), _wall_pointer, tool])
+		elif layer is AtlasTokenLayer:
+			state.append((layer as AtlasTokenLayer).tokens.duplicate())
+			if layer.id == active_layer_id:
+				state.append(_token_drag_preview)
+				state.append(_token_drag_preview.position if _token_drag_preview != null else null)
 		elif layer is AtlasRasterLayer:
 			state.append_array([layer.transform, layer.pixels_per_unit, layer.chunks.duplicate()])
 		if _render_states.get(layer.id, []) != state:
@@ -471,6 +489,12 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 			var last: Vector2 = _wall_vertices[-1]
 			if last.distance_squared_to(_wall_pointer) > 0.0001:
 				item.draw_line(last, _wall_pointer, Color("#f9cc65"), 1.5 / camera_zoom, true)
+	elif layer is AtlasTokenLayer:
+		for token: AtlasToken in (layer as AtlasTokenLayer).tokens:
+			var shown: AtlasToken = token
+			if id == active_layer_id and _token_drag_preview != null and token.id == _token_drag_preview.id:
+				shown = _token_drag_preview
+			_draw_token(item, shown)
 	elif layer is AtlasRasterLayer:
 		item.draw_set_transform_matrix(layer.transform)
 		var textures: Dictionary[String, ImageTexture] = _preview_textures if layer == _preview_layer else _raster_textures
@@ -483,6 +507,83 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 			var origin: Vector2 = Vector2(chunk.coord) * AtlasRasterChunk.SIZE / layer.pixels_per_unit
 			var dimensions: Vector2 = Vector2(chunk.width, chunk.height) / layer.pixels_per_unit
 			item.draw_texture_rect(textures[asset], Rect2(origin, dimensions), false)
+
+
+func _draw_token(item: Node2D, token: AtlasToken) -> void:
+	item.draw_circle(token.position, token.radius, token.tint)
+	item.draw_arc(token.position, token.radius, 0, TAU, 48, Color(0.95, 0.97, 1.0), 1.5)
+	var font: Font = ThemeDB.fallback_font
+	var font_size: int = 12
+	var caption: String = token.label
+	var caption_width: float = font.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	item.draw_string(font, token.position + Vector2(-caption_width * 0.5, token.radius + font_size + 4),
+		caption, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
+
+
+func delete_selected_token() -> bool:
+	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
+	if layer == null or not editing_target_is_presented() or not layer.is_editable():
+		return false
+	var selected: AtlasToken = layer.token_by_id(selected_token_id)
+	if selected == null or not edit_scope.contains_rect(Rect2(selected.position - Vector2.ONE * selected.radius,
+			Vector2.ONE * selected.radius * 2.0)):
+		return false
+	token_edit_requested.emit(selected.copy(), null)
+	selected_token_id = ""
+	queue_redraw()
+	return true
+
+
+func _begin_token_press(position: Vector2) -> void:
+	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
+	if layer == null or not editing_target_is_presented() or not layer.is_editable():
+		return
+	for index: int in range(layer.tokens.size() - 1, -1, -1):
+		var candidate: AtlasToken = layer.tokens[index]
+		if candidate.position.distance_to(position) <= candidate.radius + 5.0 / camera_zoom:
+			if not edit_scope.contains_rect(Rect2(candidate.position - Vector2.ONE * candidate.radius,
+					Vector2.ONE * candidate.radius * 2.0)):
+				return
+			selected_token_id = candidate.id
+			_token_drag_before = candidate.copy()
+			_token_drag_preview = candidate.copy()
+			_token_drag_start = position
+			queue_redraw()
+			return
+	if layer.tokens.size() >= AtlasTokenLayer.MAX_TOKENS or token_label.strip_edges().is_empty():
+		return
+	var center: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+	var created: AtlasToken = AtlasToken.new("token-" + Crypto.new().generate_random_bytes(16).hex_encode(),
+		center, token_label.strip_edges())
+	created.radius = token_radius
+	created.tint = brush_color
+	if created.is_valid() and edit_scope.contains_rect(Rect2(created.position - Vector2.ONE * created.radius,
+			Vector2.ONE * created.radius * 2.0)):
+		token_edit_requested.emit(null, created)
+		selected_token_id = created.id
+		queue_redraw()
+
+
+func _update_token_drag(position: Vector2) -> void:
+	if _token_drag_before == null:
+		return
+	var target: Vector2 = _token_drag_before.position + position - _token_drag_start
+	_token_drag_preview.position = AtlasGridSnap.point(map.grid, target) if snap_to_grid else target
+	queue_redraw()
+
+
+func _finish_token_drag(position: Vector2) -> void:
+	if _token_drag_before == null:
+		return
+	_update_token_drag(position)
+	var before: AtlasToken = _token_drag_before
+	var after: AtlasToken = _token_drag_preview
+	_token_drag_before = null
+	_token_drag_preview = null
+	if before.position != after.position:
+		token_edit_requested.emit(before, after)
+	queue_redraw()
+	interaction_finished.emit()
 
 
 func _draw_overlays(item: Node2D) -> void:
@@ -521,6 +622,14 @@ func _draw_overlays(item: Node2D) -> void:
 				color = Color("#f48771")
 		item.draw_rect(bounds, color, false, 1.5 / camera_zoom)
 		item.draw_rect(Rect2(bounds.end - Vector2.ONE * 4.0 / camera_zoom, Vector2.ONE * 8.0 / camera_zoom), color)
+	var token_layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer
+	if tool == Tool.TOKEN and token_layer != null and token_layer.visible \
+			and token_layer.opacity > 0.0 and token_layer.detail_level == presented_detail_level:
+		var selected_token: AtlasToken = _token_drag_preview if _token_drag_preview != null \
+			else token_layer.token_by_id(selected_token_id)
+		if selected_token != null:
+			item.draw_arc(selected_token.position, selected_token.radius + 4.0 / camera_zoom,
+				0, TAU, 48, Color("#f9cc65"), 2.0 / camera_zoom)
 	if not _polygon_vertices.is_empty():
 		var guide: PackedVector2Array = _polygon_vertices.duplicate()
 		guide.append(_polygon_pointer)
@@ -992,6 +1101,8 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	match tool:
 		Tool.TEXT:
 			_begin_text_edit(position)
+		Tool.TOKEN:
+			_begin_token_press(position)
 		Tool.POLYGON:
 			_begin_polygon_vertex(mouse, position)
 		Tool.WALL_PATH:
@@ -1095,7 +1206,9 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 
 
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
-	if _fill_pending:
+	if _token_drag_before != null:
+		_finish_token_drag(local_to_document(mouse.position))
+	elif _fill_pending:
 		_fill_pending = false
 		fill_requested.emit()
 		_preview_layer = null
@@ -1132,6 +1245,8 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 	elif not _moving_link_id.is_empty():
 		_link_move_end = local_to_document(motion.position)
 		queue_redraw()
+	elif _token_drag_before != null:
+		_update_token_drag(local_to_document(motion.position))
 	elif _manipulation != Manipulation.NONE:
 		_update_manipulation(local_to_document(motion.position))
 	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:

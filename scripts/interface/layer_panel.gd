@@ -293,7 +293,7 @@ func _rebuild_hierarchy() -> void:
 				badges += " [hidden]"
 			var entry: TreeItem = _make_row(group, "%s · %s%s" % [
 				"Objects" if layer is AtlasObjectsLayer and layer.display_name == "Ink" else layer.display_name,
-				"objects" if layer is AtlasObjectsLayer else "raster", badges], {"kind": "layer", "id": layer.id},
+				"objects" if layer is AtlasObjectsLayer else "tokens" if layer is AtlasTokenLayer else "raster", badges], {"kind": "layer", "id": layer.id},
 				"%s · D%d · %s\nSelect to edit on the continuous board." % [layer.display_name, level, layer.kind])
 			_layer_rows[layer.id] = entry
 			entry.add_button(0, ICON_EDIT, LAYER_SETTINGS, false, "Select layer and open its settings")
@@ -323,6 +323,10 @@ func _rebuild_hierarchy() -> void:
 						"index": stroke_index}, "Select this object for whole-object edits")
 					_stroke_rows["%s:%d" % [layer.id, stroke_index]] = item
 				# Omitted middle objects remain selectable directly on the canvas.
+			elif layer is AtlasTokenLayer:
+				var markers: AtlasTokenLayer = layer as AtlasTokenLayer
+				_make_row(entry, "%d GM tokens · canvas selection" % markers.tokens.size(),
+					{"kind": "summary"}, "Token placement, drag, and deletion use the Token tool")
 			elif layer is AtlasRasterLayer:
 				var raster: AtlasRasterLayer = layer as AtlasRasterLayer
 				if not raster.chunks.is_empty():
