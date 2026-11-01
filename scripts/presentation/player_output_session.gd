@@ -101,10 +101,12 @@ func publish(source: AtlasMapDocument, floor_id: String, detail_level: int,
 	var generation: int = _generation
 	if window == null or _capture == null or not _frame_set:
 		return false
-	# Capture runs asynchronously: a fog edit during GPU readback must invalidate
-	# the detached snapshot, even if the caller forgot to revoke its grant.
-	var fog_signature: String = _fog_signature(source, floor_id)
-	if fog_signature.is_empty():
+	# GPU readback is asynchronous. Recheck the full source/grant context:
+	# fog-only checks would allow an older public frame to be published after
+	# in-place pixel edits, layer revocation, or detail-level changes.
+	var source_signature: String = _publication_signature(source, floor_id,
+		detail_level, granted_layer_ids)
+	if source_signature.is_empty():
 		return false
 	var sanitized: AtlasCampaign = AtlasPlayerProjection.build_capture_input(
 		source, floor_id, detail_level, granted_layer_ids)
@@ -116,7 +118,8 @@ func publish(source: AtlasMapDocument, floor_id: String, detail_level: int,
 	var image: Image = await _capture.capture(sanitized, board, board.default_floor_id,
 		bounds, output_size, false, detail_level)
 	if generation != _generation or image == null or display == null \
-			or _fog_signature(source, floor_id) != fog_signature:
+			or _publication_signature(source, floor_id, detail_level,
+			granted_layer_ids) != source_signature:
 		invalidate()
 		return false
 	display.texture = ImageTexture.create_from_image(image)
@@ -137,16 +140,38 @@ func _exit_tree() -> void:
 	invalidate()
 
 
-## Compare only the fog authorization, not editor layer visibility. A complete
-## production revocation controller (including frozen output) is T-043 work.
-func _fog_signature(document: AtlasMapDocument, floor_id: String) -> String:
+## Fingerprint the publication inputs both before and after asynchronous GPU
+## readback. This does NOT confer grants: a trusted caller still owns publishing
+## policy and must call invalidate() when that policy changes, including while
+## frozen. Layer dictionaries include current raster asset hashes, so in-place
+## pixel edits and authoring/LOD/visibility revisions invalidate stale frames.
+func _publication_signature(document: AtlasMapDocument, floor_id: String,
+		detail_level: int, granted_layer_ids: Array[String]) -> String:
 	var floor: AtlasFloor = document.floor_by_id(floor_id) if document != null else null
-	if floor == null or not floor.valid_fog():
+	if floor == null or not floor.valid_fog() or document.grid == null:
 		return ""
-	var operations: Array[Dictionary] = []
+	var layers: Array[Dictionary] = []
+	for layer: AtlasLayer in floor.layers:
+		if layer == null:
+			return ""
+		var state: Dictionary = layer.to_dict()
+		if layer is AtlasRasterLayer:
+			var residency: Array[bool] = []
+			var keys: Array[String] = (layer as AtlasRasterLayer).chunks.keys()
+			keys.sort()
+			for key: String in keys:
+				var chunk: AtlasRasterChunk = (layer as AtlasRasterLayer).chunks[key]
+				if chunk == null:
+					return ""
+				residency.append(chunk.image != null)
+			state["resident"] = residency
+		layers.append(state)
+	var fog: Array[Dictionary] = []
 	for region: AtlasFogRegion in floor.fog_regions:
-		operations.append(region.to_dict())
-	return JSON.stringify({"map_instance": document.get_instance_id(),
-		"floor_instance": floor.get_instance_id(), "enabled": floor.fog_enabled,
-		"regions": operations},
-		"", true, true).sha256_text()
+		fog.append(region.to_dict())
+	return JSON.stringify({"document_instance": document.get_instance_id(),
+		"document_id": document.id, "floor_instance": floor.get_instance_id(),
+		"floor_id": floor_id, "detail_level": detail_level,
+		"grants": granted_layer_ids, "grid": document.grid.to_dict(),
+		"layers": layers, "fog_enabled": floor.fog_enabled,
+		"fog": fog}, "", true, true).sha256_text()
