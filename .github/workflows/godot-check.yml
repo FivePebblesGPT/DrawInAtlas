@@ -144,6 +144,11 @@ jobs:
           grep -q 'T067_NATIVE_PASSED (386 checks, 0 failures)' /tmp/t067-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T067_FAILED:|T067_CODEC_FAILED' \
             /tmp/t067-codec.log /tmp/t067-native.log; then exit 1; fi
+      - name: Verify T-077 performance and reviewer handoff documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t077_handoff.py' -v
       - name: Verify T-068 canonical tile-run renderer and native feasibility probe
         shell: bash
         run: |

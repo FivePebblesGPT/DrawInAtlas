@@ -42,6 +42,7 @@ instantiate reusable views with `PackedScene.instantiate()`. Pure
 ## Find code by responsibility
 
 ```text
+# Historical Atlas-only organization below; retained for T-038 readability history.
 scripts/
   campaign/                 Campaign, maps, floors, grids, links and placements
   artwork/                  Layers, strokes and raster chunks
@@ -63,10 +64,13 @@ prefix now that ownership is expressed by directories.
 - Bind scene-owned controls via `@onready`; keep signals/actions in scripts.
 - A link's `hit_radius` is a **document-space** marker pick tolerance, not a
   grid cell size or viewport pixel radius. See `scripts/campaign/map_link.gd`.
-- User saves are one binary `.scn` containing data-only map nodes and embedded
-  Resources/WebP, plus an adjacent `.bak.scn`. UI render scenes are not save nodes.
-  Keep format-specific loading/saving in `scripts/persistence/`, rather than
-  teaching panels, gestures or navigation about either representation.
+- **Historical pre-split contract:** user saves were one `.scn` with embedded
+  Resources/WebP and a `.bak.scn`. This is **not** the current canonical
+  Drawing campaign-save format. T-066 now saves a versioned generation-root
+  index plus relative `Drawings/`, `Objects/` and licensed font resources; the
+  old `.scn` code remains a legacy compatibility path. See the
+  [implemented storage contract](DRAWING_STORAGE_CONTRACT.md). UI/panels must
+  not bypass the save coordinator or mutate published generations.
 
 ## Workspace ownership
 
@@ -199,3 +203,42 @@ listed in the README, notably `tests/layer_ui_smoke.gd`,
 `tests/editor_modules_smoke.gd`. The module suite exercises form signals,
 numeric transforms, campaign replacement and two-workspace state isolation.
 Scene path checks alone cannot prove signal or focus behavior.
+
+
+## Current Drawing/Atlas ownership and review scope (T-077)
+
+The legacy organization above describes the **pre-split** readability pass.
+The current sources are split, but the new separation does not erase those
+older editing paths. Review the actual source at the target revision:
+
+| Source root | Current responsibility | Risk to inspect |
+| --- | --- | --- |
+| `addons/drawing/` | One generic `DrawingDocument`, layer/tree/edit session, renderer, codec and local history used by both apps | 64-bit signed coordinate arithmetic, immutable-versus-detached tiles, hidden RGB and transactional revision guards |
+| `drawing/` (excluding generated `drawing/addons/`) | Standalone project scenes, app shell, dedicated Object Editor UI | Editable layer IDs, dirty-file close, imported font licenses and package staging |
+| `scripts/objects/` | Atlas-owned published asset versions, instances and private drafts | Save vs Save As rebinding, NULL placeholders, draft isolation and stale-writer guards |
+| `scripts/campaign/`, `scripts/persistence/` | Map/floor/detail registry and generation-based campaign storage | Exact document ownership, lazy chunk validation, path safety and immutable root publication |
+| `scripts/interface/` and `prefab/` | Atlas main canvas, navigation, overlays and editor panels | Input arbitration, frozen edit target, correct history scope, hit-testing and preview nonmutation |
+| `tools/benchmarks/` | T-067/T-068 measurement prototypes; **not** production runtime dependencies | Distinguish real CPU/GPU measurements from unintegrated comparator claims |
+
+The historic `to_dict()` and `.scn` decisions above must not be copied to
+new code as default serialization architecture. T-051/T-052 describe the
+actual shared package and APIs, T-055/T-061 the Atlas composition, and T-066
+the working multi-file save. See the [reviewer test plan](DRAWING_TEST_PLAN.md)
+for checked commands, reviewer material boundaries and handoff requirements.
+
+**Independent T-038 review is still open.** The implementer's 2026-10-30/11-01
+findings and earlier source-only bundle were not an unfamiliar-reader review.
+To prepare an updated **code-only** ZIP from a clean checkout, run:
+
+```sh
+python3 tools/build_t038_review_bundle.py --output /tmp/drawing-code-review.zip
+```
+
+This deliberately includes tracked implementation, test, scene and native
+prototype source; it excludes all docs, README, repository history, fonts,
+skills and generated outputs. Deliver the commit SHA and SHA-256 externally;
+ask the reviewer for `path:line`, units, ownership, mutation phase and exact
+failure-mode findings. Do not attach this explanatory document to the blind
+review input. Only an explicit owner approval recorded in T-038 may close that
+manual gate. The separate T-056 **hands-on Drawing/Atlas UX** signoff remains
+pending irrespective of automated tests.

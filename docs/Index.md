@@ -8,7 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 21 | 1 | 11 | 3 | 40 | 1 | 77 |
+| 20 | 1 | 11 | 3 | 41 | 1 | 77 |
+
+**T-077 completed (2026-11-02):** [platform-specific test matrix and reviewer handoff](DRAWING_TEST_PLAN.md) distinguishes the historical milestone-6 review and latency probes from T-067 storage, T-068 CPU raster/submitted-frame and still-ready T-057 GPU/LOD work. The generator `tools/build_t038_review_bundle.py` makes a deterministic code-only reviewer ZIP. T-038/T-056 still require **actual independent/owner review**, not automatically generated evidence; no manual-review gate was closed.
 
 **T-068 in progress (2026-11-02):** [controlled CPU and native-frame benchmark](DRAWING_CPU_RASTER_BENCHMARK.md) includes 691 Godot checks on the latest rerun, **10 native kernel unit tests**, 128 Godot/C++ alpha-parity vectors, a 24-pixel signed-world fixture, 15 sparse-delta-only C++ timings, and **68 native X11 software-frame checks** across 21 input events. A new ABI-versioned delta-only prototype avoids copying unchanged edit buffers but remains unintegrated. Tile-run compositing provides ~16× lower CPU-frame time on the bounded fixture. Actual Blend2D/Skia performance, GDExtension integration, physical presentation and Windows hardware remain unverified; **no native dependency was adopted and T-068 is not Done**.
 
@@ -106,7 +108,7 @@
 | [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Ready | — | — |
 | [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Ready | — | — |
 | [T-076 · Kanban index and manual-review closure validation](Tickets/T-076.md) | Done | — | — |
-| [T-077 · Performance, code review and validation handoff docs](Tickets/T-077.md) | Ready | — | — |
+| [T-077 · Performance, code review and validation handoff docs](Tickets/T-077.md) | Done | — | — |
 
 ## Epics
 
