@@ -6,9 +6,11 @@
 
 ## Kanban summary
 
-| Ready | Blocked | Manual Review | Done | Archived | Total |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 22 | 11 | 3 | 40 | 1 | 77 |
+| Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 21 | 1 | 11 | 3 | 40 | 1 | 77 |
+
+**T-068 in progress (2026-11-02):** [controlled edit-to-visible CPU feasibility benchmark](DRAWING_CPU_RASTER_BENCHMARK.md) now includes 693 Godot checks, 6 native-kernel unit tests, 128 Godot/C++ alpha-parity vectors, a 24-pixel signed-world fixture, and software texture-upload measurements. Tile-run compositing is deployed in the canonical Drawing renderer with ~16× lower CPU-frame time on the bounded fixture. Blend2D/Skia performance, optional real GDExtension integration, true input-to-present time and Windows hardware remain unverified; **no native dependency was adopted and T-068 is not Done**.
 
 **T-067 completed (2026-11-02):** [controlled 256/512/1024/2048 Zstd tile and 3-layout packing benchmark](DRAWING_CHUNK_GEOMETRY_BENCHMARK.md) includes 48 physical-layout cases, 386 Godot native checks, software framebuffer upload measurements and explicit retiling/versioning rules. **512** is recommended for a *future new-document default* and immutable shared **segmented** packs are the physical-layout target; **neither change has been deployed**. Existing versioned 256-stride documents and T-066’s verified individual-blob writer remain authoritative until separate adoption and atomic-recovery tests. No manual review gate was bypassed.
 
@@ -95,7 +97,7 @@
 | [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Done | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
 | [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Done | — | [T-051](Tickets/T-051.md) |
-| [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | Ready | — | [T-052](Tickets/T-052.md) |
+| [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | — | [T-052](Tickets/T-052.md) |
 | [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Ready | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Ready | — | — |
 | [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Ready | — | — |

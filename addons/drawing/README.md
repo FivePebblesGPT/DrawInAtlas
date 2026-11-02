@@ -147,3 +147,16 @@ non-clipping bounds. The standalone file codec retains optional
 `drawing-object-source-v1` metadata in the ordinary `.drawing` wrapper;
 corrupt/oversize metadata is rejected on open. Atlas supplies the bridge and
 versioned asset library; do not import Atlas scripts into this package.
+
+
+## CPU compositing checkpoint (T-068, partial)
+
+`DrawingRenderer` composites existing raster tiles by horizontal signed tile runs;
+no pixel is fetched through the allocating `DrawingDocument.read_pixel` result API
+inside the inner pixel loop. This preserves lazy corruption detection, alpha
+semantics, local history and 64-bit viewport anchors without a native runtime.
+The original algorithm remains only as an independent byte-equivalence test in
+`tests/drawing_raster_backend_benchmark.gd`. See
+[`docs/DRAWING_CPU_RASTER_BENCHMARK.md`](../../docs/DRAWING_CPU_RASTER_BENCHMARK.md).
+The C++ batch-kernel performance experiment in `tools/benchmarks/` is **not**
+linked into this package, and does not yet establish native deployment support.

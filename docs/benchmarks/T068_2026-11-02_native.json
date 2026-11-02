@@ -1,0 +1,163 @@
+{
+  "schema": "t068-native-v1",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "native_boundary": "Python ctypes, not Godot/GDExtension",
+  "dispatch_us": {
+    "median": 1.332,
+    "p95": 1.423
+  },
+  "rounds": 7,
+  "rows": [
+    {
+      "region": 128,
+      "workload": "short_4px",
+      "candidates": 128,
+      "changed": 128,
+      "bytes_copied": 65536,
+      "undo_delta_bytes": 1536,
+      "median_ms": 0.0076,
+      "p95_ms": 0.0079
+    },
+    {
+      "region": 128,
+      "workload": "round_64px",
+      "candidates": 3228,
+      "changed": 3228,
+      "bytes_copied": 65536,
+      "undo_delta_bytes": 38736,
+      "median_ms": 0.0894,
+      "p95_ms": 0.1115
+    },
+    {
+      "region": 128,
+      "workload": "long_fast",
+      "candidates": 384,
+      "changed": 384,
+      "bytes_copied": 65536,
+      "undo_delta_bytes": 4608,
+      "median_ms": 0.0144,
+      "p95_ms": 0.0309
+    },
+    {
+      "region": 128,
+      "workload": "self_cross",
+      "candidates": 288,
+      "changed": 191,
+      "bytes_copied": 65536,
+      "undo_delta_bytes": 2292,
+      "median_ms": 0.0095,
+      "p95_ms": 0.0095
+    },
+    {
+      "region": 128,
+      "workload": "fill",
+      "candidates": 9216,
+      "changed": 9216,
+      "bytes_copied": 65536,
+      "undo_delta_bytes": 110592,
+      "median_ms": 0.2461,
+      "p95_ms": 0.2652
+    },
+    {
+      "region": 256,
+      "workload": "short_4px",
+      "candidates": 128,
+      "changed": 128,
+      "bytes_copied": 262144,
+      "undo_delta_bytes": 1536,
+      "median_ms": 0.0166,
+      "p95_ms": 0.0168
+    },
+    {
+      "region": 256,
+      "workload": "round_64px",
+      "candidates": 3228,
+      "changed": 3228,
+      "bytes_copied": 262144,
+      "undo_delta_bytes": 38736,
+      "median_ms": 0.098,
+      "p95_ms": 0.1175
+    },
+    {
+      "region": 256,
+      "workload": "long_fast",
+      "candidates": 896,
+      "changed": 896,
+      "bytes_copied": 262144,
+      "undo_delta_bytes": 10752,
+      "median_ms": 0.0367,
+      "p95_ms": 0.0371
+    },
+    {
+      "region": 256,
+      "workload": "self_cross",
+      "candidates": 672,
+      "changed": 447,
+      "bytes_copied": 262144,
+      "undo_delta_bytes": 5364,
+      "median_ms": 0.0254,
+      "p95_ms": 0.0258
+    },
+    {
+      "region": 256,
+      "workload": "fill",
+      "candidates": 50176,
+      "changed": 50176,
+      "bytes_copied": 262144,
+      "undo_delta_bytes": 602112,
+      "median_ms": 1.3547,
+      "p95_ms": 1.3787
+    },
+    {
+      "region": 512,
+      "workload": "short_4px",
+      "candidates": 128,
+      "changed": 128,
+      "bytes_copied": 1048576,
+      "undo_delta_bytes": 1536,
+      "median_ms": 0.0528,
+      "p95_ms": 0.0537
+    },
+    {
+      "region": 512,
+      "workload": "round_64px",
+      "candidates": 3228,
+      "changed": 3228,
+      "bytes_copied": 1048576,
+      "undo_delta_bytes": 38736,
+      "median_ms": 0.1352,
+      "p95_ms": 0.1491
+    },
+    {
+      "region": 512,
+      "workload": "long_fast",
+      "candidates": 1920,
+      "changed": 1920,
+      "bytes_copied": 1048576,
+      "undo_delta_bytes": 23040,
+      "median_ms": 0.1011,
+      "p95_ms": 0.1187
+    },
+    {
+      "region": 512,
+      "workload": "self_cross",
+      "candidates": 1440,
+      "changed": 959,
+      "bytes_copied": 1048576,
+      "undo_delta_bytes": 11508,
+      "median_ms": 0.0749,
+      "p95_ms": 0.0753
+    },
+    {
+      "region": 512,
+      "workload": "fill",
+      "candidates": 230400,
+      "changed": 230400,
+      "bytes_copied": 1048576,
+      "undo_delta_bytes": 2764800,
+      "median_ms": 6.341,
+      "p95_ms": 6.4926
+    }
+  ]
+}

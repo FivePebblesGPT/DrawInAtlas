@@ -144,6 +144,20 @@ jobs:
           grep -q 'T067_NATIVE_PASSED (386 checks, 0 failures)' /tmp/t067-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T067_FAILED:|T067_CODEC_FAILED' \
             /tmp/t067-codec.log /tmp/t067-native.log; then exit 1; fi
+      - name: Verify T-068 canonical tile-run renderer and native feasibility probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t068_kernel.py' -v
+          godot --headless --path . --script res://tests/drawing_raster_backend_benchmark.gd -- \
+            --output /tmp/t068-godot.json 2>&1 | tee /tmp/t068-godot.log
+          grep -q 'T068_GODOT_PASSED' /tmp/t068-godot.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FAILED:' /tmp/t068-godot.log; then exit 1; fi
+          python3 tools/benchmarks/t068_native.py --build-dir /tmp/t068-build \
+            --godot-vectors /tmp/t068-godot.json --output /tmp/t068-native.json \
+            2>&1 | tee /tmp/t068-native.log
+          grep -q 'T068_NATIVE_GODOT_PARITY_PASSED' /tmp/t068-native.log
+          grep -q 'T068_NATIVE_PASSED' /tmp/t068-native.log
       - name: Run domain smoke tests
         shell: bash
         run: |
