@@ -3,6 +3,7 @@ extends Control
 ## No campaign, map, Atlas registry or history imports in this UI.
 
 const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
+const TOP_BAR_SCRIPT: Script = preload("res://addons/drawing/editor_top_bar.gd")
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -17,6 +18,10 @@ var layers: Tree
 var status: Label
 var width_spin: SpinBox
 var snap_toggle: CheckButton
+var top_bar: HBoxContainer
+var inspector: TabContainer
+var dock_split: HSplitContainer
+var selection_history_toggle: CheckButton
 var history_label: Label
 var open_dialog: FileDialog
 var save_dialog: FileDialog
@@ -63,54 +68,54 @@ func _build_interface() -> void:
 	var root: VBoxContainer = VBoxContainer.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(root)
-	var menu: HBoxContainer = HBoxContainer.new()
-	root.add_child(menu)
-	_add_menu(menu, "File", ["New", "Open…", "Save", "Save As…"],
+	top_bar = TOP_BAR_SCRIPT.new() as HBoxContainer
+	root.add_child(top_bar)
+	# Eight application menus; object-source commands remain accessible in File,
+	# Image and Window without a redundant ninth menu or action toolbar.
+	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
+		"Save As…  Ctrl+Shift+S", "New Object source", "Open Object source…"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
-		Callable(self, "_save"), Callable(self, "_ask_save")])
-	_add_menu(menu, "Object", ["New Object source", "Open Object source…",
-		"Save Object", "Save Object As…", "Rename Object…", "Object frame…", "Close tab"],
-		[Callable(self, "new_object"), Callable(self, "_ask_open_object"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "_ask_rename_object"), Callable(self, "_ask_object_frame"),
-		Callable(self, "_request_close_current")])
-	_add_menu(menu, "Edit", ["Undo", "Redo"],
-		[Callable(self, "_undo"), Callable(self, "_redo")])
-	_add_menu(menu, "Layer", ["Add group", "Add raster layer", "Rasterize text layer", "Remove selected", "Toggle visibility"],
+		Callable(self, "new_object"), Callable(self, "_ask_open_object")])
+	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
+		"Record selection changes in Undo History"],
+		[Callable(self, "_undo"), Callable(self, "_redo"),
+		Callable(self, "_toggle_selection_history")])
+	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view"],
+		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
+		func() -> void: _reset_view()])
+	top_bar.add_menu_spec("Image", ["Rasterize text layer", "Object frame…"],
+		[Callable(self, "_rasterize_text"), Callable(self, "_ask_object_frame")])
+	top_bar.add_menu_spec("Layers", ["Add group", "Add raster layer",
+		"Remove selected", "Toggle visibility"],
 		[Callable(self, "_add_group"), Callable(self, "_add_layer"),
-		Callable(self, "_rasterize_text"), Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility")])
-	_add_menu(menu, "View", ["Zoom in", "Zoom out", "Reset view"],
-		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8), func() -> void: _reset_view()])
-	var divider: VSeparator = VSeparator.new()
-	divider.custom_minimum_size.x = 14
-	menu.add_child(divider)
-	var label: Label = Label.new()
-	label.text = "Options"
-	menu.add_child(label)
-	var option_scroll: ScrollContainer = ScrollContainer.new()
-	option_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	option_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	option_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	menu.add_child(option_scroll)
-	var options: HBoxContainer = HBoxContainer.new()
-	option_scroll.add_child(options)
+		Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility")])
+	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels"],
+		[Callable(self, "_change_tool").bind("Select"),
+		Callable(self, "_change_tool").bind("Move")])
+	top_bar.add_menu_spec("Window", ["Show/hide panel dock", "Reset panel width",
+		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W"],
+		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
+		Callable(self, "_ask_rename_object"), Callable(self, "_ask_save"),
+		Callable(self, "_request_close_current")])
+	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
+		[Callable(self, "_show_about_workspace")])
+	top_bar.set_menu_checked("Edit", 2, record_selection_history)
 	width_spin = SpinBox.new()
 	width_spin.min_value = 1
 	width_spin.max_value = 96
 	width_spin.value = 3
 	width_spin.prefix = "Brush px"
-	width_spin.custom_minimum_size.x = 150
+	width_spin.tooltip_text = "Stroke width in Drawing pixels"
+	width_spin.custom_minimum_size.x = 170
 	width_spin.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
-	options.add_child(width_spin)
+	width_spin.gui_input.connect(func(event: InputEvent) -> void:
+		top_bar.consume_option_wheel(event, width_spin))
 	snap_toggle = CheckButton.new()
 	snap_toggle.text = "Snap (8 px)"
+	snap_toggle.tooltip_text = "Generic Drawing grid snap"
 	snap_toggle.toggled.connect(func(enabled: bool) -> void: canvas.grid_spacing = 8 if enabled else 0)
-	options.add_child(snap_toggle)
-	var selection_history_toggle: CheckButton = CheckButton.new()
-	selection_history_toggle.text = "Record selection changes in Undo History"
-	selection_history_toggle.button_pressed = false
-	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
-	options.add_child(selection_history_toggle)
+	_refresh_tool_options()
 	var tabs_line: HBoxContainer = HBoxContainer.new()
 	root.add_child(tabs_line)
 	tab_bar = TabBar.new()
@@ -126,12 +131,16 @@ func _build_interface() -> void:
 	close_tab.tooltip_text = "Close current tab (with unsaved-changes prompt)"
 	close_tab.pressed.connect(_request_close_current)
 	tabs_line.add_child(close_tab)
-	var content: HBoxContainer = HBoxContainer.new()
-	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_child(content)
+	dock_split = HSplitContainer.new()
+	dock_split.name = "WorkspaceSplit"
+	dock_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_child(dock_split)
+	var edit_region: HBoxContainer = HBoxContainer.new()
+	edit_region.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dock_split.add_child(edit_region)
 	var rail: VBoxContainer = VBoxContainer.new()
-	rail.custom_minimum_size.x = 98
-	content.add_child(rail)
+	rail.custom_minimum_size.x = 76
+	edit_region.add_child(rail)
 	for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
 		button.text = name
@@ -141,18 +150,24 @@ func _build_interface() -> void:
 	canvas = CANVAS_SCRIPT.new() as Control
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	canvas.custom_minimum_size = Vector2(400, 280)
+	canvas.custom_minimum_size = Vector2(125, 190)
 	canvas.gesture_started.connect(_gesture_started)
 	canvas.gesture_committed.connect(_canvas_changed)
 	canvas.selection_changed.connect(_selection_changed)
 	canvas.canvas_error.connect(_show_error)
 	canvas.view_changed.connect(_update_status)
+	canvas.cursor_moved.connect(_update_status)
+	canvas.resized.connect(_update_status)
 	canvas.text_requested.connect(_edit_text_at)
-	content.add_child(canvas)
+	canvas.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseMotion:
+			_update_status())
+	edit_region.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
-	var inspector: TabContainer = TabContainer.new()
-	inspector.custom_minimum_size.x = 260
-	content.add_child(inspector)
+	inspector = TabContainer.new()
+	inspector.name = "PanelDock"
+	inspector.custom_minimum_size.x = 160
+	dock_split.add_child(inspector)
 	var color_pane: VBoxContainer = VBoxContainer.new()
 	color_pane.name = "Colors"
 	inspector.add_child(color_pane)
@@ -200,9 +215,25 @@ func _build_interface() -> void:
 	history_label = Label.new()
 	history_label.text = "Content gestures: Undo / Redo"
 	history_pane.add_child(history_label)
+	selection_history_toggle = CheckButton.new()
+	selection_history_toggle.text = "Record selection changes in Undo History"
+	selection_history_toggle.tooltip_text = "Workspace preference; OFF by default, never marks a document dirty"
+	selection_history_toggle.button_pressed = record_selection_history
+	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
+	history_pane.add_child(selection_history_toggle)
 	status = Label.new()
+	status.name = "WorkspaceStatus"
 	status.text = "Ready"
+	# Status contains unbounded cursor/asset IDs; never let it force the whole
+	# workspace wider than a narrow window.
+	status.clip_text = true
+	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	root.add_child(status)
+	var about: AcceptDialog = AcceptDialog.new()
+	about.name = "WorkspaceAbout"
+	about.title = "Drawing workspace"
+	about.dialog_text = "Independent Drawing / Object Editor workspace.\nHelp: File, Edit, View, Image, Layers, Select, Window."
+	add_child(about)
 	open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
@@ -277,16 +308,6 @@ func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
 	dialog.size = Vector2i(850, 540)
 	add_child(dialog)
 	return dialog
-
-
-func _add_menu(bar: HBoxContainer, name: String, labels: Array[String], handlers: Array[Callable]) -> void:
-	var menu: MenuButton = MenuButton.new()
-	menu.text = name
-	bar.add_child(menu)
-	var popup: PopupMenu = menu.get_popup()
-	for index: int in range(labels.size()):
-		popup.add_item(labels[index], index)
-	popup.id_pressed.connect(func(index: int) -> void: handlers[index].call())
 
 
 func _pack_color(value: Color) -> int:
@@ -778,7 +799,38 @@ func _toggle_visibility() -> void:
 func _change_tool(name: String) -> void:
 	active_tool = name
 	canvas.tool = name
+	_refresh_tool_options()
 	_update_status()
+
+
+func _refresh_tool_options() -> void:
+	if top_bar == null:
+		return
+	var controls: Array[Control] = []
+	if active_tool in ["Brush", "Eraser"]:
+		controls.append(width_spin)
+	if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]:
+		controls.append(snap_toggle)
+	top_bar.set_tool_controls(active_tool, controls)
+
+
+func _toggle_selection_history() -> void:
+	_selection_history_preference_changed(not record_selection_history)
+	if selection_history_toggle != null:
+		selection_history_toggle.set_pressed_no_signal(record_selection_history)
+
+
+func _toggle_dock() -> void:
+	inspector.visible = not inspector.visible
+
+
+func _reset_dock_width() -> void:
+	inspector.visible = true
+	dock_split.split_offset = maxi(0, int(dock_split.size.x) - 270)
+
+
+func _show_about_workspace() -> void:
+	(get_node("WorkspaceAbout") as AcceptDialog).popup_centered()
 
 
 func _capture_context() -> DrawingHistoryContext:
@@ -795,8 +847,12 @@ func _capture_context() -> DrawingHistoryContext:
 
 func _selection_history_preference_changed(enabled: bool) -> void:
 	record_selection_history = enabled
+	if top_bar != null:
+		top_bar.set_menu_checked("Edit", 2, enabled)
 	for tab: Dictionary in tabs:
 		(tab["document"] as DrawingDocument).record_selection_history = enabled
+	if selection_history_toggle != null and selection_history_toggle.button_pressed != enabled:
+		selection_history_toggle.set_pressed_no_signal(enabled)
 
 
 func _gesture_started() -> void:
@@ -857,8 +913,13 @@ func _update_status() -> void:
 	var source: String = "Object %s (%s) rev %d%s | " % [session.name,
 		session.source_id if not session.source_id.is_empty() else "new", session.source_revision,
 		origin] if session != null else ""
-	status.text = "%s%s | %s | zoom %.0f%% | revision %d | %s" % [source, active_tool,
-		current_layer(), canvas.zoom * 100.0, document.revision,
+	var cursor: Vector2i = canvas.position_to_pixel(
+		canvas.last_pointer_position if canvas.pointer_known else canvas.size * 0.5)
+	var canvas_pixels: Vector2i = Vector2i(ceili(canvas.size.x / canvas.zoom),
+		ceili(canvas.size.y / canvas.zoom))
+	status.text = "%s%s | cursor %d,%d | view %d×%d px | zoom %.0f%% | revision %d | %s" % [
+		source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
+		canvas.zoom * 100.0, document.revision,
 		"Unsaved changes" if dirty else "Saved"]
 
 
@@ -1015,7 +1076,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	match key.keycode:
 		KEY_N: new_drawing()
 		KEY_O: _ask_open()
-		KEY_S: _save()
+		KEY_S:
+			if key.shift_pressed:
+				_ask_save()
+			else:
+				_save()
 		KEY_Z:
 			if key.shift_pressed:
 				_redo()

@@ -98,8 +98,8 @@ class ObjectDocumentationContractTests(unittest.TestCase):
         self.assertNotIn("func _detect_asset_cycle(", LIBRARY)
 
     def test_browser_ui_and_owner_gates_are_not_marked_shipped(self) -> None:
-        for ticket, status in (("T-063", "Ready"), ("T-064", "Ready"),
-                               ("T-065", "Blocked"), ("T-059", "Ready"),
+        for ticket, status in (("T-063", "Done"), ("T-064", "Ready"),
+                               ("T-065", "Ready"), ("T-059", "Ready"),
                                ("T-056", "Ready")):
             with self.subTest(ticket=ticket):
                 self.assertIn(f'status: "{status}"',

@@ -46,8 +46,8 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         self.assertIn("**Status:** Proposed design", UI)
         self.assertIn("not signed off", UI)
         self.assertIn("manual_review: true", (DOCS / "Tickets/T-059.md").read_text())
-        self.assertIn('status: "Ready"', (DOCS / "Tickets/T-063.md").read_text())
-        self.assertIn('status: "Blocked"', (DOCS / "Tickets/T-065.md").read_text())
+        self.assertIn('status: "Done"', (DOCS / "Tickets/T-063.md").read_text())
+        self.assertIn('status: "Ready"', (DOCS / "Tickets/T-065.md").read_text())
 
     def test_accepted_tab_and_browser_requirements_are_not_conflated(self) -> None:
         for doc in (INVENTORY, UI):
@@ -64,10 +64,10 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         self.assertIn('for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]', WORKSPACE)
         for name in ("Brush", "Eraser", "Select", "Move", "Text", "Pan"):
             self.assertIn(name, INVENTORY.split("## T-073 implementation ledger", 1)[1])
-        for menu in ("File", "Object", "Edit", "Layer", "View"):
-            self.assertIn(f'_add_menu(menu, "{menu}"', WORKSPACE)
+        for menu in ("File", "Edit", "View", "Image", "Layers", "Select", "Window", "Help"):
+            self.assertIn(f'top_bar.add_menu_spec("{menu}"', WORKSPACE)
             self.assertIn(menu, UI.split("**Current UI audit", 1)[1].split("### Concrete", 1)[0])
-        self.assertIn("partial groundwork", UI)
+        self.assertIn("native automation", UI)
         self.assertIn("selection-history", UI)
         self.assertIn("OFF", UI)
 
@@ -76,15 +76,15 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         for constant in ("KEY_N", "KEY_O", "KEY_S", "KEY_Z", "KEY_Y", "KEY_W"):
             self.assertIn(constant, routing)
         self.assertIn("if key.shift_pressed:", routing)
-        self.assertIn("KEY_S: _save()", routing)
-        self.assertNotIn("KEY_S: _ask_save()", routing)
+        self.assertIn("KEY_S:", routing)
+        self.assertIn("_ask_save()", routing)
         for doc in (INVENTORY, UI):
             self.assertIn("Ctrl+Shift+S", doc)
             self.assertIn("Save As", doc)
             self.assertIn("Ctrl+Y", doc)
             self.assertIn("Ctrl+Shift+Z", doc)
             self.assertIn("not", doc.lower())
-        self.assertIn("menu captions do not display shortcut labels", UI)
+        self.assertIn("Visible shortcut labels", UI)
 
     def test_bounded_first_slice_and_future_baseline_not_all_done(self) -> None:
         for doc in (INVENTORY, UI):
@@ -146,8 +146,8 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         self.assertIn('manual_review: false', t073)
         self.assertIn('depends_on: []', t073)
         self.assertIn('status: "Done"', t073)
-        for ticket, expected in (("T-059", 'status: "Ready"'), ("T-063", 'status: "Ready"'),
-                                 ("T-065", 'status: "Blocked"'), ("T-068", 'status: "In Progress"')):
+        for ticket, expected in (("T-059", 'status: "Ready"'), ("T-063", 'status: "Done"'),
+                                 ("T-065", 'status: "Ready"'), ("T-068", 'status: "In Progress"')):
             self.assertIn(expected, (DOCS / f"Tickets/{ticket}.md").read_text())
 
 

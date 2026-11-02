@@ -37,7 +37,7 @@ its Godot template on the build host.
 
 ## Working with the editor
 
-- **File** New, Open, Save, Save As use independent `.drawing` files; multiple
+- **File** New, Open, Save, Save As use independent `.drawing` files; **Ctrl/Cmd+Shift+S opens Save As**, with Ctrl/Cmd+Y as the primary redo shortcut (Shift+Z alias). The eight-menu compact header keeps File/Edit/View visible and moves additional commands into More at narrow widths; per-tool options scroll through chevrons or wheel rather than wrapping. Multiple
   documents open as tabs with a dirty `*` indicator.
 - **Tools** Brush, Eraser, Select (drag rectangle), Move (drag previously selected
   pixels), Pan (left drag); middle drag pans in any tool. Scroll zooms around
@@ -45,13 +45,11 @@ its Godot template on the build host.
   picker control the Drawing core's gestures.
 - **Layer** Add group, add raster, toggle visibility, remove selected; tree
   selection chooses a raster paint target. Undo and redo apply to raster gestures.
-  The **Record selection changes in Undo History** checkbox (OFF by default)
+  The History dock's **Record selection changes in Undo History** checkbox (OFF by default)
   optionally adds completed selections as separate clean, reversible steps;
   content undo restores layer/selection/tool context regardless of the toggle.
-  Structural layer operations are dirty but are not yet undoable (T-063 and
-  follow-up layer feature work).
-- **Keyboard** Ctrl/Cmd+N, O, S, Z, Shift+Z, Y for New, Open, Save,
-  Undo, Redo. Hover status reports revision, dirty state, zoom and layer ID.
+  Structural layer operations are dirty but are not yet undoable (follow-up layer feature work).
+- **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock can be resized and shown/hidden from Window; floating custom layouts and Asset Browser remain separate work.
 
 ## File format and boundaries
 
@@ -68,9 +66,9 @@ currently capped at 128 MiB and 4096 chunks; writes use a same-directory
 This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,
 retention, backup, migration or recovery from T-066. It is not yet a complete
-production drawing editor: advanced tool/options layout,
-full structural history and performance/native acceleration belong to later
-tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
+production drawing editor: the compact T-063 layout does not implement
+all approved tools/advanced options, and full structural history and
+performance/native acceleration belong to later tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
 
 ## Verification
 

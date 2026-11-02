@@ -12,7 +12,7 @@
 - **Object reuse** uses `Object Asset` published sources under `Objects/` and independent `Object Instance` IDs/transforms on maps. That is distinct from a map link, which owns navigation and no reusable artwork. Instance Save As changes only the originating binding, retaining the newly saved source after undo.
 - **Detail** is authored artwork D0–D32 at one shared signed world coordinate reference, with each document's explicit pixel density. A missing higher-detail drawing is blank; grid and entrance overlays still work. It is not a per-hex child file or an always-visible D0 underlay. See [T-061](Tickets/T-061.md).
 
-**Still pending:** the polished BarDivider workspace (T-063), nested assets (T-064), Asset Browser dock (T-065), and owner UX gates (T-056/T-059). The old `AtlasInkLayer`/`AtlasRasterLayer` object rows and footprint edit commands described below are prototype compatibility UI, not a declaration of canonical Drawing layer subclasses.
+**Still pending:** owner acceptance of the tested T-063 BarDivider prototype (T-056/T-059), nested assets (T-064), and the Asset Browser dock (T-065). The old `AtlasInkLayer`/`AtlasRasterLayer` object rows and footprint edit commands described below are prototype compatibility UI, not a declaration of canonical Drawing layer subclasses.
 
 ## Historical T-018 relationship model and layer-tree proposal
 

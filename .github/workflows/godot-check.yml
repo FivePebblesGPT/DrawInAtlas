@@ -169,6 +169,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t073_feature_ux_docs.py' -v
+      - name: Verify T-063 compact Drawing workspace and shortcut contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t063_workspace_docs.py' -v
       - name: Verify T-074 Object Asset authoring, NULL and staged nesting documentation
         shell: bash
         run: |
@@ -593,6 +598,20 @@ jobs:
           xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/workspace_keyboard_smoke.gd 2>&1 | tee /tmp/t073-keyboard.log
           grep -q 'T073_KEYBOARD_PASSED' /tmp/t073-keyboard.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T073_KEYBOARD_FAILED:' /tmp/t073-keyboard.log; then exit 1; fi
+      - name: Verify T-063 native compact workspace, overflow and Save As
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy \
+            --rendering-method gl_compatibility --path drawing \
+            --script res://tests/compact_workspace_smoke.gd 2>&1 | tee /tmp/t063-workspace.log
+          grep -q 'T063_WORKSPACE_PASSED' /tmp/t063-workspace.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T063_FAILED:' /tmp/t063-workspace.log; then exit 1; fi
       - name: Verify T-058 native framebuffer glyphs and explicit conversion
         timeout-minutes: 4
         shell: bash

@@ -1,7 +1,7 @@
 # Product Design Specification
 
 > [!important] Active product contract and evidence (2026-11-02)
-> The owner-approved decisions are [[DECISIONS_DRAWING_ATLAS_2026-11-01]] and the approved feature inventory is [[DRAWING_FEATURE_INVENTORY]]. This page describes the current **two-application** target and verified implementation. The compact BarDivider workspace is still a **proposed** layout ([[DRAW_MODULE_UI_SPEC]], T-063), not hands-on approval. T-056/T-059 retain final UX signoff; T-009 retains Search/Find naming and scope approval.
+> The owner-approved decisions are [[DECISIONS_DRAWING_ATLAS_2026-11-01]] and the approved feature inventory is [[DRAWING_FEATURE_INVENTORY]]. This page describes the current **two-application** target and verified implementation. The compact BarDivider workspace now has a tested T-063 engineering prototype, but the original UI layout proposal ([[DRAW_MODULE_UI_SPEC]]) still lacks hands-on owner approval. T-056/T-059 retain final UX signoff; T-009 retains Search/Find naming and scope approval.
 
 ## 1. Purpose and audience
 
@@ -33,7 +33,7 @@ The product separates **Atlas** (campaigns, map graph, floors, authored-detail s
 
 1. Open a dedicated Object Editor for an object source/instance; paint, edit text or modify layers in a private Drawing draft.
 2. **Save** publishes the source version to all its linked instances. **Save As** from instance A publishes B and rebinds only A; undo/redo changes the binding without removing B.
-3. Nested reusable assets, cycle-safe dependencies and the complete Asset Browser dock are **not yet delivered** (T-064/T-065). The proposed compact workspace remains T-063.
+3. Nested reusable assets, cycle-safe dependencies and the complete Asset Browser dock are **not yet delivered** (T-064/T-065). The T-063 compact workspace prototype is implemented; its owner UX acceptance remains T-059.
 
 ### 3.3 Independent Drawing (implemented minimum witness)
 
