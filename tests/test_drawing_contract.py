@@ -85,16 +85,19 @@ class PackageIsolationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             project = BUILDER.stage(Path(temp) / "consumer")
             relpaths = {str(p.relative_to(project)) for p in project.rglob("*") if p.is_file()}
+            package = ROOT / "addons" / "drawing"
+            icons = sorted((package / "icons").glob("*.svg"))
+            self.assertTrue(icons, "Drawing must stage its canonical SVG tool icons")
             self.assertEqual(relpaths, {
                 "project.godot", "main.tscn", "main.gd"
-            } | {f"addons/drawing/{p.name}" for p in (ROOT / "addons" / "drawing").iterdir()
+            } | {f"addons/drawing/{p.name}" for p in package.iterdir()
                  if p.name.endswith(".gd") or p.name.endswith(".gd.uid")}
-               | {f"addons/drawing/fonts/{p.name}" for p in (ROOT / "addons" / "drawing" / "fonts").iterdir()
-                  if p.suffix in {".ttf", ".txt"}})
-            self.assertEqual(
-                (project / "addons/drawing/signed_tiles.gd").read_bytes(),
-                (ROOT / "addons/drawing/signed_tiles.gd").read_bytes()
-            )
+               | {f"addons/drawing/fonts/{p.name}" for p in (package / "fonts").iterdir()
+                  if p.suffix in {".ttf", ".txt"}}
+               | {f"addons/drawing/icons/{p.name}" for p in icons})
+            for source in [package / "signed_tiles.gd", *icons]:
+                staged = project / "addons" / "drawing" / source.relative_to(package)
+                self.assertEqual(staged.read_bytes(), source.read_bytes())
             godot_project = (project / "project.godot").read_text()
             self.assertNotIn("[autoload]", godot_project)
             self.assertNotIn("[editor_plugins]", godot_project)
