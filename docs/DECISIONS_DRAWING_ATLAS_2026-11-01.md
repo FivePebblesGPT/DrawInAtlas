@@ -106,8 +106,17 @@ See [[T-060]], [[T-062]], [[T-054]], [[T-063]] and the remaining questions in [[
 
 ### Implementation consequences
 - Save As from an instance is **one logical Atlas operation**: create a source asset + update the *captured originating instance binding*; use immutable instance/map IDs and revision guards. If it is no longer the same instance, reject unsafe rebinding, keep the draft and offer an explicit recovery path. Source creation / instance rebinding / global history must never silently partially succeed.
-- Undo of Save As must restore the originating instance's old binding and relevant selection/object-editing mode; redo restores the new binding and context. Decide separately whether undo removes the new unused asset from the registry/disk or retains it as a saved independent asset (do not automatically delete persisted user files).
+- Undo of Save As restores the originating instance's old binding and relevant selection/object-editing mode. **Round 6 decision:** Variant B remains in the asset library as an independent saved asset, even when no instances reference it. Redo reconnects the same Variant B asset ID; it must not create another variant.
 - Keep independent Object Editor semantics and Atlas-specific rebind orchestration at a clean boundary: **Drawing/Object Editor** creates/copies an asset, while **Atlas** owns which instance points to which asset.
 - Selection-only history applies to both standalone Drawing and embedded Atlas insofar as each exposes the same history configuration/API; in Atlas the operations join its single global chronological history. A selection-only step affects no canonical artwork and must not advance a project-content savepoint.
 
 See [[T-051]], [[T-054]], [[T-060]], [[T-062]], [[T-056]] and [[T-063]].
+
+## Round 6 — Save As undo retention policy (owner approved, 2026-11-02)
+
+- Undo of Save As through an Atlas instance **reverts only that instance's asset binding and relevant editing context**. The newly saved Variant B **remains available in the object asset library**, even when unreferenced. Do **not** delete the new asset on undo or automatically garbage-collect it because its reference count is zero.
+- Redo uses the **same stable Variant B asset ID** and rebinds the instance. It must not duplicate B, overwrite the original or silently recreate B under a new ID.
+- Variant B remains a normal asset that the user may reuse, edit, save or explicitly delete. Automatic deletion/reclamation of unused variants is **not** currently approved; revisit only if user feedback warrants it.
+- This is an intentionally **asymmetric undo**: creation/persistence of the new source survives, while the Atlas instance reference is undoable. If Variant B is stored inside the Atlas project, undo may **not** return the project to its old saved/clean state; the storage/dirty-savepoint model must report this truthfully.
+- If B is explicitly deleted after undo, redo cannot fabricate it. Define a safe missing-asset/error path (or disable invalid redo) without corrupting the original binding. All Save As writes and instance updates must still commit safely, without half-created/half-rebound states.
+- Tests should verify Save As A→B, undo A→original with B retained, redo A→same B, editor reopening B, save/reopen with unreferenced B, and a deleted-B redo failure. See [[T-060]], [[T-062]], [[T-054]], [[T-056]].
