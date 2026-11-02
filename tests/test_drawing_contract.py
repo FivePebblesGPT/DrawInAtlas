@@ -64,7 +64,7 @@ class RegistryContractTests(unittest.TestCase):
 
 class PackageIsolationTests(unittest.TestCase):
     def test_source_is_generic_and_contains_no_atlas_reference(self) -> None:
-        source = (ROOT / "drawing" / "package" / "signed_tiles.gd").read_text()
+        source = (ROOT / "addons" / "drawing" / "signed_tiles.gd").read_text()
         self.assertNotIn("Atlas", source)
         self.assertNotIn("res://scripts/", source)
         self.assertNotIn("class_name", source)
@@ -86,11 +86,12 @@ class PackageIsolationTests(unittest.TestCase):
             project = BUILDER.stage(Path(temp) / "consumer")
             relpaths = {str(p.relative_to(project)) for p in project.rglob("*") if p.is_file()}
             self.assertEqual(relpaths, {
-                "project.godot", "main.tscn", "main.gd", "addons/drawing/signed_tiles.gd"
-            })
+                "project.godot", "main.tscn", "main.gd"
+            } | {f"addons/drawing/{p.name}" for p in (ROOT / "addons" / "drawing").iterdir()
+                 if p.name.endswith(".gd") or p.name.endswith(".gd.uid")})
             self.assertEqual(
                 (project / "addons/drawing/signed_tiles.gd").read_bytes(),
-                (ROOT / "drawing/package/signed_tiles.gd").read_bytes()
+                (ROOT / "addons/drawing/signed_tiles.gd").read_bytes()
             )
             godot_project = (project / "project.godot").read_text()
             self.assertNotIn("[autoload]", godot_project)

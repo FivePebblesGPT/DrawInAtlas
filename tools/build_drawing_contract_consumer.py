@@ -2,7 +2,7 @@
 """Stage a clean Godot consumer from the canonical Drawing package (T-051).
 
 This intentionally does not build the full standalone Drawing application (T-053).
-Only a small, real package primitive and a third-party consumer are shipped.
+The full canonical source tree is staged byte-for-byte for independent consumers.
 """
 
 from __future__ import annotations
@@ -12,11 +12,10 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "drawing" / "package"
-FIXTURE = ROOT / "tests" / "fixtures" / "drawing_contract_consumer"
+PACKAGE = ROOT / "addons" / "drawing"
 
 
-def stage(output: Path) -> Path:
+def stage(output: Path, fixture_name: str = "drawing_contract_consumer") -> Path:
     """Copy the allowlisted package and consumer sources into an external project.
 
     Parameters
@@ -43,13 +42,20 @@ def stage(output: Path) -> Path:
     if not target.parent.is_dir():
         raise ValueError("Target parent does not exist")
 
-    # Strict allowlist: no Atlas application, autoloads, plugins, scenes or assets.
+    # Strict file-type allowlist: no Atlas application, autoloads, scenes or assets.
+    fixture = ROOT / "tests" / "fixtures" / fixture_name
+    if fixture_name not in {"drawing_contract_consumer", "drawing_core_consumer"}:
+        raise ValueError("Unsupported isolated test consumer")
     sources = {
-        PACKAGE / "signed_tiles.gd": target / "addons" / "drawing" / "signed_tiles.gd",
-        FIXTURE / "project.godot.txt": target / "project.godot",
-        FIXTURE / "main.tscn.txt": target / "main.tscn",
-        FIXTURE / "main.gd.txt": target / "main.gd",
+        source: target / "addons" / "drawing" / source.name
+        for source in sorted(PACKAGE.iterdir())
+        if source.is_file() and (source.name.endswith(".gd") or source.name.endswith(".gd.uid"))
     }
+    sources.update({
+        fixture / "project.godot.txt": target / "project.godot",
+        fixture / "main.tscn.txt": target / "main.tscn",
+        fixture / "main.gd.txt": target / "main.gd",
+    })
     for source in sources:
         if source.is_symlink() or not source.is_file():
             raise ValueError(f"Required source must be a regular file: {source}")
@@ -63,8 +69,9 @@ def stage(output: Path) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="External empty directory")
+    parser.add_argument("--fixture", choices=("drawing_contract_consumer", "drawing_core_consumer"), default="drawing_contract_consumer")
     args = parser.parse_args()
-    print(stage(args.output))
+    print(stage(args.output, args.fixture))
 
 
 if __name__ == "__main__":

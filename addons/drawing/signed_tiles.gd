@@ -19,3 +19,16 @@ static func tile_for_pixel(pixel: Vector2i, stride: int) -> Vector2i:
 static func offset_in_tile(pixel: Vector2i, stride: int) -> Vector2i:
 	assert(stride > 0, "Tile stride must be positive")
 	return Vector2i(posmod(pixel.x, stride), posmod(pixel.y, stride))
+
+
+## 64-bit document addressing must not pass through Vector2i or float division.
+static func tile_key64(x: int, y: int, stride: int) -> String:
+	return "%d,%d" % [floor_div(x, stride), floor_div(y, stride)]
+
+
+static func pixel_key64(x: int, y: int) -> String:
+	return "%d,%d" % [x, y]
+
+
+static func local_offset64(x: int, y: int, stride: int) -> Vector2i:
+	return Vector2i(posmod(x, stride), posmod(y, stride))

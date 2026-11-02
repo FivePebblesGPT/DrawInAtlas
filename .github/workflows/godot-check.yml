@@ -28,6 +28,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_drawing_contract.py' -v
+      - name: Verify T-052 extracted independent Drawing core
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_core.py' -v
       - name: Import resources and parse scripts
         shell: bash
         run: |
