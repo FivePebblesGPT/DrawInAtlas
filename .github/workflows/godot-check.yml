@@ -23,6 +23,11 @@ jobs:
         run: godot --version | grep -E '^4\.8\.beta2\.official\.'
       - name: Enforce explicit types in owned GDScript and skill examples
         run: python3 tests/check_explicit_types.py
+      - name: Verify T-051 isolated Drawing contract consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_contract.py' -v
       - name: Import resources and parse scripts
         shell: bash
         run: |

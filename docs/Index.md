@@ -8,9 +8,11 @@
 
 | Ready | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 17 | 27 | 3 | 29 | 1 | 77 |
+| 20 | 23 | 3 | 30 | 1 | 77 |
 
 **Owner review is intentionally narrow.** `Owner` in the table marks a direct completion gate; `Via T-039` indicates inherited privacy-policy approval. Agents can research, implement and test pending dependencies, but **must not mark Done** until the relevant direct and transitive manual approvals are recorded. Approved Drawing feature scope does not mean the final UX is accepted.
+
+**T-051 completed (2026-11-02):** [testable Drawing document/package ADR](ADR_DRAWING_DOCUMENT_CONTRACT.md) and an isolated Godot consumer build. Its direct dependents T-052, T-057, T-059 and T-067 are now Ready; implementation and owner UX gates are not complete.
 
 ## Tickets
 
@@ -66,15 +68,15 @@
 | [T-048 · Collaboration acceptance](Tickets/T-048.md) | Blocked | **Owner** | [T-046](Tickets/T-046.md), [T-047](Tickets/T-047.md), [T-043](Tickets/T-043.md) |
 | [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | — | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
 | [T-050 · Retire palette-cell TerrainLayer artwork](Tickets/T-050.md) | Done | — | [T-028](Tickets/T-028.md), [T-031](Tickets/T-031.md) |
-| [T-051 · Finalize shared/copy, coordinates and project contracts](Tickets/T-051.md) | Ready | — | — |
-| [T-052 · Independent Drawing core and generic layer groups](Tickets/T-052.md) | Blocked | — | [T-051](Tickets/T-051.md) |
+| [T-051 · Finalize shared/copy, coordinates and project contracts](Tickets/T-051.md) | Done | — | — |
+| [T-052 · Independent Drawing core and generic layer groups](Tickets/T-052.md) | Ready | — | [T-051](Tickets/T-051.md) |
 | [T-053 · Independent Drawing Godot project in monorepo](Tickets/T-053.md) | Blocked | — | [T-052](Tickets/T-052.md) |
 | [T-054 · Global history navigates to edit origin](Tickets/T-054.md) | Blocked | — | [T-052](Tickets/T-052.md) |
 | [T-055 · Compose Drawing in Atlas, input and previews](Tickets/T-055.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-054](Tickets/T-054.md), [T-060](Tickets/T-060.md), [T-061](Tickets/T-061.md), [T-062](Tickets/T-062.md) |
 | [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Blocked | **Owner** | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
-| [T-057 · Native map rendering/LOD feasibility spike](Tickets/T-057.md) | Blocked | — | [T-051](Tickets/T-051.md) |
+| [T-057 · Native map rendering/LOD feasibility spike](Tickets/T-057.md) | Ready | — | [T-051](Tickets/T-051.md) |
 | [T-058 · One text object per editable layer and rasterization](Tickets/T-058.md) | Blocked | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Blocked | **Owner** | [T-051](Tickets/T-051.md) |
+| [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | **Owner** | [T-051](Tickets/T-051.md) |
 | [T-060 · Reusable Object Assets and linked instances](Tickets/T-060.md) | Blocked | — | [T-052](Tickets/T-052.md) |
 | [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Blocked | — | [T-052](Tickets/T-052.md) |
 | [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
@@ -82,7 +84,7 @@
 | [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Blocked | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Blocked | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
-| [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Blocked | — | [T-051](Tickets/T-051.md) |
+| [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Ready | — | [T-051](Tickets/T-051.md) |
 | [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | Blocked | — | [T-052](Tickets/T-052.md) |
 | [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Ready | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Ready | — | — |

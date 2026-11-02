@@ -69,3 +69,7 @@ ExportedObj/
 *.unitypackage
 *.unitypackage.meta
 *.app
+
+# Python smoke-test artifacts
+__pycache__/
+*.py[cod]
