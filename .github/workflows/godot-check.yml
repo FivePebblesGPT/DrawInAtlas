@@ -23,6 +23,8 @@ jobs:
         run: godot --version | grep -E '^4\.8\.beta2\.official\.'
       - name: Enforce explicit types in owned GDScript and skill examples
         run: python3 tests/check_explicit_types.py
+      - name: Verify CI initializes main project before GDScript smokes
+        run: python3 -m unittest discover -s tests -p 'test_godot_ci_order.py' -v
       - name: Verify T-051 isolated Drawing contract consumer
         shell: bash
         run: |
@@ -55,6 +57,14 @@ jobs:
             2>&1 | tee /tmp/godot-export-fonts.log
           grep -q 'DRAWING_PACK_FONT_PASSED' /tmp/godot-export-fonts.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-export-fonts.log; then exit 1; fi
+      # The standalone package import above only registers *its* classes.
+      # The main checkout needs its own class cache before any --path . --script smoke.
+      - name: Import resources and parse scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
       - name: Verify T-054 Drawing/Atlas chronological history
         shell: bash
         run: |
@@ -65,12 +75,6 @@ jobs:
           godot --headless --path . --script res://tests/drawing_history_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-history-editor.log
           grep -q 'DRAWING_HISTORY_EDITOR_PASSED' /tmp/godot-drawing-history-editor.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-history-editor.log; then exit 1; fi
-      - name: Import resources and parse scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
       - name: Verify T-058 editable text, font integrity and undoable rasterization
         shell: bash
         run: |
