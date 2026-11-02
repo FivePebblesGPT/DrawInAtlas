@@ -22,25 +22,48 @@ jobs:
         shell: bash
         run: godot --version | grep -E '^4\.8\.beta2\.official\.'
       - name: Enforce explicit types in owned GDScript and skill examples
+        id: ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         run: python3 tests/check_explicit_types.py
       - name: Verify CI initializes main project before GDScript smokes
+        id: ci_03_verify_ci_initializes_main_project_before_gdscript_smokes
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         run: python3 -m unittest discover -s tests -p 'test_godot_ci_order.py' -v
+      - name: Verify fail-late CI execution and reporting
+        id: ci_04_fail_late_contract
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 -m unittest discover -s tests -p 'test_godot_ci_fail_late.py' -v
       - name: Verify T-051 isolated Drawing contract consumer
+        id: ci_04_verify_t_051_isolated_drawing_contract_consumer
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_drawing_contract.py' -v
       - name: Verify T-052 extracted independent Drawing core
+        id: ci_05_verify_t_052_extracted_independent_drawing_core
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_drawing_core.py' -v
       - name: Verify T-053 isolated standalone Drawing and third package consumer
+        id: ci_06_verify_t_053_isolated_standalone_drawing_and_third_package_cons
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_drawing_app.py' -v
       - name: Verify T-053 standalone Linux release package
+        id: ci_07_verify_t_053_standalone_linux_release_package
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -60,35 +83,49 @@ jobs:
       # The standalone package import above only registers *its* classes.
       # The main checkout needs its own class cache before any --path . --script smoke.
       - name: Import resources and parse scripts
+        id: ci_08_import_resources_and_parse_scripts
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
       - name: Verify T-054 Drawing/Atlas chronological history
+        id: ci_09_verify_t_054_drawing_atlas_chronological_history
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           godot --headless --path . --script res://tests/drawing_history_smoke.gd 2>&1 | tee /tmp/godot-drawing-history.log
           grep -q 'DRAWING_HISTORY_PASSED' /tmp/godot-drawing-history.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|failed;' /tmp/godot-drawing-history.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|failed;' /tmp/godot-drawing-history.log; then ci_fail_marker 'Forbidden error marker'; fi
           godot --headless --path . --script res://tests/drawing_history_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-history-editor.log
           grep -q 'DRAWING_HISTORY_EDITOR_PASSED' /tmp/godot-drawing-history-editor.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-history-editor.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-history-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
       - name: Verify T-058 editable text, font integrity and undoable rasterization
+        id: ci_10_verify_t_058_editable_text_font_integrity_and_undoable_rasteriz
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
           grep -q 'DRAWING_TEXT_PASSED' /tmp/godot-drawing-text.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text.log; then ci_fail_marker 'Forbidden error marker'; fi
           python3 tools/build_drawing_app.py --in-place
           # Staging refreshes font files: let Godot generate their imported FontFile resources.
           godot --headless --editor --path drawing --import --quit
           godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
           grep -q 'DRAWING_TEXT_UI_PASSED' /tmp/godot-drawing-text-ui.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text-ui.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
       - name: Verify T-060 reusable Object Assets and atomic Save As
+        id: ci_11_verify_t_060_reusable_object_assets_and_atomic_save_as
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -96,19 +133,26 @@ jobs:
           grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
+        id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
           grep -q 'OBJECT_EDITOR_PASSED' /tmp/godot-object-editor.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_EDITOR_FAILED:' /tmp/godot-object-editor.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_EDITOR_FAILED:' /tmp/godot-object-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
           python3 tools/build_drawing_app.py --in-place
           # Staged licensed fonts must be imported before UI text editing.
           godot --headless --editor --path drawing --import --quit
           godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
           grep -q 'DRAWING_OBJECT_UI_PASSED' /tmp/godot-object-editor-ui.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|DRAWING_OBJECT_UI_FAILED:' /tmp/godot-object-editor-ui.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|DRAWING_OBJECT_UI_FAILED:' /tmp/godot-object-editor-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
       - name: Verify T-061 signed floor/detail world mapping and blank D-levels
+        id: ci_13_verify_t_061_signed_floor_detail_world_mapping_and_blank_d_leve
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -116,6 +160,9 @@ jobs:
           grep -q 'T061_WORLD_MAPPING_PASSED' /tmp/godot-world-mapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T061_FAILED:' /tmp/godot-world-mapping.log; then exit 1; fi
       - name: Verify T-055 Atlas canonical Drawing composition and input
+        id: ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -123,19 +170,26 @@ jobs:
           grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
       - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
+        id: ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           godot --headless --path . --script res://tests/campaign_bundle_smoke.gd 2>&1 | tee /tmp/godot-t066-bundle.log
           grep -q 'ATLAS_BUNDLE_PASSED' /tmp/godot-t066-bundle.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_FAILED:|ATLAS_BUNDLE_FAILED' /tmp/godot-t066-bundle.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_FAILED:|ATLAS_BUNDLE_FAILED' /tmp/godot-t066-bundle.log; then ci_fail_marker 'Forbidden error marker'; fi
           godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
           grep -q 'ATLAS_BUNDLE_EDITOR_PASSED' /tmp/godot-t066-editor.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
       - name: Verify T-067 measured chunk geometry and Zstd parity
+        id: ci_16_verify_t_067_measured_chunk_geometry_and_zstd_parity
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           python3 -m unittest discover -s tests -p 'test_chunk_geometry.py' -v
           python3 tools/benchmarks/chunk_geometry.py --output /tmp/t067-ci --repeats 1 \
             2>&1 | tee /tmp/t067-layouts.log
@@ -147,67 +201,102 @@ jobs:
             --output /tmp/t067-ci/native.json 2>&1 | tee /tmp/t067-native.log
           grep -q 'T067_NATIVE_PASSED (386 checks, 0 failures)' /tmp/t067-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T067_FAILED:|T067_CODEC_FAILED' \
-            /tmp/t067-codec.log /tmp/t067-native.log; then exit 1; fi
+            /tmp/t067-codec.log /tmp/t067-native.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
       - name: Verify T-069 approved architecture and typed model documentation
+        id: ci_17_verify_t_069_approved_architecture_and_typed_model_documentatio
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t069_architecture_docs.py' -v
       - name: Verify T-070 world, authored-detail and navigation documentation
+        id: ci_18_verify_t_070_world_authored_detail_and_navigation_documentation
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t070_world_docs.py' -v
       - name: Verify T-071 sparse campaign persistence and recovery documentation
+        id: ci_19_verify_t_071_sparse_campaign_persistence_and_recovery_documenta
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t071_storage_docs.py' -v
       - name: Verify T-072 current tools versus historical workflow documentation
+        id: ci_20_verify_t_072_current_tools_versus_historical_workflow_documenta
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t072_tools_docs.py' -v
       - name: Verify T-073 approved inventory versus proposed workspace UX
+        id: ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t073_feature_ux_docs.py' -v
       - name: Verify T-063 compact Drawing workspace and shortcut contract
+        id: ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t063_workspace_docs.py' -v
       - name: Verify T-074 Object Asset authoring, NULL and staged nesting documentation
+        id: ci_23_verify_t_074_object_asset_authoring_null_and_staged_nesting_doc
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t074_object_docs.py' -v
       - name: Verify T-075 current native projection, privacy and collaboration docs
+        id: ci_24_verify_t_075_current_native_projection_privacy_and_collaboratio
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t075_projection_collaboration_docs.py' -v
       - name: Verify T-077 performance and reviewer handoff documentation
+        id: ci_25_verify_t_077_performance_and_reviewer_handoff_documentation
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t077_handoff.py' -v
       - name: Verify T-068 canonical tile-run renderer and native feasibility probe
+        id: ci_26_verify_t_068_canonical_tile_run_renderer_and_native_feasibility
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           python3 -m unittest discover -s tests -p 'test_t068_kernel.py' -v
           godot --headless --path . --script res://tests/drawing_raster_backend_benchmark.gd -- \
             --output /tmp/t068-godot.json 2>&1 | tee /tmp/t068-godot.log
           grep -q 'T068_GODOT_PASSED' /tmp/t068-godot.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FAILED:' /tmp/t068-godot.log; then exit 1; fi
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FAILED:' /tmp/t068-godot.log; then ci_fail_marker 'Forbidden error marker'; fi
           python3 tools/benchmarks/t068_native.py --build-dir /tmp/t068-build \
             --godot-vectors /tmp/t068-godot.json --output /tmp/t068-native.json \
             2>&1 | tee /tmp/t068-native.log
           grep -q 'T068_NATIVE_GODOT_PARITY_PASSED' /tmp/t068-native.log
           grep -q 'T068_NATIVE_PASSED' /tmp/t068-native.log
+          ci_finish
       - name: Run domain smoke tests
+        id: ci_27_run_domain_smoke_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -215,6 +304,9 @@ jobs:
           grep -q 'ATLAS_TESTS_PASSED' /tmp/godot-test.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-test.log; then exit 1; fi
       - name: Run artwork and history tests
+        id: ci_28_run_artwork_and_history_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -222,6 +314,9 @@ jobs:
           grep -q 'ATLAS_ARTWORK_PASSED' /tmp/godot-artwork.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-artwork.log; then exit 1; fi
       - name: Run board and grid tests
+        id: ci_29_run_board_and_grid_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -229,6 +324,9 @@ jobs:
           grep -q 'ATLAS_BOARD_GRID_PASSED' /tmp/godot-board-grid.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-board-grid.log; then exit 1; fi
       - name: Run continuous shared-canvas regression (T-002)
+        id: ci_30_run_continuous_shared_canvas_regression_t_002
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -236,6 +334,9 @@ jobs:
           grep -q 'ATLAS_CONTINUOUS_CANVAS_PASSED' /tmp/godot-continuous-canvas.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-continuous-canvas.log; then exit 1; fi
       - name: Verify viewport zoom and authored LOD contract (T-004)
+        id: ci_31_verify_viewport_zoom_and_authored_lod_contract_t_004
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -243,6 +344,9 @@ jobs:
           grep -q 'ATLAS_ZOOM_LOD_CONTRACT_PASSED' /tmp/godot-zoom-lod.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-zoom-lod.log; then exit 1; fi
       - name: Verify aligned transparent detail previews (T-003)
+        id: ci_32_verify_aligned_transparent_detail_previews_t_003
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -250,6 +354,9 @@ jobs:
           grep -q 'ATLAS_ALIGNED_DETAIL_PREVIEWS_PASSED' /tmp/godot-aligned-detail-previews.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-aligned-detail-previews.log; then exit 1; fi
       - name: Verify automatic authored artwork LOD (T-005)
+        id: ci_33_verify_automatic_authored_artwork_lod_t_005
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -257,17 +364,24 @@ jobs:
           grep -q 'ATLAS_AUTOMATIC_ARTWORK_LOD_PASSED' /tmp/godot-automatic-lod.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-automatic-lod.log; then exit 1; fi
       - name: Run layer and recovery tests
+        id: ci_34_run_layer_and_recovery_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           for suite in layers_smoke storage_smoke layer_ui_smoke; do
             godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
-            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_LAYERS_PASSED' /tmp/godot-layers_smoke.log
           grep -q 'ATLAS_STORAGE_PASSED' /tmp/godot-storage_smoke.log
           grep -q 'ATLAS_LAYER_UI_PASSED' /tmp/godot-layer_ui_smoke.log
+          ci_finish
       - name: Verify categorized sidebar tool palette (T-006)
+        id: ci_35_verify_categorized_sidebar_tool_palette_t_006
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -275,6 +389,9 @@ jobs:
           grep -q 'ATLAS_TOOL_PALETTE_PASSED' /tmp/godot-tool-palette.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-tool-palette.log; then exit 1; fi
       - name: Verify compact action controls (T-007)
+        id: ci_36_verify_compact_action_controls_t_007
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -282,6 +399,9 @@ jobs:
           grep -q 'ATLAS_COMPACT_CONTROLS_PASSED' /tmp/godot-compact-controls.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-compact-controls.log; then exit 1; fi
       - name: Verify compact authored-detail and link hierarchy (T-018 preview)
+        id: ci_37_verify_compact_authored_detail_and_link_hierarchy_t_018_preview
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -289,6 +409,9 @@ jobs:
           grep -q 'ATLAS_LAYER_HIERARCHY_PASSED' /tmp/godot-layer-hierarchy.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|HIERARCHY FAILED:' /tmp/godot-layer-hierarchy.log; then exit 1; fi
       - name: Verify grid settings toolbar popup (T-008)
+        id: ci_38_verify_grid_settings_toolbar_popup_t_008
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -296,6 +419,9 @@ jobs:
           grep -q 'ATLAS_GRID_SETTINGS_PASSED' /tmp/godot-grid-settings.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-grid-settings.log; then exit 1; fi
       - name: Verify round pen turns (T-010)
+        id: ci_39_verify_round_pen_turns_t_010
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -303,6 +429,9 @@ jobs:
           grep -q 'ATLAS_PEN_TURNS_PASSED' /tmp/godot-pen-turns.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-pen-turns.log; then exit 1; fi
       - name: Verify local detail authoring without battlemat documents (T-012)
+        id: ci_40_verify_local_detail_authoring_without_battlemat_documents_t_012
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -310,6 +439,9 @@ jobs:
           grep -q 'ATLAS_LOCAL_DETAIL_WORKFLOW_PASSED' /tmp/godot-local-detail.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-local-detail.log; then exit 1; fi
       - name: Verify retired battlemat creation paths (T-014)
+        id: ci_41_verify_retired_battlemat_creation_paths_t_014
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -317,6 +449,9 @@ jobs:
           grep -q 'ATLAS_RETIRED_BATTLEMAP_PASSED' /tmp/godot-retired-battlemap.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-retired-battlemap.log; then exit 1; fi
       - name: Inventory legacy placement migrations without modifying saves (T-015)
+        id: ci_42_inventory_legacy_placement_migrations_without_modifying_saves_t
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -324,6 +459,9 @@ jobs:
           grep -q 'ATLAS_LEGACY_MIGRATION_AUDIT_PASSED' /tmp/godot-legacy-migration-audit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-legacy-migration-audit.log; then exit 1; fi
       - name: Verify dictionary adapter responsibilities and resource validation (T-029)
+        id: ci_43_verify_dictionary_adapter_responsibilities_and_resource_validat
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -331,6 +469,9 @@ jobs:
           grep -q 'ATLAS_DICTIONARY_CONVERSION_PASSED' /tmp/godot-dictionary-audit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-dictionary-audit.log; then exit 1; fi
       - name: Verify raster image-to-chunk import contract (T-030)
+        id: ci_44_verify_raster_image_to_chunk_import_contract_t_030
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -338,6 +479,9 @@ jobs:
           grep -q 'ATLAS_RASTER_IMPORT_CHUNKS_PASSED' /tmp/godot-raster-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-import.log; then exit 1; fi
       - name: Verify raster/ink type authority and retired terrain kind (T-050)
+        id: ci_45_verify_raster_ink_type_authority_and_retired_terrain_kind_t_050
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -345,6 +489,9 @@ jobs:
           grep -q 'ATLAS_LAYER_TYPE_PASSED' /tmp/godot-layer-type.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^LAYER TYPE FAILED:' /tmp/godot-layer-type.log; then exit 1; fi
       - name: Verify raster/ink model, grid independence and native fidelity (T-050)
+        id: ci_46_verify_raster_ink_model_grid_independence_and_native_fidelity_t
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -352,6 +499,9 @@ jobs:
           grep -q 'ATLAS_RASTER_INK_MODEL_PASSED' /tmp/godot-raster-ink-model.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-ink-model.log; then exit 1; fi
       - name: Audit ink and raster representation contracts (T-028 investigation)
+        id: ci_47_audit_ink_and_raster_representation_contracts_t_028_investigati
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -359,6 +509,9 @@ jobs:
           grep -q 'ATLAS_INK_REPRESENTATION_PASSED' /tmp/godot-ink-representation.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-ink-representation.log; then exit 1; fi
       - name: Verify Brush tool opacity, stroke and raster behavior (T-020)
+        id: ci_48_verify_brush_tool_opacity_stroke_and_raster_behavior_t_020
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -366,6 +519,9 @@ jobs:
           grep -q 'ATLAS_BRUSH_PASSED' /tmp/godot-brush.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^BRUSH FAILED:' /tmp/godot-brush.log; then exit 1; fi
       - name: Verify Eraser geometry, alpha, masks and saving (T-021)
+        id: ci_49_verify_eraser_geometry_alpha_masks_and_saving_t_021
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -373,6 +529,9 @@ jobs:
           grep -q 'ATLAS_ERASER_PASSED' /tmp/godot-eraser.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^ERASER FAILED:' /tmp/godot-eraser.log; then exit 1; fi
       - name: Verify raster drawing and designated Objects workflow
+        id: ci_50_verify_raster_drawing_and_designated_objects_workflow
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -380,6 +539,9 @@ jobs:
           grep -q 'ATLAS_RASTER_OBJECTS_PASSED' /tmp/godot-raster-objects.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-objects.log; then exit 1; fi
       - name: Verify Bucket tolerance, bounds, previews and saving (T-023)
+        id: ci_51_verify_bucket_tolerance_bounds_previews_and_saving_t_023
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -387,6 +549,9 @@ jobs:
           grep -q 'ATLAS_BUCKET_PASSED' /tmp/godot-bucket.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^BUCKET FAILED:' /tmp/godot-bucket.log; then exit 1; fi
       - name: Verify active-layer Move gestures (T-022)
+        id: ci_52_verify_active_layer_move_gestures_t_022
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -394,6 +559,9 @@ jobs:
           grep -q 'ATLAS_MOVE_PASSED' /tmp/godot-move.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^MOVE FAILED:' /tmp/godot-move.log; then exit 1; fi
       - name: Verify Line endpoints, modifiers, masks and saving (T-024)
+        id: ci_53_verify_line_endpoints_modifiers_masks_and_saving_t_024
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -401,6 +569,9 @@ jobs:
           grep -q 'ATLAS_LINE_PASSED' /tmp/godot-line.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^LINE FAILED:' /tmp/godot-line.log; then exit 1; fi
       - name: Verify polygon shape geometry, masks and persistence (T-025)
+        id: ci_54_verify_polygon_shape_geometry_masks_and_persistence_t_025
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -408,6 +579,9 @@ jobs:
           grep -q 'ATLAS_POLYGON_PASSED' /tmp/godot-polygon.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^POLYGON FAILED:' /tmp/godot-polygon.log; then exit 1; fi
       - name: Verify editable wall paths, geometry, history and native saves (T-026)
+        id: ci_55_verify_editable_wall_paths_geometry_history_and_native_saves_t_
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -415,6 +589,9 @@ jobs:
           grep -q 'ATLAS_WALL_PATHS_PASSED' /tmp/godot-wall-paths.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-wall-paths.log; then exit 1; fi
       - name: Verify mouse-wheel brush width (T-011)
+        id: ci_56_verify_mouse_wheel_brush_width_t_011
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -422,18 +599,25 @@ jobs:
           grep -q 'ATLAS_PEN_WIDTH_WHEEL_PASSED' /tmp/godot-pen-width-wheel.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-pen-width-wheel.log; then exit 1; fi
       - name: Run editing tool and clipboard tests
+        id: ci_57_run_editing_tool_and_clipboard_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           for suite in fill_scope_smoke clipboard_smoke selection_smoke tools_ui_smoke; do
             godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
-            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_FILL_SCOPE_PASSED' /tmp/godot-fill_scope_smoke.log
           grep -q 'ATLAS_CLIPBOARD_PASSED' /tmp/godot-clipboard_smoke.log
           grep -q 'ATLAS_SELECTION_PASSED' /tmp/godot-selection_smoke.log
           grep -q 'ATLAS_TOOLS_UI_PASSED' /tmp/godot-tools_ui_smoke.log
+          ci_finish
       - name: Verify active-layer selection gestures and masks (T-019)
+        id: ci_58_verify_active_layer_selection_gestures_and_masks_t_019
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -441,6 +625,9 @@ jobs:
           grep -q 'ATLAS_SELECTION_INTERACTIONS_PASSED' /tmp/godot-selection-interactions.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-selection-interactions.log; then exit 1; fi
       - name: Verify coherent grid snapping and edit masks (T-016)
+        id: ci_59_verify_coherent_grid_snapping_and_edit_masks_t_016
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -448,6 +635,9 @@ jobs:
           grep -q 'ATLAS_SNAPPING_PASSED' /tmp/godot-snapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-snapping.log; then exit 1; fi
       - name: Reject stale Search navigation results (T-009)
+        id: ci_60_reject_stale_search_navigation_results_t_009
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -455,30 +645,41 @@ jobs:
           grep -q 'ATLAS_SEARCH_STALE_PASSED' /tmp/godot-search-stale.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|SEARCH STALE FAILED:' /tmp/godot-search-stale.log; then exit 1; fi
       - name: Run workspace composition and organization tests
+        id: ci_61_run_workspace_composition_and_organization_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           for suite in editor_modules_smoke organization_ui_smoke floors_view_smoke overview_smoke preview_cache_smoke; do
             godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
-            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_EDITOR_MODULES_PASSED' /tmp/godot-editor_modules_smoke.log
           grep -q 'ATLAS_ORGANIZATION_UI_PASSED' /tmp/godot-organization_ui_smoke.log
           grep -q 'ATLAS_FLOORS_VIEW_PASSED' /tmp/godot-floors_view_smoke.log
           grep -q 'ATLAS_OVERVIEW_PASSED' /tmp/godot-overview_smoke.log
           grep -q 'ATLAS_PREVIEW_CACHE_PASSED' /tmp/godot-preview_cache_smoke.log
+          ci_finish
       # Linked-map commands/UI run headlessly as well as through native input.
       - name: Run linked-map workflow tests
+        id: ci_62_run_linked_map_workflow_tests
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           for suite in links_smoke linked_maps_ui_smoke; do
             godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
-            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_LINKS_PASSED' /tmp/godot-links_smoke.log
           grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
+          ci_finish
       - name: Verify isolated player-output privacy boundary proof (T-039)
+        id: ci_63_verify_isolated_player_output_privacy_boundary_proof_t_039
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -486,6 +687,9 @@ jobs:
           grep -q 'ATLAS_PLAYER_PROJECTION_CONTRACT_PASSED' /tmp/godot-player-projection.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-player-projection.log; then exit 1; fi
       - name: Verify player privacy projection acceptance matrix (T-043)
+        id: ci_64_verify_player_privacy_projection_acceptance_matrix_t_043
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -493,6 +697,9 @@ jobs:
           grep -q 'ATLAS_PLAYER_PRIVACY_ACCEPTANCE_PASSED' /tmp/godot-player-privacy-acceptance.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|PLAYER PRIVACY FAILED:' /tmp/godot-player-privacy-acceptance.log; then exit 1; fi
       - name: Verify session-only projector framing geometry (T-013)
+        id: ci_65_verify_session_only_projector_framing_geometry_t_013
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -500,6 +707,9 @@ jobs:
           grep -q 'ATLAS_PROJECTOR_FRAME_PASSED' /tmp/godot-projector-frame.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-projector-frame.log; then exit 1; fi
       - name: Verify GM-only token authoring, history, saving and privacy (T-041)
+        id: ci_66_verify_gm_only_token_authoring_history_saving_and_privacy_t_041
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -507,6 +717,9 @@ jobs:
           grep -q 'ATLAS_TOKEN_PASSED' /tmp/godot-token.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|TOKEN FAILED:' /tmp/godot-token.log; then exit 1; fi
       - name: Verify fog operations, guarded history, native saving and projection (T-042)
+        id: ci_67_verify_fog_operations_guarded_history_native_saving_and_project
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -514,6 +727,9 @@ jobs:
           grep -q 'ATLAS_FOG_PASSED' /tmp/godot-fog.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FOG FAILED:' /tmp/godot-fog.log; then exit 1; fi
       - name: Verify isolated native player camera and calibration contract (T-040)
+        id: ci_68_verify_isolated_native_player_camera_and_calibration_contract_t
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -521,6 +737,9 @@ jobs:
           grep -q 'ATLAS_PLAYER_OUTPUT_SESSION_PASSED' /tmp/godot-player-output-session.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-player-output-session.log; then exit 1; fi
       - name: Verify single-window player fallback contract (T-044)
+        id: ci_69_verify_single_window_player_fallback_contract_t_044
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -528,6 +747,9 @@ jobs:
           grep -q 'ATLAS_PLAYER_WEB_FALLBACK_PASSED' /tmp/godot-player-web-fallback.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|WEB FALLBACK FAILED:' /tmp/godot-player-web-fallback.log; then exit 1; fi
       - name: Verify authoritative GM session and revision proof (T-045)
+        id: ci_70_verify_authoritative_gm_session_and_revision_proof_t_045
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -535,6 +757,9 @@ jobs:
           grep -q 'ATLAS_AUTHORITATIVE_SESSION_PASSED' /tmp/godot-authoritative-session.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|SESSION FAILED:' /tmp/godot-authoritative-session.log; then exit 1; fi
       - name: Verify host-bound roles and privacy-filtered replication (T-046)
+        id: ci_71_verify_host_bound_roles_and_privacy_filtered_replication_t_046
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -542,6 +767,9 @@ jobs:
           grep -q 'ATLAS_FILTERED_REPLICATION_PASSED' /tmp/godot-filtered-replication.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FILTERED REPLICATION FAILED:' /tmp/godot-filtered-replication.log; then exit 1; fi
       - name: Verify trusted reconnect and permission-filtered resynchronization (T-047)
+        id: ci_72_verify_trusted_reconnect_and_permission_filtered_resynchronizat
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -549,6 +777,9 @@ jobs:
           grep -q 'ATLAS_RECONNECT_RESYNC_PASSED' /tmp/godot-reconnect-resync.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|RECONNECT FAILED:' /tmp/godot-reconnect-resync.log; then exit 1; fi
       - name: Verify integrated collaboration authorization, wire privacy and reconnect (T-048)
+        id: ci_73_verify_integrated_collaboration_authorization_wire_privacy_and_
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -556,8 +787,14 @@ jobs:
           grep -q 'ATLAS_COLLABORATION_ACCEPTANCE_PASSED' /tmp/godot-collaboration-acceptance.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|COLLABORATION ACCEPTANCE FAILED:' /tmp/godot-collaboration-acceptance.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
+        id: ci_74_install_native_framebuffer_test_dependencies
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
       - name: Verify T-055 native Atlas renderer, overlays and history
+        id: ci_75_verify_t_055_native_atlas_renderer_overlays_and_history
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 4
         shell: bash
         env:
@@ -568,6 +805,9 @@ jobs:
           grep -q 'T055_NATIVE_PASSED' /tmp/godot-t055-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_NATIVE_FAILED:' /tmp/godot-t055-native.log; then exit 1; fi
       - name: Verify T-068 native pointer-to-frame submission latency and raster parity
+        id: ci_76_verify_t_068_native_pointer_to_frame_submission_latency_and_ras
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 4
         shell: bash
         env:
@@ -581,6 +821,9 @@ jobs:
           grep -q 'T068_NATIVE_FRAME_PASSED checks=68 failures=0' /tmp/t068-frame.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_LATENCY_FAILED:' /tmp/t068-frame.log; then exit 1; fi
       - name: Verify T-053 native Drawing pointer and framebuffer
+        id: ci_77_verify_t_053_native_drawing_pointer_and_framebuffer
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 4
         shell: bash
         env:
@@ -592,6 +835,9 @@ jobs:
           grep -q 'DRAWING_NATIVE_PASSED' /tmp/drawing-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_NATIVE_FAILED:' /tmp/drawing-native.log; then exit 1; fi
       - name: Verify T-073 actual Drawing keyboard bindings and unsaved-close guard
+        id: ci_78_verify_t_073_actual_drawing_keyboard_bindings_and_unsaved_close
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 4
         shell: bash
         env:
@@ -603,6 +849,9 @@ jobs:
           grep -q 'T073_KEYBOARD_PASSED' /tmp/t073-keyboard.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T073_KEYBOARD_FAILED:' /tmp/t073-keyboard.log; then exit 1; fi
       - name: Verify T-063 native compact workspace, overflow and Save As
+        id: ci_79_verify_t_063_native_compact_workspace_overflow_and_save_as
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 4
         shell: bash
         env:
@@ -617,6 +866,9 @@ jobs:
           grep -q 'T063_WORKSPACE_PASSED' /tmp/t063-workspace.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T063_FAILED:' /tmp/t063-workspace.log; then exit 1; fi
       - name: Verify T-058 native framebuffer glyphs and explicit conversion
+        id: ci_80_verify_t_058_native_framebuffer_glyphs_and_explicit_conversion
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 4
         shell: bash
         env:
@@ -628,6 +880,9 @@ jobs:
           grep -q 'DRAWING_TEXT_NATIVE_PASSED' /tmp/drawing-native-text.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_TEXT_NATIVE_FAILED:' /tmp/drawing-native-text.log; then exit 1; fi
       - name: Verify editable text and screen-space culling (T-027)
+        id: ci_81_verify_editable_text_and_screen_space_culling_t_027
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -635,15 +890,18 @@ jobs:
           grep -q 'ATLAS_TEXT_PASSED' /tmp/godot-text.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-text.log; then exit 1; fi
       - name: Run native framebuffer acceptance
+        id: ci_82_run_native_framebuffer_acceptance
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 5
         shell: bash
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           for suite in drawing_world_visual visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke player_projection_visual projector_frame_visual player_output_session_visual token_visual fog_visual player_privacy_acceptance_visual player_web_fallback_visual collaboration_acceptance_visual; do
             xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
-            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_VISUAL_PASSED' /tmp/godot-visual_smoke.log
           grep -q 'ATLAS_CONTINUOUS_CANVAS_VISUAL_PASSED' /tmp/godot-continuous_canvas_visual.log
@@ -679,13 +937,20 @@ jobs:
           grep -q 'ATLAS_PLAYER_PRIVACY_ACCEPTANCE_VISUAL_PASSED' /tmp/godot-player_privacy_acceptance_visual.log
           grep -q 'ATLAS_PLAYER_WEB_FALLBACK_VISUAL_PASSED' /tmp/godot-player_web_fallback_visual.log
           grep -q 'ATLAS_COLLABORATION_ACCEPTANCE_VISUAL_PASSED' /tmp/godot-collaboration_acceptance_visual.log
+          ci_finish
       - name: Launch main scene headlessly
+        id: ci_83_launch_main_scene_headlessly
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           godot --headless --path . --quit-after 5 2>&1 | tee /tmp/godot-launch.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-launch.log; then exit 1; fi
       - name: Export Web (single-thread, Compatibility)
+        id: ci_84_export_web_single_thread_compatibility
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -694,20 +959,34 @@ jobs:
           test -s build/web/index.html
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-export.log; then exit 1; fi
       - name: Verify fresh-process saves across exported script remaps
+        id: ci_85_verify_fresh_process_saves_across_exported_script_remaps
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         timeout-minutes: 3
         shell: bash
         run: |
-          set -euo pipefail
+          source tools/ci_fail_late.sh
           godot --headless --path . --script res://tests/storage_smoke.gd -- write-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-source-write.log
           godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- read-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-pack-read.log
           godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- write-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-pack-write.log
           godot --headless --path . --script res://tests/storage_smoke.gd -- read-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-source-read.log
           for log in /tmp/atlas-source-write.log /tmp/atlas-pack-read.log /tmp/atlas-pack-write.log /tmp/atlas-source-read.log; do
             grep -q 'ATLAS_PORTABILITY_PASSED' "$log"
-            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "$log"; then exit 1; fi
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "$log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
+          ci_finish
       - name: Upload Web build
+        id: ci_86_upload_web_build
+        if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: drawinatlas-web
           path: build/web/
+      # Individual checks use continue-on-error so the entire matrix runs.
+      # The original `outcome` (not the post-override `conclusion`) is decisive.
+      - name: Summarize CI failures
+        if: ${{ !cancelled() }}
+        env:
+          GODOT_CI_STEPS_JSON: ${{ toJSON(steps) }}
+        run: python3 tools/report_godot_ci.py
