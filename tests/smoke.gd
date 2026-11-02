@@ -242,6 +242,9 @@ func _test_drawing_input() -> void:
 	for frame: int in range(6):
 		await process_frame
 	var canvas: AtlasCanvas = editor.canvas
+	# Keep this historical raster test on the retained legacy compatibility path;
+	# the T-055 suite exercises the new editor-default DrawingDocument path.
+	canvas.drawing_composition = null
 	canvas.map.grid.kind = AtlasGrid.Kind.GRIDLESS
 	canvas.camera_center = Vector2(-100.25, 50.125)
 	canvas.camera_zoom = 2.0
@@ -327,6 +330,9 @@ func _test_drawing_input() -> void:
 	_check(editor.edits.is_dirty(), "failed Save cannot clear dirty state")
 	editor.store_io = null
 	file_menu.id_pressed.emit(1)
+	# Reload correctly rebinds canonical Drawing by default; this focused legacy
+	# raster regression explicitly opts back into the compatibility path.
+	canvas.drawing_composition = null
 	_check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "Load starts a fresh clean history")
 	_check(canvas.floor.raster_layer().to_dict() == saved, "Save/Load preserves erased pixels")
 	_key(KEY_B)

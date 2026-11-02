@@ -111,6 +111,13 @@ jobs:
           godot --headless --path . --script res://tests/drawing_world_mapping_smoke.gd 2>&1 | tee /tmp/godot-world-mapping.log
           grep -q 'T061_WORLD_MAPPING_PASSED' /tmp/godot-world-mapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T061_FAILED:' /tmp/godot-world-mapping.log; then exit 1; fi
+      - name: Verify T-055 Atlas canonical Drawing composition and input
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
+          grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
       - name: Run domain smoke tests
         shell: bash
         run: |
@@ -461,6 +468,16 @@ jobs:
           if grep -E 'SCRIPT ERROR:|^ERROR:|COLLABORATION ACCEPTANCE FAILED:' /tmp/godot-collaboration-acceptance.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+      - name: Verify T-055 native Atlas renderer, overlays and history
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/drawing_composition_visual.gd 2>&1 | tee /tmp/godot-t055-native.log
+          grep -q 'T055_NATIVE_PASSED' /tmp/godot-t055-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T055_NATIVE_FAILED:' /tmp/godot-t055-native.log; then exit 1; fi
       - name: Verify T-053 native Drawing pointer and framebuffer
         timeout-minutes: 4
         shell: bash

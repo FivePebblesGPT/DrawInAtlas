@@ -40,6 +40,8 @@ func _run() -> void:
 	for frame: int in range(5):
 		await process_frame
 	canvas = editor.canvas
+	# Existing link-edit and legacy raster pointer paths remain regression-tested.
+	canvas.drawing_composition = null
 	dialog = editor.link_dialog
 	for phase: String in ["_forms_and_history", "_retired_creation", "_navigation"]:
 		_check(await call(phase) == true, phase + " completes")
@@ -119,6 +121,9 @@ func _forms_and_history() -> bool:
 	legacy_link.placement_id = legacy_placement.id
 	_check(editor.edits.execute(AtlasLinkEdit.new(canvas.map.id, link, legacy_link, null, legacy_placement)),
 		"legacy placement fixture loads through existing edit command")
+	# The fixture was injected through a low-level command, not the UI; select
+	# its actual stable ID explicitly before editing its legacy footprint.
+	canvas.selected_link_id = _entrance_id
 	editor.linked_maps.open()
 	_check(not dialog.mode_picker.disabled, "existing legacy footprint can still be edited")
 	dialog.columns.value = 20

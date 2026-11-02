@@ -18,6 +18,8 @@ const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn"
 @export var title_label: Label
 
 var campaign: AtlasCampaign
+var drawing_composition: AtlasDrawingComposition
+var object_editor_window: AtlasObjectEditorWindow
 var edits: AtlasEditHistory = AtlasEditHistory.new()
 var store_io: AtlasStoreIO
 var browser: AtlasCampaignBrowser
@@ -155,12 +157,85 @@ func _ready() -> void:
 	edits.changed.connect(_on_documents_changed)
 	edits.changed.connect(map_references.refresh)
 	edits.reset(campaign, loaded and (restored == null or not restored.recovered))
+	_bind_drawing_composition()
 	_show_map(campaign.get_map(campaign.root_map_id))
 	_message("B brush · E eraser · V select · M move · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
 	if restored != null and restored.recovered:
 		_message(restored.message + " Save to establish a fresh checkpoint.")
 	elif restored != null and restored.error != OK and restored.error != ERR_FILE_NOT_FOUND:
 		_message(restored.message + " A temporary sample is open; the save was not replaced.")
+
+
+## The same canonical Drawing engine is staged in the independent Drawing app.
+## The legacy campaign .scn does NOT yet save these documents (T-066).
+func _bind_drawing_composition() -> void:
+	if drawing_composition == null:
+		var location: String = ProjectSettings.globalize_path(save_path)
+		var assets: AtlasObjectLibrary = AtlasObjectLibrary.new(location)
+		assets.load() # Absence of an index is a new, empty Object Asset library.
+		drawing_composition = AtlasDrawingComposition.new(edits, assets,
+			Callable(self, "_capture_history_context"))
+		drawing_composition.composition_error.connect(_message)
+		drawing_composition.changed.connect(func() -> void:
+			canvas._refresh_composition_view()
+			if layer_panel != null and canvas.floor != null:
+				layer_panel.set_drawing_registry(drawing_composition.registry, drawing_composition.library))
+		canvas.drawing_error.connect(_message)
+		canvas.object_instance_selected.connect(_on_object_instance_selected)
+		canvas.object_instance_edit_requested.connect(func(_id: String) -> void:
+			var opened: DrawingResult = open_selected_object_editor()
+			if not opened.ok:
+				_message(opened.message))
+		edits.changed.connect(drawing_composition.invalidate)
+		drawing_composition.library.asset_published.connect(func(_id: String, _rev: int) -> void:
+			canvas._refresh_composition_view())
+		layer_panel.drawing_layer_selected.connect(_on_drawing_layer_selected)
+	canvas.drawing_composition = drawing_composition
+	var attached: DrawingResult = drawing_composition.attach_campaign(campaign)
+	if not attached.ok:
+		_message(attached.message)
+	layer_panel.set_drawing_registry(drawing_composition.registry, drawing_composition.library)
+	if browser != null and browser.map_preview != null:
+		browser.map_preview.drawing_composition = drawing_composition
+
+
+func _on_drawing_layer_selected(map_id: String, floor_id: String,
+		level: int, layer_id: String) -> void:
+	if canvas.map == null or canvas.map.id != map_id or canvas.floor.id != floor_id:
+		return
+	var result: DrawingResult = drawing_composition.registry.document_at(map_id, floor_id, level)
+	if result.ok and result.value != null and result.value.has_node(layer_id):
+		drawing_composition.active_layer_by_detail[drawing_composition._detail_key(map_id, floor_id, level)] = layer_id
+		canvas.set_presented_detail_level(level)
+		_refresh_layers()
+
+
+func _on_object_instance_selected(id: String) -> void:
+	if drawing_composition == null:
+		return
+	var info: Dictionary = drawing_composition.library.instance_info(id)
+	_message("Object %s selected — use Open Object Editor to edit its source." % info.get("source_id", ""))
+
+
+func open_selected_object_editor() -> DrawingResult:
+	if drawing_composition == null or drawing_composition.selected_instance_id.is_empty():
+		return DrawingResult.failure("SELECTION", "Select a linked Object instance first")
+	if object_editor_window == null:
+		object_editor_window = AtlasObjectEditorWindow.new()
+		add_child(object_editor_window)
+		object_editor_window.configure(drawing_composition.library, edits,
+			Callable(self, "_capture_instance_history_context"))
+	return object_editor_window.open_instance(drawing_composition.selected_instance_id)
+
+
+func _capture_instance_history_context() -> DrawingHistoryContext:
+	var context: DrawingHistoryContext = _capture_history_context()
+	if drawing_composition != null:
+		context.selected_instance_id = drawing_composition.selected_instance_id
+		var info: Dictionary = drawing_composition.library.instance_info(context.selected_instance_id)
+		context.asset_id = String(info.get("source_id", ""))
+		context.detail_group_id = "D%d" % canvas.presented_detail_level
+	return context
 
 
 func _mount_sidebar_views() -> void:
@@ -293,6 +368,9 @@ func _on_view_changed() -> void:
 	link_chooser.hide()
 	map_references.select_source(navigator.active_entrance_id)
 	edits.active_map_id = canvas.map.id
+	if drawing_composition != null:
+		drawing_composition.registry.attach_campaign(campaign)
+		canvas._refresh_composition_view()
 	_rebuild_lod()
 	_refresh_layers()
 	_refresh_grid_controls()
@@ -336,6 +414,8 @@ func _refresh_layers(preferred_id: String = "") -> void:
 	if tool_palette != null:
 		tool_palette.sync_tool(canvas.tool)
 	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
+	if drawing_composition != null:
+		layer_panel.set_drawing_registry(drawing_composition.registry, drawing_composition.library)
 	layer_panel.set_navigation_context(campaign, canvas.map)
 	layer_panel.sync_object_selection(canvas.selection)
 	# Fill requires raster pixels; the grid remains independent of artwork.
@@ -426,6 +506,9 @@ func _on_documents_changed() -> void:
 	if campaign.get_map(canvas.map.id) == canvas.map and canvas.map.floor_by_id(canvas.floor.id) != null:
 		browser.refresh(campaign)
 		linked_maps.refresh()
+		if drawing_composition != null:
+			drawing_composition.registry.attach_campaign(campaign)
+			canvas._refresh_composition_view()
 		layer_panel.set_navigation_context(campaign, canvas.map)
 		canvas._overlay.queue_redraw()
 
@@ -578,8 +661,17 @@ func _on_save() -> void:
 	canvas.commit_edit()
 	var result: Error = AtlasCampaignStore.save_campaign(campaign, save_path, store_io)
 	if result == OK:
-		edits.mark_saved()
-	_message("Saved to %s" % save_path if result == OK else "Save failed: %s" % result)
+		var unsaved_drawing: bool = false
+		if drawing_composition != null:
+			for doc: DrawingDocument in drawing_composition.registry._documents.values():
+				if doc.is_dirty():
+					unsaved_drawing = true
+					break
+		if not unsaved_drawing:
+			edits.mark_saved()
+		_message("Legacy campaign saved; Drawing changes require T-066 multi-file save." if unsaved_drawing else "Saved to %s" % save_path)
+	else:
+		_message("Save failed: %s" % result)
 
 
 func _on_load() -> void:
@@ -589,7 +681,21 @@ func _on_load() -> void:
 		return
 	campaign = result.campaign
 	_reset_view_helpers()
+	# Loading a different campaign must never retain uncommitted Drawing docs
+	# from the previous in-memory project. T-066 will reopen its saved bundle.
+	if drawing_composition != null:
+		drawing_composition.cancel_stroke()
+		drawing_composition.registry = AtlasDrawingRegistry.new()
+		drawing_composition.active_layer_by_detail.clear()
+		drawing_composition.selected_instance_id = ""
+		drawing_composition.invalidate()
+		drawing_composition.library.load()
+	# AtlasObjectEditorWindow holds captures of the old campaign; do not reuse it.
+	if object_editor_window != null:
+		object_editor_window.queue_free()
+		object_editor_window = null
 	edits.reset(campaign, not result.recovered)
+	_bind_drawing_composition()
 	_show_map(campaign.get_map(campaign.root_map_id))
 	_message(result.message + " Save to repair the current checkpoint." if result.recovered else "Campaign loaded.")
 
@@ -1100,9 +1206,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		else:
 			delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T, KEY_K, KEY_G]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T, KEY_K, KEY_G, KEY_H]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
 			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT, KEY_K: AtlasCanvas.Tool.TOKEN, KEY_G: AtlasCanvas.Tool.FOG}
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT, KEY_K: AtlasCanvas.Tool.TOKEN, KEY_G: AtlasCanvas.Tool.FOG, KEY_H: AtlasCanvas.Tool.PAN}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

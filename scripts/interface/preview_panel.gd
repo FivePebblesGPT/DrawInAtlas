@@ -1,10 +1,12 @@
 class_name AtlasPreviewPanel
 extends VBoxContainer
-## A read-only, selected-floor snapshot rendered by a private AtlasCanvas.
+## Canonical Drawing previews are read-only bounded frames. Legacy maps retain
+## their existing capture until their artwork is extracted into Drawing.
 
 const PREVIEW_SIZE: Vector2i = Vector2i(192, 128)
 
 var cache: AtlasPreviewCache = AtlasPreviewCache.new()
+var drawing_composition: AtlasDrawingComposition
 @onready var texture_rect: TextureRect = $TextureRect
 @onready var caption: Label = $Caption
 
@@ -32,6 +34,36 @@ func request_preview(campaign: AtlasCampaign, map_id: String, floor_id: String, 
 		title += " · D%d" % detail_level
 	caption.text = title
 	caption.tooltip_text = title
+	# Canonical Drawing and Object Assets use a detached renderer, never an
+	# interactive AtlasCanvas. Cache invalidation is revision-aware in the
+	# composition, so this path never displays stale published asset pixels.
+	if drawing_composition != null and drawing_composition.campaign == campaign:
+		var authored: bool = false
+		for group: Dictionary in drawing_composition.registry.projection(map_id):
+			if group["id"] != floor_id:
+				continue
+			for detail: Dictionary in group["details"]:
+				if detail["level"] == detail_level:
+					authored = not detail["blank"]
+		if drawing_composition.library != null and not drawing_composition.registry.visible_placements(
+				drawing_composition.library, map_id, floor_id, detail_level).is_empty():
+			authored = true
+		if authored:
+			var bounds: Rect2 = artwork_bounds(document, floor, detail_level)
+			var drawing_bounds: Rect2 = drawing_composition.authored_bounds_world(map_id, floor_id, detail_level)
+			if drawing_bounds.has_area():
+				# This branch renders the canonical source, not the old native
+				# layer renderer: legacy bounds would shift its frame away from art.
+				bounds = drawing_bounds
+			if not bounds.has_area():
+				bounds = Rect2(-96.0, -64.0, 192.0, 128.0)
+			var preview_image: DrawingResult = drawing_composition.preview(map_id, floor_id,
+				detail_level, bounds, PREVIEW_SIZE)
+			if preview_image.ok:
+				texture_rect.texture = ImageTexture.create_from_image(preview_image.value)
+				return
+			caption.text = title + " (" + preview_image.message + ")"
+			return
 	# Dummy rendering never emits a usable capture; do not create a viewport or await it.
 	var driver: String = RenderingServer.get_current_rendering_driver_name()
 	if DisplayServer.get_name() == "headless" or driver.is_empty() or driver == "dummy":

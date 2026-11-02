@@ -1,7 +1,8 @@
 class_name AtlasObjectEditorWindow
 extends Window
 ## Atlas-hosted dedicated Object Editor window with Drawing document tabs.
-## T-055 will wire its open_instance() action into the Atlas selection toolbar.
+## Atlas selection double-click launches this shared Drawing editor; T-065
+## will also expose it through the Asset Browser dock.
 ## No duplicate drawing engine or locally defined painting tools are used.
 
 const WORKSPACE_SCRIPT: Script = preload("res://addons/drawing/workspace.gd")

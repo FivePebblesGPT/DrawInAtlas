@@ -662,6 +662,41 @@ func select_at(map_id: String, floor_id: String, detail_id: String,
 
 
 ## Read-only local-space render query, with an explicit NULL result for broken links.
+## Find a bounded authored source frame when the user has not supplied an
+## explicit Object Editor frame. Frame metadata remains authoritative when set;
+## the fallback uses sparse tile extents, not an infinite/giant canvas.
+func authored_bounds(asset_id: String) -> DrawingResult:
+	if not asset_exists(asset_id):
+		return DrawingResult.failure("MISSING_SOURCE", "Object source is unavailable")
+	var stored: Dictionary = asset_info(asset_id)
+	var frame: Array = stored.get("bounds", [0, 0, 0, 0])
+	if frame.size() == 4 and int(frame[2]) > 0 and int(frame[3]) > 0:
+		return DrawingResult.success(Rect2i(int(frame[0]), int(frame[1]),
+			int(frame[2]), int(frame[3])))
+	var fetched: DrawingResult = _published_document(asset_id)
+	if not fetched.ok:
+		return fetched
+	var doc: DrawingDocument = fetched.value
+	var manifest: DrawingResult = doc.export_manifest()
+	if not manifest.ok:
+		return manifest
+	var area: Rect2i = Rect2i()
+	var found: bool = false
+	for layer: Dictionary in manifest.value["layers"]:
+		if not layer["visible"]:
+			continue
+		for chunk: Dictionary in layer["chunks"]:
+			var pos: Array = chunk["coord"]
+			var piece: Rect2i = Rect2i(Vector2i(int(pos[0]), int(pos[1])) * doc.tile_stride,
+				Vector2i.ONE * doc.tile_stride)
+			area = area.merge(piece) if found else piece
+			found = true
+	if not found:
+		# Text-only sources still need a small visible frame for composition.
+		area = Rect2i(-64, -32, 128, 64)
+	return DrawingResult.success(area)
+
+
 func render_instance(instance_id: String, local_region: Rect2i) -> DrawingResult:
 	if not _instances.has(instance_id):
 		return DrawingResult.failure("INSTANCE", "Missing placement")
