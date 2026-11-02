@@ -17,6 +17,7 @@ var children: Array[String] = []
 var tiles: Dictionary[String, DrawingRasterTile] = {}
 var objects: Dictionary[String, Dictionary] = {}
 var text_value: String = ""
+var text_element: DrawingTextElement
 
 
 func _init(identifier: String = "", layer_kind: String = GROUP,
@@ -33,6 +34,7 @@ func detached_copy() -> DrawingLayerNode:
 	result.locked = locked
 	result.children = children.duplicate()
 	result.text_value = text_value
+	result.text_element = text_element.detached_copy() if text_element != null else null
 	result.objects = objects.duplicate(true)
 	for key: String in tiles:
 		result.tiles[key] = tiles[key].detached_copy()

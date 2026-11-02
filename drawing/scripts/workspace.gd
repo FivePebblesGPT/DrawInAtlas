@@ -22,6 +22,20 @@ var record_selection_history: bool = false
 var _before_gesture: DrawingHistoryContext
 var _last_selection_context: DrawingHistoryContext
 var _restoring_context: bool = false
+var text_dialog: ConfirmationDialog
+var text_edit: TextEdit
+var text_font: OptionButton
+var text_size: SpinBox
+var text_angle: SpinBox
+var text_alignment: OptionButton
+var text_color: ColorPickerButton
+var text_target: String = ""
+var text_position: Vector2i = Vector2i.ZERO
+var layer_search: LineEdit
+var layer_page: int = 0
+var layer_page_label: Label
+const ROW_PAGE: int = 200
+
 
 
 func _ready() -> void:
@@ -40,9 +54,9 @@ func _build_interface() -> void:
 		Callable(self, "_save"), Callable(self, "_ask_save")])
 	_add_menu(menu, "Edit", ["Undo", "Redo"],
 		[Callable(self, "_undo"), Callable(self, "_redo")])
-	_add_menu(menu, "Layer", ["Add group", "Add raster layer", "Remove selected", "Toggle visibility"],
+	_add_menu(menu, "Layer", ["Add group", "Add raster layer", "Rasterize text layer", "Remove selected", "Toggle visibility"],
 		[Callable(self, "_add_group"), Callable(self, "_add_layer"),
-		Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility")])
+		Callable(self, "_rasterize_text"), Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility")])
 	_add_menu(menu, "View", ["Zoom in", "Zoom out", "Reset view"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8), func() -> void: _reset_view()])
 	var divider: VSeparator = VSeparator.new()
@@ -91,7 +105,7 @@ func _build_interface() -> void:
 	var rail: VBoxContainer = VBoxContainer.new()
 	rail.custom_minimum_size.x = 98
 	content.add_child(rail)
-	for name: String in ["Brush", "Eraser", "Select", "Move", "Pan"]:
+	for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
 		button.text = name
 		button.tooltip_text = "Drawing tool: " + name
@@ -106,6 +120,7 @@ func _build_interface() -> void:
 	canvas.selection_changed.connect(_selection_changed)
 	canvas.canvas_error.connect(_show_error)
 	canvas.view_changed.connect(_update_status)
+	canvas.text_requested.connect(_edit_text_at)
 	content.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
 	var inspector: TabContainer = TabContainer.new()
@@ -132,6 +147,21 @@ func _build_interface() -> void:
 		action.text = entry["label"]
 		action.pressed.connect(entry["handler"])
 		layer_actions.add_child(action)
+	layer_search = LineEdit.new()
+	layer_search.placeholder_text = "Find layers and text labels…"
+	layer_search.text_changed.connect(func(_value: String) -> void:
+		layer_page = 0
+		_refresh_layers())
+	layer_pane.add_child(layer_search)
+	var pages: HBoxContainer = HBoxContainer.new()
+	layer_pane.add_child(pages)
+	for entry: Dictionary in [{"text": "‹", "dir": -1}, {"text": "›", "dir": 1}]:
+		var page_button: Button = Button.new()
+		page_button.text = entry["text"]
+		page_button.pressed.connect(_change_layer_page.bind(entry["dir"]))
+		pages.add_child(page_button)
+	layer_page_label = Label.new()
+	pages.add_child(layer_page_label)
 	layers = Tree.new()
 	layers.hide_root = true
 	layers.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -141,7 +171,7 @@ func _build_interface() -> void:
 	history_pane.name = "History"
 	inspector.add_child(history_pane)
 	history_label = Label.new()
-	history_label.text = "Raster gestures: Undo / Redo"
+	history_label.text = "Content gestures: Undo / Redo"
 	history_pane.add_child(history_label)
 	status = Label.new()
 	status.text = "Ready"
@@ -150,6 +180,7 @@ func _build_interface() -> void:
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	save_dialog.file_selected.connect(_save_file)
+	_build_text_dialog()
 
 
 func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
@@ -211,23 +242,50 @@ func _activate(index: int) -> void:
 	_update_status()
 
 
+func _flatten_layer_ids(parent: String, depth: int, output: Array[Dictionary]) -> void:
+	for node_id: String in current_document().list_children(parent):
+		var info: Dictionary = current_document().node_metadata(node_id)
+		output.append({"id": node_id, "depth": depth, "info": info})
+		if info["kind"] == DrawingLayerNode.GROUP:
+			_flatten_layer_ids(node_id, depth + 1, output)
+
+
 func _refresh_layers() -> void:
 	layers.clear()
 	var root: TreeItem = layers.create_item()
-	if current_document() != null:
-		_append_layers(root, DrawingDocument.ROOT_ID)
-
-
-func _append_layers(parent: TreeItem, group_id: String) -> void:
-	for node_id: String in current_document().list_children(group_id):
-		var info: Dictionary = current_document().node_metadata(node_id)
-		var item: TreeItem = layers.create_item(parent)
-		item.set_text(0, ("◉ " if info["visible"] else "○ ") + info["name"])
-		item.set_metadata(0, node_id)
-		if info["kind"] == DrawingLayerNode.GROUP:
-			_append_layers(item, node_id)
-		if node_id == current_layer():
+	if current_document() == null:
+		return
+	var all_rows: Array[Dictionary] = []
+	_flatten_layer_ids(DrawingDocument.ROOT_ID, 0, all_rows)
+	var matches: Array[Dictionary] = []
+	var query: String = layer_search.text.strip_edges().to_lower()
+	for row: Dictionary in all_rows:
+		var info: Dictionary = row["info"]
+		var content: String = ""
+		if info["kind"] == DrawingLayerNode.TEXT and not query.is_empty():
+			var preview: DrawingLayerNode = current_document().inspect_node(row["id"])
+			content = preview.text_value
+		if query.is_empty() or String(info["name"]).to_lower().contains(query) or content.to_lower().contains(query):
+			matches.append(row)
+	var page_count: int = maxi(1, ceili(float(matches.size()) / ROW_PAGE))
+	layer_page = clampi(layer_page, 0, page_count - 1)
+	layer_page_label.text = "%d/%d · %d labels/layers" % [layer_page + 1, page_count, matches.size()]
+	var first: int = layer_page * ROW_PAGE
+	for index: int in range(first, mini(first + ROW_PAGE, matches.size())):
+		var row: Dictionary = matches[index]
+		var info: Dictionary = row["info"]
+		var item: TreeItem = layers.create_item(root)
+		var kind_marker: String = "▸ " if info["kind"] == DrawingLayerNode.GROUP else ("T " if info["kind"] == DrawingLayerNode.TEXT else "◉ ")
+		item.set_text(0, "  ".repeat(mini(int(row["depth"]), 12)) + (kind_marker if info["visible"] else "○ ") + info["name"])
+		item.set_metadata(0, row["id"])
+		if row["id"] == current_layer():
 			item.select(0)
+			layers.scroll_to_item(item)
+
+
+func _change_layer_page(direction: int) -> void:
+	layer_page = maxi(0, layer_page + direction)
+	_refresh_layers()
 
 
 func _layer_selected() -> void:
@@ -236,7 +294,7 @@ func _layer_selected() -> void:
 	if selected_item == null:
 		return
 	var node_id: String = String(selected_item.get_metadata(0))
-	if current_document().node_metadata(node_id).get("kind") == DrawingLayerNode.RASTER:
+	if current_document().node_metadata(node_id).get("kind") in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT]:
 		tabs[active_tab]["layer"] = node_id
 		canvas.layer_id = node_id
 	_record_selection_context(before)
@@ -266,6 +324,106 @@ func _add_layer() -> void:
 		_after_edit()
 	else:
 		_show_error(added.message)
+
+
+func _build_text_dialog() -> void:
+	text_dialog = ConfirmationDialog.new()
+	text_dialog.title = "Editable text (one element per layer)"
+	text_dialog.size = Vector2i(470, 350)
+	add_child(text_dialog)
+	var form: VBoxContainer = VBoxContainer.new()
+	text_dialog.add_child(form)
+	var font_label: Label = Label.new()
+	font_label.text = "Bundled Lato · OFL 1.1"
+	form.add_child(font_label)
+	text_font = OptionButton.new()
+	for entry: String in ["Regular", "Bold", "Italic"]:
+		text_font.add_item(entry)
+	form.add_child(text_font)
+	text_edit = TextEdit.new()
+	text_edit.custom_minimum_size = Vector2(420, 110)
+	form.add_child(text_edit)
+	var controls: HBoxContainer = HBoxContainer.new()
+	form.add_child(controls)
+	text_size = SpinBox.new()
+	text_size.min_value = 6
+	text_size.max_value = 256
+	text_size.value = 24
+	text_size.prefix = "Size"
+	controls.add_child(text_size)
+	text_angle = SpinBox.new()
+	text_angle.min_value = -360
+	text_angle.max_value = 360
+	text_angle.prefix = "Angle °"
+	controls.add_child(text_angle)
+	text_alignment = OptionButton.new()
+	for name: String in ["left", "center", "right"]:
+		text_alignment.add_item(name.capitalize())
+	controls.add_child(text_alignment)
+	text_color = ColorPickerButton.new()
+	text_color.text = "Color"
+	form.add_child(text_color)
+	text_dialog.confirmed.connect(_commit_text_dialog)
+
+
+func _edit_text_at(point: Vector2i) -> void:
+	if active_tab < 0:
+		return
+	var node: DrawingLayerNode = current_document().inspect_node(current_layer())
+	text_target = current_layer() if node != null and node.kind == DrawingLayerNode.TEXT else ""
+	text_position = point
+	var existing: DrawingTextElement = node.text_element if not text_target.is_empty() else null
+	text_edit.text = existing.content if existing != null else ""
+	text_font.select(["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"].find(existing.font_id) if existing != null else 0)
+	text_size.value = existing.font_size if existing != null else 24
+	text_angle.value = rad_to_deg(existing.angle) if existing != null else 0.0
+	text_alignment.select(["left", "center", "right"].find(existing.alignment) if existing != null else 0)
+	text_color.color = Color8(32, 40, 64) if existing == null else Color(
+		float(existing.color_rgba & 255) / 255.0,
+		float((existing.color_rgba >> 8) & 255) / 255.0,
+		float((existing.color_rgba >> 16) & 255) / 255.0,
+		float((existing.color_rgba >> 24) & 255) / 255.0)
+	if existing != null:
+		text_position = existing.position
+	text_dialog.popup_centered()
+	text_edit.grab_focus()
+
+
+func _commit_text_dialog() -> void:
+	if active_tab < 0:
+		return
+	var document: DrawingDocument = current_document()
+	var draft: DrawingTextElement = DrawingTextElement.new()
+	draft.content = text_edit.text
+	draft.font_id = ["lato-regular-v1", "lato-bold-v1", "lato-italic-v1"][text_font.selected]
+	draft.position = text_position
+	draft.font_size = int(text_size.value)
+	draft.angle = deg_to_rad(text_angle.value)
+	draft.alignment = ["left", "center", "right"][text_alignment.selected]
+	draft.color_rgba = _pack_color(text_color.color)
+	var selected_node: DrawingLayerNode = document.inspect_node(current_layer())
+	var parent: String = selected_node.parent_id if selected_node != null else DrawingDocument.ROOT_ID
+	var before: DrawingHistoryContext = _capture_context()
+	var committed: DrawingResult = document.commit_text(text_target, draft, document.revision, parent)
+	if not committed.ok:
+		_show_error(committed.message)
+		return
+	tabs[active_tab]["layer"] = committed.value
+	canvas.layer_id = String(committed.value)
+	document.annotate_latest_gesture(before, _capture_context())
+	_after_edit()
+
+
+func _rasterize_text() -> void:
+	if active_tab < 0:
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	var converted: DrawingResult = current_document().rasterize_text(current_layer(), current_document().revision)
+	if not converted.ok:
+		_show_error(converted.message)
+		return
+	current_document().annotate_latest_gesture(before, _capture_context())
+	_after_edit()
 
 
 func _remove_layer() -> void:
@@ -342,7 +500,7 @@ func _restore_context(context: DrawingHistoryContext) -> void:
 		tabs[active_tab]["layer"] = context.selected_layer_ids[0]
 		canvas.layer_id = context.selected_layer_ids[0]
 	canvas.selected = context.selected_rect
-	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Pan"]:
+	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		_change_tool(context.editor_mode)
 	_last_selection_context = _capture_context()
 	_restoring_context = false
@@ -448,7 +606,7 @@ func _open_file(path: String) -> void:
 		return
 	var document: DrawingDocument = opened.value as DrawingDocument
 	document.record_selection_history = record_selection_history
-	var raster: String = _first_raster(document, DrawingDocument.ROOT_ID)
+	var raster: String = _first_editable(document, DrawingDocument.ROOT_ID)
 	if raster.is_empty():
 		var added: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1")
 		raster = added.value
@@ -457,13 +615,13 @@ func _open_file(path: String) -> void:
 	_activate(tabs.size() - 1)
 
 
-func _first_raster(document: DrawingDocument, parent: String) -> String:
+func _first_editable(document: DrawingDocument, parent: String) -> String:
 	for node_id: String in document.list_children(parent):
 		var info: Dictionary = document.node_metadata(node_id)
-		if info["kind"] == DrawingLayerNode.RASTER:
+		if info["kind"] in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT]:
 			return node_id
 		if info["kind"] == DrawingLayerNode.GROUP:
-			var nested: String = _first_raster(document, node_id)
+			var nested: String = _first_editable(document, node_id)
 			if not nested.is_empty():
 				return nested
 	return ""

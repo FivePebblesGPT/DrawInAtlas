@@ -88,7 +88,9 @@ class PackageIsolationTests(unittest.TestCase):
             self.assertEqual(relpaths, {
                 "project.godot", "main.tscn", "main.gd"
             } | {f"addons/drawing/{p.name}" for p in (ROOT / "addons" / "drawing").iterdir()
-                 if p.name.endswith(".gd") or p.name.endswith(".gd.uid")})
+                 if p.name.endswith(".gd") or p.name.endswith(".gd.uid")}
+               | {f"addons/drawing/fonts/{p.name}" for p in (ROOT / "addons" / "drawing" / "fonts").iterdir()
+                  if p.suffix in {".ttf", ".txt"}})
             self.assertEqual(
                 (project / "addons/drawing/signed_tiles.gd").read_bytes(),
                 (ROOT / "addons/drawing/signed_tiles.gd").read_bytes()

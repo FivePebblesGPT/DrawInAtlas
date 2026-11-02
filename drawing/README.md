@@ -12,6 +12,7 @@ From the repository root:
 
 ```sh
 python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
 godot --editor --path drawing
 godot --path drawing
 ```
@@ -28,7 +29,7 @@ godot --headless --path /tmp/drawing-out/drawing --export-release Linux /tmp/dra
 
 The output directory must be empty and outside the repository. The build copies
 only the standalone `project.godot`, scenes, app scripts, tests, export presets
-and the canonical package's `.gd` and `.gd.uid` files. The third generic
+and the canonical package's `.gd`, `.gd.uid` and licensed font files. The third generic
 consumer is staged through `tools/build_drawing_contract_consumer.py --fixture
 drawing_package_consumer --output /tmp/consumer` and also has no Atlas source.
 Linux/Windows export presets target x86_64 desktop; Windows export requires
@@ -67,9 +68,9 @@ currently capped at 128 MiB and 4096 chunks; writes use a same-directory
 This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,
 retention, backup, migration or recovery from T-066. It is not yet a complete
-production drawing editor: text/object authoring, advanced tool/options layout,
+production drawing editor: Object Editor tabs, advanced tool/options layout,
 full structural history and performance/native acceleration belong to later
-tickets. T-059 and T-056 still own hands-on owner UX acceptance.
+tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
 
 ## Verification
 
@@ -82,3 +83,44 @@ xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
 
 T-060 notes: `.drawing` semantic objects now preserve non-Object Godot Variant
 values with a checksummed payload; older JSON records remain readable.
+
+## Editable text (T-058)
+
+Choose **Text** then click the canvas to open a text dialog; **Cancel** or an
+empty commit does not create a layer. The first successful commit atomically
+creates one text layer/element. Select that text layer and use Text to edit
+its content, point size, Regular/Bold/Italic font, color, alignment and
+rotation. The Layer menu's **Rasterize text layer** command explicitly converts
+editable text to ordinary pixels; Undo restores the original text and stable
+layer ID. Paint/Erase can then edit the rasterized layer. Layer names and label
+contents can be searched in the paged Layers view (200 rows per page).
+
+Only Lato Regular/Bold/Italic are bundled, under `addons/drawing/fonts/`
+(SIL Open Font License 1.1). The standalone `.drawing` file carries the
+referenced font's full bytes and license, with a pinned identity and SHA-256.
+In desktop exports, Godot stores imported `.fontdata` rather than a readable raw
+`.ttf` file; the codec extracts the unchanged source bytes from the `FontFile`
+resource, and the export preset includes the OFL license as an extra asset.
+Missing/modified fonts fail explicitly, while unsupported glyphs show a visible
+`?` replacement with a `GLYPH_FALLBACK` warning; original editable text is intact.
+Arbitrary system fonts are never silently embedded. The same glyph atlas CPU path is used for
+editable preview and rasterization so their RGBA8 output matches exactly at
+native pixel density. Advanced typography, full Unicode fallback and the
+Atlas Object Editor are downstream work.
+
+```sh
+# Import after each fresh --in-place staging to rebuild FontFile resources.
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/text_editor_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --path drawing --script res://tests/native_text.gd
+```
+
+Validate the font bundle **inside an exported Linux `.pck`** after building
+`/tmp/drawing-dist/Drawing.pck` from `/tmp/drawing-dist/project`:
+
+```sh
+godot --headless --path /tmp/drawing-dist \
+  --main-pack /tmp/drawing-dist/Drawing.pck \
+  --script /tmp/drawing-dist/project/tests/packaged_fonts_smoke.gd
+```

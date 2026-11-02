@@ -6,6 +6,7 @@ signal gesture_committed(result: DrawingResult)
 signal selection_changed(area: Rect2i)
 signal canvas_error(message: String)
 signal view_changed()
+signal text_requested(pixel: Vector2i)
 
 var document: DrawingDocument
 var layer_id: String = ""
@@ -24,6 +25,7 @@ var moving: bool = false
 var gesture_start: Vector2i
 var last_mouse: Vector2 = Vector2.ZERO
 var _frame_textures: Array[ImageTexture] = []
+var _reported_render_errors: Dictionary[String, bool] = {}
 
 
 func _ready() -> void:
@@ -60,8 +62,12 @@ func _draw() -> void:
 			var area: Rect2i = Rect2i(left_top + Vector2i(x, y),
 				Vector2i(mini(192, dimensions.x - x), mini(192, dimensions.y - y)))
 			var composite: DrawingResult = DrawingRenderer.render(document, area)
-			if not composite.ok:
-				continue
+			if not composite.ok or composite.code == "GLYPH_FALLBACK":
+				if not _reported_render_errors.has(composite.code):
+					_reported_render_errors[composite.code] = true
+					canvas_error.emit(composite.message)
+				if not composite.ok:
+					continue
 			var image: Image = composite.value as Image
 			var texture: ImageTexture = ImageTexture.create_from_image(image)
 			_frame_textures.append(texture)
@@ -111,6 +117,9 @@ func start_gesture(position: Vector2) -> void:
 	if document == null:
 		return
 	gesture_start = position_to_pixel(position)
+	if tool == "Text":
+		text_requested.emit(gesture_start)
+		return
 	dragging = true
 	selecting = tool == "Select"
 	moving = tool == "Move"

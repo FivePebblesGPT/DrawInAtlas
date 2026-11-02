@@ -77,3 +77,6 @@ __pycache__/
 # Generated standalone Drawing package staging (canonical source: /addons/drawing/)
 /drawing/addons/
 /drawing/.godot/
+
+# Godot-generated font import metadata; the source fonts and licenses are tracked.
+/addons/drawing/fonts/*.ttf.import

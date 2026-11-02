@@ -433,10 +433,10 @@ func _append_event(event: Dictionary, content_change: bool) -> void:
 ## Attach UI context to exactly the just-committed gesture, never to a sample.
 func annotate_latest_gesture(before: DrawingHistoryContext,
 		after: DrawingHistoryContext) -> bool:
-	if external_history or _cursor != _events.size() or _cursor == 0 			or _events[_cursor - 1]["kind"] != "content" or before == null or after == null:
+	if external_history or _cursor != _events.size() or _cursor == 0 			or _events[_cursor - 1]["kind"] not in ["content", "text_tree"] or before == null or after == null:
 		return false
-	_events[_cursor - 1]["before"] = before.detached_copy()
-	_events[_cursor - 1]["after"] = after.detached_copy()
+	_events[_cursor - 1]["context_before"] = before.detached_copy()
+	_events[_cursor - 1]["context_after"] = after.detached_copy()
 	return true
 
 
@@ -469,12 +469,14 @@ func undo() -> DrawingResult:
 	var result: DrawingResult
 	if event["kind"] == "content":
 		result = replay_delta(event["delta"] as DrawingDelta, true)
+	elif event["kind"] == "text_tree":
+		result = _replay_text_tree(event, true)
 	else:
 		result = DrawingResult.success((event["before"] as DrawingHistoryContext).detached_copy(), revision)
 	if result.ok:
 		_cursor -= 1
-		if event["kind"] == "content" and event.has("before"):
-			result.value = (event["before"] as DrawingHistoryContext).detached_copy()
+		if event["kind"] in ["content", "text_tree"] and event.has("context_before"):
+			result.value = (event["context_before"] as DrawingHistoryContext).detached_copy()
 	return result
 
 
@@ -485,12 +487,14 @@ func redo() -> DrawingResult:
 	var result: DrawingResult
 	if event["kind"] == "content":
 		result = replay_delta(event["delta"] as DrawingDelta, false)
+	elif event["kind"] == "text_tree":
+		result = _replay_text_tree(event, false)
 	else:
 		result = DrawingResult.success((event["after"] as DrawingHistoryContext).detached_copy(), revision)
 	if result.ok:
 		_cursor += 1
-		if event["kind"] == "content" and event.has("after"):
-			result.value = (event["after"] as DrawingHistoryContext).detached_copy()
+		if event["kind"] in ["content", "text_tree"] and event.has("context_after"):
+			result.value = (event["context_after"] as DrawingHistoryContext).detached_copy()
 	return result
 
 
@@ -520,14 +524,148 @@ func move_object(layer_id: String, object_id: String, position: Vector2) -> Draw
 	return DrawingResult.success(null, revision)
 
 
-func set_text(layer_id: String, content: String) -> DrawingResult:
-	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT or not _editable(layer_id):
-		return DrawingResult.failure("LAYER", "Unavailable text layer")
-	if _nodes[layer_id].text_value != content:
-		_nodes[layer_id].text_value = content
-		revision += 1
+## Text is committed as ONE semantic element. The first commit atomically creates
+## the text layer and one undo event; opening/cancelling the UI never calls this.
+func commit_text(layer_id: String, draft: DrawingTextElement,
+		expected_revision: int, parent_id: String = ROOT_ID,
+		requested_id: String = "") -> DrawingResult:
+	if revision != expected_revision:
+		return DrawingResult.failure("STALE_REVISION", "Text draft has a stale revision")
+	if draft == null:
+		return DrawingResult.failure("TEXT", "Missing text draft")
+	var valid: DrawingResult = draft.validated()
+	if not valid.ok:
+		return valid
+	var supported: DrawingResult = DrawingTextRaster.font_status(draft.font_id)
+	if not supported.ok:
+		return supported
+	var created: bool = layer_id.is_empty()
+	var node: DrawingLayerNode
+	if created:
+		if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP or not _editable(parent_id):
+			return DrawingResult.failure("PARENT", "Unavailable text group")
+		layer_id = requested_id if not requested_id.is_empty() else new_id()
+		if not valid_identifier(layer_id) or layer_id == ROOT_ID or _nodes.has(layer_id):
+			return DrawingResult.failure("LAYER_ID", "Invalid or duplicate text layer identity")
+		node = DrawingLayerNode.new(layer_id, DrawingLayerNode.TEXT, "Text: " + draft.content.split("\n")[0].left(36), parent_id)
+	else:
+		if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT or not _editable(layer_id):
+			return DrawingResult.failure("LAYER", "Unavailable text layer")
+		node = _nodes[layer_id]
+	var before: DrawingLayerNode = null if created else node.detached_copy()
+	var after: DrawingLayerNode = node.detached_copy()
+	after.text_element = draft.detached_copy()
+	after.text_value = draft.content
+	if not created and before.text_element != null and before.text_element.to_record() == draft.to_record():
+		return DrawingResult.success(layer_id, revision)
+	if created:
+		_nodes[node.id] = after
+		_nodes[parent_id].children.append(layer_id)
+	else:
+		_nodes[layer_id] = after
+	revision += 1
+	_content_committed = true
+	if external_history:
 		_mark_untracked_change()
-		_content_committed = true
+	else:
+		_append_event({"kind": "text_tree", "layer": layer_id,
+			"parent": after.parent_id, "index": _nodes[after.parent_id].children.find(layer_id),
+			"before": before, "after": after.detached_copy()}, true)
+	return DrawingResult.success(layer_id, revision)
+
+
+## Compatibility entrypoint for existing semantic asset sources.
+func set_text(layer_id: String, content: String) -> DrawingResult:
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT:
+		return DrawingResult.failure("LAYER", "Unavailable text layer")
+	var existing: DrawingTextElement = _nodes[layer_id].text_element
+	var draft: DrawingTextElement = existing.detached_copy() if existing != null else DrawingTextElement.new()
+	draft.content = content
+	return commit_text(layer_id, draft, revision)
+
+
+func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
+	if revision != expected_revision:
+		return DrawingResult.failure("STALE_REVISION", "Text changed before rasterization")
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT or not _editable(layer_id):
+		return DrawingResult.failure("LAYER", "Unavailable editable text layer")
+	var before: DrawingLayerNode = _nodes[layer_id].detached_copy()
+	if before.text_element == null:
+		return DrawingResult.failure("TEXT", "Text layer has no committed element")
+	var measured: DrawingResult = DrawingTextRaster.bounds(before.text_element)
+	if not measured.ok:
+		return measured
+	var area: Rect2i = measured.value
+	if not area.has_area() or area.size.x > 1048576 or area.size.y > 1048576 / area.size.x:
+		return DrawingResult.failure("RASTER_LIMIT", "Text exceeds the bounded rasterization budget")
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(area.size.x * area.size.y * 4)
+	var rendered: DrawingResult = DrawingTextRaster.composite(before.text_element, area, bytes)
+	if not rendered.ok:
+		return rendered
+	var after: DrawingLayerNode = before.detached_copy()
+	after.kind = DrawingLayerNode.RASTER
+	after.text_value = ""
+	after.text_element = null
+	for y: int in range(area.size.y):
+		for x: int in range(area.size.x):
+			var offset: int = (y * area.size.x + x) * 4
+			if bytes[offset + 3] == 0:
+				continue
+			var world_x: int = area.position.x + x
+			var world_y: int = area.position.y + y
+			var tile_key: String = TILES.tile_key64(world_x, world_y, tile_stride)
+			if not after.tiles.has(tile_key):
+				after.tiles[tile_key] = DrawingRasterTile.new(tile_stride)
+			var local: Vector2i = TILES.local_offset64(world_x, world_y, tile_stride)
+			var rgba: int = 0
+			for channel: int in range(4):
+				rgba |= int(bytes[offset + channel]) << (channel * 8)
+			after.tiles[tile_key].set_rgba(local.x, local.y, rgba)
+	_nodes[layer_id] = after
+	for tile_key: String in after.tiles:
+		_dirty_tiles[layer_id + ":" + tile_key] = true
+		_known_refs.erase(layer_id + ":" + tile_key)
+	revision += 1
+	if external_history:
+		_mark_untracked_change()
+	else:
+		_append_event({"kind": "text_tree", "layer": layer_id,
+			"parent": after.parent_id, "index": _nodes[after.parent_id].children.find(layer_id),
+			"before": before, "after": after.detached_copy()}, true)
+	return DrawingResult.success(layer_id, revision)
+
+
+func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
+	var target: DrawingLayerNode = event["before"] if undo_action else event["after"]
+	var expected: DrawingLayerNode = event["after"] if undo_action else event["before"]
+	var layer_id: String = event["layer"]
+	var parent_id: String = event["parent"]
+	if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP:
+		return DrawingResult.failure("HISTORY_TARGET", "Text group disappeared")
+	if expected == null:
+		if _nodes.has(layer_id):
+			return DrawingResult.failure("HISTORY_TARGET", "Created text ID was reused")
+	elif not _nodes.has(layer_id) or _nodes[layer_id].kind != expected.kind:
+		return DrawingResult.failure("HISTORY_TARGET", "Text layer changed outside history")
+	if target == null:
+		_nodes.erase(layer_id)
+		_nodes[parent_id].children.erase(layer_id)
+	else:
+		_nodes[layer_id] = target.detached_copy()
+		if expected == null:
+			_nodes[parent_id].children.insert(mini(int(event["index"]), _nodes[parent_id].children.size()), layer_id)
+	# Rasterized tiles are invalidated when conversion is undone/redone.
+	for key: String in _dirty_tiles.keys():
+		if key.begins_with(layer_id + ":"):
+			_dirty_tiles.erase(key)
+	for key: String in _known_refs.keys():
+		if key.begins_with(layer_id + ":"):
+			_known_refs.erase(key)
+	if target != null and target.kind == DrawingLayerNode.RASTER:
+		for tile_key: String in target.tiles:
+			_dirty_tiles[layer_id + ":" + tile_key] = true
+	revision += 1
 	return DrawingResult.success(null, revision)
 
 
@@ -661,7 +799,8 @@ func snapshot_for_save() -> Dictionary:
 		tree.append({"id": node.id, "parent": node.parent_id, "kind": node.kind,
 			"name": node.name, "visible": node.visible, "locked": node.locked,
 			"children": node.children.duplicate(), "tiles": tile_keys(node_id),
-			"text": node.text_value, "objects": node.objects.duplicate(true)})
+			"text": node.text_value, "text_element": node.text_element.to_record() if node.text_element != null else null,
+			"objects": node.objects.duplicate(true)})
 	var dirty: Dictionary[String, PackedByteArray] = {}
 	var removed: Array[String] = []
 	for combined: String in _dirty_tiles:
@@ -740,6 +879,7 @@ func export_manifest() -> DrawingResult:
 		layers.append({"id": node.id, "parent": node.parent_id, "kind": node.kind,
 			"name": node.name, "visible": node.visible, "locked": node.locked,
 			"children": node.children.duplicate(), "text": node.text_value,
+			"text_element": node.text_element.to_record() if node.text_element != null else null,
 			"objects": node.objects.duplicate(true), "chunks": descriptors})
 	return DrawingResult.success({"logical_schema": "drawing-document-v1",
 		"id": id, "revision": revision, "tile_stride": tile_stride,
@@ -796,6 +936,22 @@ static func open_manifest(manifest: Dictionary, loader: Callable) -> DrawingResu
 		if not text is String or not objects is Dictionary:
 			return DrawingResult.failure("MANIFEST", "Invalid semantic content")
 		node.text_value = text
+		var element_record: Variant = record.get("text_element")
+		if element_record != null:
+			if kind != DrawingLayerNode.TEXT or not element_record is Dictionary:
+				return DrawingResult.failure("MANIFEST", "Invalid single text-element metadata")
+			var decoded_text: DrawingResult = DrawingTextElement.from_record(element_record)
+			if not decoded_text.ok:
+				return decoded_text
+			node.text_element = decoded_text.value as DrawingTextElement
+			if node.text_element.content != text:
+				return DrawingResult.failure("MANIFEST", "Text element and layer content differ")
+		elif not text.is_empty() and kind == DrawingLayerNode.TEXT:
+			# Legacy logical manifests may carry text without styling.
+			node.text_element = DrawingTextElement.new()
+			node.text_element.content = text
+		elif not text.is_empty() and kind != DrawingLayerNode.TEXT:
+			return DrawingResult.failure("MANIFEST", "Text on non-text layer")
 		# JSON-parsed dictionaries are untyped; populate the typed owned map safely.
 		for object_id: Variant in objects:
 			if not object_id is String or not objects[object_id] is Dictionary:

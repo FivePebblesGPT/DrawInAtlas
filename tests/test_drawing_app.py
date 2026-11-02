@@ -40,8 +40,17 @@ class StandaloneDrawingTests(unittest.TestCase):
                              {p.name for p in package.glob("*.gd")})
             for source in package.glob("*.gd"):
                 self.assertEqual(source.read_bytes(), (app / "addons/drawing" / source.name).read_bytes())
+            for source in (package / "fonts").iterdir():
+                if source.suffix in {".ttf", ".txt"}:
+                    self.assertEqual(source.read_bytes(),
+                                     (app / "addons/drawing/fonts" / source.name).read_bytes())
             self.assertEqual({p.name for p in app.iterdir() if p.is_file()},
                              {"project.godot", "main.tscn", "export_presets.cfg"})
+            # The exported .pck needs the license as a raw text asset; the
+            # original .ttf bytes are retrieved from imported FontFile data.
+            export_config = (app / "export_presets.cfg").read_text()
+            self.assertIn('addons/drawing/fonts/*.txt', export_config)
+            self.assertIn('addons/drawing/fonts/*.ttf', export_config)
             self.assertFalse((app / "scripts").joinpath("../AtlasCanvas.gd").exists())
             self.assertNotIn("[autoload]", (app / "project.godot").read_text())
             sources = "\n".join(x.read_text() for x in (app / "scripts").glob("*.gd"))

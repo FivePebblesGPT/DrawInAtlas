@@ -63,6 +63,14 @@ def stage(output: Path, fixture_name: str = "drawing_contract_consumer") -> Path
     for source, destination in sources.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
+    font_directory = PACKAGE / "fonts"
+    for source in font_directory.iterdir():
+        if source.is_symlink():
+            raise ValueError("Bundled fonts must not be symbolic links")
+        if source.is_file() and source.suffix in {".ttf", ".txt"}:
+            destination = target / "addons" / "drawing" / "fonts" / source.name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
     return target
 
 

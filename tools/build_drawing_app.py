@@ -45,6 +45,13 @@ def stage(destination: Path, in_place: bool = False) -> Path:
             raise ValueError("Package source cannot be a symlink")
         if source.is_file() and source.name.endswith((".gd", ".gd.uid")):
             shutil.copy2(source, staged / source.name)
+    fonts = PACKAGE / "fonts"
+    (staged / "fonts").mkdir(exist_ok=True)
+    for source in fonts.iterdir():
+        if source.is_symlink():
+            raise ValueError("Bundled fonts must not be symbolic links")
+        if source.is_file() and source.suffix in {".ttf", ".txt"}:
+            shutil.copy2(source, staged / "fonts" / source.name)
     return output
 
 

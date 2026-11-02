@@ -79,7 +79,7 @@ missing geometry. Atlas's multi-document move and Save As history callbacks
 are tested in `tests/drawing_history_smoke.gd`; concrete asset registry/editor
 and physical campaign save remain T-060/T-062/T-066. Structural metadata
 mutations are currently dirty but not local undo commands (follow-up feature
-scope). T-058 defines the final one-text-object-per-layer semantics;
+scope). T-058 now implements one-text-object-per-layer commits and undoable rasterization;
 T-060 implements durable linked Object Assets; T-068 profiles and selects
 native drawing acceleration. No platform export or UX approval is claimed.
 
@@ -112,3 +112,25 @@ For local tests: `python3 -m unittest discover -s tests -p 'test_drawing_app.py'
 The native compositor/viewport test is `drawing/tests/native_pointer.gd`, run
 under X11/Mesa (Xvfb on CI). Windows builds have a preset but need Windows
 export templates/runtime validation. Final UX and campaign save remain future work.
+
+## Editable text API and bundled font contract (T-058)
+
+`DrawingTextElement` is a detached one-per-layer record with nonempty content,
+stable font ID (`lato-regular-v1`, `lato-bold-v1`, `lato-italic-v1`), integer
+point size, straight RGBA8, signed top-left world origin (`Vector2i`), local
+rotation/scale and horizontal alignment. `DrawingDocument.commit_text("",
+draft, expected_revision, parent)` creates a text layer atomically only for a
+valid content commit, or pass an existing text-layer ID to edit the same
+record. `rasterize_text(layer_id, expected_revision)` converts text to sparse
+ordinary pixels using `DrawingTextRaster`'s same Godot FontFile shaped glyph
+compositor as `DrawingRenderer`. Both operations are individual local history
+entries; undo/redo restores text editability and source layer ID. Missing fonts and unbounded raster requests reject without mutation;
+unsupported glyphs use a visible replacement with an explicit warning.
+
+Standalone `DrawingFileIO` writes the referenced OFL Lato font binary, stable
+identity and SHA-256 inside the `.drawing` JSON envelope with the license;
+reopen validates it before exposing the text. These files are relocatable as
+single documents. This is not the multi-file campaign `Fonts/` save contract
+(T-066), nor an instruction to embed unknown user-system font files without
+legal review. T-055 will integrate this same API with Atlas canvas; T-062 adds
+Object Editor document tabs.

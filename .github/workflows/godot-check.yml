@@ -48,6 +48,13 @@ jobs:
           godot --headless --path /tmp/drawing-dist/project --export-release Linux /tmp/drawing-dist/Drawing.x86_64
           test -s /tmp/drawing-dist/Drawing.x86_64
           test -s /tmp/drawing-dist/Drawing.pck
+          # Godot keeps font bytes inside imported .fontdata, not raw .ttf paths.
+          # Run a source-side probe against the exported PCK (never the editor tree).
+          godot --headless --path /tmp/drawing-dist --main-pack /tmp/drawing-dist/Drawing.pck \
+            --script /tmp/drawing-dist/project/tests/packaged_fonts_smoke.gd \
+            2>&1 | tee /tmp/godot-export-fonts.log
+          grep -q 'DRAWING_PACK_FONT_PASSED' /tmp/godot-export-fonts.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-export-fonts.log; then exit 1; fi
       - name: Verify T-054 Drawing/Atlas chronological history
         shell: bash
         run: |
@@ -64,6 +71,19 @@ jobs:
           set -euo pipefail
           godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Verify T-058 editable text, font integrity and undoable rasterization
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
+          grep -q 'DRAWING_TEXT_PASSED' /tmp/godot-drawing-text.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text.log; then exit 1; fi
+          python3 tools/build_drawing_app.py --in-place
+          # Staging refreshes font files: let Godot generate their imported FontFile resources.
+          godot --headless --editor --path drawing --import --quit
+          godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
+          grep -q 'DRAWING_TEXT_UI_PASSED' /tmp/godot-drawing-text-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text-ui.log; then exit 1; fi
       - name: Verify T-060 reusable Object Assets and atomic Save As
         shell: bash
         run: |
@@ -432,6 +452,17 @@ jobs:
           xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_pointer.gd 2>&1 | tee /tmp/drawing-native.log
           grep -q 'DRAWING_NATIVE_PASSED' /tmp/drawing-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_NATIVE_FAILED:' /tmp/drawing-native.log; then exit 1; fi
+      - name: Verify T-058 native framebuffer glyphs and explicit conversion
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_text.gd 2>&1 | tee /tmp/drawing-native-text.log
+          grep -q 'DRAWING_TEXT_NATIVE_PASSED' /tmp/drawing-native-text.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_TEXT_NATIVE_FAILED:' /tmp/drawing-native-text.log; then exit 1; fi
       - name: Verify editable text and screen-space culling (T-027)
         shell: bash
         run: |

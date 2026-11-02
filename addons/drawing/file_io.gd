@@ -52,8 +52,30 @@ static func encode(document: DrawingDocument) -> DrawingResult:
 			chunk["ref"] = fingerprint
 			# Write signed tile coordinates as decimal strings to avoid JSON float truncation.
 			chunk["coord"] = [str(coords[0]), str(coords[1])]
+	# A portable file carries its licensed known font bytes with a stable identity.
+	var fonts: Dictionary = {}
+	for record: Dictionary in manifest["layers"]:
+		var element: Variant = record.get("text_element")
+		if element == null:
+			continue
+		var font_id: String = element["font_id"]
+		var supported: DrawingResult = DrawingTextRaster.font_status(font_id)
+		if not supported.ok:
+			return supported
+		if not fonts.has(font_id):
+			# A packaged Godot app contains .fontdata, not the original .ttf path.
+			var source: PackedByteArray = (supported.value as FontFile).get_data()
+			if source.is_empty():
+				return DrawingResult.failure("FONT_MISSING", "Known bundled font disappeared")
+			var hash: HashingContext = HashingContext.new()
+			hash.start(HashingContext.HASH_SHA256)
+			hash.update(source)
+			fonts[font_id] = {"sha256": hash.finish().hex_encode(),
+				"bytes64": Marshalls.raw_to_base64(source),
+				"license": FileAccess.get_file_as_string("res://addons/drawing/fonts/OFL-1.1.txt")}
 	return DrawingResult.success({"standalone_schema": SCHEMA,
-		"document": manifest, "blobs": blobs, "blob_encoding": "base64-rgba8"})
+		"document": manifest, "blobs": blobs, "font_assets": fonts,
+		"blob_encoding": "base64-rgba8"})
 
 
 static func decode(payload: Dictionary) -> DrawingResult:
@@ -65,6 +87,30 @@ static func decode(payload: Dictionary) -> DrawingResult:
 		return DrawingResult.failure("FILE", "Malformed Drawing file")
 	var manifest: Dictionary = manifest_value.duplicate(true)
 	var blobs: Dictionary = blob_value
+	var assets: Variant = payload.get("font_assets", {})
+	if not assets is Dictionary or assets.size() > 8:
+		return DrawingResult.failure("FONT_RECORD", "Malformed font bundle")
+	for font_id: Variant in assets:
+		if not font_id is String or not assets[font_id] is Dictionary:
+			return DrawingResult.failure("FONT_RECORD", "Malformed font identity")
+		var font_data: Dictionary = assets[font_id]
+		if not font_data.get("sha256") is String or not font_data.get("bytes64") is String or \
+				(font_data["bytes64"] as String).length() > MAX_FILE_BYTES:
+			return DrawingResult.failure("FONT_RECORD", "Malformed font payload")
+		var license_text: String = FileAccess.get_file_as_string("res://addons/drawing/fonts/OFL-1.1.txt")
+		if not font_data.get("license") is String or license_text.is_empty() or font_data["license"] != license_text:
+			return DrawingResult.failure("FONT_LICENSE", "Portable font requires its bundled OFL license")
+		var content: PackedByteArray = Marshalls.base64_to_raw(font_data["bytes64"])
+		var hash: HashingContext = HashingContext.new()
+		hash.start(HashingContext.HASH_SHA256)
+		hash.update(content)
+		if hash.finish().hex_encode() != font_data["sha256"]:
+			return DrawingResult.failure("FONT_CORRUPT", "Bundled font digest mismatch")
+		var supported: DrawingResult = DrawingTextRaster.font_status(font_id)
+		if not supported.ok:
+			return supported
+		if (supported.value as FontFile).get_data() != content:
+			return DrawingResult.failure("FONT_VERSION", "Document font differs from licensed bundled font")
 	# JSON numeric literals parse as floats in Godot. Validate before conversion.
 	for field: String in ["tile_stride", "revision"]:
 		var number: Variant = manifest.get(field)
@@ -101,6 +147,16 @@ static func decode(payload: Dictionary) -> DrawingResult:
 			record["objects"] = semantic_value
 			record.erase("objects_variant64")
 			record.erase("objects_sha256")
+		var element: Variant = record.get("text_element")
+		if element != null:
+			if not element is Dictionary:
+				return DrawingResult.failure("TEXT_RECORD", "Malformed text record")
+			for field: String in ["font_size", "rgba"]:
+				if not _integral(element.get(field), 0, 4294967295):
+					return DrawingResult.failure("TEXT_RECORD", "Invalid text number")
+				element[field] = int(element[field])
+			if not assets.has(element.get("font_id", "")):
+				return DrawingResult.failure("FONT_MISSING", "Portable file lacks referenced font")
 		var chunks: Variant = record.get("chunks", [])
 		if not chunks is Array:
 			return DrawingResult.failure("FILE", "Malformed chunk metadata")
