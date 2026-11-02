@@ -1,6 +1,101 @@
-# Index
+# Ticket Kanban Index
+
+**As of 2026-11-02 · `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+
+**Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
+
+## Kanban summary
+
+| Ready | Blocked | Manual Review | Done | Archived | Total |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 17 | 27 | 3 | 29 | 1 | 77 |
+
+**Owner review is intentionally narrow.** `Owner` in the table marks a direct completion gate; `Via T-039` indicates inherited privacy-policy approval. Agents can research, implement and test pending dependencies, but **must not mark Done** until the relevant direct and transitive manual approvals are recorded. Approved Drawing feature scope does not mean the final UX is accepted.
+
+## Tickets
+
+| Ticket | Status | Review gate | Hard dependencies |
+| --- | --- | --- | --- |
+| [T-001 · Explicit types and corrected skill guidance](Tickets/T-001.md) | Done | — | — |
+| [T-002 · Continuous chunked-canvas model](Tickets/T-002.md) | Done | — | — |
+| [T-003 · Aligned transparent detail previews](Tickets/T-003.md) | Done | — | [T-002](Tickets/T-002.md), [T-004](Tickets/T-004.md) |
+| [T-004 · Viewport-appropriate zoom and artwork LOD](Tickets/T-004.md) | Done | — | [T-002](Tickets/T-002.md) |
+| [T-005 · Automatic artwork LOD on by default](Tickets/T-005.md) | Done | — | [T-004](Tickets/T-004.md) |
+| [T-006 · Categorized sidebar drawing palette](Tickets/T-006.md) | Done | — | — |
+| [T-007 · Compact recognizable icon controls](Tickets/T-007.md) | Done | — | — |
+| [T-008 · Toolbar-opened grid settings popup](Tickets/T-008.md) | Done | — | — |
+| [T-009 · Search and world discovery purpose](Tickets/T-009.md) | Manual Review | **Owner** | — |
+| [T-010 · Smooth pen turns](Tickets/T-010.md) | Done | — | — |
+| [T-011 · Mouse-wheel pen width](Tickets/T-011.md) | Done | — | — |
+| [T-012 · Replace battlemats with authored local detail](Tickets/T-012.md) | Done | — | [T-002](Tickets/T-002.md), [T-004](Tickets/T-004.md) |
+| [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Via T-039 | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md) |
+| [T-014 · Retire battlemat creation controls](Tickets/T-014.md) | Done | — | [T-012](Tickets/T-012.md), [T-006](Tickets/T-006.md) |
+| [T-015 · Remove obsolete model code (save migration waived)](Tickets/T-015.md) | Ready | — | [T-012](Tickets/T-012.md) |
+| [T-016 · Coherent detail-editing snapping](Tickets/T-016.md) | Done | — | [T-012](Tickets/T-012.md), [T-019](Tickets/T-019.md) |
+| [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | **Owner** | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md) |
+| [T-018 · Compact layer/object/link hierarchy](Tickets/T-018.md) | Ready | — | [T-006](Tickets/T-006.md), [T-012](Tickets/T-012.md) |
+| [T-019 · Selection and selection masks](Tickets/T-019.md) | Done | — | [T-002](Tickets/T-002.md) |
+| [T-020 · Brush](Tickets/T-020.md) | Done | — | — |
+| [T-021 · Eraser](Tickets/T-021.md) | Done | — | — |
+| [T-022 · Move](Tickets/T-022.md) | Done | — | [T-019](Tickets/T-019.md), [T-012](Tickets/T-012.md) |
+| [T-023 · Bucket](Tickets/T-023.md) | Ready | — | — |
+| [T-024 · Line](Tickets/T-024.md) | Ready | — | — |
+| [T-025 · Polygon](Tickets/T-025.md) | Ready | — | — |
+| [T-026 · Editable open/closed wall paths](Tickets/T-026.md) | Ready | — | — |
+| [T-027 · Editable text and small-text culling](Tickets/T-027.md) | Ready | — | — |
+| [T-028 · Ink representation decision](Tickets/T-028.md) | Done | — | — |
+| [T-029 · Dictionary conversion audit and cleanup](Tickets/T-029.md) | Done | — | — |
+| [T-030 · Raster import/chunk conversion clarity](Tickets/T-030.md) | Done | — | — |
+| [T-031 · Tile-layer naming and type authority](Tickets/T-031.md) | Done | — | — |
+| [T-032 · Field encodings and invariants](Tickets/T-032.md) | Done | — | — |
+| [T-033 · Fill readability](Tickets/T-033.md) | Done | — | [T-001](Tickets/T-001.md), [T-037](Tickets/T-037.md) |
+| [T-034 · Raster brush readability](Tickets/T-034.md) | Done | — | [T-001](Tickets/T-001.md), [T-037](Tickets/T-037.md) |
+| [T-035 · Selection geometry readability](Tickets/T-035.md) | Done | — | [T-001](Tickets/T-001.md), [T-037](Tickets/T-037.md) |
+| [T-036 · Stroke eraser readability](Tickets/T-036.md) | Done | — | [T-001](Tickets/T-001.md), [T-037](Tickets/T-037.md) |
+| [T-037 · Commented function-step convention](Tickets/T-037.md) | Done | — | [T-001](Tickets/T-001.md) |
+| [T-038 · Broader code-only review](Tickets/T-038.md) | Manual Review | **Owner** | [T-033](Tickets/T-033.md), [T-034](Tickets/T-034.md), [T-035](Tickets/T-035.md), [T-036](Tickets/T-036.md) |
+| [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Manual Review | **Owner** | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md) |
+| [T-040 · GM/player views and calibration](Tickets/T-040.md) | Blocked | Via T-039 | [T-039](Tickets/T-039.md), [T-013](Tickets/T-013.md) |
+| [T-041 · Tokens](Tickets/T-041.md) | Blocked | Via T-039 | [T-039](Tickets/T-039.md) |
+| [T-042 · Fog and reveal](Tickets/T-042.md) | Blocked | Via T-039 | [T-039](Tickets/T-039.md), [T-019](Tickets/T-019.md) |
+| [T-043 · Player-output privacy acceptance](Tickets/T-043.md) | Blocked | **Owner** | [T-040](Tickets/T-040.md), [T-041](Tickets/T-041.md), [T-042](Tickets/T-042.md) |
+| [T-044 · Web-compatible player fallback — archived](Tickets/T-044.md) | Archived | — | — |
+| [T-045 · Authoritative sessions and commands](Tickets/T-045.md) | Blocked | Via T-039 | [E-007](Epics/E-007.md), [T-039](Tickets/T-039.md) |
+| [T-046 · Roles and filtered replication](Tickets/T-046.md) | Blocked | Via T-039 | [T-045](Tickets/T-045.md), [T-039](Tickets/T-039.md) |
+| [T-047 · Reconnect and resynchronization](Tickets/T-047.md) | Blocked | Via T-039 | [T-045](Tickets/T-045.md), [T-046](Tickets/T-046.md) |
+| [T-048 · Collaboration acceptance](Tickets/T-048.md) | Blocked | **Owner** | [T-046](Tickets/T-046.md), [T-047](Tickets/T-047.md), [T-043](Tickets/T-043.md) |
+| [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | — | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
+| [T-050 · Retire palette-cell TerrainLayer artwork](Tickets/T-050.md) | Done | — | [T-028](Tickets/T-028.md), [T-031](Tickets/T-031.md) |
+| [T-051 · Finalize shared/copy, coordinates and project contracts](Tickets/T-051.md) | Ready | — | — |
+| [T-052 · Independent Drawing core and generic layer groups](Tickets/T-052.md) | Blocked | — | [T-051](Tickets/T-051.md) |
+| [T-053 · Independent Drawing Godot project in monorepo](Tickets/T-053.md) | Blocked | — | [T-052](Tickets/T-052.md) |
+| [T-054 · Global history navigates to edit origin](Tickets/T-054.md) | Blocked | — | [T-052](Tickets/T-052.md) |
+| [T-055 · Compose Drawing in Atlas, input and previews](Tickets/T-055.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-054](Tickets/T-054.md), [T-060](Tickets/T-060.md), [T-061](Tickets/T-061.md), [T-062](Tickets/T-062.md) |
+| [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Blocked | **Owner** | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
+| [T-057 · Native map rendering/LOD feasibility spike](Tickets/T-057.md) | Blocked | — | [T-051](Tickets/T-051.md) |
+| [T-058 · One text object per editable layer and rasterization](Tickets/T-058.md) | Blocked | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Blocked | **Owner** | [T-051](Tickets/T-051.md) |
+| [T-060 · Reusable Object Assets and linked instances](Tickets/T-060.md) | Blocked | — | [T-052](Tickets/T-052.md) |
+| [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Blocked | — | [T-052](Tickets/T-052.md) |
+| [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
+| [T-063 · Compact Drawing UI and BarDivider overflow](Tickets/T-063.md) | Blocked | — | [T-053](Tickets/T-053.md) |
+| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Blocked | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
+| [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Blocked | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
+| [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Blocked | — | [T-051](Tickets/T-051.md) |
+| [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | Blocked | — | [T-052](Tickets/T-052.md) |
+| [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Ready | — | — |
+| [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Ready | — | — |
+| [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Ready | — | — |
+| [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Ready | — | — |
+| [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Ready | — | — |
+| [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Ready | — | — |
+| [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Ready | — | — |
+| [T-076 · Kanban index and manual-review closure validation](Tickets/T-076.md) | Done | — | — |
+| [T-077 · Performance, code review and validation handoff docs](Tickets/T-077.md) | Ready | — | — |
 
 ## Epics
+
 - [ ] [[E-009|E-009 · Drawing / Atlas capability separation]]
 - [ ] [[E-001|E-001 · Drawing, erasing and edit history]]
 - [ ] [[E-002|E-002 · Continuous chunked board and grid masks]]
@@ -13,86 +108,10 @@
 - [ ] [[E-007|E-007 · Local table and projector output]]
 - [ ] [[E-008|E-008 · Host-authoritative collaboration]]
 
-## First priority
-- [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
+## Archived platform work
 
-## Architecture split — Option B / sparse files approved; implementation pending
-- [ ] [[T-051|T-051 · Finalize shared/copy, coordinates and project contracts]]
-- [ ] [[T-052|T-052 · Independent Drawing core and generic layer groups]]
-- [ ] [[T-053|T-053 · Independent Drawing Godot project in monorepo]]
-- [ ] [[T-054|T-054 · Global history navigates to edit origin]]
-- [ ] [[T-055|T-055 · Compose Drawing in Atlas, input and previews]]
-- [ ] [[T-056|T-056 · Validate isolation, shared assets, LOD and saves]]
-- [ ] [[T-057|T-057 · Native map rendering/LOD feasibility spike]]
-- [ ] [[T-058|T-058 · One text object per editable layer and rasterization]]
-- [ ] [[T-059|T-059 · Approved Drawing feature scope; implement and validate UX]]
-- [ ] [[T-060|T-060 · Reusable Object Assets and linked instances]]
-- [ ] [[T-061|T-061 · Floor layer groups, world coordinates and blank LOD]]
-- [ ] [[T-062|T-062 · Object Editor, Save and Save As]]
-- [ ] [[T-063|T-063 · Compact Drawing UI and BarDivider overflow]]
-- [ ] [[T-064|T-064 · Nested Object Assets with cycle-safe references]]
-- [ ] [[T-065|T-065 · Asset Browser and NULL-placeholder workflow]]
-- [ ] [[T-066|T-066 · Sparse multi-file floor/detail DrawingDocument persistence]]
-- [ ] [[T-067|T-067 · Benchmark larger chunk geometry and packed storage]]
-- [ ] [[T-068|T-068 · Evaluate native drawing rasterization and compositing]]
+The Web-only [T-044 historical ticket](Archive/Web/T-044.md) is paused; native projector/privacy and collaboration tickets remain active. See [Web archive policy](Archive/Web/README.md).
 
-## Review work
-- [x] [[T-002|T-002 · Continuous chunked-canvas model]]
-- [x] [[T-003|T-003 · Aligned transparent detail previews]]
-- [x] [[T-004|T-004 · Viewport-appropriate zoom and artwork LOD]]
-- [x] [[T-005|T-005 · Automatic artwork LOD on by default]]
-- [x] [[T-006|T-006 · Categorized sidebar drawing palette]]
-- [x] [[T-007|T-007 · Compact recognizable icon controls]]
-- [x] [[T-008|T-008 · Toolbar-opened grid settings popup]]
-- [ ] [[T-009|T-009 · Search and world discovery purpose]]
-- [x] [[T-010|T-010 · Smooth pen turns]]
-- [x] [[T-011|T-011 · Mouse-wheel pen width]]
-- [x] [[T-012|T-012 · Replace battlemats with authored local detail]]
-- [x] [[T-014|T-014 · Retire battlemat creation controls]]
-- [ ] [[T-015|T-015 · Remove obsolete model code (save migration waived)]]
-- [x] [[T-016|T-016 · Coherent detail-editing snapping]]
-- [ ] [[T-018|T-018 · Compact layer/object/link hierarchy]]
-- [x] [[T-019|T-019 · Selection and selection masks]]
-- [x] [[T-020|T-020 · Brush]]
-- [x] [[T-021|T-021 · Eraser]]
-- [x] [[T-022|T-022 · Move]]
-- [ ] [[T-023|T-023 · Bucket]]
-- [ ] [[T-024|T-024 · Line]]
-- [ ] [[T-025|T-025 · Polygon]]
-- [ ] [[T-026|T-026 · Editable open/closed wall paths]]
-- [ ] [[T-027|T-027 · Editable text and small-text culling]]
-- [x] [[T-028|T-028 · Ink representation decision]]
-- [x] [[T-029|T-029 · Dictionary conversion audit and cleanup]]
-- [x] [[T-030|T-030 · Raster import/chunk conversion clarity]]
-- [x] [[T-031|T-031 · Tile-layer naming and type authority]]
-- [x] [[T-032|T-032 · Field encodings and invariants]]
-- [x] [[T-033|T-033 · Fill readability]]
-- [x] [[T-034|T-034 · Raster brush readability]]
-- [x] [[T-035|T-035 · Selection geometry readability]]
-- [x] [[T-036|T-036 · Stroke eraser readability]]
-- [x] [[T-037|T-037 · Commented function-step convention]]
-- [ ] [[T-038|T-038 · Broader code-only review]]
-- [x] [[T-050|T-050 · Retire palette-cell TerrainLayer artwork]]
-- [ ] [[T-049|T-049 · Raster-first authoring defaults and semantic-vector tools]]
+## Maintaining this index
 
-## After core usability
-- [ ] [[T-017|T-017 · Revisit floor-link authoring/testing]]
-
-## Milestone 7
-- [ ] [[T-039|T-039 · Player projection and privacy contract]]
-- [ ] [[T-013|T-013 · Projector framing object]]
-- [ ] [[T-040|T-040 · GM/player views and calibration]]
-- [ ] [[T-041|T-041 · Tokens]]
-- [ ] [[T-042|T-042 · Fog and reveal]]
-- [ ] [[T-043|T-043 · Player-output privacy acceptance]]
-
-
-## Milestone 8
-- [ ] [[T-045|T-045 · Authoritative sessions and commands]]
-- [ ] [[T-046|T-046 · Roles and filtered replication]]
-- [ ] [[T-047|T-047 · Reconnect and resynchronization]]
-- [ ] [[T-048|T-048 · Collaboration acceptance]]
-
-## Archived / paused platform work
-- [[Archive/Web/T-044|T-044 · Web-compatible player fallback — paused 2026-11-02]]
-- [[Archive/Web/README|Web archive scope and reactivation policy]]
+When adding or changing a ticket, keep its frontmatter and this table synchronized. Run `python3 tools/validate_ticket_store.py`; CI also checks these on repository updates. Never turn a manually gated ticket or any dependent ticket Done without the owner's explicit recorded approval.
