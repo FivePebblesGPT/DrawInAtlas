@@ -128,6 +128,22 @@ jobs:
           godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
           grep -q 'ATLAS_BUNDLE_EDITOR_PASSED' /tmp/godot-t066-editor.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then exit 1; fi
+      - name: Verify T-067 measured chunk geometry and Zstd parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_chunk_geometry.py' -v
+          python3 tools/benchmarks/chunk_geometry.py --output /tmp/t067-ci --repeats 1 \
+            2>&1 | tee /tmp/t067-layouts.log
+          grep -q 'T067_GEOMETRY_PASSED (16 workload/stride cases, 48 layout cases)' /tmp/t067-layouts.log
+          godot --headless --path . --script res://tests/chunk_geometry_codec_smoke.gd -- \
+            --folder /tmp/t067-ci 2>&1 | tee /tmp/t067-codec.log
+          grep -q 'T067_CODEC_PASSED' /tmp/t067-codec.log
+          godot --headless --path . --script res://tests/chunk_geometry_benchmark.gd -- \
+            --output /tmp/t067-ci/native.json 2>&1 | tee /tmp/t067-native.log
+          grep -q 'T067_NATIVE_PASSED (386 checks, 0 failures)' /tmp/t067-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T067_FAILED:|T067_CODEC_FAILED' \
+            /tmp/t067-codec.log /tmp/t067-native.log; then exit 1; fi
       - name: Run domain smoke tests
         shell: bash
         run: |

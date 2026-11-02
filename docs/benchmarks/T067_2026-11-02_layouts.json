@@ -1,0 +1,1584 @@
+{
+  "schema": "t067-geometry-benchmark-v1",
+  "system": {
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python": "3.13.5",
+    "processor": "AMD EPYC 9V74 80-Core Processor",
+    "cpu_logical": 5,
+    "ram_mib": 5947,
+    "filesystem": "container filesystem; inspect df -T",
+    "seed": 670021,
+    "zstd_level": 3
+  },
+  "repeat_count": 3,
+  "results": [
+    {
+      "workload": "dense",
+      "stride": 256,
+      "layer_count": 2,
+      "logical_tiles": 120,
+      "unique_blobs": 120,
+      "allocated_rgba_bytes": 31457280,
+      "encoded_tile_bytes": 2462532,
+      "encoded_bytes_per_tile": 20521.1,
+      "encode": {
+        "median_ms": 0.257,
+        "p95_ms": 0.682
+      },
+      "decode": {
+        "median_ms": 0.102,
+        "p95_ms": 0.34
+      },
+      "encode_mib_s": 758.0,
+      "decode_mib_s": 1543.0,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 121,
+          "index_bytes": 28454,
+          "viewport_8_tiles_process_first_ms": 0.435,
+          "viewport_8_tiles_warm_ms": 0.384,
+          "payload_bytes": 2490986,
+          "fs_allocated_bytes": 2826240,
+          "write_calls": 121,
+          "reopen_calls": 120,
+          "cold_write_ms": 6.654
+        },
+        {
+          "scheme": "document_pack",
+          "files": 3,
+          "index_bytes": 13520,
+          "viewport_8_tiles_process_first_ms": 0.39,
+          "viewport_8_tiles_warm_ms": 0.4,
+          "payload_bytes": 2477012,
+          "fs_allocated_bytes": 2482176,
+          "write_calls": 3,
+          "reopen_calls": 120,
+          "cold_write_ms": 1.089
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 21801,
+          "viewport_8_tiles_process_first_ms": 0.403,
+          "viewport_8_tiles_warm_ms": 0.375,
+          "payload_bytes": 2485293,
+          "fs_allocated_bytes": 2490368,
+          "write_calls": 2,
+          "reopen_calls": 120,
+          "cold_write_ms": 1.051
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 350,
+          "payload_write_bytes": 350,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.087
+        },
+        "document_pack": {
+          "new_blob_bytes": 350,
+          "payload_write_bytes": 32796,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.092
+        },
+        "shared_pack": {
+          "new_blob_bytes": 350,
+          "payload_write_bytes": 358,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.064
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 32,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "texture",
+      "stride": 256,
+      "layer_count": 1,
+      "logical_tiles": 25,
+      "unique_blobs": 25,
+      "allocated_rgba_bytes": 6553600,
+      "encoded_tile_bytes": 4140784,
+      "encoded_bytes_per_tile": 165631.4,
+      "encode": {
+        "median_ms": 0.102,
+        "p95_ms": 0.512
+      },
+      "decode": {
+        "median_ms": 0.037,
+        "p95_ms": 0.068
+      },
+      "encode_mib_s": 1236.2,
+      "decode_mib_s": 6108.9,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 26,
+          "index_bytes": 6110,
+          "viewport_8_tiles_process_first_ms": 0.503,
+          "viewport_8_tiles_warm_ms": 0.454,
+          "payload_bytes": 4146894,
+          "fs_allocated_bytes": 4222976,
+          "write_calls": 26,
+          "reopen_calls": 25,
+          "cold_write_ms": 2.103
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 3101,
+          "viewport_8_tiles_process_first_ms": 0.506,
+          "viewport_8_tiles_warm_ms": 0.475,
+          "payload_bytes": 4144085,
+          "fs_allocated_bytes": 4145152,
+          "write_calls": 2,
+          "reopen_calls": 25,
+          "cold_write_ms": 1.014
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 4725,
+          "viewport_8_tiles_process_first_ms": 0.495,
+          "viewport_8_tiles_warm_ms": 0.536,
+          "payload_bytes": 4145709,
+          "fs_allocated_bytes": 4149248,
+          "write_calls": 2,
+          "reopen_calls": 25,
+          "cold_write_ms": 0.883
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 68371,
+          "payload_write_bytes": 68371,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.077
+        },
+        "document_pack": {
+          "new_blob_bytes": 68371,
+          "payload_write_bytes": 4209363,
+          "payload_write_calls": 1,
+          "payload_write_ms": 10.903
+        },
+        "shared_pack": {
+          "new_blob_bytes": 68371,
+          "payload_write_bytes": 68379,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.094
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 55,
+          "misses": 25,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 32,
+          "hits": 55,
+          "misses": 25,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 55,
+          "misses": 25,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "sparse",
+      "stride": 256,
+      "layer_count": 1,
+      "logical_tiles": 24,
+      "unique_blobs": 24,
+      "allocated_rgba_bytes": 6291456,
+      "encoded_tile_bytes": 1365,
+      "encoded_bytes_per_tile": 56.9,
+      "encode": {
+        "median_ms": 0.081,
+        "p95_ms": 0.101
+      },
+      "decode": {
+        "median_ms": 0.03,
+        "p95_ms": 0.049
+      },
+      "encode_mib_s": 3066.5,
+      "decode_mib_s": 8039.9,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 25,
+          "index_bytes": 6085,
+          "viewport_8_tiles_process_first_ms": 0.345,
+          "viewport_8_tiles_warm_ms": 0.322,
+          "payload_bytes": 7450,
+          "fs_allocated_bytes": 106496,
+          "write_calls": 25,
+          "reopen_calls": 24,
+          "cold_write_ms": 1.182
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 3214,
+          "viewport_8_tiles_process_first_ms": 0.344,
+          "viewport_8_tiles_warm_ms": 0.323,
+          "payload_bytes": 4771,
+          "fs_allocated_bytes": 8192,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.185
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 4675,
+          "viewport_8_tiles_process_first_ms": 0.328,
+          "viewport_8_tiles_warm_ms": 0.32,
+          "payload_bytes": 6232,
+          "fs_allocated_bytes": 12288,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.173
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 55,
+          "payload_write_bytes": 55,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.062
+        },
+        "document_pack": {
+          "new_blob_bytes": 55,
+          "payload_write_bytes": 1620,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.065
+        },
+        "shared_pack": {
+          "new_blob_bytes": 55,
+          "payload_write_bytes": 63,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.054
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 56,
+          "misses": 24,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 32,
+          "hits": 56,
+          "misses": 24,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 56,
+          "misses": 24,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "mixed",
+      "stride": 256,
+      "layer_count": 3,
+      "logical_tiles": 107,
+      "unique_blobs": 107,
+      "allocated_rgba_bytes": 28049408,
+      "encoded_tile_bytes": 6572617,
+      "encoded_bytes_per_tile": 61426.3,
+      "encode": {
+        "median_ms": 0.349,
+        "p95_ms": 0.673
+      },
+      "decode": {
+        "median_ms": 0.167,
+        "p95_ms": 0.338
+      },
+      "encode_mib_s": 698.5,
+      "decode_mib_s": 1515.6,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 108,
+          "index_bytes": 25931,
+          "viewport_8_tiles_process_first_ms": 0.477,
+          "viewport_8_tiles_warm_ms": 0.452,
+          "payload_bytes": 6598548,
+          "fs_allocated_bytes": 6885376,
+          "write_calls": 108,
+          "reopen_calls": 107,
+          "cold_write_ms": 5.862
+        },
+        {
+          "scheme": "document_pack",
+          "files": 4,
+          "index_bytes": 12992,
+          "viewport_8_tiles_process_first_ms": 0.5,
+          "viewport_8_tiles_warm_ms": 0.56,
+          "payload_bytes": 6586465,
+          "fs_allocated_bytes": 6594560,
+          "write_calls": 4,
+          "reopen_calls": 107,
+          "cold_write_ms": 8.543
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 20025,
+          "viewport_8_tiles_process_first_ms": 0.495,
+          "viewport_8_tiles_warm_ms": 0.474,
+          "payload_bytes": 6593498,
+          "fs_allocated_bytes": 6594560,
+          "write_calls": 2,
+          "reopen_calls": 107,
+          "cold_write_ms": 6.322
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 68371,
+          "payload_write_bytes": 68371,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.151
+        },
+        "document_pack": {
+          "new_blob_bytes": 68371,
+          "payload_write_bytes": 4209363,
+          "payload_write_calls": 1,
+          "payload_write_ms": 10.871
+        },
+        "shared_pack": {
+          "new_blob_bytes": 68371,
+          "payload_write_bytes": 68379,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.115
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 32,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "dense",
+      "stride": 512,
+      "layer_count": 2,
+      "logical_tiles": 40,
+      "unique_blobs": 40,
+      "allocated_rgba_bytes": 41943040,
+      "encoded_tile_bytes": 2523701,
+      "encoded_bytes_per_tile": 63092.5,
+      "encode": {
+        "median_ms": 0.78,
+        "p95_ms": 2.555
+      },
+      "decode": {
+        "median_ms": 0.27,
+        "p95_ms": 1.216
+      },
+      "encode_mib_s": 876.1,
+      "decode_mib_s": 2238.0,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 41,
+          "index_bytes": 9574,
+          "viewport_8_tiles_process_first_ms": 0.882,
+          "viewport_8_tiles_warm_ms": 0.886,
+          "payload_bytes": 2533275,
+          "fs_allocated_bytes": 2641920,
+          "write_calls": 41,
+          "reopen_calls": 40,
+          "cold_write_ms": 2.651
+        },
+        {
+          "scheme": "document_pack",
+          "files": 3,
+          "index_bytes": 4592,
+          "viewport_8_tiles_process_first_ms": 0.879,
+          "viewport_8_tiles_warm_ms": 0.865,
+          "payload_bytes": 2528613,
+          "fs_allocated_bytes": 2539520,
+          "write_calls": 3,
+          "reopen_calls": 40,
+          "cold_write_ms": 0.794
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 7342,
+          "viewport_8_tiles_process_first_ms": 0.864,
+          "viewport_8_tiles_warm_ms": 0.864,
+          "payload_bytes": 2531363,
+          "fs_allocated_bytes": 2535424,
+          "write_calls": 2,
+          "reopen_calls": 40,
+          "cold_write_ms": 0.884
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 535,
+          "payload_write_bytes": 535,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.102
+        },
+        "document_pack": {
+          "new_blob_bytes": 535,
+          "payload_write_bytes": 29775,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.108
+        },
+        "shared_pack": {
+          "new_blob_bytes": 535,
+          "payload_write_bytes": 543,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.065
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 72
+        },
+        {
+          "budget_mib": 32,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "texture",
+      "stride": 512,
+      "layer_count": 1,
+      "logical_tiles": 9,
+      "unique_blobs": 9,
+      "allocated_rgba_bytes": 9437184,
+      "encoded_tile_bytes": 4140156,
+      "encoded_bytes_per_tile": 460017.3,
+      "encode": {
+        "median_ms": 0.553,
+        "p95_ms": 1.908
+      },
+      "decode": {
+        "median_ms": 0.107,
+        "p95_ms": 0.145
+      },
+      "encode_mib_s": 1254.1,
+      "decode_mib_s": 9345.4,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 10,
+          "index_bytes": 2262,
+          "viewport_8_tiles_process_first_ms": 1.207,
+          "viewport_8_tiles_warm_ms": 1.055,
+          "payload_bytes": 4142418,
+          "fs_allocated_bytes": 4169728,
+          "write_calls": 10,
+          "reopen_calls": 9,
+          "cold_write_ms": 1.307
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 1179,
+          "viewport_8_tiles_process_first_ms": 1.248,
+          "viewport_8_tiles_warm_ms": 1.038,
+          "payload_bytes": 4141407,
+          "fs_allocated_bytes": 4145152,
+          "write_calls": 2,
+          "reopen_calls": 9,
+          "cold_write_ms": 0.801
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 1760,
+          "viewport_8_tiles_process_first_ms": 1.089,
+          "viewport_8_tiles_warm_ms": 1.073,
+          "payload_bytes": 4141988,
+          "fs_allocated_bytes": 4145152,
+          "write_calls": 2,
+          "reopen_calls": 9,
+          "cold_write_ms": 0.787
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 165969,
+          "payload_write_bytes": 165969,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.101
+        },
+        "document_pack": {
+          "new_blob_bytes": 165969,
+          "payload_write_bytes": 4306205,
+          "payload_write_calls": 1,
+          "payload_write_ms": 12.218
+        },
+        "shared_pack": {
+          "new_blob_bytes": 165969,
+          "payload_write_bytes": 165977,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.156
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 45,
+          "evictions": 37
+        },
+        {
+          "budget_mib": 32,
+          "hits": 36,
+          "misses": 9,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 36,
+          "misses": 9,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "sparse",
+      "stride": 512,
+      "layer_count": 1,
+      "logical_tiles": 24,
+      "unique_blobs": 24,
+      "allocated_rgba_bytes": 25165824,
+      "encoded_tile_bytes": 2083,
+      "encoded_bytes_per_tile": 86.8,
+      "encode": {
+        "median_ms": 0.293,
+        "p95_ms": 0.509
+      },
+      "decode": {
+        "median_ms": 0.068,
+        "p95_ms": 0.099
+      },
+      "encode_mib_s": 3170.9,
+      "decode_mib_s": 13596.9,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 25,
+          "index_bytes": 6085,
+          "viewport_8_tiles_process_first_ms": 0.714,
+          "viewport_8_tiles_warm_ms": 0.671,
+          "payload_bytes": 8168,
+          "fs_allocated_bytes": 106496,
+          "write_calls": 25,
+          "reopen_calls": 24,
+          "cold_write_ms": 1.671
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 3220,
+          "viewport_8_tiles_process_first_ms": 0.658,
+          "viewport_8_tiles_warm_ms": 0.674,
+          "payload_bytes": 5495,
+          "fs_allocated_bytes": 8192,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.241
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 4681,
+          "viewport_8_tiles_process_first_ms": 0.724,
+          "viewport_8_tiles_warm_ms": 0.668,
+          "payload_bytes": 6956,
+          "fs_allocated_bytes": 12288,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.194
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 89,
+          "payload_write_bytes": 89,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.086
+        },
+        "document_pack": {
+          "new_blob_bytes": 89,
+          "payload_write_bytes": 2372,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.07
+        },
+        "shared_pack": {
+          "new_blob_bytes": 89,
+          "payload_write_bytes": 97,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.168
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 8,
+          "misses": 72,
+          "evictions": 64
+        },
+        {
+          "budget_mib": 32,
+          "hits": 56,
+          "misses": 24,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 56,
+          "misses": 24,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "mixed",
+      "stride": 512,
+      "layer_count": 3,
+      "logical_tiles": 51,
+      "unique_blobs": 51,
+      "allocated_rgba_bytes": 53477376,
+      "encoded_tile_bytes": 6636705,
+      "encoded_bytes_per_tile": 130131.5,
+      "encode": {
+        "median_ms": 0.633,
+        "p95_ms": 2.494
+      },
+      "decode": {
+        "median_ms": 0.095,
+        "p95_ms": 1.196
+      },
+      "encode_mib_s": 1046.7,
+      "decode_mib_s": 2841.7,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 52,
+          "index_bytes": 12521,
+          "viewport_8_tiles_process_first_ms": 1.221,
+          "viewport_8_tiles_warm_ms": 1.331,
+          "payload_bytes": 6649226,
+          "fs_allocated_bytes": 6819840,
+          "write_calls": 52,
+          "reopen_calls": 51,
+          "cold_write_ms": 3.97
+        },
+        {
+          "scheme": "document_pack",
+          "files": 4,
+          "index_bytes": 6372,
+          "viewport_8_tiles_process_first_ms": 1.111,
+          "viewport_8_tiles_warm_ms": 1.014,
+          "payload_bytes": 6643485,
+          "fs_allocated_bytes": 6651904,
+          "write_calls": 4,
+          "reopen_calls": 51,
+          "cold_write_ms": 1.829
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 9691,
+          "viewport_8_tiles_process_first_ms": 1.22,
+          "viewport_8_tiles_warm_ms": 1.053,
+          "payload_bytes": 6646804,
+          "fs_allocated_bytes": 6651904,
+          "write_calls": 2,
+          "reopen_calls": 51,
+          "cold_write_ms": 1.577
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 165969,
+          "payload_write_bytes": 165969,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.147
+        },
+        "document_pack": {
+          "new_blob_bytes": 165969,
+          "payload_write_bytes": 4306205,
+          "payload_write_calls": 1,
+          "payload_write_ms": 12.643
+        },
+        "shared_pack": {
+          "new_blob_bytes": 165969,
+          "payload_write_bytes": 165977,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.116
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 72
+        },
+        {
+          "budget_mib": 32,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "dense",
+      "stride": 1024,
+      "layer_count": 2,
+      "logical_tiles": 18,
+      "unique_blobs": 18,
+      "allocated_rgba_bytes": 75497472,
+      "encoded_tile_bytes": 2561703,
+      "encoded_bytes_per_tile": 142316.8,
+      "encode": {
+        "median_ms": 2.409,
+        "p95_ms": 10.555
+      },
+      "decode": {
+        "median_ms": 0.53,
+        "p95_ms": 5.007
+      },
+      "encode_mib_s": 1207.4,
+      "decode_mib_s": 3368.3,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 19,
+          "index_bytes": 4365,
+          "viewport_8_tiles_process_first_ms": 2.47,
+          "viewport_8_tiles_warm_ms": 2.722,
+          "payload_bytes": 2566068,
+          "fs_allocated_bytes": 2613248,
+          "write_calls": 19,
+          "reopen_calls": 18,
+          "cold_write_ms": 1.931
+        },
+        {
+          "scheme": "document_pack",
+          "files": 3,
+          "index_bytes": 2117,
+          "viewport_8_tiles_process_first_ms": 2.95,
+          "viewport_8_tiles_warm_ms": 2.544,
+          "payload_bytes": 2563964,
+          "fs_allocated_bytes": 2568192,
+          "write_calls": 3,
+          "reopen_calls": 18,
+          "cold_write_ms": 0.706
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 3367,
+          "viewport_8_tiles_process_first_ms": 2.555,
+          "viewport_8_tiles_warm_ms": 2.562,
+          "payload_bytes": 2565214,
+          "fs_allocated_bytes": 2568192,
+          "write_calls": 2,
+          "reopen_calls": 18,
+          "cold_write_ms": 0.892
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 716,
+          "payload_write_bytes": 716,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.198
+        },
+        "document_pack": {
+          "new_blob_bytes": 716,
+          "payload_write_bytes": 28386,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.265
+        },
+        "shared_pack": {
+          "new_blob_bytes": 716,
+          "payload_write_bytes": 724,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.125
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 78
+        },
+        {
+          "budget_mib": 32,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 72
+        },
+        {
+          "budget_mib": 128,
+          "hits": 62,
+          "misses": 18,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "texture",
+      "stride": 1024,
+      "layer_count": 1,
+      "logical_tiles": 4,
+      "unique_blobs": 4,
+      "allocated_rgba_bytes": 16777216,
+      "encoded_tile_bytes": 4143239,
+      "encoded_bytes_per_tile": 1035809.8,
+      "encode": {
+        "median_ms": 2.686,
+        "p95_ms": 7.67
+      },
+      "decode": {
+        "median_ms": 0.417,
+        "p95_ms": 0.951
+      },
+      "encode_mib_s": 1182.0,
+      "decode_mib_s": 8627.8,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 5,
+          "index_bytes": 1057,
+          "viewport_8_tiles_process_first_ms": 1.836,
+          "viewport_8_tiles_warm_ms": 1.998,
+          "payload_bytes": 4144296,
+          "fs_allocated_bytes": 4157440,
+          "write_calls": 5,
+          "reopen_calls": 4,
+          "cold_write_ms": 6.13
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 574,
+          "viewport_8_tiles_process_first_ms": 2.122,
+          "viewport_8_tiles_warm_ms": 1.607,
+          "payload_bytes": 4143845,
+          "fs_allocated_bytes": 4149248,
+          "write_calls": 2,
+          "reopen_calls": 4,
+          "cold_write_ms": 1.116
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 830,
+          "viewport_8_tiles_process_first_ms": 1.675,
+          "viewport_8_tiles_warm_ms": 1.566,
+          "payload_bytes": 4144101,
+          "fs_allocated_bytes": 4149248,
+          "write_calls": 2,
+          "reopen_calls": 4,
+          "cold_write_ms": 0.882
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 360866,
+          "payload_write_bytes": 360866,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.25
+        },
+        "document_pack": {
+          "new_blob_bytes": 360866,
+          "payload_write_bytes": 4504145,
+          "payload_write_calls": 1,
+          "payload_write_ms": 12.005
+        },
+        "shared_pack": {
+          "new_blob_bytes": 360866,
+          "payload_write_bytes": 360874,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.222
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 20,
+          "evictions": 18
+        },
+        {
+          "budget_mib": 32,
+          "hits": 16,
+          "misses": 4,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 16,
+          "misses": 4,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "sparse",
+      "stride": 1024,
+      "layer_count": 1,
+      "logical_tiles": 24,
+      "unique_blobs": 24,
+      "allocated_rgba_bytes": 100663296,
+      "encoded_tile_bytes": 4446,
+      "encoded_bytes_per_tile": 185.2,
+      "encode": {
+        "median_ms": 1.423,
+        "p95_ms": 2.49
+      },
+      "decode": {
+        "median_ms": 0.275,
+        "p95_ms": 0.422
+      },
+      "encode_mib_s": 2429.5,
+      "decode_mib_s": 13693.1,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 25,
+          "index_bytes": 6106,
+          "viewport_8_tiles_process_first_ms": 2.032,
+          "viewport_8_tiles_warm_ms": 1.939,
+          "payload_bytes": 10552,
+          "fs_allocated_bytes": 106496,
+          "write_calls": 25,
+          "reopen_calls": 24,
+          "cold_write_ms": 1.793
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 3246,
+          "viewport_8_tiles_process_first_ms": 1.88,
+          "viewport_8_tiles_warm_ms": 2.004,
+          "payload_bytes": 7884,
+          "fs_allocated_bytes": 12288,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.268
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 4707,
+          "viewport_8_tiles_process_first_ms": 2.266,
+          "viewport_8_tiles_warm_ms": 1.847,
+          "payload_bytes": 9345,
+          "fs_allocated_bytes": 16384,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.414
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 187,
+          "payload_write_bytes": 187,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.245
+        },
+        "document_pack": {
+          "new_blob_bytes": 187,
+          "payload_write_bytes": 4833,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.167
+        },
+        "shared_pack": {
+          "new_blob_bytes": 187,
+          "payload_write_bytes": 195,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.13
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 78
+        },
+        {
+          "budget_mib": 32,
+          "hits": 8,
+          "misses": 72,
+          "evictions": 64
+        },
+        {
+          "budget_mib": 128,
+          "hits": 56,
+          "misses": 24,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "mixed",
+      "stride": 1024,
+      "layer_count": 3,
+      "logical_tiles": 35,
+      "unique_blobs": 35,
+      "allocated_rgba_bytes": 146800640,
+      "encoded_tile_bytes": 6681432,
+      "encoded_bytes_per_tile": 190898.1,
+      "encode": {
+        "median_ms": 2.079,
+        "p95_ms": 11.951
+      },
+      "decode": {
+        "median_ms": 0.323,
+        "p95_ms": 4.204
+      },
+      "encode_mib_s": 1240.8,
+      "decode_mib_s": 5527.7,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 36,
+          "index_bytes": 8701,
+          "viewport_8_tiles_process_first_ms": 2.982,
+          "viewport_8_tiles_warm_ms": 3.051,
+          "payload_bytes": 6690133,
+          "fs_allocated_bytes": 6811648,
+          "write_calls": 36,
+          "reopen_calls": 35,
+          "cold_write_ms": 21.182
+        },
+        {
+          "scheme": "document_pack",
+          "files": 4,
+          "index_bytes": 4492,
+          "viewport_8_tiles_process_first_ms": 2.666,
+          "viewport_8_tiles_warm_ms": 2.988,
+          "payload_bytes": 6686204,
+          "fs_allocated_bytes": 6696960,
+          "write_calls": 4,
+          "reopen_calls": 35,
+          "cold_write_ms": 17.38
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 6762,
+          "viewport_8_tiles_process_first_ms": 2.941,
+          "viewport_8_tiles_warm_ms": 2.518,
+          "payload_bytes": 6688474,
+          "fs_allocated_bytes": 6692864,
+          "write_calls": 2,
+          "reopen_calls": 35,
+          "cold_write_ms": 17.298
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 360866,
+          "payload_write_bytes": 360866,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.284
+        },
+        "document_pack": {
+          "new_blob_bytes": 360866,
+          "payload_write_bytes": 4504145,
+          "payload_write_calls": 1,
+          "payload_write_ms": 12.809
+        },
+        "shared_pack": {
+          "new_blob_bytes": 360866,
+          "payload_write_bytes": 360874,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.301
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 78
+        },
+        {
+          "budget_mib": 32,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 72
+        },
+        {
+          "budget_mib": 128,
+          "hits": 48,
+          "misses": 32,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "dense",
+      "stride": 2048,
+      "layer_count": 2,
+      "logical_tiles": 8,
+      "unique_blobs": 8,
+      "allocated_rgba_bytes": 134217728,
+      "encoded_tile_bytes": 2619192,
+      "encoded_bytes_per_tile": 327399.0,
+      "encode": {
+        "median_ms": 14.248,
+        "p95_ms": 49.924
+      },
+      "decode": {
+        "median_ms": 6.425,
+        "p95_ms": 15.752
+      },
+      "encode_mib_s": 783.2,
+      "decode_mib_s": 2456.6,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 9,
+          "index_bytes": 1996,
+          "viewport_8_tiles_process_first_ms": 27.544,
+          "viewport_8_tiles_warm_ms": 25.979,
+          "payload_bytes": 2621188,
+          "fs_allocated_bytes": 2641920,
+          "write_calls": 9,
+          "reopen_calls": 8,
+          "cold_write_ms": 7.866
+        },
+        {
+          "scheme": "document_pack",
+          "files": 3,
+          "index_bytes": 992,
+          "viewport_8_tiles_process_first_ms": 27.39,
+          "viewport_8_tiles_warm_ms": 26.274,
+          "payload_bytes": 2620248,
+          "fs_allocated_bytes": 2625536,
+          "write_calls": 3,
+          "reopen_calls": 8,
+          "cold_write_ms": 7.412
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 1545,
+          "viewport_8_tiles_process_first_ms": 28.947,
+          "viewport_8_tiles_warm_ms": 26.722,
+          "payload_bytes": 2620801,
+          "fs_allocated_bytes": 2625536,
+          "write_calls": 2,
+          "reopen_calls": 8,
+          "cold_write_ms": 6.559
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 1284,
+          "payload_write_bytes": 1284,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.241
+        },
+        "document_pack": {
+          "new_blob_bytes": 1284,
+          "payload_write_bytes": 33531,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.416
+        },
+        "shared_pack": {
+          "new_blob_bytes": 1284,
+          "payload_write_bytes": 1292,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.246
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 40,
+          "evictions": 40
+        },
+        {
+          "budget_mib": 32,
+          "hits": 0,
+          "misses": 40,
+          "evictions": 38
+        },
+        {
+          "budget_mib": 128,
+          "hits": 32,
+          "misses": 8,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "texture",
+      "stride": 2048,
+      "layer_count": 1,
+      "logical_tiles": 2,
+      "unique_blobs": 2,
+      "allocated_rgba_bytes": 33554432,
+      "encoded_tile_bytes": 4140534,
+      "encoded_bytes_per_tile": 2070267.0,
+      "encode": {
+        "median_ms": 13.357,
+        "p95_ms": 17.463
+      },
+      "decode": {
+        "median_ms": 5.29,
+        "p95_ms": 5.803
+      },
+      "encode_mib_s": 1147.3,
+      "decode_mib_s": 3682.9,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 3,
+          "index_bytes": 575,
+          "viewport_8_tiles_process_first_ms": 4.135,
+          "viewport_8_tiles_warm_ms": 4.181,
+          "payload_bytes": 4141109,
+          "fs_allocated_bytes": 4149248,
+          "write_calls": 3,
+          "reopen_calls": 2,
+          "cold_write_ms": 1.083
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 332,
+          "viewport_8_tiles_process_first_ms": 3.941,
+          "viewport_8_tiles_warm_ms": 3.905,
+          "payload_bytes": 4140882,
+          "fs_allocated_bytes": 4145152,
+          "write_calls": 2,
+          "reopen_calls": 2,
+          "cold_write_ms": 1.192
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 459,
+          "viewport_8_tiles_process_first_ms": 4.539,
+          "viewport_8_tiles_warm_ms": 4.605,
+          "payload_bytes": 4141009,
+          "fs_allocated_bytes": 4145152,
+          "write_calls": 2,
+          "reopen_calls": 2,
+          "cold_write_ms": 1.208
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 439431,
+          "payload_write_bytes": 439431,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.286
+        },
+        "document_pack": {
+          "new_blob_bytes": 439431,
+          "payload_write_bytes": 4579989,
+          "payload_write_calls": 1,
+          "payload_write_ms": 1.615
+        },
+        "shared_pack": {
+          "new_blob_bytes": 439431,
+          "payload_write_bytes": 439439,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.328
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 10,
+          "evictions": 10
+        },
+        {
+          "budget_mib": 32,
+          "hits": 8,
+          "misses": 2,
+          "evictions": 0
+        },
+        {
+          "budget_mib": 128,
+          "hits": 8,
+          "misses": 2,
+          "evictions": 0
+        }
+      ]
+    },
+    {
+      "workload": "sparse",
+      "stride": 2048,
+      "layer_count": 1,
+      "logical_tiles": 24,
+      "unique_blobs": 24,
+      "allocated_rgba_bytes": 402653184,
+      "encoded_tile_bytes": 13692,
+      "encoded_bytes_per_tile": 570.5,
+      "encode": {
+        "median_ms": 11.491,
+        "p95_ms": 51.083
+      },
+      "decode": {
+        "median_ms": 6.289,
+        "p95_ms": 7.392
+      },
+      "encode_mib_s": 769.5,
+      "decode_mib_s": 3198.0,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 25,
+          "index_bytes": 6079,
+          "viewport_8_tiles_process_first_ms": 10.674,
+          "viewport_8_tiles_warm_ms": 10.635,
+          "payload_bytes": 19771,
+          "fs_allocated_bytes": 106496,
+          "write_calls": 25,
+          "reopen_calls": 24,
+          "cold_write_ms": 1.756
+        },
+        {
+          "scheme": "document_pack",
+          "files": 2,
+          "index_bytes": 3229,
+          "viewport_8_tiles_process_first_ms": 10.878,
+          "viewport_8_tiles_warm_ms": 10.219,
+          "payload_bytes": 17113,
+          "fs_allocated_bytes": 20480,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.404
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 4690,
+          "viewport_8_tiles_process_first_ms": 11.135,
+          "viewport_8_tiles_warm_ms": 11.216,
+          "payload_bytes": 18574,
+          "fs_allocated_bytes": 24576,
+          "write_calls": 2,
+          "reopen_calls": 24,
+          "cold_write_ms": 0.347
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 571,
+          "payload_write_bytes": 571,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.283
+        },
+        "document_pack": {
+          "new_blob_bytes": 571,
+          "payload_write_bytes": 14463,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.285
+        },
+        "shared_pack": {
+          "new_blob_bytes": 571,
+          "payload_write_bytes": 579,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.242
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 80
+        },
+        {
+          "budget_mib": 32,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 78
+        },
+        {
+          "budget_mib": 128,
+          "hits": 8,
+          "misses": 72,
+          "evictions": 64
+        }
+      ]
+    },
+    {
+      "workload": "mixed",
+      "stride": 2048,
+      "layer_count": 3,
+      "logical_tiles": 28,
+      "unique_blobs": 28,
+      "allocated_rgba_bytes": 469762048,
+      "encoded_tile_bytes": 6740076,
+      "encoded_bytes_per_tile": 240717.0,
+      "encode": {
+        "median_ms": 11.116,
+        "p95_ms": 48.27
+      },
+      "decode": {
+        "median_ms": 6.289,
+        "p95_ms": 8.32
+      },
+      "encode_mib_s": 948.4,
+      "decode_mib_s": 2923.5,
+      "layouts": [
+        {
+          "scheme": "individual",
+          "files": 29,
+          "index_bytes": 6993,
+          "viewport_8_tiles_process_first_ms": 13.308,
+          "viewport_8_tiles_warm_ms": 11.869,
+          "payload_bytes": 6747069,
+          "fs_allocated_bytes": 6840320,
+          "write_calls": 29,
+          "reopen_calls": 28,
+          "cold_write_ms": 20.578
+        },
+        {
+          "scheme": "document_pack",
+          "files": 4,
+          "index_bytes": 3638,
+          "viewport_8_tiles_process_first_ms": 12.665,
+          "viewport_8_tiles_warm_ms": 12.424,
+          "payload_bytes": 6743938,
+          "fs_allocated_bytes": 6750208,
+          "write_calls": 4,
+          "reopen_calls": 28,
+          "cold_write_ms": 17.487
+        },
+        {
+          "scheme": "shared_pack",
+          "files": 2,
+          "index_bytes": 5418,
+          "viewport_8_tiles_process_first_ms": 13.081,
+          "viewport_8_tiles_warm_ms": 13.057,
+          "payload_bytes": 6745718,
+          "fs_allocated_bytes": 6750208,
+          "write_calls": 2,
+          "reopen_calls": 28,
+          "cold_write_ms": 16.22
+        }
+      ],
+      "edit_rewrite": {
+        "individual": {
+          "new_blob_bytes": 439431,
+          "payload_write_bytes": 439431,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.338
+        },
+        "document_pack": {
+          "new_blob_bytes": 439431,
+          "payload_write_bytes": 4579989,
+          "payload_write_calls": 1,
+          "payload_write_ms": 6.856
+        },
+        "shared_pack": {
+          "new_blob_bytes": 439431,
+          "payload_write_bytes": 439439,
+          "payload_write_calls": 1,
+          "payload_write_ms": 0.564
+        }
+      },
+      "cache_trace": [
+        {
+          "budget_mib": 8,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 80
+        },
+        {
+          "budget_mib": 32,
+          "hits": 0,
+          "misses": 80,
+          "evictions": 78
+        },
+        {
+          "budget_mib": 128,
+          "hits": 4,
+          "misses": 76,
+          "evictions": 68
+        }
+      ]
+    }
+  ]
+}

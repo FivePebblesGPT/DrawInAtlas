@@ -8,9 +8,11 @@
 
 | Ready | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 23 | 11 | 3 | 39 | 1 | 77 |
+| 22 | 11 | 3 | 40 | 1 | 77 |
 
-**T-066 completed (2026-11-02):** [portable generation-based sparse campaign saving](DRAWING_STORAGE_CONTRACT.md) now durably publishes the single Atlas root pointer after verifying checked manifests, compressed tiles, Object Assets, licensed fonts and recovery roots. The real editor saves and reopens Drawing documents. The T-067 chunk geometry and packed-storage benchmarks are still open, as are T-056/T-059 owner UX gates.
+**T-067 completed (2026-11-02):** [controlled 256/512/1024/2048 Zstd tile and 3-layout packing benchmark](DRAWING_CHUNK_GEOMETRY_BENCHMARK.md) includes 48 physical-layout cases, 386 Godot native checks, software framebuffer upload measurements and explicit retiling/versioning rules. **512** is recommended for a *future new-document default* and immutable shared **segmented** packs are the physical-layout target; **neither change has been deployed**. Existing versioned 256-stride documents and T-066’s verified individual-blob writer remain authoritative until separate adoption and atomic-recovery tests. No manual review gate was bypassed.
+
+**T-066 completed (2026-11-02):** [portable generation-based sparse campaign saving](DRAWING_STORAGE_CONTRACT.md) now durably publishes the single Atlas root pointer after verifying checked manifests, compressed tiles, Object Assets, licensed fonts and recovery roots. The real editor saves and reopens Drawing documents. T-067 subsequently completed its geometry/packing benchmark; adoption of its recommended default/pack layout is separate work. T-056/T-059 owner UX gates remain open.
 
 **T-055 completed (2026-11-02):** [Atlas canvas composition, linked Objects, input precedence and read-only previews](DRAWING_ATLAS_COMPOSITION.md) use the one canonical Drawing package with 89 headless and 13 native display checks. T-056 is now **Ready** for separate engineering/release/owner verification; its manual-review approval remains pending. T-066 subsequently implemented the versioned multi-file save.
 
@@ -92,7 +94,7 @@
 | [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Ready | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Done | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
-| [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Ready | — | [T-051](Tickets/T-051.md) |
+| [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Done | — | [T-051](Tickets/T-051.md) |
 | [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | Ready | — | [T-052](Tickets/T-052.md) |
 | [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Ready | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Ready | — | — |
