@@ -159,6 +159,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t071_storage_docs.py' -v
+      - name: Verify T-072 current tools versus historical workflow documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t072_tools_docs.py' -v
       - name: Verify T-077 performance and reviewer handoff documentation
         shell: bash
         run: |

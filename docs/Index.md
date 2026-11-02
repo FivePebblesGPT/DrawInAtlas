@@ -8,7 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 17 | 1 | 11 | 3 | 44 | 1 | 77 |
+| 16 | 1 | 11 | 3 | 45 | 1 | 77 |
+
+**T-072 completed (2026-11-02):** the nine [tool and interaction workflow pages](BRUSH_WORKFLOW.md) now lead with current Drawing-owned gesture/pixel/edit behavior, Atlas-owned map/selection/global history, the available six-tool standalone palette, and an explicit historical section for legacy Atlas-era prototypes. Bucket/Line/Polygon/Wall Path/T-027 UX remain **Ready** despite their generic engine primitives or old smoke fixtures. Editable text's single-element/explicit rasterization and portable licensed fonts are documented; T-068's native edit-region interface is not mistaken for a selected library. Ten documentation checks run in CI. Some old `.scn` and candidate tool smoke tests still fail and are recorded in [T-072](Tickets/T-072.md); this ticket changes **documentation and tests only**.
 
 **T-071 completed (2026-11-02):** the [storage format and recovery contract](DRAWING_STORAGE_CONTRACT.md), [dictionary adapter audit](DICTIONARY_CONVERSION_AUDIT.md), and [raster importer analysis](RASTER_CHUNK_IMPORT.md) distinguish today's T-066 root-pointer/immutable-generation/individual `.zst` save from historical one-file native WebP/.scn code. Explicit, executable acceptance examples cover relocating a whole project, partial-copy/missing-file rejection, corrupted and interrupted generations, stale writers, precise signed tiles, and blank detail. [[T-067]]'s future 512-stride and segmented-pack recommendations remain **not deployed**. Eight documentation checks and actual missing-chunk failure coverage were added to CI; no save-format change or owner approval is implied.
 
@@ -109,7 +111,7 @@
 | [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Done | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Done | — | — |
 | [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Done | — | — |
-| [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Ready | — | — |
+| [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Done | — | — |
 | [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Ready | — | — |
 | [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Ready | — | — |
 | [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Ready | — | — |
