@@ -33,6 +33,7 @@
 - [ ] [[T-064|T-064 · Nested Object Assets with cycle-safe references]]
 - [ ] [[T-065|T-065 · Asset Browser and NULL-placeholder workflow]]
 - [ ] [[T-066|T-066 · Sparse multi-file floor/detail DrawingDocument persistence]]
+- [ ] [[T-067|T-067 · Benchmark larger chunk geometry and packed storage]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]

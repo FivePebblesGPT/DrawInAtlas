@@ -1,6 +1,6 @@
 # Drawing / Atlas architecture — owner decisions (2026-11-01)
 
-**Status:** owner architecture approved through Round 8 (2026-11-02), including Option B document ownership and sparse multi-file persistence. The *target design* is not yet implemented. Remaining detailed engineering contracts are in [[T-051]] and [[T-066]]; Drawing tool inventory remains in [[T-059]]. Epic: [[E-009]].
+**Status:** owner architecture approved through Round 9 (2026-11-02), including Option B document ownership, sparse multi-file persistence and larger-than-256 chunk direction. The *target design* is not yet implemented. Remaining detailed engineering contracts are in [[T-051]] and [[T-066]]; Drawing tool inventory remains in [[T-059]]. Epic: [[E-009]].
 
 ## Accepted Round 1–2 decisions
 1. **Drawing** is a physically independent, reduced-feature PhotoCraft/Paint.NET-style application and library. Its exact feature inventory will follow.
@@ -184,3 +184,19 @@ The exact manifest encoding, how to bucket payloads, whether chunk blobs are pro
 
 ### Still pending engineering decisions
 Manifest/chunk file format and indices; content-addressed deduplication vs per-doc files; cross-file staged commits; independent Object Assets sharing chunk blobs vs wholly self-contained files; package export/backup; savepoint and deletion behavior; density-change resampling; exact lazy-load/cache policy. These are plans to be measured and approved, not hidden product questions. See [[T-051]], [[T-061]], [[T-066]].
+
+## Round 9 — chunk geometry: increase size, benchmark before freezing (owner 2026-11-02)
+
+**Owner direction:** existing **256×256 chunks are too small as a hard-coded final choice**, due to high sparse-file overhead and less efficient compression across continuous painted regions. Adopt a **larger target chunk size** for the new Drawing engine/storage, but do not assert a measured winner without measurements.
+
+**Engineering candidate:** benchmark `512`, `1024` (**initial leading hypothesis**) and `2048` square pixels versus current `256` baseline. A full RGBA8 decoded chunk consumes respectively 1, 4, 16 versus 0.25 MiB. A fully painted 4096² pixel region comprises respectively 64, 16, 4 versus 256 chunks. Actual compressed sizes will depend on artwork; improvements cannot be assumed for extremely sparse isolated marks.
+
+**Keep two choices separate:**
+1. **Logical edit/chunk size** controls signed tile coordinates, re-encoding on edit, runtime working-set size, undo deltas, cache/culling and memory pressure.
+2. **Physical storage packing/sharding** controls number of filesystem files, per-file metadata and transaction cost. Multiple logical chunks might share one pack even if their logical chunk size is modest; this should be benchmarked, not used as an excuse to retain tiny edit tiles indefinitely.
+
+Do not set the new file schema's tile size by `AtlasRasterChunk.SIZE = 256`. Existing 256 chunk code and lossless WebP/hash validation are **testable baselines**, not required production dimensions. Choose a clear **per-document/persisted tile-size invariant** and version it so signed chunk coordinates have unambiguous meaning. A runtime tile-size change requires explicit retiling/manifest conversion, not silently reinterpreting saved coordinates. Since there are no historical user saves, no legacy format migration is needed, but reopening files produced by the new version must always work.
+
+**Required measurements under [[T-067]]:** dense adjacent painting, long strokes crossing boundaries, tiny isolated marks at far-apart coordinates, texture-like/noisy artwork, blank/transparent regions and exact hidden RGB/alpha. Measure encoded bytes, file counts/metadata, encode/decode/flush latency, random tiny edit cost, undo snapshot/delta memory, viewport pan/zoom and cache churn, initial load/reopen and crash-safe generation overhead. Benchmark at least one native Windows/Linux configuration using a deterministic dataset. The selected production size is an engineering result, **not yet approved as exactly 1024**.
+
+This direction does not reverse Option B, portable `Objects/`, sparse `Drawings/`, blank authored detail, Save-only object publication or the split between Drawing and Atlas.
