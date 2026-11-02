@@ -48,10 +48,32 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
             self.assertIn(term, TOP_BAR)
 
     def test_dock_and_status(self) -> None:
-        for term in ('dock_split = HSplitContainer.new()', 'inspector = TabContainer.new()',
-                     'history_pane.name = "History"', 'func _toggle_dock()',
-                     'func _reset_dock_width()', 'cursor %d,%d', 'zoom %.0f%%'):
+        for term in ('dock_split = HSplitContainer.new()', 'inspector = ScrollContainer.new()',
+                     '_add_dock_section("History")', 'func _toggle_dock()',
+                     'func _reset_dock_width()', 'cursor %d,%d', 'zoom %.0f%%',
+                     'inspector.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO',
+                     'func _toggle_document_tabs()', 'func _cycle_tab(direction: int)'):
             self.assertIn(term, WORKSPACE)
+
+    def test_user_refinements_are_packaged_and_tested(self) -> None:
+        for name in ("brush", "eraser", "select", "move", "text", "pan"):
+            asset = ROOT / f"addons/drawing/icons/{name}.svg"
+            self.assertTrue(asset.is_file(), name)
+            self.assertIn('<svg xmlns="http://www.w3.org/2000/svg"', asset.read_text())
+        self.assertIn('button.icon = load(', WORKSPACE)
+        self.assertIn('button.tooltip_text = "Drawing tool: " + name', WORKSPACE)
+        self.assertIn('func _refresh_tool_buttons()', WORKSPACE)
+        self.assertIn('top_bar.set_menu_checked("Window", 2, show_document_tabs)', WORKSPACE)
+        self.assertIn('KEY_TAB: _cycle_tab(', WORKSPACE)
+        self.assertIn('tab_identity', WORKSPACE)
+        self.assertIn('icons = PACKAGE / "icons"',
+                      (ROOT / "tools/build_drawing_app.py").read_text())
+        self.assertIn('icons = PACKAGE / "icons"',
+                      (ROOT / "tools/build_drawing_contract_consumer.py").read_text())
+        for witness in ('six tools share the icon rail', 'Ctrl+Shift+Tab cycles backward',
+                        'keyboard focus brings History into scroll viewport',
+                        'hidden tabs still enforce unsaved document close prompt'):
+            self.assertIn(witness, NATIVE)
 
     def test_native_witness_is_live_and_touches_required_behaviors(self) -> None:
         for term in ('T063_WORKSPACE_PASSED', 'Ctrl+Shift+S', 'get_popup()',

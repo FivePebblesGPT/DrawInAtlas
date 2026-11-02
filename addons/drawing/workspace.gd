@@ -14,12 +14,16 @@ var active_tool: String = "Brush"
 var active_color: Color = Color(0.12, 0.20, 0.35)
 var canvas: Control
 var tab_bar: TabBar
+var tabs_line: HBoxContainer
+var show_document_tabs: bool = true
+var tool_buttons: Dictionary = {}
 var layers: Tree
 var status: Label
 var width_spin: SpinBox
 var snap_toggle: CheckButton
 var top_bar: HBoxContainer
-var inspector: TabContainer
+var inspector: ScrollContainer
+var dock_panels: VBoxContainer
 var dock_split: HSplitContainer
 var selection_history_toggle: CheckButton
 var history_label: Label
@@ -94,10 +98,13 @@ func _build_interface() -> void:
 		[Callable(self, "_change_tool").bind("Select"),
 		Callable(self, "_change_tool").bind("Move")])
 	top_bar.add_menu_spec("Window", ["Show/hide panel dock", "Reset panel width",
+		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
 		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
-		Callable(self, "_ask_rename_object"), Callable(self, "_ask_save"),
-		Callable(self, "_request_close_current")])
+		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
+		Callable(self, "_cycle_tab").bind(-1), Callable(self, "_ask_rename_object"),
+		Callable(self, "_ask_save"), Callable(self, "_request_close_current")])
+	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
 	top_bar.set_menu_checked("Edit", 2, record_selection_history)
@@ -116,7 +123,8 @@ func _build_interface() -> void:
 	snap_toggle.tooltip_text = "Generic Drawing grid snap"
 	snap_toggle.toggled.connect(func(enabled: bool) -> void: canvas.grid_spacing = 8 if enabled else 0)
 	_refresh_tool_options()
-	var tabs_line: HBoxContainer = HBoxContainer.new()
+	tabs_line = HBoxContainer.new()
+	tabs_line.name = "DocumentTabs"
 	root.add_child(tabs_line)
 	tab_bar = TabBar.new()
 	tab_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -139,14 +147,22 @@ func _build_interface() -> void:
 	edit_region.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dock_split.add_child(edit_region)
 	var rail: VBoxContainer = VBoxContainer.new()
-	rail.custom_minimum_size.x = 76
+	rail.name = "ToolRail"
+	rail.custom_minimum_size.x = 54
 	edit_region.add_child(rail)
 	for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
-		button.text = name
+		button.name = name + "Tool"
+		button.icon = load("res://addons/drawing/icons/%s.svg" % name.to_lower()) as Texture2D
 		button.tooltip_text = "Drawing tool: " + name
+		button.custom_minimum_size = Vector2(44, 42)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		button.focus_mode = Control.FOCUS_ALL
+		button.toggle_mode = true
 		button.pressed.connect(_change_tool.bind(name))
+		tool_buttons[name] = button
 		rail.add_child(button)
+	_refresh_tool_buttons()
 	canvas = CANVAS_SCRIPT.new() as Control
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -164,13 +180,18 @@ func _build_interface() -> void:
 			_update_status())
 	edit_region.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
-	inspector = TabContainer.new()
+	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
 	inspector.custom_minimum_size.x = 160
+	inspector.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	inspector.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	inspector.follow_focus = true
 	dock_split.add_child(inspector)
-	var color_pane: VBoxContainer = VBoxContainer.new()
-	color_pane.name = "Colors"
-	inspector.add_child(color_pane)
+	dock_panels = VBoxContainer.new()
+	dock_panels.name = "DockPanels"
+	dock_panels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inspector.add_child(dock_panels)
+	var color_pane: VBoxContainer = _add_dock_section("Colors")
 	var picker: ColorPickerButton = ColorPickerButton.new()
 	picker.text = "Brush color"
 	picker.color = active_color
@@ -178,9 +199,7 @@ func _build_interface() -> void:
 		active_color = value
 		canvas.color_rgba = _pack_color(value))
 	color_pane.add_child(picker)
-	var layer_pane: VBoxContainer = VBoxContainer.new()
-	layer_pane.name = "Layers"
-	inspector.add_child(layer_pane)
+	var layer_pane: VBoxContainer = _add_dock_section("Layers")
 	var layer_actions: HBoxContainer = HBoxContainer.new()
 	layer_pane.add_child(layer_actions)
 	for entry: Dictionary in [{"label": "+ Group", "handler": Callable(self, "_add_group")},
@@ -206,18 +225,19 @@ func _build_interface() -> void:
 	pages.add_child(layer_page_label)
 	layers = Tree.new()
 	layers.hide_root = true
-	layers.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Fixed viewport for the tree: the dock scrolls as a whole, and the tree
+	# keeps its own row scrolling without expanding indefinitely.
+	layers.custom_minimum_size.y = 230
 	layers.item_selected.connect(_layer_selected)
 	layer_pane.add_child(layers)
-	var history_pane: VBoxContainer = VBoxContainer.new()
-	history_pane.name = "History"
-	inspector.add_child(history_pane)
+	var history_pane: VBoxContainer = _add_dock_section("History")
 	history_label = Label.new()
-	history_label.text = "Content gestures: Undo / Redo"
+	history_label.text = "Undo / Redo"
 	history_pane.add_child(history_label)
 	selection_history_toggle = CheckButton.new()
-	selection_history_toggle.text = "Record selection changes in Undo History"
-	selection_history_toggle.tooltip_text = "Workspace preference; OFF by default, never marks a document dirty"
+	selection_history_toggle.text = "Log selections"
+	selection_history_toggle.clip_text = true
+	selection_history_toggle.tooltip_text = "Record selection changes in Undo History (workspace preference; OFF by default, never marks a document dirty)"
 	selection_history_toggle.button_pressed = record_selection_history
 	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
 	history_pane.add_child(selection_history_toggle)
@@ -298,6 +318,20 @@ func _build_interface() -> void:
 	variant_form.add_child(variant_name)
 	variant_dialog.confirmed.connect(_save_as_named_object)
 	_build_text_dialog()
+
+
+## Always-visible stacked headings; the right dock's single vertical scrollbar
+## lets users reach History even when the window is short.
+func _add_dock_section(title: String) -> VBoxContainer:
+	var section: VBoxContainer = VBoxContainer.new()
+	section.name = title
+	dock_panels.add_child(section)
+	var heading: Label = Label.new()
+	heading.text = title.to_upper()
+	heading.tooltip_text = title + " panel"
+	section.add_child(heading)
+	section.add_child(HSeparator.new())
+	return section
 
 
 func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
@@ -615,7 +649,8 @@ func _refresh_layers() -> void:
 			matches.append(row)
 	var page_count: int = maxi(1, ceili(float(matches.size()) / ROW_PAGE))
 	layer_page = clampi(layer_page, 0, page_count - 1)
-	layer_page_label.text = "%d/%d · %d labels/layers" % [layer_page + 1, page_count, matches.size()]
+	layer_page_label.text = "%d/%d · %d" % [layer_page + 1, page_count, matches.size()]
+	layer_page_label.tooltip_text = "%d matching layers/labels" % matches.size()
 	var first: int = layer_page * ROW_PAGE
 	for index: int in range(first, mini(first + ROW_PAGE, matches.size())):
 		var row: Dictionary = matches[index]
@@ -799,8 +834,14 @@ func _toggle_visibility() -> void:
 func _change_tool(name: String) -> void:
 	active_tool = name
 	canvas.tool = name
+	_refresh_tool_buttons()
 	_refresh_tool_options()
 	_update_status()
+
+
+func _refresh_tool_buttons() -> void:
+	for name: String in tool_buttons:
+		(tool_buttons[name] as Button).set_pressed_no_signal(name == active_tool)
 
 
 func _refresh_tool_options() -> void:
@@ -818,6 +859,18 @@ func _toggle_selection_history() -> void:
 	_selection_history_preference_changed(not record_selection_history)
 	if selection_history_toggle != null:
 		selection_history_toggle.set_pressed_no_signal(record_selection_history)
+
+
+func _toggle_document_tabs() -> void:
+	show_document_tabs = not show_document_tabs
+	tabs_line.visible = show_document_tabs
+	top_bar.set_menu_checked("Window", 2, show_document_tabs)
+
+
+func _cycle_tab(direction: int) -> void:
+	if tabs.is_empty():
+		return
+	_activate(wrapi(active_tab + direction, 0, tabs.size()))
 
 
 func _toggle_dock() -> void:
@@ -917,8 +970,10 @@ func _update_status() -> void:
 		canvas.last_pointer_position if canvas.pointer_known else canvas.size * 0.5)
 	var canvas_pixels: Vector2i = Vector2i(ceili(canvas.size.x / canvas.zoom),
 		ceili(canvas.size.y / canvas.zoom))
-	status.text = "%s%s | cursor %d,%d | view %d×%d px | zoom %.0f%% | revision %d | %s" % [
-		source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
+	# Retain document identity and dirty indication while the tab strip is hidden.
+	var tab_identity: String = String(tabs[active_tab]["title"]) + (" *" if dirty else "")
+	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%% | revision %d | %s" % [
+		tab_identity, source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
 		canvas.zoom * 100.0, document.revision,
 		"Unsaved changes" if dirty else "Saved"]
 
@@ -1087,6 +1142,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else:
 				_undo()
 		KEY_Y: _redo()
+		KEY_TAB: _cycle_tab(-1 if key.shift_pressed else 1)
 		KEY_W: _request_close_current()
 		_: return
 	get_viewport().set_input_as_handled()

@@ -38,8 +38,13 @@ its Godot template on the build host.
 ## Working with the editor
 
 - **File** New, Open, Save, Save As use independent `.drawing` files; **Ctrl/Cmd+Shift+S opens Save As**, with Ctrl/Cmd+Y as the primary redo shortcut (Shift+Z alias). The eight-menu compact header keeps File/Edit/View visible and moves additional commands into More at narrow widths; per-tool options scroll through chevrons or wheel rather than wrapping. Multiple
-  documents open as tabs with a dirty `*` indicator.
-- **Tools** Brush, Eraser, Select (drag rectangle), Move (drag previously selected
+  documents open as tabs with a dirty `*` indicator. To remove the row labeled
+  `Untitled`, uncheck **Window → Show document tabs**; use Ctrl/Cmd+Tab or
+  Ctrl/Cmd+Shift+Tab to change documents without the strip. The active filename
+  and dirty marker remain in the status bar; visibility resets on app restart.
+- **Tools** The compact left rail has icon-only, keyboard-focusable Brush,
+  Eraser, Select, Move, Text and Pan buttons; hover or focus for tool names.
+  Brush, Eraser, Select (drag rectangle), Move (drag previously selected
   pixels), Pan (left drag); middle drag pans in any tool. Scroll zooms around
   the pointer. A 1–96px brush-width field, optional generic 8px snap and color
   picker control the Drawing core's gestures.
@@ -49,7 +54,7 @@ its Godot template on the build host.
   optionally adds completed selections as separate clean, reversible steps;
   content undo restores layer/selection/tool context regardless of the toggle.
   Structural layer operations are dirty but are not yet undoable (follow-up layer feature work).
-- **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock can be resized and shown/hidden from Window; floating custom layouts and Asset Browser remain separate work.
+- **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock stacks these panels vertically and scrolls at short heights; it can be resized and shown/hidden from Window. Floating custom layouts and Asset Browser remain separate work.
 
 ## File format and boundaries
 

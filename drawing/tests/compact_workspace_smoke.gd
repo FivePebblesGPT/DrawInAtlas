@@ -82,6 +82,20 @@ func run() -> void:
 		"exact eight fixed menu names in intended order")
 	check(top.divider.name == "BarDivider" and top.options_scroll.name == "ToolOptionsRegion",
 		"dedicated boundary and flexible options container")
+	var tool_names: Array[String] = ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]
+	check(app.tool_buttons.size() == 6 and app.dock_split.get_child_count() == 2,
+		"six tools share the icon rail and resizable workspace")
+	for name: String in tool_names:
+		var button: Button = app.tool_buttons[name]
+		check(button.icon != null and button.text.is_empty() and button.tooltip_text.contains(name)
+			and button.focus_mode == Control.FOCUS_ALL,
+			"icon rail has vector graphic, accessible tooltip and keyboard focus: " + name)
+	check(app.tool_buttons["Brush"].button_pressed, "selected Brush tool has a pressed icon")
+	app.tool_buttons["Eraser"].pressed.emit()
+	check(app.active_tool == "Eraser" and app.tool_buttons["Eraser"].button_pressed
+		and not app.tool_buttons["Brush"].button_pressed,
+		"icon button selects the active tool and updates pressed state")
+	app._change_tool("Brush")
 	check(not top.more_menu.visible and top._menus[7].visible,
 		"full desktop displays all eight application menus")
 	await snapshot("drawing-1280")
@@ -91,6 +105,15 @@ func run() -> void:
 		"selection-history preference OFF in History dock, not tool options")
 	check(app.dock_split != null and app.inspector.get_parent() == app.dock_split,
 		"right dock is a resizable split sibling")
+	check(app.inspector is ScrollContainer and
+		app.inspector.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_AUTO,
+		"right dock uses a single vertical scroll viewport")
+	var panel_names: Array[String] = []
+	for pane: Control in app.dock_panels.get_children():
+		panel_names.append(pane.name)
+	check(panel_names == ["Colors", "Layers", "History"] and
+		app.layers.is_visible_in_tree() and app.selection_history_toggle.is_visible_in_tree(),
+		"Colors, Layers and History are simultaneously visible stacked panels")
 	check(app.status.text.contains("cursor") and app.status.text.contains("zoom"),
 		"status reports pixel coordinates and zoom")
 	var file_popup: PopupMenu = top._menus[0].get_popup()
@@ -115,6 +138,65 @@ func run() -> void:
 	check(not app.inspector.visible, "dock can hide independently of drawing canvas")
 	app._toggle_dock()
 	check(app.inspector.visible, "dock can reopen")
+	var window_popup: PopupMenu = top._menus[6].get_popup()
+	check(window_popup.is_item_checked(2) and app.tabs_line.visible,
+		"document tab strip is initially visible and Window preference is checked")
+	app._toggle_document_tabs()
+	await frames()
+	check(not app.tabs_line.visible and not window_popup.is_item_checked(2)
+		and app.status.text.contains("Untitled 1"),
+		"hiding tab strip preserves document name in status and unchecks Window preference")
+	await snapshot("drawing-tabs-hidden")
+	app.new_drawing()
+	check(not app.tabs_line.visible and app.tabs.size() == 2 and app.active_tab == 1,
+		"hidden document tabs do not prevent opening a second document")
+	await shortcut(KEY_TAB)
+	check(app.active_tab == 0, "Ctrl+Tab cycles forward between hidden documents")
+	await shortcut(KEY_TAB, true)
+	check(app.active_tab == 1, "Ctrl+Shift+Tab cycles backward between hidden documents")
+	app._request_close_current()
+	check(app.close_dialog.visible, "hidden tabs still enforce unsaved document close prompt")
+	app.close_dialog.hide()
+	app._cancel_pending_close()
+	app._close_index(1)
+	check(app.active_tab == 0 and app.tabs.size() == 1,
+		"closing a hidden tab returns to its remaining document")
+	app._toggle_document_tabs()
+	await frames()
+	check(app.tabs_line.visible and window_popup.is_item_checked(2),
+		"document strip can be restored with the same Window command")
+	root.size = Vector2i(620, 340)
+	app.size = Vector2(620, 340)
+	await frames(12)
+	var dock_scrollbar: VScrollBar = app.inspector.get_v_scroll_bar()
+	check(dock_scrollbar.max_value > dock_scrollbar.page + 10.0,
+		"short window creates real vertical dock overflow")
+	app.inspector.scroll_vertical = 0
+	var dock_wheel: InputEventMouseButton = InputEventMouseButton.new()
+	dock_wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+	dock_wheel.pressed = true
+	dock_wheel.position = app.inspector.global_position + Vector2(24, 18)
+	dock_wheel.global_position = dock_wheel.position
+	root.push_input(dock_wheel, true)
+	await frames(5)
+	check(app.inspector.scroll_vertical > 0,
+		"native wheel over dock header scrolls the stacked panels vertically")
+	app.tool_buttons["Brush"].grab_focus()
+	app.inspector.scroll_vertical = 0
+	await frames(4)
+	app.selection_history_toggle.grab_focus()
+	await frames(8)
+	check(app.inspector.scroll_vertical > 0 and
+		app.inspector.get_global_rect().intersects(app.selection_history_toggle.get_global_rect()),
+		"keyboard focus brings History into scroll viewport")
+	app.inspector.scroll_vertical = int(dock_scrollbar.max_value)
+	await frames(4)
+	check(app.inspector.scroll_vertical > 0 and app.layers.get_parent().name == "Layers",
+		"right dock scrolls without reparenting live layer selection")
+	await snapshot("drawing-stacked-short")
+	root.size = Vector2i(1280, 800)
+	app.size = Vector2(1280, 800)
+	await frames(8)
 	app._change_tool("Pan")
 	await frames()
 	check(top.options_region.get_child_count() == 0 and top.active_options == "Pan",

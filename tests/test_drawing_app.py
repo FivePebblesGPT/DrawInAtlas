@@ -44,6 +44,9 @@ class StandaloneDrawingTests(unittest.TestCase):
                 if source.suffix in {".ttf", ".txt"}:
                     self.assertEqual(source.read_bytes(),
                                      (app / "addons/drawing/fonts" / source.name).read_bytes())
+            for source in (package / "icons").glob("*.svg"):
+                self.assertEqual(source.read_bytes(),
+                                 (app / "addons/drawing/icons" / source.name).read_bytes())
             self.assertEqual({p.name for p in app.iterdir() if p.is_file()},
                              {"project.godot", "main.tscn", "export_presets.cfg"})
             # The exported .pck needs the license as a raw text asset; the

@@ -202,6 +202,19 @@ EditorTopBar
 
 Compact vertical icons for selection, move, brush, eraser, eyedropper, fill, shapes, text, and navigation tools. Show tooltips with names and shortcuts. Support tool grouping later if needed.
 
+### T-063 refinement — owner-requested (2026-11-02)
+
+The owner requested an **icon-only tool rail** with tooltips instead of the six
+button labels; a **hideable document tab strip** (Window → Show document tabs,
+Ctrl/Cmd+Tab navigation, active document/dirty status even when hidden); and
+**stacked, vertically scrollable Colors/Layers/History dock panels**, rather
+than mutually exclusive tabs. The engineering refinement is complete with a
+75-check native witness. Document-tab-strip visibility is session-local, not a
+persisted workspace setting. This overrides the earlier tabbed-panel prototype
+for T-063 but does **not** approve the overall proposed UI or close T-059's
+hands-on owner review. T-065 Asset Browser should join the stacked dock, not
+reinstate peer tabs without further owner direction.
+
 ### Right-side dock
 
 Start with a single dock containing **Colors** and **Layers**, with **History** as a tab. Expand later to Properties, Brushes, and Navigator. Allow panel resizing and show/hide controls; floating panels and arbitrary docking can be introduced later.
