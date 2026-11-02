@@ -1,15 +1,19 @@
 # T-015 — Historical battlemat ownership audit and safe-conversion proposal
 
-> [!warning] **Approval required before changing stored campaign data.**
-> This is an inventory, a read-only diagnostic and a proposed policy, **not** an
-> executed migration. The decision in [[E-006]] retires battlemats as a new
-> authoring model; it does not authorize silently changing historical documents.
-> [[T-012]] defines the replacement D0–D32 authored-layer workflow, and [[T-014]]
-> has already removed user-facing battlemat creation controls.
+> [!warning] **Historical migration proposal, not an active user migration.**
+> The owner confirmed that no historical user-save migration is required. This page preserves an earlier read-only diagnostic and optional conversion discussion for archaeology, **not** a request for owner approval to modify nonexistent user data. See [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[T-015]] and [[Index]].
 
-## Actual ownership and compatibility dependencies at this checkout
+## Current decision and legacy-audit scope (2026-11-02)
 
-| Data or entry point | Current responsibility | Removal hazard / disposition |
+The approved owner decision is [[DECISIONS_DRAWING_ATLAS_2026-11-01]]: **there are no historical user saves requiring migration.** Accordingly, this T-015 document is retained as a **historical design/audit record**, not a required or planned destructive migration. Do not execute its proposed copy-first converter merely because a sample map contains `BATTLEMAP`. `AtlasLegacyMigrationAudit.inspect()` remains a read-only prototype diagnostic and can be tested without converting anything. The underlying old `.scn` scene codec and placements are compatibility/test paths; new authoritative Atlas saves use verified versioned `Drawings/` generations under the `.atlas.json` root (T-066).
+
+The active design has generic internal `DrawingDocument` identities per `(map, floor, D-level)` under Atlas's registry, shared signed world coordinates, and no per-hex child files. Reuse authored objects through versioned `Object Assets` and linked `Object Instances` under `Objects/`; an Atlas map link is a navigation edge, *not* a reusable Drawing source. A missing D-level is blank, not a legacy child-battlemap underlay. See [world mapping](DRAWING_WORLD_MAPPING.md), [object registry](../scripts/objects/README.md), and [architecture](ARCHITECTURE.md).
+
+**Historical conversion proposal below is not approved for implementation or needed for existing users.** T-015 may separately remove obsolete model code after regression coverage; that maintenance must not be equated to altering saved campaigns.
+
+## Historical native-prototype ownership and compatibility dependencies
+
+| Historical data or entry point | Native-prototype responsibility at the audit date | Former removal hazard / disposition |
 | --- | --- | --- |
 | `AtlasCampaign.maps` / `AtlasMapDocument`, `AtlasFloor`, `AtlasLayer` | Registry of **independent** documents, each with floors and separately authored detail layers. `kind == "BATTLEMAP"` is a historical string, **not** proof the map is safely mergeable. | Keep genuinely independent documents. Classify each legacy document and every inbound/outbound link before changing ownership. |
 | `AtlasCampaign.links` / `AtlasMapLink` | Directed source-map/floor → target-map/floor navigation with arrival focus and zoom. Marker-only links need no placement. Links can be reciprocal/cyclic or target a map from several parents. | Do not flatten the entire graph or delete dangling markers. Retain meaningful inter-document navigation. |
@@ -80,7 +84,7 @@ conflicting and missing placements; repeatability, no side effects, native-save
 roundtrip and exact decoded raster pixel preservation. It only writes to a
 private `user://atlas_legacy_audit/fixture.scn` slot, never the editor save.
 
-## Proposed conversion policy — requires owner approval
+## Archived opt-in conversion policy (not needed; not authorized)
 
 1. **Default to retaining an independent map.** A `BATTLEMAP` label alone, a
    marker-only link, or a legacy footprint is insufficient evidence that it
@@ -120,7 +124,7 @@ private `user://atlas_legacy_audit/fixture.scn` slot, never the editor save.
 
 ### Approval questions
 
-The following policy choices must be accepted or revised **before implementing
+The following **historical** policy choices would have required a separate decision **before implementing
 any saved-data rewrite or removing compatibility readers**:
 
 - Is **copy-first, opt-in conversion of individually selected spatial maps** the

@@ -8,7 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 20 | 1 | 11 | 3 | 41 | 1 | 77 |
+| 19 | 1 | 11 | 3 | 42 | 1 | 77 |
+
+**T-069 completed (2026-11-02):** the seven [architecture/data-model pages](ARCHITECTURE.md) now distinguish the shipped two-project Drawing/Atlas core, Option B internal `(map,floor,detail)` registry, Object Assets/instances and T-066 sparse generations from historical `.scn`/battlemat proposals. A six-check documentation suite and CI step guard source links, approved authority, and unresolved review/performance boundaries. No migration or UX approval was implied.
 
 **T-077 completed (2026-11-02):** [platform-specific test matrix and reviewer handoff](DRAWING_TEST_PLAN.md) distinguishes the historical milestone-6 review and latency probes from T-067 storage, T-068 CPU raster/submitted-frame and still-ready T-057 GPU/LOD work. The generator `tools/build_t038_review_bundle.py` makes a deterministic code-only reviewer ZIP. T-038/T-056 still require **actual independent/owner review**, not automatically generated evidence; no manual-review gate was closed.
 
@@ -100,7 +102,7 @@
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Done | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
 | [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Done | — | [T-051](Tickets/T-051.md) |
 | [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | — | [T-052](Tickets/T-052.md) |
-| [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Ready | — | — |
+| [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Done | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Ready | — | — |
 | [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Ready | — | — |
 | [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Ready | — | — |
