@@ -199,6 +199,16 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t063_workspace_docs.py' -v
+      - name: Verify T-078 reusable grouped dock layout model
+        id: ci_dock_layout_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_layout_smoke.gd 2>&1 | tee /tmp/godot-dock-layout.log
+          grep -q 'DRAWING_DOCK_MODEL_PASSED' /tmp/godot-dock-layout.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|DOCK MODEL FAILED:' /tmp/godot-dock-layout.log; then exit 1; fi
       - name: Summarize CI failures
         if: ${{ !cancelled() }}
         env:

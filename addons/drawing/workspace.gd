@@ -4,6 +4,7 @@ extends Control
 
 const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
 const TOP_BAR_SCRIPT: Script = preload("res://addons/drawing/editor_top_bar.gd")
+const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd")
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -24,6 +25,8 @@ var snap_toggle: CheckButton
 var top_bar: HBoxContainer
 var inspector: ScrollContainer
 var dock_panels: VBoxContainer
+var dock_layout: DrawingDockLayout
+var dock_views: Dictionary = {} # Stable panel IDs -> existing Controls, never duplicated.
 var dock_split: HSplitContainer
 var selection_history_toggle: CheckButton
 var history_label: Label
@@ -187,6 +190,8 @@ func _build_interface() -> void:
 	inspector.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	inspector.follow_focus = true
 	dock_split.add_child(inspector)
+	dock_layout = DOCK_LAYOUT_SCRIPT.new() as DrawingDockLayout
+	dock_layout.create_container("right")
 	dock_panels = VBoxContainer.new()
 	dock_panels.name = "DockPanels"
 	dock_panels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -323,8 +328,13 @@ func _build_interface() -> void:
 ## Always-visible stacked headings; the right dock's single vertical scrollbar
 ## lets users reach History even when the window is short.
 func _add_dock_section(title: String) -> VBoxContainer:
+	var panel_id: String = title.to_lower()
+	# T-078 introduces ownership without changing T-063 controls or layout.
+	dock_layout.register_panel(panel_id)
+	dock_layout.attach_panel(panel_id, "right", panel_id)
 	var section: VBoxContainer = VBoxContainer.new()
 	section.name = title
+	dock_views[panel_id] = section
 	dock_panels.add_child(section)
 	var heading: Label = Label.new()
 	heading.text = title.to_upper()

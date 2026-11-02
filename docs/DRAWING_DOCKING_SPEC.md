@@ -54,3 +54,7 @@ Only **one implementation ticket per turn**. T-065's future Asset Browser may re
 ## Limits and explicit non-goals
 
 Do not change DrawingDocument pixel/layer data, Atlas content or document-tab semantics for dock rearrangement. Avoid native OS subwindows and premature arbitrary multi-monitor docking. Do not treat a screenshot or successful automated test as owner UX signoff. Work on keyboard focus, color contrast, minimum hit size and screen-reader/tooltip labels should accompany each interactive stage, not be left solely to the final ticket.
+
+## Implementation state — T-078 foundation (2026-11-03)
+
+The reusable `DrawingDockLayout` class now owns panel/group/container state and validation; the Drawing workspace registers current Colors/Layers/History panels and keeps their existing `Control` view references without altering visual T-063 behavior. Its snapshot version is 1, designed for but **not persisted by** T-083. Headless model/shell coverage: 82 assertions; isolated staged Drawing consumer also passed. T-079 remains responsible for real chevrons, grouped icon rail, shared in-app flyouts and focus behavior. T-080–082 still own drag/group/floating interaction; T-083 still owns persistence and owner review.

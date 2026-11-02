@@ -76,6 +76,7 @@ class GodotCIFailLateTests(unittest.TestCase):
                 self.assertNotIn(forbidden, workflow)
         self.assertIn("Verify T-051 isolated Drawing contract consumer", workflow)
         self.assertIn("Verify T-055 Atlas canonical Drawing composition and input", workflow)
+        self.assertIn("Verify T-078 reusable grouped dock layout model", workflow)
 
     def test_reporting_uses_original_outcome_not_masked_conclusion(self) -> None:
         report, ok = summarize({
