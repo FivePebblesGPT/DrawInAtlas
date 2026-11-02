@@ -16,7 +16,7 @@
 ## First priority
 - [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
 
-## Architecture split — Round 3 decisions recorded; contracts pending
+## Architecture split — owner direction settled; DrawingDocument boundary pending
 - [ ] [[T-051|T-051 · Finalize shared/copy, coordinates and project contracts]]
 - [ ] [[T-052|T-052 · Independent Drawing core and generic layer groups]]
 - [ ] [[T-053|T-053 · Independent Drawing Godot project in monorepo]]
@@ -30,6 +30,8 @@
 - [ ] [[T-061|T-061 · Floor layer groups, world coordinates and blank LOD]]
 - [ ] [[T-062|T-062 · Object Editor, Save and Save As]]
 - [ ] [[T-063|T-063 · Compact Drawing UI and BarDivider overflow]]
+- [ ] [[T-064|T-064 · Nested Object Assets with cycle-safe references]]
+- [ ] [[T-065|T-065 · Asset Browser and NULL-placeholder workflow]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]
