@@ -40,6 +40,8 @@
 
 **T-051 completed (2026-11-02):** [testable Drawing document/package ADR](ADR_DRAWING_DOCUMENT_CONTRACT.md) and signed-tile consumer. **T-052 completed (2026-11-02):** the [independent generic Drawing core](../addons/drawing/README.md) and an isolated Godot consumer with 150+ runtime checks. T-053 is now Done with an [independently runnable desktop Drawing project](../drawing/README.md), a portable standalone document witness, native framebuffer tests, a third generic consumer and Linux release export. T-058 is now Done with editable one-element text layers, a shared glyph compositor and explicit undoable rasterization; T-062 is now Done with a shared Object Editor and Atlas-bound Save As workflow. T-063 remains Ready. T-054 now provides tested Drawing-local and Atlas-global contextual history, one-step cross-document transfers and the Save As binding-history contract; subsequent Object Editor and Atlas canvas composition were delivered in T-062/T-055. T-060 now provides [versioned Object Assets, linked per-map instances, private Save drafts and atomic component-level Save As rebinding](../scripts/objects/README.md), including NULL placeholders and real portable-file tests. Its per-campaign object index is now captured by T-066’s portable generation snapshots. T-055 completes live Atlas composition; T-066 completes the versioned sparse campaign save. Polished UI, performance benchmarks and owner UX gates remain incomplete.
 
+**T-075 completed (2026-11-02):** the nine [player projection and collaboration pages](PLAYER_PROJECTION_CONTRACT.md) now distinguish the currently implemented DrawingDocument/Asset/T-066 source graph from isolated legacy raster-sanitization, X11 player-window and in-process session proofs. Windows/Linux native desktop is the active target; [Web T-044](Archive/Web/T-044.md) is **Archived** without deleting its historic tests. Ten source-backed documentation tests and 375 headless plus 124 native visual checks passed. **T-039 Manual Review, T-043/T-048 blocked independent owner gates remain unchanged**; no real player-authorized projector or authenticated multiplayer is claimed.
+
 ## Tickets
 
 | Ticket | Status | Review gate | Hard dependencies |
@@ -118,7 +120,7 @@
 | [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Done | — | — |
 | [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Done | — | — |
 | [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Done | — | — |
-| [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Ready | — | — |
+| [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Done | — | — |
 | [T-076 · Kanban index and manual-review closure validation](Tickets/T-076.md) | Done | — | — |
 | [T-077 · Performance, code review and validation handoff docs](Tickets/T-077.md) | Done | — | — |
 

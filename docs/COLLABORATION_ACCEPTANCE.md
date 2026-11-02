@@ -1,5 +1,11 @@
 # T-048 — Collaboration acceptance: integrated proof and limitations
 
+## Current product and acceptance boundary (T-075, 2026-11-02)
+
+The tests below serialize real **in-process** host snapshots through JSON and exercise a separate native test `TextureRect`. They do **not** wire the production Atlas canvas, a trusted publishing controller, actual authenticated sockets, external recipients, nor a user-facing multiplayer interface. The current Atlas content source is `DrawingDocument` via `AtlasDrawingRegistry`, with linked `AtlasObjectLibrary` assets and T-066 portable generation saves. The tested host instead binds legacy `AtlasCampaign`/`AtlasTokenLayer` state and filters legacy raster grants through `AtlasPlayerProjection` ([composition](DRAWING_ATLAS_COMPOSITION.md), [objects](OBJECT_ASSETS_WORKFLOW.md), [storage](DRAWING_STORAGE_CONTRACT.md)). A passing harness cannot certify privacy for new Drawing layers, text, fonts, linked assets or their cache/revision behavior.
+
+**Release threat matrix:** untrusted peer identity and impersonation; accidental GM source serialization; wrong-floor or wrong-LOD art; Object Asset source leakage across linked instances; persistent frozen player imagery after fog/grant changes; stale reconnect snapshots; malformed/oversized packets; conflicting host and local Atlas history. Each requires an explicit deny-by-default production bridge, authenticated/limited transport and adversarial *end-to-end* review. Windows/Linux desktop is the current target, while [T-044 Web](Archive/Web/T-044.md) is Archived. [T-039](Tickets/T-039.md) is still **Manual Review** for owner publication rules; [T-043](Tickets/T-043.md) native player privacy and [T-048](Tickets/T-048.md) independent collaboration acceptance remain **Blocked**. T-075 documentation alone cannot approve or close these gates.
+
 **Status: tested in-process engineering proof, not deployment acceptance.**
 The authoritative session, identity handles, filtered publication and viewer
 rendering remain isolated from production collaboration, network transport and
@@ -54,8 +60,9 @@ reproducible image to `user://validation/collaboration-t048-visual.png`.
 This window is a *test transport consumer*, not the production player UI.
 
 CI executes both tests alongside existing focused T-045–T-047 suites and the
-native projector/privacy framebuffer checks. A full suite run and native
-Web/save validation should still accompany release review.
+native projector/privacy framebuffer checks. A full suite run, current T-066 generation-save validation and native Windows/Linux
+physical-display/privacy testing should still accompany release review; the archived
+Web fallback is not a current acceptance requirement.
 
 ## Acceptance not yet established
 
