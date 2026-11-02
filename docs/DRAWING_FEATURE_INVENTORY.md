@@ -1,6 +1,6 @@
 # Drawing feature inventory — Paint.NET / PhotoCraft comparison
 
-**Status: PROPOSED FEATURE MATRIX — owner scope review pending (2026-11-02).** This document records the requested comparative feature list and recommendations; it is not proof of implementation or blanket owner approval.
+**Status: OWNER-APPROVED FEATURE INVENTORY (2026-11-02).** The owner explicitly approved the complete Essential/Later/Skip matrix as the Drawing product-scope plan. Approval sets scope and priorities; it does **not** claim the features are implemented, tested, or visually signed off.
 
 **Scope:** Independent, reduced-feature Drawing application/package reused by Atlas for map art and Object Asset editing. Paint.NET is the primary *interaction* reference; PhotoCraft is a reference for editable text, more advanced layers, vectors, masks and effects. **Do not attempt full feature parity with either editor.**
 
@@ -8,9 +8,9 @@ Related: [[T-059]], [[T-051]], [[T-052]], [[T-053]], [[T-058]], [[T-060]], [[T-0
 
 ## Interpretation and authority
 
-- **Essential:** recommended for the complete reduced-feature Drawing baseline, **not** automatically a prerequisite for the tiny T-053 end-to-end vertical slice. Items explicitly tagged approved are already decided in the referenced owner decision/ticket.
-- **Later:** worth separate bounded implementation tickets after core workflows are usable; not an implicit commitment to implement everything.
-- **Skip:** out of scope for the reduced editor, at least initially. A future owner request can reopen a specific case.
+- **Essential:** **approved** for the complete reduced-feature Drawing baseline; **not** automatically a prerequisite for the tiny T-053 end-to-end vertical slice. Items specifically tagged approved were also settled under the prior owner decision/ticket.
+- **Later:** **approved as deferred priorities**, to be considered through separate bounded implementation tickets once core workflows are usable; this is not a commitment to implement all Later items in the initial release.
+- **Skip:** **approved as excluded from the initial reduced-feature scope**. A future owner request can reopen a specific case.
 - **Reference** means inspiration/capability family, **not** identical behavior or verified current version-to-version parity. Paint.NET's traditional text is rasterized after commit; editable one-element text layers here come from PhotoCraft and approved DrawInAtlas requirements. PhotoCraft calls itself early alpha.
 - This document **does not override** the approved contracts for one generic DrawingDocument per Atlas map/floor/detail (Option B), sparse multi-file `Drawings/` and `Objects/` persistence, one text per layer, private Object Editor drafts, Save/Save As rebinding, retained saved variants, history, missing authored detail, NULL assets or Windows/Linux-first delivery.
 - The proposed one-row top bar and layout details still need native UX validation under T-063. Existing approved Object Editor and Asset Browser choices remain approved.
@@ -212,4 +212,4 @@ Every row is an independent scope choice and rationale. The labels `Both` and `P
 - [Drawing UI specification](DRAW_MODULE_UI_SPEC.md)
 - [Approved Drawing/Atlas decisions](DECISIONS_DRAWING_ATLAS_2026-11-01.md)
 
-**Follow-up:** Owner should mark disputed choices/edge behaviors, approve a finite Essential/Later/Skip matrix, and open bounded implementation tickets for accepted Later features. No acceptance based only on a passing test count.
+**Owner sign-off (2026-11-02):** The complete 99-item Essential/Later/Skip inventory is **approved as written** (47 Essential, 34 Later, 18 Skip). Use it as the scope authority for Drawing feature planning. Preserve T-053's small initial standalone vertical slice; implement the Essential baseline incrementally. Later features remain deferred, Skip features remain out of initial scope. The separately proposed [[DRAW_MODULE_UI_SPEC]] still needs actual native UX validation; approval of this feature matrix is not implementation or usability acceptance. No acceptance based only on a passing test count.

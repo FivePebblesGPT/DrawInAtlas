@@ -25,7 +25,7 @@
 - [ ] [[T-056|T-056 · Validate isolation, shared assets, LOD and saves]]
 - [ ] [[T-057|T-057 · Native map rendering/LOD feasibility spike]]
 - [ ] [[T-058|T-058 · One text object per editable layer and rasterization]]
-- [ ] [[T-059|T-059 · Drawing feature inventory and UX criteria]]
+- [ ] [[T-059|T-059 · Approved Drawing feature scope; implement and validate UX]]
 - [ ] [[T-060|T-060 · Reusable Object Assets and linked instances]]
 - [ ] [[T-061|T-061 · Floor layer groups, world coordinates and blank LOD]]
 - [ ] [[T-062|T-062 · Object Editor, Save and Save As]]
