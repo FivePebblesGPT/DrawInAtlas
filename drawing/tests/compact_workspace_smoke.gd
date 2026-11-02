@@ -111,9 +111,9 @@ func run() -> void:
 	var panel_names: Array[String] = []
 	for pane: Control in app.dock_panels.get_children():
 		panel_names.append(pane.name)
-	check(panel_names == ["Colors", "Layers", "History"] and
+	check(panel_names == ["MinimizeDock", "Group_colors", "Group_layers", "Group_history"] and
 		app.layers.is_visible_in_tree() and app.selection_history_toggle.is_visible_in_tree(),
-		"Colors, Layers and History are simultaneously visible stacked panels")
+		"Colors, Layers and History render as separate stacked group controls")
 	check(app.status.text.contains("cursor") and app.status.text.contains("zoom"),
 		"status reports pixel coordinates and zoom")
 	var file_popup: PopupMenu = top._menus[0].get_popup()
@@ -135,9 +135,12 @@ func run() -> void:
 	check(not app.record_selection_history and not edit_popup.is_item_checked(2),
 		"history preference returns to OFF in dock and Edit menu")
 	app._toggle_dock()
-	check(not app.inspector.visible, "dock can hide independently of drawing canvas")
+	check(app.inspector.visible and app.dock_rail.visible and
+		bool(app.dock_layout.container_info("right")["minimized"]),
+		"dock minimizes to accessible panel rail instead of hiding the controls")
 	app._toggle_dock()
-	check(app.inspector.visible, "dock can reopen")
+	check(app.inspector.visible and app.dock_panels.visible,
+		"dock restores its expanded grouped controls")
 	var window_popup: PopupMenu = top._menus[6].get_popup()
 	check(window_popup.is_item_checked(2) and app.tabs_line.visible,
 		"document tab strip is initially visible and Window preference is checked")

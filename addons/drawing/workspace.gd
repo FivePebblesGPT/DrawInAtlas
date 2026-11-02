@@ -25,6 +25,15 @@ var snap_toggle: CheckButton
 var top_bar: HBoxContainer
 var inspector: ScrollContainer
 var dock_panels: VBoxContainer
+var dock_rail: VBoxContainer
+var dock_stash: VBoxContainer
+var dock_flyout: PanelContainer
+var dock_flyout_tabs: HBoxContainer
+var dock_flyout_body: VBoxContainer
+var dock_rail_buttons: Dictionary = {} # UI buttons; membership always comes from dock_layout.
+var dock_header_buttons: Dictionary = {}
+var _expanded_dock_width: int = 270
+var _expanded_scroll: int = 0
 var dock_layout: DrawingDockLayout
 var dock_views: Dictionary = {} # Stable panel IDs -> existing Controls, never duplicated.
 var dock_split: HSplitContainer
@@ -100,7 +109,7 @@ func _build_interface() -> void:
 	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels"],
 		[Callable(self, "_change_tool").bind("Select"),
 		Callable(self, "_change_tool").bind("Move")])
-	top_bar.add_menu_spec("Window", ["Show/hide panel dock", "Reset panel width",
+	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
 		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
@@ -177,6 +186,7 @@ func _build_interface() -> void:
 	canvas.view_changed.connect(_update_status)
 	canvas.cursor_moved.connect(_update_status)
 	canvas.resized.connect(_update_status)
+	canvas.resized.connect(_layout_dock_flyout)
 	canvas.text_requested.connect(_edit_text_at)
 	canvas.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseMotion:
@@ -192,10 +202,20 @@ func _build_interface() -> void:
 	dock_split.add_child(inspector)
 	dock_layout = DOCK_LAYOUT_SCRIPT.new() as DrawingDockLayout
 	dock_layout.create_container("right")
+	dock_stash = VBoxContainer.new()
+	dock_stash.name = "DockViewStorage"
+	dock_stash.visible = false
+	add_child(dock_stash)
 	dock_panels = VBoxContainer.new()
 	dock_panels.name = "DockPanels"
 	dock_panels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inspector.add_child(dock_panels)
+	dock_rail = VBoxContainer.new()
+	dock_rail.name = "DockIconRail"
+	dock_rail.custom_minimum_size.x = 48
+	dock_rail.visible = false
+	inspector.add_child(dock_rail)
+	_make_dock_flyout()
 	var color_pane: VBoxContainer = _add_dock_section("Colors")
 	var picker: ColorPickerButton = ColorPickerButton.new()
 	picker.text = "Brush color"
@@ -246,6 +266,7 @@ func _build_interface() -> void:
 	selection_history_toggle.button_pressed = record_selection_history
 	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
 	history_pane.add_child(selection_history_toggle)
+	_render_dock()
 	status = Label.new()
 	status.name = "WorkspaceStatus"
 	status.text = "Ready"
@@ -325,23 +346,253 @@ func _build_interface() -> void:
 	_build_text_dialog()
 
 
-## Always-visible stacked headings; the right dock's single vertical scrollbar
-## lets users reach History even when the window is short.
+## Register one existing panel Control against the T-078 model; no parallel ownership list.
 func _add_dock_section(title: String) -> VBoxContainer:
 	var panel_id: String = title.to_lower()
-	# T-078 introduces ownership without changing T-063 controls or layout.
-	dock_layout.register_panel(panel_id)
-	dock_layout.attach_panel(panel_id, "right", panel_id)
+	assert(dock_layout.register_panel(panel_id))
+	assert(dock_layout.attach_panel(panel_id, "right", panel_id))
 	var section: VBoxContainer = VBoxContainer.new()
 	section.name = title
 	dock_views[panel_id] = section
-	dock_panels.add_child(section)
-	var heading: Label = Label.new()
-	heading.text = title.to_upper()
-	heading.tooltip_text = title + " panel"
-	section.add_child(heading)
-	section.add_child(HSeparator.new())
+	dock_stash.add_child(section)
 	return section
+
+
+## The flyout belongs to the drawing canvas's Control tree. It is not a
+## Window, and is not a child of either split pane's layout containers.
+func _make_dock_flyout() -> void:
+	dock_flyout = PanelContainer.new()
+	dock_flyout.name = "DockGroupFlyout"
+	dock_flyout.mouse_filter = Control.MOUSE_FILTER_STOP
+	dock_flyout.visible = false
+	canvas.add_child(dock_flyout)
+	var column: VBoxContainer = VBoxContainer.new()
+	column.name = "FlyoutColumn"
+	dock_flyout.add_child(column)
+	var heading: HBoxContainer = HBoxContainer.new()
+	column.add_child(heading)
+	var caption: Label = Label.new()
+	caption.name = "FlyoutTitle"
+	caption.text = "Dock panels"
+	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(caption)
+	var close: Button = Button.new()
+	close.name = "CloseFlyout"
+	close.text = "×"
+	close.custom_minimum_size = Vector2(40, 40)
+	close.tooltip_text = "Close panel flyout"
+	close.focus_mode = Control.FOCUS_ALL
+	close.pressed.connect(func() -> void:
+		dock_layout.close_flyout("right")
+		_render_dock())
+	heading.add_child(close)
+	dock_flyout_tabs = HBoxContainer.new()
+	dock_flyout_tabs.name = "FlyoutTabs"
+	column.add_child(dock_flyout_tabs)
+	var body_scroll: ScrollContainer = ScrollContainer.new()
+	body_scroll.name = "FlyoutScroll"
+	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body_scroll.follow_focus = true
+	column.add_child(body_scroll)
+	dock_flyout_body = VBoxContainer.new()
+	dock_flyout_body.name = "FlyoutBody"
+	dock_flyout_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_scroll.add_child(dock_flyout_body)
+	_layout_dock_flyout()
+
+
+func _layout_dock_flyout() -> void:
+	if dock_flyout == null or canvas == null:
+		return
+	var width: float = minf(276.0, maxf(120.0, canvas.size.x - 12.0))
+	dock_flyout.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	dock_flyout.position = Vector2(canvas.size.x - width - 4.0, 4.0)
+	dock_flyout.size = Vector2(width, maxf(100.0, canvas.size.y - 8.0))
+
+
+func _dock_icon(panel_id: String) -> Texture2D:
+	# One icon per model member. Unknown future panels still use a graphic,
+	# never a one-letter placeholder or a hard-coded rail membership list.
+	var named_path: String = "res://addons/drawing/icons/dock_%s.svg" % panel_id
+	if ResourceLoader.exists(named_path):
+		return load(named_path) as Texture2D
+	return load("res://addons/drawing/icons/dock_panel.svg") as Texture2D
+
+
+func _panel_button(panel_id: String, rail_button: bool) -> Button:
+	var button: Button = Button.new()
+	button.name = ("Rail_" if rail_button else "Edge_") + panel_id
+	button.icon = _dock_icon(panel_id)
+	button.expand_icon = true
+	button.custom_minimum_size = Vector2(42, 42)
+	button.focus_mode = Control.FOCUS_ALL
+	button.tooltip_text = ("Open group flyout: " if rail_button else "Select panel: ") + panel_id.capitalize()
+	button.toggle_mode = true
+	button.button_pressed = (dock_layout.container_info("right")["flyout_group"] == dock_layout.group_of(panel_id)
+		and dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id) if rail_button else (dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id)
+	button.pressed.connect(_rail_panel_pressed.bind(panel_id) if rail_button else _expanded_panel_pressed.bind(panel_id))
+	# Godot 4.8 exposes accessible Control labels on supported backends.
+	for property: Dictionary in button.get_property_list():
+		if property["name"] == "accessibility_name":
+			button.set("accessibility_name", panel_id.capitalize() + " panel")
+			break
+	return button
+
+
+func _expanded_panel_pressed(panel_id: String) -> void:
+	if dock_layout.select_panel(panel_id):
+		_render_dock("edge:" + panel_id)
+
+
+func _rail_panel_pressed(panel_id: String) -> void:
+	if dock_layout.activate_from_rail("right", panel_id):
+		_render_dock("rail:" + panel_id)
+
+
+func _group_collapse_pressed(group_id: String) -> void:
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if dock_layout.set_group_collapsed(group_id, not bool(group["collapsed"])):
+		_render_dock("group:" + group_id)
+
+
+func _flyout_tab_pressed(panel_id: String) -> void:
+	if dock_layout.select_panel(panel_id):
+		_render_dock("tab:" + panel_id)
+
+
+func _restore_dock_focus(key: String) -> void:
+	var target: Button = null
+	if key.begins_with("rail:"):
+		target = dock_rail_buttons.get(key.trim_prefix("rail:")) as Button
+	elif key.begins_with("group:"):
+		target = dock_header_buttons.get(key.trim_prefix("group:")) as Button
+	elif key.begins_with("edge:"):
+		target = find_child("Edge_" + key.trim_prefix("edge:"), true, false) as Button
+	elif key.begins_with("tab:"):
+		target = dock_flyout_tabs.find_child("Tab_" + key.trim_prefix("tab:"), false, false) as Button
+	if target != null and target.is_visible_in_tree():
+		target.grab_focus()
+
+
+func _render_dock(focus_key: String = "") -> void:
+	# Reparent the actual panel controls rather than building shadow copies.
+	# This also works after T-080 changes model group membership externally.
+	for view: Control in dock_views.values():
+		if view.get_parent() != dock_stash:
+			view.reparent(dock_stash)
+	for parent: Node in [dock_panels, dock_rail, dock_flyout_tabs]:
+		for child: Node in parent.get_children():
+			parent.remove_child(child)
+			child.queue_free()
+	var info: Dictionary = dock_layout.container_info("right")
+	var minimized: bool = bool(info["minimized"])
+	var flyout_group_id: String = String(info["flyout_group"])
+	for child: Node in dock_flyout_body.get_children():
+		if child is Control and dock_views.values().has(child):
+			(child as Control).reparent(dock_stash)
+		else:
+			dock_flyout_body.remove_child(child)
+			child.queue_free()
+	dock_rail_buttons.clear()
+	dock_header_buttons.clear()
+	if not minimized:
+		var minimize: Button = Button.new()
+		minimize.name = "MinimizeDock"
+		minimize.text = "‹  Minimize panels"
+		minimize.tooltip_text = "Minimize right dock to icon rail"
+		minimize.custom_minimum_size.y = 40
+		minimize.focus_mode = Control.FOCUS_ALL
+		minimize.pressed.connect(_toggle_dock)
+		dock_panels.add_child(minimize)
+		for group: Dictionary in info["groups"]:
+			var visible_members: Array[String] = []
+			for panel_id: String in group["panels"]:
+				if dock_views.has(panel_id) and dock_layout.rail_icons("right").any(func(e: Dictionary) -> bool: return e["panel"] == panel_id):
+					visible_members.append(panel_id)
+			if visible_members.is_empty():
+				continue
+			var group_id: String = String(group["id"])
+			var frame: VBoxContainer = VBoxContainer.new()
+			frame.name = "Group_" + group_id
+			dock_panels.add_child(frame)
+			var heading: HBoxContainer = HBoxContainer.new()
+			heading.name = "GroupHeader"
+			frame.add_child(heading)
+			var collapse: Button = Button.new()
+			collapse.name = "Collapse_" + group_id
+			collapse.text = "▸" if bool(group["collapsed"]) else "▾"
+			collapse.tooltip_text = ("Expand " if bool(group["collapsed"]) else "Collapse ") + group_id.capitalize() + " group"
+			collapse.custom_minimum_size = Vector2(40, 40)
+			collapse.focus_mode = Control.FOCUS_ALL
+			collapse.pressed.connect(_group_collapse_pressed.bind(group_id))
+			heading.add_child(collapse)
+			dock_header_buttons[group_id] = collapse
+			var title: Label = Label.new()
+			title.text = group_id.capitalize()
+			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			title.clip_text = true
+			heading.add_child(title)
+			# Right-edge icons are ordered exactly as their minimized rail peers.
+			for panel_id: String in visible_members:
+				var edge: Button = _panel_button(panel_id, false)
+				heading.add_child(edge)
+			if not bool(group["collapsed"]):
+				var active_id: String = String(group["active"])
+				if visible_members.has(active_id):
+					var panel_view: Control = dock_views[active_id] as Control
+					panel_view.reparent(frame)
+			frame.add_child(HSeparator.new())
+	else:
+		var expand: Button = Button.new()
+		expand.name = "ExpandDock"
+		expand.text = "»"
+		expand.custom_minimum_size = Vector2(44, 44)
+		expand.tooltip_text = "Expand right dock"
+		expand.focus_mode = Control.FOCUS_ALL
+		expand.pressed.connect(_toggle_dock)
+		dock_rail.add_child(expand)
+		for entry: Dictionary in dock_layout.rail_icons("right"):
+			if bool(entry["separator_before"]):
+				var separator: HSeparator = HSeparator.new()
+				separator.name = "GroupSeparator"
+				separator.custom_minimum_size.y = 6
+				dock_rail.add_child(separator)
+			var panel_id: String = String(entry["panel"])
+			var icon: Button = _panel_button(panel_id, true)
+			dock_rail_buttons[panel_id] = icon
+			dock_rail.add_child(icon)
+		if not flyout_group_id.is_empty():
+			var group: Dictionary = dock_layout.group_info(flyout_group_id)
+			var flyout_column: VBoxContainer = dock_flyout.get_node("FlyoutColumn") as VBoxContainer
+			var caption: Label = flyout_column.find_child("FlyoutTitle", true, false) as Label
+			caption.text = flyout_group_id.capitalize()
+			for panel_id: String in group["panels"]:
+				if not dock_views.has(panel_id):
+					continue
+				var tab: Button = Button.new()
+				tab.name = "Tab_" + panel_id
+				tab.text = panel_id.capitalize()
+				tab.tooltip_text = panel_id.capitalize() + " panel tab"
+				tab.custom_minimum_size.y = 40
+				tab.focus_mode = Control.FOCUS_ALL
+				tab.toggle_mode = true
+				tab.button_pressed = panel_id == String(group["active"])
+				tab.pressed.connect(_flyout_tab_pressed.bind(panel_id))
+				dock_flyout_tabs.add_child(tab)
+			if dock_views.has(String(group["active"])):
+				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
+	inspector.custom_minimum_size.x = 48 if minimized else 160
+	dock_panels.visible = not minimized
+	dock_rail.visible = minimized
+	dock_flyout.visible = minimized and not flyout_group_id.is_empty()
+	_layout_dock_flyout()
+	if not focus_key.is_empty():
+		call_deferred("_restore_dock_focus", focus_key)
+
+
+func _restore_expanded_scroll() -> void:
+	inspector.scroll_vertical = _expanded_scroll
 
 
 func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
@@ -884,11 +1135,23 @@ func _cycle_tab(direction: int) -> void:
 
 
 func _toggle_dock() -> void:
-	inspector.visible = not inspector.visible
+	var minimized: bool = bool(dock_layout.container_info("right")["minimized"])
+	if not minimized:
+		_expanded_dock_width = maxi(160, int(inspector.size.x))
+		_expanded_scroll = inspector.scroll_vertical
+	if dock_layout.set_minimized("right", not minimized):
+		_render_dock()
+		# Only the rail width changes on minimize. The flyout is an overlay
+		# under canvas and must not participate in HSplitContainer sizing.
+		dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if not minimized else _expanded_dock_width))
+		if minimized:
+			call_deferred("_restore_expanded_scroll")
 
 
 func _reset_dock_width() -> void:
-	inspector.visible = true
+	if bool(dock_layout.container_info("right")["minimized"]):
+		_toggle_dock()
+	_expanded_dock_width = 270
 	dock_split.split_offset = maxi(0, int(dock_split.size.x) - 270)
 
 
