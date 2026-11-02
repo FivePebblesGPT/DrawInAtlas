@@ -1,5 +1,24 @@
 # T-009 — World discovery: scenarios, references and proposed UX contract
 
+## Current Search behavior versus pending Find proposal — T-070 (2026-11-02)
+
+**Authority:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[DRAWING_WORLD_MAPPING]], [[DRAWING_ATLAS_COMPOSITION]] and [[T-009]]. **T-009 is Manual Review and has not been owner-approved.** The proposal table further down is deliberately *not* a production specification or permission to rename Search or add place entities.
+
+| Topic | **Implemented/current** | **Proposed only — requires T-009 owner decision** |
+| --- | --- | --- |
+| Naming | Existing **Search** rail/browser | **Find** / **Find in world** label and navigation intent |
+| Indexed objects | Legacy campaign **maps, floors and explicit links**; no searchable arbitrary painted sites | Named **places/areas**, optional tags/kinds/metadata, and location-aware results |
+| Results/actions | Existing link **Focus source anchor**, **Open/Enter**, and global map lookup; some results have **no board-space anchor** | **Locate** for validated spatial anchors, optional **Open details** and independent **Open map** |
+| Safety | Current actions revalidate moved, deleted, retargeted, or stale link/footprint results before navigation; a rejected result cannot silently move the camera | New spatial indexing, scope/filter behavior and eventual player privacy permissions, none approved here |
+
+The new Atlas authored surface is **one internal generic DrawingDocument per `(map_id, floor_id, detail_id)`**, not one document per hex or searchable town. D0–D32 share a signed **1024 ticks/world unit** frame with **independently specified rational raster densities**. An explicitly shown **empty D1 has no D0 underlay** but remains navigable: Atlas renders grid, entrances and hit-test overlays, and an empty hex can be painted without a searchable place object. The selected-cell edit mask affects applicable painting, **not** Search indexing. Switching authored D-level, changing camera zoom, sampling a read-only preview and following an entrance to a different map/floor are distinct operations. Neither Search nor Locate should silently redirect an active stroke.
+
+A valid legacy map/floor link can still be navigated; **floor-link workflow usability is not approved** ([[T-017]]). No per-hex documents, retired battlemat placements as new search owners, speculative place schemas, or player-facing disclosure rules are approved by this documentation update. Search's current safety witness is `tests/search_stale_actions_smoke.gd`; the earlier research probe `tests/research/t009_discovery_probe.gd` demonstrates limitations only and is not a CI acceptance test.
+
+### Existing T-009 investigation, comparisons and proposed contract
+
+All scenario and comparison material below is historical **research/proposal**; retain its alternatives for the owner instead of replacing the existing Search implementation or quietly accepting the recommended **Find** label, searchable places, or result actions.
+
 **Status:** Research and reproducible current-state demonstration completed on
 2026-10-30. **Product naming, searchable entities, and actions are recommendations
 awaiting owner confirmation**, not accepted feature requirements. No new

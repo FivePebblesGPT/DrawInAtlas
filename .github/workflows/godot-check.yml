@@ -149,6 +149,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t069_architecture_docs.py' -v
+      - name: Verify T-070 world, authored-detail and navigation documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t070_world_docs.py' -v
       - name: Verify T-077 performance and reviewer handoff documentation
         shell: bash
         run: |

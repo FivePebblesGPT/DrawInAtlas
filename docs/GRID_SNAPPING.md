@@ -1,5 +1,18 @@
 # Artwork snapping contract (T-016)
 
+## Current generic Drawing and Atlas snapping boundary — T-070 (2026-11-02)
+
+**Authority:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[DRAWING_WORLD_MAPPING]] and [[DRAWING_ATLAS_COMPOSITION]]. The T-016 settings below describe the **legacy Atlas tool/inspector path**; they do not exhaust the independently runnable Drawing package's snapping API.
+
+- **Drawing owns generic snapping** (`addons/drawing/snap.gd`): optional spacing/origin, guides, candidate positions, proximity tolerance and point/displacement functions, with no `AtlasMap`, floor, hex or D-level imports. Atlas supplies candidates and any applicable grid or object constraints. The old Inspector checkbox for specific shape/move tools is not a campaign-wide, mandatory quantization policy.
+- **Atlas coordinates:** every `(map_id, floor_id, detail_id)` resolves one internal generic **DrawingDocument** on the same map's signed **1024 ticks/world unit** frame. D-levels have independent explicit rational pixel densities. `AtlasWorldSpace.snap_ticks` supports signed integer spacing/origin; Atlas grid routines supply rotated square/hex centers in world coordinates. Converting a snapped world point to pixels uses **floor division** on signed density, not a new grid origin or camera-rounded screen pixels.
+- **Selection masks:** a grid cell/hex is an Atlas **selection or edit mask**, not a DrawingDocument, tile owner, or storage boundary. Restrict-edits uses the selected polygon only for applicable edits; no implicit clipping/rescaling is applied to existing pixels. Gesture preview, commitment and undo must use the same coordinate/mask rule; switching the presented D-level cannot secretly move the captured edit to another document.
+- **Independent controls:** **geometric zoom**, authored D-level presentation, derived previews and entrance navigation do **not** trigger a snap or edit. Pen/Eraser are not forcibly snapped by the legacy shape-tool toggle. Explicitly showing empty D1 leaves the grid and entrance hit-testing available but no D0 artwork; snapping does not fill it. Existing floor-link navigation is Atlas-owned and pending [[T-017]] usability review.
+
+### Historical T-016 Inspector snapping behavior
+
+The detailed tool list and tests below remain the legacy Atlas inspector contract. They are a compatibility description, not evidence of a final Drawing-only or Atlas-unified snapping UX.
+
 The continuous board holds artwork at arbitrary **board-space** positions. The
 visible grid is an **editing guide**, not an owner of drawing content. Snapping
 is an **opt-in, editor-session setting** in the right Inspector under **Grid

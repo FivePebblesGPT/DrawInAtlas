@@ -1,5 +1,18 @@
 # Viewport zoom and authored artwork LOD — T-004 (2026-10-30)
 
+## Current authored-detail and preview LOD status — T-070 (2026-11-02)
+
+**Authority:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[DRAWING_WORLD_MAPPING]], [[DRAWING_ATLAS_COMPOSITION]] and [[T-061]]. The T-004 calculations below remain useful geometric examples; their older `3×` navigator ceiling, `.scn`-backed layer groups, and proposed-only LOD statements are **historical**.
+
+- **Canonical authored surface:** Atlas manages **one internal generic DrawingDocument per `(map_id, floor_id, detail_id)`**, with D0–D32 all mapped into the **same signed world frame at 1024 ticks/unit**. Each D-level has independent **explicit rational pixels/world-unit**, unrelated to camera zoom or grid travel distance. Different densities change sampling, never the authored world origin. A tile stride is per-document and versioned; T-067 recommends a future 512 default but has not deployed it.
+- **Presentation is not editing:** camera zoom/pan, automatic/manual D-level presentation, and derived read-only preview LOD are separate from a chosen document/layer edit target. The legacy `AtlasArtworkLOD` chooser uses visible authored pieces and **trial coverage thresholds 0.65/0.45**; its tuning and end-user acceptance are **not completed**. The current navigator has a **24×** ceiling. A gesture captures its owning detail/document and refuses unexpected presentation retargeting.
+- **Blank is intentional:** manually presenting unpainted D1 draws **no D0 underlay**, even if D0 is painted at that position. Automatic presentation can choose D0 if no higher artwork is locally eligible; that is a different viewer choice, not compositing D0 inside D1. Atlas's **grid, entrance/navigation overlays and hit testing** still operate over a blank D-level. Read-only map thumbnails and linked Object Asset previews never become writable layers.
+- **Map links are not LOD:** an entrance can navigate to a different independent map/floor with its own camera and grid, but neither a zoom event nor a hex cell implies a child map. The old automatic three-step wheel gate, when enabled, is only legacy linked-map navigation. Floor-link ergonomics remain pending [[T-017]], and Search naming/actions pending [[T-009]].
+
+### Historical T-004 visual-scale investigation and proposed controls
+
+The remaining sample measurements and suggested UI policy are kept as an earlier investigation. For shipped ownership and camera limits, use the current contract above rather than treating old T-004 implementation handoff text as outstanding work or accepted UX settings.
+
 > [!important] Design contract, not the automatic-LOD implementation
 > This investigation defines the presentation geometry and behavior to be used
 > by [[T-003]], [[T-005]] and subsequent UI work. It does **not** replace
