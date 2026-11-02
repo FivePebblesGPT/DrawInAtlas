@@ -169,6 +169,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t073_feature_ux_docs.py' -v
+      - name: Verify T-074 Object Asset authoring, NULL and staged nesting documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t074_object_docs.py' -v
       - name: Verify T-077 performance and reviewer handoff documentation
         shell: bash
         run: |

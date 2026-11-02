@@ -8,7 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 15 | 1 | 11 | 3 | 46 | 1 | 77 |
+| 14 | 1 | 11 | 3 | 47 | 1 | 77 |
+
+**T-074 completed (2026-11-02):** [reusable Object Asset authoring, Save As and NULL lifecycle](OBJECT_ASSETS_WORKFLOW.md) now traces distinct internal `Drawings/` documents, portable `Objects/` sources and per-map instance IDs through private edits, source publication, bound Variant B Save As, asymmetric undo/redo, deletion and missing-source repair. [The historical raster/Objects workflow](RASTER_OBJECTS_WORKFLOW.md) is explicitly labeled pre-split. Ten code-aware documentation checks run in CI, while actual Object Asset, Object Editor, composition and campaign storage suites were rerun. **T-064 nested cycles, T-065 Asset Browser/repair and T-059 owner UX review remain unfinished**; no manual gate was closed.
 
 **T-073 completed (2026-11-02):** the [owner-approved 99-row Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) retains **47 Essential / 34 Later / 18 Skip** without claiming all are shipped. Its minimum T-053 witness is distinguished from the still-open complete Essential baseline, and pointer/keyboard acceptance flows cite real tests versus pending T-059 owner UX. The [one-row BarDivider workspace specification](DRAW_MODULE_UI_SPEC.md) is **still proposed under T-063**; only the Object Editor tab is already implemented (T-062), while the approved Asset Browser dock parity awaits T-065. Ten source-aware documentation checks and an eight-check **native keyboard/pointer** witness run in CI. The currently mismapped `Ctrl+Shift+S` Save As shortcut and missing visible menu shortcut labels remain tracked as T-063 gaps; no owner gate was closed.
 
@@ -115,7 +117,7 @@
 | [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Done | — | — |
 | [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Done | — | — |
 | [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Done | — | — |
-| [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Ready | — | — |
+| [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Done | — | — |
 | [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Ready | — | — |
 | [T-076 · Kanban index and manual-review closure validation](Tickets/T-076.md) | Done | — | — |
 | [T-077 · Performance, code review and validation handoff docs](Tickets/T-077.md) | Done | — | — |
