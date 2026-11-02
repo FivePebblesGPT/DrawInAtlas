@@ -80,10 +80,14 @@
 - [ ] [[T-041|T-041 · Tokens]]
 - [ ] [[T-042|T-042 · Fog and reveal]]
 - [ ] [[T-043|T-043 · Player-output privacy acceptance]]
-- [ ] [[T-044|T-044 · Web-compatible player fallback]]
+
 
 ## Milestone 8
 - [ ] [[T-045|T-045 · Authoritative sessions and commands]]
 - [ ] [[T-046|T-046 · Roles and filtered replication]]
 - [ ] [[T-047|T-047 · Reconnect and resynchronization]]
 - [ ] [[T-048|T-048 · Collaboration acceptance]]
+
+## Archived / paused platform work
+- [[Archive/Web/T-044|T-044 · Web-compatible player fallback — paused 2026-11-02]]
+- [[Archive/Web/README|Web archive scope and reactivation policy]]
