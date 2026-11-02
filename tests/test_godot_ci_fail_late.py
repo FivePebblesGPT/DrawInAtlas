@@ -54,6 +54,16 @@ class GodotCIFailLateTests(unittest.TestCase):
                 self.assertIn("ci_finish", match.group(1))
                 self.assertNotIn("then exit 1; fi", match.group(1))
 
+    def test_every_godot_script_has_a_process_watchdog(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        calls = [line.strip() for line in workflow.splitlines()
+                 if "godot" in line and "--script" in line]
+        self.assertGreaterEqual(len(calls), 65)
+        for call in calls:
+            with self.subTest(command=call[:90]):
+                self.assertIn("timeout --signal=TERM --kill-after=5s ", call)
+                self.assertRegex(call, r"\b(?:120|240)s (?:godot|xvfb-run)\b")
+
     def test_reporting_uses_original_outcome_not_masked_conclusion(self) -> None:
         report, ok = summarize({
             "ci_03_good": {"outcome": "success", "conclusion": "success"},

@@ -1384,7 +1384,9 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	if drawing_composition != null and tool in [Tool.PEN, Tool.ERASER]:
 		var color: Color = brush_color
 		var packed: int = color.r8 | (color.g8 << 8) | (color.b8 << 16) | (color.a8 << 24)
-		var point: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+		# Pen and Eraser are always freehand; snap applies to shape drafts and
+		# selection moves, never to canonical raster brush samples.
+		var point: Vector2 = position
 		var started: DrawingResult = drawing_composition.start_stroke(map.id, floor.id,
 			presented_detail_level, point, packed, brush_width, tool == Tool.ERASER,
 			edit_scope.polygon, edit_scope.enabled)
@@ -1552,8 +1554,6 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		# extend the stroke through editor panels or off the visible canvas.
 		if Rect2(Vector2.ZERO, size).has_point(mouse.position):
 			var point: Vector2 = local_to_document(mouse.position)
-			if snap_to_grid:
-				point = AtlasGridSnap.point(map.grid, point)
 			if drawing_composition != null:
 				var staged: DrawingResult = drawing_composition.append_stroke(point)
 				if not staged.ok:
@@ -1618,8 +1618,6 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 			accept_event()
 			return
 		var point: Vector2 = local_to_document(motion.position)
-		if snap_to_grid:
-			point = AtlasGridSnap.point(map.grid, point)
 		var drawn: DrawingResult = drawing_composition.append_stroke(point)
 		if not drawn.ok:
 			drawing_error.emit(drawn.message)

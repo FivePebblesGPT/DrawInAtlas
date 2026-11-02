@@ -21,3 +21,24 @@ python3 tools/validate_ticket_store.py
 These guards validate workflow ordering, continue-on-failure coverage, group-level Bash failure collection, and final outcome aggregation. They **do not** substitute for running the full Godot/native/Web suite on GitHub.
 
 CI policy changes here do not change a feature ticket's implementation or approve any manual UX/review gate. All previously blocked or pending tickets remain in their recorded Kanban states.
+
+## Preventing hung Godot script processes
+
+Godot 4.8 beta 2 can log a GDScript runtime error in a deferred `SceneTree`
+smoke-test callback without reaching that script's final `quit()`. Previously,
+such tests occupied their GitHub Actions step indefinitely even though the
+log already displayed `SCRIPT ERROR`.
+
+Each Godot `--script` invocation now runs under GNU `timeout` with a
+5-second forced-kill grace period. Headless scripts have a **120-second** limit;
+native Xvfb scripts have **240 seconds**. A timeout exits with status 124,
+fails the individual test step (or is collected by `tools/ci_fail_late.sh` in
+a multi-test step), and leaves later independent checks runnable. The final
+summary remains red when any test failed or timed out. Editor import and
+release packaging are separate prerequisites, not subject to these per-script
+limits.
+
+`tests/test_godot_ci_fail_late.py` guards that every scripted Godot
+invocation retains its watchdog. T-016 exposed this case in
+`tests/snapping_smoke.gd` when a stale legacy stroke assertion attempted to
+dereference a null object; the smoke now verifies canonical Drawing pixels.

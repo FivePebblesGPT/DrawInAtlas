@@ -98,10 +98,10 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
-          godot --headless --path . --script res://tests/drawing_history_smoke.gd 2>&1 | tee /tmp/godot-drawing-history.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_history_smoke.gd 2>&1 | tee /tmp/godot-drawing-history.log
           grep -q 'DRAWING_HISTORY_PASSED' /tmp/godot-drawing-history.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|failed;' /tmp/godot-drawing-history.log; then ci_fail_marker 'Forbidden error marker'; fi
-          godot --headless --path . --script res://tests/drawing_history_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-history-editor.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_history_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-history-editor.log
           grep -q 'DRAWING_HISTORY_EDITOR_PASSED' /tmp/godot-drawing-history-editor.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-history-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
           ci_finish
@@ -112,13 +112,13 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
-          godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
           grep -q 'DRAWING_TEXT_PASSED' /tmp/godot-drawing-text.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text.log; then ci_fail_marker 'Forbidden error marker'; fi
           python3 tools/build_drawing_app.py --in-place
           # Staging refreshes font files: let Godot generate their imported FontFile resources.
           godot --headless --editor --path drawing --import --quit
-          godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
           grep -q 'DRAWING_TEXT_UI_PASSED' /tmp/godot-drawing-text-ui.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
           ci_finish
@@ -129,7 +129,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
           grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
@@ -139,13 +139,13 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
-          godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
           grep -q 'OBJECT_EDITOR_PASSED' /tmp/godot-object-editor.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_EDITOR_FAILED:' /tmp/godot-object-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
           python3 tools/build_drawing_app.py --in-place
           # Staged licensed fonts must be imported before UI text editing.
           godot --headless --editor --path drawing --import --quit
-          godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
           grep -q 'DRAWING_OBJECT_UI_PASSED' /tmp/godot-object-editor-ui.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|DRAWING_OBJECT_UI_FAILED:' /tmp/godot-object-editor-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
           ci_finish
@@ -156,7 +156,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/drawing_world_mapping_smoke.gd 2>&1 | tee /tmp/godot-world-mapping.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_world_mapping_smoke.gd 2>&1 | tee /tmp/godot-world-mapping.log
           grep -q 'T061_WORLD_MAPPING_PASSED' /tmp/godot-world-mapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T061_FAILED:' /tmp/godot-world-mapping.log; then exit 1; fi
       - name: Verify T-055 Atlas canonical Drawing composition and input
@@ -166,7 +166,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
           grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
       - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
@@ -176,10 +176,10 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
-          godot --headless --path . --script res://tests/campaign_bundle_smoke.gd 2>&1 | tee /tmp/godot-t066-bundle.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/campaign_bundle_smoke.gd 2>&1 | tee /tmp/godot-t066-bundle.log
           grep -q 'ATLAS_BUNDLE_PASSED' /tmp/godot-t066-bundle.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T066_FAILED:|ATLAS_BUNDLE_FAILED' /tmp/godot-t066-bundle.log; then ci_fail_marker 'Forbidden error marker'; fi
-          godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
           grep -q 'ATLAS_BUNDLE_EDITOR_PASSED' /tmp/godot-t066-editor.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
           ci_finish
@@ -194,10 +194,10 @@ jobs:
           python3 tools/benchmarks/chunk_geometry.py --output /tmp/t067-ci --repeats 1 \
             2>&1 | tee /tmp/t067-layouts.log
           grep -q 'T067_GEOMETRY_PASSED (16 workload/stride cases, 48 layout cases)' /tmp/t067-layouts.log
-          godot --headless --path . --script res://tests/chunk_geometry_codec_smoke.gd -- \
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/chunk_geometry_codec_smoke.gd -- \
             --folder /tmp/t067-ci 2>&1 | tee /tmp/t067-codec.log
           grep -q 'T067_CODEC_PASSED' /tmp/t067-codec.log
-          godot --headless --path . --script res://tests/chunk_geometry_benchmark.gd -- \
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/chunk_geometry_benchmark.gd -- \
             --output /tmp/t067-ci/native.json 2>&1 | tee /tmp/t067-native.log
           grep -q 'T067_NATIVE_PASSED (386 checks, 0 failures)' /tmp/t067-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T067_FAILED:|T067_CODEC_FAILED' \
@@ -283,7 +283,7 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           python3 -m unittest discover -s tests -p 'test_t068_kernel.py' -v
-          godot --headless --path . --script res://tests/drawing_raster_backend_benchmark.gd -- \
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_raster_backend_benchmark.gd -- \
             --output /tmp/t068-godot.json 2>&1 | tee /tmp/t068-godot.log
           grep -q 'T068_GODOT_PASSED' /tmp/t068-godot.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FAILED:' /tmp/t068-godot.log; then ci_fail_marker 'Forbidden error marker'; fi
@@ -300,7 +300,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/smoke.gd 2>&1 | tee /tmp/godot-test.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/smoke.gd 2>&1 | tee /tmp/godot-test.log
           grep -q 'ATLAS_TESTS_PASSED' /tmp/godot-test.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-test.log; then exit 1; fi
       - name: Run artwork and history tests
@@ -310,7 +310,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/artwork_smoke.gd 2>&1 | tee /tmp/godot-artwork.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/artwork_smoke.gd 2>&1 | tee /tmp/godot-artwork.log
           grep -q 'ATLAS_ARTWORK_PASSED' /tmp/godot-artwork.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-artwork.log; then exit 1; fi
       - name: Run board and grid tests
@@ -320,7 +320,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/board_grid_smoke.gd 2>&1 | tee /tmp/godot-board-grid.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/board_grid_smoke.gd 2>&1 | tee /tmp/godot-board-grid.log
           grep -q 'ATLAS_BOARD_GRID_PASSED' /tmp/godot-board-grid.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-board-grid.log; then exit 1; fi
       - name: Run continuous shared-canvas regression (T-002)
@@ -330,7 +330,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/continuous_canvas_smoke.gd 2>&1 | tee /tmp/godot-continuous-canvas.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/continuous_canvas_smoke.gd 2>&1 | tee /tmp/godot-continuous-canvas.log
           grep -q 'ATLAS_CONTINUOUS_CANVAS_PASSED' /tmp/godot-continuous-canvas.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-continuous-canvas.log; then exit 1; fi
       - name: Verify viewport zoom and authored LOD contract (T-004)
@@ -340,7 +340,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/zoom_lod_contract_smoke.gd 2>&1 | tee /tmp/godot-zoom-lod.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/zoom_lod_contract_smoke.gd 2>&1 | tee /tmp/godot-zoom-lod.log
           grep -q 'ATLAS_ZOOM_LOD_CONTRACT_PASSED' /tmp/godot-zoom-lod.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-zoom-lod.log; then exit 1; fi
       - name: Verify aligned transparent detail previews (T-003)
@@ -350,7 +350,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/aligned_detail_previews_smoke.gd 2>&1 | tee /tmp/godot-aligned-detail-previews.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/aligned_detail_previews_smoke.gd 2>&1 | tee /tmp/godot-aligned-detail-previews.log
           grep -q 'ATLAS_ALIGNED_DETAIL_PREVIEWS_PASSED' /tmp/godot-aligned-detail-previews.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-aligned-detail-previews.log; then exit 1; fi
       - name: Verify automatic authored artwork LOD (T-005)
@@ -360,7 +360,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/automatic_artwork_lod_smoke.gd 2>&1 | tee /tmp/godot-automatic-lod.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/automatic_artwork_lod_smoke.gd 2>&1 | tee /tmp/godot-automatic-lod.log
           grep -q 'ATLAS_AUTOMATIC_ARTWORK_LOD_PASSED' /tmp/godot-automatic-lod.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-automatic-lod.log; then exit 1; fi
       - name: Run layer and recovery tests
@@ -371,7 +371,7 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           for suite in layers_smoke storage_smoke layer_ui_smoke; do
-            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_LAYERS_PASSED' /tmp/godot-layers_smoke.log
@@ -385,7 +385,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/tool_palette_smoke.gd 2>&1 | tee /tmp/godot-tool-palette.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/tool_palette_smoke.gd 2>&1 | tee /tmp/godot-tool-palette.log
           grep -q 'ATLAS_TOOL_PALETTE_PASSED' /tmp/godot-tool-palette.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-tool-palette.log; then exit 1; fi
       - name: Verify compact action controls (T-007)
@@ -395,7 +395,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/compact_controls_smoke.gd 2>&1 | tee /tmp/godot-compact-controls.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/compact_controls_smoke.gd 2>&1 | tee /tmp/godot-compact-controls.log
           grep -q 'ATLAS_COMPACT_CONTROLS_PASSED' /tmp/godot-compact-controls.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-compact-controls.log; then exit 1; fi
       - name: Verify compact authored-detail and link hierarchy (T-018 preview)
@@ -405,7 +405,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/layer_hierarchy_smoke.gd 2>&1 | tee /tmp/godot-layer-hierarchy.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/layer_hierarchy_smoke.gd 2>&1 | tee /tmp/godot-layer-hierarchy.log
           grep -q 'ATLAS_LAYER_HIERARCHY_PASSED' /tmp/godot-layer-hierarchy.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|HIERARCHY FAILED:' /tmp/godot-layer-hierarchy.log; then exit 1; fi
       - name: Verify grid settings toolbar popup (T-008)
@@ -415,7 +415,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/grid_settings_smoke.gd 2>&1 | tee /tmp/godot-grid-settings.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/grid_settings_smoke.gd 2>&1 | tee /tmp/godot-grid-settings.log
           grep -q 'ATLAS_GRID_SETTINGS_PASSED' /tmp/godot-grid-settings.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-grid-settings.log; then exit 1; fi
       - name: Verify round pen turns (T-010)
@@ -425,7 +425,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/pen_turns_smoke.gd 2>&1 | tee /tmp/godot-pen-turns.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/pen_turns_smoke.gd 2>&1 | tee /tmp/godot-pen-turns.log
           grep -q 'ATLAS_PEN_TURNS_PASSED' /tmp/godot-pen-turns.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-pen-turns.log; then exit 1; fi
       - name: Verify local detail authoring without battlemat documents (T-012)
@@ -435,7 +435,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/local_detail_workflow_smoke.gd 2>&1 | tee /tmp/godot-local-detail.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/local_detail_workflow_smoke.gd 2>&1 | tee /tmp/godot-local-detail.log
           grep -q 'ATLAS_LOCAL_DETAIL_WORKFLOW_PASSED' /tmp/godot-local-detail.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-local-detail.log; then exit 1; fi
       - name: Verify retired battlemat creation paths (T-014)
@@ -445,7 +445,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/retired_battlemap_controls_smoke.gd 2>&1 | tee /tmp/godot-retired-battlemap.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/retired_battlemap_controls_smoke.gd 2>&1 | tee /tmp/godot-retired-battlemap.log
           grep -q 'ATLAS_RETIRED_BATTLEMAP_PASSED' /tmp/godot-retired-battlemap.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-retired-battlemap.log; then exit 1; fi
       - name: Inventory legacy placement migrations without modifying saves (T-015)
@@ -455,7 +455,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/legacy_migration_audit_smoke.gd 2>&1 | tee /tmp/godot-legacy-migration-audit.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/legacy_migration_audit_smoke.gd 2>&1 | tee /tmp/godot-legacy-migration-audit.log
           grep -q 'ATLAS_LEGACY_MIGRATION_AUDIT_PASSED' /tmp/godot-legacy-migration-audit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^FAIL:' /tmp/godot-legacy-migration-audit.log; then exit 1; fi
       - name: Verify dictionary adapter responsibilities and resource validation (T-029)
@@ -465,7 +465,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/dictionary_conversion_audit_smoke.gd 2>&1 | tee /tmp/godot-dictionary-audit.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/dictionary_conversion_audit_smoke.gd 2>&1 | tee /tmp/godot-dictionary-audit.log
           grep -q 'ATLAS_DICTIONARY_CONVERSION_PASSED' /tmp/godot-dictionary-audit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-dictionary-audit.log; then exit 1; fi
       - name: Verify raster image-to-chunk import contract (T-030)
@@ -475,7 +475,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/raster_import_chunks_smoke.gd 2>&1 | tee /tmp/godot-raster-import.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/raster_import_chunks_smoke.gd 2>&1 | tee /tmp/godot-raster-import.log
           grep -q 'ATLAS_RASTER_IMPORT_CHUNKS_PASSED' /tmp/godot-raster-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-import.log; then exit 1; fi
       - name: Verify raster/ink type authority and retired terrain kind (T-050)
@@ -485,7 +485,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/artwork_layer_type_smoke.gd 2>&1 | tee /tmp/godot-layer-type.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/artwork_layer_type_smoke.gd 2>&1 | tee /tmp/godot-layer-type.log
           grep -q 'ATLAS_LAYER_TYPE_PASSED' /tmp/godot-layer-type.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^LAYER TYPE FAILED:' /tmp/godot-layer-type.log; then exit 1; fi
       - name: Verify raster/ink model, grid independence and native fidelity (T-050)
@@ -495,7 +495,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/raster_ink_model_smoke.gd 2>&1 | tee /tmp/godot-raster-ink-model.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/raster_ink_model_smoke.gd 2>&1 | tee /tmp/godot-raster-ink-model.log
           grep -q 'ATLAS_RASTER_INK_MODEL_PASSED' /tmp/godot-raster-ink-model.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-ink-model.log; then exit 1; fi
       - name: Audit ink and raster representation contracts (T-028 investigation)
@@ -505,7 +505,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/ink_representation_smoke.gd 2>&1 | tee /tmp/godot-ink-representation.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/ink_representation_smoke.gd 2>&1 | tee /tmp/godot-ink-representation.log
           grep -q 'ATLAS_INK_REPRESENTATION_PASSED' /tmp/godot-ink-representation.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-ink-representation.log; then exit 1; fi
       - name: Verify Brush tool opacity, stroke and raster behavior (T-020)
@@ -515,7 +515,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/brush_smoke.gd 2>&1 | tee /tmp/godot-brush.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/brush_smoke.gd 2>&1 | tee /tmp/godot-brush.log
           grep -q 'ATLAS_BRUSH_PASSED' /tmp/godot-brush.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^BRUSH FAILED:' /tmp/godot-brush.log; then exit 1; fi
       - name: Verify Eraser geometry, alpha, masks and saving (T-021)
@@ -525,7 +525,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/eraser_smoke.gd 2>&1 | tee /tmp/godot-eraser.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/eraser_smoke.gd 2>&1 | tee /tmp/godot-eraser.log
           grep -q 'ATLAS_ERASER_PASSED' /tmp/godot-eraser.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^ERASER FAILED:' /tmp/godot-eraser.log; then exit 1; fi
       - name: Verify raster drawing and designated Objects workflow
@@ -535,7 +535,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/raster_objects_smoke.gd 2>&1 | tee /tmp/godot-raster-objects.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/raster_objects_smoke.gd 2>&1 | tee /tmp/godot-raster-objects.log
           grep -q 'ATLAS_RASTER_OBJECTS_PASSED' /tmp/godot-raster-objects.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-raster-objects.log; then exit 1; fi
       - name: Verify Bucket tolerance, bounds, previews and saving (T-023)
@@ -545,7 +545,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/bucket_smoke.gd 2>&1 | tee /tmp/godot-bucket.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/bucket_smoke.gd 2>&1 | tee /tmp/godot-bucket.log
           grep -q 'ATLAS_BUCKET_PASSED' /tmp/godot-bucket.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^BUCKET FAILED:' /tmp/godot-bucket.log; then exit 1; fi
       - name: Verify active-layer Move gestures (T-022)
@@ -555,7 +555,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/move_smoke.gd 2>&1 | tee /tmp/godot-move.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/move_smoke.gd 2>&1 | tee /tmp/godot-move.log
           grep -q 'ATLAS_MOVE_PASSED' /tmp/godot-move.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^MOVE FAILED:' /tmp/godot-move.log; then exit 1; fi
       - name: Verify Line endpoints, modifiers, masks and saving (T-024)
@@ -565,7 +565,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-line.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-line.log
           grep -q 'ATLAS_LINE_PASSED' /tmp/godot-line.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^LINE FAILED:' /tmp/godot-line.log; then exit 1; fi
       - name: Verify polygon shape geometry, masks and persistence (T-025)
@@ -575,7 +575,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/polygon_smoke.gd 2>&1 | tee /tmp/godot-polygon.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/polygon_smoke.gd 2>&1 | tee /tmp/godot-polygon.log
           grep -q 'ATLAS_POLYGON_PASSED' /tmp/godot-polygon.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|^POLYGON FAILED:' /tmp/godot-polygon.log; then exit 1; fi
       - name: Verify editable wall paths, geometry, history and native saves (T-026)
@@ -585,7 +585,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/wall_paths_smoke.gd 2>&1 | tee /tmp/godot-wall-paths.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/wall_paths_smoke.gd 2>&1 | tee /tmp/godot-wall-paths.log
           grep -q 'ATLAS_WALL_PATHS_PASSED' /tmp/godot-wall-paths.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-wall-paths.log; then exit 1; fi
       - name: Verify mouse-wheel brush width (T-011)
@@ -595,7 +595,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/pen_width_wheel_smoke.gd 2>&1 | tee /tmp/godot-pen-width-wheel.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/pen_width_wheel_smoke.gd 2>&1 | tee /tmp/godot-pen-width-wheel.log
           grep -q 'ATLAS_PEN_WIDTH_WHEEL_PASSED' /tmp/godot-pen-width-wheel.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-pen-width-wheel.log; then exit 1; fi
       - name: Run editing tool and clipboard tests
@@ -606,7 +606,7 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           for suite in fill_scope_smoke clipboard_smoke selection_smoke tools_ui_smoke; do
-            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_FILL_SCOPE_PASSED' /tmp/godot-fill_scope_smoke.log
@@ -621,7 +621,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/selection_interactions_smoke.gd 2>&1 | tee /tmp/godot-selection-interactions.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/selection_interactions_smoke.gd 2>&1 | tee /tmp/godot-selection-interactions.log
           grep -q 'ATLAS_SELECTION_INTERACTIONS_PASSED' /tmp/godot-selection-interactions.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-selection-interactions.log; then exit 1; fi
       - name: Verify coherent grid snapping and edit masks (T-016)
@@ -631,7 +631,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/snapping_smoke.gd 2>&1 | tee /tmp/godot-snapping.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/snapping_smoke.gd 2>&1 | tee /tmp/godot-snapping.log
           grep -q 'ATLAS_SNAPPING_PASSED' /tmp/godot-snapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-snapping.log; then exit 1; fi
       - name: Reject stale Search navigation results (T-009)
@@ -641,7 +641,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/search_stale_actions_smoke.gd 2>&1 | tee /tmp/godot-search-stale.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/search_stale_actions_smoke.gd 2>&1 | tee /tmp/godot-search-stale.log
           grep -q 'ATLAS_SEARCH_STALE_PASSED' /tmp/godot-search-stale.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|SEARCH STALE FAILED:' /tmp/godot-search-stale.log; then exit 1; fi
       - name: Run workspace composition and organization tests
@@ -652,7 +652,7 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           for suite in editor_modules_smoke organization_ui_smoke floors_view_smoke overview_smoke preview_cache_smoke; do
-            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_EDITOR_MODULES_PASSED' /tmp/godot-editor_modules_smoke.log
@@ -670,7 +670,7 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           for suite in links_smoke linked_maps_ui_smoke; do
-            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_LINKS_PASSED' /tmp/godot-links_smoke.log
@@ -683,7 +683,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/player_projection_contract_smoke.gd 2>&1 | tee /tmp/godot-player-projection.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/player_projection_contract_smoke.gd 2>&1 | tee /tmp/godot-player-projection.log
           grep -q 'ATLAS_PLAYER_PROJECTION_CONTRACT_PASSED' /tmp/godot-player-projection.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-player-projection.log; then exit 1; fi
       - name: Verify player privacy projection acceptance matrix (T-043)
@@ -693,7 +693,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/player_privacy_acceptance_smoke.gd 2>&1 | tee /tmp/godot-player-privacy-acceptance.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/player_privacy_acceptance_smoke.gd 2>&1 | tee /tmp/godot-player-privacy-acceptance.log
           grep -q 'ATLAS_PLAYER_PRIVACY_ACCEPTANCE_PASSED' /tmp/godot-player-privacy-acceptance.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|PLAYER PRIVACY FAILED:' /tmp/godot-player-privacy-acceptance.log; then exit 1; fi
       - name: Verify session-only projector framing geometry (T-013)
@@ -703,7 +703,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/projector_frame_smoke.gd 2>&1 | tee /tmp/godot-projector-frame.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/projector_frame_smoke.gd 2>&1 | tee /tmp/godot-projector-frame.log
           grep -q 'ATLAS_PROJECTOR_FRAME_PASSED' /tmp/godot-projector-frame.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-projector-frame.log; then exit 1; fi
       - name: Verify GM-only token authoring, history, saving and privacy (T-041)
@@ -713,7 +713,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/token_smoke.gd 2>&1 | tee /tmp/godot-token.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/token_smoke.gd 2>&1 | tee /tmp/godot-token.log
           grep -q 'ATLAS_TOKEN_PASSED' /tmp/godot-token.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|TOKEN FAILED:' /tmp/godot-token.log; then exit 1; fi
       - name: Verify fog operations, guarded history, native saving and projection (T-042)
@@ -723,7 +723,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/fog_smoke.gd 2>&1 | tee /tmp/godot-fog.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/fog_smoke.gd 2>&1 | tee /tmp/godot-fog.log
           grep -q 'ATLAS_FOG_PASSED' /tmp/godot-fog.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FOG FAILED:' /tmp/godot-fog.log; then exit 1; fi
       - name: Verify isolated native player camera and calibration contract (T-040)
@@ -733,7 +733,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/player_output_session_smoke.gd 2>&1 | tee /tmp/godot-player-output-session.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/player_output_session_smoke.gd 2>&1 | tee /tmp/godot-player-output-session.log
           grep -q 'ATLAS_PLAYER_OUTPUT_SESSION_PASSED' /tmp/godot-player-output-session.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-player-output-session.log; then exit 1; fi
       - name: Verify single-window player fallback contract (T-044)
@@ -743,7 +743,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/player_web_fallback_smoke.gd 2>&1 | tee /tmp/godot-player-web-fallback.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/player_web_fallback_smoke.gd 2>&1 | tee /tmp/godot-player-web-fallback.log
           grep -q 'ATLAS_PLAYER_WEB_FALLBACK_PASSED' /tmp/godot-player-web-fallback.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|WEB FALLBACK FAILED:' /tmp/godot-player-web-fallback.log; then exit 1; fi
       - name: Verify authoritative GM session and revision proof (T-045)
@@ -753,7 +753,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/authoritative_session_smoke.gd 2>&1 | tee /tmp/godot-authoritative-session.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/authoritative_session_smoke.gd 2>&1 | tee /tmp/godot-authoritative-session.log
           grep -q 'ATLAS_AUTHORITATIVE_SESSION_PASSED' /tmp/godot-authoritative-session.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|SESSION FAILED:' /tmp/godot-authoritative-session.log; then exit 1; fi
       - name: Verify host-bound roles and privacy-filtered replication (T-046)
@@ -763,7 +763,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/filtered_replication_smoke.gd 2>&1 | tee /tmp/godot-filtered-replication.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/filtered_replication_smoke.gd 2>&1 | tee /tmp/godot-filtered-replication.log
           grep -q 'ATLAS_FILTERED_REPLICATION_PASSED' /tmp/godot-filtered-replication.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FILTERED REPLICATION FAILED:' /tmp/godot-filtered-replication.log; then exit 1; fi
       - name: Verify trusted reconnect and permission-filtered resynchronization (T-047)
@@ -773,7 +773,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/reconnect_resync_smoke.gd 2>&1 | tee /tmp/godot-reconnect-resync.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/reconnect_resync_smoke.gd 2>&1 | tee /tmp/godot-reconnect-resync.log
           grep -q 'ATLAS_RECONNECT_RESYNC_PASSED' /tmp/godot-reconnect-resync.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|RECONNECT FAILED:' /tmp/godot-reconnect-resync.log; then exit 1; fi
       - name: Verify integrated collaboration authorization, wire privacy and reconnect (T-048)
@@ -783,7 +783,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/collaboration_acceptance_smoke.gd 2>&1 | tee /tmp/godot-collaboration-acceptance.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/collaboration_acceptance_smoke.gd 2>&1 | tee /tmp/godot-collaboration-acceptance.log
           grep -q 'ATLAS_COLLABORATION_ACCEPTANCE_PASSED' /tmp/godot-collaboration-acceptance.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|COLLABORATION ACCEPTANCE FAILED:' /tmp/godot-collaboration-acceptance.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
@@ -801,7 +801,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/drawing_composition_visual.gd 2>&1 | tee /tmp/godot-t055-native.log
+          timeout --signal=TERM --kill-after=5s 240s xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/drawing_composition_visual.gd 2>&1 | tee /tmp/godot-t055-native.log
           grep -q 'T055_NATIVE_PASSED' /tmp/godot-t055-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_NATIVE_FAILED:' /tmp/godot-t055-native.log; then exit 1; fi
       - name: Verify T-068 native pointer-to-frame submission latency and raster parity
@@ -831,7 +831,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/build_drawing_app.py --in-place
-          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_pointer.gd 2>&1 | tee /tmp/drawing-native.log
+          timeout --signal=TERM --kill-after=5s 240s xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_pointer.gd 2>&1 | tee /tmp/drawing-native.log
           grep -q 'DRAWING_NATIVE_PASSED' /tmp/drawing-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_NATIVE_FAILED:' /tmp/drawing-native.log; then exit 1; fi
       - name: Verify T-073 actual Drawing keyboard bindings and unsaved-close guard
@@ -845,7 +845,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/build_drawing_app.py --in-place
-          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/workspace_keyboard_smoke.gd 2>&1 | tee /tmp/t073-keyboard.log
+          timeout --signal=TERM --kill-after=5s 240s xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/workspace_keyboard_smoke.gd 2>&1 | tee /tmp/t073-keyboard.log
           grep -q 'T073_KEYBOARD_PASSED' /tmp/t073-keyboard.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T073_KEYBOARD_FAILED:' /tmp/t073-keyboard.log; then exit 1; fi
       - name: Verify T-063 native compact workspace, overflow and Save As
@@ -876,7 +876,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/build_drawing_app.py --in-place
-          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_text.gd 2>&1 | tee /tmp/drawing-native-text.log
+          timeout --signal=TERM --kill-after=5s 240s xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_text.gd 2>&1 | tee /tmp/drawing-native-text.log
           grep -q 'DRAWING_TEXT_NATIVE_PASSED' /tmp/drawing-native-text.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_TEXT_NATIVE_FAILED:' /tmp/drawing-native-text.log; then exit 1; fi
       - name: Verify editable text and screen-space culling (T-027)
@@ -886,7 +886,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          godot --headless --path . --script res://tests/text_smoke.gd 2>&1 | tee /tmp/godot-text.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/text_smoke.gd 2>&1 | tee /tmp/godot-text.log
           grep -q 'ATLAS_TEXT_PASSED' /tmp/godot-text.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-text.log; then exit 1; fi
       - name: Run native framebuffer acceptance
@@ -900,7 +900,7 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           for suite in drawing_world_visual visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke player_projection_visual projector_frame_visual player_output_session_visual token_visual fog_visual player_privacy_acceptance_visual player_web_fallback_visual collaboration_acceptance_visual; do
-            xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            timeout --signal=TERM --kill-after=5s 240s xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then ci_fail_marker 'Forbidden error marker'; fi
           done
           grep -q 'ATLAS_VISUAL_PASSED' /tmp/godot-visual_smoke.log
@@ -966,10 +966,10 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
-          godot --headless --path . --script res://tests/storage_smoke.gd -- write-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-source-write.log
-          godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- read-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-pack-read.log
-          godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- write-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-pack-write.log
-          godot --headless --path . --script res://tests/storage_smoke.gd -- read-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-source-read.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/storage_smoke.gd -- write-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-source-write.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- read-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-pack-read.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- write-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-pack-write.log
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/storage_smoke.gd -- read-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-source-read.log
           for log in /tmp/atlas-source-write.log /tmp/atlas-pack-read.log /tmp/atlas-pack-write.log /tmp/atlas-source-read.log; do
             grep -q 'ATLAS_PORTABILITY_PASSED' "$log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "$log"; then ci_fail_marker 'Forbidden error marker'; fi
