@@ -323,10 +323,15 @@ func _rebuild_hierarchy() -> void:
 				var section: TreeItem = _make_row(floor_group, "%s%s" % [detail["id"],
 					" · empty" if detail["blank"] else " · authored"], {"kind": "group"})
 				section.set_selectable(0, false)
-				var fetched: DrawingResult = _drawing_registry.document_at(_map.id, group["id"], detail["level"])
-				if fetched.ok and fetched.value != null:
-					_drawing_rows(section, fetched.value, DrawingDocument.ROOT_ID,
-						_map.id, group["id"], detail["level"])
+				# Do not open all archived detail sources simply to build the sidebar.
+				# Only the viewed detail (or a previously resident one) needs rows.
+				var active: bool = detail["level"] == int(view_detail_spinner.value) \
+					or _drawing_registry._documents.has(detail["document_id"])
+				if active:
+					var fetched: DrawingResult = _drawing_registry.document_at(_map.id, group["id"], detail["level"])
+					if fetched.ok and fetched.value != null:
+						_drawing_rows(section, fetched.value, DrawingDocument.ROOT_ID,
+							_map.id, group["id"], detail["level"])
 				if _drawing_library != null:
 					for instance_id: String in _drawing_registry.visible_placements(_drawing_library,
 							_map.id, group["id"], detail["level"]):

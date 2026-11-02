@@ -118,6 +118,16 @@ jobs:
           godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
           grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
+      - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/campaign_bundle_smoke.gd 2>&1 | tee /tmp/godot-t066-bundle.log
+          grep -q 'ATLAS_BUNDLE_PASSED' /tmp/godot-t066-bundle.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_FAILED:|ATLAS_BUNDLE_FAILED' /tmp/godot-t066-bundle.log; then exit 1; fi
+          godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
+          grep -q 'ATLAS_BUNDLE_EDITOR_PASSED' /tmp/godot-t066-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then exit 1; fi
       - name: Run domain smoke tests
         shell: bash
         run: |

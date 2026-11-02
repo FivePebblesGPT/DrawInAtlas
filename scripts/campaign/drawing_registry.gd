@@ -12,8 +12,15 @@ const MAX_STRIDE: int = 2048
 var _maps: Dictionary = {} # map ID -> ordered floor records
 var _documents: Dictionary[String, DrawingDocument] = {}
 var _ids: Dictionary[String, bool] = {}
+## Immutable manifest references from the last published campaign generation.
+var _persistent_refs: Dictionary = {}
+## Optimistic root-generation lease; protects against concurrent saves.
+var _loaded_root_digest: String = ""
+## Called only for a first read of an authored saved detail.
+var _lazy_document_loader: Callable
 ## Keep deleted-floor records in memory for undo, but never project/save them.
 var _orphan_floors: Dictionary[String, Dictionary] = {}
+var _orphan_maps: Dictionary = {}
 
 
 func attach_campaign(campaign: AtlasCampaign) -> DrawingResult:
@@ -30,9 +37,14 @@ func attach_campaign(campaign: AtlasCampaign) -> DrawingResult:
 			if floor == null or not DrawingDocument.valid_identifier(floor.id) or seen_ids.has(floor.id):
 				return DrawingResult.failure("FLOOR", "Invalid or duplicate floor")
 			seen_ids[floor.id] = true
+	for previous_id: String in _maps.keys():
+		if not campaign.maps.has(previous_id):
+			_orphan_maps[previous_id] = _maps[previous_id]
+			_maps.erase(previous_id)
 	for map_id: String in campaign.maps:
 		var map: AtlasMapDocument = campaign.get_map(map_id)
-		var existing: Array = _maps.get(map_id, [])
+		var existing: Array = _maps.get(map_id, _orphan_maps.get(map_id, []))
+		_orphan_maps.erase(map_id)
 		var ordered: Array[Dictionary] = []
 		var seen: Dictionary = {}
 		for floor: AtlasFloor in map.floors:
@@ -106,6 +118,11 @@ func set_density(map_id: String, floor_id: String, level: int, num: int, den: in
 	if record.is_empty() or not AtlasWorldSpace.valid_density(num, den):
 		return DrawingResult.failure("DENSITY", "Unknown detail or invalid density")
 	var doc: DrawingDocument = _documents.get(record["document_id"])
+	if doc == null and _persistent_refs.has(record["document_id"]):
+		var opened: DrawingResult = document_at(map_id, floor_id, level)
+		if not opened.ok:
+			return opened
+		doc = opened.value
 	if doc != null:
 		var changed: DrawingResult = doc.set_density(num, den)
 		if not changed.ok:
@@ -134,11 +151,29 @@ func document_at(map_id: String, floor_id: String, level: int, materialize: bool
 	if record.is_empty():
 		return DrawingResult.failure("DETAIL", "Unknown detail")
 	var id: String = record["document_id"]
+	if not _documents.has(id) and _persistent_refs.has(id):
+		if not _lazy_document_loader.is_valid():
+			return DrawingResult.failure("LOAD", "No saved-document provider")
+		var loaded: DrawingResult = _lazy_document_loader.call(id)
+		if not loaded.ok:
+			return loaded
+		var attached: DrawingResult = attach_loaded_document(map_id, floor_id, level, loaded.value)
+		if not attached.ok:
+			return attached
 	if materialize and not _documents.has(id):
 		var document: DrawingDocument = DrawingDocument.new(id, record["stride"], record["num"], record["den"])
 		document.set_external_history(true)
 		_documents[id] = document
 	return DrawingResult.success(_documents.get(id))
+
+
+func _stored_detail(document_id: String) -> Dictionary:
+	for map_id: String in _maps:
+		for floor: Dictionary in _maps[map_id]:
+			for detail: Dictionary in floor["details"]:
+				if detail["document_id"] == document_id:
+					return detail
+	return {}
 
 
 func document_count() -> int:
@@ -167,9 +202,11 @@ func projection(map_id: String) -> Array[Dictionary]:
 			var layers: Array[String] = []
 			if document != null:
 				layers = document.list_children()
+			var blank: bool = _blank(document) if document != null else \
+				bool(_persistent_refs.get(detail["document_id"], {}).get("blank", true))
 			details.append({"id": detail["id"], "document_id": detail["document_id"],
 				"level": detail["level"], "density": [detail["num"], detail["den"]],
-				"visible": floor["visible"] and detail["visible"], "blank": _blank(document),
+				"visible": floor["visible"] and detail["visible"], "blank": blank,
 				"layers": layers})
 		projected.append({"id": floor["id"], "name": floor["name"],
 			"visible": floor["visible"], "details": details})
@@ -201,8 +238,14 @@ func render_detail_at(map_id: String, floor_id: String, level: int,
 	if abs(pixel_anchor_x) > AtlasWorldSpace.MAX_PIXELS or abs(pixel_anchor_y) > AtlasWorldSpace.MAX_PIXELS:
 		return DrawingResult.failure("COORD_RANGE", "Invalid signed pixel anchor")
 	var floor: Dictionary = _floor(_maps.get(map_id, []), floor_id)
-	var document: DrawingDocument = _documents.get(detail["document_id"])
-	if not floor["visible"] or not detail["visible"] or _blank(document):
+	if not floor["visible"] or not detail["visible"]:
+		return DrawingResult.success(Image.create_empty(local_view.size.x, local_view.size.y,
+			false, Image.FORMAT_RGBA8))
+	var fetched: DrawingResult = document_at(map_id, floor_id, level)
+	if not fetched.ok:
+		return fetched
+	var document: DrawingDocument = fetched.value
+	if _blank(document):
 		return DrawingResult.success(Image.create_empty(local_view.size.x, local_view.size.y,
 			false, Image.FORMAT_RGBA8))
 	return DrawingRenderer.render(document, local_view, pixel_anchor_x, pixel_anchor_y, max_pixels)
@@ -339,7 +382,11 @@ static func from_index(index: Dictionary, campaign: AtlasCampaign) -> DrawingRes
 			details.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["level"] < b["level"])
 			floors.append({"id": floor_id, "name": floor["name"],
 				"visible": floor["visible"], "details": details})
+		if seen_floors.size() != (campaign.get_map(map_id) as AtlasMapDocument).floors.size():
+			return DrawingResult.failure("INDEX", "Missing floor from authoritative Drawing map")
 		registry._maps[map_id] = floors
+	if seen_maps.size() != campaign.maps.size():
+		return DrawingResult.failure("INDEX", "Missing map from authoritative Drawing registry")
 	var synchronized: DrawingResult = registry.attach_campaign(campaign)
 	return DrawingResult.success(registry) if synchronized.ok else synchronized
 

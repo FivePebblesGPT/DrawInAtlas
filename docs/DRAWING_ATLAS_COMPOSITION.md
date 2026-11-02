@@ -1,6 +1,6 @@
 # Atlas ↔ canonical Drawing composition — T-055
 
-**Implementation:** `scripts/interface/drawing_composition.gd` (`AtlasDrawingComposition`), `scripts/interface/canvas.gd`, `scripts/interface/editor.gd`, `scripts/interface/layer_panel.gd`, `scripts/interface/preview_panel.gd`. **Validated:** 2026-11-02, Godot 4.8-beta2 on Linux. **Status:** completed Atlas composition boundary, not production campaign persistence or final owner UX acceptance.
+**Implementation:** `scripts/interface/drawing_composition.gd` (`AtlasDrawingComposition`), `scripts/interface/canvas.gd`, `scripts/interface/editor.gd`, `scripts/interface/layer_panel.gd`, `scripts/interface/preview_panel.gd`. **Validated:** 2026-11-02, Godot 4.8-beta2 on Linux. **Status:** completed Atlas composition boundary; T-066 subsequently added portable campaign persistence, but final owner UX acceptance is still pending.
 
 ## Ownership and content identity
 
@@ -29,7 +29,7 @@ Flat source images can derive an authored rectangle from their sparse tile exten
 ## Safety, limits, and deferred tickets
 
 - Rendering and previews reject frames over **1,048,576 source pixels**; Atlas canvas avoids synthesizing more than **2,097,152 visible pixels** at once. At extreme zoom/density combinations the current implementation omits the canonical layer rather than risk unbounded allocations; this is **not** final large-world LOD performance. T-057/T-067/T-068 benchmark and optimize it. The current CPU transformed-object renderer skips source bounds over 2048×2048 or the same pixel cap; there is no native raster acceleration yet.
-- **The legacy `.scn` Save does not durably store canonical DrawingDocuments.** The editor warns instead of falsely marking these edits saved. T-066 must implement the campaign index, `Drawings/` sparse manifests/chunks, `Objects/` generations, portable fonts and recovery. Closing T-055 does **not** imply save/reload completeness.
+- **The T-055-era legacy `.scn` save did not store canonical DrawingDocuments.** T-066 subsequently connected the real editor to an atomic `.atlas.json` root and generation-based `Drawings/` manifests/chunks, `Objects/` versions, licensed fonts and recovery. See [storage contract](DRAWING_STORAGE_CONTRACT.md); T-067 performance research and owner UX signoff remain separate.
 - New Object instances are distinct from the legacy board background; no complete Asset Browser, NULL deletion workflow, Windows runtime or owner UX acceptance is claimed here. T-056 remains an **owner-review-gated validation ticket**, not automatically Done.
 - The linked-maps UI smoke suite initially had two legacy footprint-dialog assertions failing on both the unchanged pre-T-055 commit `ba8df2f` and this branch. Its manually injected fixture now explicitly selects the stable entrance ID before opening the form; all **58 checks pass**. Historical raster assertions in `smoke.gd`, `tools_ui_smoke.gd` and `linked_maps_ui_smoke.gd` intentionally detach the canonical canvas adapter so that migration does not erase legacy-path coverage.
 

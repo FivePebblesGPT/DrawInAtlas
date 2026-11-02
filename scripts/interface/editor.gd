@@ -22,6 +22,9 @@ var drawing_composition: AtlasDrawingComposition
 var object_editor_window: AtlasObjectEditorWindow
 var edits: AtlasEditHistory = AtlasEditHistory.new()
 var store_io: AtlasStoreIO
+var _restored_bundle: AtlasStoreResult
+var _discard_drawing_dialog: ConfirmationDialog
+var _pending_discard_action: Callable
 var browser: AtlasCampaignBrowser
 var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
@@ -134,6 +137,11 @@ func _ready() -> void:
 	map_references.bind(canvas)
 	canvas.references = map_references
 	_mount_sidebar_views()
+	_discard_drawing_dialog = ConfirmationDialog.new()
+	_discard_drawing_dialog.title = "Unsaved Drawing content"
+	_discard_drawing_dialog.dialog_text = "Discard unsaved Drawing edits? The last saved campaign generation will remain intact."
+	add_child(_discard_drawing_dialog)
+	_discard_drawing_dialog.confirmed.connect(_confirm_drawing_discard)
 	text_editor = AtlasTextEditorPopup.new()
 	add_child(text_editor)
 	text_editor.text_confirmed.connect(_confirm_text_edit)
@@ -147,7 +155,7 @@ func _ready() -> void:
 	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
 	if load_saved_on_startup:
-		restored = AtlasCampaignStore.load_result(save_path, store_io)
+		restored = AtlasCampaignStore.load_portable_result(save_path, store_io)
 		campaign = restored.campaign
 	var loaded: bool = campaign != null
 	if campaign == null:
@@ -157,6 +165,7 @@ func _ready() -> void:
 	edits.changed.connect(_on_documents_changed)
 	edits.changed.connect(map_references.refresh)
 	edits.reset(campaign, loaded and (restored == null or not restored.recovered))
+	_restored_bundle = restored
 	_bind_drawing_composition()
 	_show_map(campaign.get_map(campaign.root_map_id))
 	_message("B brush · E eraser · V select · M move · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
@@ -167,7 +176,7 @@ func _ready() -> void:
 
 
 ## The same canonical Drawing engine is staged in the independent Drawing app.
-## The legacy campaign .scn does NOT yet save these documents (T-066).
+## The portable campaign generation root now saves these documents (T-066).
 func _bind_drawing_composition() -> void:
 	if drawing_composition == null:
 		var location: String = ProjectSettings.globalize_path(save_path)
@@ -190,6 +199,11 @@ func _bind_drawing_composition() -> void:
 		drawing_composition.library.asset_published.connect(func(_id: String, _rev: int) -> void:
 			canvas._refresh_composition_view())
 		layer_panel.drawing_layer_selected.connect(_on_drawing_layer_selected)
+	if _restored_bundle != null and _restored_bundle.registry != null:
+		drawing_composition.cancel_stroke()
+		drawing_composition.registry = _restored_bundle.registry
+		drawing_composition.set_library(_restored_bundle.library)
+		_restored_bundle = null
 	canvas.drawing_composition = drawing_composition
 	var attached: DrawingResult = drawing_composition.attach_campaign(campaign)
 	if not attached.ok:
@@ -649,9 +663,58 @@ func update_map_metadata(name: String, tags: Array[String]) -> bool:
 	return true
 
 
-func _on_sample() -> void:
+func _dirty_object_drafts() -> bool:
+	if object_editor_window == null or object_editor_window.workspace == null:
+		return false
+	for tab: Dictionary in object_editor_window.workspace.tabs:
+		var session: DrawingObjectEditorSession = tab.get("object")
+		if session != null and session.is_dirty():
+			return true
+	return false
+
+
+func _dirty_drawing_documents() -> bool:
+	if drawing_composition == null:
+		return false
+	for document: DrawingDocument in drawing_composition.registry._documents.values():
+		if document.is_dirty():
+			return true
+	return false
+
+
+func _request_drawing_discard(action: Callable) -> void:
+	# Only one pending action: cancel/reopen cannot accumulate old callbacks.
+	_pending_discard_action = action
+	_discard_drawing_dialog.popup_centered()
+	_message("Unsaved Drawing edits: confirm discarding them, or cancel to retain your work.")
+
+
+func _confirm_drawing_discard() -> void:
+	var action: Callable = _pending_discard_action
+	_pending_discard_action = Callable()
+	if action.is_valid():
+		action.call()
+
+
+func _on_sample(discard_unsaved: bool = false) -> void:
+	if _dirty_object_drafts():
+		_message("Unsaved Object Editor draft: save or close its tab before resetting the campaign.")
+		return
+	if not discard_unsaved and _dirty_drawing_documents():
+		_request_drawing_discard(func() -> void: _on_sample(true))
+		return
+	var previous_root: String = drawing_composition.registry._loaded_root_digest if drawing_composition != null else ""
 	campaign = AtlasCampaign.sample()
 	_reset_view_helpers()
+	if drawing_composition != null:
+		drawing_composition.cancel_stroke()
+		drawing_composition.registry = AtlasDrawingRegistry.new()
+		# Resetting the document must not silently disable the root-concurrency lease.
+		drawing_composition.registry._loaded_root_digest = previous_root
+		drawing_composition.set_library(AtlasObjectLibrary.new(ProjectSettings.globalize_path(save_path)))
+		drawing_composition.active_layer_by_detail.clear()
+		drawing_composition.selected_instance_id = ""
+		drawing_composition.invalidate()
 	edits.reset(campaign, false)
 	_show_map(campaign.get_map(campaign.root_map_id))
 	_message("Sample campaign reset (not saved).")
@@ -659,45 +722,44 @@ func _on_sample() -> void:
 
 func _on_save() -> void:
 	canvas.commit_edit()
-	var result: Error = AtlasCampaignStore.save_campaign(campaign, save_path, store_io)
-	if result == OK:
-		var unsaved_drawing: bool = false
-		if drawing_composition != null:
-			for doc: DrawingDocument in drawing_composition.registry._documents.values():
-				if doc.is_dirty():
-					unsaved_drawing = true
-					break
-		if not unsaved_drawing:
-			edits.mark_saved()
-		_message("Legacy campaign saved; Drawing changes require T-066 multi-file save." if unsaved_drawing else "Saved to %s" % save_path)
-	else:
-		_message("Save failed: %s" % result)
+	if drawing_composition == null:
+		_message("Drawing workspace is unavailable; campaign not saved.")
+		return
+	var saved: DrawingResult = AtlasCampaignStore.save_portable(campaign,
+		drawing_composition.registry, drawing_composition.library, save_path, store_io)
+	if not saved.ok:
+		_message("Campaign save failed: %s %s" % [saved.code, saved.message])
+		return
+	edits.mark_saved()
+	_message("Saved generation %s (campaign, sparse Drawings and Object Assets)." % saved.value["generation"])
 
 
-func _on_load() -> void:
-	var result: AtlasStoreResult = AtlasCampaignStore.load_result(save_path, store_io)
+func _on_load(discard_unsaved: bool = false) -> void:
+	if _dirty_object_drafts():
+		_message("Unsaved Object Editor draft: save or close its tab before loading another campaign.")
+		return
+	if not discard_unsaved and _dirty_drawing_documents():
+		_request_drawing_discard(func() -> void: _on_load(true))
+		return
+	var result: AtlasStoreResult = AtlasCampaignStore.load_portable_result(save_path, store_io)
 	if result.campaign == null:
 		_message(result.message)
 		return
 	campaign = result.campaign
 	_reset_view_helpers()
-	# Loading a different campaign must never retain uncommitted Drawing docs
-	# from the previous in-memory project. T-066 will reopen its saved bundle.
 	if drawing_composition != null:
 		drawing_composition.cancel_stroke()
-		drawing_composition.registry = AtlasDrawingRegistry.new()
 		drawing_composition.active_layer_by_detail.clear()
 		drawing_composition.selected_instance_id = ""
 		drawing_composition.invalidate()
-		drawing_composition.library.load()
-	# AtlasObjectEditorWindow holds captures of the old campaign; do not reuse it.
 	if object_editor_window != null:
 		object_editor_window.queue_free()
 		object_editor_window = null
 	edits.reset(campaign, not result.recovered)
+	_restored_bundle = result
 	_bind_drawing_composition()
 	_show_map(campaign.get_map(campaign.root_map_id))
-	_message(result.message + " Save to repair the current checkpoint." if result.recovered else "Campaign loaded.")
+	_message(result.message + " Save to repair the current checkpoint." if result.recovered else "Portable campaign generation loaded.")
 
 
 func _reset_view_helpers() -> void:

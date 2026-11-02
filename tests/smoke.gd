@@ -237,7 +237,7 @@ func _test_drawing_input() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
 	editor.load_saved_on_startup = false
-	editor.save_path = "user://atlas_input_smoke.scn"
+	editor.save_path = "user://atlas_input_smoke-%s.scn" % DrawingDocument.new_id()
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame
@@ -410,7 +410,7 @@ func _test_board_workflow() -> void:
 	var scene: Node = load("res://main.tscn").instantiate()
 	var editor: AtlasEditor = scene.get_node("Interface/UI/WorkspaceSplit/Workspace")
 	editor.load_saved_on_startup = false
-	editor.save_path = "user://atlas_board_workflow.scn"
+	editor.save_path = "user://atlas_board_workflow-%s.scn" % DrawingDocument.new_id()
 	root.add_child(scene)
 	for frame: int in range(6):
 		await process_frame

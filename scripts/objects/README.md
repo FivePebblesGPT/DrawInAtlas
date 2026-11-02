@@ -88,14 +88,14 @@ placements; the **prompt UI** belongs to T-065. NULL placeholders preserve
 instance IDs/generations, original source keys and transforms, and remain
 selectable inside a bounded local marker. Nested dependencies are T-064.
 
-**Important non-claim:** This is not the final, campaign-wide atomic storage
-engine. The separately persisted object index is a transitional integration
-interface; **T-066 must incorporate the registry, instance records and
-version refs into one authoritative campaign root generation with durable
-commit/recovery rules**. T-055 mounts Object placements in the real Atlas
+**Important distinction:** This T-060 separately persisted object index
+remains a transitional integration interface. T-066 subsequently incorporated
+the Object Asset registry snapshot, instance records and immutable source
+version references into the authoritative campaign generation/root with
+verified commit and recovery rules; see `docs/DRAWING_STORAGE_CONTRACT.md`. T-055 mounts Object placements in the real Atlas
 editor; T-062 supplies the dedicated Object Editor tab, Save/Save As UI and
-unsaved-close workflow. The current legacy `.scn` save does not already embed
-these new records. A single Git monorepo and a single Drawing implementation
+unsaved-close workflow. The retained legacy `.scn` codec still does not embed these
+records, but the main editor now uses the T-066 portable generation save. A single Git monorepo and a single Drawing implementation
 are retained. No owner UX gate is treated as satisfied by these headless tests.
 
 ## Validation
@@ -140,8 +140,8 @@ unbounded sparse art.
 
 T-055 is still responsible for adding an `Edit Source` action to the main
 Atlas selection UI and rendering placed instances in that canvas. T-065 adds
-the Asset Browser dock and object deletion/NULL prompts. T-066 replaces the
-temporary component-level registry with unified campaign-generation saving.
+the Asset Browser dock and object deletion/NULL prompts. T-066 adds unified campaign-generation saving while retaining the temporary
+component-level registry for Object Asset compatibility.
 
 ```sh
 godot --headless --path . --script res://tests/object_editor_smoke.gd

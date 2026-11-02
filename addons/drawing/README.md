@@ -57,9 +57,11 @@ refs, verifies them, and atomically publishes the project generation, call
 `mark_published(revision, published_refs)`; it rejects lost dirty tile refs.
 `open_manifest(manifest, fetcher)` validates the generic layer tree and creates
 lazy chunk references; content fetch and digest verification occur on read.
-T-066 chooses the physical manifest/codec, fault-injects generation recovery,
-cache eviction, and guarantees atomic multi-file publication. The current
-API is an in-memory logical protocol, **not an implemented project save**.
+T-066 now supplies the physical `DrawingBundleManifest` and `DrawingChunkStore`
+inside this package and the Atlas-owned `AtlasCampaignBundle` generation
+coordinator; see `docs/DRAWING_STORAGE_CONTRACT.md`. This paragraph describes
+the **logical** API, which remains usable without Atlas even though the host
+now implements portable multi-file saving.
 
 Undo/redo replays compact raster deltas for an independent document. Since
 T-054, `DrawingDocument` also owns an ordered local history with optional
@@ -77,7 +79,7 @@ undo/redo. The host must supply validated stable map/floor/detail/document/asset
 IDs and any affected world bounds; a UI-only restoration cannot recreate
 missing geometry. Atlas's multi-document move and Save As history callbacks
 are tested in `tests/drawing_history_smoke.gd`; concrete asset registry/editor
-and physical campaign save remain T-060/T-062/T-066. Structural metadata
+and physical campaign save are implemented by T-060/T-062/T-066. Structural metadata
 mutations are currently dirty but not local undo commands (follow-up feature
 scope). T-058 now implements one-text-object-per-layer commits and undoable rasterization;
 T-060 implements durable linked Object Assets; T-068 profiles and selects
@@ -102,7 +104,7 @@ scenes, autoloads, plugins or root `project.godot` are staged. See
 `drawing-standalone-v1` `.drawing` single-file documents. It validates SHA-256
 and exact hidden-RGB pixels on reopen, maintains stable IDs and keeps signed
 chunk coordinates as strings to survive Godot JSON's floating numeric parser.
-It is a **standalone file codec**, not Atlas campaign persistence (T-066).
+It is a **standalone file codec**, distinct from the T-066 Atlas campaign generation format.
 `tools/build_drawing_app.py` stages these canonical package files byte-for-byte
 into an independently runnable project. The untracked `drawing/addons/` staging
 folder must never be edited or committed. The `drawing_package_consumer` fixture
@@ -130,8 +132,7 @@ unsupported glyphs use a visible replacement with an explicit warning.
 Standalone `DrawingFileIO` writes the referenced OFL Lato font binary, stable
 identity and SHA-256 inside the `.drawing` JSON envelope with the license;
 reopen validates it before exposing the text. These files are relocatable as
-single documents. This is not the multi-file campaign `Fonts/` save contract
-(T-066), nor an instruction to embed unknown user-system font files without
+single documents. The multi-file campaign `Fonts/` contract is now supplied by T-066; this standalone file format remains independent, nor an instruction to embed unknown user-system font files without
 legal review. T-055 will integrate this same API with Atlas canvas; T-062 adds
 Object Editor document tabs.
 

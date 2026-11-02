@@ -6,6 +6,20 @@ extends RefCounted
 const DEFAULT_PATH: String = "user://drawinatlas_campaign.scn"
 
 
+## T-066 portable generation format. The legacy .scn codec remains available
+## for old regression fixtures but is never the new Atlas editor save path.
+static func save_portable(campaign: AtlasCampaign, registry: AtlasDrawingRegistry,
+		library: AtlasObjectLibrary, path: String = DEFAULT_PATH,
+		io: AtlasStoreIO = null) -> DrawingResult:
+	return AtlasCampaignBundle.save(campaign, registry, library,
+		ProjectSettings.globalize_path(path), io)
+
+
+static func load_portable_result(path: String = DEFAULT_PATH,
+		io: AtlasStoreIO = null) -> AtlasStoreResult:
+	return AtlasCampaignBundle.load(ProjectSettings.globalize_path(path), io)
+
+
 static func save_campaign(campaign: AtlasCampaign, path: String = DEFAULT_PATH,
 		io: AtlasStoreIO = null) -> Error:
 	if campaign == null or not path.ends_with(".scn") or path.is_empty():

@@ -258,6 +258,15 @@ func load() -> DrawingResult:
 	if not parsed is Dictionary or parsed.get("schema") != SCHEMA \
 		or not parsed.get("assets") is Array or not parsed.get("instances") is Array:
 		return DrawingResult.failure("INDEX", "Unsupported object registry")
+	return load_snapshot(parsed)
+
+
+## Restore an immutable campaign generation independently of a later component index.
+func load_snapshot(snapshot: Dictionary) -> DrawingResult:
+	var parsed: Dictionary = snapshot
+	if not _ready_path() or parsed.get("schema") != SCHEMA \
+			or not parsed.get("assets") is Array or not parsed.get("instances") is Array:
+		return DrawingResult.failure("INDEX", "Invalid frozen Object Asset index")
 	var asset_records: Array = parsed["assets"]
 	var instance_records: Array = parsed["instances"]
 	if asset_records.size() > MAX_ENTRIES or instance_records.size() > MAX_ENTRIES:
@@ -307,7 +316,7 @@ func load() -> DrawingResult:
 	_assets = assets
 	_instances = instances
 	_cache.clear()
-	_index_hash = FileAccess.get_sha256(_index_path())
+	_index_hash = FileAccess.get_sha256(_index_path()) if FileAccess.file_exists(_index_path()) else ""
 	return DrawingResult.success({"assets": assets.size(), "instances": instances.size()})
 
 
