@@ -115,3 +115,37 @@ retained B after undo and reload, redo after delete failure, generation and
 revision rejection, independent Save As, partial-publication fault injection,
 concurrent registry guard/reload, directory move, symlink/traversal defenses,
 and NULL placement hit tests.
+
+## T-062 Object Editor integration (2026-11-02)
+
+Host the canonical Drawing UI in an Atlas project by adding
+`AtlasObjectEditorWindow.new()` as a child of the scene tree, then call
+`configure(library, history, current_context_callable)`. The callable must
+return the real `DrawingHistoryContext` with map/floor/detail, selected instance
+and source asset ID; it is checked before opening and **again at publication**.
+Use `open_instance(instance_id)` for an origin-bound Object Editor tab, or
+`open_source(asset_id)` for a standalone asset tab; the latter's Save As cannot
+rebind Atlas instances. Closing tabs releases the origin capture.
+
+The Drawing-owned `DrawingObjectEditorSession` works on a private draft and
+receives only host-injected publisher callbacks: the Drawing package imports no
+Atlas classes. Save publishes a versioned immutable asset and refreshes all
+linked placements; Save As from an origin executes T-054's durable B creation
+plus instance rebind as one history command. Undo retains B and redo reuses its
+exact ID. Errors preserve the draft/dirty indicator. Object name, signed
+local origin and optional authoring rectangle are stored with the asset record;
+`bounds` is an authoring guide, **not a pixel clip**. Older T-060 registries
+without these optional frame fields remain readable with default origin and
+unbounded sparse art.
+
+T-055 is still responsible for adding an `Edit Source` action to the main
+Atlas selection UI and rendering placed instances in that canvas. T-065 adds
+the Asset Browser dock and object deletion/NULL prompts. T-066 replaces the
+temporary component-level registry with unified campaign-generation saving.
+
+```sh
+godot --headless --path . --script res://tests/object_editor_smoke.gd
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd
+```

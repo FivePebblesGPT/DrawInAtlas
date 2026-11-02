@@ -91,6 +91,19 @@ jobs:
           godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
           grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
+      - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
+          grep -q 'OBJECT_EDITOR_PASSED' /tmp/godot-object-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_EDITOR_FAILED:' /tmp/godot-object-editor.log; then exit 1; fi
+          python3 tools/build_drawing_app.py --in-place
+          # Staged licensed fonts must be imported before UI text editing.
+          godot --headless --editor --path drawing --import --quit
+          godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
+          grep -q 'DRAWING_OBJECT_UI_PASSED' /tmp/godot-object-editor-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|DRAWING_OBJECT_UI_FAILED:' /tmp/godot-object-editor-ui.log; then exit 1; fi
       - name: Run domain smoke tests
         shell: bash
         run: |

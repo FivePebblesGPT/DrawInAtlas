@@ -61,6 +61,25 @@ static func _integer(value: Variant) -> bool:
 		and value >= 0 and value <= 2147483647 and floorf(float(value)) == float(value)
 
 
+static func _valid_frame(record: Dictionary) -> bool:
+	var origin: Variant = record.get("origin", [0, 0])
+	var bounds: Variant = record.get("bounds", [0, 0, 0, 0])
+	if not origin is Array or origin.size() != 2 or not bounds is Array or bounds.size() != 4:
+		return false
+	for value: Variant in origin:
+		if not _signed_frame_integer(value):
+			return false
+	for index: int in range(4):
+		if not _signed_frame_integer(bounds[index]) or (index >= 2 and bounds[index] < 0):
+			return false
+	return true
+
+
+static func _signed_frame_integer(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value)) and \
+		absf(float(value)) <= 1000000000.0 and floorf(float(value)) == float(value)
+
+
 func _relative(asset_id: String, version: int) -> String:
 	return "Objects/%s/v%06d.drawing" % [asset_id, version]
 
@@ -252,10 +271,13 @@ func load() -> DrawingResult:
 		var asset_id: Variant = row.get("id")
 		var revision: Variant = row.get("revision")
 		if not _id(asset_id) or not _integer(revision) or revision < 1 or assets.has(asset_id) \
+				or not _valid_frame(row) \
 				or not row.get("name") is String or not row.get("sha256") is String \
 				or (row["sha256"] as String).length() != 64 or row.get("path") != _relative(asset_id, revision):
 			return DrawingResult.failure("INDEX", "Invalid asset ID, revision or path")
 		assets[asset_id] = row.duplicate(true)
+		assets[asset_id]["origin"] = row.get("origin", [0, 0])
+		assets[asset_id]["bounds"] = row.get("bounds", [0, 0, 0, 0])
 		assets[asset_id]["revision"] = int(revision)
 	for value: Variant in instance_records:
 		if not value is Dictionary:
@@ -317,7 +339,8 @@ func _discard_staged(record: Dictionary) -> void:
 
 
 func _stage_asset(source: DrawingDocument, asset_id: String,
-		version: int, label: String) -> DrawingResult:
+		version: int, label: String, origin: Vector2i = Vector2i.ZERO,
+		bounds: Rect2i = Rect2i()) -> DrawingResult:
 	var dir: String = root_path.path_join(asset_id)
 	if _linked_component(asset_id, version):
 		return DrawingResult.failure("PATH", "Object file or parent directory is a symlink")
@@ -331,6 +354,8 @@ func _stage_asset(source: DrawingDocument, asset_id: String,
 	if not written.ok:
 		return written
 	return DrawingResult.success({"id": asset_id, "name": label,
+		"origin": [origin.x, origin.y], "bounds": [bounds.position.x,
+			bounds.position.y, bounds.size.x, bounds.size.y],
 		"revision": version, "path": relative,
 		"sha256": FileAccess.get_sha256(absolute)})
 
@@ -377,6 +402,12 @@ func begin_draft(asset_id: String, origin_instance_id: String = "") -> DrawingRe
 		return copy
 	var draft: AtlasObjectDraft = AtlasObjectDraft.new(copy.value, asset_id,
 		_assets[asset_id]["revision"], _assets[asset_id]["name"])
+	var frame: Dictionary = _assets[asset_id]
+	var frame_origin: Array = frame.get("origin", [0, 0])
+	var frame_bounds: Array = frame.get("bounds", [0, 0, 0, 0])
+	draft.origin = Vector2i(int(frame_origin[0]), int(frame_origin[1]))
+	draft.bounds = Rect2i(int(frame_bounds[0]), int(frame_bounds[1]),
+		int(frame_bounds[2]), int(frame_bounds[3]))
 	if not origin_instance_id.is_empty():
 		if not _instances.has(origin_instance_id):
 			return DrawingResult.failure("INSTANCE", "Missing originating placement")
@@ -398,7 +429,8 @@ func save_draft(draft: AtlasObjectDraft) -> DrawingResult:
 	if not detached.ok:
 		return detached
 	var version: int = draft.source_revision + 1
-	var staged: DrawingResult = _stage_asset(detached.value, draft.source_id, version, draft.name)
+	var staged: DrawingResult = _stage_asset(detached.value, draft.source_id, version,
+		draft.name, draft.origin, draft.bounds)
 	if not staged.ok:
 		return staged
 	var next_assets: Dictionary[String, Dictionary] = _assets_copy()
@@ -434,7 +466,7 @@ func _put_binding(instance_id: String, generation: String, original: String,
 
 func _publish_variant_and_bind(draft: AtlasObjectDraft, new_id: String,
 		instance_id: String, generation: String, original: String,
-		expected_revision: int) -> bool:
+		expected_revision: int, label: String) -> bool:
 	if not _instances.has(instance_id) or _instances[instance_id].generation != generation \
 		or _instances[instance_id].source_id != original \
 		or _instances[instance_id].revision != expected_revision \
@@ -443,7 +475,8 @@ func _publish_variant_and_bind(draft: AtlasObjectDraft, new_id: String,
 	var copied: DrawingResult = _clone_document(draft.document, true)
 	if not copied.ok:
 		return false
-	var staged: DrawingResult = _stage_asset(copied.value, new_id, 1, draft.name + " copy")
+	var staged: DrawingResult = _stage_asset(copied.value, new_id, 1,
+		label, draft.origin, draft.bounds)
 	if not staged.ok:
 		return false
 	var next_assets: Dictionary[String, Dictionary] = _assets_copy()
@@ -462,16 +495,20 @@ func _publish_variant_and_bind(draft: AtlasObjectDraft, new_id: String,
 
 func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 		before: DrawingHistoryContext = null,
-		after: DrawingHistoryContext = null) -> DrawingResult:
+		after: DrawingHistoryContext = null, variant_name: String = "") -> DrawingResult:
 	if draft == null or not _assets.has(draft.source_id) or \
 		_assets[draft.source_id]["revision"] != draft.source_revision:
 		return DrawingResult.failure("STALE_SOURCE", "Source changed since draft opened")
+	var label: String = variant_name.strip_edges() if not variant_name.is_empty() else draft.name + " copy"
+	if label.is_empty() or label.length() > 128 or "\n" in label or "\r" in label:
+		return DrawingResult.failure("NAME", "Invalid new Object Asset name")
 	if draft.origin_instance_id.is_empty():
 		var cloned: DrawingResult = _clone_document(draft.document, true)
 		if not cloned.ok:
 			return cloned
 		var fresh_id: String = _new_id("asset")
-		var staged: DrawingResult = _stage_asset(cloned.value, fresh_id, 1, draft.name + " copy")
+		var staged: DrawingResult = _stage_asset(cloned.value, fresh_id, 1,
+			label, draft.origin, draft.bounds)
 		if not staged.ok:
 			return staged
 		var next_assets: Dictionary[String, Dictionary] = _assets_copy()
@@ -483,6 +520,7 @@ func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 		_cache[fresh_id] = cloned.value
 		draft.source_id = fresh_id
 		draft.source_revision = 1
+		draft.name = label
 		# The editor must never receive the live published document itself.
 		draft.document = (_clone_document(cloned.value, false).value as DrawingDocument)
 		asset_published.emit(fresh_id, 1)
@@ -508,7 +546,8 @@ func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 	var exists: Callable = func(asset_id: String) -> bool:
 		return asset_exists(asset_id)
 	var publish: Callable = func(instance_id: String, gen: String, src: String, dst: String) -> bool:
-		var ok: bool = _publish_variant_and_bind(draft, dst, instance_id, gen, src, expected["revision"])
+		var ok: bool = _publish_variant_and_bind(draft, dst, instance_id, gen, src,
+			expected["revision"], label)
 		if ok:
 			expected["revision"] = expected["revision"] + 1
 		return ok
@@ -532,6 +571,7 @@ func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 		return opened
 	draft.source_id = variant
 	draft.source_revision = 1
+	draft.name = label
 	draft.document = (_clone_document(opened.value, false).value as DrawingDocument)
 	draft.origin_instance_id = ""
 	return DrawingResult.success(variant)

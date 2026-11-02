@@ -9,6 +9,8 @@ var origin_instance_id: String = ""
 var origin_generation: String = ""
 var origin_binding_revision: int = -1
 var name: String = ""
+var origin: Vector2i = Vector2i.ZERO
+var bounds: Rect2i = Rect2i()
 
 
 func _init(source: DrawingDocument = null, asset_id: String = "",

@@ -1,8 +1,12 @@
 extends Control
-## Standalone Drawing shell: no campaign, map or Atlas plugin dependencies.
+## Shared Drawing shell; the host supplies Object Asset publication callbacks.
+## No campaign, map, Atlas registry or history imports in this UI.
 
-const CANVAS_SCRIPT: Script = preload("res://scripts/canvas.gd")
+const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
 
+signal object_tab_closed(session: DrawingObjectEditorSession)
+
+var start_blank_document: bool = true
 var tabs: Array[Dictionary] = []
 var active_tab: int = -1
 var active_tool: String = "Brush"
@@ -34,13 +38,25 @@ var text_position: Vector2i = Vector2i.ZERO
 var layer_search: LineEdit
 var layer_page: int = 0
 var layer_page_label: Label
+var object_open_dialog: FileDialog
+var close_dialog: ConfirmationDialog
+var rename_dialog: ConfirmationDialog
+var rename_field: LineEdit
+var frame_dialog: ConfirmationDialog
+var frame_fields: Array[SpinBox] = []
+var variant_dialog: ConfirmationDialog
+var variant_name: LineEdit
+var _closing_index: int = -1
+var _close_after_save: bool = false
+var _local_save_as: bool = false
 const ROW_PAGE: int = 200
 
 
 
 func _ready() -> void:
 	_build_interface()
-	new_drawing()
+	if start_blank_document:
+		new_drawing()
 
 
 func _build_interface() -> void:
@@ -52,6 +68,12 @@ func _build_interface() -> void:
 	_add_menu(menu, "File", ["New", "Open…", "Save", "Save As…"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save")])
+	_add_menu(menu, "Object", ["New Object source", "Open Object source…",
+		"Save Object", "Save Object As…", "Rename Object…", "Object frame…", "Close tab"],
+		[Callable(self, "new_object"), Callable(self, "_ask_open_object"),
+		Callable(self, "_save"), Callable(self, "_ask_save"),
+		Callable(self, "_ask_rename_object"), Callable(self, "_ask_object_frame"),
+		Callable(self, "_request_close_current")])
 	_add_menu(menu, "Edit", ["Undo", "Redo"],
 		[Callable(self, "_undo"), Callable(self, "_redo")])
 	_add_menu(menu, "Layer", ["Add group", "Add raster layer", "Rasterize text layer", "Remove selected", "Toggle visibility"],
@@ -99,6 +121,11 @@ func _build_interface() -> void:
 	add_tab.text = "+"
 	add_tab.pressed.connect(new_drawing)
 	tabs_line.add_child(add_tab)
+	var close_tab: Button = Button.new()
+	close_tab.text = "×"
+	close_tab.tooltip_text = "Close current tab (with unsaved-changes prompt)"
+	close_tab.pressed.connect(_request_close_current)
+	tabs_line.add_child(close_tab)
 	var content: HBoxContainer = HBoxContainer.new()
 	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(content)
@@ -180,6 +207,65 @@ func _build_interface() -> void:
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	save_dialog.file_selected.connect(_save_file)
+	save_dialog.canceled.connect(_cancel_pending_close)
+	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
+	object_open_dialog.file_selected.connect(_open_object_file)
+	close_dialog = ConfirmationDialog.new()
+	close_dialog.title = "Unsaved Object/Drawing changes"
+	close_dialog.dialog_text = "Save changes before closing this tab?"
+	add_child(close_dialog)
+	close_dialog.confirmed.connect(_save_and_close)
+	close_dialog.add_button("Discard", false, "discard")
+	close_dialog.custom_action.connect(func(action: String) -> void:
+		if action == "discard":
+			close_dialog.hide()
+			_close_index(_closing_index))
+	rename_dialog = ConfirmationDialog.new()
+	rename_dialog.title = "Object source name"
+	add_child(rename_dialog)
+	rename_field = LineEdit.new()
+	rename_field.custom_minimum_size.x = 310
+	rename_dialog.add_child(rename_field)
+	rename_dialog.confirmed.connect(_rename_object)
+	frame_dialog = ConfirmationDialog.new()
+	frame_dialog.title = "Object-local origin and bounds"
+	add_child(frame_dialog)
+	var frame_grid: GridContainer = GridContainer.new()
+	frame_grid.columns = 2
+	frame_dialog.add_child(frame_grid)
+	for entry: Dictionary in [{"label": "Origin X", "nonnegative": false},
+		{"label": "Origin Y", "nonnegative": false},
+		{"label": "Bounds X", "nonnegative": false},
+		{"label": "Bounds Y", "nonnegative": false},
+		{"label": "Bounds width", "nonnegative": true},
+		{"label": "Bounds height", "nonnegative": true}]:
+		var field_label: Label = Label.new()
+		field_label.text = entry["label"]
+		frame_grid.add_child(field_label)
+		var field: SpinBox = SpinBox.new()
+		field.step = 1.0
+		field.min_value = 0 if entry["nonnegative"] else -1000000000
+		field.max_value = 1000000000
+		field.custom_minimum_size.x = 240
+		frame_grid.add_child(field)
+		frame_fields.append(field)
+	var frame_info: Label = Label.new()
+	frame_info.text = "Empty bounds = unrestricted sparse canvas; guides never clip pixels."
+	frame_dialog.add_child(frame_info)
+	frame_dialog.confirmed.connect(_change_object_frame)
+	variant_dialog = ConfirmationDialog.new()
+	variant_dialog.title = "Save Object as independent asset"
+	add_child(variant_dialog)
+	var variant_form: VBoxContainer = VBoxContainer.new()
+	variant_dialog.add_child(variant_form)
+	var destination: Label = Label.new()
+	destination.text = "Target: campaign/Objects/<new asset ID>/v000001.drawing"
+	variant_form.add_child(destination)
+	variant_name = LineEdit.new()
+	variant_name.placeholder_text = "New Object name"
+	variant_name.custom_minimum_size.x = 400
+	variant_form.add_child(variant_name)
+	variant_dialog.confirmed.connect(_save_as_named_object)
 	_build_text_dialog()
 
 
@@ -207,6 +293,10 @@ func _pack_color(value: Color) -> int:
 	return clampi(roundi(value.r * 255.0), 0, 255) | (clampi(roundi(value.g * 255.0), 0, 255) << 8) | (clampi(roundi(value.b * 255.0), 0, 255) << 16) | (clampi(roundi(value.a * 255.0), 0, 255) << 24)
 
 
+func current_object() -> DrawingObjectEditorSession:
+	return tabs[active_tab].get("object") as DrawingObjectEditorSession if active_tab >= 0 else null
+
+
 func current_document() -> DrawingDocument:
 	return tabs[active_tab]["document"] as DrawingDocument if active_tab >= 0 else null
 
@@ -227,6 +317,238 @@ func new_drawing() -> void:
 	_activate(tabs.size() - 1)
 
 
+## Atlas host opens a captured, detached Object Asset draft through this API.
+## The very same Drawing canvas, text editor and layer panel edit the object.
+func attach_object_session(session: DrawingObjectEditorSession) -> DrawingResult:
+	if session == null or session.document == null:
+		return DrawingResult.failure("OBJECT", "Missing Object Editor session")
+	session.document.record_selection_history = record_selection_history
+	var layer: String = _first_editable(session.document, DrawingDocument.ROOT_ID)
+	var tab_name: String = "Object: " + session.name
+	tabs.append({"document": session.document, "object": session,
+		"path": "", "title": tab_name, "layer": layer})
+	tab_bar.add_tab(tab_name)
+	_activate(tabs.size() - 1)
+	return DrawingResult.success(active_tab)
+
+
+## Standalone authoring uses ordinary portable .drawing assets; no Atlas
+## instance can be rebound by this local-file publisher.
+func new_object() -> void:
+	new_counter += 1
+	var document: DrawingDocument = DrawingDocument.new()
+	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Group 1")
+	var layer: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1", String(group.value))
+	var session: DrawingObjectEditorSession = DrawingObjectEditorSession.new(document, "", 0,
+		"New object %d" % new_counter)
+	session.save_publisher = _local_publish.bind(false)
+	session.save_as_publisher = _local_publish.bind(true)
+	attach_object_session(session)
+	tabs[active_tab]["local_object"] = true
+	tabs[active_tab]["layer"] = layer.value
+	canvas.layer_id = String(layer.value)
+	_update_status()
+
+
+func _ask_open_object() -> void:
+	object_open_dialog.popup_centered()
+
+
+func _open_object_file(path: String) -> void:
+	var opened: DrawingResult = DrawingObjectEditorFile.open(path)
+	if not opened.ok:
+		_show_error(opened.message)
+		return
+	var data: Dictionary = opened.value
+	var session: DrawingObjectEditorSession = DrawingObjectEditorSession.new(data["document"],
+		data["source_id"], data["source_revision"], data["name"], "", "",
+		data["origin"], data["bounds"])
+	session.save_publisher = _local_publish.bind(false)
+	session.save_as_publisher = _local_publish.bind(true)
+	attach_object_session(session)
+	tabs[active_tab]["local_object"] = true
+	tabs[active_tab]["path"] = path
+	_update_status()
+
+
+func _local_publish(session: DrawingObjectEditorSession, as_variant: bool) -> DrawingResult:
+	var index: int = _find_object_tab(session)
+	if index < 0:
+		return DrawingResult.failure("TAB", "Object Editor tab was closed")
+	var path: String = String(tabs[index].get("_target_path", tabs[index].get("path", "")))
+	if path.is_empty() or (as_variant and path == tabs[index].get("path", "")):
+		return DrawingResult.failure("PATH", "Choose a different target path for Save As")
+	var source: DrawingDocument = session.document
+	if as_variant:
+		var copied: DrawingDocument = DrawingDocument.new(DrawingDocument.new_id(),
+			source.tile_stride, source.density_numerator, source.density_denominator)
+		for node_id: String in source.list_children():
+			var exported: DrawingResult = source.export_subtree(node_id)
+			if not exported.ok:
+				return exported
+			var imported: DrawingResult = copied.import_subtree(exported.value, DrawingDocument.ROOT_ID)
+			if not imported.ok:
+				return imported
+		source = copied
+	var written: DrawingResult = DrawingObjectEditorFile.save(source, path, session.name,
+		session.origin, session.bounds, 1 if as_variant else session.source_revision + 1)
+	if not written.ok:
+		return written
+	var reopened: DrawingResult = DrawingObjectEditorFile.open(path)
+	if not reopened.ok:
+		return reopened
+	tabs[index]["path"] = path
+	tabs[index].erase("_target_path")
+	var snapshot: Dictionary = reopened.value
+	snapshot["detach_origin"] = true
+	return DrawingResult.success(snapshot)
+
+
+func _find_object_tab(session: DrawingObjectEditorSession) -> int:
+	for index: int in range(tabs.size()):
+		if tabs[index].get("object") == session:
+			return index
+	return -1
+
+
+func _ask_rename_object() -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		_show_error("Select an Object Editor tab")
+		return
+	rename_field.text = session.name
+	rename_dialog.popup_centered()
+
+
+func _rename_object() -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		return
+	var changed: DrawingResult = session.set_name(rename_field.text)
+	if changed.ok:
+		_update_status()
+	else:
+		_show_error(changed.message)
+
+
+func _ask_object_frame() -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		_show_error("Select an Object Editor tab")
+		return
+	var values: Array[int] = [session.origin.x, session.origin.y,
+		session.bounds.position.x, session.bounds.position.y,
+		session.bounds.size.x, session.bounds.size.y]
+	for index: int in range(frame_fields.size()):
+		frame_fields[index].value = values[index]
+	frame_dialog.popup_centered()
+
+
+func _change_object_frame() -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		return
+	var origin: Vector2i = Vector2i(int(frame_fields[0].value), int(frame_fields[1].value))
+	var bounds: Rect2i = Rect2i(int(frame_fields[2].value), int(frame_fields[3].value),
+		int(frame_fields[4].value), int(frame_fields[5].value))
+	var changed: DrawingResult = session.set_frame(origin, bounds)
+	if not changed.ok:
+		_show_error(changed.message)
+		return
+	canvas.asset_origin = session.origin
+	canvas.asset_bounds = session.bounds
+	canvas.queue_redraw()
+	_update_status()
+
+
+func _save_as_named_object() -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		return
+	var title: String = variant_name.text.strip_edges()
+	if title.is_empty() or title.length() > 128 or "\n" in title or "\r" in title:
+		_show_error("Choose a 1–128 character Object Asset name")
+		return
+	session.variant_name = title
+	_publish_object(true)
+
+
+func _request_close_current() -> void:
+	_request_close_tab(active_tab)
+
+
+func _request_close_tab(index: int) -> void:
+	if index < 0 or index >= tabs.size():
+		return
+	_closing_index = index
+	_close_after_save = false
+	var session: DrawingObjectEditorSession = tabs[index].get("object") as DrawingObjectEditorSession
+	if session != null and session.is_dirty() or (session == null and
+		(tabs[index]["document"] as DrawingDocument).is_dirty()):
+		close_dialog.popup_centered()
+	else:
+		_close_index(index)
+
+
+func _cancel_pending_close() -> void:
+	_closing_index = -1
+	_close_after_save = false
+	_local_save_as = false
+
+
+func _save_and_close() -> void:
+	if _closing_index < 0:
+		return
+	_close_after_save = true
+	_activate(_closing_index)
+	_save()
+
+
+func _close_index(index: int) -> void:
+	if index < 0 or index >= tabs.size():
+		return
+	var session: DrawingObjectEditorSession = tabs[index].get("object") as DrawingObjectEditorSession
+	if session != null:
+		object_tab_closed.emit(session)
+	tabs.remove_at(index)
+	tab_bar.remove_tab(index)
+	_closing_index = -1
+	_close_after_save = false
+	active_tab = -1
+	if tabs.is_empty():
+		canvas.document = null
+		canvas.layer_id = ""
+		layers.clear()
+		status.text = "No document open"
+	else:
+		_activate(mini(index, tabs.size() - 1))
+
+
+func _close_if_saved() -> void:
+	if not _close_after_save or _closing_index != active_tab:
+		return
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null or not session.is_dirty():
+		if not current_document().is_dirty():
+			_close_index(active_tab)
+
+
+func _sync_object_tab() -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		return
+	tabs[active_tab]["document"] = session.document
+	tabs[active_tab]["title"] = "Object: " + session.name
+	var selected: String = current_layer()
+	if not session.document.has_node(selected):
+		tabs[active_tab]["layer"] = _first_editable(session.document, DrawingDocument.ROOT_ID)
+	canvas.document = session.document
+	canvas.layer_id = current_layer()
+	canvas.asset_origin = session.origin
+	canvas.asset_bounds = session.bounds
+	_after_edit()
+
+
 func _activate(index: int) -> void:
 	if index < 0 or index >= tabs.size():
 		return
@@ -234,6 +556,9 @@ func _activate(index: int) -> void:
 	tab_bar.current_tab = index
 	canvas.document = current_document()
 	canvas.layer_id = current_layer()
+	var object_session: DrawingObjectEditorSession = current_object()
+	canvas.asset_origin = object_session.origin if object_session != null else Vector2i.ZERO
+	canvas.asset_bounds = object_session.bounds if object_session != null else Rect2i()
 	canvas.selected = Rect2i()
 	canvas.session = null
 	canvas.queue_redraw()
@@ -524,9 +849,15 @@ func _update_status() -> void:
 	if active_tab < 0:
 		return
 	var document: DrawingDocument = current_document()
-	var dirty: bool = document.is_dirty()
+	var session: DrawingObjectEditorSession = current_object()
+	var dirty: bool = session.is_dirty() if session != null else document.is_dirty()
 	tab_bar.set_tab_title(active_tab, String(tabs[active_tab]["title"]) + (" *" if dirty else ""))
-	status.text = "%s | %s | zoom %.0f%% | revision %d | %s" % [active_tool,
+	var origin: String = " | instance %s @ %s" % [session.origin_instance_id,
+		session.origin_map_id] if session != null and not session.origin_instance_id.is_empty() else ""
+	var source: String = "Object %s (%s) rev %d%s | " % [session.name,
+		session.source_id if not session.source_id.is_empty() else "new", session.source_revision,
+		origin] if session != null else ""
+	status.text = "%s%s | %s | zoom %.0f%% | revision %d | %s" % [source, active_tool,
 		current_layer(), canvas.zoom * 100.0, document.revision,
 		"Unsaved changes" if dirty else "Saved"]
 
@@ -571,12 +902,33 @@ func _ask_open() -> void:
 
 
 func _ask_save() -> void:
-	if active_tab >= 0:
+	if active_tab < 0:
+		return
+	var session: DrawingObjectEditorSession = current_object()
+	if session != null and not session.save_as_publisher.is_valid():
+		_show_error("No Object Asset publisher is connected")
+		return
+	if session != null and not bool(tabs[active_tab].get("local_object", false)):
+		variant_name.text = session.name + " copy"
+		variant_dialog.popup_centered()
+	else:
+		_local_save_as = session != null
 		save_dialog.popup_centered()
 
 
 func _save() -> void:
 	if active_tab < 0:
+		return
+	var session: DrawingObjectEditorSession = current_object()
+	if session != null:
+		if not session.save_publisher.is_valid():
+			_show_error("No Object Asset publisher is connected")
+			return
+		if session.source_id.is_empty() and tabs[active_tab]["path"].is_empty():
+			_local_save_as = false
+			save_dialog.popup_centered()
+		else:
+			_publish_object(false)
 		return
 	var path: String = tabs[active_tab]["path"]
 	if path.is_empty():
@@ -585,17 +937,39 @@ func _save() -> void:
 		_save_file(path)
 
 
+func _publish_object(as_variant: bool) -> void:
+	var session: DrawingObjectEditorSession = current_object()
+	if session == null:
+		return
+	var result: DrawingResult = session.save_as() if as_variant else session.save()
+	if not result.ok:
+		if active_tab >= 0:
+			tabs[active_tab].erase("_target_path")
+		_cancel_pending_close()
+		_show_error(result.message)
+		return
+	_sync_object_tab()
+	_close_if_saved()
+
+
 func _save_file(path: String) -> void:
 	if active_tab < 0:
 		return
 	if not path.to_lower().ends_with(".drawing"):
 		path += ".drawing"
+	if current_object() != null:
+		tabs[active_tab]["_target_path"] = path
+		_publish_object(_local_save_as)
+		_local_save_as = false
+		return
 	var result: DrawingResult = DrawingFileIO.save(current_document(), path)
 	if result.ok:
 		tabs[active_tab]["path"] = path
 		tabs[active_tab]["title"] = path.get_file()
 		_update_status()
+		_close_if_saved()
 	else:
+		_cancel_pending_close()
 		_show_error(result.message)
 
 
@@ -648,5 +1022,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else:
 				_undo()
 		KEY_Y: _redo()
+		KEY_W: _request_close_current()
 		_: return
 	get_viewport().set_input_as_handled()

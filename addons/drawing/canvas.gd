@@ -17,6 +17,10 @@ var grid_spacing: int = 0
 var zoom: float = 4.0
 var camera: Vector2 = Vector2.ZERO
 var selected: Rect2i = Rect2i()
+## Object Editor authoring guides only. Neither changes raster pixels nor clips
+## the infinite sparse canvas; the origin and optional bounds are source-local.
+var asset_origin: Vector2i = Vector2i.ZERO
+var asset_bounds: Rect2i = Rect2i()
 var session: DrawingEditSession
 var dragging: bool = false
 var panning: bool = false
@@ -73,6 +77,13 @@ func _draw() -> void:
 			_frame_textures.append(texture)
 			draw_texture_rect(texture, Rect2(pixel_to_position(Vector2(area.position)),
 				Vector2(area.size) * zoom), false)
+	if asset_bounds.has_area():
+		draw_rect(Rect2(pixel_to_position(Vector2(asset_bounds.position)),
+			Vector2(asset_bounds.size) * zoom), Color(0.2, 0.8, 0.5, 0.8), false, 1.5)
+	if asset_origin != Vector2i.ZERO or asset_bounds.has_area():
+		var anchor: Vector2 = pixel_to_position(Vector2(asset_origin))
+		draw_line(anchor + Vector2(-6, 0), anchor + Vector2(6, 0), Color(1, 0.75, 0.3), 1.0)
+		draw_line(anchor + Vector2(0, -6), anchor + Vector2(0, 6), Color(1, 0.75, 0.3), 1.0)
 	if selected.has_area():
 		draw_rect(Rect2(pixel_to_position(Vector2(selected.position)),
 			Vector2(selected.size) * zoom), Color(0.2, 0.6, 1.0), false, 1.5)

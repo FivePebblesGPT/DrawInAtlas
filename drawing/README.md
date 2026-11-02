@@ -68,7 +68,7 @@ currently capped at 128 MiB and 4096 chunks; writes use a same-directory
 This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,
 retention, backup, migration or recovery from T-066. It is not yet a complete
-production drawing editor: Object Editor tabs, advanced tool/options layout,
+production drawing editor: advanced tool/options layout,
 full structural history and performance/native acceleration belong to later
 tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
 
@@ -105,8 +105,7 @@ Missing/modified fonts fail explicitly, while unsupported glyphs show a visible
 `?` replacement with a `GLYPH_FALLBACK` warning; original editable text is intact.
 Arbitrary system fonts are never silently embedded. The same glyph atlas CPU path is used for
 editable preview and rasterization so their RGBA8 output matches exactly at
-native pixel density. Advanced typography, full Unicode fallback and the
-Atlas Object Editor are downstream work.
+native pixel density. Advanced typography, full Unicode fallback and Atlas-wide Object Editor integration remain downstream work.
 
 ```sh
 # Import after each fresh --in-place staging to rebuild FontFile resources.
@@ -123,4 +122,38 @@ Validate the font bundle **inside an exported Linux `.pck`** after building
 godot --headless --path /tmp/drawing-dist \
   --main-pack /tmp/drawing-dist/Drawing.pck \
   --script /tmp/drawing-dist/project/tests/packaged_fonts_smoke.gd
+```
+
+## Object Editor tabs (T-062)
+
+The **Object** menu can open a new or existing object source in a dedicated
+Drawing document tab using the **same** shared canvas, raster, selection,
+editable text and layer-group tools. Object tabs display their own stable
+source ID and revision; unsaved changes to content, name, origin and bounds
+show `*`. **Save** publishes the current source; **Save As** from standalone
+Drawing saves a distinct portable `.drawing` source with fresh document/layer
+IDs and no Atlas binding. The Object menu includes rename, signed origin,
+optional bounds guides, close tab and a Save/Discard/Cancel unsaved-close
+prompt. File-native Object metadata (`drawing-object-source-v1`) is optional
+inside the standard `.drawing` wrapper and is validated on load. Opening it
+as a regular drawing still reads its pixels. Object bounds guide the author
+but do not clip sparse pixels or discard transparent RGB.
+
+The canonical drawing canvas and workspace scripts now reside **only** under
+`addons/drawing/`, not `drawing/scripts/`; this allows Atlas's host window
+to use exactly the same Drawing UI. In Atlas, the
+`AtlasObjectEditorWindow` injects source publication and captured instance
+selection through `AtlasObjectEditorBridge`; ordinary source Save refreshes
+all linked placements and instance-launched Save As publishes B and rebinds
+only the origin, with one Atlas history command. Undo retains the saved B.
+
+Atlas main-canvas `Edit Source` menu, object placement/Asset Browser and
+campaign-wide atomic save remain T-055/T-065/T-066, respectively. The
+Object Editor's initial UI is a reversible engineering implementation; owner
+acceptance remains under T-056/T-059.
+
+```sh
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd
 ```

@@ -8,11 +8,13 @@
 
 | Ready | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 24 | 14 | 3 | 35 | 1 | 77 |
+| 24 | 13 | 3 | 36 | 1 | 77 |
+
+**T-062 completed (2026-11-02):** the [shared dedicated Object Editor](Tickets/T-062.md) now uses the same Drawing workspace in standalone Drawing and an Atlas-hosted window, with private drafts, Save/Save As, captured instance identity, signed local frames, unsaved-close protection and real UI/registry/history tests. **T-064 is now Ready**; Atlas main-canvas launch/composition (T-055), the Asset Browser (T-065), and owner UX review remain outstanding.
 
 **Owner review is intentionally narrow.** `Owner` in the table marks a direct completion gate; `Via T-039` indicates inherited privacy-policy approval. Agents can research, implement and test pending dependencies, but **must not mark Done** until the relevant direct and transitive manual approvals are recorded. Approved Drawing feature scope does not mean the final UX is accepted.
 
-**T-051 completed (2026-11-02):** [testable Drawing document/package ADR](ADR_DRAWING_DOCUMENT_CONTRACT.md) and signed-tile consumer. **T-052 completed (2026-11-02):** the [independent generic Drawing core](../addons/drawing/README.md) and an isolated Godot consumer with 150+ runtime checks. T-053 is now Done with an [independently runnable desktop Drawing project](../drawing/README.md), a portable standalone document witness, native framebuffer tests, a third generic consumer and Linux release export. T-058 is now Done with editable one-element text layers, a shared glyph compositor and explicit undoable rasterization; T-062 is now Ready for the Object Editor. T-063 remains Ready. T-054 now provides tested Drawing-local and Atlas-global contextual history, one-step cross-document transfers and the Save As binding-history contract; actual Object Editor/Atlas canvas composition remains with T-062/T-055. T-060 now provides [versioned Object Assets, linked per-map instances, private Save drafts and atomic component-level Save As rebinding](../scripts/objects/README.md), including NULL placeholders and real portable-file tests. Its per-campaign object index is temporary: T-066 still owns the unified project-generation save. Atlas integration, sparse campaign persistence, polished UI and owner UX gates remain incomplete.
+**T-051 completed (2026-11-02):** [testable Drawing document/package ADR](ADR_DRAWING_DOCUMENT_CONTRACT.md) and signed-tile consumer. **T-052 completed (2026-11-02):** the [independent generic Drawing core](../addons/drawing/README.md) and an isolated Godot consumer with 150+ runtime checks. T-053 is now Done with an [independently runnable desktop Drawing project](../drawing/README.md), a portable standalone document witness, native framebuffer tests, a third generic consumer and Linux release export. T-058 is now Done with editable one-element text layers, a shared glyph compositor and explicit undoable rasterization; T-062 is now Done with a shared Object Editor and Atlas-bound Save As workflow. T-063 remains Ready. T-054 now provides tested Drawing-local and Atlas-global contextual history, one-step cross-document transfers and the Save As binding-history contract; actual Object Editor/Atlas canvas composition remains with T-062/T-055. T-060 now provides [versioned Object Assets, linked per-map instances, private Save drafts and atomic component-level Save As rebinding](../scripts/objects/README.md), including NULL placeholders and real portable-file tests. Its per-campaign object index is temporary: T-066 still owns the unified project-generation save. Atlas integration, sparse campaign persistence, polished UI and owner UX gates remain incomplete.
 
 ## Tickets
 
@@ -79,9 +81,9 @@
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | **Owner** | [T-051](Tickets/T-051.md) |
 | [T-060 · Reusable Object Assets and linked instances](Tickets/T-060.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Ready | — | [T-052](Tickets/T-052.md) |
-| [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
+| [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
 | [T-063 · Compact Drawing UI and BarDivider overflow](Tickets/T-063.md) | Ready | — | [T-053](Tickets/T-053.md) |
-| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Blocked | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Ready | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Ready | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
 | [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Ready | — | [T-051](Tickets/T-051.md) |

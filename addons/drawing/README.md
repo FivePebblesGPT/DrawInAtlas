@@ -134,3 +134,15 @@ single documents. This is not the multi-file campaign `Fonts/` save contract
 (T-066), nor an instruction to embed unknown user-system font files without
 legal review. T-055 will integrate this same API with Atlas canvas; T-062 adds
 Object Editor document tabs.
+
+## Shared Object Editor (T-062)
+
+`DrawingObjectEditorSession`, `DrawingObjectEditorFile`, `canvas.gd` and
+`workspace.gd` implement a reusable tabbed Drawing editor that knows nothing
+about Atlas maps, registries, instances or history. The host injects Save and
+Save As publishers returning detached documents and published identities.
+Object tabs have isolated drafts, local undo, signed origin and optional
+non-clipping bounds. The standalone file codec retains optional
+`drawing-object-source-v1` metadata in the ordinary `.drawing` wrapper;
+corrupt/oversize metadata is rejected on open. Atlas supplies the bridge and
+versioned asset library; do not import Atlas scripts into this package.

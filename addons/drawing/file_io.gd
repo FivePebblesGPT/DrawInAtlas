@@ -216,12 +216,18 @@ static func _integral(value: Variant, minimum: int, maximum: int) -> bool:
 		floorf(float(value)) == float(value)
 
 
-static func save(document: DrawingDocument, path: String) -> DrawingResult:
+static func save(document: DrawingDocument, path: String,
+		extra: Dictionary = {}) -> DrawingResult:
 	if path.is_empty() or not path.is_absolute_path():
 		return DrawingResult.failure("PATH", "Choose an absolute file path")
 	var encoded: DrawingResult = encode(document)
 	if not encoded.ok:
 		return encoded
+	if not extra.is_empty():
+		if extra.size() != 1 or not extra.has("object_source") or \
+				not extra["object_source"] is Dictionary:
+			return DrawingResult.failure("METADATA", "Unrecognized standalone document metadata")
+		(encoded.value as Dictionary)["object_source"] = (extra["object_source"] as Dictionary).duplicate(true)
 	var text_data: String = JSON.stringify(encoded.value)
 	if text_data.to_utf8_buffer().size() > MAX_FILE_BYTES:
 		return DrawingResult.failure("FILE_LIMIT", "Drawing file exceeds standalone limit")
