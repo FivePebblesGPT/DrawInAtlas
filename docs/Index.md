@@ -8,7 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 16 | 1 | 11 | 3 | 45 | 1 | 77 |
+| 15 | 1 | 11 | 3 | 46 | 1 | 77 |
+
+**T-073 completed (2026-11-02):** the [owner-approved 99-row Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) retains **47 Essential / 34 Later / 18 Skip** without claiming all are shipped. Its minimum T-053 witness is distinguished from the still-open complete Essential baseline, and pointer/keyboard acceptance flows cite real tests versus pending T-059 owner UX. The [one-row BarDivider workspace specification](DRAW_MODULE_UI_SPEC.md) is **still proposed under T-063**; only the Object Editor tab is already implemented (T-062), while the approved Asset Browser dock parity awaits T-065. Ten source-aware documentation checks and an eight-check **native keyboard/pointer** witness run in CI. The currently mismapped `Ctrl+Shift+S` Save As shortcut and missing visible menu shortcut labels remain tracked as T-063 gaps; no owner gate was closed.
 
 **T-072 completed (2026-11-02):** the nine [tool and interaction workflow pages](BRUSH_WORKFLOW.md) now lead with current Drawing-owned gesture/pixel/edit behavior, Atlas-owned map/selection/global history, the available six-tool standalone palette, and an explicit historical section for legacy Atlas-era prototypes. Bucket/Line/Polygon/Wall Path/T-027 UX remain **Ready** despite their generic engine primitives or old smoke fixtures. Editable text's single-element/explicit rasterization and portable licensed fonts are documented; T-068's native edit-region interface is not mistaken for a selected library. Ten documentation checks run in CI. Some old `.scn` and candidate tool smoke tests still fail and are recorded in [T-072](Tickets/T-072.md); this ticket changes **documentation and tests only**.
 
@@ -112,7 +114,7 @@
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Done | — | — |
 | [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Done | — | — |
 | [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Done | — | — |
-| [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Ready | — | — |
+| [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Done | — | — |
 | [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Ready | — | — |
 | [T-075 · Native projector, privacy and collaboration docs](Tickets/T-075.md) | Ready | — | — |
 | [T-076 · Kanban index and manual-review closure validation](Tickets/T-076.md) | Done | — | — |

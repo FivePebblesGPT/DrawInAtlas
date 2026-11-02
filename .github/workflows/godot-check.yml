@@ -164,6 +164,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t072_tools_docs.py' -v
+      - name: Verify T-073 approved inventory versus proposed workspace UX
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t073_feature_ux_docs.py' -v
       - name: Verify T-077 performance and reviewer handoff documentation
         shell: bash
         run: |
@@ -567,6 +572,17 @@ jobs:
           xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_pointer.gd 2>&1 | tee /tmp/drawing-native.log
           grep -q 'DRAWING_NATIVE_PASSED' /tmp/drawing-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_NATIVE_FAILED:' /tmp/drawing-native.log; then exit 1; fi
+      - name: Verify T-073 actual Drawing keyboard bindings and unsaved-close guard
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/workspace_keyboard_smoke.gd 2>&1 | tee /tmp/t073-keyboard.log
+          grep -q 'T073_KEYBOARD_PASSED' /tmp/t073-keyboard.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T073_KEYBOARD_FAILED:' /tmp/t073-keyboard.log; then exit 1; fi
       - name: Verify T-058 native framebuffer glyphs and explicit conversion
         timeout-minutes: 4
         shell: bash
