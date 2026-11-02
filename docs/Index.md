@@ -8,7 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 18 | 1 | 11 | 3 | 43 | 1 | 77 |
+| 17 | 1 | 11 | 3 | 44 | 1 | 77 |
+
+**T-071 completed (2026-11-02):** the [storage format and recovery contract](DRAWING_STORAGE_CONTRACT.md), [dictionary adapter audit](DICTIONARY_CONVERSION_AUDIT.md), and [raster importer analysis](RASTER_CHUNK_IMPORT.md) distinguish today's T-066 root-pointer/immutable-generation/individual `.zst` save from historical one-file native WebP/.scn code. Explicit, executable acceptance examples cover relocating a whole project, partial-copy/missing-file rejection, corrupted and interrupted generations, stale writers, precise signed tiles, and blank detail. [[T-067]]'s future 512-stride and segmented-pack recommendations remain **not deployed**. Eight documentation checks and actual missing-chunk failure coverage were added to CI; no save-format change or owner approval is implied.
 
 **T-070 completed (2026-11-02):** the seven [world/detail/navigation pages](MAPS_AND_GRIDS.md) now lead with the actual Option B signed-world/explicit-density contract and distinguish blank D-levels, Atlas-only overlays, grid edit masks, derived previews and independent-map floor links from retired per-hex/battlemat designs. [Search/world discovery](SEARCH_AND_WORLD_DISCOVERY.md) separates today's safe legacy Search actions from the unapproved **Find/Locate** proposal; **T-009 Manual Review and T-017 owner usability gates remain open**. Eight automated documentation checks were added to CI; targeted runtime regressions passed except the older `snapping_smoke.gd` nil-layer case, recorded in [T-070](Tickets/T-070.md). No runtime or save-format change is implied.
 
@@ -106,7 +108,7 @@
 | [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | — | [T-052](Tickets/T-052.md) |
 | [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Done | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Done | — | — |
-| [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Ready | — | — |
+| [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Done | — | — |
 | [T-072 · Drawing tools and interaction workflows](Tickets/T-072.md) | Ready | — | — |
 | [T-073 · Approved feature inventory and proposed UX](Tickets/T-073.md) | Ready | — | — |
 | [T-074 · Object Asset authoring and NULL placeholders](Tickets/T-074.md) | Ready | — | — |
