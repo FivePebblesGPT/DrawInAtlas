@@ -79,3 +79,6 @@ python3 -m unittest discover -s tests -p 'test_drawing_app.py' -v
 xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
   --path drawing --script res://tests/native_pointer.gd
 ```
+
+T-060 notes: `.drawing` semantic objects now preserve non-Object Godot Variant
+values with a checksummed payload; older JSON records remain readable.

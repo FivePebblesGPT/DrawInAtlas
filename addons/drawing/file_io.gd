@@ -18,6 +18,20 @@ static func encode(document: DrawingDocument) -> DrawingResult:
 	var blobs: Dictionary[String, String] = {}
 	var count: int = 0
 	for record: Dictionary in manifest["layers"]:
+		# Semantic records may contain Vector2 and Color, which JSON.stringify
+		# would silently coerce to strings. Encode trusted built-in Variants without
+		# serializing Object instances; bytes_to_var disallows Object creation.
+		var objects: Dictionary = record["objects"]
+		if not objects.is_empty():
+			var semantic_bytes: PackedByteArray = var_to_bytes(objects)
+			if semantic_bytes.is_empty() or semantic_bytes.size() > MAX_FILE_BYTES:
+				return DrawingResult.failure("SEMANTIC_LIMIT", "Invalid semantic-object payload")
+			record["objects_variant64"] = Marshalls.raw_to_base64(semantic_bytes)
+			var semantic_hash: HashingContext = HashingContext.new()
+			semantic_hash.start(HashingContext.HASH_SHA256)
+			semantic_hash.update(semantic_bytes)
+			record["objects_sha256"] = semantic_hash.finish().hex_encode()
+			record["objects"] = {}
 		var layer_id: String = record["id"]
 		for chunk: Dictionary in record["chunks"]:
 			count += 1
@@ -70,6 +84,23 @@ static func decode(payload: Dictionary) -> DrawingResult:
 	for record: Variant in records:
 		if not record is Dictionary:
 			return DrawingResult.failure("FILE", "Malformed layer metadata")
+		if record.has("objects_variant64"):
+			if not record["objects_variant64"] is String or \
+					(record["objects_variant64"] as String).length() > MAX_FILE_BYTES:
+				return DrawingResult.failure("FILE", "Malformed semantic-object payload")
+			var semantic_bytes: PackedByteArray = Marshalls.base64_to_raw(record["objects_variant64"])
+			var semantic_hash: HashingContext = HashingContext.new()
+			semantic_hash.start(HashingContext.HASH_SHA256)
+			semantic_hash.update(semantic_bytes)
+			if not record.get("objects_sha256") is String or \
+					record["objects_sha256"] != semantic_hash.finish().hex_encode():
+				return DrawingResult.failure("CORRUPT_SEMANTIC", "Invalid semantic-object digest")
+			var semantic_value: Variant = bytes_to_var(semantic_bytes)
+			if not semantic_value is Dictionary or not record.get("objects", {}).is_empty():
+				return DrawingResult.failure("FILE", "Invalid semantic-object payload")
+			record["objects"] = semantic_value
+			record.erase("objects_variant64")
+			record.erase("objects_sha256")
 		var chunks: Variant = record.get("chunks", [])
 		if not chunks is Array:
 			return DrawingResult.failure("FILE", "Malformed chunk metadata")

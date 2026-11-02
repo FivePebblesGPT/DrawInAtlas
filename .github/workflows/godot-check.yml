@@ -64,6 +64,13 @@ jobs:
           set -euo pipefail
           godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Verify T-060 reusable Object Assets and atomic Save As
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
+          grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
       - name: Run domain smoke tests
         shell: bash
         run: |
