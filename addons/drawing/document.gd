@@ -682,7 +682,11 @@ static func open_manifest(manifest: Dictionary, loader: Callable) -> DrawingResu
 		if not text is String or not objects is Dictionary:
 			return DrawingResult.failure("MANIFEST", "Invalid semantic content")
 		node.text_value = text
-		node.objects = objects.duplicate(true)
+		# JSON-parsed dictionaries are untyped; populate the typed owned map safely.
+		for object_id: Variant in objects:
+			if not object_id is String or not objects[object_id] is Dictionary:
+				return DrawingResult.failure("MANIFEST", "Invalid generic object record")
+			node.objects[object_id] = (objects[object_id] as Dictionary).duplicate(true)
 		var chunks: Variant = record.get("chunks", [])
 		if not chunks is Array or (not chunks.is_empty() and kind != DrawingLayerNode.RASTER):
 			return DrawingResult.failure("MANIFEST", "Invalid raster chunk placement")

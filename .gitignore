@@ -73,3 +73,7 @@ ExportedObj/
 # Python smoke-test artifacts
 __pycache__/
 *.py[cod]
+
+# Generated standalone Drawing package staging (canonical source: /addons/drawing/)
+/drawing/addons/
+/drawing/.godot/

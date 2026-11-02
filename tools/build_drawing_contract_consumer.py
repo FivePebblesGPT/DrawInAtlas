@@ -44,7 +44,7 @@ def stage(output: Path, fixture_name: str = "drawing_contract_consumer") -> Path
 
     # Strict file-type allowlist: no Atlas application, autoloads, scenes or assets.
     fixture = ROOT / "tests" / "fixtures" / fixture_name
-    if fixture_name not in {"drawing_contract_consumer", "drawing_core_consumer"}:
+    if fixture_name not in {"drawing_contract_consumer", "drawing_core_consumer", "drawing_package_consumer"}:
         raise ValueError("Unsupported isolated test consumer")
     sources = {
         source: target / "addons" / "drawing" / source.name
@@ -69,7 +69,7 @@ def stage(output: Path, fixture_name: str = "drawing_contract_consumer") -> Path
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="External empty directory")
-    parser.add_argument("--fixture", choices=("drawing_contract_consumer", "drawing_core_consumer"), default="drawing_contract_consumer")
+    parser.add_argument("--fixture", choices=("drawing_contract_consumer", "drawing_core_consumer", "drawing_package_consumer"), default="drawing_contract_consumer")
     args = parser.parse_args()
     print(stage(args.output, args.fixture))
 

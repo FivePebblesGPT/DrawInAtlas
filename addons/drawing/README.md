@@ -6,7 +6,7 @@ project so Atlas can import it directly in T-055, and is byte-identically
 staged into independent, **Atlas-free** consumers using
 `tools/build_drawing_contract_consumer.py --fixture drawing_core_consumer`.
 Generated staging copies must never be edited in place. The standalone Drawing
-application shell is T-053; none is implied by these core classes.
+application shell is implemented under T-053; see `drawing/README.md` for the independently buildable project and isolated witness.
 
 ## Document and edit boundary
 
@@ -80,3 +80,20 @@ The core test starts an external Godot project containing **only** a small
 consumer scene and unmodified `addons/drawing/` files. No Atlas scripts,
 scenes, autoloads, plugins or root `project.godot` are staged. See
 `tests/fixtures/drawing_core_consumer/main.gd.txt` for runtime acceptance.
+
+## Standalone app integration (T-053)
+
+`DrawingFileIO` wraps the exact logical manifest and canonical per-tile bytes in
+`drawing-standalone-v1` `.drawing` single-file documents. It validates SHA-256
+and exact hidden-RGB pixels on reopen, maintains stable IDs and keeps signed
+chunk coordinates as strings to survive Godot JSON's floating numeric parser.
+It is a **standalone file codec**, not Atlas campaign persistence (T-066).
+`tools/build_drawing_app.py` stages these canonical package files byte-for-byte
+into an independently runnable project. The untracked `drawing/addons/` staging
+folder must never be edited or committed. The `drawing_package_consumer` fixture
+verifies a third independent Godot consumer uses the same complete engine.
+
+For local tests: `python3 -m unittest discover -s tests -p 'test_drawing_app.py' -v`.
+The native compositor/viewport test is `drawing/tests/native_pointer.gd`, run
+under X11/Mesa (Xvfb on CI). Windows builds have a preset but need Windows
+export templates/runtime validation. Final UX and campaign save remain future work.

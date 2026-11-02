@@ -33,6 +33,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_drawing_core.py' -v
+      - name: Verify T-053 isolated standalone Drawing and third package consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_app.py' -v
+      - name: Verify T-053 standalone Linux release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/drawing-dist
+          python3 tools/build_drawing_app.py --output /tmp/drawing-dist/project
+          godot --headless --editor --path /tmp/drawing-dist/project --import --quit
+          godot --headless --path /tmp/drawing-dist/project --export-release Linux /tmp/drawing-dist/Drawing.x86_64
+          test -s /tmp/drawing-dist/Drawing.x86_64
+          test -s /tmp/drawing-dist/Drawing.pck
       - name: Import resources and parse scripts
         shell: bash
         run: |
@@ -389,6 +404,17 @@ jobs:
           if grep -E 'SCRIPT ERROR:|^ERROR:|COLLABORATION ACCEPTANCE FAILED:' /tmp/godot-collaboration-acceptance.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+      - name: Verify T-053 native Drawing pointer and framebuffer
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_pointer.gd 2>&1 | tee /tmp/drawing-native.log
+          grep -q 'DRAWING_NATIVE_PASSED' /tmp/drawing-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_NATIVE_FAILED:' /tmp/drawing-native.log; then exit 1; fi
       - name: Verify editable text and screen-space culling (T-027)
         shell: bash
         run: |
