@@ -20,7 +20,8 @@ class GodotCIFailLateTests(unittest.TestCase):
     def test_all_checks_run_even_after_earlier_failure(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         blocks = re.findall(r"(?ms)^      - name: ([^\n]+)\n(.*?)(?=^      - name: |\Z)", workflow)
-        self.assertGreaterEqual(len(blocks), 80)
+        self.assertGreaterEqual(len(blocks), 20)
+        self.assertLess(len(blocks), 35)
         for name, block in blocks:
             if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
                 continue
@@ -35,15 +36,10 @@ class GodotCIFailLateTests(unittest.TestCase):
     def test_multi_suite_steps_collect_errors(self) -> None:
         workflow = WORKFLOW.read_text(encoding="utf-8")
         names = [
-            "Run layer and recovery tests", "Run editing tool and clipboard tests",
-            "Run workspace composition and organization tests", "Run linked-map workflow tests",
-            "Run native framebuffer acceptance", "Verify T-054 Drawing/Atlas chronological history",
+            "Verify T-054 Drawing/Atlas chronological history",
             "Verify T-058 editable text, font integrity and undoable rasterization",
             "Verify T-062 Object Editor source publishing, bound origin and saved variants",
             "Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load",
-            "Verify T-067 measured chunk geometry and Zstd parity",
-            "Verify T-068 canonical tile-run renderer and native feasibility probe",
-            "Verify fresh-process saves across exported script remaps",
         ]
         for name in names:
             match = re.search(r"(?ms)^      - name: " + re.escape(name) + r"\n(.*?)(?=^      - name: |\Z)", workflow)
@@ -58,11 +54,28 @@ class GodotCIFailLateTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         calls = [line.strip() for line in workflow.splitlines()
                  if "godot" in line and "--script" in line]
-        self.assertGreaterEqual(len(calls), 65)
+        self.assertGreaterEqual(len(calls), 12)
         for call in calls:
             with self.subTest(command=call[:90]):
                 self.assertIn("timeout --signal=TERM --kill-after=5s ", call)
                 self.assertRegex(call, r"\b(?:120|240)s (?:godot|xvfb-run)\b")
+
+    def test_fast_desktop_ci_excludes_unfinished_and_costly_suites(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        for forbidden in [
+            "Export Web", "Upload Web build", "build/web", "--export-release Web",
+            "xvfb-run", "Run native framebuffer acceptance",
+            "Verify T-058 native framebuffer glyphs", "Verify T-053 native Drawing pointer",
+            "Verify retired battlemat creation paths (T-014)",
+            "Verify active-layer Move gestures (T-022)",
+            "Verify Line endpoints, modifiers, masks and saving (T-024)",
+            "Verify polygon shape geometry, masks and persistence (T-025)",
+            "Verify editable wall paths, geometry, history and native saves (T-026)",
+        ]:
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, workflow)
+        self.assertIn("Verify T-051 isolated Drawing contract consumer", workflow)
+        self.assertIn("Verify T-055 Atlas canonical Drawing composition and input", workflow)
 
     def test_reporting_uses_original_outcome_not_masked_conclusion(self) -> None:
         report, ok = summarize({

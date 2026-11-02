@@ -1,16 +1,29 @@
-# Godot GDScript CI — run all checks, then fail
+# Godot CI policy: fast desktop core and deferred compatibility coverage
 
-The **Godot GDScript checks** job in `.github/workflows/godot-check.yml` runs its independent verification steps even when an earlier step fails. It reports failures once all checks have been attempted, avoiding the stop-at-first-failure cycle seen in CI runs #113, #115 and the later T-014 failure.
+**Policy (2026-11-03):** Required push/PR GDScript CI now verifies the implemented **Drawing package and shared Atlas composition foundation**. The approved complete Drawing Essential baseline remains unfinished under T-059. Windows/Linux desktop are the release-first targets. **Web export, broad native framebuffer sweeps, and historical Atlas pointer/shape tests are intentionally excluded from push CI.** They remain in source and are not claimed green.
 
-## Behavior
+## Required CI
 
-- Checkout and installation of the pinned Godot 4.8 beta 2 engine are prerequisites. Without a usable checkout/engine, no meaningful script tests can run. Job cancellation still stops the workflow.
-- Every subsequent check has an explicit, unique `ci_*` step ID, `if: ${{ !cancelled() }}` and `continue-on-error: true`. This lets the next check execute even when the preceding check's original outcome was failure. The main-project editor import still occurs **before** main-project GDScript smoke tests.
-- Steps containing multiple independent test invocations or `for suite in ...` loops source `tools/ci_fail_late.sh`. The helper collects nonzero commands and failed output-marker assertions but continues through the rest of that step, returning a failing status at the end. Dependent operations (for example, a Web export after an import) may still produce cascading failures if a prerequisite artifact was not generated.
-- The final **Summarize CI failures** step runs `tools/report_godot_ci.py`. It checks `steps.*.outcome`, **not** `conclusion` (which may be rewritten to success by `continue-on-error`). It writes a compact GitHub step summary listing failed or skipped checks and exits nonzero if any check failed. Consequently, the workflow remains **red**, never silently green, and identifies all recorded failures together.
-- The report step runs after the optional Web build artifact upload. Upload failures are counted like other recorded checks.
+- Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
+- T-051–053 isolated Drawing contract, core, standalone consumer and Linux desktop release package.
+- Main project import before GDScript tests: T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
+- T-073 feature inventory and T-063 workspace documentation assertions.
+- Each check retains its original GitHub Actions `steps.*.outcome` even with `continue-on-error: true`; the final summary still fails the job if any required check fails. Scripted Godot processes have 120-second watchdogs.
 
-## Reproduce the guards locally
+## Deferred but retained
+
+- Historical Atlas/battlemat/selection/move/shape/wall smoke tests, especially T-014, T-019, T-022, T-024, T-025 and T-026. Some assert superseded `AtlasRasterLayer` ownership while the current editor writes canonical `DrawingDocument`. Investigate and repair each contract as related features are implemented rather than weakening expectations or claiming success.
+- All Xvfb/Mesa native framebuffer suites (including slow T-058 and the broad native acceptance), interactive desktop witnesses, and performance probes are **targeted/manual or release-stage** checks while Drawing is completed. Native T-056/T-059 gates remain unapproved.
+- Web export and browser artifacts are removed from the push workflow. Reintroduce them only after a specific Web support decision; T-044 remains archived.
+
+A deferred script remains runnable manually, for example:
+
+```bash
+godot --headless --editor --path . --import --quit
+timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/retired_battlemap_controls_smoke.gd
+```
+
+CI guards:
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_godot_ci_order.py' -v
@@ -18,27 +31,4 @@ python3 -m unittest discover -s tests -p 'test_godot_ci_fail_late.py' -v
 python3 tools/validate_ticket_store.py
 ```
 
-These guards validate workflow ordering, continue-on-failure coverage, group-level Bash failure collection, and final outcome aggregation. They **do not** substitute for running the full Godot/native/Web suite on GitHub.
-
-CI policy changes here do not change a feature ticket's implementation or approve any manual UX/review gate. All previously blocked or pending tickets remain in their recorded Kanban states.
-
-## Preventing hung Godot script processes
-
-Godot 4.8 beta 2 can log a GDScript runtime error in a deferred `SceneTree`
-smoke-test callback without reaching that script's final `quit()`. Previously,
-such tests occupied their GitHub Actions step indefinitely even though the
-log already displayed `SCRIPT ERROR`.
-
-Each Godot `--script` invocation now runs under GNU `timeout` with a
-5-second forced-kill grace period. Headless scripts have a **120-second** limit;
-native Xvfb scripts have **240 seconds**. A timeout exits with status 124,
-fails the individual test step (or is collected by `tools/ci_fail_late.sh` in
-a multi-test step), and leaves later independent checks runnable. The final
-summary remains red when any test failed or timed out. Editor import and
-release packaging are separate prerequisites, not subject to these per-script
-limits.
-
-`tests/test_godot_ci_fail_late.py` guards that every scripted Godot
-invocation retains its watchdog. T-016 exposed this case in
-`tests/snapping_smoke.gd` when a stale legacy stroke assertion attempted to
-dereference a null object; the smoke now verifies canonical Drawing pixels.
+This is **reduced-scope CI**, not a full release sign-off. In particular, do not infer T-014/019/022/024/025/026 or native UI acceptance from a green run.
