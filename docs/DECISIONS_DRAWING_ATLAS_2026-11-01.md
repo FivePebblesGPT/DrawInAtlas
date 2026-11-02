@@ -120,3 +120,33 @@ See [[T-051]], [[T-054]], [[T-060]], [[T-062]], [[T-056]] and [[T-063]].
 - This is an intentionally **asymmetric undo**: creation/persistence of the new source survives, while the Atlas instance reference is undoable. If Variant B is stored inside the Atlas project, undo may **not** return the project to its old saved/clean state; the storage/dirty-savepoint model must report this truthfully.
 - If B is explicitly deleted after undo, redo cannot fabricate it. Define a safe missing-asset/error path (or disable invalid redo) without corrupting the original binding. All Save As writes and instance updates must still commit safely, without half-created/half-rebound states.
 - Tests should verify Save As A→B, undo A→original with B retained, redo A→same B, editor reopening B, save/reopen with unreferenced B, and a deleted-B redo failure. See [[T-060]], [[T-062]], [[T-054]], [[T-056]].
+
+## Round 7 — campaign-side Objects, authoring workflow, desktop, UX (2026-11-02)
+
+**Accepted by owner; this section supersedes earlier “open” questions wherever they overlap.**
+
+1. **Portable project-side Object library.** Store Object Asset files in an `Objects/` folder **next to the campaign file**. Use project-relative references and durable asset IDs so the **campaign file plus adjacent `Objects/` directory** can be copied/moved together. This is not a machine-global library and not silent external live-file synchronization. The current native `.scn` campaign may continue, but its old *single-file-all-content* guarantee no longer covers reusable Object Assets. See [[E-SAVE]] and [[T-060]].
+2. **Publish on Save only.** Changes made in the Object Editor are local/staged until the user presses **Save**. Other linked Atlas instances continue showing the last published asset version during editing; Cancel/close-without-save cannot leak draft changes. Save updates the source and refreshes all linked placements. Save As through an originating instance still creates Variant B and rebinds that instance only; undo leaves B saved in `Objects/`.
+3. **LOD raster density.** Every authored detail level shares one Atlas world-coordinate reference, but can have **independent explicit pixels-per-world-unit**, with a sensible default progression. Changing density must not silently reposition the art or distort world-space layout. Drawing receives resolved surface/pixel transforms, not Atlas domain types.
+4. **Undo viewport.** On global undo/redo, restore affected map/floor/detail/valid selection/editing mode. If any of the affected geometry is already partly visible, **do not move the camera**. Otherwise pan/focus until some of it is visible, **preserving the current zoom**. If map/target no longer exists, recover safely and notify the user rather than selecting a wrong replacement. Previous proposal to change zoom is superseded.
+5. **Desktop scope.** Prioritize Windows and Linux. **Drop Web as an active release target for now**; Web-specific ticket [[Archive/Web/T-044]] is archived. The native player/projector privacy work stays active. Desktop GDExtension options need not support WASM at this stage.
+6. **Dedicated Object Editor document tab**, using the same Drawing engine. Add an **Asset Browser** as a peer of Colors/Layers/History in the dock with equivalent show/hide, resizing/tab and focus behavior.
+7. **Blank detail:** no lower-detail art is displayed, but grid, entrance/hit-testing and map-navigation overlays remain usable.
+8. **Nested Object Assets are intended to be supported.** Object sources may instance other Object Assets using local transforms. Reuse map placement/rendering machinery where possible. Prevent direct/indirect reference cycles and runaway traversal; nested selection, preview invalidation, dependency saving and Save As behavior require a dedicated implementation ticket [[T-064]]. The owner did not specify an implementation milestone/depth cap.
+9. **Per-instance overrides initially:** transform and visibility only. No arbitrary per-instance pixel/material edit overrides.
+10. **Selection-history preference:** application-level, **OFF by default**, not a per-document setting. Content undo still restores selection/editing context.
+11. **Invalid history target:** safe fallback with a visible notification; never silently select or edit an unrelated replacement.
+12. **Delete Object Asset:** prompt to **remove references/placements**, **retain placements as visible `NULL` placeholders** (GMod-like), or cancel. Preserved placeholders keep stable instance identity, transform and original asset reference for inspection or deliberate repair, without dangerous implicit replacement.
+13. **Font handling:** bundle required known fonts **in the portable project save/package** and preserve explicit font references; validate licence/redistribution before bundling. Exact font physical location (embedded Resource or sibling `Fonts/`) is an implementation decision.
+14. **Entrance navigation:** use standard **configurable** double-click behavior (time/distance) and stable entrance ID checks. Brush/paint remains higher priority than entrance navigation.
+15. **Draw module UI:** [[DRAW_MODULE_UI_SPEC]] is still proposed; the owner has not provided the promised full feature list. The requested Asset Browser dock is an accepted addition.
+
+### Explicitly NOT decided: DrawingDocument granularity
+The owner asked for a concrete explanation; **no selection is approved yet**:
+- **A. One DrawingDocument per Atlas map**, with generic group tree `Map → Floor group → Detail group → Layers`. A standalone Drawing session can inspect all floor/detail groups in one document. One coherent group tree, but potentially large metadata and a need for lazy sparse content.
+- **B. One DrawingDocument per Atlas floor/detail pair**, with Atlas mapping all such documents into the same visible group tree. Better isolation/lazy loading but more complicated cross-floor moves, selection/undo and coordinated saves.
+- **C. One DrawingDocument per Atlas floor**, with detail groups inside, as a compromise.
+**Engineering preference:** A, contingent on owner preference and a realistic large-map benchmark. This is not an accepted decision and remains an explicit T-051 gate.
+
+### Other open implementation contracts
+Project/object file format (relative paths + IDs + atomic multi-file Save), staged source-edit publication versus global undo, nested asset dependency/copy rules, map instance visibility at blank detail, missing-source placeholder recovery, import/export, exact group storage and default pixel density progression. These are not reasons to re-open the accepted owner UX decisions.
