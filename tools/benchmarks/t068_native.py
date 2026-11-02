@@ -54,6 +54,10 @@ def build(directory: Path) -> Path:
 
 def open_kernel(path: Path) -> ctypes.CDLL:
     lib = ctypes.CDLL(str(path))
+    lib.draw_kernel_abi_version.argtypes = []
+    lib.draw_kernel_abi_version.restype = ctypes.c_uint32
+    if lib.draw_kernel_abi_version() != 1:
+        raise RuntimeError("unsupported native prototype ABI")
     lib.draw_source_over.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
     lib.draw_source_over.restype = ctypes.c_uint32
     lib.draw_batch.argtypes = [ctypes.POINTER(ctypes.c_uint8),
@@ -62,6 +66,13 @@ def open_kernel(path: Path) -> ctypes.CDLL:
                               ctypes.c_int32, ctypes.POINTER(ctypes.c_uint8),
                               ctypes.POINTER(Delta), ctypes.c_int32]
     lib.draw_batch.restype = ctypes.c_int32
+    lib.draw_batch_deltas.argtypes = [ctypes.POINTER(ctypes.c_uint8),
+                                     ctypes.c_int32, ctypes.c_int32,
+                                     ctypes.POINTER(ctypes.c_int32), ctypes.c_int32,
+                                     ctypes.c_uint32, ctypes.c_int32,
+                                     ctypes.POINTER(ctypes.c_uint8),
+                                     ctypes.POINTER(Delta), ctypes.c_int32]
+    lib.draw_batch_deltas.restype = ctypes.c_int32
     return lib
 
 
@@ -129,6 +140,32 @@ def call_batch(lib: ctypes.CDLL, source: bytes, width: int, height: int,
     return result, bytes(output), list(deltas[:max(0, result)])
 
 
+def call_delta_batch(lib: ctypes.CDLL, source: bytes, width: int, height: int,
+                     coords: list[tuple[int, int]], rgba: int, operation: int = 0,
+                     mask: bytes | None = None,
+                     capacity: int | None = None) -> tuple[int, list[Delta]]:
+    """Collect sparse edits only, without allocating a changed raster output."""
+    raw = (ctypes.c_uint8 * len(source)).from_buffer_copy(source)
+    points = (ctypes.c_int32 * (len(coords) * 2))(*(v for xy in coords for v in xy))
+    cap = len(coords) if capacity is None else capacity
+    deltas = (Delta * max(1, cap))()
+    selected = (ctypes.c_uint8 * len(mask)).from_buffer_copy(mask) if mask is not None else None
+    result = lib.draw_batch_deltas(raw, width, height, points, len(coords),
+                                   rgba, operation, selected, deltas, cap)
+    return result, list(deltas[:max(0, result)])
+
+
+def materialize_deltas(source: bytes, deltas: list[Delta]) -> bytes:
+    """Apply the detached delta list to a copy, representing caller-owned COW."""
+    output = bytearray(source)
+    for entry in deltas:
+        start = entry.index * 4
+        if int.from_bytes(output[start:start + 4], "little") != entry.before:
+            raise ValueError("stale source revision or stale pixel data")
+        output[start:start + 4] = entry.after.to_bytes(4, "little")
+    return bytes(output)
+
+
 def _stats(samples: list[float]) -> dict[str, float]:
     sorted_ms = sorted(samples)
     return {"median_ms": round(statistics.median(sorted_ms), 4),
@@ -147,19 +184,40 @@ def benchmark(lib: ctypes.CDLL, output_path: Path, rounds: int = 7) -> dict:
             points = (ctypes.c_int32 * (len(coords) * 2))(*(v for pair in coords for v in pair))
             deltas = (Delta * len(coords))()
             times: list[float] = []
+            delta_times: list[float] = []
             outcome = -1
-            for iteration in range(rounds + 2):
-                t0 = time.perf_counter_ns()
-                outcome = lib.draw_batch(raw, output, size, size, points, len(coords),
-                                         0x88774422, 0, None, deltas, len(coords))
-                duration = (time.perf_counter_ns() - t0) / 1_000_000
-                if iteration >= 2:
+            # Alternate call order so the delta-only path does not always get
+            # a cache-hot source immediately after a full-region materialization.
+            for iteration in range(rounds + 4):
+                def full_call() -> tuple[int, float]:
+                    t0 = time.perf_counter_ns()
+                    result = lib.draw_batch(raw, output, size, size, points, len(coords),
+                                            0x88774422, 0, None, deltas, len(coords))
+                    return result, (time.perf_counter_ns() - t0) / 1_000_000
+
+                def sparse_call() -> tuple[int, float]:
+                    t0 = time.perf_counter_ns()
+                    result = lib.draw_batch_deltas(raw, size, size, points, len(coords),
+                                                    0x88774422, 0, None, deltas, len(coords))
+                    return result, (time.perf_counter_ns() - t0) / 1_000_000
+
+                if iteration % 2:
+                    delta_count, delta_duration = sparse_call()
+                    outcome, duration = full_call()
+                else:
+                    outcome, duration = full_call()
+                    delta_count, delta_duration = sparse_call()
+                if outcome < 0 or delta_count != outcome:
+                    raise RuntimeError(f"native batch mismatch: {size} {name}: {outcome}, {delta_count}")
+                if iteration >= 4:
                     times.append(duration)
-                if outcome < 0:
-                    raise RuntimeError(f"kernel error {outcome}: {size} {name}")
+                    delta_times.append(delta_duration)
             records.append({"region": size, "workload": name, "candidates": len(coords),
                             "changed": outcome, "bytes_copied": len(source),
+                            "delta_only_bytes_copied": 0,
+                            "visited_scratch_bytes": ((size * size + 63) // 64) * 8,
                             "undo_delta_bytes": outcome * ctypes.sizeof(Delta),
+                            "full_region": _stats(times), "delta_only": _stats(delta_times),
                             **_stats(times)})
     # No-op FFI call measures ctypes/Python dispatch, not Godot GDExtension overhead.
     empty_source = (ctypes.c_uint8 * 4)()
@@ -175,9 +233,11 @@ def benchmark(lib: ctypes.CDLL, output_path: Path, rounds: int = 7) -> dict:
                "compiler": subprocess.run(["g++", "--version"], capture_output=True,
                                           text=True, check=True).stdout.splitlines()[0],
                "native_boundary": "Python ctypes, not Godot/GDExtension",
+               "delta_only_scope": "native CPU enumeration only; excludes caller's COW materialization",
                "dispatch_us": {"median": round(statistics.median(overhead_ns), 3),
                                "p95": round(sorted(overhead_ns)[949], 3)},
-               "rounds": rounds, "rows": records}
+               "rounds": rounds, "call_order": "alternating full-first and sparse-first after 4 warmups",
+               "rows": records}
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return payload

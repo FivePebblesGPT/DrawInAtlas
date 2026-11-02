@@ -518,6 +518,19 @@ jobs:
           xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/drawing_composition_visual.gd 2>&1 | tee /tmp/godot-t055-native.log
           grep -q 'T055_NATIVE_PASSED' /tmp/godot-t055-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_NATIVE_FAILED:' /tmp/godot-t055-native.log; then exit 1; fi
+      - name: Verify T-068 native pointer-to-frame submission latency and raster parity
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy \
+            --rendering-method gl_compatibility --path . \
+            --script res://tests/drawing_latency_visual.gd -- \
+            --output /tmp/t068-frame.json 2>&1 | tee /tmp/t068-frame.log
+          grep -q 'T068_NATIVE_FRAME_PASSED checks=68 failures=0' /tmp/t068-frame.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_LATENCY_FAILED:' /tmp/t068-frame.log; then exit 1; fi
       - name: Verify T-053 native Drawing pointer and framebuffer
         timeout-minutes: 4
         shell: bash
