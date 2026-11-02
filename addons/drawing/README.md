@@ -61,10 +61,25 @@ T-066 chooses the physical manifest/codec, fault-injects generation recovery,
 cache eviction, and guarantees atomic multi-file publication. The current
 API is an in-memory logical protocol, **not an implemented project save**.
 
-Undo/redo here replays compact raster deltas for an independent document.
-T-054 adds Atlas's global, context-restoring history; layer, object, text and
-other command history integration belongs to the upcoming application and
-history tickets. T-058 defines the final one-text-object-per-layer semantics;
+Undo/redo replays compact raster deltas for an independent document. Since
+T-054, `DrawingDocument` also owns an ordered local history with optional
+selection-only entries (`record_selection_history`, OFF by default), detached
+`DrawingHistoryContext` snapshots, context annotations for committed gestures,
+unique content state identities and dirty/savepoint separation. Mode/camera
+navigation alone is not an undo step. The standalone UI opts in from Options.
+
+For embedded Drawing, call `set_external_history(true)` **before** edits, then
+use `AtlasEditHistory.commit_drawing(session, before_context, after_context)`.
+It records one externally committed delta in the existing Atlas timeline;
+`DrawingDocument.undo()` is intentionally disabled in that mode to prevent
+double histories. The Atlas-owned `AtlasDrawingEdit` supports revision-checked
+undo/redo. The host must supply validated stable map/floor/detail/document/asset
+IDs and any affected world bounds; a UI-only restoration cannot recreate
+missing geometry. Atlas's multi-document move and Save As history callbacks
+are tested in `tests/drawing_history_smoke.gd`; concrete asset registry/editor
+and physical campaign save remain T-060/T-062/T-066. Structural metadata
+mutations are currently dirty but not local undo commands (follow-up feature
+scope). T-058 defines the final one-text-object-per-layer semantics;
 T-060 implements durable linked Object Assets; T-068 profiles and selects
 native drawing acceleration. No platform export or UX approval is claimed.
 

@@ -43,8 +43,12 @@ its Godot template on the build host.
   the pointer. A 1–96px brush-width field, optional generic 8px snap and color
   picker control the Drawing core's gestures.
 - **Layer** Add group, add raster, toggle visibility, remove selected; tree
-  selection chooses a raster paint target. Undo and redo apply to raster gestures
-  (non-raster UI history is deferred to T-054/T-063).
+  selection chooses a raster paint target. Undo and redo apply to raster gestures.
+  The **Record selection changes in Undo History** checkbox (OFF by default)
+  optionally adds completed selections as separate clean, reversible steps;
+  content undo restores layer/selection/tool context regardless of the toggle.
+  Structural layer operations are dirty but are not yet undoable (T-063 and
+  follow-up layer feature work).
 - **Keyboard** Ctrl/Cmd+N, O, S, Z, Shift+Z, Y for New, Open, Save,
   Undo, Redo. Hover status reports revision, dirty state, zoom and layer ID.
 

@@ -238,6 +238,9 @@ func _connect_workspace() -> void:
 	canvas.interaction_started.connect(artwork.refresh_scope)
 	canvas.interaction_finished.connect(_queue_lod_refresh)
 	canvas.view_region_changed.connect(_queue_lod_refresh)
+	edits.context_provider = Callable(self, "_capture_history_context")
+	edits.context_restorer = Callable(self, "_restore_history_context")
+	edits.restoration_warning.connect(_message)
 	edits.changed.connect(_rebuild_lod)
 	inspector.token_name_input.text_changed.connect(func(value: String) -> void: canvas.token_label = value)
 	inspector.token_radius_spinner.value_changed.connect(func(value: float) -> void: canvas.token_radius = value)
@@ -599,6 +602,55 @@ func _reset_view_helpers() -> void:
 	link_chooser.hide()
 
 
+func _capture_history_context() -> DrawingHistoryContext:
+	var context: DrawingHistoryContext = DrawingHistoryContext.new()
+	if canvas.map == null or canvas.floor == null:
+		return context
+	context.map_id = canvas.map.id
+	context.floor_group_id = canvas.floor.id
+	context.detail_group_id = str(canvas.presented_detail_level)
+	if not canvas.active_layer_id.is_empty():
+		context.selected_layer_ids.append(canvas.active_layer_id)
+	context.editor_mode = str(int(canvas.tool))
+	return context
+
+
+func _restore_history_context(context: DrawingHistoryContext,
+		_regions: Array[DrawingDirtyRegion]) -> bool:
+	# A missing stable map/floor never becomes a same-name replacement.
+	var destination: AtlasMapDocument = campaign.get_map(context.map_id)
+	if destination == null or destination.floor_by_id(context.floor_group_id) == null:
+		if campaign.get_map(campaign.root_map_id) != null:
+			_show_map(campaign.get_map(campaign.root_map_id), canvas.camera_center, canvas.camera_zoom)
+		return false
+	var same_view: bool = canvas.map != null and canvas.floor != null \
+		and canvas.map.id == context.map_id and canvas.floor.id == context.floor_group_id
+	var saved: AtlasViewState = navigator.views.resolve(campaign, context.map_id,
+		context.floor_group_id, canvas.camera_center, canvas.camera_zoom)
+	if saved == null or not navigator.show_map(destination,
+		canvas.camera_center if same_view else saved.focus,
+		canvas.camera_zoom, context.floor_group_id):
+		return false
+	var selection_valid: bool = true
+	for layer_id: String in context.selected_layer_ids:
+		if canvas.floor.layer_by_id(layer_id) == null:
+			selection_valid = false
+			break
+	if selection_valid and not context.selected_layer_ids.is_empty():
+		canvas.active_layer_id = context.selected_layer_ids[0]
+	if context.detail_group_id.is_valid_int():
+		canvas.set_presented_detail_level(int(context.detail_group_id))
+	if context.editor_mode.is_valid_int():
+		var chosen: int = int(context.editor_mode)
+		if chosen >= 0 and chosen < AtlasCanvas.Tool.size():
+			canvas.choose_tool(chosen as AtlasCanvas.Tool)
+	if context.has_focus:
+		canvas.camera_center = AtlasHistoryCamera.pan_if_hidden(canvas.camera_center,
+			canvas.camera_zoom, canvas.size, context.focus_bounds)
+	canvas.queue_redraw()
+	return selection_valid and context.selected_instance_id.is_empty()
+
+
 func _on_undo() -> void:
 	canvas.cancel_edit()
 	canvas.clear_selection()
@@ -608,7 +660,8 @@ func _on_undo() -> void:
 			if campaign.get_map(canvas.map.id) == null:
 				_show_map(campaign.get_map(campaign.root_map_id))
 		_refresh_after_history()
-		_message("Undo applied to its original board.")
+		_message(edits.last_playback_warning if not edits.last_playback_warning.is_empty() \
+			else "Undo applied to its original board.")
 	elif edits.can_undo():
 		_message("Undo blocked: the target changed outside this history.")
 
@@ -622,7 +675,8 @@ func _on_redo() -> void:
 			navigator.push_history()
 			_show_map(campaign.get_map(command.new_map_id))
 		_refresh_after_history()
-		_message("Redo applied.")
+		_message(edits.last_playback_warning if not edits.last_playback_warning.is_empty() \
+			else "Redo applied.")
 	elif edits.can_redo():
 		_message("Redo blocked: the target changed outside this history.")
 

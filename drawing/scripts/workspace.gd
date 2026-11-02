@@ -17,6 +17,11 @@ var history_label: Label
 var open_dialog: FileDialog
 var save_dialog: FileDialog
 var new_counter: int = 0
+## Application preference; existing selection entries survive toggling it off.
+var record_selection_history: bool = false
+var _before_gesture: DrawingHistoryContext
+var _last_selection_context: DrawingHistoryContext
+var _restoring_context: bool = false
 
 
 func _ready() -> void:
@@ -65,6 +70,11 @@ func _build_interface() -> void:
 	snap_toggle.text = "Snap (8 px)"
 	snap_toggle.toggled.connect(func(enabled: bool) -> void: canvas.grid_spacing = 8 if enabled else 0)
 	options.add_child(snap_toggle)
+	var selection_history_toggle: CheckButton = CheckButton.new()
+	selection_history_toggle.text = "Record selection changes in Undo History"
+	selection_history_toggle.button_pressed = false
+	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
+	options.add_child(selection_history_toggle)
 	var tabs_line: HBoxContainer = HBoxContainer.new()
 	root.add_child(tabs_line)
 	tab_bar = TabBar.new()
@@ -91,8 +101,9 @@ func _build_interface() -> void:
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.custom_minimum_size = Vector2(400, 280)
+	canvas.gesture_started.connect(_gesture_started)
 	canvas.gesture_committed.connect(_canvas_changed)
-	canvas.selection_changed.connect(func(_area: Rect2i) -> void: _update_status())
+	canvas.selection_changed.connect(_selection_changed)
 	canvas.canvas_error.connect(_show_error)
 	canvas.view_changed.connect(_update_status)
 	content.add_child(canvas)
@@ -176,6 +187,7 @@ func current_layer() -> String:
 func new_drawing() -> void:
 	new_counter += 1
 	var document: DrawingDocument = DrawingDocument.new()
+	document.record_selection_history = record_selection_history
 	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Group 1")
 	var raster: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1", String(group.value))
 	tabs.append({"document": document, "path": "", "title": "Untitled %d" % new_counter,
@@ -195,6 +207,7 @@ func _activate(index: int) -> void:
 	canvas.session = null
 	canvas.queue_redraw()
 	_refresh_layers()
+	_last_selection_context = _capture_context()
 	_update_status()
 
 
@@ -218,6 +231,7 @@ func _append_layers(parent: TreeItem, group_id: String) -> void:
 
 
 func _layer_selected() -> void:
+	var before: DrawingHistoryContext = _capture_context()
 	var selected_item: TreeItem = layers.get_selected()
 	if selected_item == null:
 		return
@@ -225,6 +239,7 @@ func _layer_selected() -> void:
 	if current_document().node_metadata(node_id).get("kind") == DrawingLayerNode.RASTER:
 		tabs[active_tab]["layer"] = node_id
 		canvas.layer_id = node_id
+	_record_selection_context(before)
 	_update_status()
 
 
@@ -283,7 +298,61 @@ func _change_tool(name: String) -> void:
 	_update_status()
 
 
+func _capture_context() -> DrawingHistoryContext:
+	var context: DrawingHistoryContext = DrawingHistoryContext.new()
+	if current_document() == null:
+		return context
+	context.document_id = current_document().id
+	if not current_layer().is_empty():
+		context.selected_layer_ids.append(current_layer())
+	context.editor_mode = active_tool
+	context.selected_rect = canvas.selected
+	return context
+
+
+func _selection_history_preference_changed(enabled: bool) -> void:
+	record_selection_history = enabled
+	for tab: Dictionary in tabs:
+		(tab["document"] as DrawingDocument).record_selection_history = enabled
+
+
+func _gesture_started() -> void:
+	_before_gesture = _capture_context()
+
+
+func _selection_changed(_area: Rect2i) -> void:
+	_record_selection_context(_last_selection_context)
+	_update_status()
+
+
+func _record_selection_context(before: DrawingHistoryContext) -> void:
+	if active_tab < 0 or _restoring_context:
+		return
+	var after: DrawingHistoryContext = _capture_context()
+	if before != null:
+		current_document().record_selection_change(before, after)
+	_last_selection_context = after
+
+
+func _restore_context(context: DrawingHistoryContext) -> void:
+	if context == null or context.document_id != current_document().id:
+		return
+	_restoring_context = true
+	if not context.selected_layer_ids.is_empty() and current_document().has_node(context.selected_layer_ids[0]):
+		tabs[active_tab]["layer"] = context.selected_layer_ids[0]
+		canvas.layer_id = context.selected_layer_ids[0]
+	canvas.selected = context.selected_rect
+	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Pan"]:
+		_change_tool(context.editor_mode)
+	_last_selection_context = _capture_context()
+	_restoring_context = false
+
+
 func _canvas_changed(_result: DrawingResult) -> void:
+	if _before_gesture != null:
+		current_document().annotate_latest_gesture(_before_gesture, _capture_context())
+	_before_gesture = null
+	_last_selection_context = _capture_context()
 	_after_edit()
 
 
@@ -309,6 +378,7 @@ func _undo() -> void:
 		return
 	var result: DrawingResult = current_document().undo()
 	if result.ok:
+		_restore_context(result.value as DrawingHistoryContext)
 		_after_edit()
 	else:
 		_show_error(result.message)
@@ -319,6 +389,7 @@ func _redo() -> void:
 		return
 	var result: DrawingResult = current_document().redo()
 	if result.ok:
+		_restore_context(result.value as DrawingHistoryContext)
 		_after_edit()
 	else:
 		_show_error(result.message)
@@ -376,6 +447,7 @@ func _open_file(path: String) -> void:
 		_show_error(opened.message)
 		return
 	var document: DrawingDocument = opened.value as DrawingDocument
+	document.record_selection_history = record_selection_history
 	var raster: String = _first_raster(document, DrawingDocument.ROOT_ID)
 	if raster.is_empty():
 		var added: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1")

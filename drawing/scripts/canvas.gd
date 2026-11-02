@@ -1,6 +1,7 @@
 extends Control
 ## Bounded framebuffer rendering and native mouse gestures, without Atlas UI types.
 
+signal gesture_started()
 signal gesture_committed(result: DrawingResult)
 signal selection_changed(area: Rect2i)
 signal canvas_error(message: String)
@@ -114,6 +115,8 @@ func start_gesture(position: Vector2) -> void:
 	selecting = tool == "Select"
 	moving = tool == "Move"
 	if selecting or moving:
+		if moving:
+			gesture_started.emit()
 		return
 	if tool not in ["Brush", "Eraser"]:
 		dragging = false
@@ -124,6 +127,7 @@ func start_gesture(position: Vector2) -> void:
 		dragging = false
 		return
 	session = result.value as DrawingEditSession
+	gesture_started.emit()
 	paint_to(gesture_start)
 
 
@@ -167,9 +171,9 @@ func finish_gesture(position: Vector2) -> void:
 					var staged: DrawingResult = DrawingClipboard.move_selection(edit, selected, displacement)
 					if staged.ok and edit.change_count() > 0:
 						var committed: DrawingResult = edit.commit()
-						_publish(committed)
 						if committed.ok:
 							selected.position += displacement
+						_publish(committed)
 					else:
 						edit.cancel()
 						if not staged.ok:

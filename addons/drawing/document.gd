@@ -17,8 +17,17 @@ var _nodes: Dictionary[String, DrawingLayerNode] = {}
 var _pending_tiles: Dictionary[String, Dictionary] = {}
 var _known_refs: Dictionary[String, Dictionary] = {}
 var _dirty_tiles: Dictionary[String, bool] = {}
-var _undo: Array[DrawingDelta] = []
-var _redo: Array[DrawingDelta] = []
+## One local ordered timeline. A selection step carries the current content token.
+## External Atlas-owned documents use the host timeline instead of this one.
+var external_history: bool = false
+var record_selection_history: bool = false
+var _events: Array[Dictionary] = []
+var _cursor: int = 0
+var _content_states: Array[int] = [0]
+var _next_content_state: int = 0
+var _saved_content_state: int = 0
+var _untracked_revision: int = 0
+var _saved_untracked_revision: int = 0
 
 
 func _init(document_id: String = "", stride: int = 256,
@@ -47,7 +56,7 @@ static func valid_identifier(identifier: String) -> bool:
 
 
 func is_dirty() -> bool:
-	return revision != published_revision
+	return _content_states[_cursor] != _saved_content_state or _untracked_revision != _saved_untracked_revision
 
 
 func layer_count() -> int:
@@ -95,6 +104,7 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 	_nodes[new_identifier] = DrawingLayerNode.new(new_identifier, kind, name, parent_id)
 	_nodes[parent_id].children.append(new_identifier)
 	revision += 1
+	_mark_untracked_change()
 	return DrawingResult.success(new_identifier, revision)
 
 
@@ -106,6 +116,7 @@ func rename_layer(node_id: String, name: String) -> DrawingResult:
 	if _nodes[node_id].name != name:
 		_nodes[node_id].name = name
 		revision += 1
+		_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
@@ -115,6 +126,7 @@ func set_visibility(node_id: String, visible: bool) -> DrawingResult:
 	if _nodes[node_id].visible != visible:
 		_nodes[node_id].visible = visible
 		revision += 1
+		_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
@@ -124,6 +136,7 @@ func set_locked(node_id: String, locked: bool) -> DrawingResult:
 	if _nodes[node_id].locked != locked:
 		_nodes[node_id].locked = locked
 		revision += 1
+		_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
@@ -154,14 +167,21 @@ func reorder(node_id: String, new_parent: String, new_index: int) -> DrawingResu
 	destination.insert(clampi(new_index, 0, destination.size()), node_id)
 	_nodes[node_id].parent_id = new_parent
 	revision += 1
+	_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
+## Preflight for atomic cross-document transfers; never mutate on rejection.
+func can_remove_subtree(node_id: String) -> bool:
+	return node_id != ROOT_ID and _nodes.has(node_id) and _editable(node_id)
+
+
 func remove_subtree(node_id: String) -> DrawingResult:
-	if node_id == ROOT_ID or not _nodes.has(node_id) or not _editable(node_id):
+	if not can_remove_subtree(node_id):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
 	_erase_subtree(node_id)
 	revision += 1
+	_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
@@ -191,6 +211,7 @@ func set_density(numerator: int, denominator: int) -> DrawingResult:
 		density_numerator = numerator
 		density_denominator = denominator
 		revision += 1
+		_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
@@ -359,31 +380,118 @@ func _publish_edit(layer_id: String, expected: int,
 	result.revision = revision
 	result.delta = DrawingDelta.new(layer_id, before, after)
 	if record_history:
-		_undo.append(result.delta)
-		_redo.clear()
+		if external_history:
+			_mark_untracked_change()
+		else:
+			_append_event({"kind": "content", "delta": result.delta}, true)
+	return result
+
+
+## A host must select external ownership *before* it begins committing edits.
+## Switching a document with existing local entries would silently split history.
+func set_external_history(enabled: bool) -> DrawingResult:
+	if enabled != external_history and not _events.is_empty():
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot migrate an existing local history implicitly")
+	external_history = enabled
+	return DrawingResult.success()
+
+
+func can_undo() -> bool:
+	return _cursor > 0
+
+
+func can_redo() -> bool:
+	return _cursor < _events.size()
+
+
+func history_length() -> int:
+	return _events.size()
+
+
+func _mark_untracked_change() -> void:
+	_untracked_revision += 1
+	# Untracked changes invalidate future redo without changing prior undo steps.
+	_drop_history_redo()
+
+
+func _drop_history_redo() -> void:
+	_events.resize(_cursor)
+	_content_states.resize(_cursor + 1)
+
+
+func _append_event(event: Dictionary, content_change: bool) -> void:
+	_drop_history_redo()
+	_events.append(event)
+	_cursor += 1
+	if content_change:
+		_next_content_state += 1
+		_content_states.append(_next_content_state)
+	else:
+		_content_states.append(_content_states[_cursor - 1])
+
+
+## Attach UI context to exactly the just-committed gesture, never to a sample.
+func annotate_latest_gesture(before: DrawingHistoryContext,
+		after: DrawingHistoryContext) -> bool:
+	if external_history or _cursor != _events.size() or _cursor == 0 			or _events[_cursor - 1]["kind"] != "content" or before == null or after == null:
+		return false
+	_events[_cursor - 1]["before"] = before.detached_copy()
+	_events[_cursor - 1]["after"] = after.detached_copy()
+	return true
+
+
+func record_selection_change(before: DrawingHistoryContext,
+		after: DrawingHistoryContext) -> bool:
+	if external_history or not record_selection_history or before == null or after == null 			or before.same_selection(after):
+		return false
+	_append_event({"kind": "selection", "before": before.detached_copy(),
+		"after": after.detached_copy()}, false)
+	return true
+
+
+## Replays a detached delta without creating a second history entry.
+## The caller must validate the stable document identity before invoking it.
+func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+	if delta == null:
+		return DrawingResult.failure("DELTA", "Missing drawing delta")
+	var result: DrawingResult = _publish_edit(delta.layer_id, revision,
+		delta.after if undo_action else delta.before,
+		delta.before if undo_action else delta.after, false)
+	if result.ok and external_history:
+		_mark_untracked_change()
 	return result
 
 
 func undo() -> DrawingResult:
-	if _undo.is_empty():
-		return DrawingResult.failure("EMPTY_HISTORY", "Nothing to undo")
-	var delta: DrawingDelta = _undo.back()
-	var replayed: DrawingResult = _publish_edit(delta.layer_id, revision, delta.after, delta.before, false)
-	if replayed.ok:
-		_undo.pop_back()
-		_redo.append(delta)
-	return replayed
+	if not can_undo() or external_history:
+		return DrawingResult.failure("EMPTY_HISTORY", "No locally owned undo step")
+	var event: Dictionary = _events[_cursor - 1]
+	var result: DrawingResult
+	if event["kind"] == "content":
+		result = replay_delta(event["delta"] as DrawingDelta, true)
+	else:
+		result = DrawingResult.success((event["before"] as DrawingHistoryContext).detached_copy(), revision)
+	if result.ok:
+		_cursor -= 1
+		if event["kind"] == "content" and event.has("before"):
+			result.value = (event["before"] as DrawingHistoryContext).detached_copy()
+	return result
 
 
 func redo() -> DrawingResult:
-	if _redo.is_empty():
-		return DrawingResult.failure("EMPTY_HISTORY", "Nothing to redo")
-	var delta: DrawingDelta = _redo.back()
-	var replayed: DrawingResult = _publish_edit(delta.layer_id, revision, delta.before, delta.after, false)
-	if replayed.ok:
-		_redo.pop_back()
-		_undo.append(delta)
-	return replayed
+	if not can_redo() or external_history:
+		return DrawingResult.failure("EMPTY_HISTORY", "No locally owned redo step")
+	var event: Dictionary = _events[_cursor]
+	var result: DrawingResult
+	if event["kind"] == "content":
+		result = replay_delta(event["delta"] as DrawingDelta, false)
+	else:
+		result = DrawingResult.success((event["after"] as DrawingHistoryContext).detached_copy(), revision)
+	if result.ok:
+		_cursor += 1
+		if event["kind"] == "content" and event.has("after"):
+			result.value = (event["after"] as DrawingHistoryContext).detached_copy()
+	return result
 
 
 func add_object(layer_id: String, data: Dictionary, requested_id: String = "") -> DrawingResult:
@@ -394,6 +502,7 @@ func add_object(layer_id: String, data: Dictionary, requested_id: String = "") -
 		return DrawingResult.failure("DUPLICATE_ID", "Object ID already exists")
 	_nodes[layer_id].objects[object_id] = data.duplicate(true)
 	revision += 1
+	_mark_untracked_change()
 	_content_committed = true
 	return DrawingResult.success(object_id, revision)
 
@@ -407,6 +516,7 @@ func move_object(layer_id: String, object_id: String, position: Vector2) -> Draw
 	updated["position"] = position
 	_nodes[layer_id].objects[object_id] = updated
 	revision += 1
+	_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
 
@@ -416,6 +526,7 @@ func set_text(layer_id: String, content: String) -> DrawingResult:
 	if _nodes[layer_id].text_value != content:
 		_nodes[layer_id].text_value = content
 		revision += 1
+		_mark_untracked_change()
 		_content_committed = true
 	return DrawingResult.success(null, revision)
 
@@ -516,6 +627,7 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 			_dirty_tiles[imported.id + ":" + tile_key] = true
 	_nodes[parent_id].children.append(mapping[original_root])
 	revision += 1
+	_mark_untracked_change()
 	return DrawingResult.success(mapping[original_root], revision)
 
 
@@ -590,6 +702,8 @@ func mark_published(saved_revision: int,
 			_known_refs[combined] = {"ref": published_refs[combined],
 				"sha256": DrawingRasterTile.digest_rgba8(tile.to_rgba8(), tile_stride)}
 	published_revision = revision
+	_saved_content_state = _content_states[_cursor]
+	_saved_untracked_revision = _untracked_revision
 	_dirty_tiles.clear()
 	return DrawingResult.success(null, revision)
 
