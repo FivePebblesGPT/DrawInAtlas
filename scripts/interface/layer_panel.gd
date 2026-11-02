@@ -95,8 +95,9 @@ func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0, auto
 			layer_list.select(layer_list.item_count - 1)
 	var current: AtlasLayer = floor.layer_by_id(_selected)
 	var hidden_target: bool = current != null and current.detail_level != view_level
-	detail_status.text = ("Viewing D%d · Editing %s (D%d, hidden)" % [view_level, current.display_name, current.detail_level]
-		if hidden_target else "Viewing D%d · Editing %s" % [view_level, current.display_name if current != null else "none"])
+	var empty_label: String = " · empty" if not _has_authored_detail(floor, view_level) else ""
+	detail_status.text = ("Viewing D%d%s · Editing %s (D%d, hidden)" % [view_level, empty_label, current.display_name, current.detail_level]
+		if hidden_target else "Viewing D%d%s · Editing %s" % [view_level, empty_label, current.display_name if current != null else "none"])
 	show_editing_detail.visible = hidden_target
 	name_input.editable = current != null
 	visibility_checkbox.disabled = current == null
@@ -116,6 +117,22 @@ func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0, auto
 	var index: int = _index()
 	_up.disabled = index < 0 or index == floor.layers.size() - 1
 	_down.disabled = index <= 0
+
+
+## Legacy native-layer indicator until T-055 mounts DrawingRegistry's projection.
+## An empty high detail is not missing/lost artwork: navigation/grid overlays
+## are separate and remain interactive even without authored pixels.
+func _has_authored_detail(floor: AtlasFloor, level: int) -> bool:
+	for layer: AtlasLayer in floor.layers:
+		if layer.detail_level != level:
+			continue
+		if layer is AtlasRasterLayer and not (layer as AtlasRasterLayer).chunks.is_empty():
+			return true
+		if layer is AtlasObjectsLayer and not (layer as AtlasObjectsLayer).strokes.is_empty():
+			return true
+		if layer is AtlasTokenLayer and not (layer as AtlasTokenLayer).tokens.is_empty():
+			return true
+	return false
 
 
 func _index() -> int:

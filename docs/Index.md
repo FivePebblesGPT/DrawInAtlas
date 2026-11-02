@@ -8,7 +8,9 @@
 
 | Ready | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 24 | 13 | 3 | 36 | 1 | 77 |
+| 24 | 12 | 3 | 37 | 1 | 77 |
+
+**T-061 completed (2026-11-02):** [Atlas floor/detail Drawing registry and shared signed world mapping](DRAWING_WORLD_MAPPING.md) now prove per-detail stable IDs, sparse blank D-levels, explicit pixel densities, 64-bit viewport anchors, Object Instance detail scoping and grid/entrance overlay continuity. **T-055 is now Ready** for main-canvas composition. T-061 does not claim that composition or T-066’s multi-file atomic save.
 
 **T-062 completed (2026-11-02):** the [shared dedicated Object Editor](Tickets/T-062.md) now uses the same Drawing workspace in standalone Drawing and an Atlas-hosted window, with private drafts, Save/Save As, captured instance identity, signed local frames, unsaved-close protection and real UI/registry/history tests. **T-064 is now Ready**; Atlas main-canvas launch/composition (T-055), the Asset Browser (T-065), and owner UX review remain outstanding.
 
@@ -74,13 +76,13 @@
 | [T-052 · Independent Drawing core and generic layer groups](Tickets/T-052.md) | Done | — | [T-051](Tickets/T-051.md) |
 | [T-053 · Independent Drawing Godot project in monorepo](Tickets/T-053.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-054 · Global history navigates to edit origin](Tickets/T-054.md) | Done | — | [T-052](Tickets/T-052.md) |
-| [T-055 · Compose Drawing in Atlas, input and previews](Tickets/T-055.md) | Blocked | — | [T-053](Tickets/T-053.md), [T-054](Tickets/T-054.md), [T-060](Tickets/T-060.md), [T-061](Tickets/T-061.md), [T-062](Tickets/T-062.md) |
+| [T-055 · Compose Drawing in Atlas, input and previews](Tickets/T-055.md) | Ready | — | [T-053](Tickets/T-053.md), [T-054](Tickets/T-054.md), [T-060](Tickets/T-060.md), [T-061](Tickets/T-061.md), [T-062](Tickets/T-062.md) |
 | [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Blocked | **Owner** | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
 | [T-057 · Native map rendering/LOD feasibility spike](Tickets/T-057.md) | Ready | — | [T-051](Tickets/T-051.md) |
 | [T-058 · One text object per editable layer and rasterization](Tickets/T-058.md) | Done | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | **Owner** | [T-051](Tickets/T-051.md) |
 | [T-060 · Reusable Object Assets and linked instances](Tickets/T-060.md) | Done | — | [T-052](Tickets/T-052.md) |
-| [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Ready | — | [T-052](Tickets/T-052.md) |
+| [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
 | [T-063 · Compact Drawing UI and BarDivider overflow](Tickets/T-063.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Ready | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
