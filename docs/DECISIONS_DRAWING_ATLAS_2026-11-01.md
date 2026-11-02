@@ -1,6 +1,6 @@
 # Drawing / Atlas architecture — owner decisions (2026-11-01)
 
-**Status:** owner direction recorded through Round 3. The *target design* is not implemented. Remaining cross-cutting details are explicit in [[T-051]]; detailed Painting UX features still await [[T-059]]. Epic: [[E-009]].
+**Status:** owner architecture approved through Round 8 (2026-11-02), including Option B document ownership and sparse multi-file persistence. The *target design* is not yet implemented. Remaining detailed engineering contracts are in [[T-051]] and [[T-066]]; Drawing tool inventory remains in [[T-059]]. Epic: [[E-009]].
 
 ## Accepted Round 1–2 decisions
 1. **Drawing** is a physically independent, reduced-feature PhotoCraft/Paint.NET-style application and library. Its exact feature inventory will follow.
@@ -150,3 +150,37 @@ The owner asked for a concrete explanation; **no selection is approved yet**:
 
 ### Other open implementation contracts
 Project/object file format (relative paths + IDs + atomic multi-file Save), staged source-edit publication versus global undo, nested asset dependency/copy rules, map instance visibility at blank detail, missing-source placeholder recovery, import/export, exact group storage and default pixel density progression. These are not reasons to re-open the accepted owner UX decisions.
+
+## Round 8 — DrawingDocument ownership and sparse multi-file storage (owner approved, 2026-11-02)
+
+**This supersedes the Round 7 A/B/C discussion:** owner chose **Option B** — **exactly one internal DrawingDocument per Atlas `(map_id, floor_id, detail_id)`**. Atlas presents `Map → Floor group → Detail group → Layers`; each detail group's visible layers come from its one DrawingDocument. Floor/detail are Atlas domain group nodes; **DrawingDocument stays a generic Drawing model** with its own layers and subgroups, without knowing maps/floors/authored D-levels.
+
+**Internal ≠ independently opened by the end user.** The owner does **not** expect anyone to open a map's D1/floor-2 DrawingDocument as an ordinary file. Atlas opens and manages it behind the unified Layers hierarchy and active surface. This does **not** repeal the separately approved standalone Drawing program: standalone users can still create/open ordinary Drawing files and edit Object Assets; Atlas's internal floor/detail documents need no dedicated user-visible document tabs.
+
+**Physical persistence:** return to **sparse, multi-file storage** for map artwork in addition to the already approved adjacent `Objects/` folder. Only populated raster chunks and necessary metadata are persisted. An empty D-level is logical metadata/a blank view, not an eager full-size raster allocation. Keep separate document/layer manifest identities and stable signed chunk coordinates. The campaign file is now a **metadata/index authority**, not a container of every raster payload; project portability means copying its **whole sibling project tree**.
+
+Illustrative candidate, not frozen binary schema or filename convention:
+```text
+CastleCampaign/
+  CastleCampaign.scn              # Atlas map/floor/detail registry, navigation, project metadata
+  Drawings/
+    documents/<document-id>.meta  # Drawing layers, groups, density, chunk references
+    chunks/<sha-prefix>/<sha>.webp # sparse, content-addressed payloads
+  Objects/<asset-id>.*             # independently saved reusable Object Assets
+  Fonts/                          # redistribution-safe bundled font assets
+```
+The exact manifest encoding, how to bucket payloads, whether chunk blobs are project-wide deduplicated, and whether documents are stored in subdirectories are **engineering design choices under [[T-066]]**. Do not assert a decided `document.meta` syntax or an approved ZIP/single-file pack. A saved Object Asset may itself use the shared Drawing chunk codec, without being confused with map-surface documents.
+
+**Existing implementation evidence, not yet multi-file:** `AtlasRasterChunk.SIZE = 256`, signed `Vector2i coord`, SHA-256 content IDs, RGBA8 canonical chunk images and validated lossless WebP exist in `scripts/artwork/raster_chunk.gd`, `raster_layer.gd`, and `scripts/persistence/webp_store.gd`; current `AtlasCampaignStore` still packs a native one-file `.scn`. Extract/reuse validated logic without claiming on-disk chunk separation already works.
+
+### Consequences accepted or implied
+- **No user-facing “Open D1.drawing” workflow.** Atlas resolves map/floor/detail to a stable document ID, activates it lazily and exposes its layers through the unified map hierarchy.
+- **No per-hex documents**: a floor/detail DrawingDocument spans continuous shared-world coordinates; hex boundaries and selection masks are overlays/constraints.
+- **Different D-levels** have independent authored pixels/density and may render blank, while retaining grid/entrance/navigation overlays.
+- **Map floor/detail layer moves** between different DrawingDocuments are cross-document copy/move transactions, not a pointer switch silently stealing the same layer. Atlas global history owns their undo.
+- **Multi-file consistency is a real requirement:** saving only touched chunk blobs isn't enough; manifest revisions, campaign references, atomic promotion/recovery and garbage-collection policy are necessary. A mere folder of `.webp` files is not crash-safe project persistence.
+- **Empty/untouched areas** must allocate neither giant image memory nor thousands of empty files. Lazy loading/caching and bounded file counts need benchmarks.
+- **No old-save migration** is required, but new-format backup/recovery, missing-chunk validation and portable copying are mandatory.
+
+### Still pending engineering decisions
+Manifest/chunk file format and indices; content-addressed deduplication vs per-doc files; cross-file staged commits; independent Object Assets sharing chunk blobs vs wholly self-contained files; package export/backup; savepoint and deletion behavior; density-change resampling; exact lazy-load/cache policy. These are plans to be measured and approved, not hidden product questions. See [[T-051]], [[T-061]], [[T-066]].

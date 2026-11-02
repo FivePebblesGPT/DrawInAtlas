@@ -12,7 +12,7 @@ The earlier **single-file native campaign save** implementation was previously v
 - [[T-029|Audit/remove obsolete dictionary conversion paths and revalidate native saves]]
 
 ## Acceptance
-- Retain the accepted native single-file direction unless a separate decision changes it.
+- **Historical only:** the earlier single-file campaign save was accepted before the new owner decision. The portable campaign now explicitly requires sparse **multi-file** Drawing payloads and project-relative Object Assets. See [[T-066]].
 - Model cleanup preserves exact artwork, identity, native values, isolated mutable copies, undo and recoverable activation.
 - Replace required cloning/validation responsibilities before removing their dictionary adapters.
 - Re-run meaningful native roundtrip, recovery and compatible-installation checks after relevant changes; decide any native schema change explicitly.
@@ -34,3 +34,8 @@ The owner now explicitly requires an **`Objects/` folder beside the campaign fil
 - Prevent directory traversal and unintended asset paths outside portable project roots; define rename/case-collision and duplicate-ID behavior.
 - Preserve project portability for bundled fonts; choose whether fonts are native embedded resources or `Fonts/` sidecars after licensing review. Do not bundle unlicensed OS fonts.
 - Historical user-save migration remains **not required**. New-format roundtrip, isolation, atomic writes and failed-save recovery are required.
+
+## Round 8 — sparse multi-file artwork (owner approved 2026-11-02)
+The owner selected **one internal DrawingDocument per floor/detail** and restored **sparse multi-file artwork persistence**. It is no longer correct to treat the current `.scn` campaign as holding *all* map artwork. Preserve the campaign metadata/index authority; save Drawing manifests and only populated chunk payloads under a sibling `Drawings/` hierarchy. `Objects/` and bundled font resources also remain adjacent and portable.
+
+[[T-066]] is now the primary multi-file save/transaction task. Saving a tiny mark in one detail should not rewrite unrelated floor/detail raster data. Validate multi-file generation consistency, recoverable interrupted saves, asset identities, chunk content, exact alpha, unreferenced retained variants, and incomplete project copies. Prior single-file save tests are baseline evidence only; no historical user-save migration is required.
