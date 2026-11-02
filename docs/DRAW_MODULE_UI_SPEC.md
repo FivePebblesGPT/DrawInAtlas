@@ -64,6 +64,18 @@ T-063, but owner hands-on UX remains open.
 
 The comprehensive owner walkthrough and first-slice/full-baseline checklist are cross-referenced in `[[DRAWING_FEATURE_INVENTORY]]`. Automated tests can validate regressions, **not** replace physical keyboard, focus, panel resizing or owner review evidence.
 
+## Future PhotoCraft-style docking (planning only; T-078–T-083)
+
+The owner agreed on 2026-11-02 to track a **six-ticket follow-up**,
+not to extend already-Done T-063. The canonical [panel docking design](DRAWING_DOCKING_SPEC.md)
+explicitly models **ordered panel groups**: separators in the right icon rail
+separate groups; **each individual panel keeps its own icon**, and any icon in
+a group opens the **same tabbed flyout**, selecting that tab. Groups may move
+as units to/from **in-app** floating containers while retaining their ordered
+tabs. Independent group collapse, reordering, insertion previews and layout
+persistence are separately gated T-079–T-083 features, **not shipped today**.
+T-083 has an owner UX approval gate; T-059 and T-056 remain outstanding.
+
 ## 1. Design objective
 
 Make the drawing environment familiar to users of Paint.NET and PhotoCraft without spending an entire row of vertical space on a conventional quick-access toolbar.
