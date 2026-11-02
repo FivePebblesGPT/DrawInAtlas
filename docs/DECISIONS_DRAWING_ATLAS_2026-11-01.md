@@ -93,3 +93,21 @@ Atlas
 5. Asset editor UI and Atlas-embedded Drawing share one canonical engine but can expose different workspace commands; the compact Draw UI spec remains proposed.
 
 See [[T-060]], [[T-062]], [[T-054]], [[T-063]] and the remaining questions in [[T-051]].
+
+## Round 5 owner decisions — context-sensitive Save As and optional selection history (2026-11-02)
+
+**These explicitly supersede the earlier open Round 4 questions.**
+
+1. **Save As after entering Object Editor through an Atlas castle instance:** create a *new independent Object Asset* (e.g. Variant B) **and automatically change that specific originating Atlas instance to reference Variant B**. Other linked instances continue referencing the original source; original source artwork remains unchanged. The Object Editor continues working with the new asset after Save As.
+2. **Save As opened independently of an Atlas instance:** create the new asset and switch the active Object Editor document to it; no Atlas instance can be rebound because no instance-edit context exists. This is the consistent default for standalone Drawing/Object Editor.
+3. **Selection undo recording is optional, OFF by default.** An explicit user-facing setting enables selection-only operations (e.g. selecting a different layer or object, or clearing a selection) as history steps. With the setting OFF, pure selection changes do not consume undo history, **but content operations always retain/restore their relevant selection and editing mode context** as decided earlier.
+4. Turning this setting ON is not permission to record every hover, mouse movement, camera pan or tool-mode switch. Record only committed, meaningful selection transitions with before/after contexts. De-duplicate no-ops, coalesce a single gesture into one history step, avoid replay recursion, and do not mark an artwork document dirty for selection-only steps.
+5. Whether mode-only actions and navigation-only actions get their *own* undo steps remains unapproved; the selection setting does not automatically include them. Retaining existing queued selection steps when toggled OFF is a proposed implementation policy, not an additional owner decision.
+
+### Implementation consequences
+- Save As from an instance is **one logical Atlas operation**: create a source asset + update the *captured originating instance binding*; use immutable instance/map IDs and revision guards. If it is no longer the same instance, reject unsafe rebinding, keep the draft and offer an explicit recovery path. Source creation / instance rebinding / global history must never silently partially succeed.
+- Undo of Save As must restore the originating instance's old binding and relevant selection/object-editing mode; redo restores the new binding and context. Decide separately whether undo removes the new unused asset from the registry/disk or retains it as a saved independent asset (do not automatically delete persisted user files).
+- Keep independent Object Editor semantics and Atlas-specific rebind orchestration at a clean boundary: **Drawing/Object Editor** creates/copies an asset, while **Atlas** owns which instance points to which asset.
+- Selection-only history applies to both standalone Drawing and embedded Atlas insofar as each exposes the same history configuration/API; in Atlas the operations join its single global chronological history. A selection-only step affects no canonical artwork and must not advance a project-content savepoint.
+
+See [[T-051]], [[T-054]], [[T-060]], [[T-062]], [[T-056]] and [[T-063]].
