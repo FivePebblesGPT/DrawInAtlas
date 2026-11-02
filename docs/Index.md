@@ -9,14 +9,14 @@
 - [ ] [[E-TOOLS|E-TOOLS · Familiar drawing-tool suite]]
 - [ ] [[E-005|E-005 · Discovery, previews and floors]]
 - [ ] [[E-006|E-006 · Authored artwork LOD and detail editing]]
-- [ ] [[E-SAVE|E-SAVE · Native-save integrity through cleanup]]
+- [ ] [[E-SAVE|E-SAVE · Portable multi-file save integrity]]
 - [ ] [[E-007|E-007 · Local table and projector output]]
 - [ ] [[E-008|E-008 · Host-authoritative collaboration]]
 
 ## First priority
 - [x] [[T-001|T-001 · Explicit types and corrected skill guidance]]
 
-## Architecture split — owner direction settled; DrawingDocument boundary pending
+## Architecture split — Option B / sparse files approved; implementation pending
 - [ ] [[T-051|T-051 · Finalize shared/copy, coordinates and project contracts]]
 - [ ] [[T-052|T-052 · Independent Drawing core and generic layer groups]]
 - [ ] [[T-053|T-053 · Independent Drawing Godot project in monorepo]]
@@ -32,6 +32,7 @@
 - [ ] [[T-063|T-063 · Compact Drawing UI and BarDivider overflow]]
 - [ ] [[T-064|T-064 · Nested Object Assets with cycle-safe references]]
 - [ ] [[T-065|T-065 · Asset Browser and NULL-placeholder workflow]]
+- [ ] [[T-066|T-066 · Sparse multi-file floor/detail DrawingDocument persistence]]
 
 ## Review work
 - [x] [[T-002|T-002 · Continuous chunked-canvas model]]
