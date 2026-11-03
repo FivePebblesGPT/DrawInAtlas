@@ -6,6 +6,17 @@
 
 ## Kanban summary
 
+**T-068 isolated GDExtension bridge milestone (2026-11-03; In Progress):**
+A throwaway Godot 4.8 beta 2 project now compiles a bounded checked raster
+batch bridge directly against the engine-generated GDExtension header. Two
+runtime runs pass 443/443 exact-pixel and error-boundary checks, without
+shipping or auto-loading any native library in Drawing or Atlas. The editor
+scan of the experimental extension is unstable, so only an explicit isolated
+runtime load is tested. Four harness contract tests run in fast CI; the full
+bridge is on-demand only. Physical-device, native publication, library
+comparators, and the final backend decision remain open. See
+[T-068](Tickets/T-068.md) and [raw runs](benchmarks/T068_2026-11-03_gdextension_bridge.json).
+
 **T-068 bounded native-kernel ABI checkpoint (2026-11-03; In Progress):**
 The unintegrated C++ raster kernel now has opt-in length-checked delta and
 full-region functions, without changing its original ABI 1. A six-test fast-CI

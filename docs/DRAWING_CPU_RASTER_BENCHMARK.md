@@ -579,3 +579,28 @@ is faster. In particular, supplied capacities cannot authenticate foreign
 pointers, so the wrapper does not make arbitrary C calls memory-safe. The
 remaining library-comparison, GDExtension, physical-hardware and operation-
 selection obligations stay open under T-068.
+
+
+## T-068 isolated Godot GDExtension ABI timing (2026-11-03)
+
+A Linux-only, manually invoked temporary GDExtension project now measures the
+real Godot `PackedByteArray` → C++ checked batch → `PackedByteArray` boundary,
+without modifying Atlas or standalone Drawing. Two Godot 4.8 beta 2 runs pass
+**443 exactness/boundary checks each**. Each call allocates detached native
+source/output storage, and the result is copied back to Godot. Four harness
+contracts are part of fast CI; the Godot binary bridge runs only on demand.
+
+| Region | Run 1 median / p95 | Run 2 median / p95 | Samples per run |
+|---|---:|---:|---:|
+| 32×32 RGBA8 | 8 / 15 μs | 9 / 14 μs | 31 |
+| 64×64 RGBA8 | 13 / 36 μs | 13 / 14 μs | 31 |
+| 128×128 RGBA8 | 16 / 60 μs | 16 / 17 μs | 31 |
+
+[Raw JSON](benchmarks/T068_2026-11-03_gdextension_bridge.json) reports the
+engine-generated header digest and timings. These values are small **API-call
+microbenchmarks**, not a comparison against a Godot in-app edit or physical
+pointer-to-visible presentation. The engine editor scan of this experimental
+module can abort; only explicit runtime loading in a throwaway project has
+passed. No source-revision or main-thread dirty-region publication, renderer
+integration, Windows binary, external-library competitor, or adoption decision
+has been established. **T-068 remains In Progress.**

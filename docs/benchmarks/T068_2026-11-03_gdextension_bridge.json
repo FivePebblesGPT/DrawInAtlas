@@ -1,0 +1,55 @@
+{
+  "ticket": "T-068",
+  "mode": "optional, isolated Linux GDExtension (not production)",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "generated_header_sha256": "c312ed1dfe6bba973018f0937b38220069467c000ee2aa3f23c34997b56f299a",
+  "test_method": "Godot GDScript calls against C++ length-checked raster batch",
+  "measurements": [
+    {
+      "checks": 443,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 16,
+          "p95_us": 60,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 8,
+          "p95_us": 15,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 13,
+          "p95_us": 36,
+          "trials": 31
+        }
+      }
+    },
+    {
+      "checks": 443,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 16,
+          "p95_us": 17,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 9,
+          "p95_us": 14,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 13,
+          "p95_us": 14,
+          "trials": 31
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "No source/document publication or production UI is exercised",
+    "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
+    "Software runner only; no physical Windows/Linux hardware or GPU timings",
+    "Temporary binary is not bundled in the repository or loaded at normal startup"
+  ]
+}
