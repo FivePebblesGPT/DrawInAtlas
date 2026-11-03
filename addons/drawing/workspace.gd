@@ -5,6 +5,7 @@ extends Control
 const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
 const TOP_BAR_SCRIPT: Script = preload("res://addons/drawing/editor_top_bar.gd")
 const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd")
+const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -29,9 +30,21 @@ var dock_rail: VBoxContainer
 var dock_stash: VBoxContainer
 var dock_flyout: PanelContainer
 var dock_flyout_tabs: HBoxContainer
+var dock_flyout_tab_scroll: ScrollContainer
 var dock_flyout_body: VBoxContainer
 var dock_rail_buttons: Dictionary = {} # UI buttons; membership always comes from dock_layout.
 var dock_header_buttons: Dictionary = {}
+var dock_tab_buttons: Dictionary = {}
+var dock_tab_strips: Dictionary = {}
+var dock_group_frames: Dictionary = {}
+var dock_group_handles: Dictionary = {}
+var dock_drag: DrawingDockDrag
+var dock_drop_hint: ColorRect
+var _drag_candidate_kind: String = ""
+var _drag_candidate_id: String = ""
+var _drag_candidate_position: Vector2 = Vector2.ZERO
+var _drag_pointer_position: Vector2 = Vector2.ZERO
+var _suppress_drag_release: bool = false
 var _expanded_dock_width: int = 270
 var _expanded_scroll: int = 0
 var dock_layout: DrawingDockLayout
@@ -202,6 +215,8 @@ func _build_interface() -> void:
 	dock_split.add_child(inspector)
 	dock_layout = DOCK_LAYOUT_SCRIPT.new() as DrawingDockLayout
 	dock_layout.create_container("right")
+	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
+	_make_dock_hint()
 	dock_stash = VBoxContainer.new()
 	dock_stash.name = "DockViewStorage"
 	dock_stash.visible = false
@@ -386,9 +401,15 @@ func _make_dock_flyout() -> void:
 		dock_layout.close_flyout("right")
 		_render_dock())
 	heading.add_child(close)
+	dock_flyout_tab_scroll = ScrollContainer.new()
+	dock_flyout_tab_scroll.name = "FlyoutTabScroll"
+	dock_flyout_tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	dock_flyout_tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	dock_flyout_tab_scroll.custom_minimum_size.y = 43
+	column.add_child(dock_flyout_tab_scroll)
 	dock_flyout_tabs = HBoxContainer.new()
 	dock_flyout_tabs.name = "FlyoutTabs"
-	column.add_child(dock_flyout_tabs)
+	dock_flyout_tab_scroll.add_child(dock_flyout_tabs)
 	var body_scroll: ScrollContainer = ScrollContainer.new()
 	body_scroll.name = "FlyoutScroll"
 	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -432,6 +453,8 @@ func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	button.button_pressed = (dock_layout.container_info("right")["flyout_group"] == dock_layout.group_of(panel_id)
 		and dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id) if rail_button else (dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id)
 	button.pressed.connect(_rail_panel_pressed.bind(panel_id) if rail_button else _expanded_panel_pressed.bind(panel_id))
+	button.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
+	button.tooltip_text += "; drag to reorder, split, or merge"
 	# Godot 4.8 exposes accessible Control labels on supported backends.
 	for property: Dictionary in button.get_property_list():
 		if property["name"] == "accessibility_name":
@@ -467,6 +490,8 @@ func _restore_dock_focus(key: String) -> void:
 		target = dock_rail_buttons.get(key.trim_prefix("rail:")) as Button
 	elif key.begins_with("group:"):
 		target = dock_header_buttons.get(key.trim_prefix("group:")) as Button
+	elif key.begins_with("drag-group:"):
+		target = dock_group_handles.get(key.trim_prefix("drag-group:")) as Button
 	elif key.begins_with("edge:"):
 		target = find_child("Edge_" + key.trim_prefix("edge:"), true, false) as Button
 	elif key.begins_with("tab:"):
@@ -496,6 +521,10 @@ func _render_dock(focus_key: String = "") -> void:
 			child.queue_free()
 	dock_rail_buttons.clear()
 	dock_header_buttons.clear()
+	dock_tab_buttons.clear()
+	dock_tab_strips.clear()
+	dock_group_frames.clear()
+	dock_group_handles.clear()
 	if not minimized:
 		var minimize: Button = Button.new()
 		minimize.name = "MinimizeDock"
@@ -516,6 +545,7 @@ func _render_dock(focus_key: String = "") -> void:
 			var frame: VBoxContainer = VBoxContainer.new()
 			frame.name = "Group_" + group_id
 			dock_panels.add_child(frame)
+			dock_group_frames[group_id] = frame
 			var heading: HBoxContainer = HBoxContainer.new()
 			heading.name = "GroupHeader"
 			frame.add_child(heading)
@@ -533,10 +563,41 @@ func _render_dock(focus_key: String = "") -> void:
 			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			title.clip_text = true
 			heading.add_child(title)
-			# Right-edge icons are ordered exactly as their minimized rail peers.
+			var drag_handle: Button = Button.new()
+			drag_handle.name = "GroupDrag_" + group_id
+			drag_handle.text = "↕"
+			drag_handle.tooltip_text = "Drag whole " + group_id.capitalize() + " group to reorder or merge; Ctrl+Shift+Up/Down to move"
+			drag_handle.custom_minimum_size = Vector2(32, 40)
+			drag_handle.focus_mode = Control.FOCUS_ALL
+			drag_handle.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.GROUP, group_id))
+			heading.add_child(drag_handle)
+			dock_group_handles[group_id] = drag_handle
+			var arrange: MenuButton = MenuButton.new()
+			arrange.name = "Arrange_" + group_id
+			arrange.text = "⋮"
+			arrange.tooltip_text = "Arrange tabs and groups by keyboard or pointer"
+			arrange.custom_minimum_size = Vector2(32, 40)
+			arrange.focus_mode = Control.FOCUS_ALL
+			heading.add_child(arrange)
+			var menu: PopupMenu = arrange.get_popup()
+			for label_text: String in ["Move active tab left", "Move active tab right", "Move active tab to previous group", "Move active tab to next group", "Split active tab into group", "Move group up", "Move group down", "Merge group into previous", "Merge group into next"]:
+				menu.add_item(label_text)
+			menu.id_pressed.connect(_dock_arrange_action.bind(group_id))
+			# A clipped horizontal strip supports arbitrary tab counts at small widths.
+			var tab_scroll: ScrollContainer = ScrollContainer.new()
+			tab_scroll.name = "TabStripScroll_" + group_id
+			tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+			tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+			tab_scroll.custom_minimum_size.y = 45
+			frame.add_child(tab_scroll)
+			dock_tab_strips[group_id] = tab_scroll
+			var tabs_row: HBoxContainer = HBoxContainer.new()
+			tabs_row.name = "TabStrip_" + group_id
+			tab_scroll.add_child(tabs_row)
 			for panel_id: String in visible_members:
 				var edge: Button = _panel_button(panel_id, false)
-				heading.add_child(edge)
+				tabs_row.add_child(edge)
+				dock_tab_buttons[panel_id] = edge
 			if not bool(group["collapsed"]):
 				var active_id: String = String(group["active"])
 				if visible_members.has(active_id):
@@ -579,6 +640,8 @@ func _render_dock(focus_key: String = "") -> void:
 				tab.toggle_mode = true
 				tab.button_pressed = panel_id == String(group["active"])
 				tab.pressed.connect(_flyout_tab_pressed.bind(panel_id))
+				tab.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
+				tab.tooltip_text += "; drag to reorder or split"
 				dock_flyout_tabs.add_child(tab)
 			if dock_views.has(String(group["active"])):
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
@@ -589,6 +652,326 @@ func _render_dock(focus_key: String = "") -> void:
 	_layout_dock_flyout()
 	if not focus_key.is_empty():
 		call_deferred("_restore_dock_focus", focus_key)
+
+
+## Drag/drop uses a single model transaction. The UI never mutates group arrays.
+func _make_dock_hint() -> void:
+	dock_drop_hint = ColorRect.new()
+	dock_drop_hint.name = "DockInsertionHint"
+	dock_drop_hint.color = Color(0.19, 0.78, 0.95, 0.87)
+	dock_drop_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dock_drop_hint.top_level = true
+	dock_drop_hint.z_index = 100
+	dock_drop_hint.visible = false
+	add_child(dock_drop_hint)
+
+
+func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_drag_candidate_kind = kind
+		_drag_candidate_id = source_id
+		_drag_candidate_position = event.global_position
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
+			_suppress_drag_release = true
+			_cancel_dock_drag()
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
+			return
+		if _dock_keyboard_command(event):
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty():
+		_drag_pointer_position = event.global_position
+		if not dock_drag.is_dragging() and event.global_position.distance_to(_drag_candidate_position) >= 7.0:
+			if _drag_candidate_kind == DrawingDockDrag.PANEL:
+				dock_drag.begin_panel(_drag_candidate_id)
+			else:
+				dock_drag.begin_group(_drag_candidate_id)
+		if dock_drag.is_dragging():
+			_preview_dock_target(event.global_position)
+			get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		if _suppress_drag_release:
+			_suppress_drag_release = false
+			get_viewport().set_input_as_handled()
+			return
+		if dock_drag.is_dragging():
+			_preview_dock_target(event.global_position)
+			var accepted: bool = dock_drag.commit()
+			_cancel_dock_drag()
+			if accepted:
+				_render_dock()
+			get_viewport().set_input_as_handled()
+		else:
+			_drag_candidate_id = ""
+			_drag_candidate_kind = ""
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if dock_drag != null and (dock_drag.is_dragging() or not _drag_candidate_id.is_empty()):
+			_suppress_drag_release = true
+			_cancel_dock_drag()
+
+
+func _process(delta: float) -> void:
+	# Scroll the group dock while holding a tab/group near its top or bottom.
+	# This makes offscreen targets reachable without abandoning the transaction.
+	if dock_drag == null or not dock_drag.is_dragging() or not inspector.get_global_rect().has_point(_drag_pointer_position):
+		return
+	var bounds: Rect2 = inspector.get_global_rect()
+	var direction: int = 0
+	if _drag_pointer_position.y < bounds.position.y + 30.0:
+		direction = -1
+	elif _drag_pointer_position.y > bounds.end.y - 30.0:
+		direction = 1
+	if direction == 0:
+		return
+	var before: int = inspector.scroll_vertical
+	inspector.scroll_vertical += roundi(float(direction) * 420.0 * delta)
+	if inspector.scroll_vertical != before:
+		_preview_dock_target(_drag_pointer_position)
+
+
+func _cancel_dock_drag() -> void:
+	_drag_candidate_kind = ""
+	_drag_candidate_id = ""
+	if dock_drag != null:
+		dock_drag.cancel()
+	if dock_drop_hint != null:
+		dock_drop_hint.visible = false
+
+
+func _dock_group_position(group_id: String) -> int:
+	var groups: Array = dock_layout.container_info("right")["groups"]
+	for i: int in range(groups.size()):
+		if groups[i]["id"] == group_id:
+			return i
+	return -1
+
+
+func _dock_target(group_id: String, index: int, as_tabs: bool) -> Dictionary:
+	return {"kind": DrawingDockDrag.MERGE_GROUP if dock_drag.source_kind() == DrawingDockDrag.GROUP else DrawingDockDrag.TAB_SLOT,
+		"group": group_id, "index": index}
+
+
+func _dock_target_at(position: Vector2) -> Dictionary:
+	var info: Dictionary = dock_layout.container_info("right")
+	var groups: Array = info["groups"]
+	if dock_flyout.visible and dock_flyout_tab_scroll.get_global_rect().has_point(position):
+		var open_group: String = String(info["flyout_group"])
+		if not open_group.is_empty():
+			return _dock_tab_target(open_group, position, dock_flyout_tabs, dock_flyout_tab_scroll)
+	if bool(info["minimized"]):
+		if not inspector.get_global_rect().has_point(position):
+			return {}
+		for entry: Dictionary in dock_layout.rail_icons("right"):
+			var panel_id: String = String(entry["panel"])
+			var button: Button = dock_rail_buttons.get(panel_id) as Button
+			if button != null and button.get_global_rect().has_point(position):
+				var group_id: String = String(entry["group"])
+				var members: Array = dock_layout.group_info(group_id)["panels"]
+				var slot: int = members.find(panel_id) + (1 if position.y >= button.get_global_rect().get_center().y else 0)
+				var edge_y: float = button.get_global_rect().position.y if position.y < button.get_global_rect().get_center().y else button.get_global_rect().end.y
+				return {"target": _dock_target(group_id, slot, true), "rect": Rect2(button.global_position.x, edge_y - 2, button.size.x, 4)}
+		for idx: int in range(groups.size() + 1):
+			var y: float = _dock_group_gap_y(idx)
+			if absf(y - position.y) <= 16.0:
+				return {"target": {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": idx},
+					"rect": Rect2(inspector.global_position.x, y - 2, inspector.size.x, 4)}
+		return {}
+	if not inspector.get_global_rect().has_point(position):
+		return {}
+	for group_index: int in range(groups.size()):
+		var group_id: String = String(groups[group_index]["id"])
+		var frame: VBoxContainer = dock_group_frames.get(group_id) as VBoxContainer
+		if frame == null or not frame.get_global_rect().has_point(position):
+			continue
+		var frame_rect: Rect2 = frame.get_global_rect()
+		if position.y < frame_rect.position.y + 12.0:
+			return _dock_group_gap(group_index, frame_rect.position.y)
+		if position.y > frame_rect.end.y - 12.0:
+			return _dock_group_gap(group_index + 1, frame_rect.end.y)
+		var strip: ScrollContainer = dock_tab_strips.get(group_id) as ScrollContainer
+		if strip != null and strip.get_global_rect().has_point(position):
+			var tabs_row: HBoxContainer = strip.get_child(0) as HBoxContainer
+			return _dock_tab_target(group_id, position, tabs_row, strip)
+		return {"target": _dock_target(group_id, dock_layout.group_info(group_id)["panels"].size(), false),
+			"rect": Rect2(frame_rect.position, Vector2(frame_rect.size.x, minf(frame_rect.size.y, 44.0)))}
+	if groups.is_empty():
+		return _dock_group_gap(0, dock_panels.global_position.y)
+	var first: VBoxContainer = dock_group_frames.get(String(groups[0]["id"])) as VBoxContainer
+	var last: VBoxContainer = dock_group_frames.get(String(groups[-1]["id"])) as VBoxContainer
+	if first != null and position.y <= first.global_position.y:
+		return _dock_group_gap(0, first.global_position.y)
+	if last != null and position.y >= last.get_global_rect().end.y:
+		return _dock_group_gap(groups.size(), last.get_global_rect().end.y)
+	return {}
+
+
+func _dock_tab_target(group_id: String, position: Vector2, row: HBoxContainer, viewport: ScrollContainer) -> Dictionary:
+	var members: Array = dock_layout.group_info(group_id)["panels"]
+	var index: int = members.size()
+	var indicator_x: float = viewport.get_global_rect().end.x - 3.0
+	for panel_index: int in range(members.size()):
+		var button: Control = row.get_node_or_null(("Tab_" if row == dock_flyout_tabs else "Edge_") + String(members[panel_index])) as Control
+		if button == null:
+			continue
+		var rect: Rect2 = button.get_global_rect()
+		if position.x < rect.get_center().x:
+			index = panel_index
+			indicator_x = rect.position.x
+			break
+		indicator_x = rect.end.x
+	indicator_x = clampf(indicator_x, viewport.global_position.x + 2.0, viewport.get_global_rect().end.x - 3.0)
+	return {"target": _dock_target(group_id, index, true),
+		"rect": Rect2(indicator_x - 2.0, viewport.global_position.y, 4.0, viewport.size.y)}
+
+
+func _dock_group_gap(index: int, y: float) -> Dictionary:
+	return {"target": {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": index},
+		"rect": Rect2(inspector.global_position.x + 4.0, y - 2.0, inspector.size.x - 8.0, 4.0)}
+
+
+func _dock_group_gap_y(index: int) -> float:
+	var groups: Array = dock_layout.container_info("right")["groups"]
+	if groups.is_empty():
+		return dock_rail.global_position.y
+	if index < groups.size():
+		var first_id: String = String(groups[index]["panels"][0])
+		var button: Button = dock_rail_buttons.get(first_id) as Button
+		if button != null:
+			return button.get_global_rect().position.y
+	var last_id: String = String(groups[-1]["panels"][-1])
+	var last_button: Button = dock_rail_buttons.get(last_id) as Button
+	return last_button.get_global_rect().end.y if last_button != null else dock_rail.get_global_rect().end.y
+
+
+func _preview_dock_target(position: Vector2) -> void:
+	var hit: Dictionary = _dock_target_at(position)
+	if hit.is_empty() or not dock_drag.preview(hit["target"]):
+		dock_drop_hint.visible = false
+		return
+	var rectangle: Rect2 = hit["rect"]
+	dock_drop_hint.global_position = rectangle.position
+	dock_drop_hint.size = rectangle.size
+	dock_drop_hint.visible = true
+
+
+func _dock_apply(source_kind: String, source_id: String, destination: Dictionary, focus_key: String = "") -> bool:
+	var started: bool = dock_drag.begin_panel(source_id) if source_kind == DrawingDockDrag.PANEL else dock_drag.begin_group(source_id)
+	if not started or not dock_drag.preview(destination):
+		dock_drag.cancel()
+		return false
+	if not dock_drag.commit():
+		return false
+	_render_dock(focus_key)
+	return true
+
+
+func _dock_arrange_action(action_id: int, group_id: String) -> void:
+	var groups: Array = dock_layout.container_info("right")["groups"]
+	var group_index: int = _dock_group_position(group_id)
+	if group_index < 0:
+		return
+	var group: Dictionary = dock_layout.group_info(group_id)
+	var panel_id: String = String(group["active"])
+	var panel_index: int = group["panels"].find(panel_id)
+	var destination: Dictionary = {}
+	var source_kind: String = DrawingDockDrag.PANEL
+	var source_id: String = panel_id
+	match action_id:
+		0: # Move active tab left.
+			if panel_index > 0:
+				destination = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": panel_index - 1}
+		1:
+			if panel_index < group["panels"].size() - 1:
+				destination = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": panel_index + 2}
+		2, 3:
+			var neighbor: int = group_index + (-1 if action_id == 2 else 1)
+			if neighbor >= 0 and neighbor < groups.size():
+				var other: Dictionary = groups[neighbor]
+				destination = {"kind": DrawingDockDrag.TAB_SLOT, "group": other["id"],
+					"index": other["panels"].size() if action_id == 2 else 0}
+		4:
+			destination = {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": group_index + 1}
+		5, 6:
+			source_kind = DrawingDockDrag.GROUP
+			source_id = group_id
+			var new_index: int = group_index + (-1 if action_id == 5 else 2)
+			if new_index >= 0 and new_index <= groups.size():
+				destination = {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": new_index}
+		7, 8:
+			source_kind = DrawingDockDrag.GROUP
+			source_id = group_id
+			var neighbor: int = group_index + (-1 if action_id == 7 else 1)
+			if neighbor >= 0 and neighbor < groups.size():
+				var other: Dictionary = groups[neighbor]
+				destination = {"kind": DrawingDockDrag.MERGE_GROUP, "group": other["id"], "index": other["panels"].size()}
+	if not destination.is_empty():
+		_dock_apply(source_kind, source_id, destination, "edge:" + panel_id)
+
+
+func _dock_keyboard_command(event: InputEventKey) -> bool:
+	if not event.ctrl_pressed or not event.alt_pressed:
+		return false
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return false
+	var kind: String = ""
+	var panel_id: String = ""
+	for key: String in dock_tab_buttons:
+		if focused == dock_tab_buttons[key]:
+			kind = DrawingDockDrag.PANEL
+			panel_id = key
+	for key: String in dock_rail_buttons:
+		if focused == dock_rail_buttons[key]:
+			kind = DrawingDockDrag.PANEL
+			panel_id = key
+	if focused.name.begins_with("Tab_") and focused.get_parent() == dock_flyout_tabs:
+		kind = DrawingDockDrag.PANEL
+		panel_id = String(focused.name).trim_prefix("Tab_")
+	if kind == DrawingDockDrag.PANEL:
+		var group_id: String = dock_layout.group_of(panel_id)
+		var group: Dictionary = dock_layout.group_info(group_id)
+		var index: int = group["panels"].find(panel_id)
+		var destination: Dictionary = {}
+		match event.keycode:
+			KEY_LEFT:
+				if index > 0:
+					destination = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index - 1}
+			KEY_RIGHT:
+				if index + 1 < group["panels"].size():
+					destination = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index + 2}
+			KEY_S:
+				destination = {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": _dock_group_position(group_id) + 1}
+			KEY_UP, KEY_DOWN:
+				var groups: Array = dock_layout.container_info("right")["groups"]
+				var next_index: int = _dock_group_position(group_id) + (-1 if event.keycode == KEY_UP else 1)
+				if next_index >= 0 and next_index < groups.size():
+					var next_group: Dictionary = groups[next_index]
+					destination = {"kind": DrawingDockDrag.TAB_SLOT, "group": next_group["id"],
+						"index": next_group["panels"].size() if event.keycode == KEY_UP else 0}
+		if not destination.is_empty():
+			_dock_apply(DrawingDockDrag.PANEL, panel_id, destination, "rail:" + panel_id if bool(dock_layout.container_info("right")["minimized"]) else "edge:" + panel_id)
+		return not destination.is_empty()
+	if event.shift_pressed and (event.keycode == KEY_UP or event.keycode == KEY_DOWN):
+		for group_id: String in dock_group_handles:
+			if focused == dock_group_handles[group_id]:
+				var group_index: int = _dock_group_position(group_id)
+				var count: int = dock_layout.container_info("right")["groups"].size()
+				var target_index: int = group_index - 1 if event.keycode == KEY_UP else group_index + 2
+				if target_index >= 0 and target_index <= count:
+					_dock_apply(DrawingDockDrag.GROUP, group_id, {"kind": DrawingDockDrag.GROUP_SLOT,
+						"container": "right", "index": target_index}, "drag-group:" + group_id)
+				return true
+	return false
 
 
 func _restore_expanded_scroll() -> void:

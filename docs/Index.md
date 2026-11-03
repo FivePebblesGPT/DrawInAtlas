@@ -8,9 +8,9 @@
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 14 | 1 | 13 | 3 | 51 | 1 | 83 |
+| 14 | 1 | 12 | 3 | 52 | 1 | 83 |
 
-**T-078–T-083 planned docking work (2026-11-02):** The owner agreed to six successive follow-up tickets to reproduce PhotoCraft-style **in-app panel docking**. The right icon rail has **one icon per panel** and **separators between tabbed groups**: clicking an icon opens the **group's shared flyout** with that panel selected. The plan includes independently collapsible stacked groups, tab reordering/merging, movable in-app floating **tabbed groups**, alignment previews that insert whole groups in their current order, and layout persistence/recovery. **T-078 is Done** (model foundation, 82 checks) and **T-079 is Done** (group chevrons, icon rail and in-app flyouts, 40 native checks); **T-080 is Ready**, T-081–T-083 remain **Blocked** on sequential dependencies, and **T-083 requires explicit owner UX review**. Advanced drag/floating/persistence remains agreed scope, **not implemented functionality or owner UX approval**. See [docking specification](DRAWING_DOCKING_SPEC.md) and [T-078](Tickets/T-078.md)–[T-083](Tickets/T-083.md). Existing T-059/T-056 manual gates remain open.
+**T-078–T-083 agreed docking sequence (2026-11-03):** The right icon rail remains panel-level, with separators only between tabbed groups. **T-078 Done** (82 model assertions) supplies unique stable-ID ownership, **T-079 Done** (40 native assertions) supplies collapsible groups, icon rail and in-app flyouts, and **T-080 Done** (60 model and 68 native assertions) adds transactional tab/group drag, visible insertion/merge hints, exact Esc/focus-loss/invalid-drop rollback, scrollable tab strips and keyboard arrangement controls. **T-081 is now Ready** for floating in-app tabbed hosts; T-082/T-083 remain Blocked, with final **T-083 owner UX review mandatory**. Grouped floating containers, cross-container reparenting and persistence are *not implemented* by T-080, and earlier T-059/T-056 UX gates remain open. See [docking specification](DRAWING_DOCKING_SPEC.md), [T-080](Tickets/T-080.md) and [T-083](Tickets/T-083.md).
 
 **T-063 owner-requested refinement (historical T-063 baseline, 2026-11-02):** The shared Drawing and Object Editor tool rail now uses six packaged, keyboard-focusable SVG icons with tooltips and pressed-state feedback. **Window → Show document tabs** hides/reopens the `Untitled` document strip for the current session; hidden tabs retain Ctrl/Cmd+Tab navigation, unsaved-close protection and document/dirty status. Colors/Layers/History now **stack vertically in one scrollable right dock**, with a bounded layer tree and focus-to-History support. The native witness has **75 required checks**; clean staging includes icons. T-063 remains Done while T-059 and T-056 **manual UX gates stay open**. See [T-063](Tickets/T-063.md) and [standalone usage](../drawing/README.md).
 
@@ -131,8 +131,8 @@
 | [T-077 · Performance, code review and validation handoff docs](Tickets/T-077.md) | Done | — | — |
 | [T-078 · Panel architecture and state](Tickets/T-078.md) | Done | — | [T-063](Tickets/T-063.md) |
 | [T-079 · Collapsible dock and grouped icon rail](Tickets/T-079.md) | Done | — | [T-078](Tickets/T-078.md) |
-| [T-080 · Tab and group reordering](Tickets/T-080.md) | Ready | — | [T-079](Tickets/T-079.md) |
-| [T-081 · Floating tabbed panel containers](Tickets/T-081.md) | Blocked | — | [T-080](Tickets/T-080.md) |
+| [T-080 · Tab and group reordering](Tickets/T-080.md) | Done | — | [T-079](Tickets/T-079.md) |
+| [T-081 · Floating tabbed panel containers](Tickets/T-081.md) | Ready | — | [T-080](Tickets/T-080.md) |
 | [T-082 · Cross-container panel and group docking](Tickets/T-082.md) | Blocked | — | [T-081](Tickets/T-081.md) |
 | [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | Blocked | **Owner** | [T-082](Tickets/T-082.md) |
 
