@@ -18,6 +18,17 @@ class ForgedBridge:
 			_rgba: int, _operation: int) -> PackedByteArray:
 		return payload
 
+class CountingBridge:
+	extends RefCounted
+	var first: PackedByteArray
+	var second: PackedByteArray
+	var calls: int = 0
+	func apply_sparse_checked(_source: PackedByteArray, _points: PackedInt32Array,
+			_mask: PackedByteArray, _width: int, _height: int,
+			_rgba: int, _operation: int) -> PackedByteArray:
+		calls += 1
+		return first if calls == 1 else second
+
 func _check(ok: bool, description: String) -> void:
 	checks += 1
 	if not ok:
@@ -170,10 +181,49 @@ func _initialize() -> void:
 		[_job(0, 0, PackedInt32Array([1, 1]), 0xFF112233, 2, guarded_mask)])
 	_check(not masked.ok and masked.code == "NATIVE_DELTA",
 		"native cannot write a pixel outside the selection mask")
+	# A structurally valid sparse response may still be incomplete. Neither an
+	# empty count nor a subset of a multi-pixel request may become a no-op or
+	# a partial published transaction.
 	forged.payload = PackedByteArray([0, 0, 0, 0])
-	var empty: Dictionary = SPARSE.apply(forged, gd, gl, gd.revision, target)
+	var omitted: Dictionary = SPARSE.apply(forged, gd, gl, gd.revision, target)
+	_check(not omitted.ok and omitted.code == "NATIVE_DELTA" and
+		gd.history_length() == 0 and _pixel(gd, gl, 1, 1) == 0,
+		"forged zero-count response cannot conceal a requested changed pixel")
+	var two_points: Array[Dictionary] = [_job(0, 0,
+		PackedInt32Array([1, 1, 2, 2]), 0xFF112233)]
+	forged.payload = _encoded(9, 0, 0xFF112233)
+	var partial: Dictionary = SPARSE.apply(forged, gd, gl, gd.revision, two_points)
+	_check(not partial.ok and partial.code == "NATIVE_DELTA" and
+		gd.history_length() == 0 and _pixel(gd, gl, 1, 1) == 0 and
+		_pixel(gd, gl, 2, 2) == 0,
+		"forged subset must not publish a partial sparse batch")
+	# Even a successful first tile cannot publish if a second tile lies about
+	# its change set: the commit must remain all-or-nothing.
+	var second_missing: Array[Dictionary] = [_job(0, 0,
+		PackedInt32Array([1, 1]), 0xFF112233), _job(1, 0,
+		PackedInt32Array([2, 2]), 0xFF112233)]
+	var first_only: Dictionary = _fixture()
+	# A bridge that returns one valid tile then omits the second tile.
+	var truncated_bridge: CountingBridge = CountingBridge.new()
+	truncated_bridge.first = _encoded(9, 0, 0xFF112233)
+	truncated_bridge.second = PackedByteArray([0, 0, 0, 0])
+	var truncated: Dictionary = SPARSE.apply(truncated_bridge,
+		first_only.doc, first_only.layer, first_only.doc.revision, second_missing)
+	_check(not truncated.ok and truncated.code == "NATIVE_DELTA" and
+		first_only.doc.history_length() == 0 and
+		_pixel(first_only.doc, first_only.layer, 1, 1) == 0 and
+		_pixel(first_only.doc, first_only.layer, 10, 2) == 0,
+		"omitted second-tile deltas abort entire canonical transaction")
+	# Genuine no-op (target already equals source) is still accepted.
+	forged.payload = PackedByteArray([0, 0, 0, 0])
+	var empty: Dictionary = SPARSE.apply(forged, gd, gl, gd.revision,
+		[_job(0, 0, PackedInt32Array([1, 1]), 0)])
 	_check(empty.ok and empty.changed == 0 and gd.history_length() == 0,
-		"explicit native no-op token is benign")
+		"true no-op token is benign when no canonical pixel would change")
+	var masked_noop: Dictionary = SPARSE.apply(forged, gd, gl, gd.revision,
+		[_job(0, 0, PackedInt32Array([1, 1]), 0xFF112233, 2, guarded_mask)])
+	_check(masked_noop.ok and masked_noop.changed == 0 and
+		gd.history_length() == 0, "mask-excluded point permits empty native output")
 
 	var late: Dictionary = _fixture()
 	var ld: DrawingDocument = late.doc

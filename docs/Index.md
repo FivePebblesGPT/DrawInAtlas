@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 complete native sparse-delta verification (2026-11-04; In Progress):**
+The isolated GDExtension adapter now independently checks the **complete**
+requested change set, not just the returned delta records. A forged zero-count
+or partial response cannot silently discard requested pixels or partially
+publish a multi-tile edit. The targeted witness passes 173 checks per run;
+fast CI validates the runner and the native test remains on demand. O(N)
+canonical verification adds CPU work and no speedup is claimed. T-068's
+production/native and physical-hardware gates remain open. See
+[T-068](Tickets/T-068.md) and the
+[sparse evidence](benchmarks/T068_2026-11-04_sparse_completeness.json).
+
+
 **T-068 experimental sparse-delta GDExtension publication (2026-11-04; In Progress):**
 The opt-in checked C++ bridge can return a length-prefixed sequence of
 (index, exact-before, exact-after) pixel records rather than an entire RGBA8

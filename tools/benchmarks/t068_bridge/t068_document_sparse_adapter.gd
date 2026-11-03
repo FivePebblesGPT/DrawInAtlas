@@ -12,26 +12,44 @@ static func _failure(code: String) -> Dictionary:
 
 
 ## The native response is little-endian [count:u32, (index, before, after):u32 * N].
-## Each before pixel must match verified source bytes; each after pixel must
-## match the declared operation. Never trust a changed coordinate just because
-## a native extension returned it.
+## Validate *completeness*, not just each returned record. A native return with
+## fewer valid records (including a forged zero-change header) must not silently
+## omit requested edits. Recompute the expected changed set from the canonical
+## source and eligible unique points before accepting a transaction.
 static func _checked_deltas(bytes: PackedByteArray, source: PackedByteArray,
 		points: PackedInt32Array, mask: PackedByteArray, stride: int,
 		rgba: int, operation: int) -> Dictionary:
-	if bytes.size() < 4 or (bytes.size() - 4) % 12 != 0:
+	if stride <= 0 or source.size() != stride * stride * 4 or \
+			points.size() % 2 != 0 or \
+			(not mask.is_empty() and mask.size() != stride * stride) or \
+			operation < 0 or operation > 2 or bytes.size() < 4 or \
+			(bytes.size() - 4) % 12 != 0:
 		return _failure("NATIVE_DELTA")
 	var count: int = bytes.decode_u32(0)
 	if count > mini(points.size() / 2, stride * stride) or bytes.size() != 4 + count * 12:
 		return _failure("NATIVE_DELTA")
-	var allowed: Dictionary[int, bool] = {}
+	var expected: Dictionary[int, int] = {}
+	var checked: Dictionary[int, bool] = {}
 	for pair: int in range(points.size() / 2):
 		var x: int = points[pair * 2]
 		var y: int = points[pair * 2 + 1]
 		if x < 0 or x >= stride or y < 0 or y >= stride:
 			return _failure("NATIVE_DELTA")
 		var index: int = y * stride + x
-		if mask.is_empty() or mask[index] != 0:
-			allowed[index] = true
+		if checked.has(index):
+			continue
+		checked[index] = true
+		if not mask.is_empty() and mask[index] == 0:
+			continue
+		var before: int = source.decode_u32(index * 4)
+		var after: int = 0 if operation == 1 else rgba if operation == 2 else \
+			DrawingEditSession._blend(rgba, before)
+		if before != after:
+			expected[index] = after
+	# The checked native kernel is permitted to return records in any order,
+	# but it must return precisely the canonical set of changed coordinates.
+	if count != expected.size():
+		return _failure("NATIVE_DELTA")
 	var seen: Dictionary[int, bool] = {}
 	var deltas: Array[Dictionary] = []
 	for i: int in range(count):
@@ -39,18 +57,13 @@ static func _checked_deltas(bytes: PackedByteArray, source: PackedByteArray,
 		var index: int = bytes.decode_u32(offset)
 		var before: int = bytes.decode_u32(offset + 4)
 		var after: int = bytes.decode_u32(offset + 8)
-		if index >= stride * stride or not allowed.has(index) or seen.has(index) or \
-				before != source.decode_u32(index * 4) or before == after:
-			return _failure("NATIVE_DELTA")
-		var expected: int = 0 if operation == 1 else rgba if operation == 2 else \
-			DrawingEditSession._blend(rgba, before)
-		if after != expected:
+		if not expected.has(index) or seen.has(index) or \
+			before != source.decode_u32(index * 4) or after != expected[index]:
 			return _failure("NATIVE_DELTA")
 		seen[index] = true
 		deltas.append({"x": index % stride, "y": index / stride,
 			"before": before, "after": after})
 	return {"ok": true, "deltas": deltas}
-
 
 ## Request shape matches t068_document_batch_adapter.gd. The extension sees
 ## immutable full source bytes, but returns only changed records rather than

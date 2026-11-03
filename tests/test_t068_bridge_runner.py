@@ -47,8 +47,8 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertEqual(bridge.BATCH_RE.search("T068_BATCH_PASSED: 128 checks\n").group(1), "128")
         self.assertIsNone(bridge.BATCH_RE.search("T068_BATCH_FAILED: 1/128"))
         self.assertEqual(bridge.SPARSE_RE.search(
-            "T068_SPARSE_PASSED: 169 checks\n").group(1), "169")
-        self.assertIsNone(bridge.SPARSE_RE.search("T068_SPARSE_FAILED: 1/169"))
+            "T068_SPARSE_PASSED: 173 checks\n").group(1), "173")
+        self.assertIsNone(bridge.SPARSE_RE.search("T068_SPARSE_FAILED: 1/173"))
         self.assertIsNotNone(bridge.SPARSE_TIMING_RE.search(
             'T068_SPARSE_TIMING: {"32":{"full_median_us":100}}\n'))
         self.assertIsNotNone(bridge.TIMING_RE.search(
@@ -71,7 +71,7 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
                                "T068_BATCH_FAIL: partial publication",
                                "T068_BATCH_FAILED: 1/128",
                                "T068_SPARSE_FAIL: malicious delta",
-                               "T068_SPARSE_FAILED: 1/169"):
+                               "T068_SPARSE_FAILED: 1/173"):
                 with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                     bridge.checked_run([sys.executable, "-c",
                                         f"print({diagnostic!r})"], cwd=wd, timeout=10)
@@ -133,11 +133,12 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         for marker in ("draw_batch_deltas_checked", "apply_sparse_checked",
                        "process_sparse", "put32", "ptrcall_sparse", "call_sparse"):
             self.assertIn(marker, cpp)
-        for marker in ("NATIVE_DELTA", "source.decode_u32", "allowed.has(index)",
-                       "seen.has(index)", "before == after", "DrawingEditSession._blend",
+        for marker in ("NATIVE_DELTA", "source.decode_u32", "expected.has(index)",
+                       "seen.has(index)", "count != expected.size()", "DrawingEditSession._blend",
                        "request_chunk_at", "edit._stage(", "edit.cancel()", "edit.commit()"):
             self.assertIn(marker, adapter)
-        for marker in ("ForgedBridge", "CORRUPT_TILE", "MISSING_TILE",
+        for marker in ("ForgedBridge", "CountingBridge", "forged zero-count response",
+                       "omitted second-tile deltas", "CORRUPT_TILE", "MISSING_TILE",
                        "T068_SPARSE_PASSED", "T068_SPARSE_TIMING", "hidden RGB"):
             self.assertIn(marker, witness)
         self.assertNotIn("ImageTexture", adapter)

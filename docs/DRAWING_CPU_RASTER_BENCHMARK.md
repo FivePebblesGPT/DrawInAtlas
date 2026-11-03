@@ -712,3 +712,23 @@ computation, file I/O, GPU upload, pointer dispatch, memory peaks or the
 performance of the production raster engine. The 16-byte record format
 omits Python/Godot container allocation overhead and the full source buffer
 still passed *into* native code. Retain pure-Godot as the shipped fallback.
+
+
+## 2026-11-04: complete sparse-output validation boundary
+
+The opt-in native bridge previously checked every delta record independently,
+but could accept a forged native zero-change header even when an eligible
+requested pixel would change. It now **recomputes the complete canonical set**
+from the verified source bytes, unique eligible point coordinates and exact
+blend/erase/replace operation; counts, indices, before/after values and
+uniqueness must all match. A partial or empty forged return never reaches a
+`DrawingDocument` publication, including in a multi-tile gesture. True no-op
+or mask-excluded operations still succeed. The targeted witness adds four
+regression assertions, reaching 173 per isolated native run.
+
+This deliberately spends O(requested unique points) GDScript CPU work in the
+sparse path and can reduce its apparent speed benefit. Retain raw paired
+staging timings in [the new diagnostic evidence](benchmarks/T068_2026-11-04_sparse_completeness.json)
+but **do not** infer native backend performance, actual pointer-to-display
+latency, or relative optimization gains from small synthetic samples. The
+shipping Drawing path remains Godot-only; T-068 is still In Progress.

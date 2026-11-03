@@ -153,7 +153,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                                          "res://sparse_test.gd"], cwd=project, timeout=120)
             sparse_match = SPARSE_RE.search(sparse_output)
             sparse_timing = SPARSE_TIMING_RE.search(sparse_output)
-            if sparse_match is None or int(sparse_match.group(1)) < 160 or sparse_timing is None:
+            if sparse_match is None or int(sparse_match.group(1)) < 173 or sparse_timing is None:
                 raise RuntimeError(f"Missing or insufficient sparse checks/timing:\n{sparse_output[-4000:]}")
             sparse_benchmark = json.loads(sparse_timing.group(1))
             if any(str(side) not in sparse_benchmark for side in (32, 64, 128)):

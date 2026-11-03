@@ -369,3 +369,15 @@ binary, framebuffer tests and benchmark stay outside fast push/PR CI. No
 `.gdextension` is installed in the shipping projects. A returned dirty
 rectangle does not imply GPU subrectangle upload, and these samples are
 not physical or production UI latency measurements. T-068 remains In Progress.
+
+
+### T-068 complete sparse-output validation (2026-11-04)
+
+The existing **non-native** fast-CI runner contract asserts that the isolated
+sparse adapter computes the full expected change set from verified source
+bytes and fails if a native response omits any required pixel. A valid no-op
+remains representable by a four-byte zero count. The existing **on-demand**
+`godot-native-t068-bridge.yml` requires at least **173 sparse test checks** per
+run, including forged empty/partial payloads and an incomplete second tile.
+The optional extension is not loaded in the main application or fast push CI;
+this does not imply third-party native backend adoption or hardware acceptance.
