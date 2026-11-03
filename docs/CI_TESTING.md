@@ -21,8 +21,15 @@
   versus embedded Drawing IDs and campaign-rebind safety. Its native
   `tests/asset_browser_atlas_native.gd` (**12** checks; **13** with screenshot)
   checks the GUI drag provider and canvas drop dispatch in a real window.
-  It has **not** established that a complete physical pointer gesture reliably
-  starts dragging; that and Windows/Linux owner UX approval remain pending.
+  A distinct, targeted **real OS-pointer** witness
+  (`tests/asset_browser_atlas_pointer_native.gd` plus
+  `tools/test_t065_x11_pointer.py`) now verifies the actual Godot drag start,
+  mouse release, invalid-target cancellation and Esc without publishing,
+  **19/19** checks (**20/20** with screenshot). It uses XTEST events through
+  a disposable X11/Xvfb desktop and requires optional `python-xlib`:
+  `xvfb-run -a -s '-screen 0 1400x900x24' python3 tools/test_t065_x11_pointer.py --godot godot`.
+  It is **not** part of fast push CI, nor a substitute for Windows/Linux
+  physical-hardware and owner hands-on UX acceptance.
 - T-065 Atlas-managed portable source registration and export:
   `tests/object_portable_registry_smoke.gd` (**33** disk-backed checks) covers
   embedded source-ID preservation, canonical campaign versioning, origin/frame
@@ -33,7 +40,7 @@
   source-manager actions extend `tests/object_source_manager_native.gd` to
   **22** targeted X11/Mesa checks (23 with optional screenshot). The standalone
   Drawing browser's Import still rejects Atlas-managed registries, and shared
-  browser-to-Atlas *physical pointer gesture* and owner acceptance remain open.
+  browser-to-Atlas physical-hardware review and owner acceptance remain open.
 - T-065 Atlas-owned source safety: `tests/object_asset_repair_smoke.gd`
   (48 disk-backed checks) covers optimistic deletion confirmations,
   Remove/NULL policies, stable placement generations, explicit no-guess

@@ -14,10 +14,13 @@ canvas drop target place linked instances at the exact view coordinate,
 with index/path/hash/revision validation and a keyboard Place alternative.
 Atlas `asset-*` identities remain distinct from the embedded Drawing
 `drawing-*` IDs; neither registry nor standalone scanner was duplicated.
-New 32-check headless acceptance is push-CI-gated; 12 native layout/drag
-provider/drop checks pass (13 with a screenshot). A full synthetic pointer
-gesture did not reach Godot's drag-start state, so physical pointer UX,
-large-project testing and **owner approval** remain open. See
+New 32-check headless acceptance is push-CI-gated; the original 12 native
+layout/provider/drop checks pass (13 with screenshot). A subsequent targeted
+**real XTEST press–move–release** witness exposed and fixed `ItemList`'s
+missing drag start: it now passes **19/19** actual native gesture checks
+(**20/20** with screenshot), including click-without-placement, valid canvas
+drop, invalid destination and Esc rollback. Direct owner pointer/keyboard
+approval, physical hardware and large-project testing remain open. See
 [T-065](Tickets/T-065.md).
 
 **T-065 Atlas-managed portable registration (2026-11-03; still In Progress):**
