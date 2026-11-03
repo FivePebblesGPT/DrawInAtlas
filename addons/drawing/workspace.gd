@@ -1410,6 +1410,8 @@ func _local_publish(session: DrawingObjectEditorSession, as_variant: bool) -> Dr
 	var reopened: DrawingResult = DrawingObjectEditorFile.open(path)
 	if not reopened.ok:
 		return reopened
+	if asset_browser != null:
+		asset_browser.notify_source_published(path)
 	tabs[index]["path"] = path
 	tabs[index].erase("_target_path")
 	var snapshot: Dictionary = reopened.value

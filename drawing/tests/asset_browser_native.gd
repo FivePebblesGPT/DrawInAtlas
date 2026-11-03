@@ -39,9 +39,18 @@ func run() -> void:
 	var objects: String = ProjectSettings.globalize_path("user://t065-native-" + DrawingDocument.new_id() + "/Objects")
 	check(DirAccess.make_dir_recursive_absolute(objects) == OK, "create portable fixture")
 	var source: DrawingDocument = DrawingDocument.new("asset-native")
-	check(source.create_layer(DrawingLayerNode.RASTER, "Pixels").ok, "create source layer")
+	var made: DrawingResult = source.create_layer(DrawingLayerNode.RASTER, "Pixels")
+	check(made.ok, "create source layer")
+	var opened: DrawingResult = source.begin_edit(made.value, source.revision)
+	check(opened.ok and (opened.value as DrawingEditSession).apply_region(
+		Rect2i(2, 2, 4, 4), PackedByteArray([200, 50, 30, 255, 200, 50, 30, 255,
+		200, 50, 30, 255, 200, 50, 30, 255, 200, 50, 30, 255, 200, 50, 30, 255,
+		200, 50, 30, 255, 200, 50, 30, 255, 200, 50, 30, 255, 200, 50, 30, 255,
+		200, 50, 30, 255, 200, 50, 30, 255, 200, 50, 30, 255, 200, 50, 30, 255,
+		200, 50, 30, 255, 200, 50, 30, 255])).ok and
+		(opened.value as DrawingEditSession).commit().ok, "paint native preview pixels")
 	check(DrawingObjectEditorFile.save(source, objects.path_join("native.drawing"), "Native Object",
-		Vector2i.ZERO, Rect2i(), 1).ok, "write portable source")
+		Vector2i.ZERO, Rect2i(0, 0, 8, 8), 1).ok, "write portable source")
 	var app: Control = load("res://main.tscn").instantiate()
 	app.layout_persistence_enabled = false
 	app.initial_asset_browser_root = objects
@@ -50,6 +59,10 @@ func run() -> void:
 	var panel: DrawingAssetBrowserPanel = app.asset_browser
 	check(panel != null and app.dock_layout.owner_of("asset_browser") == "right", "host pre-registers dock peer before layout restore")
 	check(panel.assets.item_count == 1, "asset row is present in native dock")
+	app.inspector.scroll_vertical = int(app.inspector.get_v_scroll_bar().max_value)
+	await frames(8)
+	check(panel.assets.get_item_icon(0) != null and panel.thumbnails.renders == 1,
+		"native visible asset has one lazily rendered thumbnail")
 	var rail_info: Array[Dictionary] = app.dock_layout.rail_icons("right")
 	check(rail_info.size() == 4 and rail_info[-1]["panel"] == "asset_browser", "browser has its own group and icon")
 	panel.search.grab_focus()

@@ -6,7 +6,17 @@
 
 ## Kanban summary
 
-**T-065 portable Asset Browser milestone (2026-11-03; still In Progress):** the shared Drawing workspace can now attach an `asset_browser` dock peer via Window → Asset Browser… or a host-provided portable `Objects/` root. A bounded read-only source scan, name/ID filtering, stale-file and duplicate-identity rejection, and explicit Edit Source into an Object Editor tab are covered by 37 headless and 18 native checks. The complete Atlas placement/drop, thumbnail, NULL deletion/repair and owner UX scope remains unfinished. The original owner keyboard/pointer acceptance is tracked as a manual gate; no approval was inferred. See [T-065](Tickets/T-065.md) and [standalone usage](../drawing/README.md).
+**T-065 thumbnail and portable-copy follow-up (2026-11-03; still In Progress):** real Object source
+pixels now appear as lazy, bounded 48×48 previews with a 24-image SHA-keyed
+LRU and automatic invalidation after successful local Object Editor Save.
+The headless thumbnail test passes 54 checks; portable file-copy safety passes
+29; native source/pointer/thumbnail passes 19 (20 with optional screenshot).
+Standalone copies into Atlas-managed registries are refused until proper
+registration exists. The full Atlas drop/delete/NULL
+repair and owner UX acceptance are still missing. See
+[T-065](Tickets/T-065.md) and [CI policy](CI_TESTING.md).
+
+**T-065 portable Asset Browser milestone (2026-11-03; still In Progress):** the shared Drawing workspace can now attach an `asset_browser` dock peer via Window → Asset Browser… or a host-provided portable `Objects/` root. A bounded read-only source scan, name/ID filtering, stale-file and duplicate-identity rejection, and explicit Edit Source into an Object Editor tab are covered by 37 headless and 18 native checks. The Atlas placement/drop, NULL deletion/repair, campaign registration and owner UX scope remains unfinished; the subsequently added thumbnail and standalone file-copy workflows are described above. The original owner keyboard/pointer acceptance is tracked as a manual gate; no approval was inferred. See [T-065](Tickets/T-065.md) and [standalone usage](../drawing/README.md).
 
 **T-068 publication-cache follow-up (2026-11-03; still In Progress):**
 `DrawingDocument` now resolves the immutable source tile once per touched

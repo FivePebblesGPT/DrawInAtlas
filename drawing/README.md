@@ -159,8 +159,21 @@ selected sources in an independent Object Editor tab via **Edit Source**.
 The source path appears as a tooltip; **Refresh** rechecks the folder. A
 host embedding this workspace may set `initial_asset_browser_root` before
 `add_child()` so the panel is registered before the T-083 layout restore.
-The browser currently indexes source metadata on explicit refresh, and is not
-yet a lazy-thumbnail or campaign-placement UI. Do not use source names as IDs
+The browser currently indexes source metadata on explicit refresh. Visible
+rows render transparent 48×48 thumbnails from actual source pixels with a
+bounded 192×192 center crop for oversized frames; a missing/empty authoring
+frame previews a 128×128 neighborhood of the Object origin. At most two new
+thumbnails are decoded per process frame; a 24-image content-hash cache is
+invalidated on refresh or successful local Object Editor publication. External
+changes require **Refresh** and cannot be opened from a stale listing. This
+is **not yet** an Atlas instance-placement, source-deletion or NULL-repair UI.
+**Import…** copies a separate valid `.drawing` into a standalone portable
+`Objects/` root under its embedded stable ID; it refuses duplicate identities
+and an Atlas-managed registry root because that requires campaign registration.
+**Export…** writes the selected indexed source as a new portable `.drawing`
+file, rejecting stale source bytes and existing destinations rather than
+silently replacing files. Both commands use ordinary Godot file dialogs, not
+a web runtime, and never delete artwork or create Atlas instances. Do not use source names as IDs
 or take its list as authorization to delete unused variants. Atlas placement
 and NULL repair/delete policy are still T-065 work; no automatic asset
 relinking, deletion or publication is triggered by browsing.

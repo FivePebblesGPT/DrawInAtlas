@@ -308,6 +308,26 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_smoke.gd 2>&1 | tee /tmp/godot-t065-browser.log
           grep -q 'T065_ASSET_BROWSER_PASSED' /tmp/godot-t065-browser.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ASSET_BROWSER_FAILED:' /tmp/godot-t065-browser.log; then exit 1; fi
+      - name: Verify T-065 lazily rendered Object source thumbnails
+        id: ci_t065_asset_thumbnail_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_thumbnails_smoke.gd 2>&1 | tee /tmp/godot-t065-thumbnails.log
+          grep -q 'T065_THUMBNAILS_PASSED' /tmp/godot-t065-thumbnails.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_THUMB_FAILED:' /tmp/godot-t065-thumbnails.log; then exit 1; fi
+      - name: Verify T-065 explicit portable Object source transfers
+        id: ci_t065_asset_transfer_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_transfer_smoke.gd 2>&1 | tee /tmp/godot-t065-transfers.log
+          grep -q 'T065_TRANSFERS_PASSED' /tmp/godot-t065-transfers.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_TRANSFER_FAILED:' /tmp/godot-t065-transfers.log; then exit 1; fi
       - name: Summarize CI failures
         if: ${{ !cancelled() }}
         env:

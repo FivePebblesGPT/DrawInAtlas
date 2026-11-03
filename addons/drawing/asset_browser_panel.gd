@@ -5,17 +5,24 @@ extends VBoxContainer
 signal open_requested(path: String)
 
 const INDEX_SCRIPT: Script = preload("res://addons/drawing/asset_browser_index.gd")
+const THUMBNAILS_SCRIPT: Script = preload("res://addons/drawing/asset_browser_thumbnails.gd")
+const TRANSFER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_transfer.gd")
+var thumbnails: DrawingAssetBrowserThumbnails
 var index: DrawingAssetBrowserIndex
 var search: LineEdit
 var assets: ItemList
 var message: Label
 var open_button: Button
+var import_dialog: FileDialog
+var export_dialog: FileDialog
+var _pending_export: Dictionary = {}
 var _visible_entries: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	name = "AssetBrowser"
 	index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
+	thumbnails = THUMBNAILS_SCRIPT.new() as DrawingAssetBrowserThumbnails
 	var heading: Label = Label.new()
 	heading.text = "Object Assets"
 	add_child(heading)
@@ -26,12 +33,19 @@ func _ready() -> void:
 	add_child(search)
 	assets = ItemList.new()
 	assets.name = "AssetList"
+	assets.fixed_icon_size = Vector2i(48, 48)
+	assets.icon_mode = ItemList.ICON_MODE_LEFT
+	assets.max_text_lines = 1
+	assets.get_v_scroll_bar().value_changed.connect(func(_offset: float) -> void: _queue_thumbnails())
+	assets.resized.connect(_queue_thumbnails)
 	assets.custom_minimum_size.y = 205
 	assets.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	assets.item_selected.connect(func(_i: int) -> void: _update_open_button())
+	assets.item_selected.connect(func(_i: int) -> void:
+		_update_open_button()
+		_queue_thumbnails())
 	assets.item_activated.connect(func(_i: int) -> void: open_selected())
 	add_child(assets)
-	var actions: HBoxContainer = HBoxContainer.new()
+	var actions: HFlowContainer = HFlowContainer.new()
 	add_child(actions)
 	var refresh: Button = Button.new()
 	refresh.name = "RefreshAssets"
@@ -44,6 +58,30 @@ func _ready() -> void:
 	open_button.tooltip_text = "Open the selected published source in an Object Editor tab"
 	open_button.pressed.connect(open_selected)
 	actions.add_child(open_button)
+	var import_button: Button = Button.new()
+	import_button.name = "ImportAsset"
+	import_button.text = "Import…"
+	import_button.tooltip_text = "Copy a separate portable .drawing source into this Objects/ folder; does not register Atlas placements"
+	import_button.pressed.connect(func() -> void: import_dialog.popup_centered_ratio(0.7))
+	actions.add_child(import_button)
+	var export_button: Button = Button.new()
+	export_button.name = "ExportAsset"
+	export_button.text = "Export…"
+	export_button.tooltip_text = "Copy the selected source to a new portable .drawing file (no overwrite)"
+	export_button.pressed.connect(_ask_export)
+	actions.add_child(export_button)
+	import_dialog = FileDialog.new()
+	import_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	import_dialog.filters = PackedStringArray(["*.drawing ; Drawing Object sources"])
+	import_dialog.file_selected.connect(_import_file)
+	add_child(import_dialog)
+	export_dialog = FileDialog.new()
+	export_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	export_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	export_dialog.filters = PackedStringArray(["*.drawing ; Drawing Object sources"])
+	export_dialog.file_selected.connect(_export_file)
+	add_child(export_dialog)
 	message = Label.new()
 	message.name = "AssetIndexStatus"
 	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -55,6 +93,10 @@ func set_objects_root(path: String) -> DrawingResult:
 	if index == null:
 		index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
 	var result: DrawingResult = index.scan(path)
+	if result.ok:
+		if thumbnails == null:
+			thumbnails = THUMBNAILS_SCRIPT.new() as DrawingAssetBrowserThumbnails
+		thumbnails.reconcile(index.entries)
 	if is_node_ready():
 		_refresh_view()
 		if not result.ok:
@@ -66,6 +108,14 @@ func refresh_assets() -> void:
 	if index == null or index.root_path.is_empty():
 		return
 	set_objects_root(index.root_path)
+
+
+## Only a successful publication from this workspace automatically refreshes.
+## External changes must be explicitly refreshed and stale files fail closed.
+func notify_source_published(path: String) -> void:
+	if index != null and not index.root_path.is_empty() and \
+			path.simplify_path().begins_with(index.root_path + "/"):
+		refresh_assets()
 
 
 func _refresh_view() -> void:
@@ -84,6 +134,7 @@ func _refresh_view() -> void:
 	if selection >= 0:
 		assets.select(selection)
 	_update_open_button()
+	_queue_thumbnails()
 	message.text = "%d sources; %d warnings" % [index.entries.size(), index.warnings.size()]
 	if index.root_path.is_empty():
 		message.text = "Choose a portable Objects/ folder from Window → Asset Browser…"
@@ -119,3 +170,84 @@ func open_selected() -> void:
 		message.text = "Source changed; refresh the Asset Browser before opening"
 		return
 	open_requested.emit(String(entry["path"]))
+
+
+## Defer preview work to active visible rows, at most two expensive decodes
+## per frame. Selection/filter/scroll can reorder items without caching UI IDs.
+var _preview_queued: bool = false
+var _visible_icon_rows: Array[int] = []
+
+
+func _queue_thumbnails() -> void:
+	_preview_queued = true
+
+
+func _process(_delta: float) -> void:
+	if _preview_queued:
+		_preview_queued = false
+		_render_visible_thumbnails()
+
+
+func _render_visible_thumbnails() -> void:
+	if not is_visible_in_tree() or assets == null or thumbnails == null or _visible_entries.is_empty():
+		return
+	var first: int = assets.get_item_at_position(Vector2(5, 5), true)
+	var last: int = assets.get_item_at_position(Vector2(5, maxf(5.0, assets.size.y - 5.0)), true)
+	if first < 0:
+		return
+	if last < first:
+		# A short list can leave empty space below its last item.
+		last = mini(_visible_entries.size() - 1, first + ceili(assets.size.y / 48.0))
+	last = mini(last, first + DrawingAssetBrowserThumbnails.CAPACITY - 1)
+	for previous: int in _visible_icon_rows:
+		if previous < first or previous > last:
+			if previous < assets.item_count:
+				assets.set_item_icon(previous, null)
+	_visible_icon_rows.clear()
+	var added: int = 0
+	for i: int in range(first, mini(last + 1, _visible_entries.size())):
+		if assets.get_item_icon(i) != null:
+			_visible_icon_rows.append(i)
+			continue
+		var result: DrawingResult = thumbnails.preview(index, _visible_entries[i])
+		if result.ok:
+			assets.set_item_icon(i, ImageTexture.create_from_image(result.value))
+			_visible_icon_rows.append(i)
+		else:
+			assets.set_item_tooltip(i, "%s\nPreview unavailable: %s" % [
+				_visible_entries[i]["id"], result.message])
+		added += 1
+		if added >= 2:
+			_queue_thumbnails() # Work continues on a subsequent process frame.
+			break
+
+
+## Deliberate file copies only. Atlas source registration/instance binding
+## is separate; no namesake IDs, silent overwrites or source-file deletions.
+func _import_file(path: String) -> void:
+	var imported: DrawingResult = TRANSFER_SCRIPT.import_file(index, path)
+	if not imported.ok:
+		message.text = imported.message
+		return
+	var refreshed: DrawingResult = set_objects_root(index.root_path)
+	message.text = "Imported portable source: " + String(imported.value).get_file() if refreshed.ok \
+		else "Imported file, but could not refresh Objects/: " + refreshed.message
+
+
+func _ask_export() -> void:
+	var selected: PackedInt32Array = assets.get_selected_items()
+	if selected.is_empty() or selected[0] >= _visible_entries.size():
+		message.text = "Select an Object source to export"
+		return
+	_pending_export = _visible_entries[selected[0]].duplicate(true)
+	export_dialog.current_file = String(_pending_export["id"]) + ".drawing"
+	export_dialog.popup_centered_ratio(0.7)
+
+
+func _export_file(path: String) -> void:
+	if _pending_export.is_empty():
+		return
+	var entry: Dictionary = _pending_export
+	_pending_export = {}
+	var exported: DrawingResult = TRANSFER_SCRIPT.export_file(index, entry, path)
+	message.text = "Exported: " + String(exported.value).get_file() if exported.ok else exported.message
