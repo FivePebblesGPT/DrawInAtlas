@@ -72,6 +72,37 @@ func attach_source(source_id: String, placement: Transform2D = Transform2D.IDENT
 	return DrawingResult.success(attached_id)
 
 
+## A single sibling-order step is one reversible, parent-local edit.
+## The stored row excludes the computed UI availability field and its revision
+## is intentionally ignored during replay (revisions monotonically increase).
+func move_selected_order(step: int) -> DrawingResult:
+	if is_stale():
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before reordering")
+	if step != -1 and step != 1:
+		return DrawingResult.failure("CHILD_ORDER", "Move exactly one sibling position")
+	var siblings: Array[Dictionary] = library.children_for_asset(parent_source_id)
+	var origin: int = -1
+	for index: int in range(siblings.size()):
+		if siblings[index]["id"] == selected_child_id:
+			origin = index
+			break
+	if origin < 0:
+		return DrawingResult.failure("CHILD", "Select an attached child to reorder")
+	var destination: int = origin + step
+	if destination < 0 or destination >= siblings.size():
+		return DrawingResult.success(false)
+	var saved: Dictionary = _saved_record(selected_child_id)
+	var changed: DrawingResult = library.reorder_child(parent_source_id,
+		selected_child_id, expected_revision, String(saved["generation"]),
+		int(saved["revision"]), destination)
+	if not changed.ok:
+		return changed
+	expected_revision += 1
+	_record_operation({"kind": "order", "child": selected_child_id,
+		"row": saved, "before": origin, "after": destination})
+	return DrawingResult.success(true)
+
+
 func detach_selected() -> DrawingResult:
 	if is_stale():
 		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before removing")
@@ -257,6 +288,21 @@ func _replay(forward: bool) -> DrawingResult:
 		if result.ok:
 			selected_child_id = String(operation["child"])
 
+	elif operation["kind"] == "order":
+		var child_id: String = String(operation["child"])
+		var original: Dictionary = operation["row"]
+		var current: Dictionary = _saved_record(child_id)
+		var siblings: Array[Dictionary] = library.children_for_asset(parent_source_id)
+		var from_index: int = int(operation["before"]) if forward else int(operation["after"])
+		var to_index: int = int(operation["after"]) if forward else int(operation["before"])
+		if from_index < 0 or from_index >= siblings.size() or \
+				String(siblings[from_index]["id"]) != child_id or \
+				current.is_empty() or not _same_child_identity(current, original):
+			return DrawingResult.failure("STALE_CHILDREN", "Sibling order or child identity changed")
+		result = library.reorder_child(parent_source_id, child_id, expected_revision,
+			String(original["generation"]), int(current["revision"]), to_index)
+		if result.ok:
+			selected_child_id = child_id
 	elif operation["kind"] == "transform":
 		var row: Dictionary = _record(String(operation["child"]))
 		var source: Transform2D = operation["before"] if forward else operation["after"]

@@ -227,6 +227,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_scale_smoke.gd 2>&1 | tee /tmp/godot-t064-child-scale.log
           grep -q 'T064_CHILD_SCALE_PASSED' /tmp/godot-t064-child-scale.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_SCALE_FAILED:' /tmp/godot-t064-child-scale.log; then exit 1; fi
+          # T-064 sibling paint order uses the same atomic graph/history path;
+          # no native framebuffer suite is added to the fast push job.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_order_smoke.gd 2>&1 | tee /tmp/godot-t064-child-order.log
+          grep -q 'T064_CHILD_ORDER_PASSED' /tmp/godot-t064-child-order.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_ORDER_FAILED:' /tmp/godot-t064-child-order.log; then exit 1; fi
           # T-064 child visibility is a reversible, parent-scoped graph edit;
           # hidden descendants are excluded from rendering and pointer hits.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_visibility_smoke.gd 2>&1 | tee /tmp/godot-t064-child-visibility.log

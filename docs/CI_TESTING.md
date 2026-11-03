@@ -102,6 +102,14 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 parent-owned nested sibling order: `tests/object_child_order_smoke.gd`
+  (**51/51** headless checks) verifies atomic, stale-safe sibling moves,
+  exact painter and hit-test priority, invalidation of Atlas composition
+  previews, identity/pixel isolation, parent-scoped mixed Undo/Redo,
+  boundary no-ops, persistence and live inspector buttons/keyboard actions.
+  It runs in the existing fast-CI T-064 child-edit step. The targeted
+  **52/52** Xvfb/Mesa witness captures a 420px inspector; this is not a
+  physical-hardware test or owner acceptance of graph-copy policy.
 - T-064 nested child uniform scaling: `tests/object_child_scale_smoke.gd`
   (**42/42** headless checks) validates positive parent-local basis scaling,
   child/descendant hit paths and rendered pixels, nonuniform/mirrored affine

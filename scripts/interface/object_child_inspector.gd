@@ -15,6 +15,8 @@ var attach_button: Button
 var detach_button: Button
 var repair_button: Button
 var visibility_button: Button
+var backward_button: Button
+var forward_button: Button
 var _candidate_ids: Array[String] = []
 var undo_button: Button
 var redo_button: Button
@@ -69,6 +71,10 @@ func _ready() -> void:
 	open_button.tooltip_text = "Open the referenced asset in its own Object Editor tab; Save publishes its pixels"
 	visibility_button = _button(actions, "Hide selected", "ToggleChildVisibility", _toggle_visibility)
 	visibility_button.tooltip_text = "Hide/show this instance without altering its source or deleting its stable ID; supports child Undo"
+	backward_button = _button(actions, "Send backward", "SendChildBackward", func() -> void: _reorder(-1))
+	forward_button = _button(actions, "Bring forward", "BringChildForward", func() -> void: _reorder(1))
+	backward_button.tooltip_text = "Ctrl+Alt+Up · paint behind previous sibling; child Undo reverses it"
+	forward_button.tooltip_text = "Ctrl+Alt+Down · paint above next sibling; child Undo reverses it"
 	_button(actions, "←", "MoveLeft", func() -> void: _translate(Vector2.LEFT))
 	_button(actions, "→", "MoveRight", func() -> void: _translate(Vector2.RIGHT))
 	_button(actions, "↑", "MoveUp", func() -> void: _translate(Vector2.UP))
@@ -104,6 +110,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_undo()
 	elif key.ctrl_pressed and not key.alt_pressed and not key.shift_pressed and key.keycode == KEY_Y:
 		_redo()
+	elif key.ctrl_pressed and key.alt_pressed and not key.shift_pressed:
+		match key.keycode:
+			KEY_UP: _reorder(-1)
+			KEY_DOWN: _reorder(1)
+			_: return
 	elif key.alt_pressed and not key.ctrl_pressed and not key.shift_pressed:
 		match key.keycode:
 			KEY_LEFT: _translate(Vector2.LEFT)
@@ -186,6 +197,9 @@ func refresh(message: String = "") -> void:
 	detach_button.disabled = not ready
 	visibility_button.disabled = not ready
 	visibility_button.text = "Show selected" if ready and not bool(record["visible"]) else "Hide selected"
+	var sibling_index: int = _rows.find(session.selected_child_id) if ready else -1
+	backward_button.disabled = sibling_index <= 0
+	forward_button.disabled = sibling_index < 0 or sibling_index >= _rows.size() - 1
 	repair_button.disabled = not ready or record["status"] != "NULL" or source_picker.disabled
 	undo_button.disabled = not session.can_undo()
 	redo_button.disabled = not session.can_redo()
@@ -202,8 +216,9 @@ func refresh(message: String = "") -> void:
 		var source_name: String = String(session.library.asset_info(String(record["source_id"])).get(
 			"name", "Missing source"))
 		var basis: Transform2D = AtlasObjectChildEditSession._transform(record)
-		details.text = "%s · %s · local origin (%.1f, %.1f) · scale (%.2f, %.2f) · source pixels unchanged" % [
+		details.text = "%s · %s · sibling order %d/%d (later paints above) · local origin (%.1f, %.1f) · scale (%.2f, %.2f) · source pixels unchanged" % [
 			source_name, "visible" if bool(record["visible"]) else "hidden",
+			sibling_index + 1, _rows.size(),
 			basis.origin.x, basis.origin.y, basis.x.length(), basis.y.length()]
 
 
@@ -253,6 +268,11 @@ func _translate(delta: Vector2) -> void:
 
 func _rotate(angle: float) -> void:
 	var changed: DrawingResult = session.rotate_selected(angle)
+	refresh("" if changed.ok else changed.message)
+
+
+func _reorder(step: int) -> void:
+	var changed: DrawingResult = session.move_selected_order(step)
 	refresh("" if changed.ok else changed.message)
 
 

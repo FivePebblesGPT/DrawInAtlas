@@ -268,3 +268,18 @@ registry publications. The existing transform history supports Undo/Redo and
 Atlas source-change invalidation. `tests/object_child_scale_smoke.gd` is a
 fast-CI headless witness; native screenshots are targeted. This is not an
 owner-approved nested Save As/export policy or hardware UX signoff.
+
+
+### Nested child sibling painter order (T-064, engineering candidate)
+
+Child records in a published parent's `children` list have an ordered
+painter/hit priority: **later siblings are above earlier siblings**. In the
+Object Manager's nested inspector, select a child and use **Send backward**
+or **Bring forward** (Ctrl+Alt+Up/Down). Moves are parent-local index
+transactions; they do not replace child IDs or modify the immutable Drawing
+source. Undo/Redo, stale parent/child checks and cache invalidation reuse the
+same child graph contract as transforms and visibility. Outer/inner boundary
+moves do not create empty history entries. The new source-level and live
+inspector witness is `tests/object_child_order_smoke.gd` (51 headless; 52
+with native screenshot). The still-unapproved nested Save As/export policy
+and hardware/owner UX acceptance are separate requirements.

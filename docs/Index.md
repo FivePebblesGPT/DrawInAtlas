@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-064 reversible sibling paint order (2026-11-03; In Progress):**
+The existing nested Object inspector now offers focusable **Send backward**
+and **Bring forward** actions (Ctrl+Alt+Up/Down). Later siblings paint above
+and win hit-testing over earlier siblings. The operation atomically moves one
+existing child record in its parent-owned ordered list, retains source pixels,
+identity, transform and other siblings, and shares optimistic revisions,
+transitive Atlas preview invalidation and parent-scoped Undo/Redo with the
+other nested edits. A dedicated **51/51** fast-CI Godot witness verifies
+rendered pixels, hit paths, cache invalidation, invalid/stale/cancelled edits,
+mixed history, disk reload and inspector buttons/keyboard. The targeted native
+Xvfb/Mesa run passes **52/52** with a reviewed 420px inspector screenshot.
+T-064 remains **In Progress** pending nested Save As/export policy and owner
+hardware review; no owner gate was inferred. See [T-064](Tickets/T-064.md).
+
 **T-064 reversible nested child scaling (2026-11-03; In Progress):**
 The Object Manager nested inspector now offers Shrink/Grow actions for
 parent-local scaling of selected linked/NULL child transforms. Scaling changes

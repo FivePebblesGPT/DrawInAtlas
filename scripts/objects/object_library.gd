@@ -242,6 +242,34 @@ func set_child_visibility(asset_id: String, child_id: String, expected_revision:
 	return DrawingResult.failure("CHILD", "Nested instance not found")
 
 
+## Reorder a published child among its siblings without editing source pixels.
+## Later siblings composite above earlier ones. The parent and moved child's
+## optimistic revisions protect against stale UI and concurrent graph edits.
+func reorder_child(asset_id: String, child_id: String, expected_revision: int,
+		expected_generation: String, expected_child_revision: int,
+		destination_index: int) -> DrawingResult:
+	if not _assets.has(asset_id) or children_revision(asset_id) != expected_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before reordering")
+	var siblings: Array = _assets[asset_id].get("children", []).duplicate(true)
+	if destination_index < 0 or destination_index >= siblings.size():
+		return DrawingResult.failure("CHILD_ORDER", "Sibling position is out of range")
+	for index: int in range(siblings.size()):
+		var child: Dictionary = siblings[index]
+		if String(child["id"]) != child_id:
+			continue
+		if String(child["generation"]) != expected_generation or \
+				int(child["revision"]) != expected_child_revision:
+			return DrawingResult.failure("STALE_CHILDREN", "Child changed; reload before reordering")
+		if index == destination_index:
+			return DrawingResult.success(false)
+		child["revision"] = expected_child_revision + 1
+		siblings.remove_at(index)
+		siblings.insert(destination_index, child)
+		var committed: DrawingResult = _replace_children(asset_id, expected_revision, siblings)
+		return DrawingResult.success(true) if committed.ok else committed
+	return DrawingResult.failure("CHILD", "Nested child no longer exists")
+
+
 func detach_child(asset_id: String, child_id: String, expected_revision: int) -> DrawingResult:
 	if not _assets.has(asset_id):
 		return DrawingResult.failure("CHILD", "Parent source missing")
