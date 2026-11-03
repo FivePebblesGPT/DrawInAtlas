@@ -290,18 +290,38 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 	return DrawingResult.success(_after.size())
 
 
+## Read one canonical source pixel from the gesture's immutable tile snapshot.
+## This also materializes verified lazy tiles: has_stored_pixel() only inspects
+## resident tiles, so using it to gate fill would silently reject persisted
+## artwork that has not yet been decoded. A zero RGBA8 pixel is still blank;
+## nonzero hidden RGB (alpha=0) remains a legitimate stored fill source.
+func _fill_source_pixel(point: Vector2i) -> DrawingResult:
+	var global_x: int = anchor_x + point.x
+	var global_y: int = anchor_y + point.y
+	var stride: int = document.tile_stride
+	var key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+	if not _source_tiles.has(key):
+		var loaded: DrawingResult = document._resolve_chunk(layer_id, key)
+		if not loaded.ok:
+			return loaded
+		_source_tiles[key] = loaded.value
+	var tile: DrawingRasterTile = _source_tiles[key] as DrawingRasterTile
+	if tile == null:
+		return DrawingResult.success(0)
+	return DrawingResult.success(tile.get_rgba(posmod(global_x, stride),
+		posmod(global_y, stride)))
+
+
 ## Four-connected fill of existing pixels; never expands into implicit blank space.
 func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		limit: int = 262144) -> DrawingResult:
 	if limit <= 0 or _closed:
 		return DrawingResult.failure("FILL_LIMIT", "Invalid flood fill budget/session")
-	var x: int = anchor_x + seed.x
-	var y: int = anchor_y + seed.y
-	if not document.has_stored_pixel(layer_id, x, y):
-		return DrawingResult.failure("BLANK_SEED", "Fill begins in unallocated transparent space")
-	var original: DrawingResult = document.read_pixel(layer_id, x, y)
+	var original: DrawingResult = _fill_source_pixel(seed)
 	if not original.ok:
 		return original
+	if int(original.value) == 0:
+		return DrawingResult.failure("BLANK_SEED", "Fill begins in unallocated transparent space")
 	if original.value == rgba:
 		return DrawingResult.failure("NO_CHANGE", "Target color is already present")
 	var frontier: Array[Vector2i] = [seed]
@@ -321,16 +341,12 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		visited[point] = true
 		if selection != null and not selection.allows(point):
 			continue
-		var px: int = anchor_x + point.x
-		var py: int = anchor_y + point.y
-		if not document.has_stored_pixel(layer_id, px, py):
-			continue
-		var current: DrawingResult = document.read_pixel(layer_id, px, py)
+		var current: DrawingResult = _fill_source_pixel(point)
 		if not current.ok:
 			_before = old_before
 			_after = old_after
 			return current
-		if current.value != original.value:
+		if int(current.value) == 0 or current.value != original.value:
 			continue
 		var staged: DrawingResult = _stage(point.x, point.y, rgba, selection)
 		if not staged.ok:

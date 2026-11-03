@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 cached and lazy-safe flood fill (2026-11-03; still In Progress):**
+The bounded Drawing Bucket engine now resolves each verified source tile once
+per gesture, including lazily loaded chunks. Previously resident-only lookup
+could incorrectly reject a valid saved seed or stop at an unloaded neighbor.
+A 30-check fast-CI witness verifies hidden-RGB pixels, missing/corrupt lazy
+providers and retry, selection, exact undo/redo, signed seams and atomicity.
+Two before/after microbenchmark pairs indicate lower synthetic CPU fill+commit
+medians for 32²–96² pixels, but **not** confirmed input-to-present gains.
+Native library evaluation and physical hardware gates remain open; this is
+not a backend decision or ticket closure. See [T-068](Tickets/T-068.md) and
+[CPU report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 axis-aligned hard-brush sweep geometry (2026-11-03; In Progress):**
 The canonical Drawing hard brush now handles exactly horizontal and vertical
 nonstationary sweeps with bounded scalar squared-distance tests, preserving

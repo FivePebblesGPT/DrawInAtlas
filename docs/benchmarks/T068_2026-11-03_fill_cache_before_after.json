@@ -1,0 +1,200 @@
+{
+  "method": "Two ordered before/after pairs, isolated Godot 4.8beta2 CPU paint/commit runs; 5 samples per size/run; after source-cache implementation. No input, render or GPU included. Independent document per sample.",
+  "revision_base": "ae3de9acb49dbc1a31a457d446d37bb70105c4e0",
+  "order": [
+    "before",
+    "after",
+    "after",
+    "before"
+  ],
+  "runs": [
+    {
+      "variant": "before",
+      "sequence": 0,
+      "results": [
+        {
+          "median_ms": 18.512,
+          "pixels": 1024,
+          "samples_ms": [
+            16.378,
+            18.393,
+            18.512,
+            18.859,
+            20.178
+          ],
+          "size": 32
+        },
+        {
+          "median_ms": 79.732,
+          "pixels": 4096,
+          "samples_ms": [
+            67.16,
+            78.497,
+            79.732,
+            80.786,
+            89.483
+          ],
+          "size": 64
+        },
+        {
+          "median_ms": 178.425,
+          "pixels": 9216,
+          "samples_ms": [
+            166.962,
+            174.096,
+            178.425,
+            179.811,
+            181.045
+          ],
+          "size": 96
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "sequence": 1,
+      "results": [
+        {
+          "median_ms": 12.533,
+          "pixels": 1024,
+          "samples_ms": [
+            12.17,
+            12.44,
+            12.533,
+            12.654,
+            15.417
+          ],
+          "size": 32
+        },
+        {
+          "median_ms": 50.539,
+          "pixels": 4096,
+          "samples_ms": [
+            47.335,
+            50.437,
+            50.539,
+            51.002,
+            52.742
+          ],
+          "size": 64
+        },
+        {
+          "median_ms": 126.657,
+          "pixels": 9216,
+          "samples_ms": [
+            120.762,
+            123.199,
+            126.657,
+            129.84,
+            165.522
+          ],
+          "size": 96
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "sequence": 2,
+      "results": [
+        {
+          "median_ms": 16.518,
+          "pixels": 1024,
+          "samples_ms": [
+            11.426,
+            11.531,
+            16.518,
+            20.428,
+            25.12
+          ],
+          "size": 32
+        },
+        {
+          "median_ms": 50.633,
+          "pixels": 4096,
+          "samples_ms": [
+            50.014,
+            50.432,
+            50.633,
+            52.272,
+            53.096
+          ],
+          "size": 64
+        },
+        {
+          "median_ms": 120.341,
+          "pixels": 9216,
+          "samples_ms": [
+            119.303,
+            120.3,
+            120.341,
+            121.022,
+            121.039
+          ],
+          "size": 96
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "sequence": 3,
+      "results": [
+        {
+          "median_ms": 16.859,
+          "pixels": 1024,
+          "samples_ms": [
+            16.063,
+            16.302,
+            16.859,
+            17.04,
+            17.457
+          ],
+          "size": 32
+        },
+        {
+          "median_ms": 67.696,
+          "pixels": 4096,
+          "samples_ms": [
+            65.236,
+            65.818,
+            67.696,
+            67.748,
+            71.925
+          ],
+          "size": 64
+        },
+        {
+          "median_ms": 157.46,
+          "pixels": 9216,
+          "samples_ms": [
+            154.271,
+            154.545,
+            157.46,
+            160.543,
+            162.467
+          ],
+          "size": 96
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "size": 32,
+      "before_median_ms": 17.6855,
+      "after_median_ms": 14.525500000000001,
+      "relative_change_percent": -17.9
+    },
+    {
+      "size": 64,
+      "before_median_ms": 73.714,
+      "after_median_ms": 50.586,
+      "relative_change_percent": -31.4
+    },
+    {
+      "size": 96,
+      "before_median_ms": 167.9425,
+      "after_median_ms": 123.499,
+      "relative_change_percent": -26.5
+    }
+  ]
+}

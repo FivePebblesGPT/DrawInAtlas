@@ -314,3 +314,41 @@ audio and no resource errors. The 4px-long-path CPU dispatch median was
 3.931 ms and `frame_post_draw` median was 20.317 ms (five samples); there is
 **no matched baseline**, so neither is attributable to the axis shortcut.
 [Raw stress data](benchmarks/T068_2026-11-03_axis_sweep_native.json).
+
+
+## 2026-11-03: verified lazy tile reads for bounded flood fill
+
+T-068 now reads flood-fill source pixels through the edit session's existing
+verified immutable per-tile cache, instead of separately calling resident-only
+`has_stored_pixel()` and `DrawingDocument.read_pixel()` at each visited point.
+This fixes a correctness hole for unmaterialized, hash-verified source tiles
+and avoids repeated tile-result allocation. A zero canonical RGBA8 value is
+still unfillable blank space; nonzero transparent hidden RGB is an authored
+stored pixel. Lazy resolution failure aborts the gesture without publication.
+The 30-check [fill witness](../tests/drawing_fill_tile_cache_smoke.gd)
+includes a failed/corrupt provider and retry, undo/redo, mask, and signed
+coordinates beyond 2^53.
+
+**Reproduction (same Godot 4.8 beta 2):**
+
+```sh
+godot --headless --path . --script res://tests/drawing_fill_tile_cache_smoke.gd
+godot --headless --path . --script res://tests/drawing_fill_tile_benchmark.gd
+```
+
+[Raw ordered before/after observations](benchmarks/T068_2026-11-03_fill_cache_before_after.json)
+include each of five samples for three matched areas and two runs per variant.
+The baseline was the previous `ae3de9a` commit, with the same benchmark script;
+only the fill-source read path changed. Medians of the two run medians:
+
+| Filled pixels | Before (ms) | Cached (ms) | Observed change |
+|---:|---:|---:|---:|
+| 32 × 32 | 17.686 | 14.526 | −17.9% |
+| 64 × 64 | 73.714 | 50.586 | −31.4% |
+| 96 × 96 | 167.943 | 123.499 | −26.5% |
+
+These numbers include **CPU fill staging and synchronous publication** on
+small synthetic documents, but not seed allocation, user input, texture
+upload, rendering or photon/present latency. Sequential before/after runs,
+just ten observations per variant per size and heterogeneous system load mean
+no statistically supported stable gain. No native backend was enabled.
