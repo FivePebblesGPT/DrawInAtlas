@@ -20,6 +20,7 @@ const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn"
 var campaign: AtlasCampaign
 var drawing_composition: AtlasDrawingComposition
 var object_editor_window: AtlasObjectEditorWindow
+var object_source_manager: AtlasObjectSourceManager
 var edits: AtlasEditHistory = AtlasEditHistory.new()
 var store_io: AtlasStoreIO
 var _restored_bundle: AtlasStoreResult
@@ -204,6 +205,8 @@ func _bind_drawing_composition() -> void:
 		drawing_composition.registry = _restored_bundle.registry
 		drawing_composition.set_library(_restored_bundle.library)
 		_restored_bundle = null
+	if object_source_manager != null:
+		object_source_manager.bind_library(drawing_composition.library)
 	canvas.drawing_composition = drawing_composition
 	var attached: DrawingResult = drawing_composition.attach_campaign(campaign)
 	if not attached.ok:
@@ -242,6 +245,56 @@ func open_selected_object_editor() -> DrawingResult:
 	return object_editor_window.open_instance(drawing_composition.selected_instance_id)
 
 
+## Atlas owns linked placements. The shared Drawing browser never assumes a
+## campaign context, while this explicit Atlas manager binds to the active one.
+func _open_object_source_manager() -> void:
+	if drawing_composition == null or drawing_composition.library == null:
+		_message("Atlas Object registry is unavailable")
+		return
+	if object_source_manager == null:
+		object_source_manager = AtlasObjectSourceManager.new()
+		add_child(object_source_manager)
+		object_source_manager.open_source_requested.connect(_open_object_source)
+		object_source_manager.place_source_requested.connect(_place_object_source)
+		object_source_manager.registry_mutated.connect(func(summary: String) -> void:
+			drawing_composition.invalidate()
+			_message(summary))
+	object_source_manager.bind_library(drawing_composition.library)
+	object_source_manager.popup_centered()
+
+
+func _open_object_source(source_id: String) -> void:
+	if drawing_composition == null or not drawing_composition.library.asset_exists(source_id):
+		_message("Object source changed; refresh the source manager")
+		return
+	if object_editor_window == null:
+		object_editor_window = AtlasObjectEditorWindow.new()
+		add_child(object_editor_window)
+		object_editor_window.configure(drawing_composition.library, edits,
+			Callable(self, "_capture_instance_history_context"))
+	var opened: DrawingResult = object_editor_window.open_source(source_id)
+	if not opened.ok:
+		_message(opened.message)
+
+
+func _place_object_source(source_id: String) -> void:
+	if drawing_composition == null or canvas.map == null or canvas.floor == null:
+		_message("Choose a map and floor before placing an Object Asset")
+		return
+	var center: Vector2 = canvas.local_to_document(canvas.size * 0.5)
+	if not center.is_finite():
+		_message("Current view cannot be used for placement")
+		return
+	var placed: DrawingResult = drawing_composition.place_asset(source_id,
+		canvas.map.id, canvas.floor.id, canvas.presented_detail_level,
+		Transform2D.IDENTITY.translated(center))
+	if not placed.ok:
+		_message(placed.message)
+		return
+	drawing_composition.selected_instance_id = String(placed.value)
+	_message("Placed Object source %s in the current map" % source_id)
+
+
 func _capture_instance_history_context() -> DrawingHistoryContext:
 	var context: DrawingHistoryContext = _capture_history_context()
 	if drawing_composition != null:
@@ -270,6 +323,12 @@ func _mount_sidebar_views() -> void:
 	layers_view.get_node("Heading").hide()
 	layers_view.get_node("Description").hide()
 	layer_panel = LAYER_PANEL_SCENE.instantiate() as AtlasLayerPanel
+	var objects_button: Button = Button.new()
+	objects_button.name = "ObjectAssetManagerButton"
+	objects_button.text = "Object Assets and missing links…"
+	objects_button.tooltip_text = "Published sources, source-delete choices and explicit NULL-instance repair (Ctrl+Shift+B)"
+	layers_view.add_child(objects_button)
+	objects_button.pressed.connect(_open_object_source_manager)
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.object_selected.connect(_select_hierarchy_object)
@@ -712,6 +771,8 @@ func _on_sample(discard_unsaved: bool = false) -> void:
 		# Resetting the document must not silently disable the root-concurrency lease.
 		drawing_composition.registry._loaded_root_digest = previous_root
 		drawing_composition.set_library(AtlasObjectLibrary.new(ProjectSettings.globalize_path(save_path)))
+		if object_source_manager != null:
+			object_source_manager.bind_library(drawing_composition.library)
 		drawing_composition.active_layer_by_detail.clear()
 		drawing_composition.selected_instance_id = ""
 		drawing_composition.invalidate()
@@ -1226,6 +1287,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_X: cut_selection()
 			KEY_V: paste_selection()
 			KEY_F: sidebar.select_view(&"Search")
+			KEY_B:
+				if event.shift_pressed:
+					_open_object_source_manager()
+				else:
+					return
 			_: return
 		get_viewport().set_input_as_handled()
 		return

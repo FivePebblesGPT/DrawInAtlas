@@ -6,6 +6,16 @@
 
 ## Kanban summary
 
+**T-065 Atlas linked-instance and NULL-action milestone (2026-11-03; still In Progress):**
+Atlas's Layers view now opens a library-bound source manager (`Ctrl+Shift+B`)
+with published-ID usage counts, explicit current-map placement, three-way
+Source Delete (Remove/NULL/Cancel), and deliberate stable-ID NULL repair.
+Deletion confirmations are bound to registry and instance revisions; historical
+source bytes remain untouched. The new 48-check on-disk transaction, 20-check
+manager, and 17-check native Atlas witness (18 with screenshot) complement the portable Drawing
+Asset Browser checks. Drag placement, Atlas-managed import/registration, and
+owner UX review remain open. See [T-065](Tickets/T-065.md).
+
 **T-065 thumbnail and portable-copy follow-up (2026-11-03; still In Progress):** real Object source
 pixels now appear as lazy, bounded 48×48 previews with a 24-image SHA-keyed
 LRU and automatic invalidation after successful local Object Editor Save.

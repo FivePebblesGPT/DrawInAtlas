@@ -328,6 +328,26 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_transfer_smoke.gd 2>&1 | tee /tmp/godot-t065-transfers.log
           grep -q 'T065_TRANSFERS_PASSED' /tmp/godot-t065-transfers.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T065_TRANSFER_FAILED:' /tmp/godot-t065-transfers.log; then exit 1; fi
+      - name: Verify T-065 Atlas source deletion and NULL repair transaction safety
+        id: ci_t065_atlas_null_transactions
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_asset_repair_smoke.gd 2>&1 | tee /tmp/godot-t065-null-transactions.log
+          grep -q 'T065_ASSET_REPAIR_PASSED' /tmp/godot-t065-null-transactions.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ASSET_REPAIR_FAILED:' /tmp/godot-t065-null-transactions.log; then exit 1; fi
+      - name: Verify T-065 Atlas source manager and deliberate NULL actions
+        id: ci_t065_atlas_source_manager
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_source_manager_smoke.gd 2>&1 | tee /tmp/godot-t065-source-manager.log
+          grep -q 'T065_MANAGER_PASSED' /tmp/godot-t065-source-manager.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_MANAGER_FAILED:' /tmp/godot-t065-source-manager.log; then exit 1; fi
       - name: Summarize CI failures
         if: ${{ !cancelled() }}
         env:

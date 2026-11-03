@@ -172,6 +172,70 @@ func instances_for_asset(asset_id: String) -> Array[String]:
 	return keys
 
 
+## Atlas-only usage information; the Drawing Asset Browser remains unaware of
+## placement ownership. Unreferenced published sources remain in the registry.
+func source_usage(asset_id: String) -> Dictionary:
+	var linked: int = 0
+	var placeholders: int = 0
+	var available: bool = _asset_available(asset_id)
+	for instance_id: String in _instances:
+		var item: AtlasObjectInstance = _instances[instance_id]
+		if item.source_id != asset_id:
+			continue
+		if item.placeholder or not available:
+			placeholders += 1
+		else:
+			linked += 1
+	return {"linked": linked, "null": placeholders, "total": linked + placeholders}
+
+
+## A confirmation token for destructive source changes. It captures every
+## binding, its generation and revision, and the complete registry digest.
+## The UI must pass this token back, never just the selected source name.
+func preview_delete_asset(asset_id: String) -> DrawingResult:
+	if not _assets.has(asset_id):
+		return DrawingResult.failure("SOURCE", "Object source is absent; refresh before deleting")
+	var bindings: Array[Dictionary] = []
+	for instance_id: String in instances_for_asset(asset_id):
+		var item: AtlasObjectInstance = _instances[instance_id]
+		bindings.append({"id": item.id, "generation": item.generation,
+			"revision": item.revision, "source_id": item.source_id})
+	return DrawingResult.success({"asset_id": asset_id,
+		"revision": _assets[asset_id]["revision"],
+		"registry_hash": _index_hash, "bindings": bindings})
+
+
+## Repair is an explicit, optimistic rebind. An absent source is never
+## guessed from a display name; the caller supplies a published replacement ID.
+## Preserve instance identity, generation, transform, map/floor/detail, visibility
+## and user metadata, while retaining the first missing source ID for inspection.
+func repair_placeholder(instance_id: String, expected_generation: String,
+		expected_revision: int, replacement_id: String) -> DrawingResult:
+	if not _instances.has(instance_id):
+		return DrawingResult.failure("STALE_INSTANCE", "Missing NULL placement")
+	var original: AtlasObjectInstance = _instances[instance_id]
+	if original.generation != expected_generation or original.revision != expected_revision:
+		return DrawingResult.failure("STALE_INSTANCE", "NULL placement changed; refresh before repairing")
+	if not original.placeholder and _asset_available(original.source_id):
+		return DrawingResult.failure("NOT_NULL", "Live instance does not require repair")
+	if not _asset_available(replacement_id):
+		return DrawingResult.failure("MISSING_SOURCE", "Choose a published, available replacement source")
+	if original.metadata.size() >= 128 and not original.metadata.has("null_origin_source_id"):
+		return DrawingResult.failure("METADATA_LIMIT", "Cannot retain the missing source identity in full metadata")
+	var next: Dictionary[String, AtlasObjectInstance] = _instances_copy()
+	var repaired: AtlasObjectInstance = next[instance_id]
+	if not repaired.metadata.has("null_origin_source_id"):
+		repaired.metadata["null_origin_source_id"] = repaired.source_id
+	repaired.source_id = replacement_id
+	repaired.placeholder = false
+	repaired.revision += 1
+	var saved: DrawingResult = _commit_index(_assets_copy(), next)
+	if not saved.ok:
+		return saved
+	instances_changed.emit([instance_id])
+	return DrawingResult.success(instance_id)
+
+
 func export_index() -> Dictionary:
 	var assets: Array[Dictionary] = []
 	var instances: Array[Dictionary] = []
@@ -747,11 +811,16 @@ func hit_test(instance_id: String, world_point: Vector2) -> DrawingResult:
 
 ## UI for the three deletion policies belongs to T-065. Source bytes are
 ## retained for history/backup; deletion removes the registry reference only.
-func delete_asset(asset_id: String, policy: String) -> DrawingResult:
+func delete_asset(asset_id: String, policy: String,
+		expected_preview: Dictionary = {}) -> DrawingResult:
 	if policy == "cancel":
 		return DrawingResult.success(false)
 	if not _assets.has(asset_id) or policy not in ["remove", "null"]:
 		return DrawingResult.failure("DELETE", "Unknown asset or deletion policy")
+	if not expected_preview.is_empty():
+		var current: DrawingResult = preview_delete_asset(asset_id)
+		if not current.ok or JSON.stringify(current.value) != JSON.stringify(expected_preview):
+			return DrawingResult.failure("STALE_SOURCE", "Source or bindings changed since confirmation opened")
 	var next_assets: Dictionary[String, Dictionary] = _assets_copy()
 	var next_instances: Dictionary[String, AtlasObjectInstance] = _instances_copy()
 	var touched: Array[String] = []
