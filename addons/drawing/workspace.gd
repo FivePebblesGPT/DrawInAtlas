@@ -48,6 +48,9 @@ var _drag_candidate_id: String = ""
 var _drag_candidate_position: Vector2 = Vector2.ZERO
 var _drag_pointer_position: Vector2 = Vector2.ZERO
 var _suppress_drag_release: bool = false
+var _cross_source: String = "" # Pointer source: right dock or a floating host.
+var _detach_preview: bool = false
+var _detach_hint: PanelContainer
 var _expanded_dock_width: int = 270
 var _expanded_scroll: int = 0
 var dock_layout: DrawingDockLayout
@@ -222,6 +225,7 @@ func _build_interface() -> void:
 	dock_layout.create_container("right")
 	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
 	_make_dock_hint()
+	_make_detach_hint()
 	dock_stash = VBoxContainer.new()
 	dock_stash.name = "DockViewStorage"
 	dock_stash.visible = false
@@ -572,7 +576,7 @@ func _render_dock(focus_key: String = "") -> void:
 			var drag_handle: Button = Button.new()
 			drag_handle.name = "GroupDrag_" + group_id
 			drag_handle.text = "↕"
-			drag_handle.tooltip_text = "Drag whole " + group_id.capitalize() + " group to reorder or merge; Ctrl+Shift+Up/Down to move"
+			drag_handle.tooltip_text = "Drag whole " + group_id.capitalize() + " group between dock and floating hosts; Ctrl+Alt+Shift+Up/Down to reorder"
 			drag_handle.custom_minimum_size = Vector2(32, 40)
 			drag_handle.focus_mode = Control.FOCUS_ALL
 			drag_handle.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.GROUP, group_id))
@@ -586,7 +590,7 @@ func _render_dock(focus_key: String = "") -> void:
 			arrange.focus_mode = Control.FOCUS_ALL
 			heading.add_child(arrange)
 			var menu: PopupMenu = arrange.get_popup()
-			for label_text: String in ["Move active tab left", "Move active tab right", "Move active tab to previous group", "Move active tab to next group", "Split active tab into group", "Move group up", "Move group down", "Merge group into previous", "Merge group into next"]:
+			for label_text: String in ["Move active tab left", "Move active tab right", "Move active tab to previous group", "Move active tab to next group", "Split active tab into group", "Move group up", "Move group down", "Merge group into previous", "Merge group into next", "Send active tab to first floating host", "Send whole group to first floating host"]:
 				menu.add_item(label_text)
 			menu.id_pressed.connect(_dock_arrange_action.bind(group_id))
 			# A clipped horizontal strip supports arbitrary tab counts at small widths.
@@ -666,6 +670,16 @@ func _render_dock(focus_key: String = "") -> void:
 func float_group(group_id: String) -> String:
 	if dock_layout.group_info(group_id).is_empty():
 		return ""
+	return _float_source(DrawingDockDrag.GROUP, group_id)
+
+
+## A canvas drop creates the destination only after the pointer release.
+## Creating it during preview would invalidate DrawingDockDrag's baseline.
+func _float_source(kind: String, source_id: String, at: Vector2 = Vector2(-1, -1)) -> String:
+	if kind == DrawingDockDrag.PANEL and dock_layout.owner_of(source_id).is_empty():
+		return ""
+	if kind == DrawingDockDrag.GROUP and dock_layout.group_info(source_id).is_empty():
+		return ""
 	_floating_serial += 1
 	var host_id: String = "float-%d" % _floating_serial
 	while not dock_layout.container_info(host_id).is_empty():
@@ -674,19 +688,20 @@ func float_group(group_id: String) -> String:
 	if not dock_layout.create_container(host_id, DrawingDockLayout.FLOATING):
 		return ""
 	var group_move: Dictionary = {"kind": DrawingDockDrag.GROUP_SLOT, "container": host_id, "index": 0}
-	if not dock_drag.begin_group(group_id) or not dock_drag.preview(group_move) or not dock_drag.commit():
+	var began: bool = dock_drag.begin_panel(source_id) if kind == DrawingDockDrag.PANEL else dock_drag.begin_group(source_id)
+	if not began or not dock_drag.preview(group_move) or not dock_drag.commit():
 		dock_drag.cancel()
 		dock_layout.remove_empty_container(host_id)
 		return ""
 	var host: DrawingFloatingHost = FLOATING_HOST_SCRIPT.new() as DrawingFloatingHost
-	host.setup(host_id, dock_layout, dock_drag, dock_views, dock_stash)
+	host.setup(host_id, dock_layout, dock_drag, dock_views, dock_stash, self)
 	add_child(host)
 	host.layout_changed.connect(_render_dock)
 	host.hide_requested.connect(hide_floating_host)
 	floating_hosts[host_id] = host
 	# Stagger independent hosts, then clamp their full frame to the client area.
 	var shift: float = float(_floating_serial - 1) * 26.0
-	host.set_host_rect(Rect2(Vector2(74 + shift, 64 + shift), Vector2(310, 365)))
+	host.set_host_rect(Rect2(Vector2(74 + shift, 64 + shift) if at.x < 0.0 else at - Vector2(145, 35), Vector2(310, 365)))
 	_render_dock()
 	host.raise_host()
 	return host_id
@@ -778,8 +793,8 @@ func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> voi
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
-			_suppress_drag_release = true
-			_cancel_dock_drag()
+			_suppress_drag_release = not _drag_candidate_id.is_empty()
+			_cancel_cross_drop(true)
 			get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -791,24 +806,17 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty():
 		_drag_pointer_position = event.global_position
 		if not dock_drag.is_dragging() and event.global_position.distance_to(_drag_candidate_position) >= 7.0:
-			if _drag_candidate_kind == DrawingDockDrag.PANEL:
-				dock_drag.begin_panel(_drag_candidate_id)
-			else:
-				dock_drag.begin_group(_drag_candidate_id)
-		if dock_drag.is_dragging():
-			_preview_dock_target(event.global_position)
+			begin_cross_drag("right", _drag_candidate_kind, _drag_candidate_id)
+		if dock_drag.is_dragging() and _cross_source == "right":
+			_preview_cross_drop(event.global_position)
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		if _suppress_drag_release:
 			_suppress_drag_release = false
 			get_viewport().set_input_as_handled()
 			return
-		if dock_drag.is_dragging():
-			_preview_dock_target(event.global_position)
-			var accepted: bool = dock_drag.commit()
-			_cancel_dock_drag()
-			if accepted:
-				_render_dock()
+		if dock_drag.is_dragging() and _cross_source == "right":
+			_commit_cross_drop(event.global_position, "right")
 			get_viewport().set_input_as_handled()
 		else:
 			_drag_candidate_id = ""
@@ -818,16 +826,20 @@ func _input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if dock_drag != null and (dock_drag.is_dragging() or not _drag_candidate_id.is_empty()):
-			_suppress_drag_release = true
-			_cancel_dock_drag()
+			_suppress_drag_release = not _drag_candidate_id.is_empty()
+			_cancel_cross_drop(true)
 
 
 func _process(delta: float) -> void:
 	# Scroll the group dock while holding a tab/group near its top or bottom.
 	# This makes offscreen targets reachable without abandoning the transaction.
-	if dock_drag == null or not dock_drag.is_dragging() or not inspector.get_global_rect().has_point(_drag_pointer_position):
+	if dock_drag == null or not dock_drag.is_dragging():
 		return
-	var bounds: Rect2 = inspector.get_global_rect()
+	var over_host: DrawingFloatingHost = _topmost_host(_drag_pointer_position)
+	var scroll_target: ScrollContainer = inspector if over_host == null else over_host._scroll
+	if not scroll_target.get_global_rect().has_point(_drag_pointer_position):
+		return
+	var bounds: Rect2 = scroll_target.get_global_rect()
 	var direction: int = 0
 	if _drag_pointer_position.y < bounds.position.y + 30.0:
 		direction = -1
@@ -835,19 +847,147 @@ func _process(delta: float) -> void:
 		direction = 1
 	if direction == 0:
 		return
-	var before: int = inspector.scroll_vertical
-	inspector.scroll_vertical += roundi(float(direction) * 420.0 * delta)
-	if inspector.scroll_vertical != before:
-		_preview_dock_target(_drag_pointer_position)
+	var before: int = scroll_target.scroll_vertical
+	scroll_target.scroll_vertical += roundi(float(direction) * 420.0 * delta)
+	if scroll_target.scroll_vertical != before:
+		_preview_cross_drop(_drag_pointer_position)
 
 
 func _cancel_dock_drag() -> void:
-	_drag_candidate_kind = ""
-	_drag_candidate_id = ""
-	if dock_drag != null:
-		dock_drag.cancel()
+	_cancel_cross_drop()
+
+
+func begin_cross_drag(source_container: String, kind: String, source_id: String) -> bool:
+	if dock_drag.is_dragging() or not _cross_source.is_empty():
+		return false
+	if source_container != "right" and not floating_hosts.has(source_container):
+		return false
+	if kind == DrawingDockDrag.PANEL:
+		if dock_layout.owner_of(source_id) != source_container:
+			return false
+	elif kind == DrawingDockDrag.GROUP:
+		var group: Dictionary = dock_layout.group_info(source_id)
+		if group.is_empty() or dock_layout.owner_of(String(group["panels"][0])) != source_container:
+			return false
+	else:
+		return false
+	var started: bool = dock_drag.begin_panel(source_id) if kind == DrawingDockDrag.PANEL else dock_drag.begin_group(source_id)
+	if started:
+		_cross_source = source_container
+	return started
+
+
+func _topmost_host(point: Vector2) -> DrawingFloatingHost:
+	var best: DrawingFloatingHost = null
+	for host: DrawingFloatingHost in floating_hosts.values():
+		if not is_instance_valid(host) or not host.is_visible_in_tree() or not host.get_global_rect().has_point(point):
+			continue
+		if best == null or host.get_index() > best.get_index():
+			best = host
+	return best
+
+
+func _clear_drop_hints() -> void:
 	if dock_drop_hint != null:
 		dock_drop_hint.visible = false
+	if _detach_hint != null:
+		_detach_hint.visible = false
+	for host: DrawingFloatingHost in floating_hosts.values():
+		if is_instance_valid(host) and host._hint != null:
+			host._hint.visible = false
+
+
+func _preview_cross_drop(point: Vector2) -> void:
+	_drag_pointer_position = point
+	_clear_drop_hints()
+	_detach_preview = false
+	if not dock_drag.is_dragging() or _cross_source.is_empty():
+		return
+	var host: DrawingFloatingHost = _topmost_host(point)
+	var hit: Dictionary = {}
+	if host != null:
+		hit = host._target_at(point)
+	elif inspector.get_global_rect().has_point(point) or (dock_flyout.visible and dock_flyout.get_global_rect().has_point(point)):
+		hit = _dock_target_at(point)
+	if not hit.is_empty() and dock_drag.preview(hit["target"]):
+		var marker: ColorRect = dock_drop_hint if host == null else host._hint
+		marker.global_position = (hit["rect"] as Rect2).position
+		marker.size = (hit["rect"] as Rect2).size
+		marker.visible = true
+		return
+	# Canvas release is an explicit detach action; the model remains untouched
+	# until release, and invalid regions clear any previously valid target.
+	dock_drag.preview({})
+	if host == null and canvas.get_global_rect().has_point(point):
+		_detach_preview = true
+		_detach_hint.global_position = point - Vector2(115, 22)
+		_detach_hint.visible = true
+
+
+func _commit_cross_drop(point: Vector2, source_container: String) -> bool:
+	if source_container != _cross_source or not dock_drag.is_dragging():
+		_cancel_cross_drop()
+		return false
+	_preview_cross_drop(point)
+	var kind: String = dock_drag.source_kind()
+	var source_id: String = _drag_candidate_id
+	if source_container != "right":
+		var source_host: DrawingFloatingHost = floating_hosts.get(source_container) as DrawingFloatingHost
+		if source_host != null:
+			source_id = source_host._candidate_id
+	var detach: bool = _detach_preview
+	var committed: bool = false
+	if detach:
+		dock_drag.cancel()
+		committed = not _float_source(kind, source_id, point).is_empty()
+	else:
+		committed = dock_drag.commit()
+	_cancel_cross_drop()
+	if committed:
+		_reap_empty_hosts()
+		_render_dock()
+	return committed
+
+
+func _reap_empty_hosts() -> void:
+	for host_id: String in floating_hosts.keys():
+		if not (dock_layout.container_info(host_id)["groups"] as Array).is_empty():
+			continue
+		if dock_layout.remove_empty_container(host_id):
+			var host: DrawingFloatingHost = floating_hosts[host_id]
+			floating_hosts.erase(host_id)
+			host.queue_free()
+
+
+func _cancel_cross_drop(suppress_release: bool = false) -> void:
+	var old_source: String = _cross_source
+	_cross_source = ""
+	if suppress_release and old_source != "right" and floating_hosts.has(old_source):
+		var host: DrawingFloatingHost = floating_hosts[old_source]
+		# Cancellation initiated by the window must not let a later release
+		# fire Button.pressed on the original source tab.
+		host._suppress_release = true
+		host._candidate_id = ""
+		host._candidate_kind = ""
+	_drag_candidate_kind = ""
+	_drag_candidate_id = ""
+	_detach_preview = false
+	if dock_drag != null:
+		dock_drag.cancel()
+	_clear_drop_hints()
+
+
+func _make_detach_hint() -> void:
+	_detach_hint = PanelContainer.new()
+	_detach_hint.name = "FloatingDetachPreview"
+	_detach_hint.top_level = true
+	_detach_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_detach_hint.z_index = 105
+	var caption: Label = Label.new()
+	caption.text = "Release to float panels"
+	_detach_hint.add_child(caption)
+	_detach_hint.visible = false
+	add_child(_detach_hint)
 
 
 func _dock_group_position(group_id: String) -> int:
@@ -1016,6 +1156,15 @@ func _dock_arrange_action(action_id: int, group_id: String) -> void:
 			if neighbor >= 0 and neighbor < groups.size():
 				var other: Dictionary = groups[neighbor]
 				destination = {"kind": DrawingDockDrag.MERGE_GROUP, "group": other["id"], "index": other["panels"].size()}
+		9, 10:
+			for host_id: String in floating_hosts:
+				var host: DrawingFloatingHost = floating_hosts[host_id]
+				if host.visible:
+					source_kind = DrawingDockDrag.PANEL if action_id == 9 else DrawingDockDrag.GROUP
+					source_id = panel_id if action_id == 9 else group_id
+					destination = {"kind": DrawingDockDrag.GROUP_SLOT, "container": host_id,
+						"index": dock_layout.container_info(host_id)["groups"].size()}
+					break
 	if not destination.is_empty():
 		_dock_apply(source_kind, source_id, destination, "edge:" + panel_id)
 

@@ -229,6 +229,16 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_float_smoke.gd 2>&1 | tee /tmp/godot-dock-float.log
           grep -q 'T081_FLOAT_MODEL_PASSED' /tmp/godot-dock-float.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T081_MODEL_FAILED:' /tmp/godot-dock-float.log; then exit 1; fi
+      - name: Verify T-082 cross-container docking transaction model
+        id: ci_dock_cross_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_cross_smoke.gd 2>&1 | tee /tmp/godot-dock-cross.log
+          grep -q 'T082_CROSS_MODEL_PASSED' /tmp/godot-dock-cross.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T082_MODEL_FAILED:' /tmp/godot-dock-cross.log; then exit 1; fi
       - name: Summarize CI failures
         if: ${{ !cancelled() }}
         env:

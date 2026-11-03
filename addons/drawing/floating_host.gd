@@ -14,6 +14,7 @@ var layout: DrawingDockLayout
 var drag: DrawingDockDrag
 var views: Dictionary
 var stash: Control
+var coordinator: Control
 var group_frames: Dictionary = {}
 var tab_buttons: Dictionary = {}
 var group_handles: Dictionary = {}
@@ -32,12 +33,13 @@ var _suppress_release: bool = false
 
 
 func setup(id: String, state: DrawingDockLayout, planner: DrawingDockDrag,
-		panel_views: Dictionary, storage: Control) -> void:
+		panel_views: Dictionary, storage: Control, workspace: Control = null) -> void:
 	host_id = id
 	layout = state
 	drag = planner
 	views = panel_views
 	stash = storage
+	coordinator = workspace
 	name = "FloatingHost_" + id
 	tooltip_text = "Floating Drawing panels: " + id
 
@@ -202,7 +204,7 @@ func render() -> void:
 		var handle: Button = Button.new()
 		handle.name = "GroupDrag_" + group_id
 		handle.text = "↕"
-		handle.tooltip_text = "Reorder floating group " + group_id
+		handle.tooltip_text = "Drag floating group " + group_id + " to a dock or another host; Ctrl+Alt+Shift+D redocks"
 		handle.custom_minimum_size = Vector2(38, 40)
 		handle.focus_mode = Control.FOCUS_ALL
 		handle.gui_input.connect(_tab_press.bind(DrawingDockDrag.GROUP, group_id))
@@ -216,7 +218,7 @@ func render() -> void:
 		arrange.focus_mode = Control.FOCUS_ALL
 		heading.add_child(arrange)
 		var menu: PopupMenu = arrange.get_popup()
-		for action: String in ["Move active tab left", "Move active tab right", "Split active tab into new group", "Move group up", "Move group down", "Merge into previous group", "Merge into next group"]:
+		for action: String in ["Move active tab left", "Move active tab right", "Split active tab into new group", "Move group up", "Move group down", "Merge into previous group", "Merge into next group", "Redock active tab (last group)", "Redock whole group (last group)", "Send active tab to another floating host", "Send whole group to another floating host"]:
 			menu.add_item(action)
 		menu.id_pressed.connect(_arrange.bind(group_id))
 		var tab_scroll: ScrollContainer = ScrollContainer.new()
@@ -233,7 +235,7 @@ func render() -> void:
 			var tab: Button = Button.new()
 			tab.name = "Tab_" + panel_id
 			tab.text = panel_id.capitalize()
-			tab.tooltip_text = "Floating tab " + panel_id + "; drag to reorder"
+			tab.tooltip_text = "Floating tab " + panel_id + "; drag between dock/hosts; Ctrl+Alt+D redocks"
 			tab.custom_minimum_size.y = 40
 			tab.focus_mode = Control.FOCUS_ALL
 			tab.toggle_mode = true
@@ -294,6 +296,20 @@ func _arrange(action: int, group_id: String) -> void:
 			var other_index: int = group_index + (-1 if action == 5 else 1)
 			if other_index >= 0 and other_index < groups.size():
 				target = {"kind": DrawingDockDrag.MERGE_GROUP, "group": groups[other_index]["id"], "index": groups[other_index]["panels"].size()}
+		7, 8:
+			kind = DrawingDockDrag.PANEL if action == 7 else DrawingDockDrag.GROUP
+			source = panel_id if action == 7 else group_id
+			var right_groups: Array = layout.container_info("right")["groups"]
+			target = {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": right_groups.size()}
+		9, 10:
+			if coordinator != null:
+				for other_id: String in coordinator.floating_hosts:
+					if other_id != host_id and (coordinator.floating_hosts[other_id] as DrawingFloatingHost).visible:
+						kind = DrawingDockDrag.PANEL if action == 9 else DrawingDockDrag.GROUP
+						source = panel_id if action == 9 else group_id
+						target = {"kind": DrawingDockDrag.GROUP_SLOT, "container": other_id,
+							"index": layout.container_info(other_id)["groups"].size()}
+						break
 	if not target.is_empty():
 		_apply(kind, source, target)
 
@@ -305,6 +321,8 @@ func _apply(kind: String, source: String, target: Dictionary) -> bool:
 		return false
 	if not drag.commit():
 		return false
+	if coordinator != null:
+		coordinator._reap_empty_hosts()
 	layout_changed.emit()
 	return true
 
@@ -351,12 +369,17 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif not _candidate_id.is_empty():
 			if not drag.is_dragging() and event.global_position.distance_to(_candidate_start) >= 7.0:
-				if _candidate_kind == DrawingDockDrag.PANEL:
+				if coordinator != null:
+					coordinator.begin_cross_drag(host_id, _candidate_kind, _candidate_id)
+				elif _candidate_kind == DrawingDockDrag.PANEL:
 					drag.begin_panel(_candidate_id)
 				else:
 					drag.begin_group(_candidate_id)
 			if drag.is_dragging() and _owns_drag():
-				_preview(event.global_position)
+				if coordinator != null:
+					coordinator._preview_cross_drop(event.global_position)
+				else:
+					_preview(event.global_position)
 				get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 		if _suppress_release:
@@ -368,11 +391,14 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif not _candidate_id.is_empty():
 			if drag.is_dragging() and _owns_drag():
-				_preview(event.global_position)
-				var accepted: bool = drag.commit()
+				if coordinator != null:
+					coordinator._commit_cross_drop(event.global_position, host_id)
+				else:
+					_preview(event.global_position)
+					var accepted: bool = drag.commit()
+					if accepted:
+						layout_changed.emit()
 				_clear_gesture()
-				if accepted:
-					layout_changed.emit()
 				get_viewport().set_input_as_handled()
 			else:
 				# A click is not a drag: allow Button.pressed to select its tab.
@@ -392,6 +418,8 @@ func _clear_gesture() -> void:
 	_candidate_id = ""
 	_candidate_kind = ""
 	drag.cancel()
+	if coordinator != null:
+		coordinator._cancel_cross_drop()
 	if _hint != null:
 		_hint.visible = false
 
@@ -424,12 +452,12 @@ func _target_at(point: Vector2) -> Dictionary:
 						index = j
 						x = rect.position.x
 						break
-						x = rect.end.x
+					x = rect.end.x
 			x = clampf(x, strip.global_position.x + 2.0, strip.get_global_rect().end.x - 3.0)
-			return {"target": {"kind": DrawingDockDrag.MERGE_GROUP if _candidate_kind == DrawingDockDrag.GROUP else DrawingDockDrag.TAB_SLOT,
+			return {"target": {"kind": DrawingDockDrag.MERGE_GROUP if drag.source_kind() == DrawingDockDrag.GROUP else DrawingDockDrag.TAB_SLOT,
 				"group": group_id, "index": index}, "rect": Rect2(x - 2.0, strip.global_position.y, 4.0, strip.size.y)}
 		if point.y < frame_rect.position.y + 46.0:
-			return {"target": {"kind": DrawingDockDrag.MERGE_GROUP if _candidate_kind == DrawingDockDrag.GROUP else DrawingDockDrag.TAB_SLOT,
+			return {"target": {"kind": DrawingDockDrag.MERGE_GROUP if drag.source_kind() == DrawingDockDrag.GROUP else DrawingDockDrag.TAB_SLOT,
 				"group": group_id, "index": groups[i]["panels"].size()},
 				"rect": Rect2(frame_rect.position.x, frame_rect.position.y + 44.0, frame_rect.size.x, 4)}
 	return {"target": {"kind": DrawingDockDrag.GROUP_SLOT, "container": host_id, "index": groups.size()},
@@ -459,12 +487,22 @@ func _keyboard(event: InputEventKey) -> bool:
 			if event.keycode == KEY_RIGHT and index < members.size() - 1:
 				_apply(DrawingDockDrag.PANEL, id, {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index + 2})
 				return true
+			if event.keycode == KEY_D and coordinator != null:
+				_apply(DrawingDockDrag.PANEL, id, {"kind": DrawingDockDrag.GROUP_SLOT,
+					"container": "right", "index": layout.container_info("right")["groups"].size()})
+				return true
 			if event.keycode == KEY_S:
 				var groups: Array = layout.container_info(host_id)["groups"]
 				for j: int in range(groups.size()):
 					if groups[j]["id"] == group_id:
 						_apply(DrawingDockDrag.PANEL, id, {"kind": DrawingDockDrag.GROUP_SLOT, "container": host_id, "index": j + 1})
 						return true
+	if event.shift_pressed and event.keycode == KEY_D and coordinator != null:
+		for id: String in group_handles:
+			if group_handles[id] == focused:
+				_apply(DrawingDockDrag.GROUP, id, {"kind": DrawingDockDrag.GROUP_SLOT,
+					"container": "right", "index": layout.container_info("right")["groups"].size()})
+				return true
 	if event.shift_pressed and (event.keycode == KEY_UP or event.keycode == KEY_DOWN):
 		for id: String in group_handles:
 			if group_handles[id] == focused:
