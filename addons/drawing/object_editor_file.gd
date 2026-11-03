@@ -39,17 +39,17 @@ static func save(document: DrawingDocument, path: String, name: String,
 
 
 static func open(path: String) -> DrawingResult:
-	var opened: DrawingResult = DrawingFileIO.open(path)
+	# The file and metadata must be from one bounded parse, not from two reads
+	# that could straddle an external source replacement. Decode still verifies
+	# every canonical blob before Open/preview/drop can trust the document.
+	var envelope: DrawingResult = DrawingFileIO.read_payload(path)
+	if not envelope.ok:
+		return envelope
+	var parsed: Dictionary = envelope.value
+	var opened: DrawingResult = DrawingFileIO.decode(parsed)
 	if not opened.ok:
 		return opened
 	var document: DrawingDocument = opened.value
-	var raw: FileAccess = FileAccess.open(path, FileAccess.READ)
-	if raw == null or raw.get_length() > DrawingFileIO.MAX_FILE_BYTES:
-		return DrawingResult.failure("OBJECT_FILE", "Object file unreadable or too large")
-	var parsed: Variant = JSON.parse_string(raw.get_as_text())
-	raw.close()
-	if not parsed is Dictionary:
-		return DrawingResult.failure("OBJECT_FILE", "Object metadata is unreadable")
 	var meta: Variant = parsed.get("object_source", {})
 	if not meta is Dictionary:
 		return DrawingResult.failure("OBJECT_META", "Malformed Object source metadata")

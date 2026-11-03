@@ -134,6 +134,42 @@ func run() -> void:
 			check(false, "LRU render failed for " + String(item["id"]))
 	check(cache.count() == DrawingAssetBrowserThumbnails.CAPACITY,
 		"thumbnail count remains within fixed LRU limit")
+	# An Atlas page is not a complete source index. Navigating to another page
+	# may retain previously rendered previews, but a new SHA for the same ID
+	# must invalidate its old cached pixels without evicting other IDs.
+	var retained: Array[Dictionary] = []
+	for candidate: Dictionary in index.entries:
+		if cache.contains(candidate):
+			retained.append(candidate)
+	check(retained.size() == DrawingAssetBrowserThumbnails.CAPACITY,
+		"test cache contains precisely the most recent valid thumbnails")
+	if retained.size() >= 2:
+		var page_a: Dictionary = retained[retained.size() - 1]
+		var page_b: Dictionary = retained[retained.size() - 2]
+		var before: int = cache.renders
+		cache.reconcile([page_a], false)
+		cache.reconcile([page_b], false)
+		check(cache.contains(page_a) and cache.contains(page_b),
+			"moving between partial Atlas pages keeps bounded off-page previews")
+		check(cache.preview(index, page_a).ok and cache.renders == before,
+			"revisiting earlier page reuses validated image without rerender")
+		var updated: Dictionary = page_a.duplicate(true)
+		updated["sha256"] = "f".repeat(64)
+		cache.reconcile([updated], false)
+		check(not cache.contains(page_a) and cache.contains(page_b),
+			"changed source invalidates only that stable ID across partial pages")
+		cache.reconcile([page_b])
+		check(cache.count() == 1, "complete standalone refresh removes off-index previews")
+	# Switching Atlas campaigns may not retain previews, even if IDs match.
+	var second_root: String = root_path.path_join("NewCampaign/Objects")
+	check(DirAccess.make_dir_recursive_absolute(second_root) == OK,
+		"prepare separate campaign root")
+	panel.set_published_entries(objects, [index.entries[0]], [], 0, 2, index.entries.size())
+	check(panel.thumbnails.preview(panel.index, panel.index.entries[0]).ok,
+		"first Atlas page can render its source")
+	panel.set_published_entries(second_root, [], [], 0, 1, 0)
+	check(panel.thumbnails.count() == 0,
+		"campaign switch clears even matching-ID thumbnail cache entries")
 	panel.queue_free()
 	print("T065_THUMBNAILS: %d passed; %d failed" % [passed, failed])
 	if failed == 0:

@@ -23,12 +23,24 @@ func clear() -> void:
 
 ## Only a changed source's bytes should discard a previously rendered preview.
 ## Retain a cached image when the index is refreshed without changes.
-func reconcile(entries: Array[Dictionary]) -> void:
+func reconcile(entries: Array[Dictionary], complete_index: bool = true) -> void:
 	var keys: Dictionary = {}
+	var revisions_by_id: Dictionary = {}
 	for entry: Dictionary in entries:
-		keys[_key(entry)] = true
+		var key: String = _key(entry)
+		keys[key] = true
+		revisions_by_id[String(entry.get("id", "")) + ":"] = key
 	for key: String in _order.duplicate():
-		if not keys.has(key):
+		# Standalone scans are complete and can drop missing files. Atlas pages
+		# are *not* complete indexes: preserve off-page LRU entries, but evict
+		# a prior revision if the current page exposes changed bytes for its ID.
+		var invalid: bool = complete_index and not keys.has(key)
+		if not complete_index:
+			for prefix: String in revisions_by_id:
+				if key.begins_with(prefix) and key != revisions_by_id[prefix]:
+					invalid = true
+					break
+		if invalid:
 			_images.erase(key)
 			_order.erase(key)
 

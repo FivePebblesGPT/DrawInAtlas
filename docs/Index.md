@@ -6,6 +6,16 @@
 
 ## Kanban summary
 
+**T-065 real-file source I/O and page cache (2026-11-03; still In Progress):**
+The canonical Object Editor now parses each bounded Drawing source once to
+validate both pixels and metadata from the same file snapshot. The shared
+Asset Browser retains a 24-image bounded LRU across partial Atlas pages,
+invalidates changed source revisions and clears previews on campaign change.
+A new 31-check fast-CI witness exercises a 351 KB four-tile source and
+corrupt-blob/metadata rejection; the thumbnail suite now has 62 assertions.
+These are engineering tests, **not** large physical-device campaign/owner UX
+acceptance. See [T-065](Tickets/T-065.md).
+
 **T-065 large published-library paging (2026-11-03; still In Progress):**
 Atlas's shared Asset Browser now filters names and stable IDs across the
 **entire published registry**, instead of losing all sources after the first

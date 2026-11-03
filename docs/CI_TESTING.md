@@ -9,7 +9,7 @@
 - Main project import before GDScript tests: T-015 marker-only authoring and archived-data boundary (13/23), link/history and link form (29/55), overview (67), stale-result (27), hierarchy (44), Organization UI (84) and reference controls (17), all on the modern marker model; T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
 - T-068 safe stationary round-dab CPU shortcut: `tests/drawing_dab_geometry_smoke.gd` compares its pixels against the **original** Godot `Geometry2D` segment oracle at fractional/negative positions, tile seams and 64-bit signed anchors, including undo/redo, no-op alpha and hidden RGB (125 assertions). The large raster benchmark and 25-gesture native stress run are **targeted**, not push-gating.
 - T-073 feature inventory and T-063 workspace documentation assertions.
-- T-065 partial portable Object source discovery, identity/path/hash safety, search and real dock/Object Editor tab coupling (`drawing/tests/asset_browser_smoke.gd`, 37 checks). Bounded source thumbnails (`drawing/tests/asset_browser_thumbnails_smoke.gd`, 54 checks) are generated from canonical Drawing pixels, requested only for visible rows, and cached in a 24-image digest-keyed LRU. Changed/source-replaced files invalidate previews after successful publication or explicit Refresh; stale bytes fail closed. Explicit standalone portable `*.drawing` Import/Export file copies
+- T-065 partial portable Object source discovery, identity/path/hash safety, search and real dock/Object Editor tab coupling (`drawing/tests/asset_browser_smoke.gd`, 37 checks). Bounded source thumbnails (`drawing/tests/asset_browser_thumbnails_smoke.gd`, 62 checks) are generated from canonical Drawing pixels, requested only for visible rows, and cached in a 24-image digest-keyed LRU. Changed/source-replaced files invalidate previews after successful publication or explicit Refresh; stale bytes fail closed. Explicit standalone portable `*.drawing` Import/Export file copies
   (`drawing/tests/asset_browser_transfer_smoke.gd`, 29 checks) reject stable-ID
   collisions, observed target overwrites, stale source bytes, and unregistered
   imports into Atlas-managed `*.atlas-object-index.json` roots. These copies do
@@ -30,6 +30,14 @@
   `xvfb-run -a -s '-screen 0 1400x900x24' python3 tools/test_t065_x11_pointer.py --godot godot`.
   It is **not** part of fast push CI, nor a substitute for Windows/Linux
   physical-hardware and owner hands-on UX acceptance.
+- T-065 real-file source parsing: `drawing/tests/asset_browser_real_io_smoke.gd`
+  exercises a 351 KB, four-tile Object source, canonical pixel/metadata
+  round-trip, corruption rejection, thumbnail cache and missing-source safety
+  (**31 headless checks**). The bounded JSON envelope is parsed once for both
+  Drawing pixels and Object metadata; Atlas paged browsing keeps unmodified
+  off-page thumbnails within the existing 24-image LRU, but invalidates changed
+  revisions and different campaign roots. Timings are diagnostic only; no
+  production hardware latency threshold is implied. This runs in fast CI.
 - T-065 larger Atlas source lists: `tests/asset_browser_atlas_paging_smoke.gd`
   (`T065_PAGING_PASSED`, **1,428 checks**) verifies globally searchable
   registry metadata beyond the former 512-source truncation, deterministic

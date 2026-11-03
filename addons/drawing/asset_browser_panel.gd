@@ -158,13 +158,18 @@ func set_published_entries(objects_root: String, records: Array[Dictionary],
 		index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
 	if thumbnails == null:
 		thumbnails = THUMBNAILS_SCRIPT.new() as DrawingAssetBrowserThumbnails
+	# Atlas supplies one page, not the full catalog. Keep off-page previews
+	# only while remaining in the same campaign root; their content hashes
+	# are rechecked by the normal preview path before display.
+	if index.root_path != objects_root:
+		thumbnails.clear()
 	index.root_path = objects_root
 	index.entries = records.duplicate(true)
 	index.warnings = issues.duplicate()
 	_page_number = page
 	_page_count = maxi(1, pages)
 	_matched_count = matches
-	thumbnails.reconcile(index.entries)
+	thumbnails.reconcile(index.entries, false)
 	if is_node_ready():
 		_refresh_view()
 
