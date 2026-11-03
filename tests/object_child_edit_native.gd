@@ -77,6 +77,28 @@ func _run() -> void:
 	manager.open_source_requested.connect(func(source: String) -> void: opened.append(source))
 	inspector.open_button.pressed.emit()
 	_check(opened == [cid], "native Edit child source routes to existing Object Editor request")
+	_check(inspector.source_picker.item_count == 1 and not inspector.attach_button.disabled,
+		"native inspector exposes a focusable source picker and Attach action")
+	var choose: int = inspector._candidate_ids.find(cid)
+	inspector.source_picker.select(choose)
+	inspector.attach_button.pressed.emit()
+	_check(library.children_for_asset(pid).size() == 2 and not inspector.detach_button.disabled,
+		"native Attach action publishes a second stable child")
+	var new_child: String = inspector.session.selected_child_id
+	inspector.detach_button.pressed.emit()
+	_check(library.children_for_asset(pid).size() == 1,
+		"native Remove detaches selected child without deleting source")
+	inspector.undo_button.pressed.emit()
+	_check(library.children_for_asset(pid).size() == 2 and
+		inspector.session.selected_child_id == new_child,
+		"native Undo recovers the same child instance")
+	inspector.redo_button.pressed.emit()
+	_check(library.children_for_asset(pid).size() == 1 and
+		library.asset_exists(cid), "native Redo removes only the child reference")
+	var before_invalid: Dictionary = library.export_index()
+	_check(not inspector._candidate_ids.has(pid) and
+		library.export_index() == before_invalid,
+		"native source picker excludes recursive parent/self links")
 	var shot: String = OS.get_environment("T064_CHILD_SCREENSHOT")
 	if not shot.is_empty():
 		for frame: int in range(3):

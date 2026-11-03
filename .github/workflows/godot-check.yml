@@ -195,6 +195,9 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_edit_smoke.gd 2>&1 | tee /tmp/godot-t064-child-edit.log
           grep -q 'T064_CHILD_EDIT_PASSED' /tmp/godot-t064-child-edit.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_EDIT_FAILED:' /tmp/godot-t064-child-edit.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_structure_smoke.gd 2>&1 | tee /tmp/godot-t064-child-structure.log
+          grep -q 'T064_CHILD_STRUCTURE_PASSED' /tmp/godot-t064-child-structure.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_STRUCTURE_FAILED:' /tmp/godot-t064-child-structure.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
         id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
         if: ${{ !cancelled() }}

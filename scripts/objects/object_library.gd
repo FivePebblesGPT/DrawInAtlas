@@ -229,6 +229,22 @@ func detach_child(asset_id: String, child_id: String, expected_revision: int) ->
 	return DrawingResult.failure("CHILD", "Nested instance not found")
 
 
+## Restore a detached child at its original sibling position for parent-local
+## history. The caller supplies an exact saved identity; validation and optimistic
+## publication are identical to ordinary insertion, including cycle detection.
+func _restore_child_snapshot(asset_id: String, expected_revision: int,
+		child_record: Dictionary, position: int) -> DrawingResult:
+	if not _asset_available(asset_id) or not CHILD_GRAPH._child_valid(child_record) or 			child_record.has("status"):
+		return DrawingResult.failure("CHILD", "Invalid saved nested child")
+	if not bool(child_record["placeholder"]) and 			not _asset_available(String(child_record["source_id"])):
+		return DrawingResult.failure("CHILD_SOURCE", "Child source is unavailable")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	if position < 0 or position > children.size():
+		return DrawingResult.failure("CHILD", "Original child position is no longer valid")
+	children.insert(position, child_record.duplicate(true))
+	return _replace_children(asset_id, expected_revision, children)
+
+
 func dependent_sources(asset_id: String) -> Array[String]:
 	return CHILD_GRAPH.dependent_sources(_assets, asset_id)
 
