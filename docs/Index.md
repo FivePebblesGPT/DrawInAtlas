@@ -6,27 +6,38 @@
 
 ## Kanban summary
 
+**T-065 Atlas-managed portable registration (2026-11-03; still In Progress):**
+The Atlas Object Manager now provides explicit Import/Export file dialogs
+backed by versioned registry publication, not an unregistered file copy.
+Imported `.drawing` sources retain stable source identity, human-readable
+name and local frame, reject duplicate/reserved IDs and stale/symlinked paths,
+and do not create placements. Exports reconstruct portable metadata without
+changing instance bindings. The new 33-check disk-backed import/export test is
+fast-CI-gated; the manager tests pass 33 headless and 22 native checks.
+Cross-app drag/drop, high-volume/physical desktop review and **owner UX signoff**
+remain open. See [T-065](Tickets/T-065.md).
+
 **T-065 Atlas linked-instance and NULL-action milestone (2026-11-03; still In Progress):**
 Atlas's Layers view now opens a library-bound source manager (`Ctrl+Shift+B`)
 with published-ID usage counts, explicit current-map placement, three-way
 Source Delete (Remove/NULL/Cancel), and deliberate stable-ID NULL repair.
 Deletion confirmations are bound to registry and instance revisions; historical
-source bytes remain untouched. The new 48-check on-disk transaction, 20-check
-manager, and 17-check native Atlas witness (18 with screenshot) complement the portable Drawing
-Asset Browser checks. Drag placement, Atlas-managed import/registration, and
-owner UX review remain open. See [T-065](Tickets/T-065.md).
+source bytes remain untouched. The 48-check on-disk transaction and original 20-check manager/17-check native
+Atlas witnesses introduced that workflow; later Import/Export extensions are
+documented above. Shared-browser-to-Atlas drag placement and owner UX review
+remain open. See [T-065](Tickets/T-065.md).
 
 **T-065 thumbnail and portable-copy follow-up (2026-11-03; still In Progress):** real Object source
 pixels now appear as lazy, bounded 48×48 previews with a 24-image SHA-keyed
 LRU and automatic invalidation after successful local Object Editor Save.
 The headless thumbnail test passes 54 checks; portable file-copy safety passes
 29; native source/pointer/thumbnail passes 19 (20 with optional screenshot).
-Standalone copies into Atlas-managed registries are refused until proper
-registration exists. The full Atlas drop/delete/NULL
-repair and owner UX acceptance are still missing. See
+Standalone copies into Atlas-managed registries remain refused; dedicated
+Atlas registration is now supported by the Object Manager as described above.
+Shared-browser drag/drop, large-project checks and owner UX acceptance remain open. See
 [T-065](Tickets/T-065.md) and [CI policy](CI_TESTING.md).
 
-**T-065 portable Asset Browser milestone (2026-11-03; still In Progress):** the shared Drawing workspace can now attach an `asset_browser` dock peer via Window → Asset Browser… or a host-provided portable `Objects/` root. A bounded read-only source scan, name/ID filtering, stale-file and duplicate-identity rejection, and explicit Edit Source into an Object Editor tab are covered by 37 headless and 18 native checks. The Atlas placement/drop, NULL deletion/repair, campaign registration and owner UX scope remains unfinished; the subsequently added thumbnail and standalone file-copy workflows are described above. The original owner keyboard/pointer acceptance is tracked as a manual gate; no approval was inferred. See [T-065](Tickets/T-065.md) and [standalone usage](../drawing/README.md).
+**T-065 portable Asset Browser milestone (2026-11-03; still In Progress):** the shared Drawing workspace can now attach an `asset_browser` dock peer via Window → Asset Browser… or a host-provided portable `Objects/` root. A bounded read-only source scan, name/ID filtering, stale-file and duplicate-identity rejection, and explicit Edit Source into an Object Editor tab are covered by 37 headless and 18 native checks. The later Atlas instance/NULL manager and portable registration milestones are described above; shared-browser drag/drop and owner UX acceptance remain unfinished. The original owner keyboard/pointer acceptance is tracked as a manual gate; no approval was inferred. See [T-065](Tickets/T-065.md) and [standalone usage](../drawing/README.md).
 
 **T-068 publication-cache follow-up (2026-11-03; still In Progress):**
 `DrawingDocument` now resolves the immutable source tile once per touched

@@ -47,7 +47,8 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         self.assertIn("not signed off", UI)
         self.assertIn("manual_review: true", (DOCS / "Tickets/T-059.md").read_text())
         self.assertIn('status: "Done"', (DOCS / "Tickets/T-063.md").read_text())
-        self.assertIn('status: "Ready"', (DOCS / "Tickets/T-065.md").read_text())
+        self.assertIn('status: "In Progress"', (DOCS / "Tickets/T-065.md").read_text())
+        self.assertIn('manual_review: true', (DOCS / "Tickets/T-065.md").read_text())
 
     def test_accepted_tab_and_browser_requirements_are_not_conflated(self) -> None:
         for doc in (INVENTORY, UI):
@@ -147,7 +148,7 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
         self.assertIn('depends_on: []', t073)
         self.assertIn('status: "Done"', t073)
         for ticket, expected in (("T-059", 'status: "Ready"'), ("T-063", 'status: "Done"'),
-                                 ("T-065", 'status: "Ready"'), ("T-068", 'status: "In Progress"')):
+                                 ("T-065", 'status: "In Progress"'), ("T-068", 'status: "In Progress"')):
             self.assertIn(expected, (DOCS / f"Tickets/{ticket}.md").read_text())
 
 

@@ -14,13 +14,24 @@
   collisions, observed target overwrites, stale source bytes, and unregistered
   imports into Atlas-managed `*.atlas-object-index.json` roots. These copies do
   not register Atlas instances or create NULL repairs. The native pointer/scroll/focus and preview witness (`drawing/tests/asset_browser_native.gd`, 19 checks without optional screenshot (20 with capture)) is targeted and does not satisfy T-065 owner acceptance or Atlas NULL/drop functionality.
+- T-065 Atlas-managed portable source registration and export:
+  `tests/object_portable_registry_smoke.gd` (**33** disk-backed checks) covers
+  embedded source-ID preservation, canonical campaign versioning, origin/frame
+  metadata, duplicate/reserved IDs, symlinked paths, stale registry handles,
+  optimistic publication rollback/retry, and independent portable reload.
+  Object Manager Import/Export callbacks extend
+  `tests/object_source_manager_smoke.gd` to **33** headless checks; native Atlas
+  source-manager actions extend `tests/object_source_manager_native.gd` to
+  **22** targeted X11/Mesa checks (23 with optional screenshot). The standalone
+  Drawing browser's Import still rejects Atlas-managed registries, and shared
+  browser-to-Atlas drag/drop and owner acceptance remain open.
 - T-065 Atlas-owned source safety: `tests/object_asset_repair_smoke.gd`
   (48 disk-backed checks) covers optimistic deletion confirmations,
   Remove/NULL policies, stable placement generations, explicit no-guess
   repairs and rollback. `tests/object_source_manager_smoke.gd`
-  (20 checks) covers source usage and actual button/confirmation paths.
+  (33 checks) covers source usage and actual button/confirmation paths.
   Both run in fast push CI. The native Atlas sidebar/canvas witness
-  `tests/object_source_manager_native.gd` (17 Xvfb/Mesa checks; 18 with screenshot) is targeted,
+  `tests/object_source_manager_native.gd` (22 Xvfb/Mesa checks; 23 with screenshot) is targeted,
   **not** owner approval; source drag into Atlas remains unfinished.
 - T-078 reusable grouped dock state model and existing shell binding (82 headless assertions).
 - T-080 reusable nonmutating drag planner and transactional commit/cancel (60 fast headless assertions); actual pointer/layout behavior is verified separately by native Xvfb/Mesa evidence.

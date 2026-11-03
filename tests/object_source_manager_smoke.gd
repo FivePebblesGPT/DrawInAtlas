@@ -99,6 +99,67 @@ func _run() -> void:
 		"UI repair retains stable instance generation and transform")
 	_check(manager.missing.item_count == 0 and manager.repair_button.disabled,
 		"repair refresh removes resolved NULL and disables further repair")
+	manager.delete_confirmation.hide() # Previous test invoked the confirmation callback directly.
+	var portable: DrawingDocument = DrawingDocument.new("portable-manager-id", 16)
+	var incoming: String = folder.path_join("portable-manager.drawing")
+	_check(DrawingObjectEditorFile.save(portable, incoming, "Portable manager source",
+		Vector2i(1, -3), Rect2i(0, 0, 16, 16), 5).ok,
+		"make independent portable source for Object Manager")
+	var mutation_events: Array[String] = []
+	manager.registry_mutated.connect(func(message: String) -> void: mutation_events.append(message))
+	manager._ask_import()
+	manager.import_dialog.hide()
+	manager._import_portable(incoming)
+	_check(library.asset_exists(portable.id) and manager.sources.item_count == 2,
+		"Import callback registers source in Atlas and refreshes visible rows")
+	_check(not mutation_events.is_empty() and mutation_events[-1].contains("Imported"),
+		"Import reports a real registry mutation")
+	manager._ask_import()
+	manager.import_dialog.hide()
+	manager._import_portable(incoming)
+	_check(manager.details.text.contains("already") and manager.sources.item_count == 2,
+		"UI reports duplicate portable identities without a second registry entry")
+	manager.sources.select(manager._source_ids.find(portable.id))
+	manager._update_actions()
+	_check(not manager.export_button.disabled and not manager.import_button.disabled,
+		"Atlas manager enables explicit portable import/export controls")
+	manager._ask_export()
+	_check(manager._pending_export.get("id") == portable.id and
+		manager._pending_export.get("revision") == 1,
+		"export dialog freezes source ID and revision before browsing")
+	manager.sources.select(manager._source_ids.find(replacement))
+	var outgoing: String = folder.path_join("portable-export.drawing")
+	manager._export_portable(outgoing)
+	var portable_result: DrawingResult = DrawingObjectEditorFile.open(outgoing)
+	_check(portable_result.ok and portable_result.value["source_id"] == portable.id,
+		"export uses frozen source identity, not a changed list selection")
+	_check(manager._pending_export.is_empty() and manager.details.text.contains("Exported"),
+		"successful export clears pending action and reports file creation")
+	manager.sources.select(manager._source_ids.find(portable.id))
+	manager._ask_export()
+	var draft: DrawingResult = library.begin_draft(portable.id)
+	_check(draft.ok and library.save_draft(draft.value).ok,
+		"another Object Editor Save advances source revision after export dialog opens")
+	var stale_destination: String = folder.path_join("stale-portable.drawing")
+	manager._export_portable(stale_destination)
+	_check(not FileAccess.file_exists(stale_destination) and manager.details.text.contains("Refresh"),
+		"stale export confirmation cannot silently export a newer source")
+	manager.export_dialog.hide() # Direct test callback does not auto-close FileDialog.
+	var late: DrawingDocument = DrawingDocument.new("late-portable-id", 16)
+	var late_path: String = folder.path_join("late-portable.drawing")
+	_check(DrawingObjectEditorFile.save(late, late_path, "Late", Vector2i.ZERO,
+		Rect2i(), 1).ok, "make portable source for delayed dialog callback")
+	manager._ask_import()
+	manager.import_dialog.hide()
+	manager.bind_library(null)
+	manager._import_portable(late_path)
+	_check(library.asset_info(late.id).is_empty(),
+		"import callback after campaign unbind cannot publish an unintended source")
+	manager.bind_library(library)
+	manager._ask_import()
+	manager.import_dialog.hide()
+	manager._import_portable(late_path)
+	_check(library.asset_exists(late.id), "reopening Import after rebind uses the current campaign")
 	manager.bind_library(null)
 	_check(manager.sources.item_count == 0 and manager.missing.item_count == 0,
 		"rebinding to no library clears stale view")

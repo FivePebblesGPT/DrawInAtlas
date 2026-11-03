@@ -108,6 +108,31 @@ func _run() -> void:
 	_check(manager.visible, "Ctrl+Shift+B reopens existing source manager")
 	_check(manager.missing.item_count == 0 and manager.sources.item_count == 1,
 		"manager refreshes resolved NULL without duplicate source IDs")
+	# Source Import/Export are Atlas-owned transactions, not standalone copies.
+	var external: String = folder.path_join("native-portable.drawing")
+	var incoming: DrawingDocument = DrawingDocument.new("native-portable-id", 16)
+	_check(DrawingObjectEditorFile.save(incoming, external, "Native imported",
+		Vector2i(3, 4), Rect2i(0, 0, 8, 8), 7).ok,
+		"native test creates portable Object source")
+	manager._ask_import()
+	manager.import_dialog.hide()
+	manager._import_portable(external)
+	await process_frame
+	_check(registry.asset_exists(incoming.id) and manager.sources.item_count == 2,
+		"native manager imports and displays registered portable source")
+	manager.sources.select(manager._source_ids.find(incoming.id))
+	manager._update_actions()
+	_check(not manager.export_button.disabled, "published portable source offers Export")
+	manager._ask_export()
+	_check(manager._pending_export.get("id", "") == incoming.id,
+		"native Export dialog freezes selected source ID")
+	manager.export_dialog.hide()
+	var exported: String = folder.path_join("native-export.drawing")
+	manager._export_portable(exported)
+	var exported_doc: DrawingResult = DrawingObjectEditorFile.open(exported)
+	_check(exported_doc.ok and exported_doc.value["source_id"] == incoming.id and
+		exported_doc.value["name"] == "Native imported",
+		"native Export reconstructs correct portable identity and metadata")
 	var reread: AtlasObjectLibrary = AtlasObjectLibrary.new(folder.path_join("Campaign.scn"))
 	_check(reread.load().ok and reread.instance_info(instance_id)["source_id"] == replacement,
 		"published rebind survives a fresh campaign registry load")

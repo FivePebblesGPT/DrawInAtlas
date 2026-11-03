@@ -454,6 +454,124 @@ func create_asset(document: DrawingDocument, label: String) -> DrawingResult:
 	return DrawingResult.success(asset_id)
 
 
+## Check every existing ancestor, not only the selected leaf. A file dialog
+## can return a path below a symlinked directory outside the campaign root.
+static func _portable_path_has_no_links(path: String) -> bool:
+	var current: String = path
+	for i: int in range(64):
+		var base: String = current.get_base_dir()
+		if base == current:
+			return true
+		var parent: DirAccess = DirAccess.open(base)
+		if parent == null or parent.is_link(current.get_file()):
+			return false
+		current = base
+	return false
+
+
+## Rejected imports may create a new revision directory before registry commit.
+## Remove only our unpublished version and a now-empty directory, preserving
+## anything another writer may have put there in the meantime.
+func _discard_import_stage(record: Dictionary) -> void:
+	_discard_staged(record)
+	var directory: String = root_path.path_join(String(record["id"]))
+	var dir: DirAccess = DirAccess.open(directory)
+	if dir != null and dir.get_files().is_empty() and dir.get_directories().is_empty():
+		DirAccess.remove_absolute(directory)
+
+
+## Register an external portable Object source in one Atlas index transaction.
+## Keep the original stable Drawing ID; campaign-local publication starts at v1.
+## Never adopt an existing revision directory, even if its index was deleted.
+func import_portable_source(source_path: String) -> DrawingResult:
+	if not _ready_path() or not _index_unchanged():
+		return DrawingResult.failure("STALE_INDEX", "Reload a valid campaign Object registry before import")
+	var source: String = source_path.simplify_path()
+	if not source.is_absolute_path() or not source.ends_with(".drawing") or \
+			source != source_path or source.begins_with(root_path + "/"):
+		return DrawingResult.failure("IMPORT_PATH", "Choose an external absolute portable .drawing source")
+	var parent: DirAccess = DirAccess.open(source.get_base_dir())
+	if parent == null or not _portable_path_has_no_links(source) or not FileAccess.file_exists(source):
+		return DrawingResult.failure("IMPORT_PATH", "Source is missing or a symbolic link")
+	var before: String = FileAccess.get_sha256(source)
+	if before.is_empty():
+		return DrawingResult.failure("IMPORT_PATH", "Cannot read portable source bytes")
+	var opened: DrawingResult = DrawingObjectEditorFile.open(source)
+	if not opened.ok:
+		return opened
+	var info: Dictionary = opened.value
+	var asset_id: String = String(info["source_id"])
+	var label: String = String(info["name"])
+	var origin: Vector2i = info["origin"]
+	var bounds: Rect2i = info["bounds"]
+	if not _id(asset_id) or label.strip_edges().is_empty() or \
+			label.length() > 128 or "\n" in label or "\r" in label or \
+			not _valid_frame({"origin": [origin.x, origin.y], "bounds": \
+			[bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y]}):
+		return DrawingResult.failure("SOURCE", "Invalid portable Object identity or local frame")
+	if _assets.has(asset_id):
+		return DrawingResult.failure("DUPLICATE_ID", "Stable Object source ID is already published")
+	var objects: DirAccess = DirAccess.open(root_path)
+	if objects != null and (objects.is_link(asset_id) or objects.dir_exists(asset_id)):
+		return DrawingResult.failure("DUPLICATE_ID", "An existing Object revision directory reserves this source ID")
+	if FileAccess.get_sha256(source) != before:
+		return DrawingResult.failure("STALE_SOURCE", "Portable source changed during validation")
+	var staged: DrawingResult = _stage_asset(info["document"], asset_id, 1, label, origin, bounds)
+	if not staged.ok:
+		return staged
+	if FileAccess.get_sha256(source) != before:
+		_discard_import_stage(staged.value)
+		return DrawingResult.failure("STALE_SOURCE", "Portable source changed during publication")
+	var next_assets: Dictionary[String, Dictionary] = _assets_copy()
+	next_assets[asset_id] = staged.value
+	var saved: DrawingResult = _commit_index(next_assets, _instances_copy())
+	if not saved.ok:
+		_discard_import_stage(staged.value)
+		return saved
+	asset_published.emit(asset_id, 1)
+	return DrawingResult.success(asset_id)
+
+
+## Export the exact published revision with portable name/frame metadata.
+## An export is a new file, not a registry edit or source rebinding.
+func export_portable_source(asset_id: String, destination_path: String,
+		expected_revision: int = -1) -> DrawingResult:
+	if not _assets.has(asset_id) or not _index_unchanged() or \
+			(expected_revision >= 0 and _assets[asset_id]["revision"] != expected_revision):
+		return DrawingResult.failure("STALE_SOURCE", "Refresh the selected published source")
+	if not _asset_available(asset_id):
+		return DrawingResult.failure("MISSING_SOURCE", "Published Object file is unavailable")
+	var target: String = destination_path.simplify_path()
+	if not target.is_absolute_path() or not target.ends_with(".drawing") or \
+			target != destination_path or target.begins_with(root_path + "/"):
+		return DrawingResult.failure("EXPORT_PATH", "Choose a new .drawing file outside campaign Objects/")
+	var parent: DirAccess = DirAccess.open(target.get_base_dir())
+	if parent == null or not _portable_path_has_no_links(target) or FileAccess.file_exists(target):
+		return DrawingResult.failure("EXISTS", "Export destination already exists or is unsafe")
+	var doc: DrawingResult = _published_document(asset_id)
+	if not doc.ok:
+		return doc
+	var record: Dictionary = _assets[asset_id]
+	var origin: Array = record["origin"]
+	var bounds: Array = record["bounds"]
+	var pending: String = target + ".pending-" + DrawingDocument.new_id()
+	var written: DrawingResult = DrawingObjectEditorFile.save(doc.value, pending,
+		String(record["name"]), Vector2i(int(origin[0]), int(origin[1])),
+		Rect2i(int(bounds[0]), int(bounds[1]), int(bounds[2]), int(bounds[3])),
+		int(record["revision"]))
+	if not written.ok:
+		DirAccess.remove_absolute(pending)
+		return written
+	if not _asset_available(asset_id) or not _index_unchanged() or \
+			FileAccess.file_exists(target) or not _portable_path_has_no_links(target):
+		DirAccess.remove_absolute(pending)
+		return DrawingResult.failure("STALE_SOURCE", "Published source or destination changed during export")
+	if DirAccess.rename_absolute(pending, target) != OK:
+		DirAccess.remove_absolute(pending)
+		return DrawingResult.failure("WRITE", "Cannot publish portable Object export")
+	return DrawingResult.success(target)
+
+
 func _published_document(asset_id: String) -> DrawingResult:
 	if not _asset_available(asset_id):
 		_cache.erase(asset_id)

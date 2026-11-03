@@ -14,6 +14,12 @@ var details: Label
 var edit_button: Button
 var place_button: Button
 var delete_button: Button
+var import_button: Button
+var export_button: Button
+var import_dialog: FileDialog
+var export_dialog: FileDialog
+var _pending_export: Dictionary = {}
+var _pending_import_library: AtlasObjectLibrary
 var repair_button: Button
 var delete_confirmation: ConfirmationDialog
 var _source_ids: Array[String] = []
@@ -46,6 +52,8 @@ func _ready() -> void:
 	edit_button = _action(actions, "Edit Source", "EditSource", _request_edit)
 	place_button = _action(actions, "Place at view center", "PlaceSource", _request_place)
 	delete_button = _action(actions, "Delete Source…", "DeleteSource", _ask_delete)
+	import_button = _action(actions, "Import portable…", "ImportPortable", _ask_import)
+	export_button = _action(actions, "Export portable…", "ExportPortable", _ask_export)
 	var null_heading: Label = Label.new()
 	null_heading.text = "Missing / NULL instances · choose a replacement source explicitly"
 	root.add_child(null_heading)
@@ -73,6 +81,22 @@ func _ready() -> void:
 			_delete_with_policy("null"))
 	delete_confirmation.canceled.connect(func() -> void: _pending_delete = {})
 	add_child(delete_confirmation)
+	import_dialog = FileDialog.new()
+	import_dialog.name = "ImportPortableDialog"
+	import_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	import_dialog.filters = PackedStringArray(["*.drawing ; Portable Drawing Object"])
+	import_dialog.file_selected.connect(_import_portable)
+	import_dialog.canceled.connect(func() -> void: _pending_import_library = null)
+	add_child(import_dialog)
+	export_dialog = FileDialog.new()
+	export_dialog.name = "ExportPortableDialog"
+	export_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	export_dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	export_dialog.filters = PackedStringArray(["*.drawing ; Portable Drawing Object"])
+	export_dialog.file_selected.connect(_export_portable)
+	export_dialog.canceled.connect(func() -> void: _pending_export = {})
+	add_child(export_dialog)
 	refresh()
 
 
@@ -93,6 +117,8 @@ func bind_library(next_library: AtlasObjectLibrary) -> void:
 			library.instances_changed.disconnect(_instances_changed)
 	library = next_library
 	_pending_delete = {}
+	_pending_export = {}
+	_pending_import_library = null
 	if delete_confirmation != null:
 		delete_confirmation.hide()
 	if library != null:
@@ -173,6 +199,8 @@ func _update_actions() -> void:
 	edit_button.disabled = not available
 	place_button.disabled = not available
 	delete_button.disabled = not has_source
+	import_button.disabled = library == null
+	export_button.disabled = not available
 	repair_button.disabled = not available or selected_null_id().is_empty()
 
 
@@ -184,6 +212,50 @@ func _request_edit() -> void:
 func _request_place() -> void:
 	if not selected_source_id().is_empty():
 		place_source_requested.emit(selected_source_id())
+
+
+func _ask_import() -> void:
+	if library != null:
+		_pending_import_library = library
+		import_dialog.popup_centered_ratio(0.7)
+
+
+func _import_portable(path: String) -> void:
+	var frozen_library: AtlasObjectLibrary = _pending_import_library
+	_pending_import_library = null
+	if library == null or frozen_library != library:
+		return # A new campaign was bound or the dialog was cancelled.
+	var imported: DrawingResult = library.import_portable_source(path)
+	refresh()
+	if imported.ok:
+		registry_mutated.emit("Imported portable Object %s" % String(imported.value))
+	else:
+		details.text = imported.message
+
+
+func _ask_export() -> void:
+	if library == null or selected_source_id().is_empty():
+		return
+	var asset_id: String = selected_source_id()
+	var record: Dictionary = library.asset_info(asset_id)
+	if record.is_empty() or not library.asset_exists(asset_id):
+		refresh()
+		return
+	_pending_export = {"id": asset_id, "revision": record["revision"]}
+	export_dialog.popup_centered_ratio(0.7)
+
+
+func _export_portable(path: String) -> void:
+	if library == null or _pending_export.is_empty():
+		return
+	var frozen: Dictionary = _pending_export
+	_pending_export = {}
+	var exported: DrawingResult = library.export_portable_source(String(frozen["id"]),
+		path, int(frozen["revision"]))
+	if exported.ok:
+		details.text = "Exported %s (no Atlas binding changed)" % path.get_file()
+	else:
+		details.text = exported.message
 
 
 func _ask_delete() -> void:
