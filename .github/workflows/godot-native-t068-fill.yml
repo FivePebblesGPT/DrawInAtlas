@@ -19,22 +19,19 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
       - name: Import main project
         run: timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path . --import --quit
-      - name: Verify native fill-to-frame, capture diagnostics
+      - name: Verify native fill-to-frame, capture process RSS and jitter
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/t068-native-fill
-          timeout --signal=TERM --kill-after=5s 240s xvfb-run -a -s '-screen 0 1280x900x24' \
-            godot --audio-driver Dummy --rendering-driver opengl3 \
-            --rendering-method gl_compatibility --path . \
-            --script res://tests/drawing_fill_frame_native.gd -- \
-            --output /tmp/t068-native-fill/measurements.json \
-            --screenshot /tmp/t068-native-fill/framebuffer.png \
-            2>&1 | tee /tmp/t068-native-fill/run.log
-          grep -q 'T068_FILL_FRAME_PASSED' /tmp/t068-native-fill/run.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FILL_FRAME_FAILED:' /tmp/t068-native-fill/run.log; then exit 1; fi
-          test -s /tmp/t068-native-fill/measurements.json
-          test -s /tmp/t068-native-fill/framebuffer.png
+          python3 -m unittest discover -s tests -p test_t068_fill_process_profile.py
+          timeout --signal=TERM --kill-after=5s 400s python3 \
+            tools/benchmarks/t068_fill_process_profile.py \
+            --godot "$(command -v godot)" \
+            --output-dir /tmp/t068-native-fill --runs 2 --trials 21 \
+            --sample-ms 10 --timeout-seconds 180
+          test -s /tmp/t068-native-fill/evidence.json
+          test -s /tmp/t068-native-fill/run_1.png
+          test -s /tmp/t068-native-fill/run_2.png
       - name: Upload measured evidence
         if: always()
         uses: actions/upload-artifact@v4

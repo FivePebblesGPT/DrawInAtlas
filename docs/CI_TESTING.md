@@ -281,3 +281,17 @@ python3 tools/validate_ticket_store.py
 ```
 
 This is **reduced-scope CI**, not a full release sign-off. In particular, do not infer T-014/019/022/024/025/026 or native UI acceptance from a green run.
+
+
+## T-068 extended native Bucket-adapter profiling (on demand, 2026-11-03)
+
+The manual-only `.github/workflows/godot-native-t068-fill.yml` executes
+`tools/benchmarks/t068_fill_process_profile.py` in two isolated 21-trial
+Godot 4.8 beta 2 Xvfb/Mesa processes. It requires successful source/pixel/
+framebuffer/cancellation checks and writes per-run JSON, PNG, logs and an
+aggregate Linux `/proc/PID/status` RSS/VmHWM report. It checks the executable
+path to avoid sampling the `xvfb-run` shell. The five deterministic Python
+unit tests in `tests/test_t068_fill_process_profile.py` run in the existing
+fast-CI T-068 step; **the native runner itself is not push/PR-gating**. This
+is a synthetic `DrawingEditSession` input adapter, not the real Bucket GUI,
+physical display latency, per-gesture memory or GPU VRAM.

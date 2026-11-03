@@ -481,3 +481,46 @@ outside fast push CI and uploads the evidence. T-068 remains In Progress:
 third-party kernel comparisons, optional native boundary, Windows/Linux
 physical-device, actual memory high-water, jitter and operation decision
 remain open.
+
+
+## 2026-11-03: reproducible Linux process-memory sampler and 21-trial software-frame distribution
+
+The follow-up `tools/benchmarks/t068_fill_process_profile.py` starts separate
+`xvfb-run`/Godot 4.8 beta 2 processes, identifies **Godot** by its real
+`/proc/PID/exe` rather than trusting the wrapper command line, and samples
+`VmRSS`, `VmHWM` and `VmSwap`. The 10 ms sampling interval is requested, not
+hard-real-time, and VmHWM includes the process lifetime (Godot startup plus
+renderer). A readiness marker supports a separately reported **sampled**
+post-initialization RSS change; neither figure is an allocation trace.
+
+| Fill pixels | Run A dispatch median / p95 | Run A `frame_post_draw` median / p95 | Run B dispatch median / p95 | Run B frame median / p95 |
+| --- | ---: | ---: | ---: | ---: |
+| 32² | 13.671 / 19.462 ms | 34.158 / 44.510 ms | 13.549 / 16.639 ms | 34.614 / 40.051 ms |
+| 64² | 53.826 / 67.755 ms | 79.671 / 98.488 ms | 56.037 / 78.486 ms | 83.642 / 109.090 ms |
+| 96² | 134.427 / 158.094 ms | 168.487 / 196.921 ms | 129.480 / 152.565 ms | 164.342 / 190.817 ms |
+
+Each row is based on **21 successful, seeded, fixed-size fill gestures per
+fresh process**, with visible pixel checks after a software-rendered frame.
+There are 385 passing checks in each process (770 aggregate). No trials are
+pooled to imply independent machines or statistical confidence; p95 is the
+20th ordered sample out of 21. Whole-process kernel VmHWM was **251,288 KiB**
+and **251,420 KiB**; peak sampled post-ready RSS increases were **8,988 KiB**
+and **8,284 KiB**. The process includes Godot, textures, renderer caching,
+new documents and test overhead. It does **not** isolate per-fill memory or
+physical VRAM. The test adapter sends synthetic Godot GUI events into the
+canonical fill session, not the production Bucket UI; the rendering signal
+is not physical scanout or Windows/Linux device validation.
+
+[Complete raw process/trial evidence](benchmarks/T068_2026-11-03_fill_linux_rss.json)
+was generated with:
+
+```sh
+python3 tools/benchmarks/t068_fill_process_profile.py \
+  --godot /path/to/Godot_v4.8-beta2_linux.x86_64 \
+  --output-dir /tmp/t068-fill-profile --runs 2 --trials 21 --sample-ms 10
+```
+
+The host runner requires Linux `/proc`, Xvfb, software OpenGL and an imported
+Godot project; the GitHub workflow exposes it *on demand*. No raster library
+was adopted, and T-068's external backend, optional GDExtension, physical
+Windows/Linux, GPU and operation-level decision obligations remain open.

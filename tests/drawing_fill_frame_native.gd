@@ -4,7 +4,8 @@ extends SceneTree
 ## This is a test adapter, NOT a claim that DrawingCanvas exposes a Bucket tool.
 
 const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
-const TRIALS: int = 5
+const DEFAULT_TRIALS: int = 5
+const MAX_TRIALS: int = 40
 const SIZES: Array[int] = [32, 64, 96]
 const SOURCE_RGBA: int = 0xff321e0a
 const TARGET_RGBA: int = 0xff2088e8
@@ -18,6 +19,7 @@ var _budget: int = 0
 var _started: bool = false
 var _last_result: DrawingResult
 var _dispatch_count: int = 0
+var _trials: int = DEFAULT_TRIALS
 
 
 func _initialize() -> void:
@@ -120,6 +122,19 @@ func _frame_color() -> Color:
 
 
 func _run() -> void:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var ready_file: String = ""
+	for arg_index: int in range(args.size() - 1):
+		if args[arg_index] == "--trials":
+			var parsed_trials: String = args[arg_index + 1]
+			if not parsed_trials.is_valid_int() or int(parsed_trials) < DEFAULT_TRIALS \
+					or int(parsed_trials) > MAX_TRIALS:
+				_check(false, "trials must be in [5, 40]")
+				quit(1)
+				return
+			_trials = int(parsed_trials)
+		elif args[arg_index] == "--ready-file":
+			ready_file = args[arg_index + 1]
 	if DisplayServer.get_name() == "headless":
 		_check(false, "native framebuffer required")
 		quit(1)
@@ -137,6 +152,14 @@ func _run() -> void:
 	for unused: int in range(5):
 		await process_frame
 	await RenderingServer.frame_post_draw
+	if not ready_file.is_empty():
+		var ready: FileAccess = FileAccess.open(ready_file, FileAccess.WRITE)
+		_check(ready != null, "write host sampler readiness marker")
+		if ready == null:
+			quit(1)
+			return
+		ready.store_string("ready\n")
+		ready.close()
 
 	var cases: Array[Dictionary] = []
 	var memory_peak: float = 0.0
@@ -145,7 +168,7 @@ func _run() -> void:
 	for size: int in SIZES:
 		var cpu_ms: Array[float] = []
 		var frame_ms: Array[float] = []
-		for trial: int in range(TRIALS):
+		for trial: int in range(_trials):
 			_check(_seed(size), "prepare %d trial %d" % [size, trial])
 			await RenderingServer.frame_post_draw
 			var previous: Color = _frame_color()
@@ -175,12 +198,11 @@ func _run() -> void:
 			vram_peak = maxf(vram_peak, Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED))
 			textures_peak = maxi(textures_peak,
 				RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED))
-		cases.append({"size": size, "pixels": size * size, "trials": TRIALS,
+		cases.append({"size": size, "pixels": size * size, "trials": _trials,
 			"cpu_dispatch": _stats(cpu_ms), "event_to_frame_post_draw": _stats(frame_ms)})
 		print("T068_FILL_FRAME_CASE ", JSON.stringify(cases.back()))
 
 	# Save the successfully filled 96px frame, not the subsequent rejection case.
-	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var output_path: String = ""
 	var screenshot_path: String = ""
 	for arg_index: int in range(args.size() - 1):
@@ -209,6 +231,7 @@ func _run() -> void:
 
 	var result: Dictionary = {"schema": "t068-bucket-frame-v1", "engine": Engine.get_version_info(),
 		"display": DisplayServer.get_name(), "renderer": RenderingServer.get_current_rendering_method(),
+		"configured_trials_per_size": _trials,
 		"cases": cases, "checks": checks, "failures": failures,
 		"sampled_static_memory_peak_bytes": memory_peak,
 		"sampled_render_video_memory_peak_bytes": vram_peak,
