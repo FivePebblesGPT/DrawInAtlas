@@ -68,6 +68,15 @@
   exact indexed file hashes, placement/NULL behavior, and collision/stale-index
   refusal. It does not copy campaign scene/history or authorize nested source
   Save As/export; those remain separate T-064/T-066 responsibilities.
+- T-064 complete saved-project copy:
+  `tests/object_nested_campaign_copy_smoke.gd` (`T064_CAMPAIGN_COPY_PASSED`,
+  **46** headless checks) validates a renamed destination, two portable root
+  generations including recovery pointer, immutable retired Object revisions,
+  deep child links and placements, byte-exact signed sparse Drawing data,
+  isolated clone edits/re-save, source corruption and uncheckpointed Objects
+  rejection, symlink refusal, destination collision and injected partial-copy
+  cleanup. It copies a verified *saved* root through a private staging folder;
+  it is not a UI Save As or a nested-asset deep-copy policy. CI runs it headlessly.
 - T-064 nested Object source-graph safety: `tests/object_child_graph_smoke.gd`
   (`T064_CHILD_GRAPH_PASSED`, 56 checks) verifies real on-disk parent/child
   references, bounded nonrecursive cycle/depth checks, immutable pixel Save,

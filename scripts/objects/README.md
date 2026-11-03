@@ -173,8 +173,9 @@ child drafts remain invisible to parents. Run the focused headless witness:
 godot --headless --path . --script res://tests/object_child_render_smoke.gd
 ```
 
-The nested editor-selection UI, undo/redo and Save As/export graph-copy policy
-are not yet implemented; this is an engineering milestone, not acceptance.
+The nested editor-selection and Undo/Redo paths were implemented in later
+T-064 milestones. The single-source Save As/export graph-copy policy remains
+undecided; none of these engineering tests is owner acceptance.
 
 
 ## Copy a published nested Objects component (T-064)
@@ -195,6 +196,30 @@ Run `godot --headless --path . --script res://tests/object_nested_project_copy_s
 to exercise clone/reload, edits isolated from the original project and
 corrupt/stale collision checks. CI runs the same headless witness.
 
+
+## Complete saved portable campaign copy (T-064 engineering milestone)
+
+`AtlasCampaignStore.copy_portable(source_campaign_path, new_campaign_path)`
+(`AtlasCampaignCopy.copy_portable` for a fault-injection callback) clones an
+**already checkpointed** T-066 bundle into a **new project directory**. The
+parent directory must exist; the destination project folder must not. Source
+and destination paths must be canonical absolute `.scn` filenames, with no
+linked ancestors. It validates the current and backup generations, refuses a
+transitional Objects index newer than the saved root, recursively copies
+`Drawings/`, `Objects/` (including retained old revisions), `Fonts/` and the
+portable root/recovery pointers, retargets the campaign-named Objects index,
+and validates the new project before a single final directory rename. Every
+file is checked against the source digest. Symlinks, component-copy failures,
+source-root changes and destination collisions prevent publication and clean
+up the private staging folder. This copies only the canonical bundle data,
+not unrelated files, unsaved edits or the editor's in-memory history; no
+per-object graph duplication policy is chosen. The destination is a separate,
+editable project and never shares canonical source files with the original.
+
+`godot --headless --path . --script res://tests/object_nested_campaign_copy_smoke.gd`
+runs the 46-check cross-generation, nested references, undo-safe publication,
+backup, failure/corruption and clone-independence witness. This backend API
+is not yet a campaign Save As menu/dialog or owner-approved UX.
 
 ## Nested source NULL repair (T-064 engineering milestone)
 

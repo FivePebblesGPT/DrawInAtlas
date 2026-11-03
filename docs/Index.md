@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-064 complete portable campaign copy (2026-11-03; In Progress):**
+`AtlasCampaignStore.copy_portable` now copies a verified saved campaign to a
+fresh project folder using one staged directory promotion, preserving complete
+sparse Drawing generations, physical chunks, fonts, Object source history,
+child identities and previous-generation recovery. A renamed campaign is
+validated before publication; stale Object indexes, corrupt source roots,
+symlinked components, collisions and injected copy interruption fail closed.
+The dedicated **46/46** fast-CI headless witness proves independent source and
+clone edits. It copies the *saved* project, not unsaved drafts, and does not
+choose the still-owner-dependent nested single-asset Save As/export policy.
+**T-064 remains In Progress** pending that decision and hardware review.
+See [T-064](Tickets/T-064.md).
+
 **T-064 explicit nested NULL repair (2026-11-03; In Progress):**
 A missing/deleted nested Object source can now be rebound to an explicitly
 selected verified source through the existing child inspector, preserving its
