@@ -28,6 +28,8 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertTrue((bridge.BRIDGE / "t068_document_smoke.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_document_batch_adapter.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_document_batch_smoke.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_document_sparse_adapter.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_document_sparse_smoke.gd").is_file())
         self.assertTrue((ROOT / "tools/benchmarks/t068_raster_kernel.cpp").is_file())
         self.assertFalse(list(ROOT.rglob("*.gdextension")),
                          "The experimental native extension must not load at app startup")
@@ -44,6 +46,11 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertIsNone(bridge.DOCUMENT_RE.search("T068_DOCUMENT_FAILED: 1/219"))
         self.assertEqual(bridge.BATCH_RE.search("T068_BATCH_PASSED: 128 checks\n").group(1), "128")
         self.assertIsNone(bridge.BATCH_RE.search("T068_BATCH_FAILED: 1/128"))
+        self.assertEqual(bridge.SPARSE_RE.search(
+            "T068_SPARSE_PASSED: 169 checks\n").group(1), "169")
+        self.assertIsNone(bridge.SPARSE_RE.search("T068_SPARSE_FAILED: 1/169"))
+        self.assertIsNotNone(bridge.SPARSE_TIMING_RE.search(
+            'T068_SPARSE_TIMING: {"32":{"full_median_us":100}}\n'))
         self.assertIsNotNone(bridge.TIMING_RE.search(
             'T068_BRIDGE_TIMING: {"32":{"median_us":8}}\n'))
 
@@ -62,7 +69,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
                                "T068_DOCUMENT_FAIL: stale revision accepted",
                                "T068_DOCUMENT_FAILED: 1/219",
                                "T068_BATCH_FAIL: partial publication",
-                               "T068_BATCH_FAILED: 1/128"):
+                               "T068_BATCH_FAILED: 1/128",
+                               "T068_SPARSE_FAIL: malicious delta",
+                               "T068_SPARSE_FAILED: 1/169"):
                 with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                     bridge.checked_run([sys.executable, "-c",
                                         f"print({diagnostic!r})"], cwd=wd, timeout=10)
@@ -116,6 +125,37 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertIn('"batch_checks": int(batch_match.group(1))', runner)
         self.assertNotIn("addons/drawing/workspace", adapter)
         self.assertNotIn("ImageTexture", adapter)
+
+    def test_sparse_native_delta_wire_is_checked_before_document_publication(self) -> None:
+        cpp = (bridge.BRIDGE / "t068_bridge.cpp").read_text(encoding="utf-8")
+        adapter = (bridge.BRIDGE / "t068_document_sparse_adapter.gd").read_text(encoding="utf-8")
+        witness = (bridge.BRIDGE / "t068_document_sparse_smoke.gd").read_text(encoding="utf-8")
+        for marker in ("draw_batch_deltas_checked", "apply_sparse_checked",
+                       "process_sparse", "put32", "ptrcall_sparse", "call_sparse"):
+            self.assertIn(marker, cpp)
+        for marker in ("NATIVE_DELTA", "source.decode_u32", "allowed.has(index)",
+                       "seen.has(index)", "before == after", "DrawingEditSession._blend",
+                       "request_chunk_at", "edit._stage(", "edit.cancel()", "edit.commit()"):
+            self.assertIn(marker, adapter)
+        for marker in ("ForgedBridge", "CORRUPT_TILE", "MISSING_TILE",
+                       "T068_SPARSE_PASSED", "T068_SPARSE_TIMING", "hidden RGB"):
+            self.assertIn(marker, witness)
+        self.assertNotIn("ImageTexture", adapter)
+        self.assertNotIn("workspace.gd", adapter)
+        self.assertFalse(list(ROOT.rglob("*.gdextension")))
+
+    def test_sparse_runner_is_on_demand_with_fail_closed_evidence(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/godot-native-t068-bridge.yml").read_text(
+            encoding="utf-8")
+        for required in ('"res://sparse_test.gd"', '"sparse_benchmark": sparse_benchmark',
+                         '"sparse_checks": int(sparse_match.group(1))',
+                         "SPARSE_TIMING_RE.search", "Missing or insufficient sparse checks"):
+            self.assertIn(required, source)
+        self.assertIn("workflow_dispatch", workflow)
+        self.assertNotIn("pull_request:", workflow)
+        self.assertNotIn("push:", workflow)
+        self.assertIn("run_bridge.py", workflow)
 
     def test_revision_checks_require_native_renderer_and_isolation(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")

@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 experimental sparse-delta GDExtension publication (2026-11-04; In Progress):**
+The opt-in checked C++ bridge can return a length-prefixed sequence of
+(index, exact-before, exact-after) pixel records rather than an entire RGBA8
+output tile. A separate adapter validates records against the SHA-verified
+source, declared operation, eligible points/mask and uniqueness before it
+stages one canonical DrawingDocument history transaction across up to 16 tiles.
+The isolated native witness checks whole-output parity, malformed-response
+rejection, signed-64-bit bounds, lazy tile recovery and Undo/Redo, including
+synthetic sparse-vs-full staging timings and return-byte counts. The bridge is
+**manual-only**, with fast-CI runner contracts; it is not installed in the
+application, and no physical speedup/backend approval is claimed. T-068
+remains In Progress. See [T-068](Tickets/T-068.md) and the
+[benchmark report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 atomic multi-tile native publication witness (2026-11-03; In Progress):**
 An isolated checked C++ GDExtension now stages multiple verified native tile
 outputs into **one** canonical DrawingDocument gesture, preserving one Undo/Redo

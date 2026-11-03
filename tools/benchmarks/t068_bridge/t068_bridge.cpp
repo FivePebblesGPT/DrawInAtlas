@@ -11,6 +11,10 @@
 struct DrawDelta {
     uint32_t index, before, after;
 };
+extern "C" int32_t draw_batch_deltas_checked(const uint8_t*, uint64_t,
+    int32_t, int32_t, const int32_t*, uint64_t, int32_t,
+    uint32_t, int32_t, const uint8_t*, uint64_t,
+    DrawDelta*, uint64_t, int32_t);
 extern "C" int32_t draw_batch_checked(const uint8_t*, uint64_t,
     uint8_t*, uint64_t, int32_t, int32_t, const int32_t*, uint64_t,
     int32_t, uint32_t, int32_t, const uint8_t*, uint64_t,
@@ -103,6 +107,63 @@ void process(const void* source, const void* points, const void* mask,
     }
 }
 
+// Sparse wire format: little-endian u32 count followed by count packed
+// (pixel_index, before_rgba, after_rgba) u32 triples. A four-byte zero count
+// means a valid no-op; an empty result means rejection. Never publish an
+// incomplete or partially filled result across the extension boundary.
+void process_sparse(const void* source, const void* points, const void* mask,
+                    int64_t width, int64_t height, int64_t rgba, int64_t operation,
+                    void* result) {
+    byte_constructor(result, nullptr);
+    try {
+        if (width <= 0 || height <= 0 || width > 2048 || height > 2048 ||
+            operation < 0 || operation > 2 || rgba < 0 || uint64_t(rgba) > UINT32_MAX)
+            return;
+        const int64_t pixels = width * height;
+        const int64_t source_len = packed_size(source, byte_size);
+        const int64_t point_len = packed_size(points, int_size);
+        const int64_t mask_len = packed_size(mask, byte_size);
+        if (source_len != pixels * 4 || point_len < 0 || point_len % 2 != 0 ||
+            point_len / 2 > 1048576 || (mask_len != 0 && mask_len != pixels)) return;
+        const auto* input = byte_at(source, 0);
+        const auto* coords = point_len != 0 ? int_at(points, 0) : nullptr;
+        const auto* eligibility = mask_len != 0 ? byte_at(mask, 0) : nullptr;
+        const int32_t count = int32_t(point_len / 2);
+        const int32_t capacity = int32_t(std::min<int64_t>(count, pixels));
+        std::vector<DrawDelta> deltas(static_cast<size_t>(capacity), DrawDelta{});
+        const int32_t changed = draw_batch_deltas_checked(
+            input, uint64_t(source_len), int32_t(width), int32_t(height),
+            coords, uint64_t(point_len * sizeof(int32_t)), count,
+            uint32_t(rgba), int32_t(operation), eligibility, uint64_t(mask_len),
+            deltas.empty() ? nullptr : deltas.data(),
+            uint64_t(deltas.size() * sizeof(DrawDelta)), capacity);
+        if (changed < 0) return;
+        const int64_t bytes = 4 + int64_t(changed) * 12;
+        const void* args[] = {&bytes};
+        int64_t resize_result = -1;
+        byte_resize(result, args, &resize_result, 1);
+        if (resize_result != 0) return;
+        uint8_t* output = byte_at_mutable(result, 0);
+        auto put32 = [output](size_t offset, uint32_t value) {
+            for (unsigned c = 0; c < 4; ++c)
+                output[offset + c] = uint8_t(value >> (c * 8U));
+        };
+        put32(0, uint32_t(changed));
+        for (int32_t i = 0; i < changed; ++i) {
+            const DrawDelta& delta = deltas[size_t(i)];
+            const size_t offset = 4 + size_t(i) * 12;
+            put32(offset, delta.index);
+            put32(offset + 4, delta.before);
+            put32(offset + 8, delta.after);
+        }
+    } catch (...) {
+        const int64_t zero = 0;
+        const void* args[] = {&zero};
+        int64_t ignored = -1;
+        byte_resize(result, args, &ignored, 1);
+    }
+}
+
 void ptrcall(void*, GDExtensionClassInstancePtr,
              const GDExtensionConstTypePtr* args, GDExtensionTypePtr result) {
     process(args[0], args[1], args[2],
@@ -110,9 +171,17 @@ void ptrcall(void*, GDExtensionClassInstancePtr,
         *static_cast<const int64_t*>(args[5]), *static_cast<const int64_t*>(args[6]), result);
 }
 
-void call(void*, GDExtensionClassInstancePtr,
+void ptrcall_sparse(void*, GDExtensionClassInstancePtr,
+                    const GDExtensionConstTypePtr* args, GDExtensionTypePtr result) {
+    process_sparse(args[0], args[1], args[2],
+        *static_cast<const int64_t*>(args[3]), *static_cast<const int64_t*>(args[4]),
+        *static_cast<const int64_t*>(args[5]), *static_cast<const int64_t*>(args[6]), result);
+}
+
+void call_impl(void*, GDExtensionClassInstancePtr,
           const GDExtensionConstVariantPtr* args, GDExtensionInt argc,
-          GDExtensionVariantPtr result, GDExtensionCallError* error) {
+          GDExtensionVariantPtr result, GDExtensionCallError* error,
+               bool sparse) {
     error->error = GDEXTENSION_CALL_OK;
     if (argc != 7) {
         error->error = argc < 7 ? GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS :
@@ -143,12 +212,27 @@ void call(void*, GDExtensionClassInstancePtr,
     int64_t integers[4]{};
     for (int i = 0; i < 4; ++i)
         integer_from_variant(&integers[i], const_cast<void*>(args[i + 3]));
-    process(src, coords, mask, integers[0], integers[1], integers[2], integers[3], output);
+    if (sparse)
+        process_sparse(src, coords, mask, integers[0], integers[1], integers[2], integers[3], output);
+    else
+        process(src, coords, mask, integers[0], integers[1], integers[2], integers[3], output);
     variant_from_bytes(result, output);
     byte_destructor(output);
     byte_destructor(mask);
     int_destructor(coords);
     byte_destructor(src);
+}
+
+void call(void* userdata, GDExtensionClassInstancePtr instance,
+          const GDExtensionConstVariantPtr* args, GDExtensionInt argc,
+          GDExtensionVariantPtr result, GDExtensionCallError* error) {
+    call_impl(userdata, instance, args, argc, result, error, false);
+}
+
+void call_sparse(void* userdata, GDExtensionClassInstancePtr instance,
+                 const GDExtensionConstVariantPtr* args, GDExtensionInt argc,
+                 GDExtensionVariantPtr result, GDExtensionCallError* error) {
+    call_impl(userdata, instance, args, argc, result, error, true);
 }
 
 GDExtensionObjectPtr create_instance(void*, GDExtensionBool) {
@@ -223,6 +307,11 @@ void initialize(void*, GDExtensionInitializationLevel level) {
     method.arguments_info = args;
     GDExtensionClassMethodArgumentMetadata metadata[7]{};
     method.arguments_metadata = metadata;
+    register_method(library, class_name, &method);
+    Name sparse_name("apply_sparse_checked");
+    method.name = sparse_name.data();
+    method.call_func = call_sparse;
+    method.ptrcall_func = ptrcall_sparse;
     register_method(library, class_name, &method);
     if (auto destroy = get_destructor(GDEXTENSION_VARIANT_TYPE_STRING))
         destroy(empty_string);

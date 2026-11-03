@@ -24,6 +24,8 @@ TIMING_RE = re.compile(r"^T068_BRIDGE_TIMING: (.+)$", re.MULTILINE)
 REVISION_RE = re.compile(r"^T068_REVISION_PASSED: (\d+) checks$", re.MULTILINE)
 DOCUMENT_RE = re.compile(r"^T068_DOCUMENT_PASSED: (\d+) checks$", re.MULTILINE)
 BATCH_RE = re.compile(r"^T068_BATCH_PASSED: (\d+) checks$", re.MULTILINE)
+SPARSE_RE = re.compile(r"^T068_SPARSE_PASSED: (\d+) checks$", re.MULTILINE)
+SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
 CANONICAL_SCRIPTS = (
     "document", "edit_session", "signed_tiles", "layer_node", "raster_tile",
     "result", "delta", "dirty_region", "selection", "history_context",
@@ -40,7 +42,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -108,6 +110,8 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_document_smoke.gd", project / "document_test.gd")
         shutil.copyfile(BRIDGE / "t068_document_batch_adapter.gd", project / "batch_adapter.gd")
         shutil.copyfile(BRIDGE / "t068_document_batch_smoke.gd", project / "batch_test.gd")
+        shutil.copyfile(BRIDGE / "t068_document_sparse_adapter.gd", project / "sparse_adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_document_sparse_smoke.gd", project / "sparse_test.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -144,7 +148,18 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             batch_match = BATCH_RE.search(batch_output)
             if batch_match is None or int(batch_match.group(1)) != 128:
                 raise RuntimeError(f"Missing or insufficient multi-tile checks:\n{batch_output[-4000:]}")
-            observations.append({"checks": count, "revision_checks": int(revision_match.group(1)),
+            sparse_output = checked_run([godot, "--headless", "--path", str(project),
+                                         "--audio-driver", "Dummy", "--script",
+                                         "res://sparse_test.gd"], cwd=project, timeout=120)
+            sparse_match = SPARSE_RE.search(sparse_output)
+            sparse_timing = SPARSE_TIMING_RE.search(sparse_output)
+            if sparse_match is None or int(sparse_match.group(1)) < 160 or sparse_timing is None:
+                raise RuntimeError(f"Missing or insufficient sparse checks/timing:\n{sparse_output[-4000:]}")
+            sparse_benchmark = json.loads(sparse_timing.group(1))
+            if any(str(side) not in sparse_benchmark for side in (32, 64, 128)):
+                raise RuntimeError("Sparse benchmark omitted a test size")
+            observations.append({"checks": count, "sparse_checks": int(sparse_match.group(1)),
+                                 "sparse_benchmark": sparse_benchmark, "revision_checks": int(revision_match.group(1)),
                                  "document_checks": int(document_match.group(1)),
                                  "batch_checks": int(batch_match.group(1)),
                                  "bridge_latency_us": json.loads(timing.group(1))})
@@ -155,7 +170,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             "measurements": observations,
             "limitations": [
                 "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
-                "Multi-tile batches stage full tiles in GDScript and commit once; timings do not measure or establish multi-tile speedup",
+                "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
                 "Temporary binary is not bundled in the repository or loaded at normal startup",
@@ -181,6 +196,7 @@ def main() -> None:
     print("Revision-guarded publication adapter:", ", ".join(str(item["revision_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Canonical DrawingDocument transactions:", ", ".join(str(item["document_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
 
 

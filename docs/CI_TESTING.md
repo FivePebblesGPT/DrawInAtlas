@@ -354,3 +354,18 @@ production backend adoption or a partial GPU upload. The workflow explicitly ins
 produces JSON benchmark evidence. It deliberately does not run in push/PR CI, does not
 install a native binary in either app, and does not imply editor-load or
 physical-device acceptance. See [T-068](Tickets/T-068.md).
+
+
+### T-068 isolated sparse-delta GDExtension witness (2026-11-04)
+
+The workflow-dispatch-only `godot-native-t068-bridge.yml` also runs a checked
+sparse-native-output / atomic canonical-document witness after the existing
+whole-tile integration checks. It compares exact RGBA8, dirty regions and
+Undo/Redo, rejects malformed/forged native pixel records and invalid masks,
+and records **five alternate-order full-vs-sparse synthetic staging samples**
+for each 32/64/128 tile size. `tests/test_t068_bridge_runner.py` adds
+non-native contract checks to the **existing** push-CI T-068 step; the native
+binary, framebuffer tests and benchmark stay outside fast push/PR CI. No
+`.gdextension` is installed in the shipping projects. A returned dirty
+rectangle does not imply GPU subrectangle upload, and these samples are
+not physical or production UI latency measurements. T-068 remains In Progress.

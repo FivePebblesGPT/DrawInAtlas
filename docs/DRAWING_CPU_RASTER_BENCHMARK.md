@@ -671,3 +671,44 @@ independent check counts. No comparative multi-tile runtime measurements
 were taken, so this test **cannot** justify a backend speedup. It does not
 load in production Drawing/Atlas or remove the documented external CPU
 comparators, Windows builds, physical-hardware and final selection gates.
+
+
+## Experimental sparse-delta C++ to Godot publication (2026-11-04)
+
+The optional T-068 GDExtension test bridge now returns changed-pixel records
+instead of cloning an entire RGBA8 tile over the return boundary. Wire bytes
+are **4 + 12 × changed pixels** (u32 count, then u32 index/before/after) versus
+**4 × tile stride²** returned by the earlier full-tile path; both paths still
+send the **entire original tile into native code**. For a one-pixel change,
+that is 16 bytes returned versus 4,096 / 16,384 / 65,536 bytes for 32/64/128
+pixel tiles, respectively. The GDScript adapter performs independent before/
+after and mask validation before calling the canonical `DrawingEditSession`;
+its transient native metadata, point-set dictionaries, lazy-source reads and
+canonical Undo deltas have not been measured as isolated allocation costs.
+
+The manual-only `tools/benchmarks/t068_bridge/run_bridge.py` runs five
+alternating full/sparse single-pixel edit-and-commit samples per tile size,
+plus seeded multi-tile pixel/history parity and native error-atomicity tests.
+Raw per-run latency data is in
+[`T068_2026-11-04_gdextension_sparse.json`](benchmarks/T068_2026-11-04_gdextension_sparse.json).
+These synthetic sequential samples compare prototype integration strategies,
+**not native raster versus production GDScript tools**; CPU dispatch,
+full source copy, frame upload, real input and Windows/Linux hardware remain
+unmeasured. The default backend remains pure Godot, and T-068 is In Progress.
+
+The two five-sample medians below are **isolated prototype edit+commit timings**,
+not a controlled production benchmark; loop ordering alternates across samples.
+
+| Tile | Full-output run 1 / run 2 | Sparse-delta run 1 / run 2 | Return bytes, full → sparse |
+|---:|---:|---:|---:|
+| 32² | 3,293 / 3,134 μs | 60 / 57 μs | 4,096 → 16 |
+| 64² | 13,137 / 12,252 μs | 74 / 68 μs | 16,384 → 16 |
+| 128² | 50,695 / 51,177 μs | 111 / 109 μs | 65,536 → 16 |
+
+The strong microbenchmark difference primarily reflects the previous
+`apply_region()` path scanning **all tile pixels**, whereas the sparse path
+stages just the one changed pixel. It does **not** measure brush coverage
+computation, file I/O, GPU upload, pointer dispatch, memory peaks or the
+performance of the production raster engine. The 16-byte record format
+omits Python/Godot container allocation overhead and the full source buffer
+still passed *into* native code. Retain pure-Godot as the shipped fallback.
