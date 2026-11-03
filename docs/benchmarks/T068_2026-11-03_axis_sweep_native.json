@@ -1,0 +1,79 @@
+{
+  "ticket": "T-068",
+  "source": "Godot 4.8 beta 2 synthetic native Xvfb/Mesa software framebuffer",
+  "test": "tests/drawing_latency_stress_visual.gd",
+  "checks": 80,
+  "failures": 0,
+  "cases": [
+    {
+      "cpu_dispatch": {
+        "median_ms": 0.805,
+        "p95_ms": 1.158
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 11.134,
+        "p95_ms": 14.291
+      },
+      "name": "dab_4px",
+      "synthetic_gestures": 5,
+      "world_width": 4.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 10.754,
+        "p95_ms": 11.207
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 27.348,
+        "p95_ms": 30.01
+      },
+      "name": "dab_32px",
+      "synthetic_gestures": 5,
+      "world_width": 32.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 42.531,
+        "p95_ms": 44.766
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 60.942,
+        "p95_ms": 72.749
+      },
+      "name": "dab_64px",
+      "synthetic_gestures": 5,
+      "world_width": 64.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 3.803,
+        "p95_ms": 4.064
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 22.69,
+        "p95_ms": 24.87
+      },
+      "name": "long_4px",
+      "synthetic_gestures": 5,
+      "world_width": 4.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 3.469,
+        "p95_ms": 3.73
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 20.545,
+        "p95_ms": 24.338
+      },
+      "name": "cross_4px",
+      "synthetic_gestures": 5,
+      "world_width": 4.0
+    }
+  ],
+  "limitations": [
+    "post-change diagnostic, no matched baseline",
+    "five synthetic gestures per case",
+    "frame_post_draw is not physical display scan-out"
+  ]
+}

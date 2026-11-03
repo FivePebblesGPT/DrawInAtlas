@@ -304,6 +304,9 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_dab_geometry_smoke.gd 2>&1 | tee /tmp/godot-t068-dab.log
           grep -q 'T068_DAB_PASSED' /tmp/godot-t068-dab.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_DAB_FAILED:' /tmp/godot-t068-dab.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_axis_sweep_smoke.gd 2>&1 | tee /tmp/godot-t068-axis-sweep.log
+          grep -q 'T068_AXIS_SWEEP_PASSED' /tmp/godot-t068-axis-sweep.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_AXIS_SWEEP_FAILED:' /tmp/godot-t068-axis-sweep.log; then exit 1; fi
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_edit_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-tile-cache.log
           grep -q 'T068_TILE_CACHE_PASSED' /tmp/godot-t068-tile-cache.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_TILE_CACHE_FAILED:' /tmp/godot-t068-tile-cache.log; then exit 1; fi

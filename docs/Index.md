@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 axis-aligned hard-brush sweep geometry (2026-11-03; In Progress):**
+The canonical Drawing hard brush now handles exactly horizontal and vertical
+nonstationary sweeps with bounded scalar squared-distance tests, preserving
+its original row-major candidate order, once-covered blending, masks and
+atomic gesture publication. All oblique sweeps continue through Godot's
+`Geometry2D` oracle. The new **239-check** fast-CI witness includes original
+Geometry2D pixel/RGBA8 parity, signed anchors beyond 2^53, masks, history,
+and 320 deterministic randomized geometry cases. A seven-sample isolated
+edit+commit benchmark shows **mixed** single-run timings, not a demonstrated
+end-to-end speedup. No native backend adoption or physical device results
+are implied; [T-068](Tickets/T-068.md) remains **In Progress**.
+
+
 **T-064 duplicate linked nested child placements (2026-11-03; In Progress):**
 The nested Object inspector now offers **Duplicate selected** (Ctrl+Alt+D).
 It inserts a new linked child directly above the selected sibling with a

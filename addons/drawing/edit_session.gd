@@ -193,8 +193,12 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
 			selection, max_candidates, depth + 1)
-	# A stationary dab has no segment projection. Avoid a native geometry call
-	# per candidate while retaining the same closed-circle coverage threshold.
+	# A stationary dab has no segment projection. Axis-aligned segments can
+	# compute squared distance without a Geometry2D call per candidate. Keep
+	# the original native geometry oracle for all oblique sweeps.
+	if start != finish and (start.x == finish.x or start.y == finish.y):
+		return _paint_axis_segment(start, finish, left, top, right, bottom,
+			radius * radius, rgba, erase, selection)
 	var stationary: bool = start == finish
 	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
@@ -207,6 +211,44 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 				selection, true, not erase)
 			if not result.ok:
 				return result
+	return DrawingResult.success()
+
+
+func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
+		right: int, bottom: int, radius_squared: float, rgba: int, erase: bool,
+		selection: DrawingSelection) -> DrawingResult:
+	if start.y == finish.y:
+		var min_x: float = minf(start.x, finish.x)
+		var max_x: float = maxf(start.x, finish.x)
+		for y: int in range(top, bottom):
+			var dy: float = (y + 0.5) - start.y
+			var dy_squared: float = dy * dy
+			if dy_squared > radius_squared:
+				continue
+			for x: int in range(left, right):
+				var center_x: float = x + 0.5
+				var dx: float = center_x - clampf(center_x, min_x, max_x)
+				if dx * dx + dy_squared > radius_squared:
+					continue
+				var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+					selection, true, not erase)
+				if not result.ok:
+					return result
+	else:
+		var min_y: float = minf(start.y, finish.y)
+		var max_y: float = maxf(start.y, finish.y)
+		for y: int in range(top, bottom):
+			var center_y: float = y + 0.5
+			var dy: float = center_y - clampf(center_y, min_y, max_y)
+			var dy_squared: float = dy * dy
+			for x: int in range(left, right):
+				var dx: float = (x + 0.5) - start.x
+				if dx * dx + dy_squared > radius_squared:
+					continue
+				var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+					selection, true, not erase)
+				if not result.ok:
+					return result
 	return DrawingResult.success()
 
 

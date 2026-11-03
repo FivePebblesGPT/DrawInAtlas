@@ -8,6 +8,15 @@
 - T-051–053 isolated Drawing contract, core, standalone consumer and Linux desktop release package.
 - Main project import before GDScript tests: T-015 marker-only authoring and archived-data boundary (13/23), link/history and link form (29/55), overview (67), stale-result (27), hierarchy (44), Organization UI (84) and reference controls (17), all on the modern marker model; T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
 - T-068 safe stationary round-dab CPU shortcut: `tests/drawing_dab_geometry_smoke.gd` compares its pixels against the **original** Godot `Geometry2D` segment oracle at fractional/negative positions, tile seams and 64-bit signed anchors, including undo/redo, no-op alpha and hidden RGB (125 assertions). The large raster benchmark and 25-gesture native stress run are **targeted**, not push-gating.
+- T-068 bounded axis-aligned swept hard-brush shortcut:
+  `tests/drawing_axis_sweep_smoke.gd` (**239** assertions) compares precise
+  touched-pixel dictionaries, RGBA8 values, masks, once-per-gesture coverage,
+  undo/redo and 320 seeded axis geometry cases against independent Godot
+  `Geometry2D` closest-segment results. It runs in the existing T-068 fast-CI
+  step, not a new native test or CI job. The seven-sample headless
+  `drawing_axis_sweep_benchmark.gd` is **diagnostic only**, not a push gate or
+  physical input-to-visible timing claim.
+
 - T-073 feature inventory and T-063 workspace documentation assertions.
 - T-065 partial portable Object source discovery, identity/path/hash safety, search and real dock/Object Editor tab coupling (`drawing/tests/asset_browser_smoke.gd`, 37 checks). Bounded source thumbnails (`drawing/tests/asset_browser_thumbnails_smoke.gd`, 62 checks) are generated from canonical Drawing pixels, requested only for visible rows, and cached in a 24-image digest-keyed LRU. Changed/source-replaced files invalidate previews after successful publication or explicit Refresh; stale bytes fail closed. Explicit standalone portable `*.drawing` Import/Export file copies
   (`drawing/tests/asset_browser_transfer_smoke.gd`, 29 checks) reject stable-ID

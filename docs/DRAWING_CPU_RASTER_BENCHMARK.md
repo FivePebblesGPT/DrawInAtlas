@@ -270,3 +270,47 @@ checks, with its [raw result](benchmarks/T068_2026-11-03_publication_native.json
 Because no fresh native baseline was run for this change, the numbers are
 **not** claimed as a native speedup. Windows and actual presentation latency
 remain unmeasured.
+
+
+## 2026-11-03: horizontal/vertical swept brush geometry (T-068)
+
+`DrawingEditSession._paint_segment` now uses a bounded squared-distance test
+for exact axis-aligned, nonstationary swept hard brushes. Horizontal/vertical
+paths stay in the original **row-major** candidate traversal; any angled sweep
+continues to call the existing Godot `Geometry2D` oracle. The existing
+stationary-dab path is unchanged. Mask gating, source-pixel blending, once-per-
+gesture coverage, detached previews, cancellation, undo/redo, signed anchors
+and transaction publication are also unchanged. No native dependency is added.
+
+The fast-CI `tests/drawing_axis_sweep_smoke.gd` passes **239/239** checks
+on Godot 4.8 beta 2: independent original-`Geometry2D` touched-pixel and
+straight-RGBA8 comparison, fractional/reversed endpoints, radii 1–15,
+64-bit signed anchors beyond 2^53, selection masks, retries and Undo/Redo.
+An additional 320 seeded randomized axis segments compare over 20,000
+candidate pixel classifications with `Geometry2D`, with no mismatches.
+
+Seven samples per test case on fresh blank documents, measuring only
+`paint_path` **plus** `commit` (no UI, frame, disk, or GPU) produced:
+
+| Synthetic sweep (16 px, 256 tile) | Original median/p95 ms | Shortcut median/p95 ms | Exact changed pixels |
+|---|---:|---:|---:|
+| Horizontal | 33.803 / 37.963 | 33.041 / 36.521 | 3,604 |
+| Vertical | 32.442 / 34.253 | 34.126 / 35.606 | 3,604 |
+| Oblique control (unchanged path) | 31.407 / 33.308 | 31.964 / 37.551 | 3,432 |
+
+Raw samples and execution notes: [`benchmarks/T068_2026-11-03_axis_sweep_ab.json`](benchmarks/T068_2026-11-03_axis_sweep_ab.json). The comparison is *not* randomized or
+interleaved and has no confidence interval. The vertical median regressed;
+the optimization therefore **does not establish a reliable end-to-end speedup**.
+The per-pixel stage/history overhead still dominates this small scenario.
+This work is a correctness-guarded, dependency-free baseline rather than a
+reason to select or exclude a native backend. T-068 remains **In Progress**;
+third-party library comparisons, optional Godot native binary integration,
+Windows/Linux hardware measurements, RSS/VRAM and jitter evidence remain open.
+
+
+A separate **post-change-only** targeted Xvfb/Mesa software-framebuffer
+stress run passed **80/80** checks across 25 synthetic gestures, with dummy
+audio and no resource errors. The 4px-long-path CPU dispatch median was
+3.931 ms and `frame_post_draw` median was 20.317 ms (five samples); there is
+**no matched baseline**, so neither is attributable to the axis shortcut.
+[Raw stress data](benchmarks/T068_2026-11-03_axis_sweep_native.json).
