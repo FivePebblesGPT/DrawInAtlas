@@ -6,6 +6,8 @@
 
 ## Kanban summary
 
+**T-065 portable Asset Browser milestone (2026-11-03; still In Progress):** the shared Drawing workspace can now attach an `asset_browser` dock peer via Window → Asset Browser… or a host-provided portable `Objects/` root. A bounded read-only source scan, name/ID filtering, stale-file and duplicate-identity rejection, and explicit Edit Source into an Object Editor tab are covered by 37 headless and 18 native checks. The complete Atlas placement/drop, thumbnail, NULL deletion/repair and owner UX scope remains unfinished. The original owner keyboard/pointer acceptance is tracked as a manual gate; no approval was inferred. See [T-065](Tickets/T-065.md) and [standalone usage](../drawing/README.md).
+
 **T-068 publication-cache follow-up (2026-11-03; still In Progress):**
 `DrawingDocument` now resolves the immutable source tile once per touched
 tile while validating an atomic pixel publication. A new 30-check push-CI
@@ -24,7 +26,7 @@ third-party native backend or hardware gate was satisfied. See
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 11 | 2 | 10 | 4 | 55 | 1 | 83 |
+| 10 | 3 | 10 | 4 | 55 | 1 | 83 |
 
 **T-078–T-083 agreed docking sequence (2026-11-03):** The right icon rail remains panel-level, with separators only between tabbed groups. **T-078 Done** (82 model assertions) supplies unique stable-ID ownership, **T-079 Done** (40 native assertions) supplies collapsible groups, icon rail and in-app flyouts, and **T-080 Done** (60 model and 68 native assertions) adds transactional tab/group drag, visible insertion/merge hints, exact Esc/focus-loss/invalid-drop rollback, scrollable tab strips and keyboard arrangement controls. **T-081 Done** (64 model, 55 native checks) supplies real Control-based movable/resizable floating hosts, tab/group reordering, ownership transfer, hide/Window recovery and viewport clamping. **T-082 Done** (62 model and 56 native checks) delivers cross-container panel/group pointer docking, ordered redock, empty-canvas detach, robust invalid/focus-loss cancellations and accessible transfer commands. **T-083 Manual Review** after versioned persistence/recovery engineering (46 headless, 63 native; 65 with screenshots), with **explicit owner UX approval still mandatory**. Docking settings now save and restore, and earlier T-059/T-056 UX gates remain open. See [docking specification](DRAWING_DOCKING_SPEC.md), [T-080](Tickets/T-080.md) and [T-083](Tickets/T-083.md).
 
@@ -52,7 +54,7 @@ third-party native backend or hardware gate was satisfied. See
 
 **T-066 completed (2026-11-02):** [portable generation-based sparse campaign saving](DRAWING_STORAGE_CONTRACT.md) now durably publishes the single Atlas root pointer after verifying checked manifests, compressed tiles, Object Assets, licensed fonts and recovery roots. The real editor saves and reopens Drawing documents. T-067 subsequently completed its geometry/packing benchmark; adoption of its recommended default/pack layout is separate work. T-056/T-059 owner UX gates remain open.
 
-**T-055 completed (2026-11-02):** [Atlas canvas composition, linked Objects, input precedence and read-only previews](DRAWING_ATLAS_COMPOSITION.md) use the one canonical Drawing package with 89 headless and 13 native display checks. T-056 is now **Ready** for separate engineering/release/owner verification; its manual-review approval remains pending. T-066 subsequently implemented the versioned multi-file save.
+**T-055 completed (2026-11-02):** [Atlas canvas composition, linked Objects, input precedence and read-only previews](DRAWING_ATLAS_COMPOSITION.md) use the one canonical Drawing package with 89 headless and 18 native display checks. T-056 is now **Ready** for separate engineering/release/owner verification; its manual-review approval remains pending. T-066 subsequently implemented the versioned multi-file save.
 
 **T-061 completed (2026-11-02):** [Atlas floor/detail Drawing registry and shared signed world mapping](DRAWING_WORLD_MAPPING.md) now prove per-detail stable IDs, sparse blank D-levels, explicit pixel densities, 64-bit viewport anchors, Object Instance detail scoping and grid/entrance overlay continuity. **T-055 subsequently completed** main-canvas composition. T-061 does not claim that composition or T-066’s multi-file atomic save.
 
@@ -132,7 +134,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
 | [T-063 · Compact Drawing UI and BarDivider overflow](Tickets/T-063.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Ready | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
-| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
+| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | In Progress | **Owner** | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Done | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
 | [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Done | — | [T-051](Tickets/T-051.md) |
 | [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | — | [T-052](Tickets/T-052.md) |

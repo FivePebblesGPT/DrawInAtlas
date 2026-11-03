@@ -86,7 +86,10 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
         self.assertIn('status: "Done"', TICKET)
         self.assertIn('manual_review: false', TICKET)
         self.assertIn('depends_on: ["[[T-053]]"]', TICKET)
-        self.assertIn('status: "Ready"', (ROOT / "docs/Tickets/T-065.md").read_text(encoding="utf-8"))
+        browser_ticket = (ROOT / "docs/Tickets/T-065.md").read_text(encoding="utf-8")
+        self.assertIn('status: "In Progress"', browser_ticket)
+        self.assertIn('manual_review: true', browser_ticket)
+        self.assertNotIn('status: "Done"', browser_ticket)
         self.assertIn('status: "Ready"', (ROOT / "docs/Tickets/T-059.md").read_text(encoding="utf-8"))
         self.assertIn('status: "Ready"', (ROOT / "docs/Tickets/T-056.md").read_text(encoding="utf-8"))
 

@@ -8,6 +8,7 @@ const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd"
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
+const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -18,6 +19,10 @@ var layout_persistence_enabled: bool = true
 ## Peers registered before entering the tree participate in restore and recovery.
 ## The future Asset Browser can use this without this shell depending on it.
 var initial_extra_panels: Dictionary = {} # Stable id -> Control
+## Host-provided portable root is registered before dock settings recovery.
+var initial_asset_browser_root: String = ""
+var asset_browser: DrawingAssetBrowserPanel
+var asset_browser_directory_dialog: FileDialog
 var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered new ID
 var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
 var layout_recovery_status: String = "defaults" # defaults / loaded / repaired / invalid
@@ -109,6 +114,8 @@ const ROW_PAGE: int = 200
 
 func _ready() -> void:
 	_build_interface()
+	if not initial_asset_browser_root.is_empty():
+		show_asset_browser(initial_asset_browser_root)
 	_restore_workspace_layout()
 	if start_blank_document:
 		new_drawing()
@@ -146,13 +153,14 @@ func _build_interface() -> void:
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
 		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W",
-		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout"],
+		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout",
+		"Asset Browser…"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
 		Callable(self, "_cycle_tab").bind(-1), Callable(self, "_ask_rename_object"),
 		Callable(self, "_ask_save"), Callable(self, "_request_close_current"),
 		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts"),
-		Callable(self, "reset_workspace_layout")])
+		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")])
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
@@ -334,6 +342,11 @@ func _build_interface() -> void:
 	save_dialog.canceled.connect(_cancel_pending_close)
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	object_open_dialog.file_selected.connect(_open_object_file)
+	asset_browser_directory_dialog = FileDialog.new()
+	asset_browser_directory_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	asset_browser_directory_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	asset_browser_directory_dialog.dir_selected.connect(show_asset_browser)
+	add_child(asset_browser_directory_dialog)
 	close_dialog = ConfirmationDialog.new()
 	close_dialog.title = "Unsaved Object/Drawing changes"
 	close_dialog.dialog_text = "Save changes before closing this tab?"
@@ -1324,6 +1337,30 @@ func new_object() -> void:
 	tabs[active_tab]["layer"] = layer.value
 	canvas.layer_id = String(layer.value)
 	_update_status()
+
+
+func _ask_asset_browser() -> void:
+	asset_browser_directory_dialog.popup_centered_ratio(0.7)
+
+
+## The Asset Browser becomes an ordinary T-078 dock-owned panel. A project
+## chooses its Objects/ folder explicitly; we never guess an Atlas campaign.
+func show_asset_browser(objects_root: String) -> bool:
+	if asset_browser == null:
+		asset_browser = ASSET_BROWSER_SCRIPT.new() as DrawingAssetBrowserPanel
+		asset_browser.open_requested.connect(_open_object_file)
+		if not dock_layout.register_panel("asset_browser") or \
+				not dock_layout.attach_panel("asset_browser", "right", "asset_browser"):
+			asset_browser.queue_free()
+			asset_browser = null
+			return false
+		dock_views["asset_browser"] = asset_browser
+		dock_stash.add_child(asset_browser)
+	var result: DrawingResult = asset_browser.set_objects_root(objects_root)
+	_render_dock()
+	if not result.ok:
+		_show_error(result.message)
+	return result.ok
 
 
 func _ask_open_object() -> void:

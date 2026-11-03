@@ -298,6 +298,16 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_persistence_smoke.gd 2>&1 | tee /tmp/godot-dock-persistence.log
           grep -q 'T083_MODEL_PASSED' /tmp/godot-dock-persistence.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T083_MODEL_FAILED:' /tmp/godot-dock-persistence.log; then exit 1; fi
+      - name: Verify T-065 portable Object Asset Browser and dock integration
+        id: ci_t065_asset_browser_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_smoke.gd 2>&1 | tee /tmp/godot-t065-browser.log
+          grep -q 'T065_ASSET_BROWSER_PASSED' /tmp/godot-t065-browser.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ASSET_BROWSER_FAILED:' /tmp/godot-t065-browser.log; then exit 1; fi
       - name: Summarize CI failures
         if: ${{ !cancelled() }}
         env:

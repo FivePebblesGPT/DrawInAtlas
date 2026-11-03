@@ -150,8 +150,24 @@ selection through `AtlasObjectEditorBridge`; ordinary source Save refreshes
 all linked placements and instance-launched Save As publishes B and rebinds
 only the origin, with one Atlas history command. Undo retains the saved B.
 
-Atlas main-canvas `Edit Source` menu, object placement/Asset Browser and
-campaign-wide atomic save remain T-055/T-065/T-066, respectively. The
+**Asset Browser (T-065 engineering preview):** Choose **Window → Asset Browser…**
+and select an existing absolute `Objects/` directory from a portable project.
+The resulting panel is a normal, movable/collapsible dock peer of Colors,
+Layers and History. It searches source *names* and stable *IDs*, lists loose
+`Objects/*.drawing` and the newest `Objects/<id>/vNNNNNN.drawing`, and opens
+selected sources in an independent Object Editor tab via **Edit Source**.
+The source path appears as a tooltip; **Refresh** rechecks the folder. A
+host embedding this workspace may set `initial_asset_browser_root` before
+`add_child()` so the panel is registered before the T-083 layout restore.
+The browser currently indexes source metadata on explicit refresh, and is not
+yet a lazy-thumbnail or campaign-placement UI. Do not use source names as IDs
+or take its list as authorization to delete unused variants. Atlas placement
+and NULL repair/delete policy are still T-065 work; no automatic asset
+relinking, deletion or publication is triggered by browsing.
+
+Atlas main-canvas `Edit Source` integration, instance placement, complete
+Asset Browser/NULL management and campaign-wide atomic saves remain scoped
+to T-055/T-065/T-066, respectively. The
 Object Editor's initial UI is a reversible engineering implementation; owner
 acceptance remains under T-056/T-059.
 
