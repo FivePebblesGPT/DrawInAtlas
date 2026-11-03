@@ -15,6 +15,8 @@ var attach_button: Button
 var detach_button: Button
 var repair_button: Button
 var visibility_button: Button
+var instance_label: LineEdit
+var apply_label_button: Button
 var backward_button: Button
 var forward_button: Button
 var _candidate_ids: Array[String] = []
@@ -65,6 +67,22 @@ func _ready() -> void:
 	detach_button.tooltip_text = "Remove this instance, not its source pixels; child Undo restores its identity"
 	repair_button = _button(insert_actions, "Repair NULL with source", "RepairChild", _repair_child)
 	repair_button.tooltip_text = "Explicitly replace a missing nested source; preserves the child position and supports Undo"
+	var label_actions: HFlowContainer = HFlowContainer.new()
+	label_actions.name = "ChildInstanceLabelActions"
+	root.add_child(label_actions)
+	var label_caption: Label = Label.new()
+	label_caption.text = "Instance label:"
+	label_actions.add_child(label_caption)
+	instance_label = LineEdit.new()
+	instance_label.name = "ChildInstanceLabel"
+	instance_label.custom_minimum_size.x = 165
+	instance_label.max_length = 64
+	instance_label.placeholder_text = "Optional, parent-local"
+	instance_label.tooltip_text = "Identifies this instance only; does not rename the published Object source"
+	instance_label.text_submitted.connect(func(_value: String) -> void: _save_label())
+	label_actions.add_child(instance_label)
+	apply_label_button = _button(label_actions, "Apply label", "ApplyChildLabel", _save_label)
+	apply_label_button.tooltip_text = "Commit this instance label; Undo restores the previous label"
 	var actions: HFlowContainer = HFlowContainer.new()
 	root.add_child(actions)
 	open_button = _button(actions, "Edit child source…", "EditChildSource", _open_child)
@@ -182,19 +200,26 @@ func refresh(message: String = "") -> void:
 		for child: Dictionary in session.library.children_for_asset(session.parent_source_id):
 			var source_info: Dictionary = session.library.asset_info(String(child["source_id"]))
 			var source_name: String = String(source_info.get("name", "Missing source"))
-			var label: String = "%s · %s · %s%s" % [source_name,
+			var metadata: Dictionary = child.get("metadata", {})
+			var custom: String = String(metadata.get("label", "")) if metadata.get("label", "") is String else ""
+			var label: String = "%s · %s · %s%s" % [
+				custom + " (" + source_name + ")" if not custom.is_empty() else source_name,
 				String(child["id"]).left(14), child["status"],
 				" · hidden" if not bool(child["visible"]) else ""]
 			var index: int = child_list.add_item(label)
 			_rows.append(String(child["id"]))
-			child_list.set_item_tooltip(index, "Stable instance ID: %s\nChild source: %s" % [
-				child["id"], child["source_id"]])
+			child_list.set_item_tooltip(index, "Instance: %s\nStable ID: %s\nChild source: %s" % [
+				custom if not custom.is_empty() else source_name, child["id"], child["source_id"]])
 			if child["id"] == session.selected_child_id:
 				child_list.select(index)
 	var record: Dictionary = session.selected_record()
 	var ready: bool = not session.is_stale() and not record.is_empty()
 	open_button.disabled = not ready or record["status"] != "linked"
 	detach_button.disabled = not ready
+	instance_label.editable = ready
+	apply_label_button.disabled = not ready
+	instance_label.text = String(record.get("metadata", {}).get("label", "")) if ready and \
+		record.get("metadata", {}).get("label", "") is String else ""
 	visibility_button.disabled = not ready
 	visibility_button.text = "Show selected" if ready and not bool(record["visible"]) else "Hide selected"
 	var sibling_index: int = _rows.find(session.selected_child_id) if ready else -1
@@ -254,6 +279,11 @@ func _repair_child() -> void:
 		return
 	var repaired: DrawingResult = session.repair_selected(_candidate_ids[index])
 	refresh("Nested child source repaired (Undo available)" if repaired.ok else repaired.message)
+
+
+func _save_label() -> void:
+	var changed: DrawingResult = session.label_selected(instance_label.text.strip_edges())
+	refresh("" if changed.ok else changed.message)
 
 
 func _toggle_visibility() -> void:

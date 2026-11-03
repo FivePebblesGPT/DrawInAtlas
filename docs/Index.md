@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-064 labeled nested child instances (2026-11-03; In Progress):**
+The nested Object inspector now permits a 64-character optional label for
+**each child instance**, distinguishing repeated uses of the same published
+source without renaming or copying its Drawing pixels. Label edits are
+parent-owned, version-checked registry publications, share the existing
+child-local Undo/Redo with structure/transforms/visibility, and preserve
+unrelated metadata. The **54/54** headless witness covers failed/stale edits,
+no-ops, duplicates, history, saved registry reload, portable Objects-component
+copy and live inspector controls. Its **55/55** targeted native Xvfb/Mesa
+witness captures a 420px inspector. The ticket remains **In Progress**:
+nested single-source Save As/export graph-copy policy and owner physical UX
+validation remain pending. See [T-064](Tickets/T-064.md).
+
 **T-064 reversible sibling paint order (2026-11-03; In Progress):**
 The existing nested Object inspector now offers focusable **Send backward**
 and **Bring forward** actions (Ctrl+Alt+Up/Down). Later siblings paint above

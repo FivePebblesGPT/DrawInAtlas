@@ -283,3 +283,17 @@ moves do not create empty history entries. The new source-level and live
 inspector witness is `tests/object_child_order_smoke.gd` (51 headless; 52
 with native screenshot). The still-unapproved nested Save As/export policy
 and hardware/owner UX acceptance are separate requirements.
+
+### Optional labels for nested child instances (T-064 engineering candidate)
+
+In Object Manager → Nested children, select a child, edit **Instance label**
+and press **Apply label** or Enter. This names the *instance within the
+parent*, not the shared published Object source. Empty labels fall back to
+the source's name; labels longer than 64 characters or containing surrounding
+whitespace/control characters cannot be published. The optional label lives
+in the child record's existing scalar metadata, retaining all other metadata,
+stable IDs, placement, visibility and published source bytes. Undo/Redo and
+stale-edit rejection use the existing parent-local history. Labels survive
+Object registry reload and portable component copying. The fast-CI witness
+is `tests/object_child_label_smoke.gd`; native UI and physical owner acceptance
+remain separate, and no nested single-source Save As policy is implied.

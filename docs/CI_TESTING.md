@@ -102,6 +102,14 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 optional child-instance labels: `tests/object_child_label_smoke.gd`
+  (**54** headless assertions) checks duplicate-source identity, primitive
+  metadata retention, 64-character validation, optimistic child and parent
+  revisions, no-op/failed publication, interleaved parent-local Undo/Redo,
+  portable registry copy, reload and actual inspector editing. The targeted
+  Xvfb/Mesa **55-check** run captures a 420px screenshot; native tests remain
+  non-push and do not imply Windows/Linux owner UX signoff or nested asset
+  Save As/export policy approval.
 - T-064 parent-owned nested sibling order: `tests/object_child_order_smoke.gd`
   (**51/51** headless checks) verifies atomic, stale-safe sibling moves,
   exact painter and hit-test priority, invalidation of Atlas composition

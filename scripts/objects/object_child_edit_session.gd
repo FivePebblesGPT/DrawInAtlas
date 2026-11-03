@@ -180,6 +180,30 @@ func set_selected_visibility(visible: bool) -> DrawingResult:
 	return DrawingResult.success(true)
 
 
+## A child-instance label is not the name of the referenced Object source.
+## Label changes participate in the same parent-scoped history as transforms.
+func label_selected(label: String) -> DrawingResult:
+	if is_stale():
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before labeling")
+	var row: Dictionary = selected_record()
+	if row.is_empty():
+		return DrawingResult.failure("CHILD", "Select an attached child to label")
+	var metadata: Dictionary = row.get("metadata", {})
+	if metadata.has("label") and not metadata["label"] is String:
+		return DrawingResult.failure("CHILD_LABEL", "Existing instance label is invalid")
+	var previous: String = String(metadata.get("label", ""))
+	var changed: DrawingResult = library.set_child_label(parent_source_id,
+		selected_child_id, expected_revision, String(row["generation"]),
+		int(row["revision"]), label)
+	if not changed.ok or changed.value == false:
+		return changed
+	expected_revision += 1
+	_record_operation({"kind": "label", "child": selected_child_id,
+		"generation": String(row["generation"]), "source": String(row["source_id"]),
+		"before": previous, "after": label})
+	return DrawingResult.success(true)
+
+
 func toggle_selected_visibility() -> DrawingResult:
 	var record: Dictionary = selected_record()
 	if record.is_empty():
@@ -276,6 +300,22 @@ func _replay(forward: bool) -> DrawingResult:
 			String(desired["source_id"]), bool(desired["placeholder"]), desired["metadata"])
 		if result.ok:
 			selected_child_id = String(operation["child"])
+
+	elif operation["kind"] == "label":
+		var row: Dictionary = _record(String(operation["child"]))
+		var before: String = String(operation["before"]) if forward else String(operation["after"])
+		var after: String = String(operation["after"]) if forward else String(operation["before"])
+		var metadata: Dictionary = row.get("metadata", {})
+		if row.is_empty() or String(row["generation"]) != operation["generation"] or \
+				String(row["source_id"]) != operation["source"] or \
+				metadata.has("label") and not metadata["label"] is String or \
+				String(metadata.get("label", "")) != before:
+			return DrawingResult.failure("STALE_CHILDREN", "History child identity or label changed")
+		result = library.set_child_label(parent_source_id, String(operation["child"]),
+			expected_revision, String(row["generation"]), int(row["revision"]), after)
+		if result.ok:
+			selected_child_id = String(operation["child"])
+
 	elif operation["kind"] == "visibility":
 		var row: Dictionary = _record(String(operation["child"]))
 		var from_visible: bool = bool(operation["before"]) if forward else bool(operation["after"])

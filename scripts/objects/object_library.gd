@@ -242,6 +242,50 @@ func set_child_visibility(asset_id: String, child_id: String, expected_revision:
 	return DrawingResult.failure("CHILD", "Nested instance not found")
 
 
+## Optional instance labels distinguish repeated uses of the same source.
+## They belong to the published parent layout, not to either source's artwork.
+## Empty string removes the metadata key; other primitive metadata is retained.
+static func _child_label_valid(label: String) -> bool:
+	if label.length() > 64 or label != label.strip_edges():
+		return false
+	for index: int in range(label.length()):
+		var codepoint: int = label.unicode_at(index)
+		if codepoint < 32 or codepoint == 127:
+			return false
+	return true
+
+
+func set_child_label(asset_id: String, child_id: String, expected_revision: int,
+		expected_generation: String, expected_child_revision: int,
+		label: String) -> DrawingResult:
+	if not _child_label_valid(label):
+		return DrawingResult.failure("CHILD_LABEL", "Use at most 64 visible characters without surrounding whitespace")
+	if not _assets.has(asset_id) or children_revision(asset_id) != expected_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before labeling")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	for child: Dictionary in children:
+		if String(child["id"]) != child_id:
+			continue
+		if String(child["generation"]) != expected_generation or \
+				int(child["revision"]) != expected_child_revision:
+			return DrawingResult.failure("STALE_CHILDREN", "Child identity changed; reload before labeling")
+		var metadata: Dictionary = child.get("metadata", {}).duplicate(true)
+		if metadata.has("label") and not metadata["label"] is String:
+			return DrawingResult.failure("CHILD_LABEL", "Existing label metadata has an incompatible type")
+		var previous: String = String(metadata.get("label", ""))
+		if previous == label:
+			return DrawingResult.success(false)
+		if label.is_empty():
+			metadata.erase("label")
+		else:
+			metadata["label"] = label
+		child["metadata"] = metadata
+		child["revision"] = expected_child_revision + 1
+		var committed: DrawingResult = _replace_children(asset_id, expected_revision, children)
+		return DrawingResult.success(true) if committed.ok else committed
+	return DrawingResult.failure("CHILD", "Nested child no longer exists")
+
+
 ## Reorder a published child among its siblings without editing source pixels.
 ## Later siblings composite above earlier ones. The parent and moved child's
 ## optimistic revisions protect against stale UI and concurrent graph edits.

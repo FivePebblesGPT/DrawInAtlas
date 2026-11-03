@@ -232,6 +232,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_order_smoke.gd 2>&1 | tee /tmp/godot-t064-child-order.log
           grep -q 'T064_CHILD_ORDER_PASSED' /tmp/godot-t064-child-order.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_ORDER_FAILED:' /tmp/godot-t064-child-order.log; then exit 1; fi
+          # Optional labels distinguish repeated child instances without renaming
+          # their shared source; no native framebuffer suite runs on fast CI.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_label_smoke.gd 2>&1 | tee /tmp/godot-t064-child-label.log
+          grep -q 'T064_CHILD_LABEL_PASSED' /tmp/godot-t064-child-label.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_LABEL_FAILED:' /tmp/godot-t064-child-label.log; then exit 1; fi
           # T-064 child visibility is a reversible, parent-scoped graph edit;
           # hidden descendants are excluded from rendering and pointer hits.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_visibility_smoke.gd 2>&1 | tee /tmp/godot-t064-child-visibility.log
