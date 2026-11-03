@@ -30,7 +30,7 @@ func _ready() -> void:
 	add_child(root)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var heading: Label = Label.new()
-	heading.text = "Select a child instance · edits affect the parent layout, not source pixels"
+	heading.text = "Alt+click a nested child on the Atlas canvas to select; Alt+drag to move. Edits affect the parent layout, not source pixels."
 	heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	root.add_child(heading)
 	child_list = ItemList.new()

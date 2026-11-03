@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-064 nested canvas pointer transforms (2026-11-03; In Progress):**
+Alt+drag on a published nested child now stages a transient canvas guide and
+commits one immediate-parent-local transform on release, preserving the
+existing child inspector Undo/Redo timeline. Descendant rotations and the
+root placement's transform are accounted for; Escape, pointer exit, focus
+loss, tool/map switch, stale published index or placement and invalid paths
+leave all source pixels and child transforms unchanged. The dedicated
+`object_child_canvas_drag_smoke.gd` witness is fast-CI-gated (**31/31**
+headless checks; **32/32** with native screenshot capture). This is **not** owner/hardware interaction
+acceptance; nested Save As/export copying policy remains undecided and
+T-064 remains **In Progress**. See [T-064](Tickets/T-064.md).
+
 **T-064 published Objects-component copy (2026-11-03; In Progress):**
 `AtlasObjectLibrary.copy_objects_to()` now stages checksum-verified current
 published source revisions and an unchanged registry in a separate campaign

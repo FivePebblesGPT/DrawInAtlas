@@ -198,6 +198,10 @@ func _bind_drawing_composition() -> void:
 		canvas.drawing_error.connect(_message)
 		canvas.object_instance_selected.connect(_on_object_instance_selected)
 		canvas.object_child_hit_requested.connect(_on_object_child_hit_requested)
+		canvas.object_child_drag_requested.connect(func(context: Dictionary, released_at: Vector2) -> void:
+			var result: DrawingResult = _on_object_child_drag_requested(context, released_at)
+			if not result.ok:
+				_message(result.message))
 		canvas.object_source_dropped.connect(_on_browser_source_drop)
 		canvas.object_instance_edit_requested.connect(func(_id: String) -> void:
 			var opened: DrawingResult = open_selected_object_editor()
@@ -240,7 +244,7 @@ func _on_object_instance_selected(id: String) -> void:
 	if drawing_composition == null:
 		return
 	var info: Dictionary = drawing_composition.library.instance_info(id)
-	_message("Object %s selected — use Open Object Editor to edit its source." % info.get("source_id", ""))
+	_message("Object %s selected — Alt+click a nested child to inspect; Alt+drag it to move. Open Object Editor to edit source pixels." % info.get("source_id", ""))
 
 
 ## Re-resolve the Alt+click against the active map, selected placement and
@@ -291,6 +295,74 @@ func _on_object_child_hit_requested(instance_id: String, world_point: Vector2) -
 	if not focused.ok:
 		_message(focused.message)
 	return focused
+
+
+## Commit a nested-child canvas drag only if the press-time registry, map and
+## placement are unchanged. Convert the world-space displacement into the
+## immediate owning parent's coordinates, including all ancestor transforms.
+## The existing inspector owns the single history entry and stale-child gate.
+func _on_object_child_drag_requested(context: Dictionary, released_at: Vector2) -> DrawingResult:
+	if drawing_composition == null or drawing_composition.library == null or \
+			canvas.map == null or canvas.floor == null or not released_at.is_finite():
+		return DrawingResult.failure("CHILD_DRAG", "The canvas drag is no longer valid")
+	var library: AtlasObjectLibrary = drawing_composition.library
+	var instance_id: String = String(context.get("instance_id", ""))
+	var start: Variant = context.get("start")
+	var path: Variant = context.get("path")
+	if not start is Vector2 or not (start as Vector2).is_finite() or \
+			not path is PackedStringArray or (path as PackedStringArray).is_empty() or \
+			context.get("map_id") != canvas.map.id or \
+			context.get("floor_id") != canvas.floor.id or \
+			context.get("detail") != canvas.presented_detail_level or \
+			drawing_composition.selected_instance_id != instance_id or \
+			not library._index_unchanged() or context.get("registry_hash") != library._index_hash:
+		return DrawingResult.failure("STALE_CHILDREN", "Map or Object source changed during drag")
+	var instance: Dictionary = library.instance_info(instance_id)
+	if instance.is_empty() or instance != context.get("instance") or \
+			instance.get("status") != "linked" or not bool(instance.get("visible", false)):
+		return DrawingResult.failure("STALE_INSTANCE", "The selected Object placement changed")
+	var hit: DrawingResult = library.hit_test_path(instance_id, start)
+	if not hit.ok or not hit.value is Dictionary or \
+			(hit.value as Dictionary).get("path") != path:
+		return DrawingResult.failure("STALE_CHILDREN", "The original nested hit changed")
+	var root: Array = instance["transform"]
+	var parent_world: Transform2D = Transform2D(Vector2(float(root[0]), float(root[1])),
+		Vector2(float(root[2]), float(root[3])), Vector2(float(root[4]), float(root[5])))
+	var parent_id: String = String(instance["source_id"])
+	var selected_child: Dictionary = {}
+	for depth: int in range((path as PackedStringArray).size()):
+		selected_child = {}
+		for row: Dictionary in library.children_for_asset(parent_id):
+			if row["id"] == path[depth]:
+				selected_child = row
+				break
+		if selected_child.is_empty() or not bool(selected_child.get("visible", false)):
+			return DrawingResult.failure("STALE_CHILDREN", "Nested ancestor changed")
+		if depth < (path as PackedStringArray).size() - 1:
+			if selected_child.get("status") != "linked":
+				return DrawingResult.failure("STALE_CHILDREN", "Nested ancestor is unavailable")
+			parent_world = parent_world * AtlasObjectChildEditSession._transform(selected_child)
+			parent_id = String(selected_child["source_id"])
+	var delta: Vector2 = parent_world.affine_inverse().basis_xform(released_at - (start as Vector2))
+	if not delta.is_finite() or absf(delta.x) > 1000000000.0 or absf(delta.y) > 1000000000.0:
+		return DrawingResult.failure("COORD_RANGE", "Nested transform exceeds safe coordinates")
+	if delta.length_squared() < 0.000001:
+		return DrawingResult.success(false)
+	# Do not open an inspector for an invalid move. Focus only after every
+	# optimistic snapshot and coordinate check above has succeeded.
+	var focused: DrawingResult = _on_object_child_hit_requested(instance_id, start)
+	if not focused.ok:
+		return focused
+	var session: AtlasObjectChildEditSession = object_source_manager.child_inspector.session
+	if session.parent_source_id != parent_id or \
+			session.selected_child_id != path[(path as PackedStringArray).size() - 1]:
+		return DrawingResult.failure("CHILD", "Nested inspector focus changed")
+	var moved: Transform2D = AtlasObjectChildEditSession._transform(selected_child)
+	moved.origin += delta
+	var committed: DrawingResult = session.set_selected_transform(moved)
+	if committed.ok:
+		object_source_manager.child_inspector.refresh()
+	return committed
 
 
 func open_selected_object_editor() -> DrawingResult:

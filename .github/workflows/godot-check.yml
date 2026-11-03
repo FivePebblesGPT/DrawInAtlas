@@ -213,6 +213,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_canvas_select_smoke.gd 2>&1 | tee /tmp/godot-t064-child-canvas.log
           grep -q 'T064_CANVAS_CHILD_PASSED' /tmp/godot-t064-child-canvas.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CANVAS_CHILD_FAILED:' /tmp/godot-t064-child-canvas.log; then exit 1; fi
+          # Alt+drag moves a published child only on release; all cancellation,
+          # stale-index and nested ancestor-coordinate cases are checked here.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_canvas_drag_smoke.gd 2>&1 | tee /tmp/godot-t064-child-drag.log
+          grep -q 'T064_CANVAS_DRAG_PASSED' /tmp/godot-t064-child-drag.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CANVAS_DRAG_FAILED:' /tmp/godot-t064-child-drag.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
         id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
         if: ${{ !cancelled() }}
