@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-064 saved-campaign copy UI (2026-11-03; In Progress):**
+Atlas File → Copy saved campaign… (Ctrl/Cmd+Shift+S) now clones the last
+checkpoint into a fresh directory through the verified T-066 campaign-copy
+operation. The original stays open; missing checkpoints, unsaved Atlas or
+Drawing changes, Object Editor drafts, in-progress gestures, unsafe path
+components, stale registries and existing destinations are rejected. A native
+modal with parent-directory chooser supports renaming the campaign file; the
+new **39/39** headless UI witness is fast-CI-gated (**40/40** with native
+screenshot). A compact 420px native layout was inspected. This does **not**
+select nested single-asset Save As reference-vs-deep-copy semantics or grant
+owner approval. T-064 remains In Progress. See [T-064](Tickets/T-064.md).
+
 **T-064 complete portable campaign copy (2026-11-03; In Progress):**
 `AtlasCampaignStore.copy_portable` now copies a verified saved campaign to a
 fresh project folder using one staged directory promotion, preserving complete

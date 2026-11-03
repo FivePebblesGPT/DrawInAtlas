@@ -68,6 +68,15 @@
   exact indexed file hashes, placement/NULL behavior, and collision/stale-index
   refusal. It does not copy campaign scene/history or authorize nested source
   Save As/export; those remain separate T-064/T-066 responsibilities.
+- T-064 saved-campaign Copy UI: `tests/object_nested_campaign_copy_ui_smoke.gd`
+  (**39** headless checks) verifies Atlas File menu and Ctrl+Shift+S access to
+  independent full-project copy, mandatory saved checkpoint, refusal of dirty
+  Atlas/Drawing/Object Editor state, safe destination paths, collision and
+  rename behavior, preserved nested child IDs and exact published Drawing
+  pixels. Included in the existing T-064 project-copy step without adding a
+  CI job. Targeted native Xvfb/Mesa (40 checks including screenshot) and a
+  420px compact dialog capture do **not** substitute for physical owner UX
+  review or decide nested single-source Save As/export ownership.
 - T-064 complete saved-project copy:
   `tests/object_nested_campaign_copy_smoke.gd` (`T064_CAMPAIGN_COPY_PASSED`,
   **46** headless checks) validates a renamed destination, two portable root

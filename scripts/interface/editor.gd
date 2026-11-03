@@ -31,6 +31,11 @@ var store_io: AtlasStoreIO
 var _restored_bundle: AtlasStoreResult
 var _discard_drawing_dialog: ConfirmationDialog
 var _pending_discard_action: Callable
+var _campaign_copy_dialog: ConfirmationDialog
+var _campaign_copy_parent_picker: FileDialog
+var _campaign_copy_parent: LineEdit
+var _campaign_copy_folder: LineEdit
+var _campaign_copy_filename: LineEdit
 var browser: AtlasCampaignBrowser
 var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
@@ -148,6 +153,7 @@ func _ready() -> void:
 	_discard_drawing_dialog.dialog_text = "Discard unsaved Drawing edits? The last saved campaign generation will remain intact."
 	add_child(_discard_drawing_dialog)
 	_discard_drawing_dialog.confirmed.connect(_confirm_drawing_discard)
+	_build_campaign_copy_dialog()
 	text_editor = AtlasTextEditorPopup.new()
 	add_child(text_editor)
 	text_editor.text_confirmed.connect(_confirm_text_edit)
@@ -1077,6 +1083,118 @@ func _on_save() -> void:
 	_message("Saved generation %s (campaign, sparse Drawings and Object Assets)." % saved.value["generation"])
 
 
+## Copy only an existing, fully saved generation. An independent project copy is
+## not a nested single-source Save As; no source binding or live draft changes.
+func _build_campaign_copy_dialog() -> void:
+	_campaign_copy_dialog = ConfirmationDialog.new()
+	_campaign_copy_dialog.title = "Copy saved campaign"
+	_campaign_copy_dialog.get_ok_button().text = "Copy"
+	add_child(_campaign_copy_dialog)
+	_campaign_copy_dialog.confirmed.connect(_confirm_campaign_copy)
+	var fields: GridContainer = GridContainer.new()
+	fields.columns = 2
+	_campaign_copy_dialog.add_child(fields)
+	var note: Label = Label.new()
+	note.text = "Saved data only; original stays open"
+	fields.add_child(note)
+	fields.add_child(Control.new())
+	var parent_label: Label = Label.new()
+	parent_label.text = "Destination parent"
+	fields.add_child(parent_label)
+	var row: HBoxContainer = HBoxContainer.new()
+	fields.add_child(row)
+	_campaign_copy_parent = LineEdit.new()
+	_campaign_copy_parent.custom_minimum_size.x = 150.0
+	_campaign_copy_parent.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_campaign_copy_parent.tooltip_text = "Existing directory that will contain the new project folder"
+	row.add_child(_campaign_copy_parent)
+	var browse: Button = Button.new()
+	browse.text = "Browse…"
+	row.add_child(browse)
+	browse.pressed.connect(_browse_campaign_copy_parent)
+	var folder_label: Label = Label.new()
+	folder_label.text = "New folder"
+	fields.add_child(folder_label)
+	_campaign_copy_folder = LineEdit.new()
+	_campaign_copy_folder.tooltip_text = "A new folder name; an existing project is never overwritten"
+	fields.add_child(_campaign_copy_folder)
+	var filename_label: Label = Label.new()
+	filename_label.text = "Campaign filename"
+	fields.add_child(filename_label)
+	_campaign_copy_filename = LineEdit.new()
+	_campaign_copy_filename.tooltip_text = "Portable campaign filename ending in .scn"
+	fields.add_child(_campaign_copy_filename)
+	_campaign_copy_parent_picker = FileDialog.new()
+	_campaign_copy_parent_picker.title = "Choose destination parent directory"
+	_campaign_copy_parent_picker.access = FileDialog.ACCESS_FILESYSTEM
+	_campaign_copy_parent_picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	_campaign_copy_parent_picker.use_native_dialog = false
+	add_child(_campaign_copy_parent_picker)
+	_campaign_copy_parent_picker.dir_selected.connect(_on_campaign_copy_parent_selected)
+
+
+func _campaign_copy_is_saved() -> bool:
+	return drawing_composition != null and campaign != null and not edits.is_dirty() \
+		and not _dirty_drawing_documents() and not _dirty_object_drafts() \
+		and not canvas.is_editing()
+
+
+func _request_campaign_copy() -> void:
+	if not _campaign_copy_is_saved():
+		_message("Save the campaign and all open Object Editor drafts before copying the saved project.")
+		return
+	var source: String = ProjectSettings.globalize_path(save_path)
+	if not FileAccess.file_exists(AtlasCampaignBundle.root_path(source)):
+		_message("Save the campaign before copying; no portable generation exists yet.")
+		return
+	_campaign_copy_parent.text = source.get_base_dir().get_base_dir()
+	_campaign_copy_folder.text = source.get_base_dir().get_file() + "-copy"
+	_campaign_copy_filename.text = source.get_file()
+	_campaign_copy_dialog.popup_centered(Vector2i(mini(650, maxi(380, int(size.x) - 24)), 240))
+
+
+func _browse_campaign_copy_parent() -> void:
+	_campaign_copy_parent_picker.current_dir = _campaign_copy_parent.text
+	_campaign_copy_parent_picker.popup_centered_ratio(0.65)
+
+
+func _on_campaign_copy_parent_selected(path: String) -> void:
+	_campaign_copy_parent.text = path
+
+
+## Keep user-provided names single-component: copy_portable handles the final
+## filesystem trust boundary, but the dialog must not assemble a traversing path.
+func _campaign_copy_destination() -> DrawingResult:
+	var parent: String = _campaign_copy_parent.text.strip_edges()
+	var folder: String = _campaign_copy_folder.text.strip_edges()
+	var filename: String = _campaign_copy_filename.text.strip_edges()
+	if not parent.is_absolute_path() or parent != parent.simplify_path() or \
+			folder.is_empty() or folder in [".", ".."] or \
+			filename in [".", ".."] or not filename.ends_with(".scn") or \
+			filename.length() <= 4 or \
+			"/" in folder or "\\" in folder or ":" in folder or \
+			"/" in filename or "\\" in filename or ":" in filename:
+		return DrawingResult.failure("COPY_NAME", "Choose an existing absolute parent and single-component project folder and .scn filename")
+	return DrawingResult.success(parent.path_join(folder).path_join(filename))
+
+
+func _confirm_campaign_copy() -> void:
+	# Recheck after the dialog was opened: edits may have occurred while it was up.
+	if not _campaign_copy_is_saved():
+		_message("Campaign changed while choosing a destination. Save all edits before copying.")
+		return
+	var destination: DrawingResult = _campaign_copy_destination()
+	if not destination.ok:
+		_message("Campaign copy refused: " + destination.message)
+		return
+	var copied: DrawingResult = AtlasCampaignStore.copy_portable(save_path, str(destination.value))
+	if not copied.ok:
+		_message("Campaign copy failed: %s %s" % [copied.code, copied.message])
+		return
+	_message("Copied saved campaign to %s (%d files). Original project remains open." % [
+		str(destination.value), int(copied.value["files"])])
+
+
 func _on_load(discard_unsaved: bool = false) -> void:
 	if _dirty_object_drafts():
 		_message("Unsaved Object Editor draft: save or close its tab before loading another campaign.")
@@ -1561,7 +1679,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				else:
 					_on_undo()
 			KEY_Y: _on_redo()
-			KEY_S: _on_save()
+			KEY_S:
+				if event.shift_pressed:
+					_request_campaign_copy()
+				else:
+					_on_save()
 			KEY_N: open_board_dialog()
 			KEY_A: select_all_artwork()
 			KEY_D: canvas.clear_selection()

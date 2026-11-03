@@ -219,7 +219,13 @@ editable project and never shares canonical source files with the original.
 `godot --headless --path . --script res://tests/object_nested_campaign_copy_smoke.gd`
 runs the 46-check cross-generation, nested references, undo-safe publication,
 backup, failure/corruption and clone-independence witness. This backend API
-is not yet a campaign Save As menu/dialog or owner-approved UX.
+now also has an Atlas-facing File → **Copy saved campaign…** action
+(Ctrl/Cmd+Shift+S), with a destination parent picker and a new folder and
+`.scn` name. This command refuses unsaved Atlas/Drawing/Object Editor edits,
+works only from a published checkpoint, and keeps the original campaign open.
+It is **not** the unresolved nested single-source Save As/export policy and
+it has no owner UX signoff. `tests/object_nested_campaign_copy_ui_smoke.gd`
+verifies the UI guard and exact copied registry/pixel contents.
 
 ## Nested source NULL repair (T-064 engineering milestone)
 

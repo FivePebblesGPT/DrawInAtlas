@@ -190,6 +190,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_campaign_copy_smoke.gd 2>&1 | tee /tmp/godot-t064-campaign-copy.log
           grep -q 'T064_CAMPAIGN_COPY_PASSED' /tmp/godot-t064-campaign-copy.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CAMPAIGN_COPY_FAILED:' /tmp/godot-t064-campaign-copy.log; then exit 1; fi
+          # Atlas File > Copy saved campaign routes through the same verified API.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_campaign_copy_ui_smoke.gd 2>&1 | tee /tmp/godot-t064-copy-ui.log
+          grep -q 'T064_COPY_UI_PASSED' /tmp/godot-t064-copy-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_COPY_UI_FAILED:' /tmp/godot-t064-copy-ui.log; then exit 1; fi
       - name: Verify T-064 bounded nested source composition and hit paths
         id: ci_t064_nested_source_render
         if: ${{ !cancelled() }}
