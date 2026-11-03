@@ -222,6 +222,33 @@ func _open_children() -> void:
 	child_inspector.popup_centered()
 
 
+## Canvas selection uses this same inspector; never creates a second editor.
+## Re-selecting a child of the same parent retains its local Undo timeline.
+func focus_child_from_canvas(parent_id: String, child_id: String) -> DrawingResult:
+	if library == null or not library.asset_exists(parent_id):
+		return DrawingResult.failure("CHILD", "The nested parent source is unavailable")
+	if child_inspector == null:
+		return DrawingResult.failure("CHILD", "Nested child inspector is unavailable")
+	if child_inspector.session.library != library or \
+			child_inspector.session.parent_source_id != parent_id:
+		child_inspector.bind_parent(library, parent_id)
+	if child_inspector.session.is_stale():
+		child_inspector.refresh("Parent changed; Reload parent before editing")
+		child_inspector.popup_centered()
+		return DrawingResult.failure("STALE_CHILDREN", "Reload the nested parent before selecting another child")
+	var selected: DrawingResult = child_inspector.session.select_child(child_id)
+	if not selected.ok:
+		return selected
+	var index: int = _source_ids.find(parent_id)
+	if index >= 0:
+		sources.select(index)
+		_update_actions()
+	child_inspector.refresh()
+	popup_centered()
+	child_inspector.popup_centered()
+	return DrawingResult.success()
+
+
 func _request_edit() -> void:
 	if not selected_source_id().is_empty():
 		open_source_requested.emit(selected_source_id())

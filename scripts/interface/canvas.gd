@@ -34,6 +34,8 @@ signal token_rejected(reason: String)
 signal fog_edit_requested(bounds: Rect2, reveal: bool)
 signal drawing_error(message: String)
 signal object_instance_selected(id: String)
+## Alt+click requests a nested hit; the editor rechecks location and ownership.
+signal object_child_hit_requested(instance_id: String, world_point: Vector2)
 signal object_source_dropped(token: Dictionary, local_position: Vector2)
 signal object_instance_edit_requested(id: String)
 
@@ -1397,6 +1399,11 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			_previous_object_at = now
 			_previous_object_local = mouse.position
 			object_instance_selected.emit(instance_id)
+			if mouse.alt_pressed:
+				# Unlike a normal click, Alt+click explicitly targets a child in
+				# the same published graph; the editor validates this again.
+				object_child_hit_requested.emit(instance_id, position)
+				return
 			if mouse.double_click and repeated:
 				object_instance_edit_requested.emit(instance_id)
 			return

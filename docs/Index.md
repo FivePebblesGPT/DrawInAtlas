@@ -6,6 +6,16 @@
 
 ## Kanban summary
 
+**T-064 explicit nested canvas selection (2026-11-03; In Progress):**
+Alt+click on a linked nested Object in Atlas now resolves its stable child-ID
+hit path, opens the existing parent-local inspector at the actual owning
+parent source and selects that child. Normal click retains root selection,
+repeat hits retain child Undo/Redo history, and stale map/registry or hidden
+ancestors fail closed. The dedicated **21/21** headless witness is fast-CI-gated;
+Xvfb/Mesa native UI and optional screenshot pass **22/22**. Direct pointer
+transform gestures, nested source Save As/export policy and physical review
+remain incomplete; T-064 stays In Progress. See [T-064](Tickets/T-064.md).
+
 **T-064 reversible nested child structure editing (2026-11-03; In Progress):** The existing Atlas child inspector can now attach an explicitly chosen available Object source, remove a selected child reference without deleting its source, and undo/redo structure **and** transforms in one parent-scoped history. Restored instances retain child ID, generation and sibling order; revisions advance monotonically. The new **45/45** fast-CI witness covers cycles, stale revisions, concurrent changes, failed publication and live picker/buttons; the expanded native X11/Mesa inspector witness passes **16/16**. The source picker searches published names/IDs and shows up to 128 matches. Canvas child hit interaction, Save As/export policy and owner/hardware validation remain unfinished; T-064 stays In Progress. See [T-064](Tickets/T-064.md).
 
 **T-064 parent-scoped nested child transform editing (2026-11-03; In Progress):** Atlas's Object Manager now opens a nested-child inspector with stable child instance selection, parent-local moves/rotations, explicit child-source editor navigation, optimistic parent-scoped undo/redo and stale/campaign-switch recovery. Its dedicated headless **45/45** edit/history test runs in fast CI, while a targeted X11/Mesa **10/10** native UI witness captures real window layout. Integrated hit-path selection, Save As/copy policy and owner/hardware acceptance remain unfinished; no other ticket or manual review state changed. See [T-064](Tickets/T-064.md).

@@ -197,6 +197,7 @@ func _bind_drawing_composition() -> void:
 				layer_panel.set_drawing_registry(drawing_composition.registry, drawing_composition.library))
 		canvas.drawing_error.connect(_message)
 		canvas.object_instance_selected.connect(_on_object_instance_selected)
+		canvas.object_child_hit_requested.connect(_on_object_child_hit_requested)
 		canvas.object_source_dropped.connect(_on_browser_source_drop)
 		canvas.object_instance_edit_requested.connect(func(_id: String) -> void:
 			var opened: DrawingResult = open_selected_object_editor()
@@ -242,6 +243,56 @@ func _on_object_instance_selected(id: String) -> void:
 	_message("Object %s selected — use Open Object Editor to edit its source." % info.get("source_id", ""))
 
 
+## Re-resolve the Alt+click against the active map, selected placement and
+## current published graph. The canvas does not own graph/editor state.
+func _on_object_child_hit_requested(instance_id: String, world_point: Vector2) -> DrawingResult:
+	if drawing_composition == null or drawing_composition.library == null or \
+			canvas.map == null or canvas.floor == null or not world_point.is_finite() or \
+			drawing_composition.selected_instance_id != instance_id:
+		return DrawingResult.failure("CHILD", "Nested selection no longer matches the active map")
+	var library: AtlasObjectLibrary = drawing_composition.library
+	if not library._index_unchanged():
+		return DrawingResult.failure("STALE_CHILDREN", "Published Object registry changed; reload before selecting")
+	var instance: Dictionary = library.instance_info(instance_id)
+	if instance.is_empty() or not bool(instance.get("visible", false)) or \
+			instance.get("status") != "linked" or \
+			instance.get("map_id") != canvas.map.id or \
+			instance.get("floor_id") != canvas.floor.id or \
+			instance.get("detail_id") != "D%d" % canvas.presented_detail_level:
+		return DrawingResult.failure("CHILD", "Nested selection is no longer visible here")
+	var hit: DrawingResult = library.hit_test_path(instance_id, world_point)
+	if not hit.ok:
+		return hit
+	if not hit.value is Dictionary:
+		return DrawingResult.failure("CHILD", "No published Object artwork at that point")
+	var path: PackedStringArray = hit.value.get("path", PackedStringArray())
+	if path.is_empty():
+		return DrawingResult.failure("CHILD", "Alt+click a nested child; normal click selects the parent")
+	var parent_id: String = String(instance["source_id"])
+	var selected_child: String = ""
+	for depth: int in range(path.size()):
+		selected_child = path[depth]
+		var found: Dictionary = {}
+		for row: Dictionary in library.children_for_asset(parent_id):
+			if row["id"] == selected_child:
+				found = row
+				break
+		if found.is_empty() or not bool(found.get("visible", false)):
+			return DrawingResult.failure("STALE_CHILDREN", "Nested child changed before selection")
+		if depth < path.size() - 1:
+			if found["status"] != "linked":
+				return DrawingResult.failure("STALE_CHILDREN", "Nested ancestor source is unavailable")
+			parent_id = String(found["source_id"])
+	# The source manager is the single owner of the nested inspector.
+	_ensure_object_source_manager()
+	if object_source_manager.library != library:
+		object_source_manager.bind_library(library)
+	var focused: DrawingResult = object_source_manager.focus_child_from_canvas(parent_id, selected_child)
+	if not focused.ok:
+		_message(focused.message)
+	return focused
+
+
 func open_selected_object_editor() -> DrawingResult:
 	if drawing_composition == null or drawing_composition.selected_instance_id.is_empty():
 		return DrawingResult.failure("SELECTION", "Select a linked Object instance first")
@@ -255,20 +306,26 @@ func open_selected_object_editor() -> DrawingResult:
 
 ## Atlas owns linked placements. The shared Drawing browser never assumes a
 ## campaign context, while this explicit Atlas manager binds to the active one.
+func _ensure_object_source_manager() -> void:
+	if object_source_manager != null:
+		return
+	object_source_manager = AtlasObjectSourceManager.new()
+	add_child(object_source_manager)
+	object_source_manager.open_source_requested.connect(_open_object_source)
+	object_source_manager.place_source_requested.connect(_place_object_source)
+	object_source_manager.registry_mutated.connect(func(summary: String) -> void:
+		drawing_composition.invalidate()
+		_refresh_asset_browser()
+		_message(summary))
+
+
 func _open_object_source_manager() -> void:
 	if drawing_composition == null or drawing_composition.library == null:
 		_message("Atlas Object registry is unavailable")
 		return
-	if object_source_manager == null:
-		object_source_manager = AtlasObjectSourceManager.new()
-		add_child(object_source_manager)
-		object_source_manager.open_source_requested.connect(_open_object_source)
-		object_source_manager.place_source_requested.connect(_place_object_source)
-		object_source_manager.registry_mutated.connect(func(summary: String) -> void:
-			drawing_composition.invalidate()
-			_refresh_asset_browser()
-			_message(summary))
-	object_source_manager.bind_library(drawing_composition.library)
+	_ensure_object_source_manager()
+	if object_source_manager.library != drawing_composition.library:
+		object_source_manager.bind_library(drawing_composition.library)
 	object_source_manager.popup_centered()
 
 

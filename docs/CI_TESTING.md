@@ -76,6 +76,12 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 explicit nested canvas targeting: `tests/object_child_canvas_select_smoke.gd`
+  (**21** headless checks, fast push CI) verifies normal root selection versus
+  Alt+click child/grandchild selection in the shared Atlas inspector, preserved
+  local Undo, active-map and registry revalidation, and rejection of stale or
+  forged hits. Targeted Xvfb/Mesa presentation captures a **22**-check screenshot
+  run; neither this nor synthetic input replaces physical owner pointer review.
 - T-064 reversible child attachment and removal: `tests/object_child_structure_smoke.gd` (**45** headless checks, push-CI-gated) now interleaves structure and transform history without source artwork changes. Registry restore preserves ID, generation and sibling order, advances child revisions and retains cycle/stale/publication protection. The extended native inspector (`tests/object_child_edit_native.gd`, **16** Xvfb/Mesa checks including screenshot) is targeted/non-push. The explicit source picker is filtered and bounded to 128 matching published assets. Neither test is owner or physical-Windows UX approval.
 - T-064 parent-scoped nested child editing: `tests/object_child_edit_smoke.gd`
   (`T064_CHILD_EDIT_PASSED`, **45** assertions) checks stable child selection,

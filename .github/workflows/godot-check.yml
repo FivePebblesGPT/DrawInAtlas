@@ -198,6 +198,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_structure_smoke.gd 2>&1 | tee /tmp/godot-t064-child-structure.log
           grep -q 'T064_CHILD_STRUCTURE_PASSED' /tmp/godot-t064-child-structure.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_STRUCTURE_FAILED:' /tmp/godot-t064-child-structure.log; then exit 1; fi
+          # Alt+click must resolve the correct nested parent through the live
+          # Atlas canvas, without resetting child-local history or map context.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_canvas_select_smoke.gd 2>&1 | tee /tmp/godot-t064-child-canvas.log
+          grep -q 'T064_CANVAS_CHILD_PASSED' /tmp/godot-t064-child-canvas.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CANVAS_CHILD_FAILED:' /tmp/godot-t064-child-canvas.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
         id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
         if: ${{ !cancelled() }}
