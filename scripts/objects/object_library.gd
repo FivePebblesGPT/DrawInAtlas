@@ -356,6 +356,82 @@ func export_index() -> Dictionary:
 	return {"schema": SCHEMA, "assets": assets, "instances": instances}
 
 
+## Copy the currently published Objects component to a different campaign
+## directory, preserving source IDs, nested child links and map bindings.
+## The destination campaign file itself is managed by the campaign saver.
+## No unindexed revisions or live draft pixels are copied.
+func copy_objects_to(destination_campaign_path: String) -> DrawingResult:
+	var destination: String = destination_campaign_path.simplify_path()
+	var source_directory: String = campaign_path.get_base_dir()
+	var target_directory: String = destination.get_base_dir()
+	if not _ready_path() or not FileAccess.file_exists(_index_path()) or \
+			not _index_unchanged() or _linked_component():
+		return DrawingResult.failure("STALE_INDEX", "Reload a valid source Object registry before copying")
+	if not destination.is_absolute_path() or destination != destination_campaign_path or \
+			not destination.ends_with(".scn") or target_directory == source_directory or \
+			target_directory.begins_with(source_directory + "/") or \
+			not _portable_path_has_no_links(destination):
+		return DrawingResult.failure("COPY_PATH", "Choose another existing, nonlinked campaign directory")
+	var parent: DirAccess = DirAccess.open(target_directory)
+	if parent == null or parent.dir_exists("Objects") or parent.file_exists("Objects") or \
+			parent.is_link("Objects"):
+		return DrawingResult.failure("COPY_EXISTS", "Destination Objects directory must not exist")
+	var snapshot: Dictionary = export_index()
+	var checked: DrawingResult = CHILD_GRAPH.validate(_assets)
+	if not checked.ok:
+		return checked
+	for source_id: String in asset_ids():
+		if not _asset_available(source_id):
+			return DrawingResult.failure("MISSING_SOURCE", "An indexed Object revision is unavailable")
+	var stage: String = target_directory.path_join(".Objects-copy-" + DrawingDocument.new_id())
+	if DirAccess.dir_exists_absolute(stage) or DirAccess.make_dir_absolute(stage) != OK:
+		return DrawingResult.failure("COPY_STAGE", "Cannot reserve a new Objects staging directory")
+	var copied_files: Array[String] = []
+	var copied_dirs: Array[String] = []
+	var copied_index: String = stage.path_join(destination.get_file() + ".atlas-object-index.json")
+	var copy_error: String = ""
+	for source_id: String in asset_ids():
+		if not _index_unchanged() or not _asset_available(source_id):
+			copy_error = "Source registry or revision changed while copying"
+			break
+		var revision: int = int(_assets[source_id]["revision"])
+		var source_dir: String = stage.path_join(source_id)
+		var output_path: String = source_dir.path_join("v%06d.drawing" % revision)
+		if DirAccess.make_dir_absolute(source_dir) != OK:
+			copy_error = "Cannot stage Object revision directory"
+			break
+		copied_dirs.append(source_dir)
+		# Register the destination before the copy: a failed file copy can
+		# leave partial bytes that must also be removed from the stage.
+		copied_files.append(output_path)
+		if DirAccess.copy_absolute(_absolute(_relative(source_id, revision)), output_path) != OK:
+			copy_error = "Cannot copy indexed Object revision"
+			break
+		if FileAccess.get_sha256(output_path) != String(_assets[source_id]["sha256"]):
+			copy_error = "Copied Object bytes failed the published checksum"
+			break
+	if copy_error.is_empty():
+		if DirAccess.copy_absolute(_index_path(), copied_index) != OK:
+			copy_error = "Cannot copy Object registry"
+		elif not _index_unchanged() or FileAccess.get_sha256(copied_index) != _index_hash or \
+				export_index() != snapshot:
+			copy_error = "Source Object registry changed while copying"
+		elif parent.dir_exists("Objects") or parent.file_exists("Objects") or \
+				parent.is_link("Objects") or DirAccess.rename_absolute(stage, \
+				target_directory.path_join("Objects")) != OK:
+			copy_error = "Destination Objects directory appeared or cannot be published"
+	if not copy_error.is_empty():
+		DirAccess.remove_absolute(copied_index)
+		for path: String in copied_files:
+			DirAccess.remove_absolute(path)
+		copied_dirs.reverse()
+		for path: String in copied_dirs:
+			DirAccess.remove_absolute(path)
+		DirAccess.remove_absolute(stage)
+		return DrawingResult.failure("COPY_FAILED", copy_error)
+	return DrawingResult.success({"sources": _assets.size(), "placements": _instances.size()})
+
+
 ## Only this root index is written atomically; campaign-wide publication is T-066.
 func _commit_index(assets: Dictionary[String, Dictionary],
 		instances: Dictionary[String, AtlasObjectInstance]) -> DrawingResult:

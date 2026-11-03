@@ -175,3 +175,22 @@ godot --headless --path . --script res://tests/object_child_render_smoke.gd
 
 The nested editor-selection UI, undo/redo and Save As/export graph-copy policy
 are not yet implemented; this is an engineering milestone, not acceptance.
+
+
+## Copy a published nested Objects component (T-064)
+
+`AtlasObjectLibrary.copy_objects_to(destination_campaign_path)` creates the
+`Objects/` component for an **already-existing target campaign directory**.
+The destination `Objects/` folder must not exist. The caller separately copies
+or saves the actual campaign `.scn` and other campaign components; this helper
+preserves currently indexed source revision bytes, source IDs, nested reference
+IDs/transforms and map-instance records without importing or flattening them.
+It validates published hashes, refuses symlinked output paths and concurrent
+index changes, then promotes a verified staging directory. A failure does not
+publish a partial `Objects/`. Old unindexed revision backups and live drafts
+are not copied. This does not implement nested single-source Save As or export:
+those graph-copy policy decisions are still open in T-064.
+
+Run `godot --headless --path . --script res://tests/object_nested_project_copy_smoke.gd`
+to exercise clone/reload, edits isolated from the original project and
+corrupt/stale collision checks. CI runs the same headless witness.

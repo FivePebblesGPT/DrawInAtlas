@@ -60,6 +60,14 @@
   **22** targeted X11/Mesa checks (23 with optional screenshot). The standalone
   Drawing browser's Import still rejects Atlas-managed registries, and shared
   browser-to-Atlas physical-hardware review and owner acceptance remain open.
+- T-064 verified nested project-component copying:
+  `tests/object_nested_project_copy_smoke.gd` (`T064_PROJECT_COPY_PASSED`,
+  **37** headless assertions) verifies atomic staging of the current
+  checksum-verified Objects registry/source revisions into a separate campaign
+  directory, intact child hit paths and IDs, independent cloned drafts,
+  exact indexed file hashes, placement/NULL behavior, and collision/stale-index
+  refusal. It does not copy campaign scene/history or authorize nested source
+  Save As/export; those remain separate T-064/T-066 responsibilities.
 - T-064 nested Object source-graph safety: `tests/object_child_graph_smoke.gd`
   (`T064_CHILD_GRAPH_PASSED`, 56 checks) verifies real on-disk parent/child
   references, bounded nonrecursive cycle/depth checks, immutable pixel Save,

@@ -6,6 +6,16 @@
 
 ## Kanban summary
 
+**T-064 published Objects-component copy (2026-11-03; In Progress):**
+`AtlasObjectLibrary.copy_objects_to()` now stages checksum-verified current
+published source revisions and an unchanged registry in a separate campaign
+directory. Nested child IDs/transforms, source revisions, placements and NULL
+bindings remain referential rather than flattened; edits in a copied campaign
+remain isolated. A **37/37** real-file headless witness is fast-CI-gated.
+This is not a whole-campaign Save As or the still-undecided nested asset
+Save As/export policy. Direct canvas transforms and owner/hardware review also
+remain open; **T-064 stays In Progress**. See [T-064](Tickets/T-064.md).
+
 **T-064 explicit nested canvas selection (2026-11-03; In Progress):**
 Alt+click on a linked nested Object in Atlas now resolves its stable child-ID
 hit path, opens the existing parent-local inspector at the actual owning
