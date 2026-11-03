@@ -31,11 +31,18 @@ Do not turn a screen-only research recommendation into automatic runtime adoptio
 ## Targeted T-068 brush-geometry and input-to-frame evidence
 
 Fast push CI now additionally requires `tests/drawing_edit_tile_cache_smoke.gd`
-(`T068_TILE_CACHE_PASSED`, 31 checks) alongside the existing 125-check
-original-geometry oracle. It tests lazy chunk errors/retry, cached absent tiles,
-source revision conflicts and hidden RGB; it does not run heavy benchmarks.
+(`T068_TILE_CACHE_PASSED`, 31 checks) and
+`tests/drawing_publication_tile_cache_smoke.gd` (`T068_PUBLICATION_PASSED`,
+30 checks) alongside the existing 125-check original-geometry oracle. It tests lazy chunk errors/retry, cached absent tiles,
+source revision conflicts and hidden RGB. The publication witness checks
+per-tile source resolution, signed seams, stale originals, missing lazy blobs,
+reentrant provider edits, and atomic undo/redo; neither runs heavy benchmarks in push CI.
 
 The targeted `tests/drawing_raster_backend_benchmark.gd` compares 512/1024/2048 storage strides against the independent legacy compositor; `tests/drawing_latency_stress_visual.gd` drives 25 synthetic Control pointer gestures (stationary 4/32/64 canonical pixels, long and crossing), checks canonical Drawing revisions and actual framebuffer pixel changes, and records separate dispatch and `frame_post_draw` median/p95. Run the latter on Linux with software X11/Mesa, not in fast push CI. These timings do not measure physical GPU presentation or a Windows system. See [the T-068 CPU raster report](DRAWING_CPU_RASTER_BENCHMARK.md) for evidence and unresolved backend requirements.
+
+The separate `tests/drawing_publication_tile_cache_benchmark.gd` is **targeted**,
+not push-gating. Its isolated CPU commit median is not physical input-to-present
+latency. See raw before/after measurements in `docs/benchmarks/`.
 
 ## Deferred but retained
 

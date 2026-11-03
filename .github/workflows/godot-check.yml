@@ -215,6 +215,9 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_edit_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-tile-cache.log
           grep -q 'T068_TILE_CACHE_PASSED' /tmp/godot-t068-tile-cache.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_TILE_CACHE_FAILED:' /tmp/godot-t068-tile-cache.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_publication_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-publication.log
+          grep -q 'T068_PUBLICATION_PASSED' /tmp/godot-t068-publication.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_PUBLICATION_FAILED:' /tmp/godot-t068-publication.log; then exit 1; fi
       - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
         id: ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed
         if: ${{ !cancelled() }}

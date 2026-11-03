@@ -335,6 +335,12 @@ func _publish_edit(layer_id: String, expected: int,
 
 	var detached: Dictionary[String, DrawingRasterTile] = {}
 	var bounds: Dictionary[String, Array] = {}
+	# Publication validates every original before installing any detached tile.
+	# A source tile is immutable during the validation pass, barring a
+	# reentrant provider; revision/editability are checked again before install:
+	# resolve it once per touched tile, not once per changed pixel. Null is a
+	# valid resolved (unallocated) tile; failures are returned immediately.
+	var sources: Dictionary[String, Variant] = {}
 	for coordinate: String in after:
 		var components: PackedStringArray = coordinate.split(",")
 		if components.size() != 2:
@@ -343,16 +349,19 @@ func _publish_edit(layer_id: String, expected: int,
 		var y: int = int(components[1])
 		if coordinate != TILES.pixel_key64(x, y):
 			return DrawingResult.failure("COORD", "Noncanonical signed pixel coordinate")
-		var original: DrawingResult = read_pixel(layer_id, x, y)
-		if not original.ok:
-			return original
-		if int(original.value) != before.get(coordinate, -1):
-			return DrawingResult.failure("STALE_PIXEL", "Source pixel changed during gesture")
 		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
-		if not detached.has(tile_key):
-			var existing: DrawingRasterTile = _nodes[layer_id].tiles.get(tile_key)
-			detached[tile_key] = existing.detached_copy() if existing != null else DrawingRasterTile.new(tile_stride)
+		if not sources.has(tile_key):
+			var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
+			if not resolved.ok:
+				return resolved
+			sources[tile_key] = resolved.value
+		var existing: DrawingRasterTile = sources[tile_key] as DrawingRasterTile
 		var point: Vector2i = TILES.local_offset64(x, y, tile_stride)
+		var original: int = existing.get_rgba(point.x, point.y) if existing != null else 0
+		if original != before.get(coordinate, -1):
+			return DrawingResult.failure("STALE_PIXEL", "Source pixel changed during gesture")
+		if not detached.has(tile_key):
+			detached[tile_key] = existing.detached_copy() if existing != null else DrawingRasterTile.new(tile_stride)
 		detached[tile_key].set_rgba(point.x, point.y, after[coordinate])
 		if not bounds.has(tile_key):
 			bounds[tile_key] = [x, y, x, y]
@@ -363,6 +372,12 @@ func _publish_edit(layer_id: String, expected: int,
 			rect[2] = maxi(int(rect[2]), x)
 			rect[3] = maxi(int(rect[3]), y)
 
+	# A lazy source provider can invoke application code while resolving a tile.
+	# Reject reentrant revision/visibility changes before installing detached data.
+	if revision != expected:
+		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated the gesture")
+	if not _editable(layer_id):
+		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	# No owned pixels change until every source, digest and revision check succeeds.
 	var result: DrawingResult = DrawingResult.success(null)
 	for key: String in detached:

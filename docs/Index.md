@@ -6,6 +6,16 @@
 
 ## Kanban summary
 
+**T-068 publication-cache follow-up (2026-11-03; still In Progress):**
+`DrawingDocument` now resolves the immutable source tile once per touched
+tile while validating an atomic pixel publication. A new 30-check push-CI
+witness covers signed seams, hidden RGB, lazy-source errors, stale originals,
+and exact undo/redo. In a three-sample headless, commit-only benchmark across
+512/1024/2048 strides and 64²/128² changed regions, every median was lower
+(roughly 2.7–3.6×), but staging, UI and GPU costs were not measured. No
+third-party native backend or hardware gate was satisfied. See
+[T-068](Tickets/T-068.md) and [the report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 source-cache follow-up (2026-11-03; still In Progress):** the detached Drawing gesture now reuses successful per-tile source resolves rather than allocating a result per covered pixel. New 31-check lazy/corrupt/atomicity/signed-seam witness is fast-CI-gated; existing 693-check mixed benchmark parity and 81-check native software-frame stress both pass in before/after pairs. Most operation medians improved but some regressed; this is **not** proof of a stable speedup or native renderer adoption. External CPU comparisons and physical-device/Windows measurements remain open. See [T-068](Tickets/T-068.md) and [the CPU raster report](DRAWING_CPU_RASTER_BENCHMARK.md).
 
 **T-068 measured brush-path follow-up (2026-11-03; still In Progress):** a narrow stationary-dab fast path avoids unnecessary geometry projection for hard brushes without changing edit/storage schemas. The original geometry oracle passes 125 exact-pixel/undo tests at fractional coordinates and signed 64-bit anchors; a 693-check mixed raster benchmark matches the previous changed-pixel and undo sizes across three storage strides. Two 25-gesture native X11/Mesa stress runs (81/81 each) verify visible 4/32/64px dabs, long/crossing strokes, and expose costly large-brush CPU/frame submission, but not physical presentation. Native library comparisons and two-platform validation remain open. See [T-068](Tickets/T-068.md).

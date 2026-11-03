@@ -236,3 +236,37 @@ There is still no Windows or hardware-GPU validation, third-party Blend2D/
 Skia comparison, integrated optional GDExtension, VRAM/RSS measurement or
 multi-thread-jitter study. This is a safe, isolated optimization and **T-068
 remains In Progress** pending its original research acceptance.
+
+## 2026-11-03: commit-time tile resolution benchmark (T-068)
+
+Once the detached edit session has staged pixels, `DrawingDocument._publish_edit`
+validates every source original before installing any changed tile. It now
+resolves an immutable source tile **once per touched tile** for that single
+checked publication, rather than constructing a `read_pixel()` result for
+every changed pixel. An unresolved lazy tile still aborts the entire commit;
+null source tiles are valid and create detached tiles only on publication.
+This does not alter RGBA8 semantics, history, or the exposed read API.
+
+The pinned Godot 4.8 beta 2 headless microbenchmark runs three new-document
+samples per cell, timing only `_publish_edit` for 4,096 or 16,384 new pixels.
+Its output is **not** an end-to-end gesture/frame benchmark.
+
+| Source stride | 64×64 baseline → cached median | 128×128 baseline → cached median |
+| --- | ---: | ---: |
+| 512 | 59.225 → 16.441 ms | 224.672 → 83.902 ms |
+| 1024 | 53.453 → 19.705 ms | 216.894 → 76.303 ms |
+| 2048 | 51.222 → 16.830 ms | 210.705 → 69.773 ms |
+
+Raw per-sample files: [baseline](benchmarks/T068_2026-11-03_publication_baseline.json)
+and [cached](benchmarks/T068_2026-11-03_publication_cached.json). All six cases
+pass source-pixel and delta-count checks. A separate 30-assertion CI witness
+checks signed-tile resolution counts, transparent hidden RGB, stale originals,
+lazy loading/retry, reentrant provider revision changes, no partial commits,
+and undo/redo. Existing raster,
+history, composition and mapping regressions also pass. These synthetic
+three-sample medians may be noisy; no hardware speedup or backend adoption
+is implied. A post-change X11/Mesa native framebuffer witness also passed 81/81
+checks, with its [raw result](benchmarks/T068_2026-11-03_publication_native.json).
+Because no fresh native baseline was run for this change, the numbers are
+**not** claimed as a native speedup. Windows and actual presentation latency
+remain unmeasured.
