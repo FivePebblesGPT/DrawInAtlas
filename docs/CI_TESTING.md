@@ -60,6 +60,13 @@
   **22** targeted X11/Mesa checks (23 with optional screenshot). The standalone
   Drawing browser's Import still rejects Atlas-managed registries, and shared
   browser-to-Atlas physical-hardware review and owner acceptance remain open.
+- T-064 nested Object source-graph safety: `tests/object_child_graph_smoke.gd`
+  (`T064_CHILD_GRAPH_PASSED`, 56 checks) verifies real on-disk parent/child
+  references, bounded nonrecursive cycle/depth checks, immutable pixel Save,
+  optimistic index conflict handling, corrupt snapshot rollback, and nested
+  Remove/NULL confirmation behavior. This is **only the graph/persistence
+  milestone**; no recursive rendering/selection or owner UX acceptance is
+  implied. It runs in fast push CI.
 - T-065 Atlas-owned source safety: `tests/object_asset_repair_smoke.gd`
   (48 disk-backed checks) covers optimistic deletion confirmations,
   Remove/NULL policies, stable placement generations, explicit no-guess

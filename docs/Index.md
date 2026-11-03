@@ -6,6 +6,17 @@
 
 ## Kanban summary
 
+**T-064 cycle-safe nested-source graph milestone (2026-11-03; In Progress):**
+Atlas now stores optional stable child-source instances in its existing
+published Object registry, validates cycles/depth/IDs on mutation and load,
+and persists parent-local transforms and reverse dependencies. Pixel Save
+preserves child records; deletion's Remove/NULL policy applies atomically to
+nested references, including stale confirmation guards. The new 56-check
+headless witness is push-CI-gated. Nested rendering, hit testing, source
+editing and portable Save As/export semantics remain unfinished and cannot
+be claimed accepted. See [T-064](Tickets/T-064.md).
+
+
 **T-065 verified metadata page loading (2026-11-03; still In Progress):**
 Atlas now inspects the metadata of SHA-verified published sources without
 decoding every canonical pixel tile merely to populate a browser page.
@@ -213,7 +224,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
 | [T-063 · Compact Drawing UI and BarDivider overflow](Tickets/T-063.md) | Done | — | [T-053](Tickets/T-053.md) |
-| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | Ready | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | In Progress | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | In Progress | **Owner** | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Done | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
 | [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Done | — | [T-051](Tickets/T-051.md) |

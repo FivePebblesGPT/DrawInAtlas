@@ -267,9 +267,10 @@ func _ask_delete() -> void:
 		details.text = preview.message
 		return
 	_pending_delete = (preview.value as Dictionary).duplicate(true)
-	delete_confirmation.dialog_text = "Delete %s? %d instance(s) reference this source.\n\n" % [
-		_pending_delete["asset_id"], _pending_delete["bindings"].size()] + \
-		"Remove all references permanently from the registry, or keep selectable NULL proxies retaining their identity and transform. Source bytes are retained for recovery."
+	delete_confirmation.dialog_text = "Delete %s? %d map instance(s) and %d nested child reference(s) use this source.\n\n" % [
+		_pending_delete["asset_id"], _pending_delete["bindings"].size(),
+		_pending_delete.get("child_bindings", []).size()] + \
+		"Remove all references permanently from the registry, or keep NULL proxies retaining their identity and transform. Source bytes are retained for recovery."
 	delete_confirmation.popup_centered()
 
 

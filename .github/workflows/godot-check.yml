@@ -165,6 +165,16 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
           grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
+      - name: Verify T-064 nested Object child graph, safe saves and cycle rejection
+        id: ci_11b_verify_t_064_nested_object_graph
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_graph_smoke.gd 2>&1 | tee /tmp/godot-t064-child-graph.log
+          grep -q 'T064_CHILD_GRAPH_PASSED' /tmp/godot-t064-child-graph.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_GRAPH_FAILED:' /tmp/godot-t064-child-graph.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
         id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
         if: ${{ !cancelled() }}

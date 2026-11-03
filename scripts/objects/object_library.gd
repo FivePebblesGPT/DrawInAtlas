@@ -6,10 +6,12 @@ extends RefCounted
 
 signal asset_published(asset_id: String, revision: int)
 signal instances_changed(instance_ids: Array[String])
+signal child_graph_changed(asset_id: String, dependent_source_ids: Array[String])
 
 const SCHEMA: String = "atlas-objects-v1"
 const INDEX_LIMIT: int = 16777216
 const MAX_ENTRIES: int = 10000
+const CHILD_GRAPH: Script = preload("res://scripts/objects/object_child_graph.gd")
 
 var campaign_path: String = ""
 var root_path: String = ""
@@ -149,6 +151,85 @@ func instance_info(instance_id: String) -> Dictionary:
 	return record
 
 
+## Child references are owned by the published parent source, never by its
+## Atlas map placements. The returned records are detached from the registry.
+func children_for_asset(asset_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if not _assets.has(asset_id):
+		return result
+	for child: Dictionary in _assets[asset_id].get("children", []):
+		var item: Dictionary = child.duplicate(true)
+		item["status"] = "NULL" if item["placeholder"] or not _asset_available(item["source_id"]) else "linked"
+		result.append(item)
+	return result
+
+
+func children_revision(asset_id: String) -> int:
+	return int(_assets[asset_id].get("children_revision", 0)) if _assets.has(asset_id) else -1
+
+
+## A single index transaction changes the graph without altering immutable
+## Drawing source bytes or silently publishing a new pixel revision.
+func _replace_children(asset_id: String, expected_revision: int,
+		children: Array) -> DrawingResult:
+	if not _assets.has(asset_id) or children_revision(asset_id) != expected_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Nested source changed; refresh before editing")
+	var assets: Dictionary[String, Dictionary] = _assets_copy()
+	assets[asset_id]["children"] = children.duplicate(true)
+	assets[asset_id]["children_revision"] = expected_revision + 1
+	var checked: DrawingResult = CHILD_GRAPH.validate(assets)
+	if not checked.ok:
+		return checked
+	var saved: DrawingResult = _commit_index(assets, _instances_copy())
+	if saved.ok:
+		child_graph_changed.emit(asset_id, dependent_sources(asset_id))
+	return saved
+
+
+func attach_child(asset_id: String, expected_revision: int, child_source: String,
+		placement: Transform2D = Transform2D.IDENTITY) -> DrawingResult:
+	if not _asset_available(asset_id) or not _asset_available(child_source) 			or not _transform_valid(placement):
+		return DrawingResult.failure("CHILD_SOURCE", "Both sources must be available and transform invertible")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	var child_id: String = _new_id("child")
+	children.append({"id": child_id, "generation": _new_id("generation"),
+		"source_id": child_source,
+		"transform": [placement.x.x, placement.x.y, placement.y.x,
+			placement.y.y, placement.origin.x, placement.origin.y],
+		"visible": true, "placeholder": false, "revision": 0, "metadata": {}})
+	var result: DrawingResult = _replace_children(asset_id, expected_revision, children)
+	return DrawingResult.success(child_id) if result.ok else result
+
+
+func transform_child(asset_id: String, child_id: String, expected_revision: int,
+		placement: Transform2D) -> DrawingResult:
+	if not _assets.has(asset_id) or not _transform_valid(placement):
+		return DrawingResult.failure("CHILD", "Invalid parent or transform")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	for child: Dictionary in children:
+		if child["id"] == child_id:
+			child["transform"] = [placement.x.x, placement.x.y, placement.y.x,
+				placement.y.y, placement.origin.x, placement.origin.y]
+			child["revision"] = int(child["revision"]) + 1
+			return _replace_children(asset_id, expected_revision, children)
+	return DrawingResult.failure("CHILD", "Nested instance not found")
+
+
+func detach_child(asset_id: String, child_id: String, expected_revision: int) -> DrawingResult:
+	if not _assets.has(asset_id):
+		return DrawingResult.failure("CHILD", "Parent source missing")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	for index: int in range(children.size()):
+		if children[index]["id"] == child_id:
+			children.remove_at(index)
+			return _replace_children(asset_id, expected_revision, children)
+	return DrawingResult.failure("CHILD", "Nested instance not found")
+
+
+func dependent_sources(asset_id: String) -> Array[String]:
+	return CHILD_GRAPH.dependent_sources(_assets, asset_id)
+
+
 func _asset_available(asset_id: String) -> bool:
 	if not _assets.has(asset_id):
 		return false
@@ -200,9 +281,19 @@ func preview_delete_asset(asset_id: String) -> DrawingResult:
 		var item: AtlasObjectInstance = _instances[instance_id]
 		bindings.append({"id": item.id, "generation": item.generation,
 			"revision": item.revision, "source_id": item.source_id})
+	var child_bindings: Array[Dictionary] = []
+	for parent_id: String in asset_ids():
+		var parent: Dictionary = _assets[parent_id]
+		for child: Dictionary in parent.get("children", []):
+			if child["source_id"] == asset_id:
+				child_bindings.append({"parent_id": parent_id,
+					"children_revision": parent.get("children_revision", 0),
+					"id": child["id"], "generation": child["generation"],
+					"revision": child["revision"], "source_id": child["source_id"]})
 	return DrawingResult.success({"asset_id": asset_id,
 		"revision": _assets[asset_id]["revision"],
-		"registry_hash": _index_hash, "bindings": bindings})
+		"registry_hash": _index_hash, "bindings": bindings,
+		"child_bindings": child_bindings})
 
 
 ## Repair is an explicit, optimistic rebind. An absent source is never
@@ -376,6 +467,11 @@ func load_snapshot(snapshot: Dictionary) -> DrawingResult:
 		if not _transform_valid(item.transform) or instances.has(item.id):
 			return DrawingResult.failure("INDEX", "Invalid or duplicate placement")
 		instances[item.id] = item
+	# Validate all nested-reference edges before replacing live registry state.
+	# Old indexes without children remain valid and keep their original schema.
+	var graph: DrawingResult = CHILD_GRAPH.validate(assets)
+	if not graph.ok:
+		return graph
 	# Referenced missing/corrupt assets remain in the index as broken links.
 	_assets = assets
 	_instances = instances
@@ -541,6 +637,8 @@ func export_portable_source(asset_id: String, destination_path: String,
 		return DrawingResult.failure("STALE_SOURCE", "Refresh the selected published source")
 	if not _asset_available(asset_id):
 		return DrawingResult.failure("MISSING_SOURCE", "Published Object file is unavailable")
+	if not _assets[asset_id].get("children", []).is_empty():
+		return DrawingResult.failure("NESTED_EXPORT", "Nested links cannot yet be exported as a portable source")
 	var target: String = destination_path.simplify_path()
 	if not target.is_absolute_path() or not target.ends_with(".drawing") or \
 			target != destination_path or target.begins_with(root_path + "/"):
@@ -625,6 +723,11 @@ func save_draft(draft: AtlasObjectDraft) -> DrawingResult:
 	if not staged.ok:
 		return staged
 	var next_assets: Dictionary[String, Dictionary] = _assets_copy()
+	# A pixel-only source Save must never discard the registry-owned child graph.
+	# Use the latest graph, which may have changed independently of this draft.
+	if next_assets[draft.source_id].has("children"):
+		staged.value["children"] = next_assets[draft.source_id]["children"].duplicate(true)
+		staged.value["children_revision"] = next_assets[draft.source_id].get("children_revision", 0)
 	next_assets[draft.source_id] = staged.value
 	var saved: DrawingResult = _commit_index(next_assets, _instances_copy())
 	if not saved.ok:
@@ -690,6 +793,10 @@ func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 	if draft == null or not _assets.has(draft.source_id) or \
 		_assets[draft.source_id]["revision"] != draft.source_revision:
 		return DrawingResult.failure("STALE_SOURCE", "Source changed since draft opened")
+	# Child-copy ownership policy is still unresolved in T-064/T-051.
+	# Refuse rather than silently drop or duplicate source-linked children.
+	if not _assets[draft.source_id].get("children", []).is_empty():
+		return DrawingResult.failure("NESTED_SAVE_AS", "Nested Save As needs an explicit child-copy policy")
 	var label: String = variant_name.strip_edges() if not variant_name.is_empty() else draft.name + " copy"
 	if label.is_empty() or label.length() > 128 or "\n" in label or "\r" in label:
 		return DrawingResult.failure("NAME", "Invalid new Object Asset name")
@@ -950,9 +1057,36 @@ func delete_asset(asset_id: String, policy: String,
 			else:
 				next_instances[instance_id].placeholder = true
 				next_instances[instance_id].revision += 1
+	var touched_parents: Array[String] = []
+	for parent_id: String in next_assets.keys():
+		if parent_id == asset_id:
+			continue
+		var parent: Dictionary = next_assets[parent_id]
+		var children: Array = parent.get("children", [])
+		var retained: Array = []
+		var changed: bool = false
+		for child: Dictionary in children:
+			if child["source_id"] != asset_id:
+				retained.append(child)
+				continue
+			changed = true
+			if policy == "null":
+				var null_child: Dictionary = child.duplicate(true)
+				null_child["placeholder"] = true
+				null_child["revision"] = int(null_child["revision"]) + 1
+				retained.append(null_child)
+		if changed:
+			parent["children"] = retained
+			parent["children_revision"] = int(parent.get("children_revision", 0)) + 1
+			touched_parents.append(parent_id)
 	next_assets.erase(asset_id)
+	var graph: DrawingResult = CHILD_GRAPH.validate(next_assets)
+	if not graph.ok:
+		return graph
 	var saved: DrawingResult = _commit_index(next_assets, next_instances)
 	if saved.ok:
 		_cache.erase(asset_id)
 		instances_changed.emit(touched)
+		for parent_id: String in touched_parents:
+			child_graph_changed.emit(parent_id, dependent_sources(parent_id))
 	return saved
