@@ -16,6 +16,17 @@
 - T-079 dock UI renders from the same model; its targeted **native** Xvfb/Mesa witness (`drawing/tests/dock_ui_native.gd`, 40 assertions) remains non-push engineering acceptance, alongside the T-063 native 75-check regression. T-080 native drag `drawing/tests/dock_reorder_native.gd` (68 assertions: press/hover/release, cancellations, hints, overflow, keyboard and viewport) and T-081 native `drawing/tests/dock_float_native.gd` (55 assertions) likewise remain targeted/non-push.
 - Each check retains its original GitHub Actions `steps.*.outcome` even with `continue-on-error: true`; the final summary still fails the job if any required check fails. Scripted Godot processes have 120-second watchdogs.
 
+## Targeted renderer/LOD feasibility evidence (T-057, completed research)
+
+T-057 uses reproducible **non-push** headless and native renderer benchmarks:
+`tests/t057_lod_headless.gd` (249 checks when writing raw JSON),
+`tests/t057_lod_native.gd` (36 native X11/Mesa checks), and the retained
+`tests/drawing_raster_upload_benchmark.gd` (four full-tile update sizes).
+Results, hardware limits and the retain-Godot decision are in
+[DRAWING_LOD_RENDERER_BENCHMARK.md](DRAWING_LOD_RENDERER_BENCHMARK.md).
+These measure software-GL frame submission, not physical GPU scanout or Windows.
+Do not turn a screen-only research recommendation into automatic runtime adoption.
+
 ## Deferred but retained
 
 - Historical Atlas/battlemat/selection/move/shape/wall smoke tests, especially T-014, T-019, T-022, T-024, T-025 and T-026. Some assert superseded `AtlasRasterLayer` ownership while the current editor writes canonical `DrawingDocument`. Investigate and repair each contract as related features are implemented rather than weakening expectations or claiming success.

@@ -1,0 +1,66 @@
+{
+  "backend": "gl_compatibility",
+  "cases": [
+    {
+      "force_draw": {
+        "median_ms": 3.874,
+        "p95_ms": 70.513
+      },
+      "region": 128,
+      "rgba8_bytes": 65536,
+      "update": {
+        "median_ms": 0.027,
+        "p95_ms": 0.136
+      }
+    },
+    {
+      "force_draw": {
+        "median_ms": 4.757,
+        "p95_ms": 5.305
+      },
+      "region": 256,
+      "rgba8_bytes": 262144,
+      "update": {
+        "median_ms": 0.032,
+        "p95_ms": 0.07
+      }
+    },
+    {
+      "force_draw": {
+        "median_ms": 3.614,
+        "p95_ms": 4.685
+      },
+      "region": 512,
+      "rgba8_bytes": 1048576,
+      "update": {
+        "median_ms": 0.08,
+        "p95_ms": 0.238
+      }
+    },
+    {
+      "force_draw": {
+        "median_ms": 3.787,
+        "p95_ms": 4.402
+      },
+      "region": 1024,
+      "rgba8_bytes": 4194304,
+      "update": {
+        "median_ms": 0.318,
+        "p95_ms": 0.347
+      }
+    }
+  ],
+  "engine": {
+    "build": "official",
+    "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+    "hex": 264192,
+    "major": 4,
+    "minor": 8,
+    "patch": 0,
+    "status": "beta2",
+    "string": "4.8-beta2 (official)",
+    "timestamp": 0
+  },
+  "failures": 0,
+  "schema": "t068-upload-v1"
+}
