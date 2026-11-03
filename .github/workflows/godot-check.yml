@@ -318,7 +318,7 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_thumbnails_smoke.gd 2>&1 | tee /tmp/godot-t065-thumbnails.log
           grep -q 'T065_THUMBNAILS_PASSED' /tmp/godot-t065-thumbnails.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T065_THUMB_FAILED:' /tmp/godot-t065-thumbnails.log; then exit 1; fi
-      - name: Verify T-065 large disk-backed Object source decoding and cache safety
+      - name: Verify T-065 Object metadata listing, full pixel decoding and cache safety
         id: ci_t065_real_source_io
         if: ${{ !cancelled() }}
         continue-on-error: true

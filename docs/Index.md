@@ -6,6 +6,14 @@
 
 ## Kanban summary
 
+**T-065 verified metadata page loading (2026-11-03; still In Progress):**
+Atlas now inspects the metadata of SHA-verified published sources without
+decoding every canonical pixel tile merely to populate a browser page.
+Thumbnail, Edit Source and placement paths retain full pixel validation. The
+expanded 49-check disk-backed source witness tests the trust boundary; its
+short 351 KB CPU diagnostic is not physical Windows/Linux performance evidence.
+Owner keyboard/pointer approval remains required. See [T-065](Tickets/T-065.md).
+
 **T-065 real-file source I/O and page cache (2026-11-03; still In Progress):**
 The canonical Object Editor now parses each bounded Drawing source once to
 validate both pixels and metadata from the same file snapshot. The shared

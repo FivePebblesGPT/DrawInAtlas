@@ -33,8 +33,11 @@
 - T-065 real-file source parsing: `drawing/tests/asset_browser_real_io_smoke.gd`
   exercises a 351 KB, four-tile Object source, canonical pixel/metadata
   round-trip, corruption rejection, thumbnail cache and missing-source safety
-  (**31 headless checks**). The bounded JSON envelope is parsed once for both
-  Drawing pixels and Object metadata; Atlas paged browsing keeps unmodified
+  (**49 headless checks**). The bounded JSON envelope is parsed once for both
+  Drawing pixels and Object metadata on full Open; an explicit
+  metadata-only inspection now populates SHA-verified Atlas pages without
+  decoding canonical blobs. The full loader, not that inspection, continues
+  to authorize previews, Open, import/export and placement; Atlas paged browsing keeps unmodified
   off-page thumbnails within the existing 24-image LRU, but invalidates changed
   revisions and different campaign roots. Timings are diagnostic only; no
   production hardware latency threshold is implied. This runs in fast CI.

@@ -77,6 +77,14 @@ func _run() -> void:
 		"real Object payload exceeds 250 KB and remains below bounded loader limit")
 	var payload: DrawingResult = DrawingFileIO.read_payload(source)
 	_check(payload.ok and payload.value is Dictionary, "read canonical JSON once")
+	var inspected: DrawingResult = DrawingObjectEditorFile.inspect_metadata(source)
+	_check(inspected.ok and inspected.value["source_id"] == "large-source" and
+		inspected.value["source_revision"] == 3 and
+		inspected.value["bounds"] == Rect2i(0, 0, 256, 256) and
+		inspected.value["origin"] == Vector2i(5, 9),
+		"bounded metadata-only inspection returns exact published source frame")
+	_check(inspected.ok and not inspected.value.has("document"),
+		"metadata listing cannot be mistaken for a verified decoded document")
 	var new_open: DrawingResult = DrawingObjectEditorFile.open(source)
 	var older_open: DrawingResult = _old_two_read_open(source)
 	_check(new_open.ok and older_open.ok, "new and legacy I/O shapes decode valid pixels")
@@ -118,6 +126,30 @@ func _run() -> void:
 		_check(prior.ok and current.ok, "large source read repetition %d" % index)
 	print("T065_REAL_IO_DIAGNOSTIC bytes=%d old_six_opens_us=%d single_six_opens_us=%d" % [
 		file_size, legacy_us, single_us])
+	# Compare the exact Atlas browser's former full-decode shape against its
+	# new registry-checked listing operation. Do not assert timing thresholds.
+	var full_listing_us: int = 0
+	var metadata_listing_us: int = 0
+	for iteration: int in range(6):
+		var first: int = Time.get_ticks_usec()
+		if iteration % 2 == 0:
+			_check(DrawingObjectEditorFile.open(source).ok,
+				"full listing baseline %d" % iteration)
+			full_listing_us += Time.get_ticks_usec() - first
+			first = Time.get_ticks_usec()
+			_check(DrawingObjectEditorFile.inspect_metadata(source).ok,
+				"metadata listing %d" % iteration)
+			metadata_listing_us += Time.get_ticks_usec() - first
+		else:
+			_check(DrawingObjectEditorFile.inspect_metadata(source).ok,
+				"metadata listing %d" % iteration)
+			metadata_listing_us += Time.get_ticks_usec() - first
+			first = Time.get_ticks_usec()
+			_check(DrawingObjectEditorFile.open(source).ok,
+				"full listing baseline %d" % iteration)
+			full_listing_us += Time.get_ticks_usec() - first
+	print("T065_METADATA_LISTING_DIAGNOSTIC bytes=%d full_six_us=%d metadata_six_us=%d" % [
+		file_size, full_listing_us, metadata_listing_us])
 	var indexer: DrawingAssetBrowserIndex = DrawingAssetBrowserIndex.new()
 	_check(indexer.scan(objects).ok and indexer.entries.size() == 1,
 		"real large Object is indexed by its embedded source ID")
@@ -141,6 +173,8 @@ func _run() -> void:
 			_check(_write_json(corrupt_path, damaged), "write changed base64 without updating digest")
 			_check(not DrawingObjectEditorFile.open(corrupt_path).ok,
 				"single-read Object loader rejects corrupted canonical pixel bytes")
+			_check(DrawingObjectEditorFile.inspect_metadata(corrupt_path).ok,
+				"metadata-only listing intentionally does not certify pixel integrity")
 			_check(not DrawingFileIO.open(corrupt_path).ok,
 				"ordinary Drawing loader still rejects same corrupted source")
 		var invalid: Dictionary = (payload.value as Dictionary).duplicate(true)
@@ -149,6 +183,18 @@ func _run() -> void:
 		_check(DrawingFileIO.open(corrupt_path).ok and
 			not DrawingObjectEditorFile.open(corrupt_path).ok,
 			"Drawing remains readable but Object identity contract rejects bad metadata")
+		_check(not DrawingObjectEditorFile.inspect_metadata(corrupt_path).ok,
+			"metadata inspection rejects invalid Object names before listing")
+		(invalid["object_source"] as Dictionary)["name"] = "Valid source"
+		(invalid["object_source"] as Dictionary)["source_id"] = "wrong-document-id"
+		_check(_write_json(corrupt_path, invalid) and
+			not DrawingObjectEditorFile.inspect_metadata(corrupt_path).ok,
+			"metadata inspection rejects mismatched embedded document identity")
+		(invalid["object_source"] as Dictionary)["source_id"] = "large-source"
+		invalid["standalone_schema"] = "invalid-schema"
+		_check(_write_json(corrupt_path, invalid) and
+			not DrawingObjectEditorFile.inspect_metadata(corrupt_path).ok,
+			"metadata inspection rejects unsupported standalone schemas")
 	_check(indexer.safe_to_open(indexed) and thumbnails.renders == 1,
 		"unmodified published source remains authorized after malicious neighbor")
 	_check(not DrawingObjectEditorFile.open(objects.path_join("missing.drawing")).ok and

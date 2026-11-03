@@ -355,7 +355,7 @@ func _refresh_asset_browser() -> void:
 			warnings.append("Skipped unavailable published source: " + source_id)
 			continue
 		var path: String = library._absolute(String(item["path"]))
-		var embedded: DrawingResult = DrawingObjectEditorFile.open(path)
+		var embedded: DrawingResult = DrawingObjectEditorFile.inspect_metadata(path)
 		if not embedded.ok:
 			warnings.append("Skipped unreadable published source: " + source_id)
 			continue
