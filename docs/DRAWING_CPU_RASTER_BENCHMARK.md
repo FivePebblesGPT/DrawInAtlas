@@ -434,3 +434,50 @@ pointer-to-frame latency, or physical Windows/Linux/GPU performance.
 T-068 remains **In Progress** pending the original backend comparisons,
 optional extension boundary, physical metrics and operation-by-operation
 recommendation.
+
+
+## 2026-11-03: native software frame timing and sampled allocation counters for canonical fill
+
+A new **test-only** native GUI adapter delivers a synthetic Control mouse
+release to `DrawingEditSession.flood_fill()` and publishes through
+`DrawingCanvas`. This makes the previously missing *fill transaction → software
+frame submission* path observable, while intentionally avoiding any claim that
+production Atlas or standalone Bucket tool wiring was tested. The same
+64/96/32-side RGBA8 rectangles are seeded on fresh 128-stride documents; five
+trials per size per process, two independent X11/Mesa llvmpipe processes.
+An exact changed-pixel count, source value, revision and *visible framebuffer*
+probe are assertions, not inferred from timestamps. A budget-rejected click
+is also required not to change canonical content or the framebuffer.
+
+| Pixels | Run 1 CPU / post-draw (ms) | Run 2 CPU / post-draw (ms) |
+|---|---:|---:|
+| 32² | 12.903 / 35.126 | 14.754 / 36.934 |
+| 64² | 57.530 / 85.673 | 56.060 / 84.385 |
+| 96² | 134.877 / 168.214 | 141.533 / 176.683 |
+
+These are each **medians of only five trials**. Per-trial values and
+five-sample p95s (effectively the maximum), sampled Godot static memory,
+renderer-reported VRAM and texture counters are recorded in
+[raw JSON](benchmarks/T068_2026-11-03_bucket_frame_native.json).
+Typical sampled values were approximately 97 MB Godot static memory,
+12.9 MB renderer-reported video memory and 6.4 MB texture allocation;
+these values include the process, canvas and software renderer. They are
+*not* peak physical process RSS/VRAM, per-fill allocations, or cross-platform
+jitter measurements. The software frame-post-draw signal is not GPU scanout
+or actual visible-to-human latency, and synthetic input is not OS pointer
+hardware interaction. No before/after backend comparison was performed.
+
+Reproduce locally after Godot 4.8 beta2 main-project import:
+
+```sh
+xvfb-run -a -s '-screen 0 1280x900x24' godot --audio-driver Dummy \
+  --rendering-driver opengl3 --rendering-method gl_compatibility --path . \
+  --script res://tests/drawing_fill_frame_native.gd -- \
+  --output /tmp/t068-fill-frame.json --screenshot /tmp/t068-fill-frame.png
+```
+
+An on-demand `.github/workflows/godot-native-t068-fill.yml` performs this
+outside fast push CI and uploads the evidence. T-068 remains In Progress:
+third-party kernel comparisons, optional native boundary, Windows/Linux
+physical-device, actual memory high-water, jitter and operation decision
+remain open.

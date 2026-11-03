@@ -7,6 +7,15 @@
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
 - T-051–053 isolated Drawing contract, core, standalone consumer and Linux desktop release package.
 - Main project import before GDScript tests: T-015 marker-only authoring and archived-data boundary (13/23), link/history and link form (29/55), overview (67), stale-result (27), hierarchy (44), Organization UI (84) and reference controls (17), all on the modern marker model; T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
+- T-068 targeted *non-push* canonical Bucket fill-to-software-frame witness:
+  `tests/drawing_fill_frame_native.gd` verifies the real Drawing fill and
+  renderer behind a **test-only** GUI release adapter, with signed RGBA8
+  delta/revision checks, framebuffer pixel changes, and rollback on small
+  budgets. Two Xvfb/Mesa runs passed 96 and 95 checks; the optional screenshot
+  and JSON diagnostics are reproduced through manual
+  `.github/workflows/godot-native-t068-fill.yml`. This witness is deliberately
+  **excluded** from fast push/PR CI. It does not measure the production Bucket
+  UI, hardware input, real display scan-out or true peak RSS/VRAM.
 - T-068 verified cached flood-fill sources:
   `tests/drawing_fill_tile_cache_smoke.gd` (**30** fast-CI assertions) checks
   four-connected fills on verified lazy Object tiles as well as resident
