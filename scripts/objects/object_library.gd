@@ -218,6 +218,30 @@ func transform_child(asset_id: String, child_id: String, expected_revision: int,
 	return DrawingResult.failure("CHILD", "Nested instance not found")
 
 
+## Visibility is a parent-owned child layout edit, not a source pixel edit.
+## Check both identities/revisions so a stale inspector cannot affect a
+## different generation of the same instance or publish a partial layout.
+func set_child_visibility(asset_id: String, child_id: String, expected_revision: int,
+		expected_generation: String, expected_child_revision: int,
+		visible: bool) -> DrawingResult:
+	if not _assets.has(asset_id) or children_revision(asset_id) != expected_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before editing visibility")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	for child: Dictionary in children:
+		if String(child["id"]) != child_id:
+			continue
+		if String(child["generation"]) != expected_generation or \
+				int(child["revision"]) != expected_child_revision:
+			return DrawingResult.failure("STALE_CHILDREN", "Child identity changed; reload before editing visibility")
+		if bool(child["visible"]) == visible:
+			return DrawingResult.success(false)
+		child["visible"] = visible
+		child["revision"] = int(child["revision"]) + 1
+		var changed: DrawingResult = _replace_children(asset_id, expected_revision, children)
+		return DrawingResult.success(true) if changed.ok else changed
+	return DrawingResult.failure("CHILD", "Nested instance not found")
+
+
 func detach_child(asset_id: String, child_id: String, expected_revision: int) -> DrawingResult:
 	if not _assets.has(asset_id):
 		return DrawingResult.failure("CHILD", "Parent source missing")

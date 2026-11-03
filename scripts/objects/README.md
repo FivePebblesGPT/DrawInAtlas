@@ -241,3 +241,17 @@ The parent-local `AtlasObjectChildEditSession.repair_selected()` participates
 in the same Undo/Redo timeline as structure and transforms. A stale session
 must reload; a live child is not eligible for repair. Export/Save As nested
 copying policy remains an explicit separate product decision.
+
+
+## Nested child visibility (T-064 engineering milestone)
+
+`AtlasObjectChildInspector` exposes **Hide selected / Show selected** for
+published child instances. The source's immutable pixels are untouched;
+`AtlasObjectLibrary.set_child_visibility()` validates exact graph revision,
+child generation and revision before committing the parent's `visible` field.
+Hidden children and all descendants are omitted from render/hit traversal,
+but their IDs/transforms remain selectable in the parent inspector for later
+re-show. The existing child-edit session records the action with reversible
+Undo/Redo; graph-change signaling invalidates Atlas previews. The dedicated
+`tests/object_child_visibility_smoke.gd` is CI-gated. This does not settle
+nested source Save As/export policy or owner interaction acceptance.

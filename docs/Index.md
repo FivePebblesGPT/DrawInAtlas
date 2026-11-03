@@ -6,6 +6,17 @@
 
 ## Kanban summary
 
+**T-064 nested child visibility (2026-11-03; In Progress):**
+The Object Manager nested inspector now hides/shows a selected child without
+removing its stable identity or source pixels. Hidden child subtrees leave
+Atlas preview rendering and hit paths, while remaining selectable in the
+inspector. One parent-scoped action supports Undo/Redo; stale revisions and
+publication vetoes fail closed. A dedicated **39/39** headless test is in
+fast CI; the targeted native inspector screenshot witness passes **40/40**.
+This is engineering evidence, not physical-device or owner UX signoff;
+**T-064 remains In Progress** pending single-source Save As/export policy and
+remaining validation. See [T-064](Tickets/T-064.md).
+
 **T-064 saved-campaign copy UI (2026-11-03; In Progress):**
 Atlas File → Copy saved campaign… (Ctrl/Cmd+Shift+S) now clones the last
 checkpoint into a fresh directory through the verified T-066 campaign-copy

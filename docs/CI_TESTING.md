@@ -102,6 +102,14 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 reversible visibility in nested parent layouts:
+  `tests/object_child_visibility_smoke.gd` (**39** headless assertions,
+  fast push CI) checks optimistic child generation and parent revision,
+  pixel-source isolation, no-op and publication veto, mixed Undo/Redo,
+  hidden descendants excluded from render/hit paths, Atlas cache
+  invalidation, portable reload and the live inspector Hide/Show control.
+  A targeted Xvfb/Mesa inspector screenshot passes **40** checks; it is not
+  push-gated and does not imply physical owner UX approval.
 - T-064 explicit nested canvas targeting: `tests/object_child_canvas_select_smoke.gd`
   (**21** headless checks, fast push CI) verifies normal root selection versus
   Alt+click child/grandchild selection in the shared Atlas inspector, preserved

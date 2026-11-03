@@ -127,6 +127,35 @@ func _saved_record(child_id: String) -> Dictionary:
 	return row
 
 
+## Hidden children remain selectable in the inspector but disappear from
+## traversal, preview rendering and canvas hit-testing. One edit = one undo.
+func set_selected_visibility(visible: bool) -> DrawingResult:
+	if is_stale():
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before editing visibility")
+	var row: Dictionary = selected_record()
+	if row.is_empty():
+		return DrawingResult.failure("CHILD", "Select a current nested child")
+	if bool(row["visible"]) == visible:
+		return DrawingResult.success(false)
+	var changed: DrawingResult = library.set_child_visibility(parent_source_id,
+		selected_child_id, expected_revision, String(row["generation"]),
+		int(row["revision"]), visible)
+	if not changed.ok:
+		return changed
+	expected_revision += 1
+	_record_operation({"kind": "visibility", "child": selected_child_id,
+		"generation": String(row["generation"]), "source": String(row["source_id"]),
+		"before": bool(row["visible"]), "after": visible})
+	return DrawingResult.success(true)
+
+
+func toggle_selected_visibility() -> DrawingResult:
+	var record: Dictionary = selected_record()
+	if record.is_empty():
+		return DrawingResult.failure("CHILD", "Select a current nested child")
+	return set_selected_visibility(not bool(record["visible"]))
+
+
 func translate_selected(delta: Vector2) -> DrawingResult:
 	if is_stale():
 		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before editing")
@@ -201,6 +230,18 @@ func _replay(forward: bool) -> DrawingResult:
 			String(desired["source_id"]), bool(desired["placeholder"]), desired["metadata"])
 		if result.ok:
 			selected_child_id = String(operation["child"])
+	elif operation["kind"] == "visibility":
+		var row: Dictionary = _record(String(operation["child"]))
+		var from_visible: bool = bool(operation["before"]) if forward else bool(operation["after"])
+		var to_visible: bool = bool(operation["after"]) if forward else bool(operation["before"])
+		if row.is_empty() or String(row["generation"]) != operation["generation"] or \
+				String(row["source_id"]) != operation["source"] or bool(row["visible"]) != from_visible:
+			return DrawingResult.failure("STALE_CHILDREN", "History child identity or visibility changed")
+		result = library.set_child_visibility(parent_source_id, String(operation["child"]),
+			expected_revision, String(row["generation"]), int(row["revision"]), to_visible)
+		if result.ok:
+			selected_child_id = String(operation["child"])
+
 	elif operation["kind"] == "transform":
 		var row: Dictionary = _record(String(operation["child"]))
 		var source: Transform2D = operation["before"] if forward else operation["after"]

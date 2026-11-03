@@ -14,6 +14,7 @@ const MAX_SOURCE_CHOICES: int = 128
 var attach_button: Button
 var detach_button: Button
 var repair_button: Button
+var visibility_button: Button
 var _candidate_ids: Array[String] = []
 var undo_button: Button
 var redo_button: Button
@@ -66,6 +67,8 @@ func _ready() -> void:
 	root.add_child(actions)
 	open_button = _button(actions, "Edit child source…", "EditChildSource", _open_child)
 	open_button.tooltip_text = "Open the referenced asset in its own Object Editor tab; Save publishes its pixels"
+	visibility_button = _button(actions, "Hide selected", "ToggleChildVisibility", _toggle_visibility)
+	visibility_button.tooltip_text = "Hide/show this instance without altering its source or deleting its stable ID; supports child Undo"
 	_button(actions, "←", "MoveLeft", func() -> void: _translate(Vector2.LEFT))
 	_button(actions, "→", "MoveRight", func() -> void: _translate(Vector2.RIGHT))
 	_button(actions, "↑", "MoveUp", func() -> void: _translate(Vector2.UP))
@@ -164,8 +167,9 @@ func refresh(message: String = "") -> void:
 		for child: Dictionary in session.library.children_for_asset(session.parent_source_id):
 			var source_info: Dictionary = session.library.asset_info(String(child["source_id"]))
 			var source_name: String = String(source_info.get("name", "Missing source"))
-			var label: String = "%s · %s · %s" % [source_name,
-				String(child["id"]).left(14), child["status"]]
+			var label: String = "%s · %s · %s%s" % [source_name,
+				String(child["id"]).left(14), child["status"],
+				" · hidden" if not bool(child["visible"]) else ""]
 			var index: int = child_list.add_item(label)
 			_rows.append(String(child["id"]))
 			child_list.set_item_tooltip(index, "Stable instance ID: %s\nChild source: %s" % [
@@ -176,6 +180,8 @@ func refresh(message: String = "") -> void:
 	var ready: bool = not session.is_stale() and not record.is_empty()
 	open_button.disabled = not ready or record["status"] != "linked"
 	detach_button.disabled = not ready
+	visibility_button.disabled = not ready
+	visibility_button.text = "Show selected" if ready and not bool(record["visible"]) else "Hide selected"
 	repair_button.disabled = not ready or record["status"] != "NULL" or source_picker.disabled
 	undo_button.disabled = not session.can_undo()
 	redo_button.disabled = not session.can_redo()
@@ -191,8 +197,9 @@ func refresh(message: String = "") -> void:
 	else:
 		var source_name: String = String(session.library.asset_info(String(record["source_id"])).get(
 			"name", "Missing source"))
-		details.text = "%s · local origin (%.1f, %.1f) · source pixels unchanged" % [
-			source_name, record["transform"][4], record["transform"][5]]
+		details.text = "%s · %s · local origin (%.1f, %.1f) · source pixels unchanged" % [
+			source_name, "visible" if bool(record["visible"]) else "hidden",
+			record["transform"][4], record["transform"][5]]
 
 
 func actions_node() -> Control:
@@ -227,6 +234,11 @@ func _repair_child() -> void:
 		return
 	var repaired: DrawingResult = session.repair_selected(_candidate_ids[index])
 	refresh("Nested child source repaired (Undo available)" if repaired.ok else repaired.message)
+
+
+func _toggle_visibility() -> void:
+	var changed: DrawingResult = session.toggle_selected_visibility()
+	refresh("" if changed.ok else changed.message)
 
 
 func _translate(delta: Vector2) -> void:
