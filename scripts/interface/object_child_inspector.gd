@@ -13,6 +13,7 @@ var source_filter: LineEdit
 const MAX_SOURCE_CHOICES: int = 128
 var attach_button: Button
 var detach_button: Button
+var repair_button: Button
 var _candidate_ids: Array[String] = []
 var undo_button: Button
 var redo_button: Button
@@ -59,6 +60,8 @@ func _ready() -> void:
 	attach_button = _button(insert_actions, "Attach source", "AttachChild", _attach_child)
 	detach_button = _button(insert_actions, "Remove selected", "DetachChild", _detach_child)
 	detach_button.tooltip_text = "Remove this instance, not its source pixels; child Undo restores its identity"
+	repair_button = _button(insert_actions, "Repair NULL with source", "RepairChild", _repair_child)
+	repair_button.tooltip_text = "Explicitly replace a missing nested source; preserves the child position and supports Undo"
 	var actions: HFlowContainer = HFlowContainer.new()
 	root.add_child(actions)
 	open_button = _button(actions, "Edit child source…", "EditChildSource", _open_child)
@@ -173,6 +176,7 @@ func refresh(message: String = "") -> void:
 	var ready: bool = not session.is_stale() and not record.is_empty()
 	open_button.disabled = not ready or record["status"] != "linked"
 	detach_button.disabled = not ready
+	repair_button.disabled = not ready or record["status"] != "NULL" or source_picker.disabled
 	undo_button.disabled = not session.can_undo()
 	redo_button.disabled = not session.can_redo()
 	reload_button.disabled = not valid
@@ -214,6 +218,15 @@ func _attach_child() -> void:
 func _detach_child() -> void:
 	var detached: DrawingResult = session.detach_selected()
 	refresh("" if detached.ok else detached.message)
+
+
+func _repair_child() -> void:
+	var index: int = source_picker.get_selected()
+	if index < 0 or index >= _candidate_ids.size():
+		refresh("Choose a verified replacement Object source first")
+		return
+	var repaired: DrawingResult = session.repair_selected(_candidate_ids[index])
+	refresh("Nested child source repaired (Undo available)" if repaired.ok else repaired.message)
 
 
 func _translate(delta: Vector2) -> void:

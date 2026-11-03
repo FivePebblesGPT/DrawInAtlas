@@ -208,6 +208,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_structure_smoke.gd 2>&1 | tee /tmp/godot-t064-child-structure.log
           grep -q 'T064_CHILD_STRUCTURE_PASSED' /tmp/godot-t064-child-structure.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_STRUCTURE_FAILED:' /tmp/godot-t064-child-structure.log; then exit 1; fi
+          # Repair retained NULL children through the same optimistic graph
+          # boundary and reversible parent-scoped history (no owner UX gate).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_null_repair_smoke.gd 2>&1 | tee /tmp/godot-t064-child-null-repair.log
+          grep -q 'T064_CHILD_REPAIR_PASSED' /tmp/godot-t064-child-null-repair.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_REPAIR_FAILED:' /tmp/godot-t064-child-null-repair.log; then exit 1; fi
           # Alt+click must resolve the correct nested parent through the live
           # Atlas canvas, without resetting child-local history or map context.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_canvas_select_smoke.gd 2>&1 | tee /tmp/godot-t064-child-canvas.log

@@ -6,6 +6,17 @@
 
 ## Kanban summary
 
+**T-064 explicit nested NULL repair (2026-11-03; In Progress):**
+A missing/deleted nested Object source can now be rebound to an explicitly
+selected verified source through the existing child inspector, preserving its
+stable child ID, generation, parent-local transform and original missing-source
+ID. Repair and parent-local Undo/Redo share one optimistic graph transaction;
+indirect cycles, stale child/parent revisions and rejected publications leave
+registry bytes unchanged. A dedicated **45-check** headless witness is fast-CI-
+gated, with **46/46** checks in the native screenshot run. This does not decide nested
+Save As/export graph-copy semantics or grant physical owner acceptance.
+**T-064 remains In Progress.** See [T-064](Tickets/T-064.md).
+
 **T-064 nested canvas pointer transforms (2026-11-03; In Progress):**
 Alt+drag on a published nested child now stages a transient canvas guide and
 commits one immediate-parent-local transform on release, preserving the

@@ -245,6 +245,60 @@ func _restore_child_snapshot(asset_id: String, expected_revision: int,
 	return _replace_children(asset_id, expected_revision, children)
 
 
+## Rebind one child without changing its stable identity or local transform.
+## History can restore a NULL link only through this checked private boundary;
+## all callers share the same graph validation and atomic index publication.
+func _set_child_binding(parent_id: String, child_id: String,
+		expected_parent_revision: int, expected_generation: String,
+		expected_child_revision: int, source_id: String, placeholder: bool,
+		metadata: Dictionary) -> DrawingResult:
+	if not _assets.has(parent_id) or children_revision(parent_id) != expected_parent_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Parent source changed before child repair")
+	if not placeholder and not _asset_available(source_id):
+		return DrawingResult.failure("MISSING_SOURCE", "Choose an available published replacement source")
+	var children: Array = _assets[parent_id].get("children", []).duplicate(true)
+	for child: Dictionary in children:
+		if child["id"] != child_id:
+			continue
+		if child["generation"] != expected_generation or int(child["revision"]) != expected_child_revision:
+			return DrawingResult.failure("STALE_CHILDREN", "Child identity or revision has changed")
+		child["source_id"] = source_id
+		child["placeholder"] = placeholder
+		child["metadata"] = metadata.duplicate(true)
+		child["revision"] = expected_child_revision + 1
+		return _replace_children(parent_id, expected_parent_revision, children)
+	return DrawingResult.failure("CHILD", "Nested child no longer exists")
+
+
+## Explicit NULL repair never guesses a replacement by name. The original
+## source ID survives in metadata for forensic/UX inspection and undo.
+func repair_child_placeholder(parent_id: String, child_id: String,
+		expected_parent_revision: int, expected_generation: String,
+		expected_child_revision: int, replacement_source_id: String) -> DrawingResult:
+	if not _assets.has(parent_id) or children_revision(parent_id) != expected_parent_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Reload parent before repairing a nested child")
+	var children: Array = _assets[parent_id].get("children", [])
+	for child: Dictionary in children:
+		if child["id"] != child_id:
+			continue
+		if child["generation"] != expected_generation or int(child["revision"]) != expected_child_revision:
+			return DrawingResult.failure("STALE_CHILDREN", "Nested child changed before repair")
+		if not bool(child["placeholder"]) and _asset_available(String(child["source_id"])):
+			return DrawingResult.failure("NOT_NULL", "Only missing nested sources can be repaired")
+		if not _asset_available(replacement_source_id):
+			return DrawingResult.failure("MISSING_SOURCE", "Replacement source is absent or unverified")
+		var metadata: Dictionary = child.get("metadata", {}).duplicate(true)
+		if not metadata.has("null_origin_source_id"):
+			if metadata.size() >= 128:
+				return DrawingResult.failure("METADATA_LIMIT", "Cannot preserve missing source identity")
+			metadata["null_origin_source_id"] = child["source_id"]
+		var repaired: DrawingResult = _set_child_binding(parent_id, child_id,
+			expected_parent_revision, expected_generation, expected_child_revision,
+			replacement_source_id, false, metadata)
+		return DrawingResult.success(child_id) if repaired.ok else repaired
+	return DrawingResult.failure("CHILD", "Nested child no longer exists")
+
+
 func dependent_sources(asset_id: String) -> Array[String]:
 	return CHILD_GRAPH.dependent_sources(_assets, asset_id)
 

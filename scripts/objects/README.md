@@ -194,3 +194,19 @@ those graph-copy policy decisions are still open in T-064.
 Run `godot --headless --path . --script res://tests/object_nested_project_copy_smoke.gd`
 to exercise clone/reload, edits isolated from the original project and
 corrupt/stale collision checks. CI runs the same headless witness.
+
+
+## Nested source NULL repair (T-064 engineering milestone)
+
+Deleting a published source with the retain-NULL policy keeps child-instance
+ID, generation, local transform and missing source key. The nested inspector's
+**Repair NULL with source** action chooses an available replacement by its
+published ID; it never guesses a same-named source. The library endpoint
+`repair_child_placeholder(parent_id, child_id, expected_parent_revision,
+expected_generation, expected_child_revision, replacement_source_id)` verifies
+identity, revision, source hash and acyclicity, publishes the whole registry
+atomically and records `null_origin_source_id` without rewriting artwork.
+The parent-local `AtlasObjectChildEditSession.repair_selected()` participates
+in the same Undo/Redo timeline as structure and transforms. A stale session
+must reload; a live child is not eligible for repair. Export/Save As nested
+copying policy remains an explicit separate product decision.

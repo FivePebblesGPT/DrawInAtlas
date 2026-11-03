@@ -94,6 +94,26 @@ func detach_selected() -> DrawingResult:
 	return DrawingResult.success()
 
 
+## Rebinding a NULL child is one parent-local history action. Replaying it
+## preserves the old source tombstone and never changes either source's pixels.
+func repair_selected(replacement_source_id: String) -> DrawingResult:
+	if is_stale():
+		return DrawingResult.failure("STALE_CHILDREN", "Reload the parent before repairing")
+	var before: Dictionary = _saved_record(selected_child_id)
+	if before.is_empty():
+		return DrawingResult.failure("CHILD", "Select a missing nested child")
+	var repaired: DrawingResult = library.repair_child_placeholder(parent_source_id,
+		selected_child_id, expected_revision, String(before["generation"]),
+		int(before["revision"]), replacement_source_id)
+	if not repaired.ok:
+		return repaired
+	expected_revision += 1
+	_record_operation({"kind": "rebind", "child": selected_child_id,
+		"generation": String(before["generation"]), "before": before,
+		"after": _saved_record(selected_child_id)})
+	return repaired
+
+
 func _record_operation(operation: Dictionary) -> void:
 	# Structural edits and transforms share one parent-local history timeline.
 	_operations.resize(_cursor)
@@ -169,7 +189,19 @@ func _replay(forward: bool) -> DrawingResult:
 	var index: int = _cursor if forward else _cursor - 1
 	var operation: Dictionary = _operations[index]
 	var result: DrawingResult
-	if operation["kind"] == "transform":
+	if operation["kind"] == "rebind":
+		var current: Dictionary = _saved_record(String(operation["child"]))
+		var expected: Dictionary = operation["before"] if forward else operation["after"]
+		var desired: Dictionary = operation["after"] if forward else operation["before"]
+		if current.is_empty() or current["generation"] != operation["generation"] or \
+				not _same_child_identity(current, expected):
+			return DrawingResult.failure("STALE_CHILDREN", "Rebound child differs from history snapshot")
+		result = library._set_child_binding(parent_source_id, String(operation["child"]),
+			expected_revision, String(operation["generation"]), int(current["revision"]),
+			String(desired["source_id"]), bool(desired["placeholder"]), desired["metadata"])
+		if result.ok:
+			selected_child_id = String(operation["child"])
+	elif operation["kind"] == "transform":
 		var row: Dictionary = _record(String(operation["child"]))
 		var source: Transform2D = operation["before"] if forward else operation["after"]
 		var target: Transform2D = operation["after"] if forward else operation["before"]

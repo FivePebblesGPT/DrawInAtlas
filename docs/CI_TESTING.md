@@ -98,6 +98,14 @@
   with an optional Xvfb/Mesa screenshot of the uncommitted guide. It runs in
   fast push CI headlessly. Synthetic and native framebuffer events are not
   physical mouse hardware or owner UX approval; T-064 remains In Progress.
+- T-064 explicit nested NULL-child repair: `tests/object_child_null_repair_smoke.gd`
+  (`T064_CHILD_REPAIR_PASSED`, **45** headless checks) verifies source-deletion
+  NULL identity, explicit published replacement, original-ID metadata,
+  cycle/parent/child revision rejection, publication failure rollback,
+  mixed source-rebinding and transform Undo/Redo, disk reload and actual
+  inspector button wiring. It runs in fast CI. An optional Xvfb/Mesa
+  screenshot run passes **46/46** checks and is a targeted visual check, not an owner
+  usability or Windows/Linux physical-hardware approval.
 - T-064 reversible child attachment and removal: `tests/object_child_structure_smoke.gd` (**45** headless checks, push-CI-gated) now interleaves structure and transform history without source artwork changes. Registry restore preserves ID, generation and sibling order, advances child revisions and retains cycle/stale/publication protection. The extended native inspector (`tests/object_child_edit_native.gd`, **16** Xvfb/Mesa checks including screenshot) is targeted/non-push. The explicit source picker is filtered and bounded to 128 matching published assets. Neither test is owner or physical-Windows UX approval.
 - T-064 parent-scoped nested child editing: `tests/object_child_edit_smoke.gd`
   (`T064_CHILD_EDIT_PASSED`, **45** assertions) checks stable child selection,
