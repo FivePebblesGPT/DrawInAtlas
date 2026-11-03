@@ -202,6 +202,16 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
           grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
+      - name: Verify T-068 stationary hard-dab pixel parity
+        id: ci_t068_stationary_dab_parity
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_dab_geometry_smoke.gd 2>&1 | tee /tmp/godot-t068-dab.log
+          grep -q 'T068_DAB_PASSED' /tmp/godot-t068-dab.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_DAB_FAILED:' /tmp/godot-t068-dab.log; then exit 1; fi
       - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
         id: ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed
         if: ${{ !cancelled() }}

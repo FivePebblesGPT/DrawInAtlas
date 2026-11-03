@@ -7,6 +7,7 @@
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
 - T-051–053 isolated Drawing contract, core, standalone consumer and Linux desktop release package.
 - Main project import before GDScript tests: T-015 marker-only authoring and archived-data boundary (13/23), link/history and link form (29/55), overview (67), stale-result (27), hierarchy (44), Organization UI (84) and reference controls (17), all on the modern marker model; T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
+- T-068 safe stationary round-dab CPU shortcut: `tests/drawing_dab_geometry_smoke.gd` compares its pixels against the **original** Godot `Geometry2D` segment oracle at fractional/negative positions, tile seams and 64-bit signed anchors, including undo/redo, no-op alpha and hidden RGB (125 assertions). The large raster benchmark and 25-gesture native stress run are **targeted**, not push-gating.
 - T-073 feature inventory and T-063 workspace documentation assertions.
 - T-078 reusable grouped dock state model and existing shell binding (82 headless assertions).
 - T-080 reusable nonmutating drag planner and transactional commit/cancel (60 fast headless assertions); actual pointer/layout behavior is verified separately by native Xvfb/Mesa evidence.
@@ -26,6 +27,10 @@ Results, hardware limits and the retain-Godot decision are in
 [DRAWING_LOD_RENDERER_BENCHMARK.md](DRAWING_LOD_RENDERER_BENCHMARK.md).
 These measure software-GL frame submission, not physical GPU scanout or Windows.
 Do not turn a screen-only research recommendation into automatic runtime adoption.
+
+## Targeted T-068 brush-geometry and input-to-frame evidence
+
+The targeted `tests/drawing_raster_backend_benchmark.gd` compares 512/1024/2048 storage strides against the independent legacy compositor; `tests/drawing_latency_stress_visual.gd` drives 25 synthetic Control pointer gestures (stationary 4/32/64 canonical pixels, long and crossing), checks canonical Drawing revisions and actual framebuffer pixel changes, and records separate dispatch and `frame_post_draw` median/p95. Run the latter on Linux with software X11/Mesa, not in fast push CI. These timings do not measure physical GPU presentation or a Windows system. See [the T-068 CPU raster report](DRAWING_CPU_RASTER_BENCHMARK.md) for evidence and unresolved backend requirements.
 
 ## Deferred but retained
 

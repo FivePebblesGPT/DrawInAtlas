@@ -6,6 +6,8 @@
 
 ## Kanban summary
 
+**T-068 measured brush-path follow-up (2026-11-03; still In Progress):** a narrow stationary-dab fast path avoids unnecessary geometry projection for hard brushes without changing edit/storage schemas. The original geometry oracle passes 125 exact-pixel/undo tests at fractional coordinates and signed 64-bit anchors; a 693-check mixed raster benchmark matches the previous changed-pixel and undo sizes across three storage strides. Two 25-gesture native X11/Mesa stress runs (81/81 each) verify visible 4/32/64px dabs, long/crossing strokes, and expose costly large-brush CPU/frame submission, but not physical presentation. Native library comparisons and two-platform validation remain open. See [T-068](Tickets/T-068.md).
+
 **T-015 completed (2026-11-03):** Legacy battlemat placement creation/editing, spatial hit-testing, preview overlays and actionable Focus/Open are retired. Historical placement records and link fields remain **archival only** for lossless old-fixture reads, native saves and the standalone audit; they cannot participate in live navigation or Drawing. Marker-only navigation, search, selected-cell filtering, undo/history and native saves have replacement CI coverage. The old aligned-preview acceptance witness is retained under `tests/retired_legacy/`, not claimed green. T-014's historical D0–D2 raster assertions remain a separately deferred failure. See [T-015](Tickets/T-015.md).
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |

@@ -149,3 +149,23 @@ measurements, test real physical input-to-display and peak RAM/VRAM/jitter on
 Windows/Linux hardware, and prove two-platform optional exports. Those cannot
 be represented as completed by the above prototype. Runtime fallback remains
 pure Godot and no new binary or external license is shipped.
+
+## 2026-11-03 follow-up: stationary hard dab and nontrivial native gestures
+
+`DrawingEditSession._paint_segment()` now skips `Geometry2D.get_closest_point_to_segment()` for a **stationary** hard-brush dab (`start == finish`), using the same center/closed-circle comparison and unchanged once-per-pixel staging. Swept nonstationary segments keep their existing geometry and all commit/cancel/undo paths are unchanged. This is a small, dependency-free CPU optimization, **not** a replacement raster kernel or altered brush policy.
+
+- `tests/drawing_dab_geometry_smoke.gd` supplies an **independent original `Geometry2D` oracle**, not the new fast branch. On Godot 4.8.beta2 it passes **125 checks**, including exact pixels over multiple widths and fractional/negative points at tile seams beyond 2^53 signed anchors, history undo/redo and hidden RGB on transparent no-op paint.
+- The normal headless `drawing_raster_backend_benchmark.gd` passed **693/693** after the change. A before/after headless comparison on this sandbox found **identical** 128 blend vectors, signed parity fixture, changed-pixel maxima and undo wire sizes for all 18 operation/stride cases. On the three 64px round-dab cases, edit+commit+undo+redo medians were **211.206 → 201.767 ms** (512), **208.288 → 199.490 ms** (1024), and **211.647 → 211.511 ms** (2048). Individual runs can be affected by scheduling and background load; this is a *single* before/after pass, not a randomized A/B study. No reliable large speedup is claimed.
+- The new **non-push native X11/Mesa** `tests/drawing_latency_stress_visual.gd` witnesses actual Control pointer input to a canonical Drawing revision and a changed `root.get_texture()` pixel. Its **25 synthetic gestures and 81/81 checks** passed on each of two runs. The test explicitly verifies sample D0 uses **1 canonical pixel per world unit**, so widths are accurately labeled 4/32/64px, plus a 4px long path and a 4px crossing path. Each row has only five observations; measured p95 is the **maximum**, not a stable latency estimator.
+
+| Synthetic native gesture | Run A CPU dispatch median / p95 | Run A input → `frame_post_draw` median / p95 | Run B CPU dispatch median / p95 | Run B input → `frame_post_draw` median / p95 |
+|---|---:|---:|---:|---:|
+| 4px stationary dab | 2.655 / 4.887 ms | 29.597 / 49.078 ms | 1.193 / 1.732 ms | 20.018 / 31.172 ms |
+| 32px stationary dab | 30.111 / 204.851 ms | 58.226 / 451.334 ms | 40.323 / 143.219 ms | 76.653 / 171.599 ms |
+| 64px stationary dab | 116.110 / 220.834 ms | 161.146 / 263.005 ms | 151.746 / 190.818 ms | 176.075 / 212.372 ms |
+| 4px long swept stroke | 9.553 / 16.889 ms | 44.020 / 54.690 ms | 8.499 / 10.689 ms | 38.355 / 52.760 ms |
+| 4px self-crossing stroke | 7.137 / 169.542 ms | 65.573 / 437.637 ms | 8.315 / 13.095 ms | 29.981 / 37.973 ms |
+
+[Raw native stress run A](benchmarks/T068_2026-11-03_stress.json) · [Raw native stress run B](benchmarks/T068_2026-11-03_stress_repeat.json) · [Original vs optimized mixed workload data](benchmarks/T068_2026-11-03_dab_comparison.json).
+
+These are **synthetic input dispatch and software framebuffer submission**, not hardware input latency, real frame scan-out, a representative graphics card, Windows, or multithread jitter. A 64px frame outlier should motivate *separately instrumented* raster/undo/cache/upload profiling, not a premature adoption of Blend2D, Skia, or a custom GDExtension. The earlier 21 single-dab/native result remains a distinct workload. No third-party executable comparison or optional cross-platform binary was added. **T-068 remains In Progress.**

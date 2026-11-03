@@ -182,10 +182,15 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
 			selection, max_candidates, depth + 1)
+	# A stationary dab has no segment projection. Avoid a native geometry call
+	# per candidate while retaining the same closed-circle coverage threshold.
+	var stationary: bool = start == finish
+	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
 		for x: int in range(left, right):
 			var center: Vector2 = Vector2(x + 0.5, y + 0.5)
-			if center.distance_squared_to(Geometry2D.get_closest_point_to_segment(center, start, finish)) > radius * radius:
+			var nearest: Vector2 = start if stationary else Geometry2D.get_closest_point_to_segment(center, start, finish)
+			if center.distance_squared_to(nearest) > radius_squared:
 				continue
 			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
 				selection, true, not erase)
