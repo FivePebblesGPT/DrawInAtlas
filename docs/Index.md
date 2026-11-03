@@ -1,10 +1,22 @@
 # Ticket Kanban Index
 
-**As of 2026-11-03 · `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+**As of 2026-11-04 · `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
 ## Kanban summary
+
+**T-068 optional Cairo CPU comparator (2026-11-04; In Progress):**
+A standalone, runtime-versioned Cairo 1.18.4 experiment tests a *third-party
+CPU rasterizer* against the checked scalar C++ kernel and independent canonical
+straight-RGBA8 oracle. Two 9-trial runs cover 32²/64²/128² half-tile
+rectangles, opaque and translucent source-over, replacement, transparent
+no-op, and clearing (**36 verified scenarios**). Opaque operations reproduce
+canonical pixels, but premultiplied ARGB32 conversion destroys hidden RGB
+outside painted areas and most translucent cases disagree. It is **not**
+Blend2D/Skia acceptance, nor a production fallback; it runs on demand and
+fast CI checks only the Python contracts. [T-068](Tickets/T-068.md),
+[raw evidence](benchmarks/T068_2026-11-04_cairo_cpu.json).
 
 **T-068 complete native sparse-delta verification (2026-11-04; In Progress):**
 The isolated GDExtension adapter now independently checks the **complete**

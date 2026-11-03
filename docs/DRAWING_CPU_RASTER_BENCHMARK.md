@@ -732,3 +732,53 @@ staging timings in [the new diagnostic evidence](benchmarks/T068_2026-11-04_spar
 but **do not** infer native backend performance, actual pointer-to-display
 latency, or relative optimization gains from small synthetic samples. The
 shipping Drawing path remains Godot-only; T-068 is still In Progress.
+
+
+## 2026-11-04: optional Cairo image-surface CPU parity screen
+
+The isolated `tools/benchmarks/t068_cairo_cpu.py` compares **Cairo 1.18.4
+(runtime-reported)** with the existing checked scalar C++ batch and an
+independent canonical straight-RGBA8 Python oracle. It uses `ctypes` against
+the Linux system `libcairo.so.2`, not a bundled dependency. Every C++ result
+is asserted byte-for-byte equal to the oracle. Cairo is rendered into
+native-endian premultiplied `CAIRO_FORMAT_ARGB32`, then converted back to
+canonical straight RGBA8 without silently repairing changed or unchanged
+pixels. Its half-tile rectangular operation is intended only to screen
+source-over, replace, clear and exact-color compatibility; it does not mimic
+brush/path geometry, masks, document storage, history or GPU uploads.
+
+[Raw two-run measurements](benchmarks/T068_2026-11-04_cairo_cpu.json)
+contain 9 samples/run, 6 operations and 3 square sizes (36 scenario
+observations). Both runs had **12 of 18 non-parity cases**, exclusively with
+partially/fully transparent source tiles. For a 64² image, the two runs
+reproduce these mismatch counts:
+
+| Case | Painted disagreement pixels | Unpainted disagreement pixels | Hidden transparent RGB loss (all locations) |
+|---|---:|---:|---:|
+| Opaque replace | 0 | 0 | 0 |
+| Opaque source-over | 0 | 0 | 0 |
+| Transparent source-over | 654 | 2,025 | 704 |
+| Translucent source-over | 970 | 2,025 | 704 |
+| Translucent replace | 1,024 | 2,025 | 704 |
+| Clear | 0 | 2,025 | 544 |
+
+The clear operation correctly sets painted pixels to canonical zero, but
+**unpainted** transparent/semistransparent source pixels are damaged just by
+premultiplying and unpremultiplying the full surface. The transparent source
+(no-op) also loses untouched RGB, violating the strict hidden-RGB gate. A
+future comparator could avoid copying untouched pixels out of Cairo and
+conditionally normalize *changed* pixels, but that would be a different
+implementation requiring independent tests. The current adapter must **not**
+be used as a canonical Drawing backend.
+
+For 64² opaque source-over, the paired native-kernel call medians were
+**37.8/35.0 μs**, Cairo's rectangle draw-only medians **6.1/5.1 μs**,
+and Cairo's entire Python prepare/convert/draw/readback medians
+**4,370/3,557 μs**. The three timings cover **different boundaries**:
+the C++ call receives precomputed coordinates and canonical buffers;
+Cairo's draw-only excludes buffer conversions, while Cairo's total includes
+nonoptimized Python per-pixel format conversion. These observations cannot
+establish that Cairo is faster or slower for a production stroke. There are
+no GPU, Windows, or physical input-to-visible results, and Cairo is optional,
+not a substitute for **Blend2D and Skia CPU comparisons**. No raster backend
+was adopted; the ticket remains In Progress.

@@ -16,6 +16,16 @@
   `.github/workflows/godot-native-t068-fill.yml`. This witness is deliberately
   **excluded** from fast push/PR CI. It does not measure the production Bucket
   UI, hardware input, real display scan-out or true peak RSS/VRAM.
+- T-068 optional Cairo CPU format comparator:
+  `tests/test_t068_cairo_cpu.py` (**10** Python tests) exercises an independent
+  straight-RGBA8 oracle, exact opaque-pixel parity, loss of premultiplied
+  transparent hidden RGB, mismatch accounting, and the installed Cairo
+  runtime when available; the runtime tests skip if libcairo is absent from
+  fast CI. The separate **manual-only**
+  `.github/workflows/godot-native-t068-cairo.yml` installs Cairo and runs the
+  complete two-run 32/64/128² comparison, with a machine-readable JSON
+  artifact. It never installs a native dependency in Drawing/Atlas or
+  promotes opaque-only parity to a chosen backend.
 - T-068 verified cached flood-fill sources:
   `tests/drawing_fill_tile_cache_smoke.gd` (**30** fast-CI assertions) checks
   four-connected fills on verified lazy Object tiles as well as resident
