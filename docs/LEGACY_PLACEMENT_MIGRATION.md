@@ -7,7 +7,19 @@
 
 The approved owner decision is [[DECISIONS_DRAWING_ATLAS_2026-11-01]]: **there are no historical user saves requiring migration.** Accordingly, this T-015 document is retained as a **historical design/audit record**, not a required or planned destructive migration. Do not execute its proposed copy-first converter merely because a sample map contains `BATTLEMAP`. `AtlasLegacyMigrationAudit.inspect()` remains a read-only prototype diagnostic and can be tested without converting anything. The underlying old `.scn` scene codec and placements are compatibility/test paths; new authoritative Atlas saves use verified versioned `Drawings/` generations under the `.atlas.json` root (T-066).
 
-**2026-11-03 retirement checkpoint:** All *new* low-level `AtlasCreateMap`
+**2026-11-03 superseding completion note:** T-015 is now **Done**, without
+historical save migration. Active map links are markers only, and the retired
+placement geometry is no longer used for pointer hit-testing, automatic
+navigation, search source focus or parent/child reference overlays. Obsolete
+Inspector preview controls were removed/hidden. The legacy array and codec
+remain deliberately isolated for lossless archival fixture reads, native saves,
+and the independent read-only audit; no runtime edit command accepts them.
+The former native aligned-overlay acceptance source was moved intact to
+`tests/retired_legacy/references_ui_footprints_legacy.gd.txt`, with modern
+marker-only replacement coverage. See [[T-015]] for tested behavior and
+explicitly deferred unrelated raster failures.
+
+**2026-11-03 earlier retirement checkpoint (historical):** All *new* low-level `AtlasCreateMap`
 commands reject `BATTLEMAP`; `AtlasLinkEdit` and the visible linked-map form
 no longer create or edit parent/child footprint bundles. New map links are
 independent navigation markers. The old `AtlasPlacement` record/serializer,

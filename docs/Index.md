@@ -6,7 +6,7 @@
 
 ## Kanban summary
 
-**T-015 partial retirement (2026-11-03):** Independent map creation and marker-only link authoring are now enforced down to `AtlasCreateMap` and `AtlasLinkEdit`, and the linked-map form no longer exposes obsolete footprint controls. New fast CI guards cover 13 retirement checks, 29 marker/history checks and 55 link UI checks. **T-015 remains In Progress** until the old `AtlasPlacement` serialization, spatial reference/rendering and fixtures are retired or deliberately isolated without losing modern navigation coverage. The historical T-014 D0–D2 pixel assertions remain failing in targeted runs; do not call them green. See [T-015](Tickets/T-015.md).
+**T-015 completed (2026-11-03):** Legacy battlemat placement creation/editing, spatial hit-testing, preview overlays and actionable Focus/Open are retired. Historical placement records and link fields remain **archival only** for lossless old-fixture reads, native saves and the standalone audit; they cannot participate in live navigation or Drawing. Marker-only navigation, search, selected-cell filtering, undo/history and native saves have replacement CI coverage. The old aligned-preview acceptance witness is retained under `tests/retired_legacy/`, not claimed green. T-014's historical D0–D2 raster assertions remain a separately deferred failure. See [T-015](Tickets/T-015.md).
 
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -68,7 +68,7 @@
 | [T-012 · Replace battlemats with authored local detail](Tickets/T-012.md) | Done | — | [T-002](Tickets/T-002.md), [T-004](Tickets/T-004.md) |
 | [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Via T-039 | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md) |
 | [T-014 · Retire battlemat creation controls](Tickets/T-014.md) | Done | — | [T-012](Tickets/T-012.md), [T-006](Tickets/T-006.md) |
-| [T-015 · Remove obsolete model code (save migration waived)](Tickets/T-015.md) | In Progress | — | [T-012](Tickets/T-012.md) |
+| [T-015 · Remove obsolete model code (save migration waived)](Tickets/T-015.md) | Done | — | [T-012](Tickets/T-012.md) |
 | [T-016 · Coherent detail-editing snapping](Tickets/T-016.md) | Done | — | [T-012](Tickets/T-012.md), [T-019](Tickets/T-019.md) |
 | [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | **Owner** | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md) |
 | [T-018 · Compact layer/object/link hierarchy](Tickets/T-018.md) | Ready | — | [T-006](Tickets/T-006.md), [T-012](Tickets/T-012.md) |

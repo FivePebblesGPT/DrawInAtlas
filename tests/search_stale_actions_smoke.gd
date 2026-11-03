@@ -101,7 +101,7 @@ func _run() -> void:
 		"deleted link cannot focus and disappears after refresh")
 	campaign.links.append(link)
 
-	# Legacy footprints also contribute to the source location and must be fresh.
+	# Archived footprints are reported but are never live source locations.
 	var footprint: AtlasPlacement = AtlasPlacement.new()
 	footprint.id = "old-footprint"
 	footprint.parent_map_id = "world"
@@ -110,16 +110,17 @@ func _run() -> void:
 	campaign.placements.append(footprint)
 	link.placement_id = footprint.id
 	current = _result(editor)
-	_check(AtlasOverview.entry_is_current(campaign, current), "initial footprint result is current")
+	_check(current != null and not current.can_focus and
+		not AtlasOverview.entry_is_current(campaign, current),
+		"archived footprint is not an actionable search result")
 	footprint.rotation = PI / 4.0
 	canvas.camera_center = Vector2.ZERO
 	editor.browser._focus_overview_source(current)
 	_check(canvas.camera_center == Vector2.ZERO, "rotated footprint invalidates old Focus")
 	fresh = editor.overview_panel.entries[0]
 	editor.browser._focus_overview_source(fresh)
-	_check(canvas.camera_center.is_equal_approx(
-		footprint.local_to_parent() * (Vector2(footprint.columns, footprint.rows) * 0.5)),
-		"refreshed footprint locates its transformed center")
+	_check(canvas.camera_center == Vector2.ZERO and fresh != null and not fresh.can_focus,
+		"refresh never converts archived geometry into a focusable source")
 
 	# Replacing a same-ID document must not revive a detached result.
 	current = _result(editor)
@@ -138,7 +139,9 @@ func _run() -> void:
 		"campaign replacement rejects old result despite identical IDs and values")
 	editor.browser._open_overview_entry(current)
 	_check(canvas.map.id == "world", "replaced campaign cannot use old Open event")
-	# A descendant row must also reject edits to the intermediate entrance.
+	# Continue with an ordinary marker: recursive results must still validate
+	# the full navigation path, without relying on a retired placement.
+	link.placement_id = ""
 	editor.browser.refresh(campaign)
 	campaign.add_map(AtlasMapDocument.new("mine", "Deep Mine"))
 	var nested: AtlasMapLink = AtlasMapLink.new()

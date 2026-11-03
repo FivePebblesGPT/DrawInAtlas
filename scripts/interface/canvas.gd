@@ -811,14 +811,8 @@ func _draw_overlays(item: Node2D) -> void:
 	if not _moving_link_id.is_empty():
 		var link: AtlasMapLink = campaign.link_by_id(_moving_link_id)
 		if link != null:
-			var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
 			var offset: Vector2 = _link_move_end - _link_move_start
-			if placement != null:
-				var points: PackedVector2Array = placement.corners()
-				for index: int in range(points.size()):
-					points[index] += offset
-				_stroke_polygon(points, Color("#f9cc65"), 2.0 / camera_zoom, item)
-			else:
+			if link.placement_id.is_empty():
 				item.draw_arc(link.anchor + offset, link.hit_radius, 0, TAU, 48, Color("#f9cc65"), 2.0 / camera_zoom)
 	if _manipulation == Manipulation.MARQUEE:
 		item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color(0.3, 0.7, 1.0, 0.15))
@@ -1156,22 +1150,14 @@ func _draw_links(item: Node2D) -> void:
 		var target: AtlasMapDocument = campaign.get_map(link.target_map_id)
 		if target == null:
 			continue
+		# Archived footprint links cannot be drawn as selectable placements.
 		if not link.placement_id.is_empty():
-			var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
-			if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
-				continue
-			var corners: PackedVector2Array = placement.corners()
-			var fill: Color = Color(0.24, 0.70, 0.82, 0.15)
-			item.draw_colored_polygon(corners, fill)
-			_stroke_polygon(corners, Color("#f9cc65") if link.id == selected_link_id else Color("#63d3e5"), 2.0 / camera_zoom, item)
-			item.draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
-		else:
-			item.draw_circle(link.anchor, 18.0 / camera_zoom, Color("#efd797"))
-			item.draw_arc(link.anchor, 18.0 / camera_zoom, 0.0, TAU, 24,
-				Color("#395760"), 2.0 / camera_zoom)
-			item.draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
-				target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+			continue
+		item.draw_circle(link.anchor, 18.0 / camera_zoom, Color("#efd797"))
+		item.draw_arc(link.anchor, 18.0 / camera_zoom, 0.0, TAU, 24,
+			Color("#395760"), 2.0 / camera_zoom)
+		item.draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
+			target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
 
 func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, item: Node2D) -> void:

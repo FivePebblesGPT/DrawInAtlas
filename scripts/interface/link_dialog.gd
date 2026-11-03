@@ -63,7 +63,9 @@ func configure(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor
 		var target: AtlasMapDocument = campaign.get_map(link.target_map_id)
 		link_list.add_item("%d · %s / %s · %s" % [_link_ids.size() - 1,
 			target.display_name if target != null else "Missing map", link.target_floor_id, link.anchor])
-		link_list.set_item_tooltip(_link_ids.size() - 1, "Entrance %s\nArrival: %s · zoom %.3f" % [link.id, link.target_focus, link.target_zoom])
+		link_list.set_item_tooltip(_link_ids.size() - 1,
+			"Retired footprint link — archival, not editable or navigable" if not link.placement_id.is_empty()
+			else "Entrance %s\nArrival: %s · zoom %.3f" % [link.id, link.target_focus, link.target_zoom])
 	var index: int = maxi(0, _link_ids.find(selected))
 	link_list.select(index)
 	_select(index)
@@ -135,15 +137,11 @@ func _select_destination(link: AtlasMapLink) -> void:
 		target_floor_picker.select(_floor_ids.find(link.target_floor_id))
 
 
-func _can_enter(link: AtlasMapLink, placement: AtlasPlacement) -> bool:
-	if link == null:
+func _can_enter(link: AtlasMapLink, _placement: AtlasPlacement) -> bool:
+	if link == null or not link.placement_id.is_empty():
 		return false
 	var destination: AtlasMapDocument = _campaign.get_map(link.target_map_id)
-	if destination == null or destination.floor_by_id(link.target_floor_id) == null:
-		return false
-	if link.placement_id.is_empty():
-		return true
-	return placement != null and placement.parent_map_id == link.source_map_id and placement.child_map_id == link.target_map_id
+	return destination != null and destination.floor_by_id(link.target_floor_id) != null
 
 
 func _target_changed(index: int) -> void:
