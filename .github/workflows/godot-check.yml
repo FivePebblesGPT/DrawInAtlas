@@ -175,6 +175,16 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_graph_smoke.gd 2>&1 | tee /tmp/godot-t064-child-graph.log
           grep -q 'T064_CHILD_GRAPH_PASSED' /tmp/godot-t064-child-graph.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_GRAPH_FAILED:' /tmp/godot-t064-child-graph.log; then exit 1; fi
+      - name: Verify T-064 bounded nested source composition and hit paths
+        id: ci_t064_nested_source_render
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_render_smoke.gd 2>&1 | tee /tmp/godot-t064-child-render.log
+          grep -q 'T064_CHILD_RENDER_PASSED' /tmp/godot-t064-child-render.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_RENDER_FAILED:' /tmp/godot-t064-child-render.log; then exit 1; fi
       - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
         id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
         if: ${{ !cancelled() }}

@@ -6,15 +6,25 @@
 
 ## Kanban summary
 
+**T-064 bounded nested composition milestone (2026-11-03; In Progress):**
+The Atlas Object renderer now paints linked parent/child/grandchild sources in
+stable order with composed transforms and returns stable child-ID hit paths.
+Atlas map previews include the nested extents and invalidate on graph changes
+or explicit source Save; deleted child sources show bounded NULL markers.
+The fast-CI 36-check `object_child_render_smoke.gd` covers on-disk sources,
+rotation, deep paths, alpha, and bounded failures. Nested editing UI,
+per-child undo/redo, and the Save As/portable copying policy are still open;
+this is **not** T-064 acceptance or owner UX approval. See [T-064](Tickets/T-064.md).
+
 **T-064 cycle-safe nested-source graph milestone (2026-11-03; In Progress):**
 Atlas now stores optional stable child-source instances in its existing
 published Object registry, validates cycles/depth/IDs on mutation and load,
 and persists parent-local transforms and reverse dependencies. Pixel Save
 preserves child records; deletion's Remove/NULL policy applies atomically to
 nested references, including stale confirmation guards. The new 56-check
-headless witness is push-CI-gated. Nested rendering, hit testing, source
-editing and portable Save As/export semantics remain unfinished and cannot
-be claimed accepted. See [T-064](Tickets/T-064.md).
+headless witness is push-CI-gated. Rendering and hit paths have a separate
+bounded engineering witness above; nested editing and portable Save As/export
+semantics remain unfinished and cannot be claimed accepted. See [T-064](Tickets/T-064.md).
 
 
 **T-065 verified metadata page loading (2026-11-03; still In Progress):**

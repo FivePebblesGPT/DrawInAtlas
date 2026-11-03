@@ -12,6 +12,9 @@ const SCHEMA: String = "atlas-objects-v1"
 const INDEX_LIMIT: int = 16777216
 const MAX_ENTRIES: int = 10000
 const CHILD_GRAPH: Script = preload("res://scripts/objects/object_child_graph.gd")
+const MAX_TREE_NODES: int = 2048
+const MAX_TREE_RENDER_PIXELS: int = 4194304
+const MAX_TREE_FRAME_PIXELS: int = 1048576
 
 var campaign_path: String = ""
 var root_path: String = ""
@@ -995,6 +998,212 @@ func authored_bounds(asset_id: String) -> DrawingResult:
 	return DrawingResult.success(area)
 
 
+## T-064: draw-order traversal of validated source-owned child references.
+## Every item uses root-source coordinates, retaining the stable child path for
+## future parent-vs-child selection. A second defensive path check prevents an
+## externally corrupted graph from causing a recursive render loop.
+func _tree_nodes(source_id: String) -> DrawingResult:
+	var nodes: Array[Dictionary] = []
+	var pending: Array[Dictionary] = [{"source_id": source_id,
+		"transform": Transform2D.IDENTITY, "path": PackedStringArray(),
+		"ancestors": [source_id], "depth": 0, "placeholder": false}]
+	while not pending.is_empty():
+		if nodes.size() >= MAX_TREE_NODES:
+			return DrawingResult.failure("TREE_LIMIT", "Too many visible nested Object instances")
+		var item: Dictionary = pending.pop_back()
+		nodes.append(item)
+		if item["placeholder"]:
+			continue
+		var parent_id: String = item["source_id"]
+		var children: Array = _assets[parent_id].get("children", []) if _assets.has(parent_id) else []
+		for index: int in range(children.size() - 1, -1, -1):
+			var child: Dictionary = children[index]
+			if not child["visible"]:
+				continue
+			var child_source: String = child["source_id"]
+			var next_path: PackedStringArray = item["path"].duplicate()
+			next_path.append(str(child["id"]))
+			var next_ancestors: Array = item["ancestors"].duplicate()
+			if child_source in next_ancestors or int(item["depth"]) >= CHILD_GRAPH.MAX_NESTING_DEPTH:
+				return DrawingResult.failure("CHILD_CYCLE", "Unsafe nested Object source path")
+			next_ancestors.append(child_source)
+			var values: Array = child["transform"]
+			var local_transform: Transform2D = Transform2D(
+				Vector2(float(values[0]), float(values[1])),
+				Vector2(float(values[2]), float(values[3])),
+				Vector2(float(values[4]), float(values[5])))
+			var composed: Transform2D = (item["transform"] as Transform2D) * local_transform
+			if not _transform_valid(composed):
+				return DrawingResult.failure("CHILD_TRANSFORM", "Nested Object transform exceeds safe range")
+			pending.append({"source_id": child_source, "transform": composed,
+				"path": next_path, "ancestors": next_ancestors,
+				"depth": int(item["depth"]) + 1,
+				"placeholder": child["placeholder"] or not _asset_available(child_source)})
+	return DrawingResult.success(nodes)
+
+
+static func _tree_region(region: Rect2i, inverted: Transform2D) -> DrawingResult:
+	var corners: Array[Vector2] = [Vector2(region.position),
+		Vector2(region.end.x, region.position.y), Vector2(region.end),
+		Vector2(region.position.x, region.end.y)]
+	var first: Vector2 = inverted * corners[0]
+	var smallest: Vector2 = first
+	var largest: Vector2 = first
+	for corner: Vector2 in corners.slice(1):
+		var mapped: Vector2 = inverted * corner
+		smallest = smallest.min(mapped)
+		largest = largest.max(mapped)
+	if not smallest.is_finite() or not largest.is_finite() or 			absf(smallest.x) > 1000000000.0 or absf(smallest.y) > 1000000000.0 or 			absf(largest.x) > 1000000000.0 or absf(largest.y) > 1000000000.0:
+		return DrawingResult.failure("TREE_LIMIT", "Nested Object sample coordinates exceed safe range")
+	var mapped_region: Rect2i = Rect2i(floori(smallest.x), floori(smallest.y),
+		maxi(1, ceili(largest.x) - floori(smallest.x)),
+		maxi(1, ceili(largest.y) - floori(smallest.y)))
+	if mapped_region.size.x > MAX_TREE_FRAME_PIXELS or 			mapped_region.size.y > MAX_TREE_FRAME_PIXELS / mapped_region.size.x:
+		return DrawingResult.failure("TREE_LIMIT", "Nested Object sample exceeds pixel budget")
+	return DrawingResult.success(mapped_region)
+
+
+## Read-only, ordered recursive composition of published raster/text source
+## images. Child art overlays parent art; sibling order follows registry order.
+## The same affine local coordinates drive nested selection and Atlas placement.
+func render_source_tree(source_id: String, region: Rect2i) -> DrawingResult:
+	if not _asset_available(source_id):
+		return DrawingResult.failure("MISSING_SOURCE", "Root Object source unavailable")
+	if region.size.x <= 0 or region.size.y <= 0 or 			region.size.x > MAX_TREE_FRAME_PIXELS or 			region.size.y > MAX_TREE_FRAME_PIXELS / region.size.x:
+		return DrawingResult.failure("TREE_LIMIT", "Invalid nested render viewport")
+	var traversal: DrawingResult = _tree_nodes(source_id)
+	if not traversal.ok:
+		return traversal
+	var nodes: Array = traversal.value
+	var output: Image
+	var remaining: int = MAX_TREE_RENDER_PIXELS
+	for node: Dictionary in nodes:
+		var local_to_root: Transform2D = node["transform"]
+		var inverse: Transform2D = local_to_root.affine_inverse()
+		var sample_bounds: DrawingResult = _tree_region(region, inverse)
+		if not sample_bounds.ok:
+			return sample_bounds
+		var sample_region: Rect2i = sample_bounds.value
+		var area: int = sample_region.size.x * sample_region.size.y
+		remaining -= area + region.size.x * region.size.y
+		if remaining < 0:
+			return DrawingResult.failure("TREE_LIMIT", "Nested Object sampling budget exceeded")
+		var tile: Image
+		if node["placeholder"]:
+			tile = Image.create_empty(sample_region.size.x, sample_region.size.y,
+				false, Image.FORMAT_RGBA8)
+			for y: int in range(sample_region.size.y):
+				for x: int in range(sample_region.size.x):
+					var point: Vector2i = sample_region.position + Vector2i(x, y)
+					if Rect2i(-8, -8, 16, 16).has_point(point):
+						tile.set_pixel(x, y, Color(1.0, 0.25, 0.3, 0.8))
+		else:
+			var source: DrawingResult = _published_document(node["source_id"])
+			if not source.ok:
+				return source
+			var rendered: DrawingResult = DrawingRenderer.render(source.value, sample_region)
+			if not rendered.ok:
+				return rendered
+			tile = rendered.value
+		if output == null:
+			output = tile
+			continue
+		for y: int in range(region.size.y):
+			for x: int in range(region.size.x):
+				var local: Vector2 = inverse * (Vector2(region.position) + Vector2(x + 0.5, y + 0.5))
+				var sample: Vector2i = Vector2i(floori(local.x), floori(local.y)) - sample_region.position
+				if sample.x < 0 or sample.y < 0 or sample.x >= tile.get_width() or 						sample.y >= tile.get_height():
+					continue
+				var color: Color = tile.get_pixelv(sample)
+				if color.a > 0.0:
+					output.set_pixel(x, y, output.get_pixel(x, y).blend(color))
+	return DrawingResult.success(output)
+
+
+## Includes transformed children beyond the parent's authoring guide, without
+## treating that guide as a clip. Atlas uses this for preview/canvas framing.
+func composed_bounds(source_id: String) -> DrawingResult:
+	if not _asset_available(source_id):
+		return DrawingResult.failure("MISSING_SOURCE", "Root Object source unavailable")
+	var traversal: DrawingResult = _tree_nodes(source_id)
+	if not traversal.ok:
+		return traversal
+	var combined: Rect2i = Rect2i()
+	var found: bool = false
+	for node: Dictionary in traversal.value:
+		var piece: Rect2i
+		if node["placeholder"]:
+			piece = Rect2i(-8, -8, 16, 16)
+		else:
+			var available: DrawingResult = authored_bounds(node["source_id"])
+			if not available.ok:
+				return available
+			piece = available.value
+		if not piece.has_area():
+			continue
+		var transform: Transform2D = node["transform"]
+		var corners: Array[Vector2] = [Vector2(piece.position),
+			Vector2(piece.end.x, piece.position.y), Vector2(piece.end),
+			Vector2(piece.position.x, piece.end.y)]
+		var low: Vector2 = transform * corners[0]
+		var high: Vector2 = low
+		for corner: Vector2 in corners.slice(1):
+			var mapped: Vector2 = transform * corner
+			low = low.min(mapped)
+			high = high.max(mapped)
+		if not low.is_finite() or not high.is_finite() or 				absf(low.x) > 1000000000.0 or absf(low.y) > 1000000000.0 or 				absf(high.x) > 1000000000.0 or absf(high.y) > 1000000000.0:
+			return DrawingResult.failure("TREE_LIMIT", "Nested Object bounds exceed safe range")
+		var enclosed: Rect2i = Rect2i(floori(low.x), floori(low.y),
+			maxi(1, ceili(high.x) - floori(low.x)),
+			maxi(1, ceili(high.y) - floori(low.y)))
+		combined = combined.merge(enclosed) if found else enclosed
+		found = true
+	return DrawingResult.success(combined)
+
+
+## Deepest, topmost visible child wins; the path contains stable child IDs.
+## Returns false for transparent points, without modifying parent selection.
+func hit_test_path(instance_id: String, world_point: Vector2) -> DrawingResult:
+	if not _instances.has(instance_id) or not world_point.is_finite():
+		return DrawingResult.failure("HIT_TEST", "Invalid nested hit-test request")
+	var instance: AtlasObjectInstance = _instances[instance_id]
+	if not instance.visible:
+		return DrawingResult.success(false)
+	var root_local: Vector2 = instance.transform.affine_inverse() * world_point
+	if not root_local.is_finite() or absf(root_local.x) > 1000000000.0 or 			absf(root_local.y) > 1000000000.0:
+		return DrawingResult.failure("COORD_RANGE", "Nested hit test exceeds safe coordinates")
+	if instance.placeholder or not _asset_available(instance.source_id):
+		return DrawingResult.success({"status": "NULL", "path": PackedStringArray(),
+			"source_id": instance.source_id}) if Rect2(-8, -8, 16, 16).has_point(root_local) 			else DrawingResult.success(false)
+	var traversal: DrawingResult = _tree_nodes(instance.source_id)
+	if not traversal.ok:
+		return traversal
+	var nodes: Array = traversal.value
+	for index: int in range(nodes.size() - 1, -1, -1):
+		var node: Dictionary = nodes[index]
+		var local: Vector2 = (node["transform"] as Transform2D).affine_inverse() * root_local
+		if not local.is_finite() or absf(local.x) > 1000000000.0 or absf(local.y) > 1000000000.0:
+			return DrawingResult.failure("COORD_RANGE", "Nested hit outside coordinate range")
+		var hit: bool = false
+		if node["placeholder"]:
+			hit = Rect2(-8, -8, 16, 16).has_point(local)
+		else:
+			var document: DrawingResult = _published_document(node["source_id"])
+			if not document.ok:
+				return document
+			var point: Vector2i = Vector2i(floori(local.x), floori(local.y))
+			var pixel: DrawingResult = DrawingRenderer.render(document.value,
+				Rect2i(point, Vector2i.ONE))
+			if not pixel.ok:
+				return pixel
+			hit = (pixel.value as Image).get_pixel(0, 0).a > 0.0
+		if hit:
+			return DrawingResult.success({"status": "NULL" if node["placeholder"] else "linked",
+				"source_id": node["source_id"], "path": node["path"].duplicate(),
+				"source_local": local})
+	return DrawingResult.success(false)
+
+
 func render_instance(instance_id: String, local_region: Rect2i) -> DrawingResult:
 	if not _instances.has(instance_id):
 		return DrawingResult.failure("INSTANCE", "Missing placement")
@@ -1007,7 +1216,9 @@ func render_instance(instance_id: String, local_region: Rect2i) -> DrawingResult
 	var source: DrawingResult = _published_document(item.source_id)
 	if not source.ok:
 		return source
-	var rendered: DrawingResult = DrawingRenderer.render(source.value, local_region)
+	var rendered: DrawingResult = render_source_tree(item.source_id, local_region) \
+		if not _assets[item.source_id].get("children", []).is_empty() \
+		else DrawingRenderer.render(source.value, local_region)
 	if not rendered.ok:
 		return rendered
 	return DrawingResult.success({"status": "linked", "source_id": item.source_id,
@@ -1027,6 +1238,11 @@ func hit_test(instance_id: String, world_point: Vector2) -> DrawingResult:
 			"selectable": Rect2(-8.0, -8.0, 16.0, 16.0).has_point(local)})
 	if not local.is_finite() or absf(local.x) > 1000000000.0 or absf(local.y) > 1000000000.0:
 		return DrawingResult.failure("COORD_RANGE", "Hit test outside supported local viewport")
+	if not _assets[item.source_id].get("children", []).is_empty():
+		var nested_hit: DrawingResult = hit_test_path(instance_id, world_point)
+		if not nested_hit.ok:
+			return nested_hit
+		return DrawingResult.success(nested_hit.value is Dictionary)
 	var output: DrawingResult = render_instance(instance_id,
 		Rect2i(floori(local.x), floori(local.y), 1, 1))
 	if not output.ok:

@@ -67,6 +67,15 @@
   Remove/NULL confirmation behavior. This is **only the graph/persistence
   milestone**; no recursive rendering/selection or owner UX acceptance is
   implied. It runs in fast push CI.
+- T-064 bounded nested Object render and hit paths: `tests/object_child_render_smoke.gd`
+  (`T064_CHILD_RENDER_PASSED`, 36 checks) verifies parent/child/grandchild
+  pixels, negative translations and quarter-turn transforms, paint order,
+  stable child-ID hit paths, NULL markers, published Save visibility, disk
+  reload and Atlas map-frame invalidation. Source composition is limited to
+  1,048,576 pixels per viewport, 2,048 visible nodes and 4,194,304 cumulative
+  sampling/destination pixels. No nested editor UI or Save As policy is implied.
+  This regression runs in fast push CI; physical display interaction remains
+  outside that automated gate.
 - T-065 Atlas-owned source safety: `tests/object_asset_repair_smoke.gd`
   (48 disk-backed checks) covers optimistic deletion confirmations,
   Remove/NULL policies, stable placement generations, explicit no-guess

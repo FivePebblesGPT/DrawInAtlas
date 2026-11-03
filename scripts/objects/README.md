@@ -149,3 +149,29 @@ python3 tools/build_drawing_app.py --in-place
 godot --headless --editor --path drawing --import --quit
 godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd
 ```
+
+## T-064 bounded nested source rendering (2026-11-03)
+
+A published Object source can reference ordered child Object sources via the
+existing Atlas registry. `render_source_tree(source_id, local_rect)` draws
+the root, then visible descendants (depth-first, later siblings on top),
+using composed parent-local affine transforms and the same canonical
+`DrawingRenderer` as flat assets. `render_instance` uses that path only when
+a source has children; flat placement and independent Drawing still work as
+before. Missing/NULL children use a bounded visible marker rather than
+looking up stale pixels. `composed_bounds` returns the union of transformed
+child frames; `hit_test_path` returns a stable root-to-child ID path so a
+future editor can distinguish parent selection from child selection.
+
+The renderer refuses unsafe source/view sizes (1,048,576 output pixels,
+2,048 visible nodes, 4,194,304 total sampled and composited pixels), and
+uses a traversal-path cycle guard as a second line of defense. Atlas preview
+invalidation follows child-graph mutation and published asset Save; unsaved
+child drafts remain invisible to parents. Run the focused headless witness:
+
+```sh
+godot --headless --path . --script res://tests/object_child_render_smoke.gd
+```
+
+The nested editor-selection UI, undo/redo and Save As/export graph-copy policy
+are not yet implemented; this is an engineering milestone, not acceptance.
