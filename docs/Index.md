@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 real DrawingDocument publication witness (2026-11-03; In Progress):**
+The optional checked C++ raster GDExtension now feeds a detached native tile
+through the *actual* `DrawingEditSession.apply_region()` and
+`DrawingDocument._publish_edit()` path in a disposable Godot project. Two
+independent runs pass **443/443** native parity, **370/370** texture-publication
+and **219/219** canonical document/history checks each. Real undo/redo,
+dirty regions, negative/far signed tiles, lazy digest failures, locks,
+no-op and stale/concurrent commits are exercised. This is **not** production
+UI/backend adoption; copying a whole tile through GDScript is intentionally
+unoptimized and does not establish a native speedup. T-068 stays In Progress.
+See [T-068](Tickets/T-068.md) and
+[raw evidence](benchmarks/T068_2026-11-03_gdextension_document.json).
+
 **T-068 revision-guarded experimental native publication (2026-11-03; In Progress):**
 The opt-in Godot/C++ bridge now has an isolated GDScript publication adapter
 that rejects stale revisions and changed source bytes, reports exact changed-

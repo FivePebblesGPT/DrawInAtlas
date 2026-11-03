@@ -24,6 +24,8 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertTrue((bridge.BRIDGE / "t068_bridge_smoke.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_revision_adapter.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_revision_smoke.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_document_adapter.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_document_smoke.gd").is_file())
         self.assertTrue((ROOT / "tools/benchmarks/t068_raster_kernel.cpp").is_file())
         self.assertFalse(list(ROOT.rglob("*.gdextension")),
                          "The experimental native extension must not load at app startup")
@@ -35,6 +37,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertEqual(bridge.REVISION_RE.search(
             "T068_REVISION_PASSED: 370 checks\n").group(1), "370")
         self.assertIsNone(bridge.REVISION_RE.search("T068_REVISION_FAILED: 1/370"))
+        self.assertEqual(bridge.DOCUMENT_RE.search(
+            "T068_DOCUMENT_PASSED: 219 checks\n").group(1), "219")
+        self.assertIsNone(bridge.DOCUMENT_RE.search("T068_DOCUMENT_FAILED: 1/219"))
         self.assertIsNotNone(bridge.TIMING_RE.search(
             'T068_BRIDGE_TIMING: {"32":{"median_us":8}}\n'))
 
@@ -49,7 +54,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
             for diagnostic in ("SCRIPT ERROR: parse failed", "ERROR: invalid extension",
                                "T068_BRIDGE_FAIL: mismatched bytes",
                                "T068_REVISION_FAIL: stale write accepted",
-                               "T068_REVISION_FAILED: 1/370"):
+                               "T068_REVISION_FAILED: 1/370",
+                               "T068_DOCUMENT_FAIL: stale revision accepted",
+                               "T068_DOCUMENT_FAILED: 1/219"):
                 with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                     bridge.checked_run([sys.executable, "-c",
                                         f"print({diagnostic!r})"], cwd=wd, timeout=10)
@@ -61,7 +68,32 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertIn("str(ROOT / \"tools/benchmarks/t068_raster_kernel.cpp\")", original)
         self.assertIn('"--script", "res://test.gd"', original)
         self.assertNotIn('ROOT / "project.godot").write_text(', original)
-        self.assertNotIn('ROOT / "addons"', original)
+        self.assertIn('drawing.mkdir(parents=True)', original)
+        self.assertIn('shutil.copyfile(ROOT / "addons" / "drawing"', original)
+        self.assertNotIn('shutil.copytree(ROOT / "addons"', original)
+
+    def test_canonical_script_dependency_subset_is_explicit(self) -> None:
+        expected = {"document", "edit_session", "signed_tiles", "layer_node",
+                    "raster_tile", "result", "delta", "dirty_region", "selection",
+                    "history_context", "text_element", "text_raster"}
+        self.assertEqual(set(bridge.CANONICAL_SCRIPTS), expected)
+        for stem in expected:
+            self.assertTrue((ROOT / "addons" / "drawing" / (stem + ".gd")).is_file())
+        self.assertNotIn("workspace", expected)
+
+    def test_real_document_adapter_requires_transactional_publication(self) -> None:
+        adapter = (bridge.BRIDGE / "t068_document_adapter.gd").read_text(encoding="utf-8")
+        witness = (bridge.BRIDGE / "t068_document_smoke.gd").read_text(encoding="utf-8")
+        for required in ("request_chunk_at", "begin_edit", "apply_region", "edit.commit()",
+                         "expected_revision", "STALE_REVISION", "COORD_RANGE"):
+            self.assertIn(required, adapter)
+        for required in ("doc.undo()", "doc.redo()", "register_lazy_chunk",
+                         "T068_DOCUMENT_PASSED", "DrawingEditSession._blend"):
+            self.assertIn(required, witness)
+        self.assertNotIn(".texture.update(", adapter)
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn('"document_checks": int(document_match.group(1))', source)
+        self.assertIn('"res://document_test.gd"', source)
 
     def test_revision_checks_require_native_renderer_and_isolation(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")

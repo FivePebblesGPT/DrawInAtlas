@@ -625,3 +625,26 @@ reported dirty rectangle does **not** mean Godot supports partial
 `ImageTexture.update()`. The production renderer, file format and editor
 startup are unchanged; the third-party backend and hardware comparisons remain
 outstanding.
+
+
+### Real canonical DrawingDocument transaction witness (2026-11-03)
+
+The optional native bridge now has a **second, independent publication path**
+for experimental verification: one checked C++ tile result is fed to the real
+`DrawingDocument` through `DrawingEditSession.apply_region()` and its usual
+atomic `commit()`. The temporary Godot project includes only 12 source scripts
+from the generic Drawing package. No native library or extension descriptor
+is installed in the real editor. This is not optimized: a whole tile crosses
+the GDExtension boundary and is scanned/staged through GDScript, and a maximum
+1,024² tile is allowed by the existing edit-region budget.
+
+[Two-run raw evidence](benchmarks/T068_2026-11-03_gdextension_document.json)
+records **443 native bridge**, **370 texture readback** and **219 canonical
+Document** checks per run. The latter verify source pixels/hidden RGB, 48
+independent randomized blend/erase/replacement oracles, revisions, real
+history and dirty regions, mask eligibility, stale concurrent commits, signed
+coordinates, lazy SHA-verified bytes, and lock failure atomicity. Reported
+microsecond bridge timings exclude the whole-tile Drawing commit and must
+**not** be used to claim an edit-to-visible improvement. No real editor
+startup, production Bucket tool, GPU subrectangle upload, Windows build or
+physical-hardware comparison was exercised. T-068 remains **In Progress**.
