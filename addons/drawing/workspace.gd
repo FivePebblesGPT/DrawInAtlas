@@ -7,10 +7,24 @@ const TOP_BAR_SCRIPT: Script = preload("res://addons/drawing/editor_top_bar.gd")
 const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd")
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
+const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
 var start_blank_document: bool = true
+## One store per host Godot project (Drawing and Atlas have independent user:// roots).
+## A harness can opt out before add_child(), or supply a private test file.
+var layout_persistence_enabled: bool = true
+## Peers registered before entering the tree participate in restore and recovery.
+## The future Asset Browser can use this without this shell depending on it.
+var initial_extra_panels: Dictionary = {} # Stable id -> Control
+var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered new ID
+var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
+var layout_recovery_status: String = "defaults" # defaults / loaded / repaired / invalid
+var _layout_booted: bool = false
+var _layout_save_pending: bool = false
+var _saved_layout_width: int = 270
+var _saved_layout_scroll: int = 0
 var tabs: Array[Dictionary] = []
 var active_tab: int = -1
 var active_tool: String = "Brush"
@@ -95,6 +109,7 @@ const ROW_PAGE: int = 200
 
 func _ready() -> void:
 	_build_interface()
+	_restore_workspace_layout()
 	if start_blank_document:
 		new_drawing()
 
@@ -131,12 +146,13 @@ func _build_interface() -> void:
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
 		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W",
-		"Float selected dock group", "Show hidden floating panels"],
+		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
 		Callable(self, "_cycle_tab").bind(-1), Callable(self, "_ask_rename_object"),
 		Callable(self, "_ask_save"), Callable(self, "_request_close_current"),
-		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts")])
+		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts"),
+		Callable(self, "reset_workspace_layout")])
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
@@ -290,6 +306,12 @@ func _build_interface() -> void:
 	selection_history_toggle.button_pressed = record_selection_history
 	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
 	history_pane.add_child(selection_history_toggle)
+	for panel_id: String in initial_extra_panels:
+		var view: Control = initial_extra_panels[panel_id] as Control
+		if view != null and not dock_views.has(panel_id) and dock_layout.register_panel(panel_id):
+			if dock_layout.attach_panel(panel_id, "right", panel_id):
+				dock_views[panel_id] = view
+				dock_stash.add_child(view)
 	_render_dock()
 	resized.connect(_clamp_floating_hosts)
 	status = Label.new()
@@ -663,6 +685,7 @@ func _render_dock(focus_key: String = "") -> void:
 	_render_floating_hosts()
 	if not focus_key.is_empty():
 		call_deferred("_restore_dock_focus", focus_key)
+	_schedule_layout_save()
 
 
 ## T-081: instantiate a single Control host for a whole group, using the same
@@ -698,6 +721,7 @@ func _float_source(kind: String, source_id: String, at: Vector2 = Vector2(-1, -1
 	add_child(host)
 	host.layout_changed.connect(_render_dock)
 	host.hide_requested.connect(hide_floating_host)
+	host.state_changed.connect(_schedule_layout_save)
 	floating_hosts[host_id] = host
 	# Stagger independent hosts, then clamp their full frame to the client area.
 	var shift: float = float(_floating_serial - 1) * 26.0
@@ -725,6 +749,7 @@ func hide_floating_host(host_id: String) -> void:
 	var host: DrawingFloatingHost = floating_hosts.get(host_id) as DrawingFloatingHost
 	if host != null:
 		host.hide()
+		_schedule_layout_save()
 
 
 func show_floating_host(host_id: String) -> void:
@@ -733,6 +758,7 @@ func show_floating_host(host_id: String) -> void:
 		host.show()
 		host.clamp_to_client()
 		host.raise_host()
+		_schedule_layout_save()
 
 
 func show_hidden_floating_hosts() -> void:
@@ -1780,6 +1806,7 @@ func _toggle_dock() -> void:
 		dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if not minimized else _expanded_dock_width))
 		if minimized:
 			call_deferred("_restore_expanded_scroll")
+		_schedule_layout_save()
 
 
 func _reset_dock_width() -> void:
@@ -1787,6 +1814,7 @@ func _reset_dock_width() -> void:
 		_toggle_dock()
 	_expanded_dock_width = 270
 	dock_split.split_offset = maxi(0, int(dock_split.size.x) - 270)
+	_schedule_layout_save()
 
 
 func _show_about_workspace() -> void:
@@ -2053,3 +2081,119 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_W: _request_close_current()
 		_: return
 	get_viewport().set_input_as_handled()
+
+
+## T-083: restore once the default T-063 groups and built-in panel Controls exist.
+## No document, Object source, or layer data is included in this preference.
+func _restore_workspace_layout() -> void:
+	if layout_persistence_enabled:
+		var stored: Dictionary = DrawingDockPersistence.read_file(layout_settings_path)
+		if not stored.is_empty():
+			var restored: Dictionary = DrawingDockPersistence.recover(stored, dock_layout, layout_panel_aliases)
+			if not restored.is_empty() and dock_layout.restore(restored["layout"]):
+				layout_recovery_status = "repaired" if restored["recovered"] else "loaded"
+				_saved_layout_width = restored["dock_width"]
+				_saved_layout_scroll = restored["dock_scroll"]
+				_expanded_dock_width = _saved_layout_width
+				_expanded_scroll = _saved_layout_scroll
+				for metadata: Dictionary in restored["hosts"]:
+					var host_id: String = metadata["id"]
+					var host: DrawingFloatingHost = FLOATING_HOST_SCRIPT.new() as DrawingFloatingHost
+					host.setup(host_id, dock_layout, dock_drag, dock_views, dock_stash, self)
+					add_child(host)
+					host.layout_changed.connect(_render_dock)
+					host.hide_requested.connect(hide_floating_host)
+					host.state_changed.connect(_schedule_layout_save)
+					floating_hosts[host_id] = host
+					host.set_host_rect(DrawingDockPersistence.restore_rect(metadata, size))
+					if not metadata["visible"]:
+						host.hide()
+					if host_id.begins_with("float-") and host_id.substr(6).is_valid_int():
+						_floating_serial = maxi(_floating_serial, int(host_id.substr(6)))
+				_render_dock()
+		elif FileAccess.file_exists(layout_settings_path):
+			layout_recovery_status = "invalid"
+	_layout_booted = true
+	call_deferred("_apply_saved_dock_geometry")
+
+
+func _apply_saved_dock_geometry() -> void:
+	if dock_split == null or not is_inside_tree():
+		return
+	var minimized: bool = dock_layout.container_info("right")["minimized"]
+	dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if minimized else _expanded_dock_width))
+	if not minimized:
+		inspector.scroll_vertical = _expanded_scroll
+
+
+func _schedule_layout_save() -> void:
+	if not _layout_booted or not layout_persistence_enabled or _layout_save_pending or dock_drag.is_dragging():
+		return
+	_layout_save_pending = true
+	call_deferred("_flush_workspace_layout")
+
+
+func _flush_workspace_layout() -> void:
+	_layout_save_pending = false
+	if not _layout_booted or not layout_persistence_enabled or dock_drag.is_dragging():
+		return
+	_save_workspace_layout()
+
+
+func _save_workspace_layout() -> bool:
+	if not layout_persistence_enabled or dock_layout == null:
+		return false
+	if not dock_layout.container_info("right")["minimized"]:
+		_expanded_dock_width = maxi(160, int(inspector.size.x))
+		_expanded_scroll = inspector.scroll_vertical
+	var state: Dictionary = DrawingDockPersistence.capture(dock_layout, floating_hosts,
+		_expanded_dock_width, _expanded_scroll, size)
+	return DrawingDockPersistence.save_file(layout_settings_path, state)
+
+
+func reset_workspace_layout() -> void:
+	# Return views to a safe parent before destroying the existing hosts.
+	_cancel_cross_drop()
+	for panel_view: Control in dock_views.values():
+		if panel_view.get_parent() != dock_stash:
+			panel_view.reparent(dock_stash)
+	for host: DrawingFloatingHost in floating_hosts.values():
+		host.queue_free()
+	floating_hosts.clear()
+	_floating_serial = 0
+	dock_layout = DOCK_LAYOUT_SCRIPT.new() as DrawingDockLayout
+	dock_layout.create_container("right")
+	for panel_id: String in dock_views:
+		dock_layout.register_panel(panel_id)
+		dock_layout.attach_panel(panel_id, "right", panel_id)
+	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
+	_expanded_dock_width = 270
+	_expanded_scroll = 0
+	_render_dock()
+	call_deferred("_apply_saved_dock_geometry")
+	_schedule_layout_save()
+
+
+## Dynamic peers, including a future Asset Browser, are registered by stable ID;
+## no plugin panel is hardcoded into the persisted schema or initial dock.
+func register_workspace_panel(panel_id: String, view: Control) -> bool:
+	if view == null or panel_id.is_empty() or dock_views.has(panel_id):
+		return false
+	if not dock_layout.register_panel(panel_id):
+		return false
+	var group_id: String = panel_id
+	var counter: int = 1
+	while not dock_layout.group_info(group_id).is_empty():
+		group_id = "%s-extra-%d" % [panel_id, counter]
+		counter += 1
+	if not dock_layout.attach_panel(panel_id, "right", group_id):
+		return false
+	dock_views[panel_id] = view
+	dock_stash.add_child(view)
+	_render_dock()
+	return true
+
+
+func _exit_tree() -> void:
+	if _layout_booted and layout_persistence_enabled:
+		_save_workspace_layout()

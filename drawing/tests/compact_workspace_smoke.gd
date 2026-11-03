@@ -71,6 +71,7 @@ func run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1280, 800)
 	var app: Control = load("res://main.tscn").instantiate()
+	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await frames(12)
 	var top: HBoxContainer = app.top_bar

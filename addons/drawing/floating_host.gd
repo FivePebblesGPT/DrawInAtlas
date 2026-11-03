@@ -5,6 +5,7 @@ extends PanelContainer
 
 signal layout_changed
 signal hide_requested(host_id: String)
+signal state_changed
 
 const MIN_FRAME: Vector2 = Vector2(236, 180)
 const EDGE_MARGIN: float = 5.0
@@ -144,8 +145,9 @@ func _finite_vector(value: Vector2) -> bool:
 
 
 func raise_host() -> void:
-	if get_parent() != null:
+	if get_parent() != null and get_index() != get_parent().get_child_count() - 1:
 		get_parent().move_child(self, get_parent().get_child_count() - 1)
+		state_changed.emit()
 
 
 func _frontmost_at(point: Vector2) -> bool:
@@ -388,6 +390,7 @@ func _input(event: InputEvent) -> void:
 			return
 		if not _gesture.is_empty():
 			_gesture = ""
+			state_changed.emit()
 			get_viewport().set_input_as_handled()
 		elif not _candidate_id.is_empty():
 			if drag.is_dragging() and _owns_drag():

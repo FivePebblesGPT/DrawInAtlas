@@ -106,6 +106,7 @@ func _run() -> void:
 	_check(not bool(layout.container_info("right")["minimized"]), "expanded dock state retained")
 	# The existing workspace uses this model while rendering the same T-063 shell.
 	var workspace: Control = WORKSPACE_SCRIPT.new() as Control
+	workspace.layout_persistence_enabled = false
 	workspace.set("start_blank_document", false)
 	root.add_child(workspace)
 	for frame: int in range(3):

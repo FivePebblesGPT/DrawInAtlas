@@ -1,6 +1,6 @@
 # Drawing workspace panel docking — agreed follow-up scope
 
-**Agreed roadmap (2026-11-02), progress through 2026-11-03:** T-078 (model), T-079 (collapsible/rail/flyout UI), T-080 (tab/group reordering and previews), T-081 (movable floating hosts), and T-082 (transactional cross-container docking) are **engineering Done**. T-083 persistence/final **owner UX review** remains ahead. The user flows below describe **the whole future feature set**, not all functionality delivered yet. Earlier T-063 and T-059/T-056 owner-review boundaries remain intact. See [the workflow](TICKET_WORKFLOW.md) and [the UI specification](DRAW_MODULE_UI_SPEC.md).
+**Agreed roadmap (2026-11-02), progress through 2026-11-03:** T-078 (model), T-079 (collapsible/rail/flyout UI), T-080 (tab/group reordering and previews), T-081 (movable floating hosts), and T-082 (transactional cross-container docking) are **engineering Done**. T-083 persistence/recovery engineering is verified and **awaits explicit owner UX review**. The user flows below describe **the whole future feature set**, not all functionality delivered yet. Earlier T-063 and T-059/T-056 owner-review boundaries remain intact. See [the workflow](TICKET_WORKFLOW.md) and [the UI specification](DRAW_MODULE_UI_SPEC.md).
 
 ## Reference behavior and terminology
 
@@ -25,7 +25,7 @@ Distinct concepts: **panel visibility**, **panel ownership** (dock or floating c
 5. **Cancel and recover:** escape/invalid drop restores the original layout; hide/close a floating panel without unexpectedly redocking it, then reopen via Window or an equivalent panel list. No orphaned group, duplicate tab, or data loss after repeated moves.
 6. **Persist and validate:** restart/restore a mixed docked/floating layout with group order, active tabs, collapsed groups and minimized state intact. Invalid/offscreen geometry is clamped into the current application viewport; narrow-screen/HiDPI focus and hit targets work; owner verifies the native interaction once engineering tests are complete.
 
-These are cross-ticket scenarios, **not evidence that every feature is present**. Grouped tabs, within-dock drag targets and floating-host-local interactions are implemented under T-079–T-081; cross-container pointer drops and persistence remain T-082–T-083. Native pointer/keyboard evidence is required for interaction tickets; code-only/document assertions are not a substitute. All windows are in-app controls, never independent OS windows.
+These are cross-ticket scenarios, **not evidence that every feature is present**. Grouped tabs, within-dock drag targets and floating-host-local interactions are implemented under T-079–T-081; cross-container pointer drops are implemented in T-082 and persistence/recovery engineering in T-083; owner UX approval remains outstanding. Native pointer/keyboard evidence is required for interaction tickets; code-only/document assertions are not a substitute. All windows are in-app controls, never independent OS windows.
 
 ## Delivery stages and dependency edges
 
@@ -37,8 +37,8 @@ Statuses below are the **initial planning state on 2026-11-02**, not a substitut
 | [T-079](Tickets/T-079.md) | Collapsible vertically scrolling groups, grouped icon rail, shared group flyouts | T-078 | Native interaction tests; **Blocked** |
 | [T-080](Tickets/T-080.md) | Tab reordering, group creation/splitting and rail insertion previews | T-079 | Native drag tests; **Blocked** |
 | [T-081](Tickets/T-081.md) | Movable/resizable in-app floating **tabbed group** containers | T-080 | Native window/control tests; **Blocked** |
-| [T-082](Tickets/T-082.md) | Cross-container docking: tabs and whole groups with alignment hints | T-081 | Native target/cancellation tests; **Blocked** |
-| [T-083](Tickets/T-083.md) | Workspace layout persistence/recovery and final owner UX acceptance | T-082 | **Owner manual review** after engineering; **Blocked** |
+| [T-082](Tickets/T-082.md) | Cross-container docking: tabs and whole groups with alignment hints | T-081 | **Done**; native target/cancellation tests |
+| [T-083](Tickets/T-083.md) | Workspace layout persistence/recovery and final owner UX acceptance | T-082 | **Manual Review**; engineering verified; owner decision pending |
 
 Only **one implementation ticket per turn**. T-065's future Asset Browser may register as another panel, but this design work does not make T-065 Done or create an unnecessary hard dependency on it. T-059 and T-056 retain their separate full-Drawing UX and Atlas integration manual gates. Owner agreement to this staged scope is **not** manual approval of a future T-083 implementation.
 
@@ -57,7 +57,7 @@ Do not change DrawingDocument pixel/layer data, Atlas content or document-tab se
 
 ## Implementation state — T-078 foundation (2026-11-03)
 
-The reusable `DrawingDockLayout` class now owns panel/group/container state and validation; the Drawing workspace registers current Colors/Layers/History panels and keeps their existing `Control` view references without altering visual T-063 behavior. Its snapshot version is 1, designed for but **not persisted by** T-083. Headless model/shell coverage: 82 assertions; isolated staged Drawing consumer also passed. T-079 remains responsible for real chevrons, grouped icon rail, shared in-app flyouts and focus behavior. T-080–082 still own drag/group/floating interaction; T-083 still owns persistence and owner review.
+The reusable `DrawingDockLayout` class now owns panel/group/container state and validation; the Drawing workspace registers current Colors/Layers/History panels and keeps their existing `Control` view references without altering visual T-063 behavior. Its snapshot version is 1, now persisted inside T-083's separate, versioned workspace settings file (not in Drawing documents). Headless model/shell coverage: 82 assertions; isolated staged Drawing consumer also passed. T-079 remains responsible for real chevrons, grouped icon rail, shared in-app flyouts and focus behavior. T-080–082 still own drag/group/floating interaction; T-083 still owns persistence and owner review.
 
 ## Implementation state — T-079 dock UI (2026-11-03)
 
@@ -80,3 +80,12 @@ Evidence: `drawing/tests/dock_float_smoke.gd` **64/64 headless** and `drawing/te
 ## Implementation state — T-082 cross-container docking (2026-11-03)
 
 The shared workspace now coordinates cross-container panel and group drags rather than letting individual hosts commit independently. Dock-origin drags can insert in either floating-host tab/group slots; host-origin drags can insert into expanded dock groups or the minimized icon rail's exact between-group gap, or into another floating host. Bare-canvas drop creates a new in-app floating Control host only on commit; any other invalid drop cancels. Preview markers always reflect the actual hovered target, and invalidation clears the previously valid target. A source host with no remaining groups is reaped after a successful transfer. Hidden hosts are not drop targets. The native witness `drawing/tests/dock_cross_native.gd` verified Colors+Layers detach → Layers+Colors floating reorder → precise redock between History and Swatches, complete rail-separator order, single-panel merge, multiple hosts, Esc/focus-loss/stale-target rollback and narrow/HiDPI; **56/56** functional checks. Headless shared-model coverage `drawing/tests/dock_cross_smoke.gd` passed **62/62**. This is engineering evidence, **not** T-083 owner UX approval. T-083 remains Ready for engineering and may not be Done without explicit owner acceptance.
+
+
+## Implementation state — T-083 persisted workspace and recovery (2026-11-03)
+
+The shared workspace now saves a `DrawingDockLayout` snapshot plus dock width/scroll and floating-host geometry, visibility and z-order in a separate versioned `user://drawing-workspace-dock-v1.json` preference. The registered model remains the sole ownership registry. Valid layouts restore group/tab order and selection, independent collapse, minimized rail and its active shared flyout, and original in-app floating group views. A peer can provide stable IDs and Controls through `initial_extra_panels` before `_ready` or `register_workspace_panel` later, without this serializer importing Asset Browser code. An explicit old-to-new ID mapping (`layout_panel_aliases`) supports known renames; otherwise unknown saved panels are omitted and newly registered panels get a safe dock singleton. Missing T-063 settings use three stacked defaults, since T-063 never stored any older persistent layout.
+
+All document pixels, object sources, history and dirty flags are separate. Corrupt/unsupported/oversized preferences never partially mutate the live model; offscreen/invalid host placements recover visibly, and **Window → Reset workspace layout** returns to the defaults without touching the document. The standalone and Atlas projects have independent `user://` directories; embedding hosts can provide another `layout_settings_path` for multiple distinct workspaces. Settings are saved on layout changes and clean shutdown; a process killed before a flush may lose its last layout tweak (never document content). Windows native hardware and extreme multi-monitor transition UX require owner/release testing.
+
+Verified with Godot 4.8 beta 2: T-083 model **46/46**, native round-trip **63/63** (**65/65** including two saved before/after screenshots), T-079–T-082 native regression witnesses **40/68/55/56**, T-063 **75**, and native keyboard **8**. These are objective engineering results only. [T-083](Tickets/T-083.md) is **Manual Review** until the owner explicitly approves the rail/flyout/grouping/drag/floating/persistence/recovery experience. T-056 and T-059 approvals remain separate and pending.

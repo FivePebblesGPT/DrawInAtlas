@@ -55,6 +55,7 @@ func run() -> void:
 	root.size = Vector2i(1080, 700)
 	root.mode = Window.MODE_WINDOWED
 	var app: Control = load("res://main.tscn").instantiate()
+	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await frames(8)
 	check(app.tabs.size() == 1, "one ordinary document at startup")

@@ -42,6 +42,7 @@ func gesture(canvas: Control, begin: Vector2i, finish: Vector2i) -> void:
 
 func _run() -> void:
 	var shell: Control = load("res://main.tscn").instantiate()
+	shell.layout_persistence_enabled = false
 	root.add_child(shell)
 	await process_frame
 	await process_frame

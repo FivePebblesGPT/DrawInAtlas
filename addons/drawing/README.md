@@ -160,3 +160,8 @@ The original algorithm remains only as an independent byte-equivalence test in
 [`docs/DRAWING_CPU_RASTER_BENCHMARK.md`](../../docs/DRAWING_CPU_RASTER_BENCHMARK.md).
 The C++ batch-kernel performance experiment in `tools/benchmarks/` is **not**
 linked into this package, and does not yet establish native deployment support.
+
+
+### Dock layout settings (T-083, engineering verified; owner UX review open)
+
+`dock_persistence.gd` serializes the existing `DrawingDockLayout` state and visible in-app `DrawingFloatingHost` rectangles to a versioned `user://` JSON workspace preference, independently of Drawing or Object Asset files. The shared `workspace.gd` loads settings after its initial panel IDs register, writes on layout changes and clean shutdown, and exposes **Window → Reset workspace layout**. Embedders can set `layout_settings_path`, `initial_extra_panels` (stable ID -> `Control` set before adding the workspace to the scene tree), and `layout_panel_aliases` (old ID -> currently registered ID). Unknown saved panels are ignored and newly registered panels receive singleton dock groups; corrupt/unsupported formats fall back to T-063 defaults. `register_workspace_panel` supports peers introduced after startup. `drawing/tests/dock_persistence_smoke.gd` exercises 46 model checks; `drawing/tests/dock_persistence_native.gd` exercises 63 native checks (65 with optional screenshots). The manual T-083 owner UX gate remains unapproved.
