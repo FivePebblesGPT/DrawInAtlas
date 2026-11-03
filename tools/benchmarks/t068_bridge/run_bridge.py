@@ -23,6 +23,7 @@ PASS_RE = re.compile(r"^T068_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
 TIMING_RE = re.compile(r"^T068_BRIDGE_TIMING: (.+)$", re.MULTILINE)
 REVISION_RE = re.compile(r"^T068_REVISION_PASSED: (\d+) checks$", re.MULTILINE)
 DOCUMENT_RE = re.compile(r"^T068_DOCUMENT_PASSED: (\d+) checks$", re.MULTILINE)
+BATCH_RE = re.compile(r"^T068_BATCH_PASSED: (\d+) checks$", re.MULTILINE)
 CANONICAL_SCRIPTS = (
     "document", "edit_session", "signed_tiles", "layer_node", "raster_tile",
     "result", "delta", "dirty_region", "selection", "history_context",
@@ -39,7 +40,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -105,6 +106,8 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_revision_smoke.gd", project / "revision_test.gd")
         shutil.copyfile(BRIDGE / "t068_document_adapter.gd", project / "document_adapter.gd")
         shutil.copyfile(BRIDGE / "t068_document_smoke.gd", project / "document_test.gd")
+        shutil.copyfile(BRIDGE / "t068_document_batch_adapter.gd", project / "batch_adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_document_batch_smoke.gd", project / "batch_test.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -135,16 +138,24 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             document_match = DOCUMENT_RE.search(document_output)
             if document_match is None or int(document_match.group(1)) < 140:
                 raise RuntimeError(f"Missing or insufficient canonical document checks:\n{document_output[-4000:]}")
+            batch_output = checked_run([godot, "--headless", "--path", str(project),
+                                        "--audio-driver", "Dummy", "--script",
+                                        "res://batch_test.gd"], cwd=project, timeout=120)
+            batch_match = BATCH_RE.search(batch_output)
+            if batch_match is None or int(batch_match.group(1)) != 128:
+                raise RuntimeError(f"Missing or insufficient multi-tile checks:\n{batch_output[-4000:]}")
             observations.append({"checks": count, "revision_checks": int(revision_match.group(1)),
                                  "document_checks": int(document_match.group(1)),
+                                 "batch_checks": int(batch_match.group(1)),
                                  "bridge_latency_us": json.loads(timing.group(1))})
         return {
             "ticket": "T-068", "mode": "optional, isolated Linux GDExtension (not production)",
             "godot_version": version, "generated_header_sha256": header_sha,
-            "test_method": "Godot calls against checked native batch, detached texture adapter, and real DrawingDocument transaction/history",
+            "test_method": "Checked native batch, detached texture adapter, and real single/multiple-tile DrawingDocument transactions",
             "measurements": observations,
             "limitations": [
                 "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
+                "Multi-tile batches stage full tiles in GDScript and commit once; timings do not measure or establish multi-tile speedup",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
                 "Temporary binary is not bundled in the repository or loaded at normal startup",
@@ -169,6 +180,7 @@ def main() -> None:
     print(f"T068_GDEXTENSION_INTEGRATION_PASSED: {counts} native parity checks per run")
     print("Revision-guarded publication adapter:", ", ".join(str(item["revision_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Canonical DrawingDocument transactions:", ", ".join(str(item["document_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
 
 

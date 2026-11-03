@@ -23,7 +23,7 @@ jobs:
         run: |
           g++ --version
           python3 -m unittest discover -s tests -p test_t068_bridge_runner.py -v
-      - name: Build and exercise optional native, texture and real DrawingDocument boundaries
+      - name: Build and exercise optional native, texture and single/multi-tile DrawingDocument boundaries
         shell: bash
         run: |
           set -euo pipefail

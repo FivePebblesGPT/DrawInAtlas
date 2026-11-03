@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 atomic multi-tile native publication witness (2026-11-03; In Progress):**
+An isolated checked C++ GDExtension now stages multiple verified native tile
+outputs into **one** canonical DrawingDocument gesture, preserving one Undo/Redo
+entry and per-tile signed-integer dirty regions. It caps aggregate full-tile
+work at 1,048,576 pixels / 16 tiles, fails closed on corrupt/lazy sources,
+duplicate targets, bad native output, revision conflicts and locked layers,
+and never publishes partial batches. The dedicated **128-check** Godot witness
+is manual-only; fast CI checks runner isolation without loading native code.
+No production integration, performance gain, physical-hardware acceptance or
+backend decision is claimed. [T-068](Tickets/T-068.md) remains In Progress.
+
+
 **T-068 real DrawingDocument publication witness (2026-11-03; In Progress):**
 The optional checked C++ raster GDExtension now feeds a detached native tile
 through the *actual* `DrawingEditSession.apply_region()` and

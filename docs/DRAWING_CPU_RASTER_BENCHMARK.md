@@ -648,3 +648,26 @@ microsecond bridge timings exclude the whole-tile Drawing commit and must
 **not** be used to claim an edit-to-visible improvement. No real editor
 startup, production Bucket tool, GPU subrectangle upload, Windows build or
 physical-hardware comparison was exercised. T-068 remains **In Progress**.
+
+
+## T-068: isolated atomic multi-tile native-to-document boundary (2026-11-03)
+
+The optional bridge prototype now accepts a bounded batch of independently
+computed checked C++ raster tiles and publishes them through **one** real
+`DrawingEditSession` history event. Its preflight rejects duplicate/unsafe
+tile targets and invalid results before any stage; `commit()` revalidates
+source revisions and bytes before installing all tiles. The deliberate
+1,048,576-pixel aggregate full-tile staging limit and view-relative range
+restriction avoid unbounded allocations. Per-tile dirty rectangles are
+reported using integer local coordinates (not floating-point world
+coordinates), including at signed-world origins beyond 2^53.
+
+Two standalone Godot 4.8 beta 2 runs of
+`tools/benchmarks/t068_bridge/run_bridge.py --runs 2` each pass the new
+**128-check** multi-tile witness alongside the established 443/370/219
+checks for native parity, texture readback and single-tile publication.
+[Raw results](benchmarks/T068_2026-11-03_gdextension_multitile.json) retain
+independent check counts. No comparative multi-tile runtime measurements
+were taken, so this test **cannot** justify a backend speedup. It does not
+load in production Drawing/Atlas or remove the documented external CPU
+comparators, Windows builds, physical-hardware and final selection gates.

@@ -26,6 +26,8 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertTrue((bridge.BRIDGE / "t068_revision_smoke.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_document_adapter.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_document_smoke.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_document_batch_adapter.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_document_batch_smoke.gd").is_file())
         self.assertTrue((ROOT / "tools/benchmarks/t068_raster_kernel.cpp").is_file())
         self.assertFalse(list(ROOT.rglob("*.gdextension")),
                          "The experimental native extension must not load at app startup")
@@ -40,6 +42,8 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertEqual(bridge.DOCUMENT_RE.search(
             "T068_DOCUMENT_PASSED: 219 checks\n").group(1), "219")
         self.assertIsNone(bridge.DOCUMENT_RE.search("T068_DOCUMENT_FAILED: 1/219"))
+        self.assertEqual(bridge.BATCH_RE.search("T068_BATCH_PASSED: 128 checks\n").group(1), "128")
+        self.assertIsNone(bridge.BATCH_RE.search("T068_BATCH_FAILED: 1/128"))
         self.assertIsNotNone(bridge.TIMING_RE.search(
             'T068_BRIDGE_TIMING: {"32":{"median_us":8}}\n'))
 
@@ -56,7 +60,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
                                "T068_REVISION_FAIL: stale write accepted",
                                "T068_REVISION_FAILED: 1/370",
                                "T068_DOCUMENT_FAIL: stale revision accepted",
-                               "T068_DOCUMENT_FAILED: 1/219"):
+                               "T068_DOCUMENT_FAILED: 1/219",
+                               "T068_BATCH_FAIL: partial publication",
+                               "T068_BATCH_FAILED: 1/128"):
                 with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                     bridge.checked_run([sys.executable, "-c",
                                         f"print({diagnostic!r})"], cwd=wd, timeout=10)
@@ -94,6 +100,22 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         source = SOURCE.read_text(encoding="utf-8")
         self.assertIn('"document_checks": int(document_match.group(1))', source)
         self.assertIn('"res://document_test.gd"', source)
+
+    def test_multi_tile_adapter_stays_atomic_and_opt_in(self) -> None:
+        adapter = (bridge.BRIDGE / "t068_document_batch_adapter.gd").read_text(encoding="utf-8")
+        witness = (bridge.BRIDGE / "t068_document_batch_smoke.gd").read_text(encoding="utf-8")
+        runner = SOURCE.read_text(encoding="utf-8")
+        for required in ("MAX_TILES", "MAX_PIXELS", "DUPLICATE_TILE",
+                         "request_chunk_at", "edit.apply_region", "edit.commit()",
+                         "edit.cancel()", "STALE_REVISION", "dirty_tiles"):
+            self.assertIn(required, adapter)
+        for required in ("doc.undo()", "doc.redo()", "MISSING_TILE",
+                         "CORRUPT_TILE", "BATCH_LIMIT", "T068_BATCH_PASSED"):
+            self.assertIn(required, witness)
+        self.assertIn('"res://batch_test.gd"', runner)
+        self.assertIn('"batch_checks": int(batch_match.group(1))', runner)
+        self.assertNotIn("addons/drawing/workspace", adapter)
+        self.assertNotIn("ImageTexture", adapter)
 
     def test_revision_checks_require_native_renderer_and_isolation(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")
