@@ -55,7 +55,7 @@ func commit() -> DrawingResult:
 
 
 func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
-		once: bool = false, blend: bool = false) -> DrawingResult:
+		once: bool = false, blend: bool = false, verified_source: int = -1) -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if rgba < 0 or rgba > 0xffffffff:
@@ -69,16 +69,21 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	var key: String = "%d,%d" % [global_x, global_y]
 	if once and _covered.has(key):
 		return DrawingResult.success()
-	var stride: int = document.tile_stride
-	var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
-	if not _source_tiles.has(tile_key):
-		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
-		if not resolved.ok:
-			return resolved
-		_source_tiles[tile_key] = resolved.value
-	var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
-	var old: int = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
-		if tile != null else 0
+	# Flood fill has already read this exact pixel through the verified source
+	# snapshot. Re-resolving its tile here needlessly allocates a tile key and
+	# repeats the pixel lookup. -1 means all other callers read it normally.
+	var old: int = verified_source
+	if old == -1:
+		var stride: int = document.tile_stride
+		var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+		if not _source_tiles.has(tile_key):
+			var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+			if not resolved.ok:
+				return resolved
+			_source_tiles[tile_key] = resolved.value
+		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		old = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
+			if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
 	if once:
 		_covered[key] = true
@@ -348,7 +353,8 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			return current
 		if int(current.value) == 0 or current.value != original.value:
 			continue
-		var staged: DrawingResult = _stage(point.x, point.y, rgba, selection)
+		var staged: DrawingResult = _stage(point.x, point.y, rgba, selection,
+			false, false, int(current.value))
 		if not staged.ok:
 			_before = old_before
 			_after = old_after

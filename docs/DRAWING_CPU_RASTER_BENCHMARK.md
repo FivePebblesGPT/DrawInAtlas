@@ -396,3 +396,41 @@ passed. The optional native Xvfb/Mesa brush/framebuffer witness passed
 **81/81**, with [raw results](benchmarks/T068_2026-11-03_frontier_native.json).
 This native test does **not** exercise Bucket, so it is only a general
 post-change display regression check. No native fill-latency comparison was made.
+
+
+## 2026-11-03: reuse previously verified flood-fill source bytes
+
+The fill path previously read the canonical original RGBA8 for comparison,
+then called the normal `_stage()` path, which re-created a source tile address
+and retrieved the same pixel again. A private `verified_source` parameter now
+reuses the already authenticated value for that fill match only. Other tools
+keep the normal source read, and the original delta and revision checks still
+run. No new native dependency, storage layout, blending rule or GPU feature
+was introduced.
+
+New regression: [29-check verified-stage smoke](../tests/drawing_fill_verified_stage_smoke.gd)
+with a same-session edit/fill/edit and a rejected limited fill, immutable
+before-values, hidden RGB, signed 64-bit tile crossings, repeated fills,
+selection, Undo/Redo and concurrent revision rejection. The 15-suite
+headless check aggregate passed **1,832/1,832**; the targeted unrelated brush
+framebuffer stress passed **81/81** on X11/Mesa.
+
+Three ordered baseline/changed pairs of the same `drawing_fill_tile_benchmark.gd`
+(5 independent fill+commit timings per size per process; 3 separate processes
+per version) produced the following median of the three run medians:
+
+| Source rectangle | Before | With verified-source staging | Relative |
+| --- | ---: | ---: | ---: |
+| 32×32 | 11.922 ms | 11.048 ms | −7.3% |
+| 64×64 | 50.868 ms | 44.961 ms | −11.6% |
+| 96×96 | 121.659 ms | 115.892 ms | −4.7% |
+
+[Raw trials, including each process's five timings](benchmarks/T068_2026-11-03_verified_stage_ab.json)
+· [Targeted native brush diagnostic](benchmarks/T068_2026-11-03_verified_stage_native.json).
+This is only a small, nonrandomized CPU study in a software sandbox; the
+96×96 changed result regressed against baseline in one pair. It does not
+establish statistical significance, measured peak memory, real Bucket
+pointer-to-frame latency, or physical Windows/Linux/GPU performance.
+T-068 remains **In Progress** pending the original backend comparisons,
+optional extension boundary, physical metrics and operation-by-operation
+recommendation.

@@ -6,6 +6,8 @@
 
 ## Kanban summary
 
+**T-068 verified-fill staging (2026-11-03; In Progress):** The Drawing flood-fill path now passes its already-validated source pixel into the detached staging operation instead of re-reading that pixel from the source tile; all ordinary editing tools retain normal source reads. A new **29-check** fast-CI witness covers mixed edits in one session, budget rollback, precise hidden RGB and signed 64-bit coordinates, Undo/Redo and stale-publication refusal. The 15-suite **1,832-check** headless regression and 81-check native software-frame brush witness pass; paired CPU-only timings are encouraging but too limited for a production performance claim. T-068 native-backend, Windows/Linux physical, memory/jitter, and external-library acceptance remain open. See [T-068](Tickets/T-068.md) and the [measurement report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 unique-candidate flood-fill frontier (2026-11-03; still In Progress):**
 Four-connected Bucket fills now mark each candidate when enqueued, rather
 than repeatedly appending already queued positions. Work budgets count

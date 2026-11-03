@@ -16,6 +16,13 @@
   Before/after fill CPU samples are diagnostic only and not CI gating;
   Windows/Linux hardware performance and native backend comparisons remain
   open under T-068.
+- T-068 verified-source fill staging:
+  `tests/drawing_fill_verified_stage_smoke.gd` (**29** headless assertions)
+  verifies that fill reuses already validated immutable source RGBA8 when
+  staging, without rereading each matched source pixel, while ordinary edits,
+  rollback, exact hidden RGB, far signed tile seams, Undo/Redo and stale
+  publication preserve prior behavior. The witness runs in the existing
+  T-068 fast-CI step; software framebuffer stress remains targeted only.
 - T-068 bounded flood-fill frontier:
   `tests/drawing_fill_frontier_smoke.gd` (**56** fast-CI assertions) checks
   unique-candidate work budgets, atomic rollback/retry, transparent hidden-RGB
