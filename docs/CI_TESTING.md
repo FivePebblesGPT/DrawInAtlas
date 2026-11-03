@@ -30,6 +30,14 @@
   `xvfb-run -a -s '-screen 0 1400x900x24' python3 tools/test_t065_x11_pointer.py --godot godot`.
   It is **not** part of fast push CI, nor a substitute for Windows/Linux
   physical-hardware and owner hands-on UX acceptance.
+- T-065 larger Atlas source lists: `tests/asset_browser_atlas_paging_smoke.gd`
+  (`T065_PAGING_PASSED`, **1,428 checks**) verifies globally searchable
+  registry metadata beyond the former 512-source truncation, deterministic
+  64-source pages, empty/stale-page bounds, 1,301 synthetic IDs and 66 real
+  disk-backed published sources. The 10,000-summary case tests the existing
+  maximum registry count without opening 10,000 files. Per-page file/hash/
+  revision checks remain mandatory before Open, drag or placement; owner UX,
+  physical-device latency and genuinely large source-file IO remain separate.
 - T-065 Atlas-managed portable source registration and export:
   `tests/object_portable_registry_smoke.gd` (**33** disk-backed checks) covers
   embedded source-ID preservation, canonical campaign versioning, origin/frame

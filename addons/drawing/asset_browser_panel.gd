@@ -5,6 +5,8 @@ extends VBoxContainer
 signal open_requested(path: String)
 signal place_requested(source: Dictionary)
 signal refresh_requested
+signal query_changed(query: String)
+signal page_requested(offset: int)
 
 const INDEX_SCRIPT: Script = preload("res://addons/drawing/asset_browser_index.gd")
 const THUMBNAILS_SCRIPT: Script = preload("res://addons/drawing/asset_browser_thumbnails.gd")
@@ -22,6 +24,12 @@ var import_dialog: FileDialog
 var export_dialog: FileDialog
 var _pending_export: Dictionary = {}
 var _visible_entries: Array[Dictionary] = []
+var previous_page: Button
+var next_page: Button
+var page_status: Label
+var _page_number: int = 0
+var _page_count: int = 1
+var _matched_count: int = 0
 
 
 func _ready() -> void:
@@ -34,7 +42,10 @@ func _ready() -> void:
 	search = LineEdit.new()
 	search.name = "AssetSearch"
 	search.placeholder_text = "Search name or source ID…"
-	search.text_changed.connect(func(_query: String) -> void: _refresh_view())
+	search.text_changed.connect(func(query: String) -> void:
+		_refresh_view()
+		if atlas_host_mode:
+			query_changed.emit(query))
 	add_child(search)
 	assets = DRAG_LIST_SCRIPT.new() as DrawingAssetBrowserDragList
 	assets.drag_entry_provider = Callable(self, "_drag_entry_for_row")
@@ -51,6 +62,24 @@ func _ready() -> void:
 		_queue_thumbnails())
 	assets.item_activated.connect(func(_i: int) -> void: open_selected())
 	add_child(assets)
+	var pages: HBoxContainer = HBoxContainer.new()
+	pages.name = "AssetPages"
+	pages.visible = atlas_host_mode
+	add_child(pages)
+	previous_page = Button.new()
+	previous_page.name = "PreviousAssetPage"
+	previous_page.text = "◀ Previous"
+	previous_page.pressed.connect(func() -> void: page_requested.emit(-1))
+	pages.add_child(previous_page)
+	page_status = Label.new()
+	page_status.name = "AssetPageStatus"
+	page_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pages.add_child(page_status)
+	next_page = Button.new()
+	next_page.name = "NextAssetPage"
+	next_page.text = "Next ▶"
+	next_page.pressed.connect(func() -> void: page_requested.emit(1))
+	pages.add_child(next_page)
 	var actions: HFlowContainer = HFlowContainer.new()
 	add_child(actions)
 	var refresh: Button = Button.new()
@@ -122,7 +151,9 @@ func set_objects_root(path: String) -> DrawingResult:
 ## Atlas supplies published asset records from its authoritative registry.
 ## Their published IDs intentionally differ from the embedded document IDs.
 ## The generic browser only displays and transfers these records.
-func set_published_entries(objects_root: String, records: Array[Dictionary], issues: Array[String] = []) -> void:
+func set_published_entries(objects_root: String, records: Array[Dictionary],
+		issues: Array[String] = [], page: int = 0, pages: int = 1,
+		matches: int = 0) -> void:
 	if index == null:
 		index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
 	if thumbnails == null:
@@ -130,6 +161,9 @@ func set_published_entries(objects_root: String, records: Array[Dictionary], iss
 	index.root_path = objects_root
 	index.entries = records.duplicate(true)
 	index.warnings = issues.duplicate()
+	_page_number = page
+	_page_count = maxi(1, pages)
+	_matched_count = matches
 	thumbnails.reconcile(index.entries)
 	if is_node_ready():
 		_refresh_view()
@@ -173,6 +207,15 @@ func _refresh_view() -> void:
 	_update_open_button()
 	_queue_thumbnails()
 	message.text = "%d sources; %d warnings" % [index.entries.size(), index.warnings.size()]
+	if atlas_host_mode:
+		message.text = "%d matching sources · %d shown; %d warnings" % [
+			_matched_count, index.entries.size(), index.warnings.size()]
+	if page_status != null:
+		page_status.text = "%d / %d" % [_page_number + 1, _page_count]
+	if previous_page != null:
+		previous_page.disabled = _page_number <= 0
+	if next_page != null:
+		next_page.disabled = _page_number + 1 >= _page_count
 	if index.root_path.is_empty():
 		message.text = "Choose a portable Objects/ folder from Window → Asset Browser…"
 

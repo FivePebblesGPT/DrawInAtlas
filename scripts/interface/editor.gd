@@ -12,6 +12,7 @@ const LAYER_PANEL_SCENE: PackedScene = preload("res://prefab/layer_panel.tscn")
 const OVERVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/overview_panel.tscn")
 const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
+const ASSET_BROWSER_PAGES_SCRIPT: Script = preload("res://scripts/objects/object_browser_pages.gd")
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
@@ -24,6 +25,7 @@ var object_editor_window: AtlasObjectEditorWindow
 var object_source_manager: AtlasObjectSourceManager
 var asset_browser_panel: DrawingAssetBrowserPanel
 var asset_browser_toggle: Button
+var _asset_browser_page: int = 0
 var edits: AtlasEditHistory = AtlasEditHistory.new()
 var store_io: AtlasStoreIO
 var _restored_bundle: AtlasStoreResult
@@ -316,6 +318,16 @@ func _toggle_published_asset_browser() -> void:
 		asset_browser_panel.search.grab_focus()
 
 
+func _asset_browser_query_changed(_query: String) -> void:
+	_asset_browser_page = 0
+	_refresh_asset_browser()
+
+
+func _asset_browser_page_requested(offset: int) -> void:
+	_asset_browser_page = maxi(0, _asset_browser_page + offset)
+	_refresh_asset_browser()
+
+
 func _refresh_asset_browser() -> void:
 	if asset_browser_panel == null or drawing_composition == null or \
 			drawing_composition.library == null or not asset_browser_panel.visible:
@@ -326,16 +338,26 @@ func _refresh_asset_browser() -> void:
 	if not library._index_unchanged():
 		asset_browser_panel.set_published_entries(library.root_path, catalog, warnings)
 		return # Unverified registry state is never presented as drop-authorized.
+	# Search and sort *registry metadata* before opening any source documents.
+	# This keeps the entire campaign searchable even beyond the old 512-source
+	# cutoff, while bounding the costly hash/decode work to one visible page.
+	var metadata: Array[Dictionary] = []
 	for source_id: String in library.asset_ids():
-		if catalog.size() >= DrawingAssetBrowserIndex.MAX_ASSETS:
-			warnings.append("Showing first %d published sources; narrow the campaign library before browsing more" % DrawingAssetBrowserIndex.MAX_ASSETS)
-			break
+		var item: Dictionary = library.asset_info(source_id)
+		metadata.append({"id": source_id, "name": String(item["name"])})
+	var selected: Dictionary = ASSET_BROWSER_PAGES_SCRIPT.select_page(
+		metadata, asset_browser_panel.search.text, _asset_browser_page)
+	_asset_browser_page = int(selected["page"])
+	for summary: Dictionary in selected["records"]:
+		var source_id: String = String(summary["id"])
 		var item: Dictionary = library.asset_info(source_id)
 		if not library.asset_exists(source_id):
+			warnings.append("Skipped unavailable published source: " + source_id)
 			continue
 		var path: String = library._absolute(String(item["path"]))
 		var embedded: DrawingResult = DrawingObjectEditorFile.open(path)
 		if not embedded.ok:
+			warnings.append("Skipped unreadable published source: " + source_id)
 			continue
 		var data: Dictionary = embedded.value
 		var count: int = int(library.source_usage(source_id)["total"])
@@ -344,10 +366,8 @@ func _refresh_asset_browser() -> void:
 			"bounds": data["bounds"], "embedded_id": data["source_id"],
 			"embedded_revision": data["source_revision"],
 			"usage": "unused" if count == 0 else "%d in use" % count})
-	catalog.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return String(a["name"]).nocasecmp_to(String(b["name"])) < 0 if a["name"] != b["name"] \
-			else String(a["id"]) < String(b["id"]))
-	asset_browser_panel.set_published_entries(library.root_path, catalog, warnings)
+	asset_browser_panel.set_published_entries(library.root_path, catalog, warnings,
+		_asset_browser_page, int(selected["pages"]), int(selected["total"]))
 
 
 func _valid_browser_source(token: Dictionary) -> bool:
@@ -458,6 +478,8 @@ func _mount_sidebar_views() -> void:
 	asset_browser_panel.open_requested.connect(_on_browser_open_source)
 	asset_browser_panel.place_requested.connect(_on_browser_place_source)
 	asset_browser_panel.refresh_requested.connect(_refresh_asset_browser)
+	asset_browser_panel.query_changed.connect(_asset_browser_query_changed)
+	asset_browser_panel.page_requested.connect(_asset_browser_page_requested)
 	layers_view.add_child(asset_browser_panel)
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)

@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-065 large published-library paging (2026-11-03; still In Progress):**
+Atlas's shared Asset Browser now filters names and stable IDs across the
+**entire published registry**, instead of losing all sources after the first
+512. A metadata-first search selects one 64-source page for verified file
+opening/thumbnail work, with Previous/Next, clamped page navigation and a
+matching-source count. The new 1,428-check fast-CI witness includes 1,301
+synthetic and 66 real published sources, plus a 10,000-summary upper-bound
+exercise; prior browser and Atlas registry regressions passed. The native Atlas UI
+passes 12/12, and its real XTEST pointer gesture passes 19/19 again after
+page controls were introduced.
+Standalone portable scanning retains its separate bounded safety policy.
+Physical-device/large-real-file latency and **owner UX approval** are still
+outstanding; T-065 remains In Progress. See [T-065](Tickets/T-065.md).
+
 **T-065 Atlas shared-browser drop bridge (2026-11-03; still In Progress):**
 The canonical Drawing Asset Browser is now embedded as an optional Layers
 section in Atlas, showing published `Objects/` sources with registry-owned

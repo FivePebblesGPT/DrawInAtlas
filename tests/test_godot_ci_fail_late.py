@@ -21,7 +21,9 @@ class GodotCIFailLateTests(unittest.TestCase):
         workflow = WORKFLOW.read_text(encoding="utf-8")
         blocks = re.findall(r"(?ms)^      - name: ([^\n]+)\n(.*?)(?=^      - name: |\Z)", workflow)
         self.assertGreaterEqual(len(blocks), 20)
-        self.assertLess(len(blocks), 35)
+        # Keep push CI bounded while permitting new focused, fast model
+        # witnesses (e.g. the T-065 large-library paging regression).
+        self.assertLessEqual(len(blocks), 40)
         for name, block in blocks:
             if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
                 continue
