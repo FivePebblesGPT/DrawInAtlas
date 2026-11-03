@@ -6,9 +6,11 @@
 
 ## Kanban summary
 
+**T-015 partial retirement (2026-11-03):** Independent map creation and marker-only link authoring are now enforced down to `AtlasCreateMap` and `AtlasLinkEdit`, and the linked-map form no longer exposes obsolete footprint controls. New fast CI guards cover 13 retirement checks, 29 marker/history checks and 55 link UI checks. **T-015 remains In Progress** until the old `AtlasPlacement` serialization, spatial reference/rendering and fixtures are retired or deliberately isolated without losing modern navigation coverage. The historical T-014 D0–D2 pixel assertions remain failing in targeted runs; do not call them green. See [T-015](Tickets/T-015.md).
+
 | Ready | In Progress | Blocked | Manual Review | Done | Archived | Total |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 12 | 1 | 10 | 4 | 55 | 1 | 83 |
+| 11 | 2 | 10 | 4 | 55 | 1 | 83 |
 
 **T-078–T-083 agreed docking sequence (2026-11-03):** The right icon rail remains panel-level, with separators only between tabbed groups. **T-078 Done** (82 model assertions) supplies unique stable-ID ownership, **T-079 Done** (40 native assertions) supplies collapsible groups, icon rail and in-app flyouts, and **T-080 Done** (60 model and 68 native assertions) adds transactional tab/group drag, visible insertion/merge hints, exact Esc/focus-loss/invalid-drop rollback, scrollable tab strips and keyboard arrangement controls. **T-081 Done** (64 model, 55 native checks) supplies real Control-based movable/resizable floating hosts, tab/group reordering, ownership transfer, hide/Window recovery and viewport clamping. **T-082 Done** (62 model and 56 native checks) delivers cross-container panel/group pointer docking, ordered redock, empty-canvas detach, robust invalid/focus-loss cancellations and accessible transfer commands. **T-083 Manual Review** after versioned persistence/recovery engineering (46 headless, 63 native; 65 with screenshots), with **explicit owner UX approval still mandatory**. Docking settings now save and restore, and earlier T-059/T-056 UX gates remain open. See [docking specification](DRAWING_DOCKING_SPEC.md), [T-080](Tickets/T-080.md) and [T-083](Tickets/T-083.md).
 
@@ -66,7 +68,7 @@
 | [T-012 · Replace battlemats with authored local detail](Tickets/T-012.md) | Done | — | [T-002](Tickets/T-002.md), [T-004](Tickets/T-004.md) |
 | [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Via T-039 | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md) |
 | [T-014 · Retire battlemat creation controls](Tickets/T-014.md) | Done | — | [T-012](Tickets/T-012.md), [T-006](Tickets/T-006.md) |
-| [T-015 · Remove obsolete model code (save migration waived)](Tickets/T-015.md) | Ready | — | [T-012](Tickets/T-012.md) |
+| [T-015 · Remove obsolete model code (save migration waived)](Tickets/T-015.md) | In Progress | — | [T-012](Tickets/T-012.md) |
 | [T-016 · Coherent detail-editing snapping](Tickets/T-016.md) | Done | — | [T-012](Tickets/T-012.md), [T-019](Tickets/T-019.md) |
 | [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | **Owner** | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md) |
 | [T-018 · Compact layer/object/link hierarchy](Tickets/T-018.md) | Ready | — | [T-006](Tickets/T-006.md), [T-012](Tickets/T-012.md) |

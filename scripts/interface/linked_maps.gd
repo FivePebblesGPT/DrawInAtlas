@@ -42,8 +42,10 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 		return false
 	var before: AtlasMapLink = _canvas.campaign.link_by_id(link.id)
 	var old: AtlasPlacement = _canvas.campaign.placement_by_id(before.placement_id) if before != null else null
-	# Keep editing legacy footprints, but never create new containers through links.
-	if new_map != null or (placement != null and old == null):
+	# No footprint editing or creation is available after T-015. The original
+	# footprint must not be silently flattened into a marker on Apply.
+	if new_map != null or placement != null or old != null \
+			or not link.placement_id.is_empty():
 		_rejected()
 		return false
 	if dialog.visible:

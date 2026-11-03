@@ -65,15 +65,12 @@ func _forms_and_history() -> bool:
 	editor.inspector.get_node("Scroll/Margin/Sections/ReferenceSection/ManageLinks").pressed.emit()
 	_check(dialog.visible and dialog.source_label.text.contains("Balcony"), "native Linked maps button opens the active source floor")
 	_target("greyhaven", "roof")
-	dialog.mode_picker.select(2)
-	dialog.mode_picker.item_selected.emit(2)
 	dialog.origin_x.value = -30.0
 	dialog.origin_y.value = 40.0
 	dialog.radius.value = 8.0
 	dialog.arrival_x.value = 123.5
 	dialog.arrival_y.value = -77.25
 	dialog.arrival_zoom.value = 2.5
-	dialog.center_arrival.button_pressed = false
 	if DisplayServer.get_name() != "headless":
 		for frame: int in range(3):
 			await process_frame
@@ -103,71 +100,59 @@ func _forms_and_history() -> bool:
 	_check(editor.campaign.link_by_id(_entrance_id).anchor == Vector2(-30, 40), "drag movement is undoable")
 	# Marker-only links cannot be converted into new footprints via the form.
 	editor.linked_maps.open()
-	dialog.mode_picker.select(0)
-	_check(dialog.draft().is_empty(), "marker cannot draft a new spatial footprint")
+	_check(dialog.get_node_or_null("Scroll/Form/ModePicker") == null
+		and dialog.get_node_or_null("Scroll/Form/FootprintFields") == null,
+		"retired spatial and symbolic controls are absent")
 	var forbidden: AtlasPlacement = AtlasPlacement.new()
 	forbidden.parent_map_id = canvas.map.id
 	forbidden.child_map_id = "greyhaven"
 	_check(not editor.linked_maps.submit(AtlasMapLink.from_dict(link.to_dict()), forbidden),
 		"linked-map command facade refuses a new footprint")
 	dialog.hide()
-	# Simulate a previously saved placement to retain coverage for legacy editing.
-	var legacy_link: AtlasMapLink = AtlasMapLink.from_dict(link.to_dict())
-	var legacy_placement: AtlasPlacement = AtlasPlacement.new()
-	legacy_placement.id = "legacy-fixture"
-	legacy_placement.parent_map_id = canvas.map.id
-	legacy_placement.child_map_id = "greyhaven"
-	legacy_placement.origin = Vector2(-30, 40)
-	legacy_link.placement_id = legacy_placement.id
-	_check(editor.edits.execute(AtlasLinkEdit.new(canvas.map.id, link, legacy_link, null, legacy_placement)),
-		"legacy placement fixture loads through existing edit command")
-	# The fixture was injected through a low-level command, not the UI; select
-	# its actual stable ID explicitly before editing its legacy footprint.
-	canvas.selected_link_id = _entrance_id
+	# T-015: the obsolete placement editor is retired even when callers forge
+	# a low-level link snapshot. Native marker precision and stale-action safety
+	# remain required after removing footprint calibration.
+	var attempted: AtlasMapLink = AtlasMapLink.from_dict(link.to_dict())
+	attempted.placement_id = "legacy-fixture"
+	var fake: AtlasPlacement = AtlasPlacement.new()
+	fake.id = attempted.placement_id
+	fake.parent_map_id = canvas.map.id
+	fake.child_map_id = "greyhaven"
+	var stable: Dictionary = editor.campaign.to_dict()
+	_check(not editor.edits.execute(AtlasLinkEdit.new(canvas.map.id, link, attempted, null, fake))
+		and editor.campaign.to_dict() == stable,
+		"low-level command cannot reinstate placement ownership")
 	editor.linked_maps.open()
-	_check(not dialog.mode_picker.disabled, "existing legacy footprint can still be edited")
-	dialog.columns.value = 20
-	dialog.rows.value = 15
-	dialog.parent_pitch.value = 3.0
-	dialog.child_pitch.value = 64.0
-	dialog.angle.value = 37.0
-	dialog.confirmed.emit()
-	link = editor.campaign.link_by_id(_entrance_id)
-	var footprint: AtlasPlacement = editor.campaign.placement_by_id(link.placement_id)
-	_check(footprint != null and footprint.columns == 20 and footprint.rows == 15
-		and is_equal_approx(footprint.rotation, deg_to_rad(37.0)), "legacy footprint geometry remains editable")
-	_check(editor.campaign.get_map("greyhaven").to_dict() == target_before,
-		"legacy calibration never resamples independent art")
-	var precise: AtlasMapLink = AtlasMapLink.from_dict(link.to_dict())
+	_check(dialog.get_node_or_null("Scroll/Form/FootprintFields") == null,
+		"no footprint calibration controls survive in the editor")
+	dialog.hide()
+	var precise: AtlasMapLink = AtlasMapLink.from_dict(editor.campaign.link_by_id(_entrance_id).to_dict())
 	precise.target_zoom = 1.2345678901234567
 	precise.target_focus = Vector2(-4.123456, 12.34567)
-	var calibrated: AtlasPlacement = AtlasPlacement.from_dict(footprint.to_dict())
-	calibrated.parent_units_per_cell = 3.1234567890123456
-	calibrated.rotation = 0.12345678901234567
-	calibrated.origin = Vector2(-30.12345, 40.98765)
-	_check(editor.linked_maps.submit(precise, calibrated), "precise native calibration setup")
+	_check(editor.linked_maps.submit(precise, null), "precise marker arrival values can be saved")
 	var precise_link: Dictionary = editor.campaign.link_by_id(_entrance_id).to_dict()
-	var precise_placement: Dictionary = editor.campaign.placement_by_id(footprint.id).to_dict()
 	editor.linked_maps.open()
-	dialog.rows.value = 16
+	dialog.radius.value = 10.0
 	dialog.confirmed.emit()
-	precise_placement.rows = 16
-	_check(editor.campaign.link_by_id(_entrance_id).to_dict() == precise_link
-		and editor.campaign.placement_by_id(footprint.id).to_dict() == precise_placement,
-		"Apply preserves untouched native precision despite display rounding")
+	precise_link.hit_radius = 10.0
+	_check(editor.campaign.link_by_id(_entrance_id).to_dict() == precise_link,
+		"Apply preserves untouched marker precision despite display rounding")
 	editor.linked_maps.open()
 	var current: AtlasMapLink = editor.campaign.link_by_id(_entrance_id)
 	var history_before: AtlasEditCommand = editor.edits.get_undo_command()
 	current.hit_radius += 1.0
 	dialog.arrival_x.value += 10
 	dialog.confirmed.emit()
-	_check(dialog.visible and not dialog.error_label.text.is_empty() and current.target_focus == Vector2(-4.123456, 12.34567)
-		and editor.edits.get_undo_command() == history_before, "stale open form cannot overwrite externally changed entrance data")
+	_check(dialog.visible and not dialog.error_label.text.is_empty()
+		and current.target_focus == Vector2(-4.123456, 12.34567)
+		and editor.edits.get_undo_command() == history_before,
+		"stale open form cannot overwrite externally changed marker data")
 	current.hit_radius -= 1.0
 	dialog.hide()
 	var wrong_floor: AtlasMapLink = AtlasMapLink.from_dict(current.to_dict())
 	wrong_floor.source_floor_id = "ground"
-	_check(not editor.linked_maps.submit(wrong_floor, calibrated), "active child/source-floor context cannot modify another floor's entrance")
+	_check(not editor.linked_maps.submit(wrong_floor, null),
+		"active source-floor context cannot edit another floor's entrance")
 	# A form opened before a graph edit must not delete or navigate from stale data.
 	editor.linked_maps.open()
 	var stale_link: AtlasMapLink = editor.campaign.link_by_id(_entrance_id)
@@ -177,7 +162,7 @@ func _forms_and_history() -> bool:
 	dialog.remove_button.pressed.emit()
 	_check(editor.campaign.link_by_id(_entrance_id) == stale_link and dialog.visible
 		and not dialog.error_label.text.is_empty() and editor.edits.get_undo_command() == state_before_stale_actions,
-		"stale Remove keeps the entrance, history and dialog intact")
+		"stale Remove keeps the marker, history and dialog intact")
 	dialog.focus_button.pressed.emit()
 	_check(canvas.camera_center == camera_before_stale_actions and dialog.visible,
 		"stale Focus does not move the camera")
@@ -187,27 +172,23 @@ func _forms_and_history() -> bool:
 	stale_link.hit_radius -= 2.0
 	dialog.hide()
 	editor.linked_maps.open()
-	var stale_placement: AtlasPlacement = editor.campaign.placement_by_id(footprint.id)
-	stale_placement.origin += Vector2(5, -3)
-	_check(not editor.linked_maps.remove(_entrance_id) and editor.campaign.link_by_id(_entrance_id) != null
-		and dialog.visible and not dialog.error_label.text.is_empty(),
-		"stale legacy footprint also blocks destructive unlink")
-	stale_placement.origin -= Vector2(5, -3)
-	dialog.hide()
-	editor.linked_maps.open()
 	var removed_index: int = editor.campaign.links.find(stale_link)
 	editor.campaign.links.remove_at(removed_index)
 	dialog.remove_button.pressed.emit()
 	_check(dialog.visible and not dialog.error_label.text.is_empty()
 		and editor.edits.get_undo_command() == state_before_stale_actions,
-		"removed entrance is reported as stale rather than silently accepted")
+		"removed marker is reported stale rather than silently accepted")
 	editor.campaign.links.insert(removed_index, stale_link)
 	dialog.hide()
 	editor.linked_maps.open()
 	dialog.remove_button.pressed.emit()
-	_check(editor.campaign.link_by_id(_entrance_id) == null and editor.campaign.get_map("greyhaven") != null, "Unlink keeps the independently editable destination")
+	_check(editor.campaign.link_by_id(_entrance_id) == null
+		and editor.campaign.get_map("greyhaven") != null,
+		"unlink retains the independently editable destination")
 	editor._on_undo()
-	_check(editor.campaign.link_by_id(_entrance_id).placement_id == footprint.id, "undo unlink restores footprint identity")
+	_check(editor.campaign.link_by_id(_entrance_id) != null
+		and editor.campaign.link_by_id(_entrance_id).placement_id.is_empty(),
+		"undo unlink restores marker identity with no footprint")
 	return true
 
 
@@ -221,13 +202,15 @@ func _retired_creation() -> bool:
 		and not editor.linked_maps.has_method("create_drag"),
 		"gesture and facade creation routes were removed")
 	editor.linked_maps.open()
-	_check(dialog.target_picker.item_count == map_count and dialog.mode_picker.disabled,
-		"new entrances choose only existing documents and disable footprint modes")
+	_check(dialog.target_picker.item_count == map_count
+		and dialog.get_node_or_null("Scroll/Form/ModePicker") == null,
+		"new entrances choose existing documents without footprint modes")
 	_check(dialog.get_node_or_null("Scroll/Form/NewDocument") == null
 		and editor.inspector.get_node_or_null("Scroll/Margin/Sections/PlacementSection") == null,
 		"new child document and placement spinner are absent")
-	_check(dialog.mode_picker.selected == AtlasLinkDialog.LinkMode.MARKER,
-		"new links default to marker-only navigation")
+	var candidate: Array[Resource] = dialog.draft()
+	_check(candidate.size() == 3 and candidate[1] == null and candidate[2] == null,
+		"new links draft marker-only navigation")
 	dialog.hide()
 	var old_map: String = canvas.map.id
 	editor._choose_tool(AtlasCanvas.Tool.PEN)
@@ -322,11 +305,9 @@ func _marker(anchor: Vector2, floor_id: String) -> String:
 	canvas.selected_link_id = ""
 	editor.linked_maps.open()
 	_target("greyhaven", floor_id)
-	dialog.mode_picker.select(2)
 	dialog.origin_x.value = anchor.x
 	dialog.origin_y.value = anchor.y
 	dialog.radius.value = 10
-	dialog.center_arrival.button_pressed = false
 	dialog.confirmed.emit()
 	return canvas.selected_link_id
 

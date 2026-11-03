@@ -91,6 +91,23 @@ jobs:
           set -euo pipefail
           godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Verify T-015 retired battlemat authoring and marker-only links
+        id: ci_t015_retired_battlemat_authoring
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t015_retirement_smoke.gd 2>&1 | tee /tmp/godot-t015-retirement.log
+          grep -q 'ATLAS_T015_RETIREMENT_PASSED' /tmp/godot-t015-retirement.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-t015-retirement.log; then ci_fail_marker 'Forbidden error marker'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/links_smoke.gd 2>&1 | tee /tmp/godot-t015-links.log
+          grep -q 'ATLAS_LINKS_PASSED' /tmp/godot-t015-links.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-t015-links.log; then ci_fail_marker 'Forbidden error marker'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/linked_maps_ui_smoke.gd 2>&1 | tee /tmp/godot-t015-link-ui.log
+          grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-t015-link-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-t015-link-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
       - name: Verify T-054 Drawing/Atlas chronological history
         id: ci_09_verify_t_054_drawing_atlas_chronological_history
         if: ${{ !cancelled() }}

@@ -6,7 +6,7 @@
 
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
 - T-051–053 isolated Drawing contract, core, standalone consumer and Linux desktop release package.
-- Main project import before GDScript tests: T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
+- Main project import before GDScript tests: T-015 marker-only creation, history and UI regression (13/29/55 focused checks); T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
 - T-073 feature inventory and T-063 workspace documentation assertions.
 - T-078 reusable grouped dock state model and existing shell binding (82 headless assertions).
 - T-080 reusable nonmutating drag planner and transactional commit/cancel (60 fast headless assertions); actual pointer/layout behavior is verified separately by native Xvfb/Mesa evidence.

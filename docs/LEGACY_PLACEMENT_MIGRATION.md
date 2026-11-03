@@ -7,6 +7,16 @@
 
 The approved owner decision is [[DECISIONS_DRAWING_ATLAS_2026-11-01]]: **there are no historical user saves requiring migration.** Accordingly, this T-015 document is retained as a **historical design/audit record**, not a required or planned destructive migration. Do not execute its proposed copy-first converter merely because a sample map contains `BATTLEMAP`. `AtlasLegacyMigrationAudit.inspect()` remains a read-only prototype diagnostic and can be tested without converting anything. The underlying old `.scn` scene codec and placements are compatibility/test paths; new authoritative Atlas saves use verified versioned `Drawings/` generations under the `.atlas.json` root (T-066).
 
+**2026-11-03 retirement checkpoint:** All *new* low-level `AtlasCreateMap`
+commands reject `BATTLEMAP`; `AtlasLinkEdit` and the visible linked-map form
+no longer create or edit parent/child footprint bundles. New map links are
+independent navigation markers. The old `AtlasPlacement` record/serializer,
+spatial reference presentation, and legacy migration auditor are still
+compiled for historical fixtures, so T-015 is **In Progress**, not Done.
+The owner waived migration, but removing these residual readers safely
+remains a separate outstanding part of this same ticket. The historical
+conversion proposal below is not a supported implementation plan.
+
 The active design has generic internal `DrawingDocument` identities per `(map, floor, D-level)` under Atlas's registry, shared signed world coordinates, and no per-hex child files. Reuse authored objects through versioned `Object Assets` and linked `Object Instances` under `Objects/`; an Atlas map link is a navigation edge, *not* a reusable Drawing source. A missing D-level is blank, not a legacy child-battlemap underlay. See [world mapping](DRAWING_WORLD_MAPPING.md), [object registry](../scripts/objects/README.md), and [architecture](ARCHITECTURE.md).
 
 **Historical conversion proposal below is not approved for implementation or needed for existing users.** T-015 may separately remove obsolete model code after regression coverage; that maintenance must not be equated to altering saved campaigns.
