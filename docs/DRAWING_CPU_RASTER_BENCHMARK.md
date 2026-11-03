@@ -169,3 +169,70 @@ pure Godot and no new binary or external license is shipped.
 [Raw native stress run A](benchmarks/T068_2026-11-03_stress.json) · [Raw native stress run B](benchmarks/T068_2026-11-03_stress_repeat.json) · [Original vs optimized mixed workload data](benchmarks/T068_2026-11-03_dab_comparison.json).
 
 These are **synthetic input dispatch and software framebuffer submission**, not hardware input latency, real frame scan-out, a representative graphics card, Windows, or multithread jitter. A 64px frame outlier should motivate *separately instrumented* raster/undo/cache/upload profiling, not a premature adoption of Blend2D, Skia, or a custom GDExtension. The earlier 21 single-dab/native result remains a distinct workload. No third-party executable comparison or optional cross-platform binary was added. **T-068 remains In Progress.**
+
+
+## 2026-11-03 follow-up: source-tile cache during a detached gesture
+
+The pure-Godot `DrawingEditSession` now resolves each source tile at most once
+per session. `_stage()` previously constructed a `DrawingResult` and resolved
+its source tile **per covered candidate pixel**, even when thousands of
+candidates belonged to one tile. The session now holds a dictionary keyed by
+canonical signed tile keys with nullable `DrawingRasterTile` values; successful
+absent tiles are cached as `null`, while missing/corrupt lazy-source failures
+are **never cached**. The cache is discarded on `commit()` (including rejected
+commits) and `cancel()`. Document publication still verifies its revision and
+re-reads original values before atomically replacing only touched sparse tiles.
+No storage schema, brush geometry, canvas renderer, platform dependency or
+native prototype ABI changed.
+
+New CI-required `tests/drawing_edit_tile_cache_smoke.gd` passes **31/31**:
+reads across four signed tile seams, duplicate dab coverage, exact RGBA8
+(including hidden RGB), undo/redo, empty-tile caching, missing/corrupt lazy
+chunk error and repair, mid-gesture partial failure/retry, concurrent writer
+rejection, and precise >2^53 anchors. Existing original-geometry witness
+passes **125/125**, and two unmodified 512/1024/2048 mixed benchmark runs
+pass **693/693 each** both before and after this change. The 128 blend
+vectors, native parity fixture, 18 changed-pixel maxima and undo wire sizes
+match exactly on each before/after pair. Source files:
+
+- [Godot baseline A](benchmarks/T068_2026-11-03_tile_cache_baseline.json)
+  and [cached B](benchmarks/T068_2026-11-03_tile_cache_cached.json)
+- [Godot baseline A repeat](benchmarks/T068_2026-11-03_tile_cache_baseline_repeat.json)
+  and [cached B repeat](benchmarks/T068_2026-11-03_tile_cache_cached_repeat.json)
+- [Native software-frame baseline](benchmarks/T068_2026-11-03_tile_cache_native_baseline.json)
+  and [cached](benchmarks/T068_2026-11-03_tile_cache_native_cached.json)
+
+### Measured effect and constraints
+
+Two **non-randomized** mixed Godot baseline/cached pairs measured a single
+5-sample median per operation and stride, including commit, undo and redo:
+
+| Workload | 512 base → cached (ms), runs 1 / 2 | 1024 base → cached | 2048 base → cached |
+|---|---|---|---|
+| 64px dab | 260.732 → 184.416 / 316.833 → 338.228 | 227.670 → 203.334 / 434.734 → 238.021 | 293.677 → 219.989 / 206.255 → 190.271 |
+| Long 4px stroke | 84.125 → 60.591 / 74.839 → 76.593 | 70.265 → 59.475 / 101.243 → 83.791 | 75.557 → 55.387 / 66.297 → 90.848 |
+
+Results are mixed: the 512-stride dab and long stroke in repeat 2, and the
+2048 long stroke in repeat 2, **regressed**. The optimization removes
+redundant tile lookups, but these pairs do not isolate stage time from undo,
+GC, process startup or scheduling; no stable speedup distribution is claimed.
+
+The existing **native Control-pointer to `frame_post_draw`** stress test also
+passed 81/81 baseline and 81/81 cached on fresh Xvfb/Mesa llvmpipe runs
+(Godot 4.8.beta2, dummy audio, 5 synthetic gestures/case):
+
+| Native case | CPU dispatch baseline → cached median | Input → software `frame_post_draw` baseline → cached median |
+|---|---:|---:|
+| 4px dab | 1.453 → 0.989 ms | 19.109 → 16.552 ms |
+| 32px dab | 33.430 → 21.934 ms | 53.561 → 47.719 ms |
+| 64px dab | 117.367 → 83.709 ms | 140.281 → 109.453 ms |
+| 4px long | 12.092 → 8.401 ms | 41.099 → 32.761 ms |
+| 4px crossing | 7.534 → 8.578 ms | 33.313 → 52.407 ms |
+
+The crossing-path median **regressed**, and the cached 32px and crossing
+p95 contain large outliers. Five samples do not characterize production
+latency. X11/Mesa software frame submission is not physical display time.
+There is still no Windows or hardware-GPU validation, third-party Blend2D/
+Skia comparison, integrated optional GDExtension, VRAM/RSS measurement or
+multi-thread-jitter study. This is a safe, isolated optimization and **T-068
+remains In Progress** pending its original research acceptance.
