@@ -295,3 +295,15 @@ unit tests in `tests/test_t068_fill_process_profile.py` run in the existing
 fast-CI T-068 step; **the native runner itself is not push/PR-gating**. This
 is a synthetic `DrawingEditSession` input adapter, not the real Bucket GUI,
 physical display latency, per-gesture memory or GPU VRAM.
+
+
+### T-068 isolated native thread-safety witness (2026-11-03)
+
+The existing fast T-068 step runs
+`python3 -m unittest discover -s tests -p test_t068_native_thread_jitter.py`
+(two tests). The compiler-backed contract checks 1/2/4 worker output parity
+across both native prototype APIs. The full 101-call contention benchmark is
+**not** a push/PR gate; run
+`python3 tools/benchmarks/t068_native_thread_jitter.py --trials 101`
+when diagnostic evidence is needed. This is standalone host CPU C++ and does
+not run Godot framebuffer or a GDExtension. See T-068 and its raw evidence.

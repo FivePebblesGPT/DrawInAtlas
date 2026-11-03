@@ -524,3 +524,35 @@ The host runner requires Linux `/proc`, Xvfb, software OpenGL and an imported
 Godot project; the GitHub workflow exposes it *on demand*. No raster library
 was adopted, and T-068's external backend, optional GDExtension, physical
 Windows/Linux, GPU and operation-level decision obligations remain open.
+
+
+## 2026-11-03: independent C++ threads, kernel jitter and exact edit parity
+
+The [two-run evidence](benchmarks/T068_2026-11-03_native_thread_jitter.json)
+measures **only** the isolated C++ kernel. The new
+`tools/benchmarks/t068_thread_jitter.cpp` uses `std::thread` (not Python
+threads) to dispatch one, two, or four simultaneously running callers with
+**private immutable RGBA8 copies, separate output and delta arrays**, and a
+start barrier. It compares source-over with repeated coordinates, masked
+erase and exact replacement with nonzero RGB at alpha zero. Each native
+worker's output/source/deltas must match a serial oracle before results are
+accepted. Full-buffer-copy and sparse-delta APIs are timed separately.
+
+Representative *median of two run medians* (ms) at 256² pixels, 101 calls
+per worker and three warmups:
+
+| Kernel case | Mode | 1 worker | 2 workers | 4 workers |
+|---|---|---:|---:|---:|
+| Masked erase | Sparse deltas | 0.1048 | 0.1045 | 0.1451 |
+| Masked erase | Full region | 0.1199 | 0.1216 | 0.1641 |
+| Exact replace | Sparse deltas | 0.0915 | 0.1250 | 0.1586 |
+| Exact replace | Full region | 0.1063 | 0.1097 | 0.1769 |
+
+**Caveats:** These figures are microbenchmarks on a shared Linux host, not
+confirmed scalable throughput, integrated drawing latency or physical-device
+performance. The p95 tails fluctuate materially between runs and may include
+OS scheduling and CPU contention. No shared mutable source is deliberately
+allowed in the benchmark. The compiled kernel has **not** been adopted as a
+Godot GDExtension, no renderer or save format changed, and no new native
+runtime dependency is shipped. These results narrow T-068's concurrency
+unknowns but cannot close the ticket or determine a backend by themselves.

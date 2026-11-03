@@ -6,6 +6,15 @@
 
 ## Kanban summary
 
+**T-068 isolated native-thread jitter milestone (2026-11-03; In Progress):**
+Two runs of the unintegrated C++ raster kernel now compare 1/2/4 concurrent
+workers with private RGBA8/source and output buffers, across blend, masked
+erase and exact replacement. All 36 timed cells verified exact output parity;
+the 2-test native/parser contract joins fast CI. Contention p95 varied and
+cannot justify adopting a multithreaded Godot backend. See
+[T-068](Tickets/T-068.md) and [the benchmark report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
+
 **T-068 longer software-frame and Linux RSS checkpoint (2026-11-03; In Progress):** Two 21-trial-per-size native Bucket-adapter processes passed **770/770** visual/canonical checks; Linux `/proc` tracked only the actual Godot executable (VmHWM **251,288/251,420 KiB**). Empirical CPU and `frame_post_draw` medians/p95s are recorded with raw trial samples, and the manual-only workflow now captures process RSS alongside screenshots. This is not production Bucket UI, physical scan-out, per-fill memory isolation or native backend acceptance. Fast CI adds five process-profiler contract tests but no framebuffer sweeps. See [T-068](Tickets/T-068.md) and [raw evidence](benchmarks/T068_2026-11-03_fill_linux_rss.json).
 
 **T-068 measured canonical Bucket fill-to-frame on software GL (2026-11-03; In Progress):** New targeted native `drawing_fill_frame_native.gd` sends 15 synthetic GUI click gestures through a narrow **test adapter** into the real Drawing flood-fill transaction and renderer; it verifies exact deltas, visible framebuffer pixels and atomic budget rollback. Two five-trial runs pass **96/96** (with screenshot) and **95/95** checks. Results now include CPU-dispatch, `frame_post_draw` and sampled Godot memory monitors, but **do not** represent production Bucket UI, physical input, scan-out or peak RAM/VRAM. A workflow-dispatch-only Linux/Mesa action can reproduce the witness without changing fast CI. The native-backend, hardware and comparative performance gates of [T-068](Tickets/T-068.md) remain open. See [raw evidence](benchmarks/T068_2026-11-03_bucket_frame_native.json).
