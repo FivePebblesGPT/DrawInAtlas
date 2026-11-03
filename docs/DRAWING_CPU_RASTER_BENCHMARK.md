@@ -604,3 +604,24 @@ module can abort; only explicit runtime loading in a throwaway project has
 passed. No source-revision or main-thread dirty-region publication, renderer
 integration, Windows binary, external-library competitor, or adoption decision
 has been established. **T-068 remains In Progress.**
+
+
+### T-068 revision-aware opt-in publication boundary (2026-11-03)
+
+An isolated GDScript adapter now exercises the checked native GDExtension output
+through a detached RGBA8 edit, a revalidated expected source revision **and**
+byte snapshot, single-step atomic install, dirty-pixel bounding rectangle and
+whole-`ImageTexture.update()` call on the main thread. A publication race
+changes the source between native computation and install; the computed result
+is discarded without overwriting the concurrent source. Masked hidden-RGB,
+no-op, invalid-input and stale-revision cases are explicit.
+
+Two Godot 4.8b2 runs pass **370/370 publication checks** and **443/443 native
+pixel/argument checks** each. The GL readback is performed under Xvfb/Mesa,
+not Godot's headless dummy driver. [Raw evidence](benchmarks/T068_2026-11-03_gdextension_revision.json)
+contains check counts and bridge timings. This test does **not** measure
+native `DrawingDocument` publication costs or input-to-photon latency, and the
+reported dirty rectangle does **not** mean Godot supports partial
+`ImageTexture.update()`. The production renderer, file format and editor
+startup are unchanged; the third-party backend and hardware comparisons remain
+outstanding.

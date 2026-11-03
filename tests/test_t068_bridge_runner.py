@@ -22,6 +22,8 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertEqual(bridge.ROOT, ROOT)
         self.assertTrue((bridge.BRIDGE / "t068_bridge.cpp").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_bridge_smoke.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_revision_adapter.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_revision_smoke.gd").is_file())
         self.assertTrue((ROOT / "tools/benchmarks/t068_raster_kernel.cpp").is_file())
         self.assertFalse(list(ROOT.rglob("*.gdextension")),
                          "The experimental native extension must not load at app startup")
@@ -30,6 +32,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         expected = "T068_BRIDGE_PASSED: 443 checks\n"
         self.assertEqual(bridge.PASS_RE.search(expected).group(1), "443")
         self.assertIsNone(bridge.PASS_RE.search("T068_BRIDGE_FAILED: 1/443"))
+        self.assertEqual(bridge.REVISION_RE.search(
+            "T068_REVISION_PASSED: 370 checks\n").group(1), "370")
+        self.assertIsNone(bridge.REVISION_RE.search("T068_REVISION_FAILED: 1/370"))
         self.assertIsNotNone(bridge.TIMING_RE.search(
             'T068_BRIDGE_TIMING: {"32":{"median_us":8}}\n'))
 
@@ -42,7 +47,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
                 bridge.checked_run([sys.executable, "-c", "raise SystemExit(3)"],
                                    cwd=wd, timeout=10)
             for diagnostic in ("SCRIPT ERROR: parse failed", "ERROR: invalid extension",
-                               "T068_BRIDGE_FAIL: mismatched bytes"):
+                               "T068_BRIDGE_FAIL: mismatched bytes",
+                               "T068_REVISION_FAIL: stale write accepted",
+                               "T068_REVISION_FAILED: 1/370"):
                 with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                     bridge.checked_run([sys.executable, "-c",
                                         f"print({diagnostic!r})"], cwd=wd, timeout=10)
@@ -55,6 +62,20 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertIn('"--script", "res://test.gd"', original)
         self.assertNotIn('ROOT / "project.godot").write_text(', original)
         self.assertNotIn('ROOT / "addons"', original)
+
+    def test_revision_checks_require_native_renderer_and_isolation(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn('shutil.which("xvfb-run")', source)
+        self.assertIn('"--audio-driver", "Dummy"', source)
+        self.assertIn('"res://revision_test.gd"', source)
+        self.assertIn('"revision_checks": int(revision_match.group(1))', source)
+        self.assertIn("T068_REVISION_PASSED", source)
+        self.assertNotIn('ROOT / "scripts"', source)
+        adapter = (bridge.BRIDGE / "t068_revision_adapter.gd").read_text(encoding="utf-8")
+        self.assertIn('expected_revision != revision or original != _pixels', adapter)
+        self.assertIn('texture.update(_image())', adapter)
+        self.assertIn('"dirty_rect": Rect2i(', adapter)
+
 
 
 if __name__ == "__main__":

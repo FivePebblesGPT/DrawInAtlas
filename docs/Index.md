@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 revision-guarded experimental native publication (2026-11-03; In Progress):**
+The opt-in Godot/C++ bridge now has an isolated GDScript publication adapter
+that rejects stale revisions and changed source bytes, reports exact changed-
+pixel bounds, preserves the caller's RGBA8 buffer and updates a full
+`ImageTexture` only after a successful single-threaded commit. Two Godot
+4.8b2 runs pass **443 native bridge checks and 370 publication/GL readback
+checks each**, using temporary project Xvfb/Mesa for reliable texture readback;
+fast CI only runs five non-native runner contracts. This is **not** production
+`DrawingDocument` publication, actual dirty-subrectangle upload, hardware
+latency, or final native adoption. T-068 stays In Progress. See
+[T-068](Tickets/T-068.md) and [raw evidence](benchmarks/T068_2026-11-03_gdextension_revision.json).
+
 **T-068 isolated GDExtension bridge milestone (2026-11-03; In Progress):**
 A throwaway Godot 4.8 beta 2 project now compiles a bounded checked raster
 batch bridge directly against the engine-generated GDExtension header. Two

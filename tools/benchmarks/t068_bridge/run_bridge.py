@@ -21,6 +21,7 @@ BRIDGE = Path(__file__).resolve().parent
 EXPECTED_VERSION = "4.8.beta2.official.cafc17a19"
 PASS_RE = re.compile(r"^T068_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
 TIMING_RE = re.compile(r"^T068_BRIDGE_TIMING: (.+)$", re.MULTILINE)
+REVISION_RE = re.compile(r"^T068_REVISION_PASSED: (\d+) checks$", re.MULTILINE)
 
 
 def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
@@ -32,7 +33,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -87,6 +88,8 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         # when scanning a hand-authored GDExtension descriptor.
         # Keep the standalone stress script outside the editor initial scan.
         shutil.copyfile(BRIDGE / "t068_bridge_smoke.gd", project / "test.gd")
+        shutil.copyfile(BRIDGE / "t068_revision_adapter.gd", project / "adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_revision_smoke.gd", project / "revision_test.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -98,14 +101,26 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             count = int(match.group(1))
             if count < 442:
                 raise RuntimeError(f"Only {count} GDExtension checks ran; expected at least 442")
-            observations.append({"checks": count, "bridge_latency_us": json.loads(timing.group(1))})
+            xvfb = shutil.which("xvfb-run")
+            if xvfb is None:
+                raise RuntimeError("Native texture readback witness requires xvfb-run")
+            revision_output = checked_run([xvfb, "-a", "-s", "-screen 0 1280x720x24",
+                                           godot, "--path", str(project), "--audio-driver", "Dummy",
+                                           "--rendering-method", "gl_compatibility",
+                                           "--script", "res://revision_test.gd"],
+                                          cwd=project, timeout=120)
+            revision_match = REVISION_RE.search(revision_output)
+            if revision_match is None or int(revision_match.group(1)) < 300:
+                raise RuntimeError(f"Missing or insufficient revision checks:\n{revision_output[-4000:]}")
+            observations.append({"checks": count, "revision_checks": int(revision_match.group(1)),
+                                 "bridge_latency_us": json.loads(timing.group(1))})
         return {
             "ticket": "T-068", "mode": "optional, isolated Linux GDExtension (not production)",
             "godot_version": version, "generated_header_sha256": header_sha,
-            "test_method": "Godot GDScript calls against C++ length-checked raster batch",
+            "test_method": "Godot GDScript calls against checked native batch and revision-guarded publication adapter",
             "measurements": observations,
             "limitations": [
-                "No source/document publication or production UI is exercised",
+                "Only the isolated GDScript adapter publishes revisions and whole-texture updates; production DrawingDocument and UI are not exercised",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
                 "Temporary binary is not bundled in the repository or loaded at normal startup",
@@ -127,7 +142,8 @@ def main() -> None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     counts = ", ".join(str(item["checks"]) for item in evidence["measurements"])
-    print(f"T068_GDEXTENSION_INTEGRATION_PASSED: {counts} checks per run")
+    print(f"T068_GDEXTENSION_INTEGRATION_PASSED: {counts} native parity checks per run")
+    print("Revision-guarded publication adapter:", ", ".join(str(item["revision_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
 
 
