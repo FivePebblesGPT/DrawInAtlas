@@ -556,3 +556,26 @@ allowed in the benchmark. The compiled kernel has **not** been adopted as a
 Godot GDExtension, no renderer or save format changed, and no new native
 runtime dependency is shipped. These results narrow T-068's concurrency
 unknowns but cannot close the ticket or determine a backend by themselves.
+
+
+## 2026-11-03: bounded C ABI prototype safety gate (not integrated)
+
+The benchmark-only scalar kernel still exports its existing `draw_batch` and
+`draw_batch_deltas` functions at ABI version 1. New opt-in
+`draw_batch_checked` and `draw_batch_deltas_checked` functions also take
+**declared byte capacities** for source, points, mask, deltas and optional full
+output. They validate sizes before accessing buffers, reject writable range
+aliasing and return new error codes `-5` (short/invalid) and `-6` (overlap),
+while preserving legacy source-over, clear and replacement bytes. Checked
+calls catch internal C++ exceptions at their C boundary (`-4`).
+
+`tests/test_t068_checked_abi.py` passes six contract tests: 160 randomized
+source/mask/operation cases compared byte-for-byte to both original entry
+points; exact-capacity canaries; short, null, overflow and overlapping buffers;
+zero-alpha/empty batches; and failure-atomic invalid coordinates and capacity.
+Only the test harness calls these functions. There is **no evidence** that
+native integration, Godot buffer marshaling or overall edit-to-visible latency
+is faster. In particular, supplied capacities cannot authenticate foreign
+pointers, so the wrapper does not make arbitrary C calls memory-safe. The
+remaining library-comparison, GDExtension, physical-hardware and operation-
+selection obligations stay open under T-068.

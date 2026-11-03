@@ -303,6 +303,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p test_t068_fill_process_profile.py
           python3 -m unittest discover -s tests -p test_t068_native_thread_jitter.py
+          python3 -m unittest discover -s tests -p test_t068_checked_abi.py
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_dab_geometry_smoke.gd 2>&1 | tee /tmp/godot-t068-dab.log
           grep -q 'T068_DAB_PASSED' /tmp/godot-t068-dab.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_DAB_FAILED:' /tmp/godot-t068-dab.log; then exit 1; fi

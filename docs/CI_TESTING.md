@@ -307,3 +307,15 @@ across both native prototype APIs. The full 101-call contention benchmark is
 `python3 tools/benchmarks/t068_native_thread_jitter.py --trials 101`
 when diagnostic evidence is needed. This is standalone host CPU C++ and does
 not run Godot framebuffer or a GDExtension. See T-068 and its raw evidence.
+
+
+### T-068 opt-in checked native buffer contract (2026-11-03)
+
+The existing fast T-068 CI step now also runs
+`python3 -m unittest discover -s tests -p test_t068_checked_abi.py`.
+Six tests compile the **isolated**, not-shipped native CPU kernel and compare
+new length-checked calls against ABI-1 output for 160 deterministic RGBA8
+cases. They also check short/null buffers, partial alias rejection, sentinel
+canaries and atomic failures. This requires only a host C++17 compiler; it
+adds **no** Godot native framebuffer check to fast push CI and does not
+endorse the prototype as the Drawing runtime.

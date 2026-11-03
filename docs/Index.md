@@ -6,6 +6,16 @@
 
 ## Kanban summary
 
+**T-068 bounded native-kernel ABI checkpoint (2026-11-03; In Progress):**
+The unintegrated C++ raster kernel now has opt-in length-checked delta and
+full-region functions, without changing its original ABI 1. A six-test fast-CI
+contract suite checks 160 seeded source/operation cases against the original
+functions, output canaries, partial alias rejection, short buffers and failure
+atomicity. Caller-declared byte lengths cannot authenticate foreign pointers;
+no native Godot integration, physical-device evidence or backend decision is
+claimed. See [T-068](Tickets/T-068.md) and the
+[CPU raster report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 isolated native-thread jitter milestone (2026-11-03; In Progress):**
 Two runs of the unintegrated C++ raster kernel now compare 1/2/4 concurrent
 workers with private RGBA8/source and output buffers, across blend, masked
