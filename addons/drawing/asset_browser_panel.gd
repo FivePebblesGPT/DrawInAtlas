@@ -3,14 +3,19 @@ extends VBoxContainer
 ## Optional T-065 dock peer; selection is read-only until an explicit Open.
 
 signal open_requested(path: String)
+signal place_requested(source: Dictionary)
+signal refresh_requested
 
 const INDEX_SCRIPT: Script = preload("res://addons/drawing/asset_browser_index.gd")
 const THUMBNAILS_SCRIPT: Script = preload("res://addons/drawing/asset_browser_thumbnails.gd")
 const TRANSFER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_transfer.gd")
+const DRAG_LIST_SCRIPT: Script = preload("res://addons/drawing/asset_browser_drag_list.gd")
 var thumbnails: DrawingAssetBrowserThumbnails
 var index: DrawingAssetBrowserIndex
 var search: LineEdit
-var assets: ItemList
+var assets: DrawingAssetBrowserDragList
+var atlas_host_mode: bool = false
+var place_button: Button
 var message: Label
 var open_button: Button
 var import_dialog: FileDialog
@@ -31,7 +36,8 @@ func _ready() -> void:
 	search.placeholder_text = "Search name or source ID…"
 	search.text_changed.connect(func(_query: String) -> void: _refresh_view())
 	add_child(search)
-	assets = ItemList.new()
+	assets = DRAG_LIST_SCRIPT.new() as DrawingAssetBrowserDragList
+	assets.drag_entry_provider = Callable(self, "_drag_entry_for_row")
 	assets.name = "AssetList"
 	assets.fixed_icon_size = Vector2i(48, 48)
 	assets.icon_mode = ItemList.ICON_MODE_LEFT
@@ -58,18 +64,27 @@ func _ready() -> void:
 	open_button.tooltip_text = "Open the selected published source in an Object Editor tab"
 	open_button.pressed.connect(open_selected)
 	actions.add_child(open_button)
+	place_button = Button.new()
+	place_button.name = "PlaceAsset"
+	place_button.text = "Place at view center"
+	place_button.tooltip_text = "Place the selected published Object in the current Atlas map"
+	place_button.pressed.connect(_request_place)
+	place_button.visible = atlas_host_mode
+	actions.add_child(place_button)
 	var import_button: Button = Button.new()
 	import_button.name = "ImportAsset"
 	import_button.text = "Import…"
 	import_button.tooltip_text = "Copy a separate portable .drawing source into this Objects/ folder; does not register Atlas placements"
 	import_button.pressed.connect(func() -> void: import_dialog.popup_centered_ratio(0.7))
 	actions.add_child(import_button)
+	import_button.visible = not atlas_host_mode
 	var export_button: Button = Button.new()
 	export_button.name = "ExportAsset"
 	export_button.text = "Export…"
 	export_button.tooltip_text = "Copy the selected source to a new portable .drawing file (no overwrite)"
 	export_button.pressed.connect(_ask_export)
 	actions.add_child(export_button)
+	export_button.visible = not atlas_host_mode
 	import_dialog = FileDialog.new()
 	import_dialog.access = FileDialog.ACCESS_FILESYSTEM
 	import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
@@ -104,7 +119,26 @@ func set_objects_root(path: String) -> DrawingResult:
 	return result
 
 
+## Atlas supplies published asset records from its authoritative registry.
+## Their published IDs intentionally differ from the embedded document IDs.
+## The generic browser only displays and transfers these records.
+func set_published_entries(objects_root: String, records: Array[Dictionary], issues: Array[String] = []) -> void:
+	if index == null:
+		index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
+	if thumbnails == null:
+		thumbnails = THUMBNAILS_SCRIPT.new() as DrawingAssetBrowserThumbnails
+	index.root_path = objects_root
+	index.entries = records.duplicate(true)
+	index.warnings = issues.duplicate()
+	thumbnails.reconcile(index.entries)
+	if is_node_ready():
+		_refresh_view()
+
+
 func refresh_assets() -> void:
+	if atlas_host_mode:
+		refresh_requested.emit()
+		return
 	if index == null or index.root_path.is_empty():
 		return
 	set_objects_root(index.root_path)
@@ -127,7 +161,10 @@ func _refresh_view() -> void:
 	var selection: int = -1
 	for i: int in range(_visible_entries.size()):
 		var entry: Dictionary = _visible_entries[i]
-		assets.add_item("%s  (v%d)" % [entry["name"], entry["revision"]])
+		var text_label: String = "%s  (v%d)" % [entry["name"], entry["revision"]]
+		if entry.has("usage"):
+			text_label += " · " + String(entry["usage"])
+		assets.add_item(text_label)
 		assets.set_item_tooltip(i, "%s\n%s" % [entry["id"], entry["path"]])
 		if entry["id"] == selected_id:
 			selection = i
@@ -152,6 +189,8 @@ func selected_asset_id() -> String:
 func _update_open_button() -> void:
 	if open_button != null:
 		open_button.disabled = selected_asset_id().is_empty()
+	if place_button != null:
+		place_button.disabled = selected_asset_id().is_empty()
 
 
 func open_selected() -> void:
@@ -166,7 +205,8 @@ func open_selected() -> void:
 		message.text = "Source moved or changed; refresh the Asset Browser before opening"
 		return
 	var fresh: DrawingResult = DrawingObjectEditorFile.open(entry["path"])
-	if not fresh.ok or fresh.value["source_id"] != entry["id"] or fresh.value["source_revision"] != entry["revision"]:
+	if not fresh.ok or String(fresh.value["source_id"]) != String(entry.get("embedded_id", entry["id"])) or \
+			int(fresh.value["source_revision"]) != int(entry.get("embedded_revision", entry["revision"])):
 		message.text = "Source changed; refresh the Asset Browser before opening"
 		return
 	open_requested.emit(String(entry["path"]))
@@ -251,3 +291,29 @@ func _export_file(path: String) -> void:
 	_pending_export = {}
 	var exported: DrawingResult = TRANSFER_SCRIPT.export_file(index, entry, path)
 	message.text = "Exported: " + String(exported.value).get_file() if exported.ok else exported.message
+
+
+## This transport token is not an authorization to publish. Atlas validates it
+## against the active registry and its exact published path/hash at drop time.
+func _drag_entry_for_row(row: int) -> Dictionary:
+	if index == null or row < 0 or row >= _visible_entries.size():
+		return {}
+	var entry: Dictionary = _visible_entries[row]
+	if not index.safe_to_open(entry):
+		if message != null:
+			message.text = "Source changed; refresh before dragging"
+		return {}
+	return {"kind": "drawing-object-source-v1", "id": entry["id"],
+		"name": entry["name"], "revision": entry["revision"],
+		"path": entry["path"], "sha256": entry["sha256"],
+		"embedded_id": entry.get("embedded_id", entry["id"]),
+		"embedded_revision": entry.get("embedded_revision", entry["revision"])}
+
+
+func _request_place() -> void:
+	var selection: PackedInt32Array = assets.get_selected_items() if assets != null else PackedInt32Array()
+	if selection.is_empty():
+		return
+	var token: Dictionary = _drag_entry_for_row(selection[0])
+	if not token.is_empty():
+		place_requested.emit(token)

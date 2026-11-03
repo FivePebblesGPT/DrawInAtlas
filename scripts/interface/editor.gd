@@ -11,6 +11,7 @@ const BROWSER_SCENE: PackedScene = preload("res://prefab/campaign_browser.tscn")
 const LAYER_PANEL_SCENE: PackedScene = preload("res://prefab/layer_panel.tscn")
 const OVERVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/overview_panel.tscn")
 const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn")
+const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
@@ -21,6 +22,8 @@ var campaign: AtlasCampaign
 var drawing_composition: AtlasDrawingComposition
 var object_editor_window: AtlasObjectEditorWindow
 var object_source_manager: AtlasObjectSourceManager
+var asset_browser_panel: DrawingAssetBrowserPanel
+var asset_browser_toggle: Button
 var edits: AtlasEditHistory = AtlasEditHistory.new()
 var store_io: AtlasStoreIO
 var _restored_bundle: AtlasStoreResult
@@ -192,13 +195,15 @@ func _bind_drawing_composition() -> void:
 				layer_panel.set_drawing_registry(drawing_composition.registry, drawing_composition.library))
 		canvas.drawing_error.connect(_message)
 		canvas.object_instance_selected.connect(_on_object_instance_selected)
+		canvas.object_source_dropped.connect(_on_browser_source_drop)
 		canvas.object_instance_edit_requested.connect(func(_id: String) -> void:
 			var opened: DrawingResult = open_selected_object_editor()
 			if not opened.ok:
 				_message(opened.message))
 		edits.changed.connect(drawing_composition.invalidate)
 		drawing_composition.library.asset_published.connect(func(_id: String, _rev: int) -> void:
-			canvas._refresh_composition_view())
+			canvas._refresh_composition_view()
+			_refresh_asset_browser())
 		layer_panel.drawing_layer_selected.connect(_on_drawing_layer_selected)
 	if _restored_bundle != null and _restored_bundle.registry != null:
 		drawing_composition.cancel_stroke()
@@ -207,6 +212,7 @@ func _bind_drawing_composition() -> void:
 		_restored_bundle = null
 	if object_source_manager != null:
 		object_source_manager.bind_library(drawing_composition.library)
+	_refresh_asset_browser()
 	canvas.drawing_composition = drawing_composition
 	var attached: DrawingResult = drawing_composition.attach_campaign(campaign)
 	if not attached.ok:
@@ -258,6 +264,7 @@ func _open_object_source_manager() -> void:
 		object_source_manager.place_source_requested.connect(_place_object_source)
 		object_source_manager.registry_mutated.connect(func(summary: String) -> void:
 			drawing_composition.invalidate()
+			_refresh_asset_browser()
 			_message(summary))
 	object_source_manager.bind_library(drawing_composition.library)
 	object_source_manager.popup_centered()
@@ -295,6 +302,114 @@ func _place_object_source(source_id: String) -> void:
 	_message("Placed Object source %s in the current map" % source_id)
 
 
+## One shared portable browser view, bound to the active Atlas registry.
+## Its scanned file listing is never authoritative for a linked placement.
+func _toggle_published_asset_browser() -> void:
+	if asset_browser_panel == null:
+		return
+	asset_browser_panel.visible = not asset_browser_panel.visible
+	if asset_browser_panel.visible:
+		_refresh_asset_browser()
+	asset_browser_toggle.text = "Hide Object Browser ▴" if asset_browser_panel.visible else \
+		"Browse published Object sources ▾"
+	if asset_browser_panel.visible and asset_browser_panel.search != null:
+		asset_browser_panel.search.grab_focus()
+
+
+func _refresh_asset_browser() -> void:
+	if asset_browser_panel == null or drawing_composition == null or \
+			drawing_composition.library == null or not asset_browser_panel.visible:
+		return
+	var library: AtlasObjectLibrary = drawing_composition.library
+	var catalog: Array[Dictionary] = []
+	var warnings: Array[String] = []
+	if not library._index_unchanged():
+		asset_browser_panel.set_published_entries(library.root_path, catalog, warnings)
+		return # Unverified registry state is never presented as drop-authorized.
+	for source_id: String in library.asset_ids():
+		if catalog.size() >= DrawingAssetBrowserIndex.MAX_ASSETS:
+			warnings.append("Showing first %d published sources; narrow the campaign library before browsing more" % DrawingAssetBrowserIndex.MAX_ASSETS)
+			break
+		var item: Dictionary = library.asset_info(source_id)
+		if not library.asset_exists(source_id):
+			continue
+		var path: String = library._absolute(String(item["path"]))
+		var embedded: DrawingResult = DrawingObjectEditorFile.open(path)
+		if not embedded.ok:
+			continue
+		var data: Dictionary = embedded.value
+		var count: int = int(library.source_usage(source_id)["total"])
+		catalog.append({"id": source_id, "name": item["name"],
+			"revision": item["revision"], "path": path, "sha256": item["sha256"],
+			"bounds": data["bounds"], "embedded_id": data["source_id"],
+			"embedded_revision": data["source_revision"],
+			"usage": "unused" if count == 0 else "%d in use" % count})
+	catalog.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return String(a["name"]).nocasecmp_to(String(b["name"])) < 0 if a["name"] != b["name"] \
+			else String(a["id"]) < String(b["id"]))
+	asset_browser_panel.set_published_entries(library.root_path, catalog, warnings)
+
+
+func _valid_browser_source(token: Dictionary) -> bool:
+	if asset_browser_panel == null or asset_browser_panel.index == null or \
+			drawing_composition == null or drawing_composition.library == null:
+		return false
+	var library: AtlasObjectLibrary = drawing_composition.library
+	var source_id: String = String(token.get("id", ""))
+	var published: Dictionary = library.asset_info(source_id)
+	if published.is_empty() or not library._index_unchanged() or \
+			asset_browser_panel.index.root_path != library.root_path:
+		return false
+	if String(token.get("kind", "")) != "drawing-object-source-v1" or \
+			int(token.get("revision", -1)) != int(published.get("revision", -2)) or \
+			String(token.get("sha256", "")) != String(published.get("sha256", "")) or \
+			String(token.get("path", "")) != library._absolute(String(published.get("path", ""))):
+		return false
+	if not asset_browser_panel.index.safe_to_open(token) or not library.asset_exists(source_id):
+		return false
+	var on_disk: DrawingResult = DrawingObjectEditorFile.open(String(token["path"]))
+	return on_disk.ok and String(on_disk.value["source_id"]) == String(token.get("embedded_id", "")) and \
+		int(on_disk.value["source_revision"]) == int(token.get("embedded_revision", -1))
+
+
+func _on_browser_open_source(_path: String) -> void:
+	var source_id: String = asset_browser_panel.selected_asset_id()
+	var selected: PackedInt32Array = asset_browser_panel.assets.get_selected_items()
+	if selected.is_empty() or selected[0] >= asset_browser_panel._visible_entries.size():
+		return
+	var token: Dictionary = asset_browser_panel._drag_entry_for_row(selected[0])
+	if _valid_browser_source(token):
+		_open_object_source(source_id)
+	else:
+		_message("Object source changed or is not published here; refresh before editing")
+
+
+func _on_browser_place_source(token: Dictionary) -> void:
+	_on_browser_source_drop(token, canvas.size * 0.5)
+
+
+func _on_browser_source_drop(token: Dictionary, local_position: Vector2) -> void:
+	if canvas.map == null or canvas.floor == null or canvas.is_editing() or \
+			not local_position.is_finite() or \
+			not Rect2(Vector2.ZERO, canvas.size).has_point(local_position) or \
+			not _valid_browser_source(token):
+		_message("Object drop rejected: refresh the published source or finish the current edit")
+		return
+	var world: Vector2 = canvas.local_to_document(local_position)
+	if not world.is_finite():
+		_message("Object drop rejected: invalid map coordinate")
+		return
+	var source_id: String = String(token["id"])
+	var placed: DrawingResult = drawing_composition.place_asset(source_id,
+		canvas.map.id, canvas.floor.id, canvas.presented_detail_level,
+		Transform2D.IDENTITY.translated(world))
+	if not placed.ok:
+		_message(placed.message)
+		return
+	drawing_composition.selected_instance_id = String(placed.value)
+	_message("Placed linked Object %s at the drop position" % source_id)
+
+
 func _capture_instance_history_context() -> DrawingHistoryContext:
 	var context: DrawingHistoryContext = _capture_history_context()
 	if drawing_composition != null:
@@ -329,6 +444,21 @@ func _mount_sidebar_views() -> void:
 	objects_button.tooltip_text = "Published sources, source-delete choices and explicit NULL-instance repair (Ctrl+Shift+B)"
 	layers_view.add_child(objects_button)
 	objects_button.pressed.connect(_open_object_source_manager)
+	asset_browser_toggle = Button.new()
+	asset_browser_toggle.name = "BrowsePublishedObjectsButton"
+	asset_browser_toggle.text = "Browse published Object sources ▾"
+	asset_browser_toggle.tooltip_text = "Browse thumbnails and drag a source onto the map, or place by keyboard"
+	asset_browser_toggle.pressed.connect(_toggle_published_asset_browser)
+	layers_view.add_child(asset_browser_toggle)
+	asset_browser_panel = ASSET_BROWSER_SCRIPT.new() as DrawingAssetBrowserPanel
+	asset_browser_panel.atlas_host_mode = true
+	asset_browser_panel.name = "PublishedAssetBrowser"
+	asset_browser_panel.custom_minimum_size.y = 290
+	asset_browser_panel.visible = false
+	asset_browser_panel.open_requested.connect(_on_browser_open_source)
+	asset_browser_panel.place_requested.connect(_on_browser_place_source)
+	asset_browser_panel.refresh_requested.connect(_refresh_asset_browser)
+	layers_view.add_child(asset_browser_panel)
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.object_selected.connect(_select_hierarchy_object)
@@ -773,6 +903,7 @@ func _on_sample(discard_unsaved: bool = false) -> void:
 		drawing_composition.set_library(AtlasObjectLibrary.new(ProjectSettings.globalize_path(save_path)))
 		if object_source_manager != null:
 			object_source_manager.bind_library(drawing_composition.library)
+		_refresh_asset_browser()
 		drawing_composition.active_layer_by_detail.clear()
 		drawing_composition.selected_instance_id = ""
 		drawing_composition.invalidate()

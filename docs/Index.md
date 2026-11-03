@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-065 Atlas shared-browser drop bridge (2026-11-03; still In Progress):**
+The canonical Drawing Asset Browser is now embedded as an optional Layers
+section in Atlas, showing published `Objects/` sources with registry-owned
+IDs, thumbnails and usage counts. Godot GUI drag tokens and a native Atlas
+canvas drop target place linked instances at the exact view coordinate,
+with index/path/hash/revision validation and a keyboard Place alternative.
+Atlas `asset-*` identities remain distinct from the embedded Drawing
+`drawing-*` IDs; neither registry nor standalone scanner was duplicated.
+New 32-check headless acceptance is push-CI-gated; 12 native layout/drag
+provider/drop checks pass (13 with a screenshot). A full synthetic pointer
+gesture did not reach Godot's drag-start state, so physical pointer UX,
+large-project testing and **owner approval** remain open. See
+[T-065](Tickets/T-065.md).
+
 **T-065 Atlas-managed portable registration (2026-11-03; still In Progress):**
 The Atlas Object Manager now provides explicit Import/Export file dialogs
 backed by versioned registry publication, not an unregistered file copy.

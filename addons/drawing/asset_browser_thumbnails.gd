@@ -49,8 +49,8 @@ func preview(index: DrawingAssetBrowserIndex, entry: Dictionary) -> DrawingResul
 	if not opened.ok:
 		return opened
 	var data: Dictionary = opened.value
-	if String(data["source_id"]) != String(entry["id"]) or \
-			int(data["source_revision"]) != int(entry["revision"]) or \
+	if String(data["source_id"]) != String(entry.get("embedded_id", entry["id"])) or \
+			int(data["source_revision"]) != int(entry.get("embedded_revision", entry["revision"])) or \
 			FileAccess.get_sha256(String(entry["path"])) != entry["sha256"]:
 		return DrawingResult.failure("STALE_SOURCE", "Object source changed while making its preview")
 	var bounds: Rect2i = data["bounds"]

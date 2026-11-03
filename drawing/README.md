@@ -178,6 +178,19 @@ or take its list as authorization to delete unused variants. Atlas placement
 and NULL repair/delete policy are still T-065 work; no automatic asset
 relinking, deletion or publication is triggered by browsing.
 
+**Atlas host behavior (T-065):** In Atlas's **Layers** sidebar, use
+**Browse published Object sources** to see registry-backed assets and usage,
+then drag an Object source over the map or select it and choose **Place at
+view center**. The source creates one linked Atlas instance at the drop
+coordinate, not another Drawing document. **Edit Source** opens the shared
+Object Editor. Atlas's separate **Object Assets and missing links…** manager
+owns campaign Import/Export, Source Delete (Remove/NULL/Cancel) and deliberate
+NULL repair. A registry asset ID need not equal the embedded Drawing document
+ID; the browser retains both, and Atlas validates path/hash/revision before
+placement. The shared browser does not auto-import an unknown source.
+Actual physical pointer gesture acceptance, large-library review and explicit
+owner UX approval are still pending under T-065.
+
 Atlas main-canvas `Edit Source` integration, instance placement, complete
 Asset Browser/NULL management and campaign-wide atomic saves remain scoped
 to T-055/T-065/T-066, respectively. The

@@ -358,6 +358,16 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_portable_registry_smoke.gd 2>&1 | tee /tmp/godot-t065-portable-registry.log
           grep -q 'T065_PORTABLE_PASSED' /tmp/godot-t065-portable-registry.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T065_PORTABLE_FAILED:' /tmp/godot-t065-portable-registry.log; then exit 1; fi
+      - name: Verify T-065 shared Atlas Asset Browser and guarded linked drops
+        id: ci_t065_atlas_browser_bridge
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/asset_browser_atlas_smoke.gd 2>&1 | tee /tmp/godot-t065-atlas-browser.log
+          grep -q 'T065_ATLAS_BROWSER_PASSED' /tmp/godot-t065-atlas-browser.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ATLAS_BROWSER_FAILED:' /tmp/godot-t065-atlas-browser.log; then exit 1; fi
       - name: Summarize CI failures
         if: ${{ !cancelled() }}
         env:

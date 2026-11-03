@@ -34,6 +34,7 @@ signal token_rejected(reason: String)
 signal fog_edit_requested(bounds: Rect2, reveal: bool)
 signal drawing_error(message: String)
 signal object_instance_selected(id: String)
+signal object_source_dropped(token: Dictionary, local_position: Vector2)
 signal object_instance_edit_requested(id: String)
 
 enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG, PAN }
@@ -1885,3 +1886,17 @@ func _update_polygon_preview(local_position: Vector2) -> void:
 			_preview_textures.clear()
 			_render_states.erase(active_layer_id)
 	queue_redraw()
+
+
+## Godot's native Control drag/drop path is separate from the ordinary painting
+## gesture path. Only an explicit, versioned browser token is preview-eligible;
+## the Atlas host must still revalidate ownership and publication on release.
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	return map != null and floor != null and not is_editing() and \
+		Rect2(Vector2.ZERO, size).has_point(at_position) and data is Dictionary and \
+		String((data as Dictionary).get("kind", "")) == "drawing-object-source-v1"
+
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	if _can_drop_data(at_position, data):
+		object_source_dropped.emit((data as Dictionary).duplicate(true), at_position)
