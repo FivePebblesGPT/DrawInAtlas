@@ -75,6 +75,10 @@ func _ready() -> void:
 	_button(actions, "↓", "MoveDown", func() -> void: _translate(Vector2.DOWN))
 	_button(actions, "⟲ 15°", "RotateLeft", func() -> void: _rotate(-PI / 12.0))
 	_button(actions, "⟳ 15°", "RotateRight", func() -> void: _rotate(PI / 12.0))
+	_button(actions, "Shrink 10%", "ScaleDown", func() -> void: _scale(0.9))
+	_button(actions, "Grow 10%", "ScaleUp", func() -> void: _scale(1.1))
+	for action: String in ["ScaleDown", "ScaleUp"]:
+		(actions.get_node(action) as Button).tooltip_text = "Uniform parent-local scale; keeps the child origin and source pixels unchanged. Child Undo reverses it."
 	undo_button = _button(actions, "Undo child edit", "UndoChild", _undo)
 	redo_button = _button(actions, "Redo child edit", "RedoChild", _redo)
 	undo_button.tooltip_text = "Ctrl+Z · child layout history (transform/attach/remove, not map history)"
@@ -186,7 +190,7 @@ func refresh(message: String = "") -> void:
 	undo_button.disabled = not session.can_undo()
 	redo_button.disabled = not session.can_redo()
 	reload_button.disabled = not valid
-	for button_id: String in ["MoveLeft", "MoveRight", "MoveUp", "MoveDown", "RotateLeft", "RotateRight"]:
+	for button_id: String in ["MoveLeft", "MoveRight", "MoveUp", "MoveDown", "RotateLeft", "RotateRight", "ScaleDown", "ScaleUp"]:
 		(actions_node().get_node(button_id) as Button).disabled = not ready
 	if not message.is_empty():
 		details.text = message
@@ -197,9 +201,10 @@ func refresh(message: String = "") -> void:
 	else:
 		var source_name: String = String(session.library.asset_info(String(record["source_id"])).get(
 			"name", "Missing source"))
-		details.text = "%s · %s · local origin (%.1f, %.1f) · source pixels unchanged" % [
+		var basis: Transform2D = AtlasObjectChildEditSession._transform(record)
+		details.text = "%s · %s · local origin (%.1f, %.1f) · scale (%.2f, %.2f) · source pixels unchanged" % [
 			source_name, "visible" if bool(record["visible"]) else "hidden",
-			record["transform"][4], record["transform"][5]]
+			basis.origin.x, basis.origin.y, basis.x.length(), basis.y.length()]
 
 
 func actions_node() -> Control:
@@ -248,6 +253,11 @@ func _translate(delta: Vector2) -> void:
 
 func _rotate(angle: float) -> void:
 	var changed: DrawingResult = session.rotate_selected(angle)
+	refresh("" if changed.ok else changed.message)
+
+
+func _scale(factor: float) -> void:
+	var changed: DrawingResult = session.scale_selected(factor)
 	refresh("" if changed.ok else changed.message)
 
 

@@ -222,6 +222,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_null_repair_smoke.gd 2>&1 | tee /tmp/godot-t064-child-null-repair.log
           grep -q 'T064_CHILD_REPAIR_PASSED' /tmp/godot-t064-child-null-repair.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_REPAIR_FAILED:' /tmp/godot-t064-child-null-repair.log; then exit 1; fi
+          # Uniform child scaling shares the optimistic transform timeline.
+          # A native inspector screenshot is targeted, never fast push CI.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_scale_smoke.gd 2>&1 | tee /tmp/godot-t064-child-scale.log
+          grep -q 'T064_CHILD_SCALE_PASSED' /tmp/godot-t064-child-scale.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_SCALE_FAILED:' /tmp/godot-t064-child-scale.log; then exit 1; fi
           # T-064 child visibility is a reversible, parent-scoped graph edit;
           # hidden descendants are excluded from rendering and pointer hits.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_visibility_smoke.gd 2>&1 | tee /tmp/godot-t064-child-visibility.log

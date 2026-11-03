@@ -182,6 +182,21 @@ func rotate_selected(angle: float) -> DrawingResult:
 	return set_selected_transform(original.rotated_local(angle))
 
 
+## Uniform scale is a parent-local layout edit; the selected child source and
+## placement origin stay untouched. A positive factor preserves handedness,
+## including previously mirrored/nonuniform basis vectors.
+func scale_selected(factor: float) -> DrawingResult:
+	if is_stale():
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before scaling")
+	if not is_finite(factor) or factor <= 0.0:
+		return DrawingResult.failure("CHILD", "Scale factor must be finite and positive")
+	var row: Dictionary = selected_record()
+	if row.is_empty():
+		return DrawingResult.failure("CHILD", "Select a current nested child")
+	var original: Transform2D = _transform(row)
+	return set_selected_transform(original.scaled_local(Vector2(factor, factor)))
+
+
 func set_selected_transform(next_transform: Transform2D) -> DrawingResult:
 	if is_stale():
 		return DrawingResult.failure("STALE_CHILDREN", "Nested source changed; reload before editing")

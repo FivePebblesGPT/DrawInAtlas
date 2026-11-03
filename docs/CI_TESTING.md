@@ -102,6 +102,14 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 nested child uniform scaling: `tests/object_child_scale_smoke.gd`
+  (**42/42** headless checks) validates positive parent-local basis scaling,
+  child/descendant hit paths and rendered pixels, nonuniform/mirrored affine
+  transforms, unchanged source revisions, invalid factors, stale writers,
+  atomic publication veto, history branching and live inspector buttons.
+  It is included in the existing fast-CI nested edit step. The targeted
+  **43/43** Xvfb/Mesa witness captures the 420px-wide inspector; it is not
+  hardware owner acceptance or an approval of nested Save As/export policy.
 - T-064 reversible visibility in nested parent layouts:
   `tests/object_child_visibility_smoke.gd` (**39** headless assertions,
   fast push CI) checks optimistic child generation and parent revision,

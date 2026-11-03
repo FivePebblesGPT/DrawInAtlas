@@ -255,3 +255,16 @@ re-show. The existing child-edit session records the action with reversible
 Undo/Redo; graph-change signaling invalidates Atlas previews. The dedicated
 `tests/object_child_visibility_smoke.gd` is CI-gated. This does not settle
 nested source Save As/export policy or owner interaction acceptance.
+
+## Nested child scaling (T-064 engineering milestone)
+
+The nested parent inspector's **Shrink 10%** and **Grow 10%** buttons call
+`AtlasObjectChildEditSession.scale_selected(factor)` through the existing
+optimistic `transform_child` transaction. Scaling multiplies the child-local
+basis vectors, leaving its parent-local origin intact, and preserving source
+artwork, stable child IDs, descendants and any mirrored or nonuniform basis.
+Zero/negative/nonfinite factors fail, as do stale parent writers and rejected
+registry publications. The existing transform history supports Undo/Redo and
+Atlas source-change invalidation. `tests/object_child_scale_smoke.gd` is a
+fast-CI headless witness; native screenshots are targeted. This is not an
+owner-approved nested Save As/export policy or hardware UX signoff.

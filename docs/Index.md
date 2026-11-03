@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-064 reversible nested child scaling (2026-11-03; In Progress):**
+The Object Manager nested inspector now offers Shrink/Grow actions for
+parent-local scaling of selected linked/NULL child transforms. Scaling changes
+only the published affine basis, preserving source pixels, identity, local
+origin and child-relative descendants. It shares stale-safe Undo/Redo with
+movement, rotation, structure, visibility and NULL repair. The new **42/42**
+fast-CI Godot witness exercises nested render/hit paths, rotated/mirrored
+bases, veto/stale guards and disk reload; a targeted **43/43** Xvfb/Mesa run
+includes a 420px native screenshot. No physical owner UX review or nested
+Save As/export dependency-copy decision is implied; **T-064 stays In Progress**.
+See [T-064](Tickets/T-064.md).
+
 **T-064 nested child visibility (2026-11-03; In Progress):**
 The Object Manager nested inspector now hides/shows a selected child without
 removing its stable identity or source pixels. Hidden child subtrees leave
