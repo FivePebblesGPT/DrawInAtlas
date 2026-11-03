@@ -313,6 +313,9 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-fill-cache.log
           grep -q 'T068_FILL_CACHE_PASSED' /tmp/godot-t068-fill-cache.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FILL_CACHE_FAILED:' /tmp/godot-t068-fill-cache.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_frontier_smoke.gd 2>&1 | tee /tmp/godot-t068-frontier.log
+          grep -q 'T068_FRONTIER_PASSED' /tmp/godot-t068-frontier.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FRONTIER_FAILED:' /tmp/godot-t068-frontier.log; then exit 1; fi
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_publication_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-publication.log
           grep -q 'T068_PUBLICATION_PASSED' /tmp/godot-t068-publication.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_PUBLICATION_FAILED:' /tmp/godot-t068-publication.log; then exit 1; fi

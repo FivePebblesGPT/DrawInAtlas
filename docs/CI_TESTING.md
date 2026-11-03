@@ -16,6 +16,13 @@
   Before/after fill CPU samples are diagnostic only and not CI gating;
   Windows/Linux hardware performance and native backend comparisons remain
   open under T-068.
+- T-068 bounded flood-fill frontier:
+  `tests/drawing_fill_frontier_smoke.gd` (**56** fast-CI assertions) checks
+  unique-candidate work budgets, atomic rollback/retry, transparent hidden-RGB
+  undo, masks, negative coordinates, and deterministic independent four-neighbor
+  grid-oracle parity. It is added to the existing T-068 job step; its 32²–96²
+  five-sample CPU timing pairs are diagnostic, **not** a gating performance
+  target or physical end-to-end benchmark.
 - T-068 safe stationary round-dab CPU shortcut: `tests/drawing_dab_geometry_smoke.gd` compares its pixels against the **original** Godot `Geometry2D` segment oracle at fractional/negative positions, tile seams and 64-bit signed anchors, including undo/redo, no-op alpha and hidden RGB (125 assertions). The large raster benchmark and 25-gesture native stress run are **targeted**, not push-gating.
 - T-068 bounded axis-aligned swept hard-brush shortcut:
   `tests/drawing_axis_sweep_smoke.gd` (**239** assertions) compares precise

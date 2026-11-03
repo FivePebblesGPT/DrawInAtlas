@@ -6,6 +6,17 @@
 
 ## Kanban summary
 
+**T-068 unique-candidate flood-fill frontier (2026-11-03; still In Progress):**
+Four-connected Bucket fills now mark each candidate when enqueued, rather
+than repeatedly appending already queued positions. Work budgets count
+unique examined positions, including transparent/selection boundary pixels;
+original source colors, publication, masks and Undo/Redo are unchanged. A
+56-check headless fixture uses an independent grid oracle and exact-budget
+retry; it joins the existing fast-CI T-068 step. Two ordered baseline/follow-up
+CPU microbenchmarks show **mixed** results, not a reliable latency improvement.
+Native library and hardware gates remain open. See [T-068](Tickets/T-068.md)
+and [CPU report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 cached and lazy-safe flood fill (2026-11-03; still In Progress):**
 The bounded Drawing Bucket engine now resolves each verified source tile once
 per gesture, including lazily loaded chunks. Previously resident-only lookup

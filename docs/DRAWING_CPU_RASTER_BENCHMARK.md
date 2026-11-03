@@ -352,3 +352,47 @@ small synthetic documents, but not seed allocation, user input, texture
 upload, rendering or photon/present latency. Sequential before/after runs,
 just ten observations per variant per size and heterogeneous system load mean
 no statistically supported stable gain. No native backend was enabled.
+
+
+## 2026-11-03: queue each flood-fill candidate only once
+
+The four-connected `DrawingEditSession.flood_fill()` now marks a candidate as
+soon as it enters the queue. Previously a position could be queued repeatedly
+by several already accepted neighboring pixels; the duplicate entries were
+later skipped, consuming temporary queue space. The queue is now unique, and
+its `head` counts the unique candidates examined by the explicit `limit`.
+The four-neighbor order, source-tile verification, immutable original colors,
+selection tests, detached staging, rollback, and commit/Undo contract are
+unchanged. The fill still refuses unallocated clear source pixels and does not
+change its native/backend dependencies.
+
+The independent 56-check finite-grid oracle and exact-budget rollback/retry
+witness is `tests/drawing_fill_frontier_smoke.gd` (fast-CI-gated). It exercises
+masked/unmasked connected regions, wall colors, holes, negative coordinates,
+transparent hidden RGB, and Undo/Redo. Existing lazy-source fill and gesture
+regressions are separately retained; no synthetic benchmark is a replacement.
+
+Two ordered baseline and changed five-sample **CPU-only** benchmark runs of
+`drawing_fill_tile_benchmark.gd` (same Godot beta2 and test script) yielded:
+
+| Filled pixels | Baseline run 1 / 2 medians (ms) | Unique-frontier run 1 / 2 (ms) |
+|---:|---:|---:|
+| 32 × 32 | 12.766 / 13.601 | 13.225 / 19.539 |
+| 64 × 64 | 53.491 / 57.204 | 56.587 / 55.861 |
+| 96 × 96 | 140.005 / 142.046 | 134.218 / 130.686 |
+
+[Full samples](benchmarks/T068_2026-11-03_unique_frontier.json). The larger
+region appears somewhat faster while 32² regresses badly in the second run;
+this is **not evidence of stable speedup**. Scheduling, short sample windows,
+GC, and workload shape are uncontrolled. No physical event-to-display latency,
+peak RSS/VRAM, thread jitter or native/backend comparison is implied.
+T-068 remains In Progress pending its original acceptance obligations.
+
+
+Final regression checkpoint for this change: **14/14** headless suites,
+**1,803/1,803** assertions, with editor-imported bundled fonts; explicit
+GDScript types, ticket validator (83), CI contracts (6) and workflow YAML
+passed. The optional native Xvfb/Mesa brush/framebuffer witness passed
+**81/81**, with [raw results](benchmarks/T068_2026-11-03_frontier_native.json).
+This native test does **not** exercise Bucket, so it is only a general
+post-change display regression check. No native fill-latency comparison was made.

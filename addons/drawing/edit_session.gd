@@ -325,20 +325,20 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 	if original.value == rgba:
 		return DrawingResult.failure("NO_CHANGE", "Target color is already present")
 	var frontier: Array[Vector2i] = [seed]
-	var visited: Dictionary[Vector2i, bool] = {}
+	# Mark a point when queued, rather than when popped. Dense regions would
+	# otherwise enqueue the same interior and boundary coordinates repeatedly.
+	# The limit still counts unique examined candidates, including boundaries.
+	var queued: Dictionary[Vector2i, bool] = {seed: true}
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	var head: int = 0
 	while head < frontier.size():
-		if visited.size() >= limit:
+		if head >= limit:
 			_before = old_before
 			_after = old_after
 			return DrawingResult.failure("FILL_LIMIT", "Fill was cancelled at the pixel budget")
 		var point: Vector2i = frontier[head]
 		head += 1
-		if visited.has(point):
-			continue
-		visited[point] = true
 		if selection != null and not selection.allows(point):
 			continue
 		var current: DrawingResult = _fill_source_pixel(point)
@@ -355,7 +355,8 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset
-			if not visited.has(next):
+			if not queued.has(next):
+				queued[next] = true
 				frontier.append(next)
 	return DrawingResult.success(_after.size())
 

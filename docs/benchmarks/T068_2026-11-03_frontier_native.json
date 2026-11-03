@@ -1,0 +1,75 @@
+{
+  "checks": 81,
+  "driver": "X11",
+  "failures": 0,
+  "limitations": "Synthetic X11 Control events; software GL frame_post_draw, not presentation or hardware input",
+  "renderer": "gl_compatibility",
+  "rows": [
+    {
+      "cpu_dispatch": {
+        "median_ms": 0.797,
+        "p95_ms": 4.767
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 14.661,
+        "p95_ms": 15.079
+      },
+      "name": "dab_4px",
+      "synthetic_gestures": 5,
+      "world_width": 4.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 10.86,
+        "p95_ms": 11.932
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 23.16,
+        "p95_ms": 32.505
+      },
+      "name": "dab_32px",
+      "synthetic_gestures": 5,
+      "world_width": 32.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 39.182,
+        "p95_ms": 50.033
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 55.343,
+        "p95_ms": 66.876
+      },
+      "name": "dab_64px",
+      "synthetic_gestures": 5,
+      "world_width": 64.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 3.917,
+        "p95_ms": 4.179
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 22.167,
+        "p95_ms": 26.786
+      },
+      "name": "long_4px",
+      "synthetic_gestures": 5,
+      "world_width": 4.0
+    },
+    {
+      "cpu_dispatch": {
+        "median_ms": 3.185,
+        "p95_ms": 3.441
+      },
+      "event_to_frame_post_draw": {
+        "median_ms": 18.939,
+        "p95_ms": 19.867
+      },
+      "name": "cross_4px",
+      "synthetic_gestures": 5,
+      "world_width": 4.0
+    }
+  ],
+  "schema": "t068-native-stress-v1"
+}
