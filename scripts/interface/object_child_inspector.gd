@@ -13,6 +13,7 @@ var source_filter: LineEdit
 const MAX_SOURCE_CHOICES: int = 128
 var attach_button: Button
 var detach_button: Button
+var duplicate_button: Button
 var repair_button: Button
 var visibility_button: Button
 var instance_label: LineEdit
@@ -63,6 +64,8 @@ func _ready() -> void:
 	source_picker.tooltip_text = "Choose an already-published Object source; cycles are rejected"
 	insert_actions.add_child(source_picker)
 	attach_button = _button(insert_actions, "Attach source", "AttachChild", _attach_child)
+	duplicate_button = _button(insert_actions, "Duplicate selected", "DuplicateChild", _duplicate_child)
+	duplicate_button.tooltip_text = "Ctrl+Alt+D · make another linked instance one parent-local unit to the right/down; source pixels are shared; Undo removes the copy"
 	detach_button = _button(insert_actions, "Remove selected", "DetachChild", _detach_child)
 	detach_button.tooltip_text = "Remove this instance, not its source pixels; child Undo restores its identity"
 	repair_button = _button(insert_actions, "Repair NULL with source", "RepairChild", _repair_child)
@@ -132,6 +135,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		match key.keycode:
 			KEY_UP: _reorder(-1)
 			KEY_DOWN: _reorder(1)
+			KEY_D: _duplicate_child()
 			_: return
 	elif key.alt_pressed and not key.ctrl_pressed and not key.shift_pressed:
 		match key.keycode:
@@ -216,6 +220,7 @@ func refresh(message: String = "") -> void:
 	var ready: bool = not session.is_stale() and not record.is_empty()
 	open_button.disabled = not ready or record["status"] != "linked"
 	detach_button.disabled = not ready
+	duplicate_button.disabled = not ready or record["status"] != "linked"
 	instance_label.editable = ready
 	apply_label_button.disabled = not ready
 	instance_label.text = String(record.get("metadata", {}).get("label", "")) if ready and \
@@ -265,6 +270,11 @@ func _attach_child() -> void:
 		return
 	var attached: DrawingResult = session.attach_source(_candidate_ids[index])
 	refresh("" if attached.ok else attached.message)
+
+
+func _duplicate_child() -> void:
+	var result: DrawingResult = session.duplicate_selected()
+	refresh("Linked child instance duplicated (Undo available)" if result.ok else result.message)
 
 
 func _detach_child() -> void:

@@ -297,3 +297,18 @@ stale-edit rejection use the existing parent-local history. Labels survive
 Object registry reload and portable component copying. The fast-CI witness
 is `tests/object_child_label_smoke.gd`; native UI and physical owner acceptance
 remain separate, and no nested single-source Save As policy is implied.
+
+
+### Duplicate a nested child placement (T-064 engineering)
+
+In the Object Manager's nested child inspector, select a **linked** child and
+choose **Duplicate selected** (or Ctrl+Alt+D). This inserts a separate instance
+immediately above the selected child with its own stable ID and parent-local
+transform displaced by (1, 1); the inspector selects the new child. Both
+instances share the exact same verified published Object source pixels.
+Visibility, label and primitive metadata are copied, but subsequent edits to
+the instances remain separate. Undo/Redo restores the duplicate's identity
+and original selection; a missing/NULL reference must be repaired before it
+can be duplicated. This does **not** implement nested Object Asset Save As,
+graph duplication, or any unapproved source-copy policy. The safe graph
+capacity and owner physical-hardware review remain separate.

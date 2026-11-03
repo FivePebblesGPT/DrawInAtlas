@@ -102,6 +102,15 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 linked-child placement duplication:
+  `tests/object_child_duplicate_smoke.gd` (**53** headless checks) covers
+  distinct child instance identity/generation with an unchanged referenced
+  source, parent-local offset and sibling insertion, mixed structural
+  Undo/Redo, stale writer/publication veto/NULL limits, missing source files,
+  rendered pixels, nested hit paths, and portable reload/copy. It runs in the
+  existing fast-CI child-edit step. The optional **54**-check native inspector
+  screenshot witness is targeted; it is not required push CI or owner
+  acceptance. Source Save As/export policy remains unresolved under T-064.
 - T-064 optional child-instance labels: `tests/object_child_label_smoke.gd`
   (**54** headless assertions) checks duplicate-source identity, primitive
   metadata retention, 64-character validation, optimistic child and parent

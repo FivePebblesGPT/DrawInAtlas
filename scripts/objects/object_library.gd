@@ -204,6 +204,50 @@ func attach_child(asset_id: String, expected_revision: int, child_source: String
 	return DrawingResult.success(child_id) if result.ok else result
 
 
+## Create a separate placement of the same *published* source. This is not
+## Object Asset Save As: no source pixels or dependency graph are cloned.
+## New identity is mandatory; all other parent-local layout fields are copied.
+## Insert directly above the source sibling for predictable painter priority.
+func duplicate_child_instance(asset_id: String, child_id: String, expected_revision: int,
+		expected_generation: String, expected_child_revision: int,
+		offset: Vector2 = Vector2(1.0, 1.0)) -> DrawingResult:
+	if not offset.is_finite() or absf(offset.x) > 1000000000.0 or \
+		absf(offset.y) > 1000000000.0:
+		return DrawingResult.failure("CHILD_TRANSFORM", "Duplicate offset exceeds safe world-coordinate bounds")
+	if not _assets.has(asset_id) or children_revision(asset_id) != expected_revision:
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before duplicating")
+	if not _asset_available(asset_id):
+		return DrawingResult.failure("CHILD_SOURCE", "Parent source is not available")
+	var children: Array = _assets[asset_id].get("children", []).duplicate(true)
+	for index: int in range(children.size()):
+		var existing: Dictionary = children[index]
+		if String(existing["id"]) != child_id:
+			continue
+		if String(existing["generation"]) != expected_generation or \
+				int(existing["revision"]) != expected_child_revision:
+			return DrawingResult.failure("STALE_CHILDREN", "Child changed; reload before duplicating")
+		if bool(existing["placeholder"]) or not _asset_available(String(existing["source_id"])):
+			return DrawingResult.failure("MISSING_SOURCE", "Repair the NULL child before duplicating")
+		var placement: Array = existing["transform"]
+		var copy_transform: Transform2D = Transform2D(
+			Vector2(float(placement[0]), float(placement[1])),
+			Vector2(float(placement[2]), float(placement[3])),
+			Vector2(float(placement[4]), float(placement[5])) + offset)
+		if not _transform_valid(copy_transform):
+			return DrawingResult.failure("CHILD_TRANSFORM", "Duplicate placement is not invertible or finite")
+		var duplicated: Dictionary = existing.duplicate(true)
+		duplicated["id"] = _new_id("child")
+		duplicated["generation"] = _new_id("generation")
+		duplicated["revision"] = 0
+		duplicated["transform"] = [copy_transform.x.x, copy_transform.x.y,
+			copy_transform.y.x, copy_transform.y.y, copy_transform.origin.x,
+			copy_transform.origin.y]
+		children.insert(index + 1, duplicated)
+		var committed: DrawingResult = _replace_children(asset_id, expected_revision, children)
+		return DrawingResult.success(String(duplicated["id"])) if committed.ok else committed
+	return DrawingResult.failure("CHILD", "Nested child no longer exists")
+
+
 func transform_child(asset_id: String, child_id: String, expected_revision: int,
 		placement: Transform2D) -> DrawingResult:
 	if not _assets.has(asset_id) or not _transform_valid(placement):

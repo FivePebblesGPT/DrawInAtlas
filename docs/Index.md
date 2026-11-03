@@ -6,6 +6,22 @@
 
 ## Kanban summary
 
+**T-064 duplicate linked nested child placements (2026-11-03; In Progress):**
+The nested Object inspector now offers **Duplicate selected** (Ctrl+Alt+D).
+It inserts a new linked child directly above the selected sibling with a
+fresh stable child ID/generation, a one-unit parent-local displacement,
+independent transform/metadata/visibility and the *same* published source.
+The existing structural history supports exact Undo/Redo of this instance
+without copying any source artwork. Invalid/stale sources, unsafe offsets,
+failed publication and the 64-child graph limit reject atomically.
+`tests/object_child_duplicate_smoke.gd` passes **53/53** headless checks,
+plus **54/54** targeted native Xvfb/Mesa checks with a 420px inspector
+screenshot. This is placement duplication, **not** the unresolved nested
+single-source Save As/export reference-versus-deep-copy policy. T-064 remains
+In Progress, with owner decisions and hardware validation outstanding.
+See [T-064](Tickets/T-064.md).
+
+
 **T-064 labeled nested child instances (2026-11-03; In Progress):**
 The nested Object inspector now permits a 64-character optional label for
 **each child instance**, distinguishing repeated uses of the same published

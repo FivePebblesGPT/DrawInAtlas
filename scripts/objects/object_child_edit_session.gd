@@ -72,6 +72,37 @@ func attach_source(source_id: String, placement: Transform2D = Transform2D.IDENT
 	return DrawingResult.success(attached_id)
 
 
+## Duplicate only the child *placement*, leaving its published source shared.
+## The existing structural attach history replays the new identity exactly.
+func duplicate_selected(offset: Vector2 = Vector2(1.0, 1.0)) -> DrawingResult:
+	if is_stale():
+		return DrawingResult.failure("STALE_CHILDREN", "Parent changed; reload before duplicating")
+	var source: Dictionary = selected_record()
+	if source.is_empty():
+		return DrawingResult.failure("CHILD", "Select a current nested child")
+	var siblings: Array[Dictionary] = library.children_for_asset(parent_source_id)
+	var origin: int = -1
+	for index: int in range(siblings.size()):
+		if siblings[index]["id"] == selected_child_id:
+			origin = index
+			break
+	if origin < 0:
+		return DrawingResult.failure("CHILD", "Selected nested child is no longer attached")
+	var previous_selection: String = selected_child_id
+	var result: DrawingResult = library.duplicate_child_instance(parent_source_id,
+		selected_child_id, expected_revision, String(source["generation"]),
+		int(source["revision"]), offset)
+	if not result.ok:
+		return result
+	expected_revision += 1
+	var duplicated_id: String = String(result.value)
+	var duplicate_row: Dictionary = _saved_record(duplicated_id)
+	selected_child_id = duplicated_id
+	_record_operation({"kind": "attach", "row": duplicate_row,
+		"index": origin + 1, "previous_selection": previous_selection})
+	return DrawingResult.success(duplicated_id)
+
+
 ## A single sibling-order step is one reversible, parent-local edit.
 ## The stored row excludes the computed UI availability field and its revision
 ## is intentionally ignored during replay (revisions monotonically increase).
