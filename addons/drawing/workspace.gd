@@ -6,6 +6,7 @@ const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
 const TOP_BAR_SCRIPT: Script = preload("res://addons/drawing/editor_top_bar.gd")
 const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd")
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
+const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -39,6 +40,8 @@ var dock_tab_strips: Dictionary = {}
 var dock_group_frames: Dictionary = {}
 var dock_group_handles: Dictionary = {}
 var dock_drag: DrawingDockDrag
+var floating_hosts: Dictionary = {} # Container ID -> DrawingFloatingHost (real Control)
+var _floating_serial: int = 0
 var dock_drop_hint: ColorRect
 var _drag_candidate_kind: String = ""
 var _drag_candidate_id: String = ""
@@ -124,11 +127,13 @@ func _build_interface() -> void:
 		Callable(self, "_change_tool").bind("Move")])
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
-		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W"],
+		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W",
+		"Float selected dock group", "Show hidden floating panels"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
 		Callable(self, "_cycle_tab").bind(-1), Callable(self, "_ask_rename_object"),
-		Callable(self, "_ask_save"), Callable(self, "_request_close_current")])
+		Callable(self, "_ask_save"), Callable(self, "_request_close_current"),
+		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts")])
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
@@ -282,6 +287,7 @@ func _build_interface() -> void:
 	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
 	history_pane.add_child(selection_history_toggle)
 	_render_dock()
+	resized.connect(_clamp_floating_hosts)
 	status = Label.new()
 	status.name = "WorkspaceStatus"
 	status.text = "Ready"
@@ -650,8 +656,104 @@ func _render_dock(focus_key: String = "") -> void:
 	dock_rail.visible = minimized
 	dock_flyout.visible = minimized and not flyout_group_id.is_empty()
 	_layout_dock_flyout()
+	_render_floating_hosts()
 	if not focus_key.is_empty():
 		call_deferred("_restore_dock_focus", focus_key)
+
+
+## T-081: instantiate a single Control host for a whole group, using the same
+## model transaction as T-080. Mouse drag from a dock to a host is T-082.
+func float_group(group_id: String) -> String:
+	if dock_layout.group_info(group_id).is_empty():
+		return ""
+	_floating_serial += 1
+	var host_id: String = "float-%d" % _floating_serial
+	while not dock_layout.container_info(host_id).is_empty():
+		_floating_serial += 1
+		host_id = "float-%d" % _floating_serial
+	if not dock_layout.create_container(host_id, DrawingDockLayout.FLOATING):
+		return ""
+	var group_move: Dictionary = {"kind": DrawingDockDrag.GROUP_SLOT, "container": host_id, "index": 0}
+	if not dock_drag.begin_group(group_id) or not dock_drag.preview(group_move) or not dock_drag.commit():
+		dock_drag.cancel()
+		dock_layout.remove_empty_container(host_id)
+		return ""
+	var host: DrawingFloatingHost = FLOATING_HOST_SCRIPT.new() as DrawingFloatingHost
+	host.setup(host_id, dock_layout, dock_drag, dock_views, dock_stash)
+	add_child(host)
+	host.layout_changed.connect(_render_dock)
+	host.hide_requested.connect(hide_floating_host)
+	floating_hosts[host_id] = host
+	# Stagger independent hosts, then clamp their full frame to the client area.
+	var shift: float = float(_floating_serial - 1) * 26.0
+	host.set_host_rect(Rect2(Vector2(74 + shift, 64 + shift), Vector2(310, 365)))
+	_render_dock()
+	host.raise_host()
+	return host_id
+
+
+func move_group_to_floating(group_id: String, host_id: String) -> bool:
+	if not floating_hosts.has(host_id):
+		return false
+	var group_count: int = dock_layout.container_info(host_id)["groups"].size()
+	if not dock_drag.begin_group(group_id) or not dock_drag.preview({"kind": DrawingDockDrag.GROUP_SLOT,
+		"container": host_id, "index": group_count}):
+		dock_drag.cancel()
+		return false
+	if not dock_drag.commit():
+		return false
+	_render_dock()
+	return true
+
+
+func hide_floating_host(host_id: String) -> void:
+	var host: DrawingFloatingHost = floating_hosts.get(host_id) as DrawingFloatingHost
+	if host != null:
+		host.hide()
+
+
+func show_floating_host(host_id: String) -> void:
+	var host: DrawingFloatingHost = floating_hosts.get(host_id) as DrawingFloatingHost
+	if host != null:
+		host.show()
+		host.clamp_to_client()
+		host.raise_host()
+
+
+func show_hidden_floating_hosts() -> void:
+	# Window menu recovery: hiding never changes group ownership or view state.
+	for host_id: String in floating_hosts:
+		show_floating_host(host_id)
+
+
+func _float_selected_dock_group() -> void:
+	var focus: Control = get_viewport().gui_get_focus_owner()
+	var group_id: String = ""
+	for panel_id: String in dock_tab_buttons:
+		if focus == dock_tab_buttons[panel_id]:
+			group_id = dock_layout.group_of(panel_id)
+	for panel_id: String in dock_rail_buttons:
+		if focus == dock_rail_buttons[panel_id]:
+			group_id = dock_layout.group_of(panel_id)
+	for id: String in dock_group_handles:
+		if focus == dock_group_handles[id]:
+			group_id = id
+	if group_id.is_empty():
+		var groups: Array = dock_layout.container_info("right")["groups"]
+		if not groups.is_empty():
+			group_id = groups[0]["id"]
+	if not group_id.is_empty():
+		float_group(group_id)
+
+
+func _clamp_floating_hosts() -> void:
+	for host: DrawingFloatingHost in floating_hosts.values():
+		host.clamp_to_client()
+
+
+func _render_floating_hosts() -> void:
+	for host: DrawingFloatingHost in floating_hosts.values():
+		host.render()
 
 
 ## Drag/drop uses a single model transaction. The UI never mutates group arrays.

@@ -34,6 +34,16 @@ func create_container(container_id: String, kind: String = DOCK) -> bool:
 	return _commit(candidate)
 
 
+## A failed float transaction must not leave an orphaned empty container.
+func remove_empty_container(container_id: String) -> bool:
+	var index: int = _container_index(_containers, container_id)
+	if index < 0 or _containers[index]["kind"] != FLOATING or not (_containers[index]["groups"] as Array).is_empty():
+		return false
+	var candidate: Array[Dictionary] = _containers.duplicate(true)
+	candidate.remove_at(index)
+	return _commit(candidate)
+
+
 func attach_panel(panel_id: String, container_id: String, group_id: String, group_index: int = -1) -> bool:
 	if not _panels.has(panel_id) or not owner_of(panel_id).is_empty() or group_id.is_empty() or _group_exists(_containers, group_id):
 		return false
