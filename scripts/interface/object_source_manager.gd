@@ -14,6 +14,8 @@ var details: Label
 var edit_button: Button
 var place_button: Button
 var delete_button: Button
+var children_button: Button
+var child_inspector: AtlasObjectChildInspector
 var import_button: Button
 var export_button: Button
 var import_dialog: FileDialog
@@ -52,6 +54,7 @@ func _ready() -> void:
 	edit_button = _action(actions, "Edit Source", "EditSource", _request_edit)
 	place_button = _action(actions, "Place at view center", "PlaceSource", _request_place)
 	delete_button = _action(actions, "Delete Source…", "DeleteSource", _ask_delete)
+	children_button = _action(actions, "Nested children…", "EditChildren", _open_children)
 	import_button = _action(actions, "Import portable…", "ImportPortable", _ask_import)
 	export_button = _action(actions, "Export portable…", "ExportPortable", _ask_export)
 	var null_heading: Label = Label.new()
@@ -97,6 +100,10 @@ func _ready() -> void:
 	export_dialog.file_selected.connect(_export_portable)
 	export_dialog.canceled.connect(func() -> void: _pending_export = {})
 	add_child(export_dialog)
+	child_inspector = AtlasObjectChildInspector.new()
+	add_child(child_inspector)
+	child_inspector.edit_source_requested.connect(func(id: String) -> void:
+		open_source_requested.emit(id))
 	refresh()
 
 
@@ -119,6 +126,9 @@ func bind_library(next_library: AtlasObjectLibrary) -> void:
 	_pending_delete = {}
 	_pending_export = {}
 	_pending_import_library = null
+	if child_inspector != null:
+		child_inspector.hide()
+		child_inspector.bind_parent(null, "")
 	if delete_confirmation != null:
 		delete_confirmation.hide()
 	if library != null:
@@ -199,9 +209,17 @@ func _update_actions() -> void:
 	edit_button.disabled = not available
 	place_button.disabled = not available
 	delete_button.disabled = not has_source
+	children_button.disabled = not available
 	import_button.disabled = library == null
 	export_button.disabled = not available
 	repair_button.disabled = not available or selected_null_id().is_empty()
+
+
+func _open_children() -> void:
+	if library == null or selected_source_id().is_empty() or not library.asset_exists(selected_source_id()):
+		return
+	child_inspector.bind_parent(library, selected_source_id())
+	child_inspector.popup_centered()
 
 
 func _request_edit() -> void:

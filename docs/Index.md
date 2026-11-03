@@ -6,6 +6,8 @@
 
 ## Kanban summary
 
+**T-064 parent-scoped nested child transform editing (2026-11-03; In Progress):** Atlas's Object Manager now opens a nested-child inspector with stable child instance selection, parent-local moves/rotations, explicit child-source editor navigation, optimistic parent-scoped undo/redo and stale/campaign-switch recovery. Its dedicated headless **45/45** edit/history test runs in fast CI, while a targeted X11/Mesa **10/10** native UI witness captures real window layout. Nested attach/remove interaction, integrated hit-path selection, Save As/copy policy and owner/hardware acceptance remain unfinished; no other ticket or manual review state changed. See [T-064](Tickets/T-064.md).
+
 **T-064 bounded nested composition milestone (2026-11-03; In Progress):**
 The Atlas Object renderer now paints linked parent/child/grandchild sources in
 stable order with composed transforms and returns stable child-ID hit paths.

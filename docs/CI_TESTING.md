@@ -76,6 +76,15 @@
   sampling/destination pixels. No nested editor UI or Save As policy is implied.
   This regression runs in fast push CI; physical display interaction remains
   outside that automated gate.
+- T-064 parent-scoped nested child editing: `tests/object_child_edit_smoke.gd`
+  (`T064_CHILD_EDIT_PASSED`, **45** assertions) checks stable child selection,
+  local translation and rotation, monotonic revisions across undo/redo,
+  divergent history branches, stale/concurrent edits, failed index publication,
+  independent child source navigation and Atlas source-manager controls.
+  A separate **10-check** Xvfb/Mesa window/interaction witness
+  (`tests/object_child_edit_native.gd`) is targeted, not fast-push or owner
+  UX approval. Attach/remove history, integrated canvas child selection,
+  nested Save As and portable graph copy remain open.
 - T-065 Atlas-owned source safety: `tests/object_asset_repair_smoke.gd`
   (48 disk-backed checks) covers optimistic deletion confirmations,
   Remove/NULL policies, stable placement generations, explicit no-guess
