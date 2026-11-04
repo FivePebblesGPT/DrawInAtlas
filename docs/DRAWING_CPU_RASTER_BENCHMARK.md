@@ -1408,3 +1408,39 @@ completeness checking.
 [Two-run scalar native integration evidence](benchmarks/T068_2026-11-04_scalar_gdextension.json) ·
 [reproduction harness](../tools/benchmarks/t068_bridge/run_bridge.py) ·
 [contract tests](../tests/test_t068_scalar_gdextension.py).
+
+
+## 2026-11-04 — matched opt-in Godot/native hard-brush publication timing
+
+An isolated Godot 4.8b2 temporary GDExtension project now runs **the same
+source, geometry and publication target** through canonical
+`DrawingEditSession.paint_path()` and the C++17 scalar hard-brush sparse output
+plus checked Godot-side decode, staging and `DrawingDocument` commit. Three
+power-of-two tile sides (32/128/256) × short/crossing 4px gestures, six fresh
+trials each (one warmup, five timed), were run twice. Each run passed **356
+correctness checks** including exact straight-RGBA8 reconstruction, source
+hidden RGB, sorted original-value deltas, one atomic revision and Undo/Redo.
+
+| Tile / gesture | Changed pixels / sparse bytes | Godot stage+commit median, two runs | Native call+decode+stage+commit median, two runs |
+|---|---:|---:|---:|
+| 32² short | 138 / 1,660 B | 1.210–2.093 ms | 1.032–1.111 ms |
+| 128² short | 618 / 7,420 B | 5.301–5.336 ms | 4.659–4.743 ms |
+| 256² crossing | 1,908 / 22,900 B | 21.072–21.119 ms | 15.304–16.494 ms |
+
+The **256² crossing native call alone** has 1.426–1.458 ms observed medians;
+independent wire checking, staging and commit account for most of the total.
+The two paths do **not** use the same internal staging algorithm, and Godot
+always ran before native within each paired trial. Five trials per cell do
+not establish statistical confidence or a production speedup. Source
+construction, PackedByteArray path generation, independent full-tile oracle
+check, Undo/Redo, texture upload, UI event dispatch and GPU presentation are
+excluded from the timed boundary. The suite establishes a narrower
+**Godot↔native stage-to-publication diagnostic**, not real input-to-visible
+latency, a native backend selection or a portable build.
+
+Reproduce with `python3 tools/benchmarks/t068_bridge/run_bridge.py --godot
+/path/to/Godot_v4.8-beta2_linux.x86_64 --runs 2 --output /tmp/t068.json`.
+The Linux on-demand native CI repeats it; fast CI checks evidence tampering
+without native load. [Two-run raw timing and method](benchmarks/T068_2026-11-04_scalar_publication.json)
+· [contracts](../tests/test_t068_scalar_publication.py).
+T-068 remains **In Progress**.

@@ -462,3 +462,18 @@ The existing fast push/PR CI step runs
 without loading a `.gdextension`. This boundary **is not enabled in either
 app**, has no physical-device GPU proof and does not certify portable native
 shipping or a measured speedup. T-068 stays In Progress.
+
+
+### T-068 matched native sparse brush/document publication (2026-11-04)
+
+The on-demand `godot-native-t068-bridge.yml` also runs
+`t068_scalar_publication_profile.gd` in its disposable Godot project, with
+six 32²/128²/256² short/crossing 4px workloads and five measured fresh
+transactions per workload and run. The runner rejects missing markers,
+Godot diagnostics, incomplete timing stages and inconsistent sparse payloads.
+The independent `tests/test_t068_scalar_publication.py` runs in fast CI
+without a native binary, checking the pinned two-run evidence, source digest,
+complete 356-check native publication proof and tamper rejection. The fixture
+validates original RGBA8 and complete Godot oracle parity before timing
+native staging. It does not ship or enable a backend in either app and does
+not measure input-to-present, physical GPU, or Windows builds.

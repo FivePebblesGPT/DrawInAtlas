@@ -29,6 +29,8 @@ SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
 SCALAR_RE = re.compile(r"^T068_SCALAR_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
 SCALAR_EVIDENCE_RE = re.compile(r"^T068_SCALAR_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
+PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
+PUBLICATION_TIMING_RE = re.compile(r"^T068_SCALAR_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
 MARSHAL_TIMING_RE = re.compile(r"^T068_MARSHAL_TIMING: (.+)$", re.MULTILINE)
 CANONICAL_SCRIPTS = (
     "document", "edit_session", "signed_tiles", "layer_node", "raster_tile",
@@ -46,7 +48,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -105,6 +107,57 @@ def validate_scalar_evidence(record: dict[str, int]) -> None:
         record["no_op_bytes"] != 4 or record["erase_sparse_bytes"] != 16 or
         record["checks"] < 31):
         raise ValueError("Incomplete scalar brush parity evidence")
+
+
+
+def validate_scalar_publication(cases: Any) -> None:
+    """Reject missing, forged, or dimensionally inconsistent timing data."""
+    expected = {(side, gesture) for side in (32, 128, 256)
+                for gesture in ("short", "crossing")}
+    phases = {"godot_stage", "godot_commit", "native_call", "native_decode",
+              "native_stage", "native_commit", "godot_total", "native_total"}
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        raise ValueError("Expected six matched native/publication workloads")
+    observed: set[tuple[int, str]] = set()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != {
+                "side", "gesture", "source_bytes", "path_bytes", "changed",
+                "sparse_bytes", "measurements_us"}:
+            raise ValueError("Malformed publication workload")
+        identity = (case["side"], case["gesture"])
+        if (type(case["side"]) is not int or
+                not isinstance(case["gesture"], str) or
+                identity not in expected or identity in observed or
+                type(case["source_bytes"]) is not int or
+                case["source_bytes"] != case["side"] ** 2 * 4 or
+                type(case["path_bytes"]) is not int or
+                case["path_bytes"] != (32 if case["gesture"] == "short" else 64) or
+                type(case["changed"]) is not int or
+                not 0 < case["changed"] <= case["side"] ** 2 or
+                type(case["sparse_bytes"]) is not int or
+                case["sparse_bytes"] != 4 + case["changed"] * 12):
+            raise ValueError("Inconsistent publication workload dimensions")
+        observed.add(identity)
+        timings = case["measurements_us"]
+        if not isinstance(timings, dict) or set(timings) != phases:
+            raise ValueError("Incomplete publication timing stages")
+        for stats in timings.values():
+            if (not isinstance(stats, dict) or
+                    set(stats) != {"trials", "min_us", "median_us", "max_us"} or
+                    type(stats["trials"]) is not int or stats["trials"] != 5 or
+                    any(type(stats[key]) is not int for key in
+                        ("min_us", "median_us", "max_us")) or
+                    not 0 <= stats["min_us"] <= stats["median_us"] <= stats["max_us"]):
+                raise ValueError("Invalid publication sample distribution")
+        # A paired total includes every listed stage for the same trial.
+        for mode, parts in (("godot_total", ("godot_stage", "godot_commit")),
+                            ("native_total", ("native_call", "native_decode",
+                                              "native_stage", "native_commit"))):
+            if (timings[mode]["min_us"] < max(timings[part]["min_us"] for part in parts) or
+                    timings[mode]["max_us"] > sum(timings[part]["max_us"] for part in parts)):
+                raise ValueError("Impossible paired publication total")
+    if observed != expected:
+        raise ValueError("Missing publication workloads")
 
 
 def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
@@ -175,6 +228,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_document_sparse_smoke.gd", project / "sparse_test.gd")
         shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_publication_profile.gd", project / "scalar_publication.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -247,8 +301,25 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 raise RuntimeError("Rejected malformed scalar brush proof") from exc
             if int(scalar_match.group(1)) != scalar_record["checks"]:
                 raise RuntimeError("Scalar bridge assertion count mismatch")
+            publication_output = checked_run([godot, "--headless", "--path", str(project),
+                                              "--audio-driver", "Dummy", "--script",
+                                              "res://scalar_publication.gd"],
+                                             cwd=project, timeout=180)
+            publication_match = PUBLICATION_RE.search(publication_output)
+            publication_timing = PUBLICATION_TIMING_RE.search(publication_output)
+            if publication_match is None or publication_timing is None:
+                raise RuntimeError(f"Missing matched scalar publication proof:\n{publication_output[-4000:]}")
+            try:
+                publication_cases = json.loads(publication_timing.group(1))
+                validate_scalar_publication(publication_cases)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected scalar publication evidence") from exc
+            if int(publication_match.group(1)) < 250:
+                raise RuntimeError("Insufficient scalar publication correctness checks")
             observations.append({"scalar_checks": int(scalar_match.group(1)),
-                                 "scalar_evidence": scalar_record, "checks": count, "marshal_checks": int(marshal_match.group(1)),
+                                 "scalar_evidence": scalar_record, "scalar_publication_checks": int(publication_match.group(1)),
+                                 "scalar_publication_cases": publication_cases,
+                                 "checks": count, "marshal_checks": int(marshal_match.group(1)),
                                  "marshal_cases": marshal_cases, "sparse_checks": int(sparse_match.group(1)),
                                  "sparse_benchmark": sparse_benchmark, "revision_checks": int(revision_match.group(1)),
                                  "document_checks": int(document_match.group(1)),
@@ -266,6 +337,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
                 "Scalar brush native call accepts local packed float64 path samples and a binary mask; completeness is verified against the Godot canonical stroke before publication, not by the native output alone",
                 "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
+                "Matched scalar publication timings are headless CPU diagnostics, each phase measured separately with only five usable samples; source seeding, correctness checks, undo and redo are excluded",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
                 "Temporary binary is not bundled in the repository or loaded at normal startup",
@@ -293,6 +365,7 @@ def main() -> None:
     print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Scalar native brush publication screen:", ", ".join(str(item["scalar_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Matched scalar publication screens:", ", ".join(str(item["scalar_publication_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Godot native marshal screens:", ", ".join(str(item["marshal_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
 
