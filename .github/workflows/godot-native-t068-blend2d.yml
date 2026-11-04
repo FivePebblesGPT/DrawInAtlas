@@ -29,7 +29,9 @@ jobs:
           T068_BLEND2D_ARCHIVE: /tmp/blend2d-0.21.2.tar.gz
           T068_BLEND2D_SOURCE: /tmp/blend2d
           T068_BLEND2D_BUILD: /tmp/blend2d-build
-        run: python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py -v
+        run: |
+          python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py -v
+          python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py -v
       - name: Record two complete conversion scopes with checked kernel oracle
         shell: bash
         run: |
@@ -41,6 +43,17 @@ jobs:
             --output /tmp/t068-blend2d-cpu.json | tee /tmp/t068-blend2d-cpu.log
           grep -q 'T068_BLEND2D_CPU_PASSED: 72 verified cases across 2 runs;' /tmp/t068-blend2d-cpu.log
           test -s /tmp/t068-blend2d-cpu.json
+      - name: Compare native A8 stroke and mask to Godot fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_blend2d_brush.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --runs 2 --trials 7 \
+            --output /tmp/t068-blend2d-brush.json | tee /tmp/t068-blend2d-brush.log
+          grep -q 'T068_BLEND2D_BRUSH_PASSED: 64 comparisons across 2 runs;' /tmp/t068-blend2d-brush.log
+          test -s /tmp/t068-blend2d-brush.json
       - name: Upload parity and timing diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -49,4 +62,6 @@ jobs:
           path: |
             /tmp/t068-blend2d-cpu.json
             /tmp/t068-blend2d-cpu.log
+            /tmp/t068-blend2d-brush.json
+            /tmp/t068-blend2d-brush.log
           if-no-files-found: warn

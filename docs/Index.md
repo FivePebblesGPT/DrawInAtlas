@@ -6,6 +6,22 @@
 
 ## Kanban summary
 
+**T-068 native Blend2D hard-brush and selection comparison (2026-11-04; In Progress):**
+The pinned 0.21.2 C++ A8 path rasterizer is now screened against **16 actual
+Godot-generated hard-brush fixtures** per threshold, including far signed
+anchors, view-to-local transforms, inverted/sparse selections, once-per-gesture
+coverage, erasing and transparent hidden RGB. Blend2D's coverage is thresholded
+and selected **inside the detached native shim**, then composited once with
+canonical straight-RGBA8 math (no premultiplied round-trip). Two independent
+seven-trial runs produce **64 comparisons**: at alpha threshold 128, **14/16**
+cases have exact Godot coverage and RGBA8; inverted-selection variants each
+miss one pixel. At threshold 1, all 16 cases overpaint and 15 alter final
+RGBA8 (the alpha-zero no-op remains exact). Source, fixture and native outputs
+are independently checked; runtime adoption, transformed four-corner clipping,
+GDExtension publication, Windows/Linux physical frame/VRAM and release gates
+remain open. [T-068](Tickets/T-068.md),
+[raw two-run evidence](benchmarks/T068_2026-11-04_blend2d_brush.json).
+
 **T-068 measured Godot↔C++ transfer boundary (2026-11-04; In Progress):**
 The isolated pinned Godot 4.8b2 GDExtension now runs a fail-closed transfer
 microbenchmark on 32²/128²/256² canonical tiles, with one-point, sparse and
