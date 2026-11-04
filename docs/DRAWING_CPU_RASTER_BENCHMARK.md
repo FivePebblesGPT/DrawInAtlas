@@ -1596,3 +1596,30 @@ interleavings in a headless, temporary Godot project. They do not simulate
 preemptive worker cancellation, physical input-to-visible latency, software
 presentation, GPU allocation, Windows binaries or production backend usage.
 T-068 therefore remains In Progress.
+
+
+## 2026-11-04 — native four-corner near-boundary differential (T-068)
+
+A new 48-case deterministic Godot 4.8 beta 2 oracle exercises
+`AtlasFill._allows_pixel()` under mirrored, sheared, rotated, nonuniform and
+translated raster transforms. It includes convex/reversed-winding scopes and
+near-edge offsets of ±1e-5. The oracle stores the exact Godot-generated 32²
+eligibility bits, including the engine's float32 `Vector2` representation.
+
+The detached C++17 native mask was rebuilt from source and compared against
+those bytes in two runs: **32 exact cases, 16 discrepant cases per run**, with
+**247 pixels included by Godot but omitted by native C++** per run (zero
+native-only pixels). All discrepant cases are the offset near-edge mirror/shear
+variants; exact-edge baseline fixtures remain independently tested. The
+numeric cause has not been isolated sufficiently to permit an epsilon fix.
+These are **correctness failures of the candidate implementation**, not
+regression failures of the canonical application. The production path remains
+Godot-only. Do not treat the 15 previously matching fixed scopes as blanket
+native selection parity.
+
+[Godot corpus](../tools/benchmarks/t068_quad_differential_oracle.json) ·
+[Two-run full discrepancy indices](benchmarks/T068_2026-11-04_quad_differential.json) ·
+[detached runnable comparator](../tools/benchmarks/t068_quad_differential.py) ·
+[fast-CI fail-closed test](../tests/test_t068_quad_differential.py).
+No published or GPU timing, Windows binary, or portable native packaging is
+measured here.

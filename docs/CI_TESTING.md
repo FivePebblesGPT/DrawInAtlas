@@ -538,3 +538,18 @@ It remains a headless CPU-only comparison, not Windows/Linux physical
 input-to-visible p95, hardware RAM/VRAM, application backend acceptance, or
 a deployable native export. The 1024²/2048² matched native timings are slower
 than canonical Godot in both pinned runs.
+
+
+### T-068 native/Godot near-edge quad differential (2026-11-04)
+
+Fast push CI runs `T068_QUAD_GODOT=godot python3 -m unittest discover -s
+ tests -p test_t068_quad_differential.py`. This first regenerates the
+independent Godot-authoritative 48-case four-corner scope oracle (exact
+serialized mask bytes must match), then compiles the detached C++17 native
+mask source with the host compiler. It validates **two reproducible diagnostic
+runs** and rejects evidence corruption; the current native implementation
+misses **247 Godot-eligible pixels across 16/48 cases per run**. Test success
+means the discrepancy is measured and guarded, **not that parity is achieved**.
+The application remains on canonical Godot masking; no extension is loaded
+or accepted. Revisit these counterexamples before any native selection
+adoption; no physical end-to-end benchmark or release gate is affected.

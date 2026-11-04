@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 seeded native four-corner near-boundary differential (2026-11-04; In Progress):**
+An independently generated Godot 4.8b2 `AtlasFill._allows_pixel()` corpus
+now covers **48 deterministic 32² transformed convex selections**, including
+mirroring, shear, rotation, scaling, reversed winding, exact edges and ±1e-5
+near-edge offsets. The detached C++17 scope kernel produces identical masks
+across two runs but differs from Godot in **16/48 cases, omitting 247 eligible
+pixels per run** (no extra pixels). All disagreements occur in near-edge
+mirror/shear variants; the previously passing 15-case exact-edge oracle is
+unchanged. This is a recorded correctness blocker for native selection, **not
+backend acceptance**. Source-pinned oracle regeneration, failure-atomic ABI
+checks, tamper-rejecting evidence replay and fast CI are included. T-068 stays
+In Progress. [Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_quad_differential.json).
+
 **T-068 native four-corner scope to revision-checked document publication (2026-11-04; In Progress):**
 A new explicit-load, temporary Godot 4.8 beta 2 GDExtension witness
 composes the already checked **native convex four-corner selection mask** with
