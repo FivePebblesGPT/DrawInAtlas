@@ -24,14 +24,22 @@ class ScalarPublicationContracts(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/godot-native-t068-bridge.yml").read_text(
             encoding="utf-8")
         for marker in ("DrawingDocument.new", "paint_path(", "apply_scalar_brush_sparse(",
-                       "_decode_sparse(", "decoded.bytes != expected", "_stage(",
+                       "_decode_sparse(", "decoded.bytes == expected", "_stage(",
                        "native.doc.undo()", "native.doc.redo()", "Time.get_ticks_usec()",
-                       "T068_SCALAR_PUBLICATION_PASSED", "T068_SCALAR_PUBLICATION_TIMING"):
+                       "T068_SCALAR_PUBLICATION_PASSED", "T068_SCALAR_PUBLICATION_TIMING",
+                       "godot_first", "native_first", "samples_us"):
             self.assertIn(marker, source)
         for marker in ('"res://scalar_publication.gd"', "validate_scalar_publication(publication_cases)",
                        '"scalar_publication_cases": publication_cases',
                        '"scalar_publication_checks": int(publication_match.group(1))'):
             self.assertIn(marker, driver)
+        native_function = source.split("func _native_trial(", 1)[1].split("func _case(", 1)[0]
+        self.assertLess(native_function.index('decoded.get("bytes"'),
+                        native_function.index('native.doc.begin_edit('),
+                        "Native bytes must be verified against the canonical oracle before staging")
+        self.assertLess(source.index('var oracle: Dictionary = _new_document('),
+                        source.index('for trial: int in range(WARMUP + TRIALS)'),
+                        "Oracle generation must precede all timed native trials")
         self.assertIn("workflow_dispatch", workflow)
         self.assertNotIn("push:", workflow)
         self.assertNotIn("pull_request:", workflow)
@@ -41,7 +49,7 @@ class ScalarPublicationContracts(unittest.TestCase):
     def test_two_live_runs_have_complete_source_pinned_evidence(self) -> None:
         evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))
         self.assertEqual(evidence["ticket"], "T-068")
-        self.assertEqual(evidence["schema_version"], 1)
+        self.assertEqual(evidence["schema_version"], 2)
         self.assertIn(runner.EXPECTED_VERSION, evidence["godot_version"])
         self.assertEqual(evidence["source_sha256"], hashlib.sha256(
             (ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest())
@@ -49,7 +57,7 @@ class ScalarPublicationContracts(unittest.TestCase):
             (BRIDGE / "t068_scalar_publication_profile.gd").read_bytes()).hexdigest())
         self.assertEqual(len(evidence["runs"]), 2)
         for run in evidence["runs"]:
-            self.assertEqual(run["checks"], 356)
+            self.assertEqual(run["checks"], 536)
             runner.validate_scalar_publication(run["cases"])
         first = {(case["side"], case["gesture"]): (case["changed"], case["sparse_bytes"])
                  for case in evidence["runs"][0]["cases"]}
@@ -64,13 +72,24 @@ class ScalarPublicationContracts(unittest.TestCase):
             lambda data: data.append(copy.deepcopy(data[0])),
             lambda data: data[0].update(side=64),
             lambda data: data[0].update(side=32.0),
+            lambda data: data[0].update(side=[]),
+            lambda data: data[0].update(gesture=[]),
             lambda data: data[0].update(changed=True),
             lambda data: data[0].update(changed=0),
             lambda data: data[0].update(source_bytes=1),
             lambda data: data[0].update(path_bytes=12),
             lambda data: data[0].update(sparse_bytes=4),
             lambda data: data[0].update(invented=42),
+            lambda data: data[0]["samples_us"].pop(),
+            lambda data: data[0]["samples_us"][0].update(order="native_first"),
+            lambda data: data[0]["samples_us"][1].update(order="godot_first"),
+            lambda data: data[0]["samples_us"][0].update(trial=2),
+            lambda data: data[0]["samples_us"][2].update(native_call=-1),
+            lambda data: data[0]["samples_us"][3].update(godot_total=0),
+            lambda data: data[0]["samples_us"][3].update(native_total=True),
+            lambda data: data[0]["samples_us"][4].update(godot_stage=0),
             lambda data: data[0]["measurements_us"].pop("native_decode"),
+            lambda data: data[0]["measurements_us"].update(native_total=None),
             lambda data: data[0]["measurements_us"]["native_total"].update(trials=2),
             lambda data: data[0]["measurements_us"]["native_total"].update(min_us=-1),
             lambda data: data[0]["measurements_us"]["native_total"].update(max_us=0),
@@ -88,9 +107,9 @@ class ScalarPublicationContracts(unittest.TestCase):
 
     def test_missing_markers_and_godot_diagnostics_are_rejected(self) -> None:
         self.assertEqual(runner.PUBLICATION_RE.search(
-            "T068_SCALAR_PUBLICATION_PASSED: 356 checks").group(1), "356")
+            "T068_SCALAR_PUBLICATION_PASSED: 536 checks").group(1), "536")
         self.assertIsNone(runner.PUBLICATION_RE.search(
-            "T068_SCALAR_PUBLICATION_FAILED: 1/356"))
+            "T068_SCALAR_PUBLICATION_FAILED: 1/536"))
         self.assertIsNotNone(runner.PUBLICATION_TIMING_RE.search(
             'T068_SCALAR_PUBLICATION_TIMING: [{"side":32}]'))
         self.assertIn("T068_SCALAR_PUBLICATION_FAIL:",

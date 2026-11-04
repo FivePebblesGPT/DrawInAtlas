@@ -6,19 +6,23 @@
 
 ## Kanban summary
 
-**T-068 matched Godot-native brush publication timing (2026-11-04; In Progress):**
-An opt-in, temporary Godot 4.8b2 GDExtension benchmark now compares real
-canonical `DrawingEditSession.paint_path()` + commit to C++17 scalar sparse
-brush invocation, checked wire decoding, revision-checked staging and commit,
-using the same hidden-RGB source and 4px brush paths at **32²/128²/256²**.
-Two runs each passed **356 correctness assertions**; 5 measured fresh-document
-trials per six workloads per run (plus warmups) include exact published bytes,
-undo/redo and 138–1,908 changed pixels. The 256² crossing-stroke observed
-medians were **21.07–21.12 ms Godot vs 15.30–16.49 ms native path**;
-measurement is headless, sequential and excludes GPU/UI, complete-oracle checks
-and source construction, so it is **not a production speedup claim**. No runtime
+**T-068 counterbalanced Godot/native brush publication evidence (2026-11-04; In Progress):**
+The temporary opt-in Godot 4.8b2 GDExtension benchmark now alternates
+**Godot-first and native-first** execution order on *fresh identical
+DrawingDocument sources*. Two warmups and six paired timed trials (three per
+order) cover six 32²/128²/256² short/crossing 4px strokes in each of two
+independent runs. Both pass **536 correctness assertions**; exact raw
+per-trial stage durations, order, phase totals, and recomputed distributions
+are pinned and reject tampered evidence. An untimed Godot oracle is
+precomputed before the timed pairs; sparse bytes are checked against it before
+native staging. The 256² crossing-stroke run medians
+were **18.955–21.991 ms canonical vs 13.371–13.631 ms native path**. This
+reduces the previous fixed-order bias but does not prove a speedup: the
+results remain headless CPU-only, small-sample, prepacked-geometry diagnostics
+excluding rendering, GPU and physical input-to-visible latency. No production
 backend, manual gate or other ticket changed. [T-068](Tickets/T-068.md) ·
-[two-run evidence](benchmarks/T068_2026-11-04_scalar_publication.json).
+[paired evidence](benchmarks/T068_2026-11-04_scalar_publication.json).
+
 
 **T-068 optional scalar brush through real Godot GDExtension (2026-11-04; In Progress):**
 The detached C++17 hard-brush sparse ABI now executes through the existing

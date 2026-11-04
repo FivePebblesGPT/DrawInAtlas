@@ -464,16 +464,22 @@ app**, has no physical-device GPU proof and does not certify portable native
 shipping or a measured speedup. T-068 stays In Progress.
 
 
-### T-068 matched native sparse brush/document publication (2026-11-04)
+### T-068 counterbalanced native sparse brush/document publication (2026-11-04)
 
-The on-demand `godot-native-t068-bridge.yml` also runs
-`t068_scalar_publication_profile.gd` in its disposable Godot project, with
-six 32²/128²/256² short/crossing 4px workloads and five measured fresh
-transactions per workload and run. The runner rejects missing markers,
-Godot diagnostics, incomplete timing stages and inconsistent sparse payloads.
-The independent `tests/test_t068_scalar_publication.py` runs in fast CI
-without a native binary, checking the pinned two-run evidence, source digest,
-complete 356-check native publication proof and tamper rejection. The fixture
-validates original RGBA8 and complete Godot oracle parity before timing
-native staging. It does not ship or enable a backend in either app and does
-not measure input-to-present, physical GPU, or Windows builds.
+The on-demand `godot-native-t068-bridge.yml` runs the isolated
+`t068_scalar_publication_profile.gd` under Godot 4.8b2, with six matched
+32²/128²/256² 4px short/crossing workloads, two fresh-document warmups and
+**six timed pairs in alternating execution order** (three per order), in
+each of two independent runs. Complete canonical and native pixels, native
+wire originals, one revision and Undo/Redo must match outside the measured
+phases. One complete trusted Godot oracle is precomputed per workload, and
+verified native bytes may only be staged after matching it. Full runs require **536 publication checks**; missing Godot markers
+or error diagnostics fail the command.
+
+Fast push CI runs `tests/test_t068_scalar_publication.py` without a native
+binary. It validates source/profile digests, the pinned schema-v2 evidence,
+all six raw paired samples per workload, counterbalanced order, exact paired
+totals, and independently recomputed min/median/max. Tampered measurements,
+missing trials and fake distributions fail closed. This is CPU-only
+research; the test cannot establish physical input-to-present latency or
+portable native release eligibility. No extension is loaded in the apps.

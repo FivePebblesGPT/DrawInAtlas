@@ -111,23 +111,28 @@ def validate_scalar_evidence(record: dict[str, int]) -> None:
 
 
 def validate_scalar_publication(cases: Any) -> None:
-    """Reject missing, forged, or dimensionally inconsistent timing data."""
+    """Validate raw paired trials and recompute every published timing summary."""
     expected = {(side, gesture) for side in (32, 128, 256)
                 for gesture in ("short", "crossing")}
-    phases = {"godot_stage", "godot_commit", "native_call", "native_decode",
-              "native_stage", "native_commit", "godot_total", "native_total"}
+    parts = ("godot_stage", "godot_commit", "native_call", "native_decode",
+             "native_stage", "native_commit")
+    totals = {"godot_total": parts[:2], "native_total": parts[2:]}
+    phases = set(parts) | set(totals)
     if not isinstance(cases, list) or len(cases) != len(expected):
         raise ValueError("Expected six matched native/publication workloads")
     observed: set[tuple[int, str]] = set()
     for case in cases:
         if not isinstance(case, dict) or set(case) != {
                 "side", "gesture", "source_bytes", "path_bytes", "changed",
-                "sparse_bytes", "measurements_us"}:
+                "sparse_bytes", "samples_us", "measurements_us"}:
             raise ValueError("Malformed publication workload")
+        # Reject unhashable JSON values before using the workload as a key.
+        # All malformed evidence must fail with ValueError, not an incidental
+        # TypeError from set membership.
+        if type(case["side"]) is not int or type(case["gesture"]) is not str:
+            raise ValueError("Invalid publication workload identity")
         identity = (case["side"], case["gesture"])
-        if (type(case["side"]) is not int or
-                not isinstance(case["gesture"], str) or
-                identity not in expected or identity in observed or
+        if (identity not in expected or identity in observed or
                 type(case["source_bytes"]) is not int or
                 case["source_bytes"] != case["side"] ** 2 * 4 or
                 type(case["path_bytes"]) is not int or
@@ -138,24 +143,32 @@ def validate_scalar_publication(cases: Any) -> None:
                 case["sparse_bytes"] != 4 + case["changed"] * 12):
             raise ValueError("Inconsistent publication workload dimensions")
         observed.add(identity)
+        samples = case["samples_us"]
+        if not isinstance(samples, list) or len(samples) != 6:
+            raise ValueError("Expected six paired publication samples")
+        for i, sample in enumerate(samples):
+            if (not isinstance(sample, dict) or
+                    set(sample) != phases | {"trial", "order"} or
+                    type(sample["trial"]) is not int or sample["trial"] != i or
+                    sample["order"] != ("godot_first" if i % 2 == 0 else "native_first") or
+                    any(type(sample[part]) is not int or sample[part] < 0
+                        for part in phases)):
+                raise ValueError("Malformed or non-counterbalanced publication pair")
+            for mode, mode_parts in totals.items():
+                if sample[mode] != sum(sample[part] for part in mode_parts):
+                    raise ValueError("Forged paired publication total")
         timings = case["measurements_us"]
         if not isinstance(timings, dict) or set(timings) != phases:
             raise ValueError("Incomplete publication timing stages")
-        for stats in timings.values():
-            if (not isinstance(stats, dict) or
-                    set(stats) != {"trials", "min_us", "median_us", "max_us"} or
-                    type(stats["trials"]) is not int or stats["trials"] != 5 or
-                    any(type(stats[key]) is not int for key in
-                        ("min_us", "median_us", "max_us")) or
-                    not 0 <= stats["min_us"] <= stats["median_us"] <= stats["max_us"]):
-                raise ValueError("Invalid publication sample distribution")
-        # A paired total includes every listed stage for the same trial.
-        for mode, parts in (("godot_total", ("godot_stage", "godot_commit")),
-                            ("native_total", ("native_call", "native_decode",
-                                              "native_stage", "native_commit"))):
-            if (timings[mode]["min_us"] < max(timings[part]["min_us"] for part in parts) or
-                    timings[mode]["max_us"] > sum(timings[part]["max_us"] for part in parts)):
-                raise ValueError("Impossible paired publication total")
+        for phase in phases:
+            values = sorted(sample[phase] for sample in samples)
+            expected_stats = {"trials": 6, "min_us": values[0],
+                              "median_us": values[3], "max_us": values[-1]}
+            stats = timings[phase]
+            if (not isinstance(stats, dict) or set(stats) != set(expected_stats) or
+                    any(type(value) is not int for value in stats.values()) or
+                    stats != expected_stats):
+                raise ValueError("Forged publication distribution")
     if observed != expected:
         raise ValueError("Missing publication workloads")
 
@@ -314,7 +327,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 validate_scalar_publication(publication_cases)
             except (ValueError, TypeError) as exc:
                 raise RuntimeError("Rejected scalar publication evidence") from exc
-            if int(publication_match.group(1)) < 250:
+            if int(publication_match.group(1)) != 536:
                 raise RuntimeError("Insufficient scalar publication correctness checks")
             observations.append({"scalar_checks": int(scalar_match.group(1)),
                                  "scalar_evidence": scalar_record, "scalar_publication_checks": int(publication_match.group(1)),
@@ -337,7 +350,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
                 "Scalar brush native call accepts local packed float64 path samples and a binary mask; completeness is verified against the Godot canonical stroke before publication, not by the native output alone",
                 "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
-                "Matched scalar publication timings are headless CPU diagnostics, each phase measured separately with only five usable samples; source seeding, correctness checks, undo and redo are excluded",
+                "Matched scalar publication timings are headless CPU diagnostics, with six alternating-order raw paired samples; source seeding, correctness checks, undo and redo are excluded",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
                 "Temporary binary is not bundled in the repository or loaded at normal startup",
