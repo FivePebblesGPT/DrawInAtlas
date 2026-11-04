@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 detached native ASan/UBSan checkpoint (2026-11-04; In Progress):**
+A standalone C++17 harness now instruments the four-corner selection
+and scalar hard-brush coverage, RGBA8 and sparse-delta ABIs with
+**AddressSanitizer + UndefinedBehaviorSanitizer** under GCC and Clang.
+Two runs per compiler verify **1,024 seeded small-tile cases**,
+**68 failure-atomic malformed calls**, matching full/sparse RGBA8
+reconstruction and output redzones. No sanitizer findings occurred
+in these runs. Evidence replays are source-pinned and tamper-checked.
+These tests are not arbitrary native memory safety proof or physical
+input-to-visible, Windows, GPU, or release acceptance; T-068 stays
+In Progress. [Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_native_sanitizer.json).
+
 **T-068 varied-convex selection stress checkpoint (2026-11-04; In Progress):**
 A separate deterministic Godot 4.8b2 `AtlasFill._allows_pixel()` oracle now
 covers **96 different 24² scopes**, including 3–8-vertex convex polygons,

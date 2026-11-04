@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "ticket": "T-068",
+  "sources": {
+    "tools/benchmarks/t068_native_sanitizer_smoke.cpp": "7c0583dc47d55653be009f5b8e8f03c96f37f58b8b6afcdd213d3724afbb33fd",
+    "tools/benchmarks/t068_quad_scope_kernel.cpp": "95094bfb518dc1b7289e53e9ef767bbf6705166a444a734b861dbe527ce64466",
+    "tools/benchmarks/t068_scalar_hard_brush.cpp": "526fff803f891ea7a2b3e66ec2c6b1868c423bd2cfa4bb092ded3a135e34843b"
+  },
+  "compiler_flags": [
+    "-std=c++17",
+    "-O1",
+    "-g",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "-fno-sanitize-recover=all"
+  ],
+  "profiles": [
+    {
+      "compiler": "g++",
+      "version": "g++ (Debian 14.2.0-19) 14.2.0",
+      "runs": [
+        {
+          "cases": 256,
+          "checks": 54378,
+          "rejected": 17,
+          "covered": 2070,
+          "changed": 2057,
+          "digest": "93bb007e99ff4dbd"
+        },
+        {
+          "cases": 256,
+          "checks": 54378,
+          "rejected": 17,
+          "covered": 2070,
+          "changed": 2057,
+          "digest": "93bb007e99ff4dbd"
+        }
+      ]
+    },
+    {
+      "compiler": "clang++",
+      "version": "clang version 17.0.0 (https://github.com/swiftlang/llvm-project.git 10999b6d034fe318f3d56c83bddb6572593a8bb0)",
+      "runs": [
+        {
+          "cases": 256,
+          "checks": 54378,
+          "rejected": 17,
+          "covered": 2070,
+          "changed": 2057,
+          "digest": "93bb007e99ff4dbd"
+        },
+        {
+          "cases": 256,
+          "checks": 54378,
+          "rejected": 17,
+          "covered": 2070,
+          "changed": 2057,
+          "digest": "93bb007e99ff4dbd"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Linux x86-64 GCC/Clang ASan+UBSan only; no Windows, ARM or Godot app integration",
+    "Small seeded fixtures and malformed buffers, not proof against all native memory faults",
+    "No GPU, input-to-present latency, production native backend or release acceptance"
+  ]
+}

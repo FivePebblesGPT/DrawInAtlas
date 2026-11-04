@@ -53,6 +53,18 @@
   The fast push/PR T-068 contracts and the manual-only bridge workflow both
   exercise this matrix. This is Linux C++ ABI safety, not native deployment,
   Windows support, a measured speedup, or physical GPU evidence.
+- T-068 detached C++ ASan/UBSan safety screen:
+  `tests/test_t068_native_sanitizer.py` builds two instrumented
+  standalone executables (GCC and Clang `-O1`), each run twice,
+  exercising the four-corner mask and scalar brush coverage,
+  canonical RGBA8 and sparse-delta ABIs. The 1,024 total seeded
+  cases match independently checked mask geometry and exact
+  full/sparse reconstruction; 68 malformed calls reject atomically
+  without redzone corruption. The source-pinned evidence must match
+  all counters/digests, and ASan/UBSan must exit cleanly. It runs
+  in the usual (non-gating legacy) T-068 step and the opt-in native
+  bridge workflow. This does not establish Windows, arbitrary ABI
+  safety, production threading or physical latency.
 - T-068 additional convex polygon scope stress:
   `tests/test_t068_quad_stress.py` checks a SHA-pinned Godot 4.8b2
   96-case convex scope oracle against the detached C++ selection ABI under

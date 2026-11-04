@@ -39,6 +39,14 @@ jobs:
           python3 tools/benchmarks/t068_quad_compiler_matrix.py \
             --output /tmp/t068-quad-compiler-matrix.json
           test -s /tmp/t068-quad-compiler-matrix.json
+      - name: Instrument detached native scope and sparse brush with ASan/UBSan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py -v
+          python3 tools/benchmarks/t068_native_sanitizer.py \
+            --output /tmp/t068-native-sanitizer.json
+          test -s /tmp/t068-native-sanitizer.json
       - name: Build and verify isolated native, texture, document, and scalar sparse brush paths
         shell: bash
         run: |

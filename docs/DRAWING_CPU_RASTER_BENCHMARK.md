@@ -29,6 +29,27 @@ A temporary explicit-load extension and pinned Godot-generated masks do not
 measure real Atlas pointer delivery, physical presentation latency, VRAM,
 concurrent workers, native release compatibility or an approved backend.
 
+## Detached native ABI sanitizer screen (2026-11-04)
+
+The test-only four-corner and scalar brush/straight-RGBA8/sparse-delta
+kernels now have a separate C++17 ASan+UBSan executable regression.
+GCC and Clang each completed two runs of 256 deterministic small-tile
+cases (**1,024 total**); all matched the independent rectangular
+corner-reference and full-versus-sparse pixel reconstruction.
+**68 deliberately malformed calls** rejected atomically, and no
+sanitizer errors were reported. The four results are byte-identical,
+source-pinned and revalidated by Python. This is **not** a timing
+comparison, general safety proof, cross-platform or runtime approval.
+
+```sh
+python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py -v
+python3 tools/benchmarks/t068_native_sanitizer.py \
+  --output /tmp/t068-native-sanitizer.json
+```
+
+[Raw evidence](benchmarks/T068_2026-11-04_native_sanitizer.json) ·
+[T-068 remaining gates](Tickets/T-068.md).
+
 ## Reproduction
 
 From the repository root, with `godot`, `g++` and Python 3 installed:
