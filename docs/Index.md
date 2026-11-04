@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 native transformed four-corner scope checkpoint (2026-11-04; In Progress):**
+The detached Blend2D C++ brush comparison now computes a fail-closed binary
+selection mask from **all four transformed pixel corners**, with an independent
+Godot `AtlasFill._allows_pixel` oracle. Two runs × eight 64² convex scope cases
+(identity, rotate, shear, mirror, nonuniform density, diamond, disabled/empty)
+produce **16 exact mask matches**; native composition preserves hidden RGBA8.
+Fixtures intentionally avoid exact polygon boundary ties (an aligned probe
+differed at 43 pixels). Neither Blend2D hard-brush geometry, Godot publication,
+physical GPU/frame timing nor desktop release validation is established.
+[T-068](Tickets/T-068.md), [two-run quad evidence](benchmarks/T068_2026-11-04_blend2d_quad.json).
+
+
 **T-068 large-tile Godot-vs-native brush geometry checkpoint (2026-11-04; In Progress):**
 A Godot 4.8b2 `DrawingEditSession` oracle at signed anchors beyond 2^53
 now covers all **12 full-size 512²/1024²/2048²** Blend2D scaling workloads,

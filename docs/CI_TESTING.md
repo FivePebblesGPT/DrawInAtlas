@@ -37,6 +37,13 @@
   SHA-256-pinned source, builds Blend2D with its bundled AsmJit, and records
   two 9-trial runs plus raw JSON diagnostics. No library is shipped or loaded
   into Drawing, and timing boundaries are not considered equivalent.
+- T-068 detached transformed four-corner convex selection comparison:
+  `tests/test_t068_blend2d_quad.py` replays eight Godot-authored 64² masks
+  for transformed polygonal scope checks and validates the two-run native
+  evidence without a required native dependency. The workflow-dispatch
+  Blend2D job compiles the isolated `t068_blend2d_quad_selection` ABI and
+  checks failure atomicity, mask-to-brush handoff and 16 exact parity cases.
+  Polygon-edge tie behavior and hardware/release gates remain open.
 - T-068 verified cached flood-fill sources:
   `tests/drawing_fill_tile_cache_smoke.gd` (**30** fast-CI assertions) checks
   four-connected fills on verified lazy Object tiles as well as resident

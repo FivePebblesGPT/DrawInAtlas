@@ -1,0 +1,134 @@
+{
+  "comparison": "all four transformed raster pixel corners inside convex board-space scope",
+  "godot_oracle_sha256": "de2511fa9b6a902662b633dc5a6b99a53fc51cc141d7a4333e39255be6264a0f",
+  "limitations": [
+    "CPU mask precomputation only; no native Godot publication or GPU timings",
+    "Fixtures avoid exact polygon-edge/corner ties; boundary inclusion needs separate parity",
+    "Existing Blend2D A8 brush stencil retains geometric mismatches"
+  ],
+  "runs": [
+    [
+      {
+        "extra_indices": [],
+        "id": "rect_identity",
+        "mask_sha256": "bfc2c08dfd16ebd62133aba8e241d9382b60482f9c2cfba287356812799c3727",
+        "missing_indices": [],
+        "native_allowed": 1056
+      },
+      {
+        "extra_indices": [],
+        "id": "rotated",
+        "mask_sha256": "122889604eb4484c7dc56a40b2b38850677d52d5afa2e6504f1014d595347d6d",
+        "missing_indices": [],
+        "native_allowed": 1008
+      },
+      {
+        "extra_indices": [],
+        "id": "shear",
+        "mask_sha256": "819843bd426698834780e2647902c76ea6f4ceaa375e8a27b4a240abc7c86d3c",
+        "missing_indices": [],
+        "native_allowed": 1397
+      },
+      {
+        "extra_indices": [],
+        "id": "mirror",
+        "mask_sha256": "210f2dea9ae4376935a03805c4be3c6e82efc6f84d80d40034dfd456a11b02c7",
+        "missing_indices": [],
+        "native_allowed": 1258
+      },
+      {
+        "extra_indices": [],
+        "id": "nonuniform_density",
+        "mask_sha256": "5e6dd511015954d69d186d3504c359709e656d3729b0c222f65ee753a8df756e",
+        "missing_indices": [],
+        "native_allowed": 1505
+      },
+      {
+        "extra_indices": [],
+        "id": "diamond",
+        "mask_sha256": "92ef532827b3422087784febc8bc43d89c0c857a897732f86658a0e201cb3fe9",
+        "missing_indices": [],
+        "native_allowed": 1059
+      },
+      {
+        "extra_indices": [],
+        "id": "disabled",
+        "mask_sha256": "3431383721510cf1c211de027cf958c183e16db5fabb6b230eb284c85e196aa9",
+        "missing_indices": [],
+        "native_allowed": 4096
+      },
+      {
+        "extra_indices": [],
+        "id": "empty_enabled",
+        "mask_sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+        "missing_indices": [],
+        "native_allowed": 0
+      }
+    ],
+    [
+      {
+        "extra_indices": [],
+        "id": "rect_identity",
+        "mask_sha256": "bfc2c08dfd16ebd62133aba8e241d9382b60482f9c2cfba287356812799c3727",
+        "missing_indices": [],
+        "native_allowed": 1056
+      },
+      {
+        "extra_indices": [],
+        "id": "rotated",
+        "mask_sha256": "122889604eb4484c7dc56a40b2b38850677d52d5afa2e6504f1014d595347d6d",
+        "missing_indices": [],
+        "native_allowed": 1008
+      },
+      {
+        "extra_indices": [],
+        "id": "shear",
+        "mask_sha256": "819843bd426698834780e2647902c76ea6f4ceaa375e8a27b4a240abc7c86d3c",
+        "missing_indices": [],
+        "native_allowed": 1397
+      },
+      {
+        "extra_indices": [],
+        "id": "mirror",
+        "mask_sha256": "210f2dea9ae4376935a03805c4be3c6e82efc6f84d80d40034dfd456a11b02c7",
+        "missing_indices": [],
+        "native_allowed": 1258
+      },
+      {
+        "extra_indices": [],
+        "id": "nonuniform_density",
+        "mask_sha256": "5e6dd511015954d69d186d3504c359709e656d3729b0c222f65ee753a8df756e",
+        "missing_indices": [],
+        "native_allowed": 1505
+      },
+      {
+        "extra_indices": [],
+        "id": "diamond",
+        "mask_sha256": "92ef532827b3422087784febc8bc43d89c0c857a897732f86658a0e201cb3fe9",
+        "missing_indices": [],
+        "native_allowed": 1059
+      },
+      {
+        "extra_indices": [],
+        "id": "disabled",
+        "mask_sha256": "3431383721510cf1c211de027cf958c183e16db5fabb6b230eb284c85e196aa9",
+        "missing_indices": [],
+        "native_allowed": 4096
+      },
+      {
+        "extra_indices": [],
+        "id": "empty_enabled",
+        "mask_sha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+        "missing_indices": [],
+        "native_allowed": 0
+      }
+    ]
+  ],
+  "schema": 1,
+  "source_sha256": "234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa",
+  "summary": {
+    "cases_per_run": 8,
+    "mismatched_cases": 0,
+    "runs": 2
+  }
+}

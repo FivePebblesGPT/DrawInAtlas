@@ -33,6 +33,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py -v
           python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py -v
           python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py -v
+          python3 -m unittest discover -s tests -p test_t068_blend2d_quad.py -v
       - name: Record two complete conversion scopes with checked kernel oracle
         shell: bash
         run: |
@@ -76,6 +77,16 @@ jobs:
             --output /tmp/t068-blend2d-large-parity.json | tee /tmp/t068-blend2d-large-parity.log
           grep -q 'T068_LARGE_PARITY_PASSED: 24 verified Godot/native comparisons;' /tmp/t068-blend2d-large-parity.log
           test -s /tmp/t068-blend2d-large-parity.json
+      - name: Compare native transformed full-pixel convex scopes to Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_blend2d_quad.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --output /tmp/t068-blend2d-quad.json | tee /tmp/t068-blend2d-quad.log
+          grep -q 'T068_QUAD_SCOPE_PASSED: 16 native/Godot mask comparisons; 0 mismatched cases' /tmp/t068-blend2d-quad.log
+          test -s /tmp/t068-blend2d-quad.json
       - name: Upload parity and timing diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -90,4 +101,6 @@ jobs:
             /tmp/t068-blend2d-scale.log
             /tmp/t068-blend2d-large-parity.json
             /tmp/t068-blend2d-large-parity.log
+            /tmp/t068-blend2d-quad.json
+            /tmp/t068-blend2d-quad.log
           if-no-files-found: warn

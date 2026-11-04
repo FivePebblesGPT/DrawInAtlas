@@ -1254,3 +1254,24 @@ A8 threshold of 128 as exact Godot hard-brush semantics. T-068 remains
 In Progress pending transformed four-corner clipping, native Skia C++ and
 matched publication benchmarks, physical Windows/Linux RAM/VRAM/p95 and
 standalone-release validation. No production backend was changed.
+
+## 2026-11-04 native convex four-corner selection micro-contract
+
+A detached native Blend2D bridge now constructs **binary scope eligibility**
+from all four transformed raster pixel corners, rather than accepting only a
+precomputed local mask. Godot's real `AtlasFill._allows_pixel()` produced eight
+64² scope fixtures (identity, rotation, shear, mirror, nonuniform transform
+with density, diamond, disabled and empty). In two native passes, **16/16
+masks matched byte-for-byte**, including exact counts 1,056, 1,008, 1,397,
+1,258, 1,505, 1,059, 4,096 and 0. The C++ function is failure-atomic and
+its mask is consumed by the existing detached once-per-pixel Blend2D brush
+compositor without changing canonical straight-RGBA8 or untouched hidden RGB.
+
+The fixtures **exclude exact transformed corners on scope polygon edges**.
+An initial aligned nonuniform-scale case differed on 43 edge-tie pixels,
+so boundary inclusion remains **unverified**, not fixed by this research
+patch. This isolated mask computation contains no raster brush geometry,
+Godot UI publication, physical GPU, CPU-to-present timing or backend selection.
+See [pinned native evidence](benchmarks/T068_2026-11-04_blend2d_quad.json),
+`tests/drawing_t068_quad_scope_oracle.gd`, and
+`tools/benchmarks/t068_blend2d_quad.py`.
