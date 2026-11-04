@@ -103,6 +103,18 @@ jobs:
           grep -q 'T068_MATCHED_NATIVE_PASSED: 20 paired workloads' /tmp/t068-matched-brush.log
           python3 tools/benchmarks/t068_matched_brush.py \
             --replay --output /tmp/t068-matched-brush.json
+      - name: Isolated Linux process RSS and native high-water screen
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_native_memory.py -v
+          python3 tools/benchmarks/t068_native_memory.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --output /tmp/t068-native-memory.json | tee /tmp/t068-native-memory.log
+          grep -q 'T068_NATIVE_MEMORY_PASSED: 12 isolated worker calls' /tmp/t068-native-memory.log
+          python3 tools/benchmarks/t068_native_memory.py \
+            --replay --output /tmp/t068-native-memory.json
       - name: Upload parity and timing diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -121,4 +133,6 @@ jobs:
             /tmp/t068-blend2d-quad.log
             /tmp/t068-matched-brush.json
             /tmp/t068-matched-brush.log
+            /tmp/t068-native-memory.json
+            /tmp/t068-native-memory.log
           if-no-files-found: warn

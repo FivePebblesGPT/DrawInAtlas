@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 isolated Linux native process-memory screen (2026-11-04; In Progress):**
+A new opt-in, source-pinned Linux `/proc` diagnostic spawns **12 fresh Python
+workers** (two independent runs × scalar/Blend2D × 512/1024/2048²) for the
+*same* 4px long-stroke buffers and tests exact Godot-authored coverage and
+canonical RGBA8 before accepting memory samples. Preprepared buffer/worker
+high-water RSS growth during the native call ranges **23.79–23.80 MiB scalar**
+versus **24.40–24.52 MiB Blend2D** at 2048². This includes native temporary
+allocations and process behavior, **not** isolated C++ heap, Godot RAM, VRAM,
+Windows process memory or device measurements. No backend selection or ticket
+closure is claimed. [Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_native_process_memory.json).
+
+
 **T-068 matched scalar/Blend2D brush benchmark (2026-11-04; In Progress):**
 A new opt-in, counterbalanced 2-run comparison times the **same preallocated
 Python→C++ ABI call boundary** for the detached scalar brush and Blend2D 0.21.2

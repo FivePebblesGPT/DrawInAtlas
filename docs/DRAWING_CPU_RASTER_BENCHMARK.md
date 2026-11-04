@@ -1769,3 +1769,38 @@ implementation only—not Blend2D shape/text rendering capabilities.
 [Raw two-run evidence](benchmarks/T068_2026-11-04_matched_brush.json) ·
 [Fail-closed replay and opt-in live test](../tests/test_t068_matched_brush.py).
 No production native library is selected or shipped; T-068 stays In Progress.
+
+
+## 2026-11-04 T-068 — isolated scalar/Blend2D Linux process RSS
+
+The opt-in [process-memory runner](../tools/benchmarks/t068_native_memory.py)
+uses **fresh Linux Python subprocesses**, one backend/library per worker, and
+identical preallocated canonical tile/path/selection and both candidate output buffers for a
+Godot-matching 4px long stroke. It reports `/proc/self/status` resident
+memory and process high-water mark at preparation and native-call boundaries.
+Source/fixture hashes, complete selection masks, and exact RGBA8 output are
+checked independently **after** sampling so oracle allocation does not
+contaminate the measured native-call boundary. All 12 workers across two
+runs matched the pinned 512²/1024²/2048² Godot coverage and pixels.
+
+| Side | Scalar native-call high-water growth (KiB), two runs | Blend2D growth (KiB), two runs |
+| --- | ---: | ---: |
+| 512 | 1308 / 1308 | 2340 / 2084 |
+| 1024 | 6048 / 6052 | 6752 / 6708 |
+| 2048 | 24364 / 24376 | 24988 / 25112 |
+
+These are **per-worker Linux VmHWM differences**, not attributed native
+heap or allocation tracking. In particular, ctypes/Python working buffers,
+shared libraries, allocator caching and page-fault behavior differ from a
+shipping Godot extension. A zero high-water increase is possible when
+native temporary allocations stay below a prior peak; these measurements
+are not a general upper bound on per-gesture RAM. With only two observations
+per configuration they establish neither memory confidence intervals nor a
+production memory-performance recommendation. They do **not** measure
+Godot process RAM, GPU/VRAM, Windows, texture upload or physical
+input-to-visible latency. The 512/1024/2048 **storage tile sizes are not
+claimed to be GPU display-region dimensions**.
+
+[Raw, checked two-run JSON](benchmarks/T068_2026-11-04_native_process_memory.json) ·
+[offline tamper-rejecting tests](../tests/test_t068_native_memory.py).
+Native dependencies remain optional research fixtures; T-068 is In Progress.

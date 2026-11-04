@@ -46,6 +46,15 @@
   kernel and reruns both against the same buffers in alternating order.
   This is an isolated Python→C++ call timing, **not** publication, real
   hardware, Windows or production backend acceptance.
+- T-068 Linux native process-memory screen:
+  `tests/test_t068_native_memory.py` verifies source-pinned, two-run `/proc`
+  `VmRSS`/`VmHWM` evidence for 12 fresh scalar/Blend2D native workers,
+  including complete pinned Godot hard-brush coverage/pixel parity, worker
+  ordering and sample consistency. The offline replay is push-CI safe and
+  requires no native library. The manual-only Blend2D workflow runs the
+  actual Linux process-memory sampling after building both native ABIs.
+  This **does not** measure production editor RAM, device VRAM, Windows,
+  physical latency or a backend speedup.
 - T-068 detached transformed four-corner convex selection comparison:
   `tests/test_t068_blend2d_quad.py` replays 15 Godot-authored 64² masks
   for transformed polygonal scope checks and validates the two-run native
