@@ -26,6 +26,17 @@
   complete two-run 32/64/128² comparison, with a machine-readable JSON
   artifact. It never installs a native dependency in Drawing/Atlas or
   promotes opaque-only parity to a chosen backend.
+- T-068 optional pinned Blend2D CPU compositor comparator:
+  `tests/test_t068_blend2d_cpu.py` (**12** Python checks, including **7**
+  optional live tests) verifies exact source digest, bounded caller lengths,
+  untouched hidden-RGB preservation for region-only conversion, opaque/clear
+  byte-parity and premultiplied-alpha non-parity. The no-dependency contracts
+  join the existing T-068 fast-CI step; live tests skip without externally
+  supplied Blend2D 0.21.2 build paths. The manual-only
+  `.github/workflows/godot-native-t068-blend2d.yml` downloads the
+  SHA-256-pinned source, builds Blend2D with its bundled AsmJit, and records
+  two 9-trial runs plus raw JSON diagnostics. No library is shipped or loaded
+  into Drawing, and timing boundaries are not considered equivalent.
 - T-068 verified cached flood-fill sources:
   `tests/drawing_fill_tile_cache_smoke.gd` (**30** fast-CI assertions) checks
   four-connected fills on verified lazy Object tiles as well as resident

@@ -782,3 +782,70 @@ establish that Cairo is faster or slower for a production stroke. There are
 no GPU, Windows, or physical input-to-visible results, and Cairo is optional,
 not a substitute for **Blend2D and Skia CPU comparisons**. No raster backend
 was adopted; the ticket remains In Progress.
+
+## 2026-11-04 optional Blend2D 0.21.2 CPU parity screen (not adoption)
+
+The user supplied the official `blend2d-0.21.2.tar.gz` archive with bundled
+AsmJit; SHA-256 verified as
+`234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa`.
+A disposable local Release CMake build (JIT enabled) supplies `libblend2d.so`.
+The standalone `t068_blend2d_bridge.cpp` shim draws one opaque-edged rectangle
+into caller-owned little-endian **premultiplied BGRA32**, not canonical Drawing
+straight RGBA8; it is never installed as a GDExtension or runtime library.
+[`T068_2026-11-04_blend2d_cpu.json`](benchmarks/T068_2026-11-04_blend2d_cpu.json)
+retains both nine-trial runs and per-scenario mismatched pixel counts.
+
+Reproduce from an externally supplied source tree and built shared library:
+
+```bash
+sha256sum -c <<<'234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa  /path/to/blend2d-0.21.2.tar.gz'
+cmake -S /path/to/blend2d -B /tmp/blend2d-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DBLEND2D_TEST=OFF -DBLEND2D_DEMOS=OFF -DBLEND2D_NO_INSTALL=ON -DBLEND2D_NO_STDCXX=OFF
+cmake --build /tmp/blend2d-build --parallel 4
+T068_BLEND2D_ARCHIVE=/path/to/blend2d-0.21.2.tar.gz \
+T068_BLEND2D_SOURCE=/path/to/blend2d T068_BLEND2D_BUILD=/tmp/blend2d-build \
+  python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py -v
+python3 tools/benchmarks/t068_blend2d_cpu.py \
+  --archive /path/to/blend2d-0.21.2.tar.gz --source /path/to/blend2d \
+  --library-dir /tmp/blend2d-build --runs 2 --trials 9 --sides 32 64 128 \
+  --output /tmp/t068-blend2d-cpu.json
+```
+
+**72 checked scenarios** (2 runs × 3 sides × 6 operations × 2 conversion scopes)
+all reproduced the independent **checked C++** oracle; **42** Blend2D
+conversion/scoping scenarios disagreed with exact canonical RGBA8. This is a
+correctness screen, not "72 passing Blend2D parity cases":
+
+| Operation | Full-tile PRGB32 roundtrip | Edit-region-only PRGB32 roundtrip |
+|---|---|---|
+| Opaque replace | exact | exact |
+| Opaque source-over | exact | exact |
+| Transparent source-over | non-parity (including untouched) | non-parity (touched only) |
+| Translucent source-over | non-parity (including untouched) | non-parity (touched only) |
+| Translucent replace | non-parity (including untouched) | non-parity (touched only) |
+| Erase | non-parity (untouched only) | exact |
+
+The full-tile conversion can destroy *outside* hidden RGB and slightly alter
+nonzero translucent RGB just by premultiplying and unpremultiplying. Restricting
+premultiplied storage to a bounded edit rectangle and pasting only those rows
+preserves every outside source byte, including hidden RGB, but **does not**
+restore exact values of touched translucent pixels. A transparent source-over
+must be short-circuited *before* any format conversion to be an exact no-op;
+this comparator deliberately measures the raw library path. Exact-source
+replacement is better implemented by a canonical byte copy rather than a
+round-tripped premultiplied source. Opaque paint and scoped erase are usable
+*operation-level* parity observations, not reasons to select a dependency.
+
+The two clocks are **not comparable backend races**: checked-kernel duration
+covers a `ctypes` call on prepared points and source/output/delta buffers;
+Blend2D's context duration includes context begin, style, rectangle, and
+synchronous end on preconverted bytes, and its "total" includes naïve Python
+RGBA↔BGRA loops, detached buffers, and patch reconstruction. For the 64²
+opaque source-over case, inspect exact per-run medians in raw evidence rather
+than inferring a speedup from the render-only values. Source is pinned; the
+local Linux compiler, Mesa software-GPU context and Python overhead do not
+represent the user's physical Intel GPU or any Windows deployment. There is
+no shape/AA oracle, mixed-layer or mask workload, live GDExtension bridge,
+production pointer path, peak memory test, or matched native conversion cost.
+**No Blend2D source/binary has been imported into Drawing/Atlas.** Continue
+Skia/shape and real hardware evaluation; T-068 stays In Progress.

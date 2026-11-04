@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 pinned Blend2D CPU conversion/parity screen (2026-11-04; In Progress):**
+User-supplied, SHA-256-verified Blend2D **0.21.2** with bundled AsmJit
+was built locally as a *manual-only* CPU compositor. Two 9-trial runs across
+32²/64²/128² rectangles, six operations and two conversion scopes checked
+**72 scenarios** against the existing checked C++ kernel and independent
+straight-RGBA8 oracle. Opaque painting and bounded-region clear were exact;
+**42** scenarios showed format/rounding mismatch. Clipping conversion to the
+edit rectangle preserves all outside hidden RGB, **not** exact translucent
+source-over/replace pixels. Blend2D was **not adopted**; T-068 remains open
+for Skia, real shapes, portable native/physical timings, and release gates.
+[T-068](Tickets/T-068.md), [raw evidence](benchmarks/T068_2026-11-04_blend2d_cpu.json).
+
 **T-068 optional Cairo CPU comparator (2026-11-04; In Progress):**
 A standalone, runtime-versioned Cairo 1.18.4 experiment tests a *third-party
 CPU rasterizer* against the checked scalar C++ kernel and independent canonical
