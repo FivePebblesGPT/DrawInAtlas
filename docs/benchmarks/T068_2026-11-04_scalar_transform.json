@@ -1,0 +1,146 @@
+{
+  "ticket": "T-068",
+  "schema_version": 1,
+  "mode": "optional isolated Godot 4.8b2 GDExtension; no production native backend",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "scalar_source_sha256": "526fff803f891ea7a2b3e66ec2c6b1868c423bd2cfa4bb092ded3a135e34843b",
+  "profile_sha256": "a7ef65db736f0f6f340af810f6f20c8f489dd7c577bdbb3cc8e9352f4390bb0f",
+  "runs": [
+    {
+      "checks": 110,
+      "cases": [
+        {
+          "canonical_sha256": "4a689d75c48e4ad7145bf50d51d86d21bbc3f70907a2ec02363a250dbc0cdf36",
+          "changed": 92,
+          "name": "identity_rect",
+          "path_bytes": 32,
+          "selected": 400,
+          "side": 32,
+          "source_bytes": 4096,
+          "sparse_bytes": 1108
+        },
+        {
+          "canonical_sha256": "e5750ae870ca1ce561fb6cc60c416893f25b03338dcee506f7867232ba23e7d7",
+          "changed": 24,
+          "name": "rotated_inverted",
+          "path_bytes": 32,
+          "selected": 624,
+          "side": 32,
+          "source_bytes": 4096,
+          "sparse_bytes": 292
+        },
+        {
+          "canonical_sha256": "fdee8742a89c8c281d58bf90fb52068fe690c5f9f866e8d49cf1b4f7e38a2349",
+          "changed": 27,
+          "name": "shear_sparse_erase",
+          "path_bytes": 48,
+          "selected": 182,
+          "side": 32,
+          "source_bytes": 4096,
+          "sparse_bytes": 328
+        },
+        {
+          "canonical_sha256": "5597e3eb609438af45c149d222d564c2fe3add401982889fbf4f4cbac2eefe51",
+          "changed": 596,
+          "name": "mirrored_crossing",
+          "path_bytes": 64,
+          "selected": 2704,
+          "side": 64,
+          "source_bytes": 16384,
+          "sparse_bytes": 7156
+        },
+        {
+          "canonical_sha256": "8a888dc87c776635ad0d9dcaea99e846c349a6db5e790d11c2a7a333403988c5",
+          "changed": 62,
+          "name": "nonuniform_inverted_sparse",
+          "path_bytes": 32,
+          "selected": 2867,
+          "side": 64,
+          "source_bytes": 16384,
+          "sparse_bytes": 748
+        },
+        {
+          "canonical_sha256": "245bfe6de1beaf49f69683a1542975c4f586a6dc34a89e4a8f9b3ed33a19669e",
+          "changed": 13,
+          "name": "zoom_pan_dab",
+          "path_bytes": 16,
+          "selected": 4096,
+          "side": 64,
+          "source_bytes": 16384,
+          "sparse_bytes": 160
+        }
+      ]
+    },
+    {
+      "checks": 110,
+      "cases": [
+        {
+          "canonical_sha256": "4a689d75c48e4ad7145bf50d51d86d21bbc3f70907a2ec02363a250dbc0cdf36",
+          "changed": 92,
+          "name": "identity_rect",
+          "path_bytes": 32,
+          "selected": 400,
+          "side": 32,
+          "source_bytes": 4096,
+          "sparse_bytes": 1108
+        },
+        {
+          "canonical_sha256": "e5750ae870ca1ce561fb6cc60c416893f25b03338dcee506f7867232ba23e7d7",
+          "changed": 24,
+          "name": "rotated_inverted",
+          "path_bytes": 32,
+          "selected": 624,
+          "side": 32,
+          "source_bytes": 4096,
+          "sparse_bytes": 292
+        },
+        {
+          "canonical_sha256": "fdee8742a89c8c281d58bf90fb52068fe690c5f9f866e8d49cf1b4f7e38a2349",
+          "changed": 27,
+          "name": "shear_sparse_erase",
+          "path_bytes": 48,
+          "selected": 182,
+          "side": 32,
+          "source_bytes": 4096,
+          "sparse_bytes": 328
+        },
+        {
+          "canonical_sha256": "5597e3eb609438af45c149d222d564c2fe3add401982889fbf4f4cbac2eefe51",
+          "changed": 596,
+          "name": "mirrored_crossing",
+          "path_bytes": 64,
+          "selected": 2704,
+          "side": 64,
+          "source_bytes": 16384,
+          "sparse_bytes": 7156
+        },
+        {
+          "canonical_sha256": "8a888dc87c776635ad0d9dcaea99e846c349a6db5e790d11c2a7a333403988c5",
+          "changed": 62,
+          "name": "nonuniform_inverted_sparse",
+          "path_bytes": 32,
+          "selected": 2867,
+          "side": 64,
+          "source_bytes": 16384,
+          "sparse_bytes": 748
+        },
+        {
+          "canonical_sha256": "245bfe6de1beaf49f69683a1542975c4f586a6dc34a89e4a8f9b3ed33a19669e",
+          "changed": 13,
+          "name": "zoom_pan_dab",
+          "path_bytes": 16,
+          "selected": 4096,
+          "side": 64,
+          "source_bytes": 16384,
+          "sparse_bytes": 160
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "View-space test samples are transformed in Godot and inverted to float64 raster-local points before the native call.",
+    "The caller derives a binary mask from DrawingSelection.allows; native transformed four-corner Atlas selection clipping is not tested.",
+    "Canonical before/after RGBA8 is compared byte-for-byte before staging native wire records into a revision-checked DrawingDocument.",
+    "This is correctness evidence only: no matched timing, physical GPU, Windows, VRAM, or portable release validation."
+  ]
+}

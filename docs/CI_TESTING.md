@@ -44,6 +44,14 @@
   Blend2D job compiles the isolated `t068_blend2d_quad_selection` ABI and
   checks failure atomicity, mask-to-brush handoff and 30 exact parity comparisons.
   Exact polygon-edge and vertex ties are covered; near-boundary floating-point tolerance and hardware/release gates remain open.
+- T-068 temporary Godot↔native transformed sparse brush comparison:
+  `tests/test_t068_scalar_transform.py` verifies source-pinned, two-run
+  110-check native GDExtension evidence for transformed view-space strokes,
+  sparse/inverted binary selections, erasure, RGBA8, and revision-checked
+  Undo/Redo. Its fast-CI tests require no extension. Real Godot native calls
+  run only through `godot-native-t068-bridge.yml` (`workflow_dispatch`),
+  not push/PR CI. This is client-inverted geometry and a caller-generated
+  mask, **not** Atlas four-corner scope or physical GPU testing.
 - T-068 detached scalar C++17 hard-brush compositing:
   `tests/test_t068_scalar_hard_brush.py` and `tests/test_t068_scalar_rgba8.py`
   compile the dependency-free, non-shipping scalar research ABI. The latter

@@ -1448,3 +1448,36 @@ Reproduce with `python3 tools/benchmarks/t068_bridge/run_bridge.py --godot
 [Source-pinned counterbalanced two-run timing](benchmarks/T068_2026-11-04_scalar_publication.json)
 · [evidence validator](../tests/test_t068_scalar_publication.py).
 T-068 remains **In Progress**.
+
+
+## 2026-11-04 — transformed native sparse brush correctness screen (not timing)
+
+The isolated, explicit-load Godot 4.8 beta 2 GDExtension now compares six
+**32×32 and 64×64** cases against actual canonical
+`DrawingEditSession.paint_path()` painting. Godot first applies a view
+transform (identity, rotation, shear, mirroring, nonuniform scale or zoom/pan)
+and constructs a rectangular, inverted or sparse binary selection; the
+client inverts the view-space path to local float64 samples for the native
+scalar kernel. The verified native sparse before/after records are reconstructed
+into exact straight-RGBA8 and compared byte-for-byte with the independent Godot
+output before staged publication. Undo/Redo, a hidden-RGB source, real erasure,
+mask confinement and insufficient-capacity rejection are covered.
+
+| Case | Side | Changed pixels | Native sparse bytes |
+|---|---:|---:|---:|
+| Identity rectangle | 32² | 92 | 1,108 |
+| Rotated inverted selection | 32² | 24 | 292 |
+| Sheared sparse erase | 32² | 27 | 328 |
+| Mirrored crossing gesture | 64² | 596 | 7,156 |
+| Nonuniform inverted sparse erase | 64² | 62 | 748 |
+| Zoom/pan single dab | 64² | 13 | 160 |
+
+**Two independent full native runs passed 110/110 new correctness checks each,
+with identical pixel hashes and sparse counts.** The source-pinned evidence
+is [here](benchmarks/T068_2026-11-04_scalar_transform.json), and the
+[opt-in runner](../tools/benchmarks/t068_bridge/run_bridge.py) verifies it.
+The transformed binary mask is computed in Godot, **not** by the native
+Atlas four-corner convex scope implementation. This is not a benchmark
+of real input latency, staging throughput, texture upload, Windows behavior,
+peak memory, or a portable release, and cannot justify changing the runtime
+backend. T-068 remains **In Progress**.

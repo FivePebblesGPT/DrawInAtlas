@@ -6,6 +6,22 @@
 
 ## Kanban summary
 
+**T-068 transformed-view native sparse brush publication (2026-11-04; In Progress):**
+The explicit-load, temporary Godot 4.8b2 GDExtension now verifies six
+**32²/64² transformed hard-brush and mask cases** against independent
+`DrawingEditSession.paint_path()` output: identity rectangle, 90° rotation
+with inverted selection, sheared sparse-mask erase, mirrored crossing path,
+nonuniform inverted sparse erase and zoom/pan dab. Two complete bridge runs
+passed **110/110 new assertions each** with identical canonical SHA-256
+outputs and sparse counts. Native output is decoded and checked against all
+Godot RGBA8 bytes *before* revision-checked staging; undo/redo and capacity
+rejection pass. The client computes the binary `DrawingSelection` mask and
+inverts view transforms; this **does not test a native four-corner Atlas
+polygon clipper** or provide physical latency or release proof. Runtime
+backend and ticket status remain unchanged. [T-068](Tickets/T-068.md) ·
+[two-run native evidence](benchmarks/T068_2026-11-04_scalar_transform.json).
+
+
 **T-068 counterbalanced Godot/native brush publication evidence (2026-11-04; In Progress):**
 The temporary opt-in Godot 4.8b2 GDExtension benchmark now alternates
 **Godot-first and native-first** execution order on *fresh identical

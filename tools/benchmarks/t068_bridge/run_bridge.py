@@ -28,6 +28,8 @@ SPARSE_RE = re.compile(r"^T068_SPARSE_PASSED: (\d+) checks$", re.MULTILINE)
 SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
 SCALAR_RE = re.compile(r"^T068_SCALAR_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
 SCALAR_EVIDENCE_RE = re.compile(r"^T068_SCALAR_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
+TRANSFORM_RE = re.compile(r"^T068_SCALAR_TRANSFORM_PASSED: (\d+) checks$", re.MULTILINE)
+TRANSFORM_EVIDENCE_RE = re.compile(r"^T068_SCALAR_TRANSFORM_EVIDENCE: (.+)$", re.MULTILINE)
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_TIMING_RE = re.compile(r"^T068_SCALAR_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
@@ -48,7 +50,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -173,6 +175,41 @@ def validate_scalar_publication(cases: Any) -> None:
         raise ValueError("Missing publication workloads")
 
 
+def validate_scalar_transform(cases: Any) -> None:
+    """Reject missing/malformed transformed-path and binary-mask parity records."""
+    expected = {
+        "identity_rect": 32, "rotated_inverted": 32,
+        "shear_sparse_erase": 32, "mirrored_crossing": 64,
+        "nonuniform_inverted_sparse": 64, "zoom_pan_dab": 64,
+    }
+    required = {"name", "side", "changed", "selected", "path_bytes",
+                "source_bytes", "sparse_bytes", "canonical_sha256"}
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        raise ValueError("Transformed native comparison requires six cases")
+    observed: set[str] = set()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != required:
+            raise ValueError("Malformed transformed native parity case")
+        name, side = case["name"], case["side"]
+        if type(name) is not str or name not in expected or name in observed:
+            raise ValueError("Unknown or duplicate transformed native case")
+        observed.add(name)
+        if (type(side) is not int or side != expected[name] or
+                any(type(case[key]) is not int for key in (
+                    "changed", "selected", "path_bytes", "source_bytes", "sparse_bytes")) or
+                not 0 < case["changed"] <= case["selected"] <= side * side or
+                case["source_bytes"] != side * side * 4 or
+                case["sparse_bytes"] != 4 + 12 * case["changed"] or
+                case["path_bytes"] not in (16, 32, 48, 64)):
+            raise ValueError("Inconsistent transformed native dimensions")
+        digest = case["canonical_sha256"]
+        if (type(digest) is not str or
+                re.fullmatch(r"[0-9a-f]{64}", digest) is None):
+            raise ValueError("Malformed transformed canonical hash")
+    if observed != set(expected):
+        raise ValueError("Missing transformed native cases")
+
+
 def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
     """Build against Godot's own header and verify actual Godot Variant calls."""
     version = checked_run([godot, "--version"], cwd=ROOT, timeout=15).strip()
@@ -242,6 +279,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_publication_profile.gd", project / "scalar_publication.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_transform_smoke.gd", project / "scalar_transform.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -329,8 +367,24 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 raise RuntimeError("Rejected scalar publication evidence") from exc
             if int(publication_match.group(1)) != 536:
                 raise RuntimeError("Insufficient scalar publication correctness checks")
+            transform_output = checked_run([godot, "--headless", "--path", str(project),
+                                            "--audio-driver", "Dummy", "--script",
+                                            "res://scalar_transform.gd"],
+                                           cwd=project, timeout=120)
+            transform_match = TRANSFORM_RE.search(transform_output)
+            transform_evidence = TRANSFORM_EVIDENCE_RE.search(transform_output)
+            if transform_match is None or transform_evidence is None:
+                raise RuntimeError(f"Missing transformed scalar parity proof:\n{transform_output[-4000:]}")
+            try:
+                transform_cases = json.loads(transform_evidence.group(1))
+                validate_scalar_transform(transform_cases)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected transformed scalar parity evidence") from exc
+            if int(transform_match.group(1)) != 110:
+                raise RuntimeError("Insufficient transformed scalar parity checks")
             observations.append({"scalar_checks": int(scalar_match.group(1)),
-                                 "scalar_evidence": scalar_record, "scalar_publication_checks": int(publication_match.group(1)),
+                                 "scalar_evidence": scalar_record, "scalar_transform_checks": int(transform_match.group(1)),
+                                 "scalar_transform_cases": transform_cases, "scalar_publication_checks": int(publication_match.group(1)),
                                  "scalar_publication_cases": publication_cases,
                                  "checks": count, "marshal_checks": int(marshal_match.group(1)),
                                  "marshal_cases": marshal_cases, "sparse_checks": int(sparse_match.group(1)),
@@ -349,6 +403,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
                 "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
                 "Scalar brush native call accepts local packed float64 path samples and a binary mask; completeness is verified against the Godot canonical stroke before publication, not by the native output alone",
+                "Transformed selection screen constructs the binary mask in Godot, not via native four-corner polygon clipping; tested view transformations are client-inverted before the native call",
                 "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
                 "Matched scalar publication timings are headless CPU diagnostics, with six alternating-order raw paired samples; source seeding, correctness checks, undo and redo are excluded",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
@@ -378,6 +433,7 @@ def main() -> None:
     print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Scalar native brush publication screen:", ", ".join(str(item["scalar_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Transformed scalar selection screens:", ", ".join(str(item["scalar_transform_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Matched scalar publication screens:", ", ".join(str(item["scalar_publication_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Godot native marshal screens:", ", ".join(str(item["marshal_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
