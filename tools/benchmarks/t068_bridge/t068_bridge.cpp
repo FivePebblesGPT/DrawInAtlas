@@ -15,6 +15,10 @@ extern "C" int32_t draw_batch_deltas_checked(const uint8_t*, uint64_t,
     int32_t, int32_t, const int32_t*, uint64_t, int32_t,
     uint32_t, int32_t, const uint8_t*, uint64_t,
     DrawDelta*, uint64_t, int32_t);
+extern "C" int32_t t068_scalar_hard_brush_deltas(
+    uint8_t*, uint64_t, const uint8_t*, uint64_t, const uint8_t*, uint64_t,
+    int32_t, const double*, uint64_t, int32_t, double,
+    const uint8_t*, uint64_t, int32_t);
 extern "C" int32_t draw_batch_checked(const uint8_t*, uint64_t,
     uint8_t*, uint64_t, int32_t, int32_t, const int32_t*, uint64_t,
     int32_t, uint32_t, int32_t, const uint8_t*, uint64_t,
@@ -43,7 +47,7 @@ GDExtensionPtrBuiltInMethod byte_size = nullptr, int_size = nullptr, byte_resize
 GDExtensionPtrConstructor byte_constructor = nullptr;
 GDExtensionPtrDestructor byte_destructor = nullptr, int_destructor = nullptr;
 GDExtensionVariantFromTypeConstructorFunc variant_from_bytes = nullptr;
-GDExtensionTypeFromVariantConstructorFunc bytes_from_variant = nullptr, ints_from_variant = nullptr, integer_from_variant = nullptr;
+GDExtensionTypeFromVariantConstructorFunc bytes_from_variant = nullptr, ints_from_variant = nullptr, integer_from_variant = nullptr, float_from_variant = nullptr;
 
 alignas(16) unsigned char class_name[64]{};
 alignas(16) unsigned char object_name[64]{};
@@ -235,6 +239,105 @@ void call_sparse(void* userdata, GDExtensionClassInstancePtr instance,
     call_impl(userdata, instance, args, argc, result, error, true);
 }
 
+// A research-only batched brush: byte-packed local float64 sample pairs and a
+// checked, bounded sparse return. This does NOT publish a DrawingDocument.
+// A result is either a complete native delta stream or an empty rejection.
+void process_scalar(const void* source, const void* selection, const void* path,
+                    int64_t side, double width, const void* paint,
+                    int64_t erase, int64_t max_changes, void* result) {
+    byte_constructor(result, nullptr);
+    try {
+        if (side < 1 || side > 2048 || erase < 0 || erase > 1 ||
+            max_changes < 0 || max_changes > 65536 ||
+            max_changes > side * side) return;
+        const int64_t pixels = side * side;
+        const int64_t source_len = packed_size(source, byte_size);
+        const int64_t selection_len = packed_size(selection, byte_size);
+        const int64_t path_len = packed_size(path, byte_size);
+        const int64_t paint_len = packed_size(paint, byte_size);
+        if (source_len != pixels * 4 || selection_len != pixels ||
+            path_len < 16 || path_len > 128 * 16 || path_len % 16 != 0 ||
+            paint_len != 4) return;
+        // PackedByteArray has no guaranteed double alignment; read the wire
+        // into aligned native storage rather than type-punning its data.
+        std::vector<double> points(size_t(path_len / 8), 0.0);
+        std::memcpy(points.data(), byte_at(path, 0), size_t(path_len));
+        std::vector<uint8_t> native(size_t(4 + max_changes * 12), 0);
+        const int32_t changed = t068_scalar_hard_brush_deltas(
+            native.data(), uint64_t(native.size()), byte_at(source, 0),
+            uint64_t(source_len), byte_at(selection, 0), uint64_t(selection_len),
+            int32_t(side), points.data(), uint64_t(path_len),
+            int32_t(path_len / 16), width, byte_at(paint, 0), 4, int32_t(erase));
+        if (changed < 0 || changed > max_changes) return;
+        const int64_t bytes = 4 + int64_t(changed) * 12;
+        const void* args[] = {&bytes};
+        int64_t resized = -1;
+        byte_resize(result, args, &resized, 1);
+        if (resized != 0) return;
+        std::memcpy(byte_at_mutable(result, 0), native.data(), size_t(bytes));
+    } catch (...) {
+        const int64_t zero = 0;
+        const void* args[] = {&zero};
+        int64_t ignored = -1;
+        byte_resize(result, args, &ignored, 1);
+    }
+}
+
+void ptrcall_scalar(void*, GDExtensionClassInstancePtr,
+                    const GDExtensionConstTypePtr* args, GDExtensionTypePtr result) {
+    process_scalar(args[0], args[1], args[2],
+        *static_cast<const int64_t*>(args[3]), *static_cast<const double*>(args[4]),
+        args[5], *static_cast<const int64_t*>(args[6]),
+        *static_cast<const int64_t*>(args[7]), result);
+}
+
+void call_scalar(void*, GDExtensionClassInstancePtr,
+                 const GDExtensionConstVariantPtr* args, GDExtensionInt argc,
+                 GDExtensionVariantPtr result, GDExtensionCallError* error) {
+    error->error = GDEXTENSION_CALL_OK;
+    if (argc != 8) {
+        error->error = argc < 8 ? GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS :
+                                  GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
+        error->expected = 8;
+        new_nil(result);
+        return;
+    }
+    const GDExtensionVariantType expected[] = {
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_INT, GDEXTENSION_VARIANT_TYPE_FLOAT,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_INT, GDEXTENSION_VARIANT_TYPE_INT};
+    for (int i = 0; i < 8; ++i) {
+        if (variant_type(args[i]) != expected[i]) {
+            error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
+            error->argument = i;
+            error->expected = expected[i];
+            new_nil(result);
+            return;
+        }
+    }
+    alignas(16) unsigned char source[64]{}, selection[64]{}, path[64]{}, paint[64]{}, output[64]{};
+    bytes_from_variant(source, const_cast<void*>(args[0]));
+    bytes_from_variant(selection, const_cast<void*>(args[1]));
+    bytes_from_variant(path, const_cast<void*>(args[2]));
+    bytes_from_variant(paint, const_cast<void*>(args[5]));
+    int64_t side = 0, erase = 0, capacity = 0;
+    double width = 0;
+    integer_from_variant(&side, const_cast<void*>(args[3]));
+    float_from_variant(&width, const_cast<void*>(args[4]));
+    integer_from_variant(&erase, const_cast<void*>(args[6]));
+    integer_from_variant(&capacity, const_cast<void*>(args[7]));
+    process_scalar(source, selection, path, side, width, paint, erase, capacity, output);
+    variant_from_bytes(result, output);
+    byte_destructor(output);
+    byte_destructor(paint);
+    byte_destructor(path);
+    byte_destructor(selection);
+    byte_destructor(source);
+}
+
 GDExtensionObjectPtr create_instance(void*, GDExtensionBool) {
     GDExtensionObjectPtr object = construct_object(object_name);
     if (!object) return nullptr;
@@ -261,6 +364,7 @@ void initialize(void*, GDExtensionInitializationLevel level) {
     bytes_from_variant = to_type(GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY);
     ints_from_variant = to_type(GDEXTENSION_VARIANT_TYPE_PACKED_INT32_ARRAY);
     integer_from_variant = to_type(GDEXTENSION_VARIANT_TYPE_INT);
+    float_from_variant = to_type(GDEXTENSION_VARIANT_TYPE_FLOAT);
     GDExtensionClassCreationInfo6 klass{};
     klass.is_exposed = 1;
     klass.create_instance_func = create_instance;
@@ -312,6 +416,37 @@ void initialize(void*, GDExtensionInitializationLevel level) {
     method.name = sparse_name.data();
     method.call_func = call_sparse;
     method.ptrcall_func = ptrcall_sparse;
+    register_method(library, class_name, &method);
+    // Same isolated class, but the scalar brush has a distinct, strictly
+    // typed eight-argument signature and a caller-bounded delta capacity.
+    Name scalar_name("apply_scalar_brush_sparse");
+    const char* scalar_args[] = {"source", "selection", "path_f64le", "side",
+        "width", "paint_rgba8", "erase", "max_changes"};
+    const GDExtensionVariantType scalar_types[] = {
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_INT, GDEXTENSION_VARIANT_TYPE_FLOAT,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY,
+        GDEXTENSION_VARIANT_TYPE_INT, GDEXTENSION_VARIANT_TYPE_INT};
+    std::vector<Name> scalar_names;
+    scalar_names.reserve(8);
+    for (const auto* name : scalar_args) scalar_names.emplace_back(name);
+    GDExtensionPropertyInfo scalar_info[8]{};
+    GDExtensionClassMethodArgumentMetadata scalar_meta[8]{};
+    for (int i = 0; i < 8; ++i) {
+        scalar_info[i].type = scalar_types[i];
+        scalar_info[i].name = scalar_names[size_t(i)].data();
+        scalar_info[i].class_name = return_name.data();
+        scalar_info[i].hint_string = empty_string;
+        scalar_info[i].usage = 6;
+    }
+    method.name = scalar_name.data();
+    method.call_func = call_scalar;
+    method.ptrcall_func = ptrcall_scalar;
+    method.argument_count = 8;
+    method.arguments_info = scalar_info;
+    method.arguments_metadata = scalar_meta;
     register_method(library, class_name, &method);
     if (auto destroy = get_destructor(GDEXTENSION_VARIANT_TYPE_STRING))
         destroy(empty_string);

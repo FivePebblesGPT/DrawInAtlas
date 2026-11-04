@@ -370,7 +370,7 @@ additional push/PR framebuffer step. The fast runner contracts reject a
 missing/failed multi-tile success marker. See T-068 and its raw JSON.
 
 
-`tests/test_t068_bridge_runner.py` runs **eight fast, non-native** harness
+`tests/test_t068_bridge_runner.py` runs **11 fast, non-native** harness
 contracts in the existing T-068 push/PR step. It checks fail-closed subprocess
 handling, evidence markers, source locations and the absence of a checked-in
 `.gdextension` descriptor. It does **not** load a native Godot extension.
@@ -442,3 +442,23 @@ atomicity, malicious wire rejection and two-run evidence regeneration.
 The native result is **not** wired into the application: no Godot publication,
 texture update, physical-device latency or memory result is claimed.
 [Raw evidence](benchmarks/T068_2026-11-04_scalar_deltas.json).
+
+
+### T-068 optional scalar brush GDExtension integration (2026-11-04)
+
+The existing **on-demand** `godot-native-t068-bridge.yml` additionally links
+`tools/benchmarks/t068_scalar_hard_brush.cpp` into its temporary native
+library and executes `t068_scalar_sparse_smoke.gd`. Each real Godot 4.8
+beta 2 run requires **31 passing scalar checks** and a fail-closed JSON
+witness (63 changed records on a canonical 16² test stroke). The suite checks
+Godot `DrawingEditSession.paint_path()` output before publishing sparse
+records in a revision-checked document edit, then checks exact Undo/Redo,
+hidden RGB, mask, erase, no-op and malformed capacity rejection. A missing,
+truncated or contradictory marker fails the runner. Two-run source-pinned
+[evidence](benchmarks/T068_2026-11-04_scalar_gdextension.json) is committed.
+
+The existing fast push/PR CI step runs
+`python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py`
+without loading a `.gdextension`. This boundary **is not enabled in either
+app**, has no physical-device GPU proof and does not certify portable native
+shipping or a measured speedup. T-068 stays In Progress.

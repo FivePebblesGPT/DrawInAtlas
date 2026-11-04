@@ -1375,3 +1375,36 @@ reserves up to 65,536 changed records; dense edits require a larger explicit
 capacity or a full buffer. The implementation and tests remain detached from
 Godot and Drawing/Atlas production paths. No native technology was selected.
 [Complete reproducible two-run evidence](benchmarks/T068_2026-11-04_scalar_deltas.json).
+
+## 2026-11-04 — scalar sparse brush through Godot's opt-in native boundary
+
+The previously detached C++17 exact hard-brush kernel now has a real
+**temporary-project Godot 4.8 beta 2 GDExtension** entrypoint. An 8-argument
+call accepts immutable canonical straight-RGBA8, a 0/1 local selection mask,
+byte-packed little-endian float64 local stroke samples, brush width and paint,
+erase flag, and an explicit maximum number of changed pixels (at most 65,536).
+It returns the prior exact sparse before/after record format or an empty
+rejection. No native binary or descriptor is shipped with Drawing/Atlas.
+
+Two independent full isolated bridge runs each passed **31 scalar tests**
+in addition to every existing suite. For a 16² self-crossing 4px stroke on a
+seeded hidden-RGB source, **63 changed pixels** yielded **760 sparse bytes**
+versus **1,024 whole-tile RGBA8 bytes**. The native output was compared with
+actual `DrawingEditSession.paint_path()` pixel output before a
+revision-checked one-step canonical document commit and Undo/Redo. Masked
+one-pixel output was 16 bytes; transparent paint was a valid four-byte no-op;
+erasure removed all hidden RGB. Malformed input and output-capacity shortage
+returned empty rejection without changing source bytes.
+
+This **closes only a tested Godot↔scalar native correctness boundary**. It
+omits converted real-time pointer events, measured CPU-native call overhead,
+large-tile publication timing, GPU uploads, physical-device p95, Windows
+binaries and standalone release proofs. In particular, the test precomputes
+raster-local geometry and validates native changes against the complete
+Godot oracle before allowing publication; this is *not* a production adapter
+or a claim that untrusted native deltas can be accepted without independent
+completeness checking.
+
+[Two-run scalar native integration evidence](benchmarks/T068_2026-11-04_scalar_gdextension.json) ·
+[reproduction harness](../tools/benchmarks/t068_bridge/run_bridge.py) ·
+[contract tests](../tests/test_t068_scalar_gdextension.py).

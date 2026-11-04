@@ -6,6 +6,22 @@
 
 ## Kanban summary
 
+**T-068 optional scalar brush through real Godot GDExtension (2026-11-04; In Progress):**
+The detached C++17 hard-brush sparse ABI now executes through the existing
+**temporary, explicit-load Godot 4.8 beta 2 GDExtension** using an 8-argument,
+capacity-bounded PackedByteArray/float64 path interface. Each of two runs
+passed **31 scalar integration checks**, comparing its 63 changed records
+(760 bytes instead of a 1,024-byte tile) byte-for-byte with an independent
+`DrawingEditSession.paint_path()` on a hidden-RGB source before one
+revision-checked document commit. Undo/redo, inverted-size and malformed
+calls, sparse mask, zero-alpha no-op and erase are covered. Existing bridge,
+revision, document, batch, sparse and marshaling suites also passed in both
+runs. This is **not enabled in either app**; the test recomputes canonical
+Godot output before publication and supplies pretransformed local geometry.
+No real input-to-present, Windows/physical GPU, memory, or portable release
+claim is made. [T-068](Tickets/T-068.md) ·
+[isolated two-run evidence](benchmarks/T068_2026-11-04_scalar_gdextension.json).
+
 **T-068 bounded scalar sparse hard-brush payload (2026-11-04; In Progress):**
 A detached C++17 hard-brush kernel now emits only changed canonical RGBA8
 pixels as ordered, checked 12-byte before/after records plus a 4-byte count,

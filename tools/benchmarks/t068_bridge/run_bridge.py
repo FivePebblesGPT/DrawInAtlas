@@ -26,6 +26,8 @@ DOCUMENT_RE = re.compile(r"^T068_DOCUMENT_PASSED: (\d+) checks$", re.MULTILINE)
 BATCH_RE = re.compile(r"^T068_BATCH_PASSED: (\d+) checks$", re.MULTILINE)
 SPARSE_RE = re.compile(r"^T068_SPARSE_PASSED: (\d+) checks$", re.MULTILINE)
 SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
+SCALAR_RE = re.compile(r"^T068_SCALAR_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
+SCALAR_EVIDENCE_RE = re.compile(r"^T068_SCALAR_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
 MARSHAL_TIMING_RE = re.compile(r"^T068_MARSHAL_TIMING: (.+)$", re.MULTILINE)
 CANONICAL_SCRIPTS = (
@@ -44,7 +46,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -88,6 +90,23 @@ def validate_marshal_evidence(cases: Any) -> None:
         raise ValueError("Missing marshal workloads")
 
 
+def validate_scalar_evidence(record: dict[str, int]) -> None:
+    """Require complete, internally consistent native sparse bridge evidence."""
+    keys = {"source_bytes", "path_bytes", "sparse_bytes", "changed",
+            "masked_sparse_bytes", "no_op_bytes", "erase_sparse_bytes", "checks"}
+    if not isinstance(record, dict) or set(record) != keys or any(
+            type(value) is not int for value in record.values()):
+        raise ValueError("Malformed scalar bridge metrics")
+    if (record["source_bytes"] != 16 * 16 * 4 or
+        record["path_bytes"] != 3 * 16 or
+        record["changed"] <= 5 or record["changed"] > 256 or
+        record["sparse_bytes"] != 4 + 12 * record["changed"] or
+        record["masked_sparse_bytes"] != 16 or
+        record["no_op_bytes"] != 4 or record["erase_sparse_bytes"] != 16 or
+        record["checks"] < 31):
+        raise ValueError("Incomplete scalar brush parity evidence")
+
+
 def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
     """Build against Godot's own header and verify actual Godot Variant calls."""
     version = checked_run([godot, "--version"], cwd=ROOT, timeout=15).strip()
@@ -126,6 +145,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             compiler, "-std=c++17", "-O2", "-fPIC", "-shared", "-Wall", "-Wextra", "-Werror",
             "-I", str(header_dir), str(BRIDGE / "t068_bridge.cpp"),
             str(ROOT / "tools/benchmarks/t068_raster_kernel.cpp"),
+            str(ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp"),
             "-o", str(library),
         ], cwd=ROOT, timeout=90)
         # Install only the canonical Drawing document/transaction dependency set;
@@ -154,6 +174,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_document_sparse_adapter.gd", project / "sparse_adapter.gd")
         shutil.copyfile(BRIDGE / "t068_document_sparse_smoke.gd", project / "sparse_test.gd")
         shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -212,7 +233,22 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 validate_marshal_evidence(marshal_cases)
             except ValueError as exc:
                 raise RuntimeError("Marshal evidence rejected") from exc
-            observations.append({"checks": count, "marshal_checks": int(marshal_match.group(1)),
+            scalar_output = checked_run([godot, "--headless", "--path", str(project),
+                                         "--audio-driver", "Dummy", "--script",
+                                         "res://scalar_test.gd"], cwd=project, timeout=120)
+            scalar_match = SCALAR_RE.search(scalar_output)
+            scalar_evidence = SCALAR_EVIDENCE_RE.search(scalar_output)
+            if scalar_match is None or scalar_evidence is None:
+                raise RuntimeError(f"Missing scalar brush proof:\n{scalar_output[-4000:]}")
+            try:
+                scalar_record = json.loads(scalar_evidence.group(1))
+                validate_scalar_evidence(scalar_record)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected malformed scalar brush proof") from exc
+            if int(scalar_match.group(1)) != scalar_record["checks"]:
+                raise RuntimeError("Scalar bridge assertion count mismatch")
+            observations.append({"scalar_checks": int(scalar_match.group(1)),
+                                 "scalar_evidence": scalar_record, "checks": count, "marshal_checks": int(marshal_match.group(1)),
                                  "marshal_cases": marshal_cases, "sparse_checks": int(sparse_match.group(1)),
                                  "sparse_benchmark": sparse_benchmark, "revision_checks": int(revision_match.group(1)),
                                  "document_checks": int(document_match.group(1)),
@@ -221,11 +257,14 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         return {
             "ticket": "T-068", "mode": "optional, isolated Linux GDExtension (not production)",
             "godot_version": version, "generated_header_sha256": header_sha,
-            "test_method": "Checked native batch, detached texture adapter, and real single/multiple-tile DrawingDocument transactions",
+            "scalar_source_sha256": hashlib.sha256(
+                (ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+            "test_method": "Checked native batch and scalar brush deltas, detached texture adapter, and real revision-checked DrawingDocument transactions",
             "measurements": observations,
             "limitations": [
                 "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
                 "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
+                "Scalar brush native call accepts local packed float64 path samples and a binary mask; completeness is verified against the Godot canonical stroke before publication, not by the native output alone",
                 "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
@@ -253,6 +292,7 @@ def main() -> None:
     print("Canonical DrawingDocument transactions:", ", ".join(str(item["document_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Scalar native brush publication screen:", ", ".join(str(item["scalar_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Godot native marshal screens:", ", ".join(str(item["marshal_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
 
