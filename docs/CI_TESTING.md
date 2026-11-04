@@ -44,6 +44,15 @@
   Blend2D job compiles the isolated `t068_blend2d_quad_selection` ABI and
   checks failure atomicity, mask-to-brush handoff and 30 exact parity comparisons.
   Exact polygon-edge and vertex ties are covered; near-boundary floating-point tolerance and hardware/release gates remain open.
+- T-068 native Atlas four-corner scope through the *temporary* Godot bridge:
+  `tests/test_t068_quad_gdextension.py` pins two 55-check Godot 4.8b2
+  runs against 15 real `AtlasFill._allows_pixel` full masks, tests the
+  checked C++ scope ABI and rejects tampered mask, sparse and RGBA8 evidence.
+  The standard CI uses the no-Godot contract and native C++ unit checks; the
+  full `build_quad_selection()` + `apply_scalar_brush_sparse()` integration
+  remains manual-only in `godot-native-t068-bridge.yml`. It neither loads
+  the extension at application startup nor establishes native backend,
+  physical GPU, Windows or release acceptance.
 - T-068 temporary Godot↔native transformed sparse brush comparison:
   `tests/test_t068_scalar_transform.py` verifies source-pinned, two-run
   110-check native GDExtension evidence for transformed view-space strokes,

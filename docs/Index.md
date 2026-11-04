@@ -6,6 +6,22 @@
 
 ## Kanban summary
 
+**T-068 native four-corner Atlas scope through Godot GDExtension (2026-11-04; In Progress):**
+The temporary, explicit-load Godot 4.8 beta 2 extension now exposes a checked
+C++17 **native convex polygon/whole-pixel selection-mask builder**, then feeds
+its returned 0/1 mask into the existing scalar sparse brush. It matches all
+**15 Godot-authored 64² `AtlasFill._allows_pixel()` masks byte-for-byte** in
+each of **two independent 55-check runs**, including exact edge/vertex ties,
+rotation, shear, mirroring, nonuniform density, disabled/empty selections.
+Every sparse brush output is validated against the selected pixel set and
+independently reconstructed canonical RGBA8, preserving transparent hidden
+RGB. Invalid transforms, polygon wire data, dimensions and scope flags reject
+without modifying the source. This remains a **separate Atlas-scope research
+screen**: the regular `DrawingSelection` path still constructs its mask in
+Godot, and no production application or release loads this extension.
+[T-068](Tickets/T-068.md) ·
+[two-run evidence](benchmarks/T068_2026-11-04_quad_gdextension.json).
+
 **T-068 transformed-view native sparse brush publication (2026-11-04; In Progress):**
 The explicit-load, temporary Godot 4.8b2 GDExtension now verifies six
 **32²/64² transformed hard-brush and mask cases** against independent

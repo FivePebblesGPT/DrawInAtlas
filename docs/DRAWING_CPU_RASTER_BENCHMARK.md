@@ -1481,3 +1481,35 @@ Atlas four-corner convex scope implementation. This is not a benchmark
 of real input latency, staging throughput, texture upload, Windows behavior,
 peak memory, or a portable release, and cannot justify changing the runtime
 backend. T-068 remains **In Progress**.
+
+
+## 2026-11-04 — native Godot GDExtension Atlas four-corner scope handoff
+
+The isolated GDExtension now includes a dependency-free C++17 convex scope
+mask builder (`build_quad_selection`), distinct from the existing
+`DrawingSelection` (pixel-local) masking path. For each of **15 pinned 64²**
+Godot `AtlasFill._allows_pixel()` cases, two complete Godot 4.8 beta 2 bridge
+runs generated **30 exact mask matches / zero discrepancies** and passed
+**55 new assertions per run**. The C++ mask was consumed by the checked
+scalar sparse brush in the same GDExtension. A hidden-RGB source is preserved,
+all edited pixel indices are within the mask, and a separate Python reference
+reconstructs the full expected source-over output, sparse counts, and hashes.
+
+The screen includes exact polygon edge/vertex ties, reversed winding,
+rotations, shear, mirroring, nonuniform density, disabled and empty scopes;
+malformed buffers, concave boundaries and singular transforms reject without
+publishing. For an identity rectangle the native brush changed 154 pixels and
+returned 1,852 sparse bytes; the disabled (unrestricted) scope changed 248
+pixels and returned 2,980 bytes, while an enabled empty scope returned a
+four-byte zero count. **These are sizes, not timing measurements.**
+
+[Godot-authored scope oracle](../tools/benchmarks/t068_quad_scope_oracle.json)
+· [two-run native GDExtension evidence](benchmarks/T068_2026-11-04_quad_gdextension.json)
+· [contract tests](../tests/test_t068_quad_gdextension.py).
+
+This is a temporary project integration of Atlas polygon scope and detached
+native brush bytes, **not a production Atlas-to-Drawing wiring change**. A
+separate DrawingSelection source, path inverse mapping, revision-checked
+publication, full 512/1024/2048-scale workloads, hardware rendering and
+Windows/portable releases remain outside this new test. T-068 remains
+**In Progress**, without any native dependency selection or speedup claim.

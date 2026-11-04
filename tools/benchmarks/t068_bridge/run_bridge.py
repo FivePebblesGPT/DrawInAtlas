@@ -6,8 +6,10 @@ Godot project. Nothing is loaded by the standalone Drawing or Atlas projects.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -29,6 +31,8 @@ SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
 SCALAR_RE = re.compile(r"^T068_SCALAR_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
 SCALAR_EVIDENCE_RE = re.compile(r"^T068_SCALAR_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
 TRANSFORM_RE = re.compile(r"^T068_SCALAR_TRANSFORM_PASSED: (\d+) checks$", re.MULTILINE)
+QUAD_RE = re.compile(r"^T068_QUAD_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
+QUAD_EVIDENCE_RE = re.compile(r"^T068_QUAD_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
 TRANSFORM_EVIDENCE_RE = re.compile(r"^T068_SCALAR_TRANSFORM_EVIDENCE: (.+)$", re.MULTILINE)
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
@@ -50,10 +54,53 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:|T068_QUAD_BRIDGE_FAIL:|T068_QUAD_BRIDGE_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
+
+
+def validate_quad_bridge(cases: Any) -> None:
+    """Fail closed against the exact, independently Godot-authored quad oracle."""
+    oracle_path = ROOT / "tools/benchmarks/t068_quad_scope_oracle.json"
+    if hashlib.sha256(oracle_path.read_bytes()).hexdigest() != (
+            "17aa26b3440508382a7a3c6a5a0e23c35c2a170a9b29d392c0a6aff6bd1cfa19"):
+        raise ValueError("Godot four-corner oracle checksum differs")
+    oracle = json.loads(oracle_path.read_text(encoding="utf-8"))
+    expected = oracle["cases"]
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        raise ValueError("Missing or extra native quad cases")
+    for actual, reference in zip(cases, expected):
+        if not isinstance(actual, dict) or set(actual) != {
+                "id", "allowed", "mask_sha256", "changed", "sparse_bytes", "pixels_sha256"}:
+            raise ValueError("Malformed native quad record")
+        mask = base64.b64decode(reference["mask_base64"], validate=True)
+        # Independently reconstruct this fixture's fixed 4px local stroke and
+        # RGBA8 output. A plausible-looking hash/changed count is not proof.
+        expected_pixels = bytearray(64 * 64 * 4)
+        hidden = (22 * 64 + 22) * 4
+        expected_pixels[hidden:hidden + 4] = bytes((0x44, 0x33, 0x22, 0))
+        expected_changed = 0
+        for index, eligible in enumerate(mask):
+            x = (index % 64) + 0.5
+            y = (index // 64) + 0.5
+            t = max(0.0, min(1.0, ((x - 8.5) + (y - 8.5)) / 94.0))
+            if eligible and math.hypot(x - (8.5 + 47.0 * t),
+                                       y - (8.5 + 47.0 * t)) <= 2.0:
+                expected_pixels[index * 4:index * 4 + 4] = bytes((204, 170, 68, 128))
+                expected_changed += 1
+        if (type(actual["id"]) is not str or actual["id"] != reference["id"] or
+                type(actual["allowed"]) is not int or actual["allowed"] != reference["allowed"] or
+                actual["mask_sha256"] != hashlib.sha256(mask).hexdigest() or
+                type(actual["changed"]) is not int or
+                actual["changed"] != expected_changed or
+                type(actual["sparse_bytes"]) is not int or
+                actual["sparse_bytes"] != 4 + 12 * actual["changed"] or
+                not isinstance(actual["pixels_sha256"], str) or
+                len(actual["pixels_sha256"]) != 64 or
+                any(c not in "0123456789abcdef" for c in actual["pixels_sha256"]) or
+                actual["pixels_sha256"] != hashlib.sha256(expected_pixels).hexdigest()):
+            raise ValueError("Native quad output differs from pinned Godot mask")
 
 
 def validate_marshal_evidence(cases: Any) -> None:
@@ -249,6 +296,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             "-I", str(header_dir), str(BRIDGE / "t068_bridge.cpp"),
             str(ROOT / "tools/benchmarks/t068_raster_kernel.cpp"),
             str(ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp"),
+            str(ROOT / "tools/benchmarks/t068_quad_scope_kernel.cpp"),
             "-o", str(library),
         ], cwd=ROOT, timeout=90)
         # Install only the canonical Drawing document/transaction dependency set;
@@ -280,6 +328,8 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_publication_profile.gd", project / "scalar_publication.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_transform_smoke.gd", project / "scalar_transform.gd")
+        shutil.copyfile(BRIDGE / "t068_quad_scope_smoke.gd", project / "quad_scope.gd")
+        shutil.copyfile(ROOT / "tools/benchmarks/t068_quad_scope_oracle.json", project / "quad_oracle.json")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -382,7 +432,21 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 raise RuntimeError("Rejected transformed scalar parity evidence") from exc
             if int(transform_match.group(1)) != 110:
                 raise RuntimeError("Insufficient transformed scalar parity checks")
-            observations.append({"scalar_checks": int(scalar_match.group(1)),
+            quad_output = checked_run([godot, "--headless", "--path", str(project),
+                                       "--audio-driver", "Dummy", "--script", "res://quad_scope.gd"],
+                                      cwd=project, timeout=120)
+            quad_match = QUAD_RE.search(quad_output)
+            quad_evidence = QUAD_EVIDENCE_RE.search(quad_output)
+            if quad_match is None or quad_evidence is None:
+                raise RuntimeError(f"Missing native four-corner parity proof:\n{quad_output[-4000:]}")
+            try:
+                quad_cases = json.loads(quad_evidence.group(1))
+                validate_quad_bridge(quad_cases)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected native four-corner evidence") from exc
+            if int(quad_match.group(1)) != 55:
+                raise RuntimeError("Insufficient native four-corner correctness checks")
+            observations.append({"quad_checks": int(quad_match.group(1)), "quad_cases": quad_cases, "scalar_checks": int(scalar_match.group(1)),
                                  "scalar_evidence": scalar_record, "scalar_transform_checks": int(transform_match.group(1)),
                                  "scalar_transform_cases": transform_cases, "scalar_publication_checks": int(publication_match.group(1)),
                                  "scalar_publication_cases": publication_cases,
@@ -395,6 +459,8 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         return {
             "ticket": "T-068", "mode": "optional, isolated Linux GDExtension (not production)",
             "godot_version": version, "generated_header_sha256": header_sha,
+            "quad_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_kernel.cpp").read_bytes()).hexdigest(),
+            "quad_fixture_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_oracle.json").read_bytes()).hexdigest(),
             "scalar_source_sha256": hashlib.sha256(
                 (ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
             "test_method": "Checked native batch and scalar brush deltas, detached texture adapter, and real revision-checked DrawingDocument transactions",
@@ -403,7 +469,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
                 "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
                 "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
                 "Scalar brush native call accepts local packed float64 path samples and a binary mask; completeness is verified against the Godot canonical stroke before publication, not by the native output alone",
-                "Transformed selection screen constructs the binary mask in Godot, not via native four-corner polygon clipping; tested view transformations are client-inverted before the native call",
+                "The transformed DrawingSelection screen still constructs its pixel-local binary mask in Godot; a separate native four-corner Atlas scope benchmark now matches the pinned Godot oracle",
                 "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
                 "Matched scalar publication timings are headless CPU diagnostics, with six alternating-order raw paired samples; source seeding, correctness checks, undo and redo are excluded",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
@@ -433,6 +499,7 @@ def main() -> None:
     print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Scalar native brush publication screen:", ", ".join(str(item["scalar_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Native Atlas four-corner mask screens:", ", ".join(str(item["quad_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Transformed scalar selection screens:", ", ".join(str(item["scalar_transform_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Matched scalar publication screens:", ", ".join(str(item["scalar_publication_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Godot native marshal screens:", ", ".join(str(item["marshal_checks"]) for item in evidence["measurements"]), "checks per run")

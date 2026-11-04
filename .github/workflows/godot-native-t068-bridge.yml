@@ -25,6 +25,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_bridge_runner.py -v
           python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py -v
           python3 -m unittest discover -s tests -p test_t068_scalar_transform.py -v
+          python3 -m unittest discover -s tests -p test_t068_quad_gdextension.py -v
       - name: Build and verify isolated native, texture, document, and scalar sparse brush paths
         shell: bash
         run: |

@@ -24,6 +24,10 @@ extern "C" int32_t draw_batch_checked(const uint8_t*, uint64_t,
     int32_t, uint32_t, int32_t, const uint8_t*, uint64_t,
     DrawDelta*, uint64_t, int32_t);
 
+extern "C" int32_t t068_quad_scope_mask(
+    uint8_t*, uint64_t, int32_t, const double*, uint64_t, double,
+    const double*, uint64_t, int32_t, int32_t);
+
 namespace {
 GDExtensionClassLibraryPtr library = nullptr;
 GDExtensionInterfaceStringNameNewWithLatin1Chars make_name = nullptr;
@@ -338,6 +342,89 @@ void call_scalar(void*, GDExtensionClassInstancePtr,
     byte_destructor(source);
 }
 
+// Temporary, explicit-load transformed Atlas four-corner mask. Return a
+// detached binary mask, or an empty array on invalid input. An *enabled*
+// scope with no vertices is a legitimate all-zero mask, not an error.
+void process_quad(const void* transform, double density, const void* polygon,
+                  int64_t side, int64_t enabled, void* result) {
+    byte_constructor(result, nullptr);
+    try {
+        if (side < 1 || side > 2048 || enabled < 0 || enabled > 1 ||
+            packed_size(transform, byte_size) != 48) return;
+        const int64_t polygon_bytes = packed_size(polygon, byte_size);
+        if (polygon_bytes < 0 || polygon_bytes > 32 * 16 ||
+            polygon_bytes % 16 != 0) return;
+        double coefficients[6]{};
+        std::memcpy(coefficients, byte_at(transform, 0), sizeof(coefficients));
+        std::vector<double> vertices(size_t(polygon_bytes / 8));
+        if (polygon_bytes)
+            std::memcpy(vertices.data(), byte_at(polygon, 0), size_t(polygon_bytes));
+        const int64_t bytes = side * side;
+        std::vector<uint8_t> mask(size_t(bytes), 0);
+        const int32_t selected = t068_quad_scope_mask(
+            mask.data(), uint64_t(bytes), int32_t(side), coefficients,
+            sizeof(coefficients), density, vertices.empty() ? nullptr : vertices.data(),
+            uint64_t(polygon_bytes), int32_t(vertices.size() / 2), int32_t(enabled));
+        if (selected < 0) return;
+        const void* args[] = {&bytes};
+        int64_t resized = -1;
+        byte_resize(result, args, &resized, 1);
+        if (resized != 0) return;
+        std::memcpy(byte_at_mutable(result, 0), mask.data(), size_t(bytes));
+    } catch (...) {
+        const int64_t zero = 0;
+        const void* args[] = {&zero};
+        int64_t ignored = -1;
+        byte_resize(result, args, &ignored, 1);
+    }
+}
+
+void ptrcall_quad(void*, GDExtensionClassInstancePtr,
+                  const GDExtensionConstTypePtr* args, GDExtensionTypePtr result) {
+    process_quad(args[0], *static_cast<const double*>(args[1]), args[2],
+        *static_cast<const int64_t*>(args[3]),
+        *static_cast<const int64_t*>(args[4]), result);
+}
+
+void call_quad(void*, GDExtensionClassInstancePtr,
+               const GDExtensionConstVariantPtr* args, GDExtensionInt argc,
+               GDExtensionVariantPtr result, GDExtensionCallError* error) {
+    error->error = GDEXTENSION_CALL_OK;
+    if (argc != 5) {
+        error->error = argc < 5 ? GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS :
+                                  GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS;
+        error->expected = 5;
+        new_nil(result);
+        return;
+    }
+    const GDExtensionVariantType expected[] = {
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY, GDEXTENSION_VARIANT_TYPE_FLOAT,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY, GDEXTENSION_VARIANT_TYPE_INT,
+        GDEXTENSION_VARIANT_TYPE_INT};
+    for (int i = 0; i < 5; ++i) {
+        if (variant_type(args[i]) != expected[i]) {
+            error->error = GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT;
+            error->argument = i;
+            error->expected = expected[i];
+            new_nil(result);
+            return;
+        }
+    }
+    alignas(16) unsigned char transform[64]{}, polygon[64]{}, output[64]{};
+    bytes_from_variant(transform, const_cast<void*>(args[0]));
+    bytes_from_variant(polygon, const_cast<void*>(args[2]));
+    double density = 0;
+    int64_t side = 0, enabled = 0;
+    float_from_variant(&density, const_cast<void*>(args[1]));
+    integer_from_variant(&side, const_cast<void*>(args[3]));
+    integer_from_variant(&enabled, const_cast<void*>(args[4]));
+    process_quad(transform, density, polygon, side, enabled, output);
+    variant_from_bytes(result, output);
+    byte_destructor(output);
+    byte_destructor(polygon);
+    byte_destructor(transform);
+}
+
 GDExtensionObjectPtr create_instance(void*, GDExtensionBool) {
     GDExtensionObjectPtr object = construct_object(object_name);
     if (!object) return nullptr;
@@ -447,6 +534,31 @@ void initialize(void*, GDExtensionInitializationLevel level) {
     method.argument_count = 8;
     method.arguments_info = scalar_info;
     method.arguments_metadata = scalar_meta;
+    register_method(library, class_name, &method);
+    Name quad_name("build_quad_selection");
+    const char* quad_args[] = {"transform_f64le", "density", "polygon_f64le", "side", "enabled"};
+    const GDExtensionVariantType quad_types[] = {
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY, GDEXTENSION_VARIANT_TYPE_FLOAT,
+        GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY, GDEXTENSION_VARIANT_TYPE_INT,
+        GDEXTENSION_VARIANT_TYPE_INT};
+    std::vector<Name> quad_names;
+    quad_names.reserve(5);
+    for (const char* name : quad_args) quad_names.emplace_back(name);
+    GDExtensionPropertyInfo quad_info[5]{};
+    GDExtensionClassMethodArgumentMetadata quad_meta[5]{};
+    for (int i = 0; i < 5; ++i) {
+        quad_info[i].type = quad_types[i];
+        quad_info[i].name = quad_names[size_t(i)].data();
+        quad_info[i].class_name = return_name.data();
+        quad_info[i].hint_string = empty_string;
+        quad_info[i].usage = 6;
+    }
+    method.name = quad_name.data();
+    method.call_func = call_quad;
+    method.ptrcall_func = ptrcall_quad;
+    method.argument_count = 5;
+    method.arguments_info = quad_info;
+    method.arguments_metadata = quad_meta;
     register_method(library, class_name, &method);
     if (auto destroy = get_destructor(GDEXTENSION_VARIANT_TYPE_STRING))
         destroy(empty_string);
