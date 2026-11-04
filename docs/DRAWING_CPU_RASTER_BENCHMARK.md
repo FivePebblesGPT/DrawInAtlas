@@ -919,3 +919,68 @@ matched native C++ Skia/marshalling benchmarks, real brush/path masks and
 transforms, portable Godot extension/standalone builds, Windows and Linux
 physical end-to-visible p95 and RAM/VRAM/multithread results. **T-068 stays
 In Progress.** Raw evidence: [Skia CPU JSON](benchmarks/T068_2026-11-04_skia_cpu.json).
+
+
+## 2026-11-04 optional Skia vs *canonical Godot brush* stencil screen
+
+The [prior Skia rectangle and standalone quadratic path screen](#2026-11-04-optional-skia-python-1441-cpu-rgba8--path-screen-not-adoption)
+confirmed the CPU API runs but did not compare Skia geometry against the
+**actual** Drawing hard brush. The new experiment freezes a Godot 4.8 beta 2
+fixture from `DrawingEditSession` rather than defining a supposedly equivalent
+Python stroke oracle. Each case authors a new 32² document with an RGBA8 tile
+containing zero-alpha *hidden RGB* and uses far signed anchors beyond 2^53;
+its `coverage_indices` include no-op covered pixels, while `changed_indices`
+and `after_sha256` describe the actual committed transaction. The independent
+Python `source_over` oracle confirms all 11 generated case digests and
+changed-pixel sets. Continuous vs split-batch strokes produce identical Godot
+coverage and commits, including overlap semantics.
+
+Reproduce with the **externally installed**, SHA-pinned Skia 144.1 wheel:
+
+```bash
+# Regenerate the frozen Godot fixture (check JSON equality before replacing it).
+godot --headless --path . --script res://tests/drawing_t068_skia_brush_oracle.gd -- /tmp/t068-godot-brush.json
+T068_GODOT=godot python3 -m unittest discover -s tests -p test_t068_skia_brush.py -v
+# The second invocation requires Python 3.13 and the optional installed wheel.
+T068_SKIA_WHEEL=/path/to/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl \
+  python3.13 -m unittest discover -s tests -p test_t068_skia_brush.py -v
+python3.13 tools/benchmarks/t068_skia_brush.py \
+  --wheel /path/to/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl \
+  --runs 2 --trials 7 --output /tmp/t068-skia-brush.json
+```
+
+The live runner uses CPU `SkSurface.MakeRasterDirect` on **A8** for one
+non-antialiased round-capped, round-joined Skia stroke and also executes the
+same shape directly against a detached straight-RGBA8 surface. It independently
+replays a software canonical blend over the Skia-generated stencil. A
+rectangular, sparse, or inverted selection is applied *after* drawing in
+Python, not implemented with Skia's native clip API. Neither the Skia
+prototype nor its fixture is linked to the real Drawing application.
+
+| Godot fixture group | Cases per run | Skia stencil coverage errors | Direct RGBA8 case errors | Observation |
+|---|---:|---:|---:|---|
+| Stationary, axis-aligned and diagonal hard brushes | 4 | 0 | 0 | Exact in **these fixtures only** |
+| Self-crossing whole / split-batch gesture | 2 | 2 × one missing pixel | 2 × one mismatched pixel | Skia's stroked path does not cover every Godot brush pixel |
+| Rectangle, sparse, inverted post-selection | 3 | 0 | 0 | Tested postmask semantics, **not** native Skia clipping |
+| Erase on source with hidden transparent RGB | 1 | 0 | 0 | Exact bounded erased pixel bytes |
+| Alpha-zero self-crossing | 1 | 1 missing coverage pixel | 0 | Coverage differs even when output bytes are a no-op |
+
+Two independent runs, each seven timing trials per case, reported the same
+three coverage exceptions per run (**6/22**), and two direct-pixel exceptions
+per run (**4/22**). The exact same geometry gap is present when Skia's stencil
+is blended with the independent canonical math, so replacing Skia's color
+compositor alone cannot achieve hard-brush parity. Shape mask and draw-only
+microseconds are included as **descriptive Python-call diagnostics** in
+[`T068_2026-11-04_skia_brush.json`](benchmarks/T068_2026-11-04_skia_brush.json);
+they omit surface creation, selection postmask, native API marshaling, Godot
+history/publication and GPU display. No backend speedup is inferred.
+
+**Operation-level decision:** retain the existing canonical Godot brush,
+mask and undo implementation for exact editing. Skia CPU is still a candidate
+for *future noncanonical previews or quality-directed AA paths*, not a drop-in
+source of hard brush geometry, even if its alpha math were corrected in a
+postpass. A future native test must explicitly compare all path cap/join,
+transformed masks, clipping and same-gesture repeated-sample cases, and must
+measure native C++ and Godot upload boundaries before any integration decision.
+Physical Windows/Linux p95 and memory/VRAM, standalone release packaging and
+user-facing latency gates also remain open. **T-068 is In Progress.**

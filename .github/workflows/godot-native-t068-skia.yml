@@ -29,7 +29,9 @@ jobs:
       - name: Verify format loss, oracle and independent path coverage
         env:
           T068_SKIA_WHEEL: /tmp/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl
-        run: python3 -m unittest discover -s tests -p test_t068_skia_cpu.py -v
+        run: |
+          python3 -m unittest discover -s tests -p test_t068_skia_cpu.py -v
+          python3 -m unittest discover -s tests -p test_t068_skia_brush.py -v
       - name: Record two runs against checked C++ and exact RGBA8
         shell: bash
         run: |
@@ -40,6 +42,16 @@ jobs:
             --output /tmp/t068-skia-cpu.json | tee /tmp/t068-skia-cpu.log
           grep -q 'T068_SKIA_CPU_PASSED: 126 verified rectangle cases across 2 runs;' /tmp/t068-skia-cpu.log
           test -s /tmp/t068-skia-cpu.json
+      - name: Compare Skia hard brush and selections to pinned Godot oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_skia_brush.py \
+            --wheel /tmp/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl \
+            --runs 2 --trials 7 --output /tmp/t068-skia-brush.json \
+            | tee /tmp/t068-skia-brush.log
+          grep -q 'T068_SKIA_BRUSH_SCREEN_PASSED: 22 Godot brush/mask comparisons;' /tmp/t068-skia-brush.log
+          test -s /tmp/t068-skia-brush.json
       - name: Upload Skia parity and timing diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,4 +60,6 @@ jobs:
           path: |
             /tmp/t068-skia-cpu.json
             /tmp/t068-skia-cpu.log
+            /tmp/t068-skia-brush.json
+            /tmp/t068-skia-brush.log
           if-no-files-found: warn
