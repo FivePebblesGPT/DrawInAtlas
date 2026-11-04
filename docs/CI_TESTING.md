@@ -546,10 +546,12 @@ Fast push CI runs `T068_QUAD_GODOT=godot python3 -m unittest discover -s
  tests -p test_t068_quad_differential.py`. This first regenerates the
 independent Godot-authoritative 48-case four-corner scope oracle (exact
 serialized mask bytes must match), then compiles the detached C++17 native
-mask source with the host compiler. It validates **two reproducible diagnostic
-runs** and rejects evidence corruption; the current native implementation
-misses **247 Godot-eligible pixels across 16/48 cases per run**. Test success
-means the discrepancy is measured and guarded, **not that parity is achieved**.
-The application remains on canonical Godot masking; no extension is loaded
-or accepted. Revisit these counterexamples before any native selection
-adoption; no physical end-to-end benchmark or release gate is affected.
+mask source with the host compiler. It validates **two reproducible runs with exact 48/48 mask parity** and
+rejects evidence corruption, source changes, malformed buffers and lost
+counterexample provenance. The original strict-double kernel's **247 omitted
+pixels across 16 cases** remain in a separately hashed historical record.
+The Godot 4.8b2-compatible native float32 segment/approximate-edge policy
+is a constrained research result, not proof across precision modes,
+compilers, large coordinates or arbitrary convex boundaries. The application
+remains on canonical Godot masking; no extension is loaded or accepted.
+Physical input-to-visible, memory and release gates remain open.

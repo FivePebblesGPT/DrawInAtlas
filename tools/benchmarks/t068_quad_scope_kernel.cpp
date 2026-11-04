@@ -18,6 +18,69 @@ bool overlaps(const void* a, size_t len_a, const void* b, size_t len_b) noexcept
         len_b > std::numeric_limits<uintptr_t>::max() - y) return true;
     return x < y + len_b && y < x + len_a;
 }
+
+// Match the pinned Godot 4.8b2 Vector2/Geometry2D float32 path, including
+// its approximate edge hit. A strict double-precision ray test misses legal
+// near-edge pixels. This is a detached compatibility kernel, not a generic
+// exact-geometry predicate (and not an application backend).
+struct Vec2f {
+    float x, y;
+    Vec2f operator+(Vec2f v) const noexcept { return {x + v.x, y + v.y}; }
+    Vec2f operator-(Vec2f v) const noexcept { return {x - v.x, y - v.y}; }
+    Vec2f operator*(float v) const noexcept { return {x * v, y * v}; }
+    Vec2f operator/(float v) const noexcept { return {x / v, y / v}; }
+};
+
+bool approximate(float left, float right) noexcept {
+    return left == right || std::abs(left - right) <
+        std::max(1.e-5f, 1.e-5f * std::abs(left));
+}
+
+bool segment_intersection(Vec2f from, Vec2f to, Vec2f other_from,
+                          Vec2f other_to, Vec2f& intersection) noexcept {
+    const Vec2f line = to - from;
+    Vec2f a = other_from - from;
+    Vec2f b = other_to - from;
+    const float length_squared = line.x * line.x + line.y * line.y;
+    if (length_squared <= 0.f) return false;
+    const Vec2f normalized = line / length_squared;
+    a = {a.x * normalized.x + a.y * normalized.y,
+         a.y * normalized.x - a.x * normalized.y};
+    b = {b.x * normalized.x + b.y * normalized.y,
+         b.y * normalized.x - b.x * normalized.y};
+    if ((a.y < -1.e-5f && b.y < -1.e-5f) ||
+        (a.y > 1.e-5f && b.y > 1.e-5f) || approximate(a.y, b.y)) return false;
+    const float position = b.x + (a.x - b.x) * b.y / (b.y - a.y);
+    if (position < 0.f || position > 1.f) return false;
+    intersection = from + line * position;
+    return true;
+}
+
+bool godot_point_in_polygon(float x, float y, const double* polygon,
+                            int32_t vertices) noexcept {
+    Vec2f far = {-1.e20f, -1.e20f};
+    Vec2f near = {1.e20f, 1.e20f};
+    for (int32_t i = 0; i < vertices; ++i) {
+        const Vec2f vertex = {float(polygon[2 * i]), float(polygon[2 * i + 1])};
+        far = {std::max(far.x, vertex.x), std::max(far.y, vertex.y)};
+        near = {std::min(near.x, vertex.x), std::min(near.y, vertex.y)};
+    }
+    const Vec2f extent = far - near;
+    far = far + Vec2f{extent.x * 1.221313f, extent.y * 1.512312f};
+    const Vec2f point = {x, y};
+    int intersections = 0;
+    for (int32_t i = 0; i < vertices; ++i) {
+        const int32_t next = (i + 1) % vertices;
+        const Vec2f v1 = {float(polygon[2 * i]), float(polygon[2 * i + 1])};
+        const Vec2f v2 = {float(polygon[2 * next]), float(polygon[2 * next + 1])};
+        Vec2f hit{};
+        if (segment_intersection(v1, v2, point, far, hit)) {
+            ++intersections;
+            if (approximate(hit.x, x) && approximate(hit.y, y)) return true;
+        }
+    }
+    return (intersections & 1) != 0;
+}
 }
 
 extern "C" int32_t t068_quad_scope_mask(
@@ -67,34 +130,17 @@ extern "C" int32_t t068_quad_scope_mask(
             std::fill(staged.begin(), staged.end(), uint8_t(1));
             selected = int32_t(count);
         } else if (vertices != 0) {
-            const auto inside = [polygon, vertices](double x, double y) noexcept -> bool {
-                bool found = false;
-                for (int i = 0, j = vertices - 1; i < vertices; j = i++) {
-                    const double xi = polygon[2 * i], yi = polygon[2 * i + 1];
-                    const double xj = polygon[2 * j], yj = polygon[2 * j + 1];
-                    // Godot Geometry2D.is_point_in_polygon includes points on
-                    // an edge, unlike a conventional strict ray crossing.
-                    const double dx = xj - xi, dy = yj - yi;
-                    const double cross = (x - xi) * dy - (y - yi) * dx;
-                    if (cross == 0.0 &&
-                        x >= std::min(xi, xj) && x <= std::max(xi, xj) &&
-                        y >= std::min(yi, yj) && y <= std::max(yi, yj)) return true;
-                    if ((yi > y) != (yj > y) &&
-                        x < dx * (y - yi) / dy + xi) found = !found;
-                }
-                return found;
-            };
             for (int32_t y = 0; y < side; ++y) {
                 for (int32_t x = 0; x < side; ++x) {
                     bool allowed = true;
                     for (int cy = 0; cy < 2 && allowed; ++cy) {
                         for (int cx = 0; cx < 2; ++cx) {
-                            const double lx = (double(x) + cx) / density;
-                            const double ly = (double(y) + cy) / density;
-                            const double board_x = coefficients[0] * lx + coefficients[2] * ly + coefficients[4];
-                            const double board_y = coefficients[1] * lx + coefficients[3] * ly + coefficients[5];
+                            const float lx = float((double(x) + cx) / density);
+                            const float ly = float((double(y) + cy) / density);
+                            const float board_x = float(coefficients[0]) * lx + float(coefficients[2]) * ly + float(coefficients[4]);
+                            const float board_y = float(coefficients[1]) * lx + float(coefficients[3]) * ly + float(coefficients[5]);
                             if (!std::isfinite(board_x) || !std::isfinite(board_y) ||
-                                !inside(board_x, board_y)) {
+                                !godot_point_in_polygon(board_x, board_y, polygon, vertices)) {
                                 allowed = false;
                                 break;
                             }

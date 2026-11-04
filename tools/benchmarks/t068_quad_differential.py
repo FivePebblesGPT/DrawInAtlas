@@ -122,7 +122,7 @@ def screen(library: Path) -> dict[str, Any]:
               "summary": summary, "runs": runs,
               "limitations": [
                   "Seeded near-boundary diagnostic, not native selection acceptance",
-                  "Uses Godot-generated float32 Vector2 transform and polygon coordinates; native geometry uses double intermediates",
+                  "Native point tests now emulate the pinned Godot 4.8b2 float32 Vector2 segment-intersection and approximate-edge rules; this does not prove broader precision modes",
                   "Detached C++ CPU mask only, not GDExtension document publication, GPU, or physical latency",
               ]}
     validate_evidence(result)

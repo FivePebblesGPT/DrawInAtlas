@@ -6,19 +6,23 @@
 
 ## Kanban summary
 
-**T-068 seeded native four-corner near-boundary differential (2026-11-04; In Progress):**
-An independently generated Godot 4.8b2 `AtlasFill._allows_pixel()` corpus
-now covers **48 deterministic 32² transformed convex selections**, including
-mirroring, shear, rotation, scaling, reversed winding, exact edges and ±1e-5
-near-edge offsets. The detached C++17 scope kernel produces identical masks
-across two runs but differs from Godot in **16/48 cases, omitting 247 eligible
-pixels per run** (no extra pixels). All disagreements occur in near-edge
-mirror/shear variants; the previously passing 15-case exact-edge oracle is
-unchanged. This is a recorded correctness blocker for native selection, **not
-backend acceptance**. Source-pinned oracle regeneration, failure-atomic ABI
-checks, tamper-rejecting evidence replay and fast CI are included. T-068 stays
-In Progress. [Ticket](Tickets/T-068.md) ·
-[evidence](benchmarks/T068_2026-11-04_quad_differential.json).
+**T-068 near-boundary native four-corner compatibility checkpoint (2026-11-04; In Progress):**
+The detached scope kernel now follows the pinned Godot 4.8b2 float32
+`Vector2` / segment-intersection **approximate boundary** behavior instead of
+strict double-precision ray crossings. The **48 seeded 32² transformed
+selection cases now match all 48/48 Godot masks**, twice, with **zero missed
+or extra pixels**; the original 15/15 exact-edge 64² fixture still matches.
+Two real isolated GDExtension runs confirm **55/55 native mask checks** and
+**153/153 selection-to-`DrawingDocument` publication checks per run**,
+including source-byte validation and Undo/Redo. The previous **16 cases / 247
+omissions** are preserved in the
+[historical strict-double evidence](benchmarks/T068_2026-11-04_quad_differential_strict_double.json)
+and are not passed off as current results.
+This is **not native backend acceptance**: float64 builds, arbitrary polygons,
+physical latency, memory/VRAM, Windows, and portable native exports remain
+unverified. T-068 stays In Progress.
+[Ticket](Tickets/T-068.md) ·
+[current two-run differential](benchmarks/T068_2026-11-04_quad_differential.json).
 
 **T-068 native four-corner scope to revision-checked document publication (2026-11-04; In Progress):**
 A new explicit-load, temporary Godot 4.8 beta 2 GDExtension witness

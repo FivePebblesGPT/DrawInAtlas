@@ -14,6 +14,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools/benchmarks/t068_quad_differential.py"
 EVIDENCE = ROOT / "docs/benchmarks/T068_2026-11-04_quad_differential.json"
+HISTORICAL = ROOT / "docs/benchmarks/T068_2026-11-04_quad_differential_strict_double.json"
+HISTORICAL_SHA256 = "0e838efee61177c7c4276109e730e4d28bae0823ad0f82201f3424fbcd3a3072"
 spec = importlib.util.spec_from_file_location("t068_quad_differential", SCRIPT)
 assert spec is not None and spec.loader is not None
 quad = importlib.util.module_from_spec(spec)
@@ -26,12 +28,25 @@ class DifferentialContracts(unittest.TestCase):
         data = json.loads(EVIDENCE.read_text(encoding="utf-8"))
         quad.validate_evidence(data)
         self.assertEqual(data["summary"], {
-            "runs": 2, "cases_per_run": 48, "nonparity_cases": 16,
-            "missing_pixels_per_run": 247, "extra_pixels_per_run": 0,
+            "runs": 2, "cases_per_run": 48, "nonparity_cases": 0,
+            "missing_pixels_per_run": 0, "extra_pixels_per_run": 0,
         })
         self.assertEqual(data["runs"][0], data["runs"][1])
         self.assertEqual(sum(bool(row["missing_indices"] or row["extra_indices"])
-                             for row in data["runs"][0]), 16)
+                             for row in data["runs"][0]), 0)
+
+    def test_original_strict_double_failure_is_preserved(self) -> None:
+        # Historical source-pinned result must not be overwritten or passed
+        # off as a run of the revised float32-compatible native kernel.
+        raw = HISTORICAL.read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), HISTORICAL_SHA256)
+        previous = json.loads(raw)
+        self.assertEqual(previous["native_source_sha256"],
+                         "7079e2390dfc4ef899ee6e8ca35507e94c692b4c5e622387677e4e17cbd7c3da")
+        self.assertEqual(previous["summary"]["nonparity_cases"], 16)
+        self.assertEqual(previous["summary"]["missing_pixels_per_run"], 247)
+        self.assertNotEqual(previous["native_source_sha256"],
+                            hashlib.sha256(quad.SOURCE.read_bytes()).hexdigest())
 
     def test_evidence_tampering_rejected(self) -> None:
         data = json.loads(EVIDENCE.read_text(encoding="utf-8"))
@@ -45,8 +60,8 @@ class DifferentialContracts(unittest.TestCase):
             lambda p: p["runs"][0][1].update(extra_indices=[0]),
             lambda p: p["runs"][0][1].update(id="seed_00"),
             lambda p: p["runs"][0][1].update(extra_field=7),
-            lambda p: p["runs"][1][1].update(missing_indices=[]),
-            lambda p: p["summary"].update(nonparity_cases=0),
+            lambda p: p["runs"][1][1].update(missing_indices=[0]),
+            lambda p: p["summary"].update(nonparity_cases=16),
             lambda p: p.update(godot_oracle_sha256="0" * 64),
             lambda p: p.update(native_source_sha256="0" * 64),
             lambda p: p.update(limitations=[]),

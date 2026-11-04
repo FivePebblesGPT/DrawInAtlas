@@ -1623,3 +1623,30 @@ native selection parity.
 [fast-CI fail-closed test](../tests/test_t068_quad_differential.py).
 No published or GPU timing, Windows binary, or portable native packaging is
 measured here.
+
+
+## 2026-11-04 T-068: near-edge four-corner scope semantics
+
+The original strict-double C++ convex scope check failed in 16/48 seeded
+Godot-authored transformed near-boundary masks, omitting 247 eligible pixels
+per run (no native extras). The pinned Godot 4.8b2
+`Geometry2D.is_point_in_polygon` behavior performs a floating-point
+segment-intersection ray test and approximate endpoint comparison; **exact
+zero-crossing geometry is not behaviorally equivalent**. The detached C++17
+scope kernel now uses float32 `Vector2`-compatible arithmetic and that
+approximate endpoint rule. This is a semantics correction, not a tolerance
+chosen to fit the mask count.
+
+- The [new two-run differential](benchmarks/T068_2026-11-04_quad_differential.json)
+  exactly reproduces **48/48 independent Godot masks** (no missing or extra
+  pixels); the source-pinned
+  [strict-double failures](benchmarks/T068_2026-11-04_quad_differential_strict_double.json)
+  are retained for comparison.
+- The original **15/15** transformed 64² scope masks still match; two fresh
+  real Godot 4.8b2 GDExtension runs pass **55 mask checks** and **153
+  selection-to-document publication checks per run**, including exact RGBA8,
+  revision arbitration, Undo/Redo and zero-change rejection.
+- **Still unproven:** arbitrary polygon families, double-precision Godot,
+  platform-dependent near-edge rounding, large coordinate ranges, runtime
+  editor integration, physical display latency, RAM/VRAM and release exports.
+  No timing or speedup conclusion is drawn from these correctness tests.
