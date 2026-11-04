@@ -118,6 +118,15 @@
   without a native extension; the explicit `--quad-publication-only --runs 2`
   bridge mode runs in the manual-only native CI job. The temporary extension
   does not prove deployed Atlas UI behavior or physical GPU performance.
+- T-068 visual/X11 process-memory diagnostic:
+  `tests/test_t068_visual_device.py` replays a **source-pinned Xvfb/llvmpipe**
+  25-trial Godot input-to-`frame_post_draw` witness and independently validates
+  raw timing medians/p95, process RSS/HWM samples, Godot 4.8 beta2 identity,
+  and rejection of false hardware/VRAM claims. Fast CI never starts an X11
+  window for this test; an opt-in `godot-native-t068-bridge.yml` step starts a
+  separate software-GL Godot process and publishes fresh JSON diagnostics.
+  Physical hardware runs require `--profile hardware` and a non-software
+  `glxinfo`/Godot adapter. Synthetic input does not measure OS-to-photon latency.
 - T-068 native scalar sparse publication **cancellation/conflict**:
   `tests/test_t068_scalar_atomicity.py` checks source-pinned two-run
   37-assertion Godot evidence and independently reconstructs canonical

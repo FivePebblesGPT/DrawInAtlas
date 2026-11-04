@@ -2,6 +2,29 @@
 
 **Measured 2026-11-02 on a Linux x86_64 sandbox, Godot 4.8.beta2, G++ 14.2, Mesa llvmpipe 25.0.7.** Engineering evidence only. No native backend has been selected, linked into Godot, exported to Windows, or shipped. T-068 remains **In Progress** because the full gate requires actual third-party CPU raster runs, input-event-to-present profiling, native extension boundary, and multi-thread/Windows memory-jitter evidence. This is not an owner-review gate.
 
+## X11 synthetic-event-to-frame and Godot-process RSS diagnostic (2026-11-04)
+
+The existing Godot 4.8 beta 2 X11 `drawing_latency_stress_visual.gd` witness now retains **all 25 paired raw trial timings** rather than just five-workload median/p95 summaries. `tools/benchmarks/t068_visual_device.py` starts a separate Godot process, samples `/proc/<pid>/status` (`VmRSS`, `VmHWM`) every 20 ms, and saves source-pinned evidence. The saved [Xvfb/Mesa llvmpipe run](benchmarks/T068_2026-11-04_visual_process_software.json) completed **81/81 framebuffer-pixel, document revision, and history checks**. Its process high-water sample was approximately **281 MiB**. Sampled process RSS includes the **entire engine**, Python's runner is excluded, and transient allocations may occur between samples. These are **not isolated brush allocations or GPU memory measurements**.
+
+The five gestures are a 4/32/64px dab, 4px long stroke and 4px self-crossing stroke (five samples each). Timing starts immediately before **synthetic Godot mouse events**, records CPU dispatch return, and then `frame_post_draw` completion, not OS pointer hardware delivery or physical monitor scan-out. A non-software GL-renderer requirement prevents labeling llvmpipe as hardware; it does not make event-to-photon measurements. The script does not modify the Drawing or Atlas backend.
+
+Reproduce on Linux after a full Godot resource import:
+
+```sh
+# Software-only Xvfb diagnostic; does not satisfy hardware acceptance.
+LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s '-screen 0 1400x900x24' \
+  python3 tools/benchmarks/t068_visual_device.py \
+    --godot /path/to/Godot_v4.8-beta2_linux.x86_64 --profile software \
+    --output /tmp/t068-visual-software.json
+python3 tools/benchmarks/t068_visual_device.py --evidence /tmp/t068-visual-software.json
+
+# On a real Linux X11 graphics session (requires glxinfo for GPU identification).
+python3 tools/benchmarks/t068_visual_device.py --godot /path/to/godot \
+  --profile hardware --output /tmp/t068-visual-hardware.json
+```
+
+`python3 -m unittest discover -s tests -p test_t068_visual_device.py -v` checks the pinned evidence and rejects tampering. Physical Windows/Linux event-to-photon p95/jitter, VRAM, and portable exports **remain open**, irrespective of whether the hardware-renderer gate passes.
+
 ## Detached scalar brush strict floating-point safety (2026-11-04)
 
 A direct GCC `-Ofast` build of the detached `t068_scalar_hard_brush.cpp`
