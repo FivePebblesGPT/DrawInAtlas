@@ -85,7 +85,7 @@ jobs:
             --archive /tmp/blend2d-0.21.2.tar.gz \
             --source /tmp/blend2d --library-dir /tmp/blend2d-build \
             --output /tmp/t068-blend2d-quad.json | tee /tmp/t068-blend2d-quad.log
-          grep -q 'T068_QUAD_SCOPE_PASSED: 16 native/Godot mask comparisons; 0 mismatched cases' /tmp/t068-blend2d-quad.log
+          grep -q 'T068_QUAD_SCOPE_PASSED: 30 native/Godot mask comparisons; 0 mismatched cases' /tmp/t068-blend2d-quad.log
           test -s /tmp/t068-blend2d-quad.json
       - name: Upload parity and timing diagnostics
         if: always()

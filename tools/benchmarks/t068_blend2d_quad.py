@@ -22,9 +22,10 @@ from t068_blend2d_brush import NativeBrush, compile_bridge
 from t068_blend2d_cpu import PINNED_SOURCE_SHA256, ROOT, verify_archive
 
 ORACLE = ROOT / "tools/benchmarks/t068_quad_scope_oracle.json"
-ORACLE_SHA256 = "de2511fa9b6a902662b633dc5a6b99a53fc51cc141d7a4333e39255be6264a0f"
+ORACLE_SHA256 = "17aa26b3440508382a7a3c6a5a0e23c35c2a170a9b29d392c0a6aff6bd1cfa19"
 CASE_IDS = ("rect_identity", "rotated", "shear", "mirror", "nonuniform_density",
-            "diamond", "disabled", "empty_enabled")
+            "diamond", "edge_rect", "edge_rect_cw", "edge_rotated", "edge_sheared",
+            "edge_density", "edge_diamond", "edge_thin", "disabled", "empty_enabled")
 SIDE = 64
 
 
@@ -112,7 +113,7 @@ def screen(library: Path, runs: int = 2) -> dict[str, Any]:
                                             "mismatched_cases": sum(bool(r["missing_indices"] or r["extra_indices"])
                                                                     for run in reports for r in run)},
               "limitations": ["CPU mask precomputation only; no native Godot publication or GPU timings",
-                              "Fixtures avoid exact polygon-edge/corner ties; boundary inclusion needs separate parity",
+                              "Exact-edge and vertex cases included; near-edge float rounding and broader polygons not proven",
                               "Existing Blend2D A8 brush stencil retains geometric mismatches"]}
     validate_evidence(result)
     return result
@@ -172,7 +173,7 @@ def main() -> None:
         evidence = screen(bridge)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"T068_QUAD_SCOPE_PASSED: 16 native/Godot mask comparisons; "
+    print(f"T068_QUAD_SCOPE_PASSED: {2 * len(CASE_IDS)} native/Godot mask comparisons; "
           f"{evidence['summary']['mismatched_cases']} mismatched cases")
 
 

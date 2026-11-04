@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 inclusive exact polygon-edge scope checkpoint (2026-11-04; In Progress):**
+The research-only Blend2D C++ four-corner mask now accepts points exactly on
+convex boundary segments, consistent with Godot's boundary-inclusive polygon
+predicate. Seven additional Godot-authored 64² fixtures (axis-aligned edge,
+reversed winding, rotation, shear, nonuniform density, diamond and one-pixel
+strip) extend the existing eight to **15 cases**. Two independent native runs
+show **30/30 byte-exact masks** with zero coverage differences; the thin
+boundary-aligned strip accepts exactly 64 eligible pixels. This resolves the
+previous demonstrated aligned-edge mismatch for pinned cases only; floating
+near-edge tolerance and broader transforms remain unproven. No runtime backend
+was adopted, and physical GPU/release gates remain open.
+[T-068](Tickets/T-068.md), [two-run scope evidence](benchmarks/T068_2026-11-04_blend2d_quad.json).
+
 **T-068 native transformed four-corner scope checkpoint (2026-11-04; In Progress):**
 The detached Blend2D C++ brush comparison now computes a fail-closed binary
 selection mask from **all four transformed pixel corners**, with an independent

@@ -1,9 +1,9 @@
 {
   "comparison": "all four transformed raster pixel corners inside convex board-space scope",
-  "godot_oracle_sha256": "de2511fa9b6a902662b633dc5a6b99a53fc51cc141d7a4333e39255be6264a0f",
+  "godot_oracle_sha256": "17aa26b3440508382a7a3c6a5a0e23c35c2a170a9b29d392c0a6aff6bd1cfa19",
   "limitations": [
     "CPU mask precomputation only; no native Godot publication or GPU timings",
-    "Fixtures avoid exact polygon-edge/corner ties; boundary inclusion needs separate parity",
+    "Exact-edge and vertex cases included; near-edge float rounding and broader polygons not proven",
     "Existing Blend2D A8 brush stencil retains geometric mismatches"
   ],
   "runs": [
@@ -49,6 +49,55 @@
         "mask_sha256": "92ef532827b3422087784febc8bc43d89c0c857a897732f86658a0e201cb3fe9",
         "missing_indices": [],
         "native_allowed": 1059
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_rect",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_rect_cw",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_rotated",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_sheared",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_density",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_diamond",
+        "mask_sha256": "19da488fc4beac72bc4ad1a8fb65862d4fd98f2cf9ad02891a7a4662931c0edf",
+        "missing_indices": [],
+        "native_allowed": 1104
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_thin",
+        "mask_sha256": "9c1edbe9487196718125ab21dae7293d16d70d4e03f3c3659a7dfed49afccb27",
+        "missing_indices": [],
+        "native_allowed": 64
       },
       {
         "extra_indices": [],
@@ -110,6 +159,55 @@
       },
       {
         "extra_indices": [],
+        "id": "edge_rect",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_rect_cw",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_rotated",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_sheared",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_density",
+        "mask_sha256": "94a4fa6cf9b10edc365c7de26b5305def70f438b6f4cc4c5406f02661c503948",
+        "missing_indices": [],
+        "native_allowed": 1600
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_diamond",
+        "mask_sha256": "19da488fc4beac72bc4ad1a8fb65862d4fd98f2cf9ad02891a7a4662931c0edf",
+        "missing_indices": [],
+        "native_allowed": 1104
+      },
+      {
+        "extra_indices": [],
+        "id": "edge_thin",
+        "mask_sha256": "9c1edbe9487196718125ab21dae7293d16d70d4e03f3c3659a7dfed49afccb27",
+        "missing_indices": [],
+        "native_allowed": 64
+      },
+      {
+        "extra_indices": [],
         "id": "disabled",
         "mask_sha256": "3431383721510cf1c211de027cf958c183e16db5fabb6b230eb284c85e196aa9",
         "missing_indices": [],
@@ -127,7 +225,7 @@
   "schema": 1,
   "source_sha256": "234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa",
   "summary": {
-    "cases_per_run": 8,
+    "cases_per_run": 15,
     "mismatched_cases": 0,
     "runs": 2
   }

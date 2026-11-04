@@ -26,13 +26,31 @@ EVIDENCE = ROOT / "docs/benchmarks/T068_2026-11-04_blend2d_quad.json"
 class QuadEvidenceTests(unittest.TestCase):
     def test_pinned_complete_fixture_and_evidence(self) -> None:
         oracle = QUAD.load_oracle()
-        self.assertEqual(len(oracle["cases"]), 8)
+        self.assertEqual(len(oracle["cases"]), 15)
         self.assertEqual([r["allowed"] for r in oracle["cases"]],
-                         [1056, 1008, 1397, 1258, 1505, 1059, 4096, 0])
+                         [1056, 1008, 1397, 1258, 1505, 1059, 1600, 1600, 1600,
+                          1600, 1600, 1104, 64, 4096, 0])
         evidence = json.loads(EVIDENCE.read_text())
         QUAD.validate_evidence(evidence)
-        self.assertEqual(evidence["summary"], {"runs": 2, "cases_per_run": 8,
+        self.assertEqual(evidence["summary"], {"runs": 2, "cases_per_run": 15,
                                                 "mismatched_cases": 0})
+
+    def test_exact_edge_masks_have_independent_expected_pixels(self) -> None:
+        """An exact 40² rectangle includes its four boundary corners; no fringe."""
+        rows = {row["id"]: row for row in QUAD.load_oracle()["cases"]}
+        square = bytes(int(12 <= x < 52 and 12 <= y < 52)
+                       for y in range(QUAD.SIDE) for x in range(QUAD.SIDE))
+        for name in ("edge_rect", "edge_rect_cw", "edge_rotated", "edge_sheared",
+                     "edge_density"):
+            with self.subTest(case=name):
+                self.assertEqual(base64.b64decode(rows[name]["mask_base64"]), square)
+        thin = bytes(int(x == 0) for _y in range(QUAD.SIDE)
+                     for x in range(QUAD.SIDE))
+        self.assertEqual(base64.b64decode(rows["edge_thin"]["mask_base64"]), thin)
+        diamond = base64.b64decode(rows["edge_diamond"]["mask_base64"])
+        self.assertEqual(diamond[32 * QUAD.SIDE + 31], 1)
+        self.assertEqual(diamond[8 * QUAD.SIDE + 32], 0)  # corner alone cannot fit a full pixel
+        self.assertEqual(diamond[32 * QUAD.SIDE + 8], 0)
 
     def test_invalid_evidence_is_rejected(self) -> None:
         evidence = json.loads(EVIDENCE.read_text())
@@ -64,7 +82,7 @@ class QuadEvidenceTests(unittest.TestCase):
                                      capture_output=True, text=True, timeout=120, cwd=ROOT,
                                      env={**os.environ, "GODOT_SILENCE_ROOT_WARNING": "1"}, check=False)
             self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
-            self.assertIn("T068_QUAD_SCOPE_ORACLE_PASSED: 8 cases", process.stdout)
+            self.assertIn("T068_QUAD_SCOPE_ORACLE_PASSED: 15 cases", process.stdout)
             self.assertNotIn("SCRIPT ERROR", process.stdout + process.stderr)
             self.assertEqual(json.loads(output.read_text()), QUAD.load_oracle())
 

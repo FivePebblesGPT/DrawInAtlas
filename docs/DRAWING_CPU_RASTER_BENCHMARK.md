@@ -1275,3 +1275,23 @@ Godot UI publication, physical GPU, CPU-to-present timing or backend selection.
 See [pinned native evidence](benchmarks/T068_2026-11-04_blend2d_quad.json),
 `tests/drawing_t068_quad_scope_oracle.gd`, and
 `tools/benchmarks/t068_blend2d_quad.py`.
+
+
+## 2026-11-04 follow-up — boundary-inclusive native polygon scopes
+
+The previous eight-case native/Godot four-corner scope comparison excluded
+pixel-quad vertices on the exact boundary. The detached C++ selection predicate
+now accepts points exactly on a segment, matching Godot's documented inclusive
+`Geometry2D.is_point_in_polygon()` result for these cases. An independently
+regenerated Godot fixture adds seven boundary-tie scenarios: CW and CCW
+rectangles, rotation, shear, nonuniform raster density, diamond corners and a
+one-pixel strip. The two-run pinned evidence covers **30 byte-exact masks of
+64×64 pixels**, with **zero missing or extra coverage**; individual rectangle
+and strip pixels are also independently checked in Python.
+
+This is narrow CPU-only correctness evidence. It does **not** demonstrate
+Godot's approximate boundary comparisons at arbitrary near-edge floating
+coordinates, a complete optional native integration, exact Blend2D brush
+footprints, display/GPU publication cost or hardware acceptance. T-068
+remains **In Progress**, and the production raster backend is unchanged.
+See [raw evidence](benchmarks/T068_2026-11-04_blend2d_quad.json).

@@ -226,8 +226,15 @@ T068_EXPORT int32_t t068_blend2d_quad_selection(
                 for (int i = 0, j = vertices - 1; i < vertices; j = i++) {
                     const double xi = polygon[2 * i], yi = polygon[2 * i + 1];
                     const double xj = polygon[2 * j], yj = polygon[2 * j + 1];
+                    // Godot Geometry2D.is_point_in_polygon includes points on
+                    // an edge, unlike a conventional strict ray crossing.
+                    const double dx = xj - xi, dy = yj - yi;
+                    const double cross = (x - xi) * dy - (y - yi) * dx;
+                    if (cross == 0.0 &&
+                        x >= std::min(xi, xj) && x <= std::max(xi, xj) &&
+                        y >= std::min(yi, yj) && y <= std::max(yi, yj)) return true;
                     if ((yi > y) != (yj > y) &&
-                        x < (xj - xi) * (y - yi) / (yj - yi) + xi) found = !found;
+                        x < dx * (y - yi) / dy + xi) found = !found;
                 }
                 return found;
             };
