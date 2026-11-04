@@ -429,3 +429,16 @@ runs against pinned real Godot oracles, plus randomized distance cases,
 invalid-buffer failure atomicity, and evidence replay. This work introduces
 no external library download or new workflow job. It is a research-only
 geometry witness, not a shipped Godot module or native UI/GPU acceptance.
+
+
+### T-068 checked scalar sparse hard-brush wire (2026-11-04)
+
+The existing fast-CI T-068 step additionally compiles the detached C++17
+scalar brush and runs `tests/test_t068_scalar_deltas.py` (six tests). It
+compares 56 changed-pixel wire streams against 16 genuine Godot pixel and
+12 Godot-coverage/independent-pixel fixtures; validates sorted unique records,
+source-before bytes and full RGBA8 reconstruction, buffer-capacity/alias
+atomicity, malicious wire rejection and two-run evidence regeneration.
+The native result is **not** wired into the application: no Godot publication,
+texture update, physical-device latency or memory result is claimed.
+[Raw evidence](benchmarks/T068_2026-11-04_scalar_deltas.json).

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from functools import lru_cache
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -88,18 +89,23 @@ def run(library: Path) -> dict[str, Any]:
     return payload
 
 
+@lru_cache(maxsize=1)
+def _reference_rows() -> tuple[dict[str, Any], ...]:
+    """Cache fixture-derived ground truth for repeated tamper validations."""
+    return tuple(expected_row(case) for case in fixtures())
+
+
 def validate(payload: dict[str, Any]) -> None:
     """Reconstruct every byte digest and changed count from pinned sources."""
-    cases = fixtures()
-    rows = [expected_row(case) for case in cases]
+    rows = list(_reference_rows())
     if (type(payload) is not dict or payload.get("schema") != 1 or
             payload.get("native_source_sha256") != hashlib.sha256(SOURCE.read_bytes()).hexdigest() or
             payload.get("small_oracle_sha256") != SMALL_SHA256 or
             payload.get("large_oracle_sha256") != LARGE_SHA256 or
             type(payload.get("runs")) is not list or len(payload["runs"]) != 2 or
             any(run != rows for run in payload["runs"]) or
-            payload.get("summary") != {"runs": 2, "cases_per_run": len(cases),
-                                       "exact_coverage_and_rgba8": len(cases) * 2} or
+            payload.get("summary") != {"runs": 2, "cases_per_run": len(rows),
+                                       "exact_coverage_and_rgba8": len(rows) * 2} or
             type(payload.get("limitations")) is not list or
             payload["limitations"] != [
                 "Detached C++17 and Python ctypes: no Godot marshaling, document publication, or GPU upload",

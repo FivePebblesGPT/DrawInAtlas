@@ -1349,3 +1349,29 @@ This is a **functional/parity checkpoint**, not a benchmark speed comparison.
 There are no matched Godot-native timings, full-size Godot pixel witnesses,
 physical input-to-visible p95, RAM/VRAM or GPU publication results; no production
 backend was selected. T-068 remains **In Progress**.
+
+
+## 2026-11-04 detached scalar hard-brush sparse output screen
+
+The exact-footprint C++17 scalar prototype now supports a **bounded sparse
+before/after RGBA8 wire** (4-byte little-endian changed count and 12 bytes per
+changed pixel), alongside the earlier full-tile output. It scans tile-local
+hard-brush geometry and applies each selected pixel once; only changed pixels
+are emitted, with source bytes retained and output capacity/alias errors
+rejected before any caller-memory mutation. Two native runs reconstruct all
+28 pinned Godot-derived cases exactly (**56/56**). The 16 small cases have
+real Godot pixel witnesses; the large cases have Godot coverage witnesses
+plus independent RGBA8 composition on a patterned source.
+
+| 2048² workload | Changed pixels | Sparse wire | Whole-tile RGBA8 |
+|---|---:|---:|---:|
+| 4px long stroke | 460 | 5,524 B | 16,777,216 B |
+| 256px dab | 51,468 | 617,620 B | 16,777,216 B |
+| Alpha-zero no-op | 0 | 4 B | 16,777,216 B |
+
+These figures are **payload sizes**, not native/Godot interop timing,
+publication costs, GPU upload or resident memory. The bounded fixture caller
+reserves up to 65,536 changed records; dense edits require a larger explicit
+capacity or a full buffer. The implementation and tests remain detached from
+Godot and Drawing/Atlas production paths. No native technology was selected.
+[Complete reproducible two-run evidence](benchmarks/T068_2026-11-04_scalar_deltas.json).

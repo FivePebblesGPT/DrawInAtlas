@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import shutil
+import struct
 import subprocess
 import tempfile
 from pathlib import Path
@@ -52,6 +53,13 @@ class ScalarBrush:
                                   ctypes.c_void_p, ctypes.c_uint64,
                                   ctypes.c_int32, ctypes.c_void_p, ctypes.c_uint64,
                                   ctypes.c_int32, ctypes.c_double)
+        self.delta_function = native.t068_scalar_hard_brush_deltas
+        self.delta_function.restype = ctypes.c_int32
+        self.delta_function.argtypes = (
+            ctypes.c_void_p, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_uint64,
+            ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32,
+            ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32, ctypes.c_double,
+            ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32)
         self.composite_function = native.t068_scalar_hard_brush_rgba8
         self.composite_function.restype = ctypes.c_int32
         self.composite_function.argtypes = (
@@ -59,6 +67,54 @@ class ScalarBrush:
             ctypes.c_void_p, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_uint64,
             ctypes.c_int32, ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32,
             ctypes.c_double, ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32)
+
+    def deltas(self, source: bytes, side: int, path: list[list[float]],
+               width: float, selection: bytes, paint: tuple[int, int, int, int],
+               erase: bool, *, max_changes: int) -> bytes:
+        """Return a checked LE sparse wire record stream, with a caller budget.
+
+        A capacity error is not retried implicitly: callers must explicitly
+        raise their bounded changed-pixel budget before invoking native again.
+        """
+        if (not 1 <= side <= 2048 or len(source) != side * side * 4 or
+                len(selection) != side * side or
+                selection.count(0) + selection.count(1) != len(selection) or
+                not 1 <= len(path) <= 128 or not math.isfinite(width) or
+                not 0 < width <= 512 or
+                any(len(p) != 2 or any(not math.isfinite(v) or
+                    not -2 * side <= v <= 3 * side for v in p) for p in path) or
+                len(paint) != 4 or any(type(c) is not int or not 0 <= c <= 255 for c in paint) or
+                type(max_changes) is not int or not 0 <= max_changes <= side * side):
+            raise ValueError("Invalid sparse brush inputs or changed-pixel budget")
+        coordinates = (ctypes.c_double * (2 * len(path)))(*(v for pair in path for v in pair))
+        source_array = (ctypes.c_uint8 * len(source)).from_buffer_copy(source)
+        selection_array = (ctypes.c_uint8 * len(selection)).from_buffer_copy(selection)
+        color = (ctypes.c_uint8 * 4)(*paint)
+        capacity = 4 + max_changes * 12
+        payload = (ctypes.c_uint8 * capacity)()
+        changed = self.delta_function(
+            payload, capacity, source_array, len(source_array),
+            selection_array, len(selection_array), side, coordinates,
+            ctypes.sizeof(coordinates), len(path), width, color, 4, int(erase))
+        if changed == -5:
+            raise BufferError("Native delta payload exceeded changed-pixel budget")
+        if changed < 0:
+            raise RuntimeError(f"Native scalar delta function returned {changed}")
+        used = 4 + changed * 12
+        if used > capacity or struct.unpack_from("<I", payload, 0)[0] != changed:
+            raise AssertionError("Malformed native scalar delta count")
+        result = bytes(payload[:used])
+        previous = -1
+        for offset in range(4, used, 12):
+            index = struct.unpack_from("<I", result, offset)[0]
+            if index <= previous or index >= side * side:
+                raise AssertionError("Nonordered/out-of-range native delta index")
+            previous = index
+            at = index * 4
+            if (result[offset + 4:offset + 8] != source[at:at + 4] or
+                    result[offset + 4:offset + 8] == result[offset + 8:offset + 12]):
+                raise AssertionError("Incorrect original or unchanged native delta")
+        return result
 
     def render(self, side: int, path: list[list[float]], width: float,
                selection: bytes) -> bytes:

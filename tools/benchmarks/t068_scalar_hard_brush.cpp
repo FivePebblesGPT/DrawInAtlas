@@ -163,3 +163,83 @@ T068_EXPORT int32_t t068_scalar_hard_brush_rgba8(
         return -4;
     }
 }
+
+/// Research-only sparse hard-brush RGBA8 edit wire format, shared with the
+/// isolated Godot bridge: LE32 changed-count, then sorted 12-byte records
+/// {LE32 pixel index, 4-byte before RGBA, 4-byte after RGBA}. Only actual
+/// pixel changes are emitted; coverage-only alpha-zero gestures return a
+/// four-byte zero count. No document revision or publication is performed.
+/// All input is validated and records are staged before the caller's payload
+/// is modified. Capacity shortage (-5), like other errors, is failure atomic.
+/// @return Number of *changed* pixels, -1 malformed lengths/aliases/points,
+///         -3 invalid selection, -4 allocation failure, -5 short payload.
+T068_EXPORT int32_t t068_scalar_hard_brush_deltas(
+    uint8_t* payload, uint64_t capacity,
+    const uint8_t* source, uint64_t source_bytes,
+    const uint8_t* selection, uint64_t selection_bytes,
+    int32_t side, const double* points, uint64_t point_bytes,
+    int32_t point_count, double width,
+    const uint8_t* paint, uint64_t paint_bytes, int32_t erase) noexcept {
+    if (!payload || !source || !selection || !points || !paint ||
+        side < 1 || side > 2048 || point_count < 1 || point_count > 128 ||
+        !std::isfinite(width) || width <= 0.0 || width > 512.0 ||
+        (erase != 0 && erase != 1)) return -1;
+    const uint64_t count = uint64_t(side) * uint64_t(side);
+    const uint64_t rgba_bytes = count * 4U;
+    if (capacity < 4 || capacity > 4 + count * 12U ||
+        source_bytes != rgba_bytes || selection_bytes != count ||
+        point_bytes != uint64_t(point_count) * 2U * sizeof(double) ||
+        paint_bytes != 4 ||
+        overlap(payload, capacity, source, rgba_bytes) ||
+        overlap(payload, capacity, selection, count) ||
+        overlap(payload, capacity, points, point_bytes) ||
+        overlap(payload, capacity, paint, 4)) return -1;
+    for (uint64_t i = 0; i < count; ++i)
+        if (selection[i] > 1) return -3;
+    for (int32_t i = 0; i < point_count * 2; ++i)
+        if (!std::isfinite(points[i]) || points[i] < -2.0 * side ||
+            points[i] > 3.0 * side) return -1;
+    try {
+        std::vector<Point> path;
+        path.reserve(size_t(point_count));
+        for (int32_t i = 0; i < point_count; ++i)
+            path.push_back({float(points[2 * i]), float(points[2 * i + 1])});
+        // A sparse record is twelve bytes. The source buffer remains
+        // immutable and no full-tile output or coverage buffer is allocated.
+        struct Record { uint32_t index; uint8_t before[4]; uint8_t after[4]; };
+        std::vector<Record> changed;
+        const float radius = float(width * 0.5);
+        if (erase != 0 || paint[3] != 0) {
+            for (int32_t y = 0; y < side; ++y) {
+                for (int32_t x = 0; x < side; ++x) {
+                    const size_t index = size_t(y) * size_t(side) + size_t(x);
+                    if (!selection[index] ||
+                        !touched({float(x) + 0.5f, float(y) + 0.5f}, path, radius)) continue;
+                    Record record{};
+                    record.index = uint32_t(index);
+                    std::memcpy(record.before, source + index * 4, 4);
+                    std::memcpy(record.after, record.before, 4);
+                    composite(record.after, paint, erase != 0);
+                    if (std::memcmp(record.before, record.after, 4) != 0)
+                        changed.push_back(record);
+                }
+            }
+        }
+        const uint64_t needed = 4U + uint64_t(changed.size()) * 12U;
+        if (needed > capacity) return -5;
+        auto write32 = [payload](size_t offset, uint32_t value) noexcept {
+            for (unsigned i = 0; i < 4; ++i)
+                payload[offset + i] = uint8_t(value >> (i * 8U));
+        };
+        write32(0, uint32_t(changed.size()));
+        for (size_t i = 0; i < changed.size(); ++i) {
+            const size_t offset = 4 + i * 12;
+            write32(offset, changed[i].index);
+            std::memcpy(payload + offset + 4, changed[i].before, 4);
+            std::memcpy(payload + offset + 8, changed[i].after, 4);
+        }
+        return int32_t(changed.size());
+    } catch (const std::bad_alloc&) {
+        return -4;
+    }
+}

@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 bounded scalar sparse hard-brush payload (2026-11-04; In Progress):**
+A detached C++17 hard-brush kernel now emits only changed canonical RGBA8
+pixels as ordered, checked 12-byte before/after records plus a 4-byte count,
+using the existing isolated bridge wire format. Across two independent passes
+all **56/56 small/large Godot-oracle-derived comparisons** reconstruct exact
+final RGBA8; no-op paint emits four bytes. A 2048² 4px stroke produces 5,524
+wire bytes versus 16 MiB full-tile output, **not a measured marshaling or GPU
+speedup**. Bounded capacity and malformed/aliased buffers fail atomically.
+The prototype is not linked into Godot, and hardware/release gates remain open.
+[T-068](Tickets/T-068.md),
+[two-run sparse evidence](benchmarks/T068_2026-11-04_scalar_deltas.json).
+
 **T-068 scalar native hard-brush canonical RGBA8 checkpoint (2026-11-04; In Progress):**
 The detached C++17 hard-brush comparator now returns both the full 0/255
 gesture coverage bitmap and detached **straight-RGBA8 pixels**. Two passes
