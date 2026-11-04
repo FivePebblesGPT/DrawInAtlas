@@ -409,3 +409,14 @@ remains representable by a four-byte zero count. The existing **on-demand**
 run, including forged empty/partial payloads and an incomplete second tile.
 The optional extension is not loaded in the main application or fast push CI;
 this does not imply third-party native backend adoption or hardware acceptance.
+
+
+### T-068 detached scalar hard-brush parity (2026-11-04)
+
+The existing fast-CI T-068 step compiles the **self-contained C++17 scalar
+coverage comparator** and executes `tests/test_t068_scalar_hard_brush.py`.
+Five tests validate 56 exact coverage comparisons across two independent
+runs against pinned real Godot oracles, plus randomized distance cases,
+invalid-buffer failure atomicity, and evidence replay. This work introduces
+no external library download or new workflow job. It is a research-only
+geometry witness, not a shipped Godot module or native UI/GPU acceptance.

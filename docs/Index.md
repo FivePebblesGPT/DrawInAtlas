@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 dependency-free C++ hard-brush geometry parity (2026-11-04; In Progress):**
+A detached scalar C++17 pixel-center / swept-segment comparator now returns
+exact binary once-per-gesture coverage with checked input buffers and local
+selection masks. Compared against the real Godot 4.8b2 brush oracles, two
+independent runs produce **56/56 identical masks** across sixteen 32²
+brush/selection/transform cases and twelve 512²/1024²/2048² workloads.
+This closes the *tested scalar geometry screen*, not the application path:
+canonical small-case RGBA8 is independently reconstructed, while large cases
+compare coverage on empty-source gestures. No Godot GDExtension integration,
+publication/texture timing, Windows/GPU memory/p95 or portable binary proof
+is claimed. [T-068](Tickets/T-068.md),
+[two-run scalar evidence](benchmarks/T068_2026-11-04_scalar_hard_brush.json).
+
+
 **T-068 inclusive exact polygon-edge scope checkpoint (2026-11-04; In Progress):**
 The research-only Blend2D C++ four-corner mask now accepts points exactly on
 convex boundary segments, consistent with Godot's boundary-inclusive polygon

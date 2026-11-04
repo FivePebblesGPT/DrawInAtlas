@@ -1295,3 +1295,33 @@ coordinates, a complete optional native integration, exact Blend2D brush
 footprints, display/GPU publication cost or hardware acceptance. T-068
 remains **In Progress**, and the production raster backend is unchanged.
 See [raw evidence](benchmarks/T068_2026-11-04_blend2d_quad.json).
+
+
+## 2026-11-04 — isolated scalar C++ hard-brush coverage compared with Godot
+
+A small **dependency-free C++17 scalar** comparator now screens the native
+hard-brush geometry that Blend2D A8 thresholding cannot reproduce exactly.
+It evaluates pixel-center distances to round swept segments and unions their
+coverage once before enforcing a binary pixel-local selection. The comparison
+reuses actual Godot-generated oracle output rather than a Python-generated
+brush stencil. Two complete native passes match **16/16 small 32²** and
+**12/12 large 512²/1024²/2048²** cases, or **56/56 total masks**, byte-for-byte.
+The comparison also checks re-created canonical straight-RGBA8 results for
+small-source fixtures and validates full large bitmap coverage. No new
+Godot-side or native timing measurements have been taken: these figures
+**must not be represented as speedup or physical responsiveness evidence**.
+The detached kernel does not composite, stage detached chunks, marshal through
+GDExtension, create undo deltas, or upload display tiles. It does not validate
+arbitrary float-tie geometries or transformed board-space quad selection
+beyond the separate native mask screen.
+
+Source: `tools/benchmarks/t068_scalar_hard_brush.cpp` and
+`tools/benchmarks/t068_scalar_hard_brush.py`; regression:
+`tests/test_t068_scalar_hard_brush.py`; raw evidence:
+[56 complete comparisons](benchmarks/T068_2026-11-04_scalar_hard_brush.json).
+
+**Operation-specific recommendation unchanged:** keep Godot for canonical
+hard-pixel edits while evaluating a *narrow optional scalar/SIMD native path*
+for the same semantics. Blend2D remains a candidate for future AA/vector
+work, not the canonical hard-brush replacement. Physical and release gates
+still block T-068 closure.

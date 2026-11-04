@@ -310,6 +310,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_hard_brush.py
           T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_blend2d_quad.py
           python3 -m unittest discover -s tests -p test_t068_skia_cpu.py
           T068_GODOT=godot python3 -m unittest discover -s tests -p test_t068_skia_brush.py
