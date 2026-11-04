@@ -27,6 +27,21 @@ godot --headless --path /tmp/drawing-out/drawing --script res://tests/standalone
 godot --headless --path /tmp/drawing-out/drawing --export-release Linux /tmp/drawing-release.x86_64
 ```
 
+Optional T-068 distribution gate after an export into `/tmp/drawing-dist`
+containing `Drawing.x86_64` and `Drawing.pck`:
+
+```sh
+python3 tools/benchmarks/t068_release_gate.py \
+  --stage /tmp/drawing-out/drawing --linux /tmp/drawing-dist \
+  --launch-linux --output /tmp/drawing-release-validation.json
+```
+
+This requires Godot export templates. The Linux check runs the exported
+executable from a clean working directory and user profile, not the source
+project. A Windows `.exe`/`.pck` may be structurally checked with `--windows`
+but requires an actual Windows runtime pass for acceptance. This tool does not
+measure physical pointer-to-photon latency or GPU/VRAM usage.
+
 The output directory must be empty and outside the repository. The build copies
 only the standalone `project.godot`, scenes, app scripts, tests, export presets
 and the canonical package's `.gd`, `.gd.uid` and licensed font files. The third generic

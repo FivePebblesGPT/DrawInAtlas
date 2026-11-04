@@ -6,6 +6,18 @@
 
 ## Kanban summary
 
+**T-068 standalone portable-release isolation gate (2026-11-04; In Progress):**
+A new source-staging, exported ELF/PE and Godot PCK verifier rejects a missing
+pack, wrong x86_64 architecture, native extension sidecars, source/Atlas leakage,
+and failing headless Linux starts. Fast CI invokes it on the real standalone
+Linux export using a fresh working directory and disposable user profile; a
+Windows export receives structural inspection only until run on Windows.
+Local contracts and independent staging pass; the sandbox has no export
+**templates**, so a new Linux/Windows release pass is **not claimed here**.
+This does not establish physical GPU/VRAM, native-backend adoption or portable
+Windows runtime acceptance. [Ticket](Tickets/T-068.md) ·
+[release gate](../tools/benchmarks/t068_release_gate.py).
+
 **T-068 counterbalanced software-frame contention witness (2026-11-04; In Progress):**
 A separate opt-in Linux X11 **idle → loaded → loaded → idle** experiment runs
 four fresh 25-gesture Godot 4.8b2 framebuffer witnesses (324/324 checks), with

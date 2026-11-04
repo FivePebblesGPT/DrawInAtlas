@@ -80,6 +80,11 @@ jobs:
             2>&1 | tee /tmp/godot-export-fonts.log
           grep -q 'DRAWING_PACK_FONT_PASSED' /tmp/godot-export-fonts.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-export-fonts.log; then exit 1; fi
+          # Validate the shipped ELF/PCK without looking at editor resources.
+          # The binary must launch from a fresh cwd and disposable HOME.
+          python3 tools/benchmarks/t068_release_gate.py \
+            --stage /tmp/drawing-dist/project --linux /tmp/drawing-dist \
+            --launch-linux --output /tmp/t068-standalone-linux-release.json
       # The standalone package import above only registers *its* classes.
       # The main checkout needs its own class cache before any --path . --script smoke.
       - name: Import resources and parse scripts
@@ -320,6 +325,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_visual_device.py
           python3 -m unittest discover -s tests -p test_t068_visual_contention.py
           python3 -m unittest discover -s tests -p test_t068_visual_counterbalanced.py
+          python3 -m unittest discover -s tests -p test_t068_release_gate.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py
           python3 -m unittest discover -s tests -p test_t068_scalar_hard_brush.py

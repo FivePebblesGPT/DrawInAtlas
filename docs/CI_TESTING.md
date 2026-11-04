@@ -636,3 +636,19 @@ is a constrained research result, not proof across precision modes,
 compilers, large coordinates or arbitrary convex boundaries. The application
 remains on canonical Godot masking; no extension is loaded or accepted.
 Physical input-to-visible, memory and release gates remain open.
+
+### T-068 portable Drawing release isolation gate (2026-11-04)
+
+Fast CI's existing T-053 standalone Linux export now additionally invokes
+`python3 tools/benchmarks/t068_release_gate.py --stage /tmp/drawing-dist/project
+--linux /tmp/drawing-dist --launch-linux --output /tmp/t068-standalone-linux-release.json`.
+The validator checks the separately exported x86_64 ELF and `Drawing.pck`,
+forbids unapproved native extension/shipped-library sidecars, and launches the
+binary from a fresh working directory with isolated HOME/XDG paths. It rejects
+missing PCK, wrong executable architecture, nonzero exit, and Godot script
+errors; separate four-test offline contracts run in the T-068 fast step.
+Release templates are required for CI's actual export. On a host without them,
+only the offline tests/stage checks can run: no release acceptance may be
+inferred. Windows artifacts may be structurally checked with `--windows`, but
+must also be launched on Windows; physical GPU and release acceptance remain
+open under T-068.

@@ -143,6 +143,20 @@ Medians over seven hot kernel calls; all outputs identical to canonical straight
 
 The [Godot ImageTexture API](https://docs.godotengine.org/en/stable/classes/class_imagetexture.html) defines `update()` as **replacing the texture's complete data**, not uploading an arbitrary subrectangle. An independent 128/256/512/1024 test under software OpenGL 4.5 (Mesa llvmpipe) produced these upload-only medians: **0.014 / 0.017 / 0.044 / 0.168 ms**, with complete RGBA8 upload sizes 0.0625 / 0.25 / 1 / 4 MiB. `RenderingServer.force_draw()` medians were around 2 ms, but this is a driver/queue probe, **not an input-to-visible frame timestamp**. Independent 128/256 edit-display tiles can reduce full-upload work relative to 512/1024 storage tiles. Do not conflate compressed storage stride, dirty edit regions, or display-upload geometry.
 
+## T-068 standalone export isolation verification (2026-11-04)
+
+The new `tools/benchmarks/t068_release_gate.py` checks an *actual* separate
+standalone Drawing export: x86_64 ELF/PE file identity, the adjacent `.pck`
+magic and SHA-256/size, absence of detached native research sidecars, canonical
+Drawing-only staging, and for Linux a headless exported-binary launch with
+fresh cwd and isolated HOME/XDG locations. The pre-existing T-053 fast-CI Linux
+export step now calls the verifier, with failures treated as export failures.
+The four offline unit tests and a real 130-file source staging audit passed in
+this sandbox; no release templates were installed here, so the exported Linux
+runtime and Windows hardware runs remain **unverified locally**. Windows static
+PE checks cannot prove functional Windows compatibility. This does not alter the
+interim operation-level recommendation or approve shipping a native renderer.
+
 ## Operation-by-operation candidate screening
 
 | Operation | A/B Godot | C++ prototype | Blend2D D | Skia CPU E | Decision today |
