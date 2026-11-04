@@ -44,6 +44,15 @@
   Blend2D job compiles the isolated `t068_blend2d_quad_selection` ABI and
   checks failure atomicity, mask-to-brush handoff and 30 exact parity comparisons.
   Exact polygon-edge and vertex ties are covered; near-boundary floating-point tolerance and hardware/release gates remain open.
+- T-068 strict CPU selection kernel compiler matrix:
+  `tests/test_t068_quad_compiler_matrix.py` checks a source-pinned, two-run
+  Godot 48-case oracle under **GCC and Clang `-O0/-O2/-O3`** (576 exact masks)
+  and 42 malformed-input atomic rejection checks. GCC `-Ofast` and Clang
+  `-O3 -ffast-math` builds must fail specifically on the native compile guard:
+  fast-math can elide `std::isfinite` checks, violating failure atomicity.
+  The fast push/PR T-068 contracts and the manual-only bridge workflow both
+  exercise this matrix. This is Linux C++ ABI safety, not native deployment,
+  Windows support, a measured speedup, or physical GPU evidence.
 - T-068 native Atlas four-corner scope through the *temporary* Godot bridge:
   `tests/test_t068_quad_gdextension.py` pins two 55-check Godot 4.8b2
   runs against 15 real `AtlasFill._allows_pixel` full masks, tests the

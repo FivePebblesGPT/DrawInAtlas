@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 strict GCC/Clang native selection ABI checkpoint (2026-11-04; In Progress):**
+The test-only convex four-corner C++ kernel now rejects `-ffast-math` and
+`-Ofast` builds: GCC fast-math can elide NaN/Inf rejection and overwrite
+output buffers. Source-pinned GCC/Clang `-O0/-O2/-O3` builds matched all
+**576/576 Godot oracle masks** across two passes per profile and rejected
+**42/42 invalid ABI calls** without output modification. Both unsafe
+compiler configurations failed at build time. Fresh Godot GDExtension runs
+preserve **55/55 scope** and **153/153 publication** checks per run, twice.
+This is **not** Windows/hardware performance or production backend approval;
+T-068 remains In Progress.
+[Ticket](Tickets/T-068.md) ·
+[compiler evidence](benchmarks/T068_2026-11-04_quad_compiler_matrix.json).
+
 **T-068 near-boundary native four-corner compatibility checkpoint (2026-11-04; In Progress):**
 The detached scope kernel now follows the pinned Godot 4.8b2 float32
 `Vector2` / segment-intersection **approximate boundary** behavior instead of

@@ -10,6 +10,14 @@
 #include <new>
 #include <vector>
 
+// Nonfinite-input rejection and Godot float32 near-edge parity require strict
+// floating-point semantics. GCC -Ofast can erase std::isfinite() checks and
+// publish an output mask for NaN transforms. Fail closed at build time even
+// when fast-math is inherited from a parent project toolchain.
+#if defined(__FAST_MATH__)
+#error "T-068 quad scope requires strict floating-point semantics (no -ffast-math/-Ofast)"
+#endif
+
 namespace {
 bool overlaps(const void* a, size_t len_a, const void* b, size_t len_b) noexcept {
     const auto x = reinterpret_cast<uintptr_t>(a);

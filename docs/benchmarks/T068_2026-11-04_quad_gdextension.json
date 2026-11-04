@@ -3,7 +3,7 @@
   "schema_version": 1,
   "mode": "optional isolated Godot 4.8b2 GDExtension; not a runtime backend",
   "godot_version": "4.8.beta2.official.cafc17a19",
-  "quad_source_sha256": "48a2be779dd8140f987aa53177d14c875ade17c912e0ccaf4ff60fd4a5f9975c",
+  "quad_source_sha256": "95094bfb518dc1b7289e53e9ef767bbf6705166a444a734b861dbe527ce64466",
   "bridge_source_sha256": "37055ba1a0494a9cc1aeaf9e170f9f71b3b1e27b9a2451dd896d4af5b148f2ab",
   "profile_sha256": "55db711cf88b253d5b71938186d6ad5ac605e8d175b9e6cb5c5fdec34006daf1",
   "oracle_sha256": "17aa26b3440508382a7a3c6a5a0e23c35c2a170a9b29d392c0a6aff6bd1cfa19",

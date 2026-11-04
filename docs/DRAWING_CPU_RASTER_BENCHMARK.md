@@ -1650,3 +1650,27 @@ chosen to fit the mask count.
   platform-dependent near-edge rounding, large coordinate ranges, runtime
   editor integration, physical display latency, RAM/VRAM and release exports.
   No timing or speedup conclusion is drawn from these correctness tests.
+
+## 2026-11-04 T-068 — compiler optimization and malformed native inputs
+
+The detached four-corner scope mask's float32 approximate-edge rules are
+compiler-sensitive **and** its ABI must reject nonfinite input atomically.
+A controlled pre-guard reproduction showed GCC `-Ofast` could return a
+nonerror mask and overwrite an output sentinel on NaN coefficient/density
+inputs, where strict `-O2` returned an error without modifying the buffer.
+The test-only C++ kernel now rejects builds defining `__FAST_MATH__`.
+
+[Reproducible six-profile matrix](benchmarks/T068_2026-11-04_quad_compiler_matrix.json) ·
+[runner](../tools/benchmarks/t068_quad_compiler_matrix.py) ·
+[contracts](../tests/test_t068_quad_compiler_matrix.py).
+GCC/Clang `-O0/-O2/-O3` yielded **576/576 identical pinned Godot masks**
+(two full 48-case passes per profile). All **42/42 invalid buffer/input
+checks** rejected without modifying the sentinel. GCC `-Ofast` and Clang
+`-O3 -ffast-math` failed compilation on the explicit guard. The recompiled
+native Godot bridge also retained 15-case mask/brush/document publication
+parity (55 scope and 153 publication checks per run, twice).
+
+These are Linux x86-64 compiler and input-validation checks, **not speed
+measurements** or proof of arbitrary near-edge geometry, Windows/MSVC, ARM,
+GPU input-to-visible latency, memory/VRAM or production backend readiness.
+The historical strict-double counterexample stays preserved separately.
