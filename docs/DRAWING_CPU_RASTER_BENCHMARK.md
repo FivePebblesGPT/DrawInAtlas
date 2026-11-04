@@ -1674,3 +1674,20 @@ These are Linux x86-64 compiler and input-validation checks, **not speed
 measurements** or proof of arbitrary near-edge geometry, Windows/MSVC, ARM,
 GPU input-to-visible latency, memory/VRAM or production backend readiness.
 The historical strict-double counterexample stays preserved separately.
+
+
+## 2026-11-04 — additional convex-scope C++/Godot differential screen
+
+The original 48-case near-boundary oracle emphasized rectangles. A second,
+independently Godot-authored 96-case oracle varies convex 3–8-vertex polygons,
+exact/near-edge rectangles, winding, affine transforms, enabled/empty
+selections and density at **24×24** pixels. The detached quad C++17 kernel
+matched **384/384 full masks** under strict GCC `-O2` and Clang `-O3`, two
+runs per compiler. There were **no extra or missing selected pixels** in this
+finite screen. The source- and oracle-pinned
+[evidence](benchmarks/T068_2026-11-04_quad_stress.json),
+[runner](../tools/benchmarks/t068_quad_stress.py),
+[Godot fixture generator](../tests/drawing_t068_quad_stress_oracle.gd) and
+[contracts](../tests/test_t068_quad_stress.py) reproduce the result and reject
+tampering. These are **correctness comparisons only**: no timing, production
+native extension, cross-OS parity or release validation is implied.

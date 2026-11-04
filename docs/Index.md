@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 varied-convex selection stress checkpoint (2026-11-04; In Progress):**
+A separate deterministic Godot 4.8b2 `AtlasFill._allows_pixel()` oracle now
+covers **96 different 24² scopes**, including 3–8-vertex convex polygons,
+reversed winding, disabled/empty scopes, four raster densities, mirrored,
+rotated and sheared transforms, and near-edge rectangles. The detached C++
+quad mask matched **384/384 masks** (GCC `-O2` and Clang `-O3`, two complete
+passes each) with zero missing or extra pixels. A source/fixture-pinned replay
+rejects forged evidence and tests invalid-buffer failure atomicity; CI
+regenerates the Godot oracle. This remains **research evidence**, not a
+claim about arbitrary polygons, Windows, 64-bit Godot geometry, physical
+latency, or native-backend approval. T-068 stays In Progress.
+[Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_quad_stress.json).
+
 **T-068 strict GCC/Clang native selection ABI checkpoint (2026-11-04; In Progress):**
 The test-only convex four-corner C++ kernel now rejects `-ffast-math` and
 `-Ofast` builds: GCC fast-math can elide NaN/Inf rejection and overwrite

@@ -35,6 +35,7 @@ jobs:
           command -v g++
           command -v clang++
           python3 -m unittest discover -s tests -p test_t068_quad_compiler_matrix.py -v
+          python3 -m unittest discover -s tests -p test_t068_quad_stress.py -v
           python3 tools/benchmarks/t068_quad_compiler_matrix.py \
             --output /tmp/t068-quad-compiler-matrix.json
           test -s /tmp/t068-quad-compiler-matrix.json

@@ -53,6 +53,14 @@
   The fast push/PR T-068 contracts and the manual-only bridge workflow both
   exercise this matrix. This is Linux C++ ABI safety, not native deployment,
   Windows support, a measured speedup, or physical GPU evidence.
+- T-068 additional convex polygon scope stress:
+  `tests/test_t068_quad_stress.py` checks a SHA-pinned Godot 4.8b2
+  96-case convex scope oracle against the detached C++ selection ABI under
+  GCC `-O2` and Clang `-O3`. Both profiles run twice (**384 masks**),
+  and evidence tampering or invalid native output fails the normal push-CI
+  job. `T068_QUAD_GODOT=godot` regenerates the independent fixture byte-for-byte.
+  The experiment is not loaded by either app and does not imply Windows,
+  GPU, or release acceptance.
 - T-068 native Atlas four-corner scope through the *temporary* Godot bridge:
   `tests/test_t068_quad_gdextension.py` pins two 55-check Godot 4.8b2
   runs against 15 real `AtlasFill._allows_pixel` full masks, tests the
