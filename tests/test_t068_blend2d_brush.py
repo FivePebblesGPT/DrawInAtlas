@@ -163,7 +163,10 @@ class NativeBlend2DBrushContracts(unittest.TestCase):
                                  ({"coverage": source}, -1),
                                  ({"output": coverage}, -1),
                                  ({"coverage": selection}, -1),
-                                 ({"side": 513}, -1)):
+                                 ({"side": 2049}, -1),
+                                 ({"draw_ns": ctypes.cast(source, ctypes.POINTER(ctypes.c_uint64))}, -1),
+                                 ({"composite_ns": ctypes.cast(output, ctypes.POINTER(ctypes.c_uint64))}, -1),
+                                 ({"composite_ns": ctypes.byref(draw)}, -1)):
             with self.subTest(kwargs=kwargs):
                 self.assertEqual(invoke(**kwargs), expected)
                 self.assertEqual(bytes(output), bytes([113] * 256))

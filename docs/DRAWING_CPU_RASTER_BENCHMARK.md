@@ -1141,3 +1141,63 @@ limited screen. The masked C++ straight-RGBA8 pipeline is a useful boundary
 experiment, **not** a native Godot extension, physical input-to-visible
 measurement, complete production CPU workload, or Skia C++ benchmark. T-068
 still requires hardware, full-size document, release and approval gates.
+
+
+## 2026-11-04 detached native Blend2D full-size scaling (not Godot frame timings)
+
+The pinned 0.21.2 C++ A8 path comparator from the earlier 32² Godot parity
+screen now supports **512²/1024²/2048²** input/output tiles. It uses
+straight-RGBA8 source buffers with nonzero hidden RGB under zero alpha,
+three additional alpha classes and independent once-per-pixel canonical
+source-over/erase reconstruction. Four synthetic gestures are placed at the
+center of each tile with eligible spans of **128 or 256 pixels**, keeping
+local path geometry fixed while the surrounding storage region grows:
+4px long stroke, 256px round dab, 64px self-crossing sparse-mask erase and
+transparent source-over no-op. The synthetic coverage is from **Blend2D**,
+not Godot's hard brush; this screen does **not** establish geometry parity.
+
+Two independent runs, three timed calls per case: 3 sizes × 4 workloads ×
+2 runs = **24 independently byte-replayed outputs**. The `call_us` medians
+include Python `ctypes` call and native stencil/composition but exclude
+Python input preparation and output unpacking (both separately recorded).
+All timings below are *ranges of the two run medians*; just three samples
+per cell cannot establish a reliable p95 or production speedup.
+
+| Storage side | 4px stroke call median | 256px dab call median | Sparse crossing erase call median | Transparent no-op call median | Whole-tile output bytes |
+|---:|---:|---:|---:|---:|---:|
+| 512 | 706–900 µs | 1,571–1,720 µs | 556–725 µs | 491–552 µs | 1 MiB |
+| 1024 | 3,180–3,322 µs | 3,129–3,370 µs | 2,334–2,921 µs | 2,183–2,647 µs | 4 MiB |
+| 2048 | 13,502–15,483 µs | 10,622–11,914 µs | 11,153–13,061 µs | 11,146–11,294 µs | 16 MiB |
+
+The 4px gesture changes only **460 pixels** at every size, yet the same
+full-size returned RGBA8 buffer scales from 1 to 16 MiB. Under an entirely
+separate **hypothetical** display grid, four touched 128² tiles would require
+256 KiB, and four touched 256² tiles would require 1 MiB of full-tile updates.
+These values are **computed** from changed pixels and region geometry, not
+measured GPU transfer, GDExtension output, or evidence that `ImageTexture`
+supports subrectangle uploads. Actual native-compositor work also includes
+a full-tile scan and source copy, explaining why no-op calls still scale.
+Selection and final RGBA8 bytes, compressed native selected-pixel masks,
+no-op preservation, dirty-region counts and native timing samples are
+fail-closed in [the two-run raw results](benchmarks/T068_2026-11-04_blend2d_scale.json).
+
+Reproduce after building the externally pinned `libblend2d.so`, without
+copying the library into the repository:
+
+```bash
+T068_BLEND2D_ARCHIVE=/path/to/blend2d-0.21.2.tar.gz \
+T068_BLEND2D_SOURCE=/path/to/blend2d \
+T068_BLEND2D_BUILD=/path/to/blend2d-build \
+python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py -v
+python3 tools/benchmarks/t068_blend2d_scale.py \
+  --archive /path/to/blend2d-0.21.2.tar.gz \
+  --source /path/to/blend2d --library-dir /path/to/blend2d-build \
+  --runs 2 --trials 3 --output /tmp/t068-blend2d-scale.json
+```
+
+**Conclusion:** the fixed output-size scan/copy penalty is measurable under
+large canonical storage strides; pursue bounded region and sparse native
+publication experiments before considering native adoption. Transformed
+four-corner selection/Godot brush parity, Skia native C++ matching, real
+Godot marshaling, physical Windows/Linux p95/RAM/VRAM and standalone release
+validation remain open. T-068 is **In Progress**.

@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <new>
 #include <vector>
 
 #if defined(_WIN32)
@@ -62,7 +63,8 @@ T068_EXPORT int32_t t068_blend2d_brush_abi_version() noexcept { return 1; }
 /// @param draw_ns Synchronous stencil setup+render+end (not Godot/USB/GPU).
 /// @param composite_ns Selection and canonical RGBA8 CPU pass (no publication).
 /// @return Changed pixel count, or -1 invalid args, -2 Blend2D failure,
-///         -3 nonbinary selection. All negative returns leave outputs intact.
+///         -3 nonbinary selection, -4 allocation failure. All negative returns
+///         leave output buffers and timing counters intact.
 T068_EXPORT int32_t t068_blend2d_brush(
     const uint8_t* source, uint64_t source_bytes, uint8_t* output,
     uint64_t output_bytes, uint8_t* coverage, uint64_t coverage_bytes,
@@ -71,7 +73,7 @@ T068_EXPORT int32_t t068_blend2d_brush(
     int32_t point_count, double width,
     uint32_t argb, int32_t erase, int32_t threshold, uint64_t* draw_ns,
     uint64_t* composite_ns) noexcept {
-    if (side < 1 || side > 512 || !source || !output || !coverage || !selection ||
+    if (side < 1 || side > 2048 || !source || !output || !coverage || !selection ||
         !points || !draw_ns || !composite_ns || source == output ||
         point_count < 1 || point_count > 128 || !std::isfinite(width) ||
         width <= 0 || width > 512 || erase < 0 || erase > 1 ||
@@ -80,6 +82,17 @@ T068_EXPORT int32_t t068_blend2d_brush(
     if (source_bytes != count * 4U || output_bytes != count * 4U ||
         selection_bytes != count || coverage_bytes != count ||
         point_bytes != uint64_t(point_count) * 2U * sizeof(double)) return -1;
+    // Timing pointers are outputs too: they must not alias any input or output
+    // buffer, nor each other. Otherwise a successful call can mutate "const"
+    // source bytes or corrupt a delivered pixel buffer after validation.
+    for (const auto* timing : {draw_ns, composite_ns}) {
+        if (overlaps(timing, sizeof(uint64_t), source, count * 4U) ||
+            overlaps(timing, sizeof(uint64_t), selection, count) ||
+            overlaps(timing, sizeof(uint64_t), points, size_t(point_bytes)) ||
+            overlaps(timing, sizeof(uint64_t), output, count * 4U) ||
+            overlaps(timing, sizeof(uint64_t), coverage, count)) return -1;
+    }
+    if (overlaps(draw_ns, sizeof(uint64_t), composite_ns, sizeof(uint64_t))) return -1;
     if (overlaps(output, count * 4U, source, count * 4U) ||
         overlaps(output, count * 4U, selection, count) ||
         overlaps(output, count * 4U, points, point_bytes) ||
@@ -93,6 +106,7 @@ T068_EXPORT int32_t t068_blend2d_brush(
     for (size_t i = 0; i < count; ++i)
         if (selection[i] != 0U && selection[i] != 1U) return -3;
 
+    try {
     std::vector<uint8_t> stencil(count, 0);
     const auto draw_start = Clock::now();
     BLImage image;
@@ -146,4 +160,7 @@ T068_EXPORT int32_t t068_blend2d_brush(
     *draw_ns = draw_time;
     *composite_ns = composite_time;
     return changed;
+    } catch (const std::bad_alloc&) {
+        return -4;  // A large detached tile could not be allocated; outputs untouched.
+    }
 }

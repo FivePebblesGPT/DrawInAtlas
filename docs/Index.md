@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 native Blend2D 512/1024/2048 scaling checkpoint (2026-11-04; In Progress):**
+The pinned detached C++ A8 brush shim now accepts bounded **512², 1024² and
+2048²** straight-RGBA8 tiles (including allocation and timing-pointer alias
+failure guards). Four fixed 128/256-local-region gestures per size cover 4px
+strokes, 256px round dabs, self-crossing sparse-mask erase and an alpha-zero
+no-op. Two runs × three trials produce **24 independently reconstructed
+full-output comparisons** and 72 native calls. The 2048² full output is
+**16 MiB** even with only 460 changed pixels; the same hypothetical four
+128² display tiles would total **256 KiB** of full updates, *not measured
+Godot uploads*. Native call timings rise materially with whole-tile size;
+no Godot large-brush geometry parity or end-to-end speedup is claimed.
+[T-068](Tickets/T-068.md),
+[two-run evidence](benchmarks/T068_2026-11-04_blend2d_scale.json).
+
 **T-068 native Blend2D hard-brush and selection comparison (2026-11-04; In Progress):**
 The pinned 0.21.2 C++ A8 path rasterizer is now screened against **16 actual
 Godot-generated hard-brush fixtures** per threshold, including far signed

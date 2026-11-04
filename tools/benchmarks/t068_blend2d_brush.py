@@ -51,7 +51,7 @@ class NativeBrush:
                width: float, paint: tuple[int, int, int, int], erase: bool,
                selection: bytes, threshold: int) -> tuple[bytes, set[int], dict[str, float], int]:
         """Return detached canonical pixels, postselection mask, timings, changes."""
-        if (side < 1 or side > 512 or len(source) != side * side * 4
+        if (side < 1 or side > 2048 or len(source) != side * side * 4
                 or len(selection) != side * side or any(c not in (0, 1) for c in selection)
                 or not 1 <= len(path) <= 128 or not 0 < width <= 512
                 or not 1 <= threshold <= 255 or len(paint) != 4
