@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 pinned Skia 144.1 CPU pixel/shape screen (2026-11-04; In Progress):**
+The owner-supplied, SHA-256-verified **CPython 3.13 Linux wheel** was used
+outside the repository for an optional CPU-only comparison. Two nine-trial
+runs checked **126 rectangle scenarios** across 32²/64²/128² surfaces,
+three transfer modes and seven operations against the checked C++ kernel and
+canonical straight-RGBA8 oracle. **60** scenarios disagreed; direct
+unpremultiplied RGBA8 matched six fixed-case operations and retained all
+untouched hidden RGB, but zero-alpha color replacement failed and seeded
+random source-over revealed two changed-pixel rounding mismatches per run.
+Antialiased and hard path footprints are only capability screens, **not**
+canonical brush parity. Skia remains unadopted; T-068 still needs native C++
+path/marshal, physical Windows/Linux timings and release gates.
+[T-068](Tickets/T-068.md), [raw evidence](benchmarks/T068_2026-11-04_skia_cpu.json).
+
 **T-068 pinned Blend2D CPU conversion/parity screen (2026-11-04; In Progress):**
 User-supplied, SHA-256-verified Blend2D **0.21.2** with bundled AsmJit
 was built locally as a *manual-only* CPU compositor. Two 9-trial runs across

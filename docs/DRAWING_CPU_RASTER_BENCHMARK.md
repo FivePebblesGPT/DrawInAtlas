@@ -54,13 +54,13 @@ The [Godot ImageTexture API](https://docs.godotengine.org/en/stable/classes/clas
 
 | Operation | A/B Godot | C++ prototype | Blend2D D | Skia CPU E | Decision today |
 |---|---|---|---|---|---|
-| Existing once-covered hard brush, exact straight-RGBA8 | Reference behavior, measured | Masked per-pixel batch verified; native path geometry not implemented | Premultiplied format conversion / rounding parity **not established**; no runnable dependency | Same unresolved exact-byte bridge | Keep GDScript; prototype narrow native batch further for large gestures |
+| Existing once-covered hard brush, exact straight-RGBA8 | Reference behavior, measured | Masked per-pixel batch verified; native path geometry not implemented | Pinned premultiplied comparison has parity losses (see later checkpoint) | Direct Skia RGBA8 shows rare rounding/transparent-replace mismatches; no brush/mask parity (see later checkpoint) | Keep GDScript; prototype narrow native batch further for large gestures |
 | Erase, bounded fill, touched-region COW, compact undo | Functional and regression-tested; large fill slow | Exact replace/erase/mask and compact deltas verified, but region copied fully | Not a complete undo/document store | Not a complete undo/document store | Optimize bounded native buffers and touched-region COW first |
-| Visible multi-layer CPU composite | B is measured ~16× A | No compiled compositing integration | CPU compositor feasible; output parity unknown | CPU compositor feasible; output parity unknown | **Ship B**, no external renderer |
-| Vector paths, Béziers, antialias, complex blend | Separate existing tool contracts | Unsupported by simple hard-pixel prototype | Candidate when quality/workload requirements justify it | Candidate if paths/text/filters warrant heavier dependency | Defer new engine; performance **not measured** |
+| Visible multi-layer CPU composite | B is measured ~16× A | No compiled compositing integration | CPU rectangle rendered, but straight RGBA8 parity not general | Direct CPU rectangles screened; canonical general compositing not proven | **Ship B**, no external renderer |
+| Vector paths, Béziers, antialias, complex blend | Separate existing tool contracts | Unsupported by simple hard-pixel prototype | Candidate when quality/workload requirements justify it | Skia CPU path/AA capability screened; no canonical geometry parity yet | Defer new engine; app-level performance **not measured** |
 | Natural brush dynamics, pressure/tilt | Not this hard-brush benchmark | Unsupported | Limited natural-media brush semantics | No libmypaint equivalence assumed | Evaluate **libmypaint** separately only if feature scope demands |
 
-External dependencies were **not fetched, built or timed**: no Blend2D, Skia or libmypaint development packages were available on this machine, and source download failed due DNS/network access. Thus **there is no honest D/E p95 speedup, binary-size, conversion-cost, exact output parity, or release compatibility result**. Capability/licensing screening is not an execution benchmark. Blend2D [zlib licensing / AsmJit requirement and release pin hashes](https://blend2d.com/download.html), candidate version **0.21.2**, source SHA **`def0d1238c3e5d0983bb848e5676049d829e435b`**; Skia [BSD 3-Clause](https://github.com/google/skia/blob/main/LICENSE) with GN and extensive optional build dependencies; libmypaint [ISC and json-c](https://github.com/mypaint/libmypaint/blob/master/README.md). No external code or binaries were copied into the monorepo. Windows builds and all third-party versions would require actual validated dependency locking before acceptance.
+At the **initial 2026-11-02 checkpoint only**, external dependencies were **not fetched, built or timed**: no Blend2D, Skia or libmypaint development packages were available on this machine, and source download failed due DNS/network access. Thus **there is no honest D/E p95 speedup, binary-size, conversion-cost, exact output parity, or release compatibility result**. Capability/licensing screening is not an execution benchmark. Blend2D [zlib licensing / AsmJit requirement and release pin hashes](https://blend2d.com/download.html), candidate version **0.21.2**, source SHA **`def0d1238c3e5d0983bb848e5676049d829e435b`**; Skia [BSD 3-Clause](https://github.com/google/skia/blob/main/LICENSE) with GN and extensive optional build dependencies; libmypaint [ISC and json-c](https://github.com/mypaint/libmypaint/blob/master/README.md). No external code or binaries were copied into the monorepo. Windows builds and all third-party versions would require actual validated dependency locking before acceptance.
 
 
 ## Regression and legacy compatibility evidence
@@ -72,7 +72,7 @@ External dependencies were **not fetched, built or timed**: no Blend2D, Skia or 
 
 ## Remaining mandatory T-068 acceptance work
 
-1. Build/run pinned Blend2D CPU and Skia CPU comparators on eligible path/shape and compositing workloads; document exact premultiplied↔straight-byte conversions and unchanged hidden-RGB preservation. libmypaint only if natural brush support enters Essential scope.
+1. Extend the pinned Blend2D rectangle and Skia CPU rectangle/path screens with an independently verified canonical shape/brush/mask workload and matched *native C++* conversion/marshal benchmarks; their current source/format differences and hidden-RGB losses are recorded below. Evaluate libmypaint only if natural brush support enters Essential scope.
 2. Prototype a **versioned optional GDExtension** (no Atlas references), pass bounded region batches and measure real marshal+conversion overhead, source revision conflicts, output dirty rectangles and main-thread publication. Explicitly measure SIMD vs scalar only once compiled; the existing C++ prototype does not implement SIMD.
 3. Measure real pointer-event → CPU stage → main-thread texture update → displayed-frame latency median/p95, plus RAM/VRAM peaks and multi-thread jitter on Windows and Linux (including non-software GPUs). Test large brush, shape/flood, transformed four-corner masks, multiple layers and rapid cancel/undo under controlled loads.
 4. Prove the native module optionality and independent standalone Drawing release on both desktop targets. Do **not** select or ship a native library until verified repeatable wins outweigh the additional binary, license and update burden.
@@ -849,3 +849,73 @@ no shape/AA oracle, mixed-layer or mask workload, live GDExtension bridge,
 production pointer path, peak memory test, or matched native conversion cost.
 **No Blend2D source/binary has been imported into Drawing/Atlas.** Continue
 Skia/shape and real hardware evaluation; T-068 stays In Progress.
+
+
+## 2026-11-04 optional Skia-python 144.1 CPU RGBA8 + path screen (not adoption)
+
+The externally supplied [Skia-python 144.1 wheel](https://pypi.org/project/skia-python/144.1/)
+was SHA-256 verified as
+`a008767c16671f3704ea5e1a8cee99854047044632c0d71a37105d6b632b816a`.
+It bundles a Skia native library in a Python binding, **not** the source or
+linkable native SDK; this is an executable CPU pixel screen, **not** a direct
+Skia C++ performance comparison. `tools/benchmarks/t068_skia_cpu.py` creates
+CPU-only `SkSurface.MakeRasterDirect` surfaces, uses explicitly disabled
+antialiasing for rectangular parity, and checks the *same* independent
+straight-RGBA8 oracle and checked C++ kernel as Blend2D and Cairo.
+
+To reproduce using the uploaded wheel without installing anything in the
+Drawing/Atlas repository:
+
+```bash
+python3.13 -m pip install --target /tmp/t068-skia-deps   /path/to/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl
+T068_SKIA_WHEEL=/path/to/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl PYTHONPATH=/tmp/t068-skia-deps python3.13 -m unittest discover -s tests -p test_t068_skia_cpu.py -v
+PYTHONPATH=/tmp/t068-skia-deps python3.13 tools/benchmarks/t068_skia_cpu.py   --wheel /path/to/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl   --runs 2 --trials 9 --sides 32 64 128   --output /tmp/t068-skia-cpu.json
+```
+
+The separate *manual-only* workflow pins the wheel and Python 3.13; ordinary
+push CI validates contracts without installing Skia. Two independent runs of
+9 trials × 3 sizes × 7 operations × 3 transfer paths yield **126** rect
+scenarios. **60** showed non-canonical Skia pixels (30 per run):
+
+| Transfer mode | Non-parity cases per run (of 21) | Untouched hidden RGB | Key distinction |
+|---|---:|---|---|
+| Direct straight-RGBA8 SkSurface | 3 | Preserved | Only transparent-color replacement disagreed in fixed matrix; two seeded random blend mismatches/run |
+| Premultiplied full tile | 15 | Damaged | Source roundtrip alters unpainted bytes, even for zero-alpha source-over |
+| Premultiplied region and patch | 12 | Preserved | Touched translucent colors/alpha still differ from canonical rounding |
+
+Example at 64²: direct translucent source-over has **0** disagreements in
+this fixed fixture, while region-premultiplied has **782 touched** disagreements
+and full-premultiplied additionally has **2,025 untouched** mismatches. Direct
+transparent-color replacement loses the explicit color in **1,024** touched
+zero-alpha pixels; it is **not** equivalent to Drawing's replacement rule.
+Skia's straight RGBA8 surface sometimes reproduces exact source-over values,
+but 16 seeded randomized sources × 3 operations exposed **2 touched rounding
+mismatches per run**, with zero untouched modifications. Do not silently
+consider the six fixed matrix passes proof of universal exactness.
+
+An independent CPU SkPath quadratic triangle screen produces **634** hard-edge
+changed pixels and **737** AA changed pixels (including **83** partial-alpha
+edge pixels) in a 64² image; every modified byte stayed in its conservative
+bounds and both runs were deterministic. There is **no** canonical hard-brush
+geometry, mask or gesture oracle for this AA screen, so it is capability
+coverage rather than exact functional acceptance.
+
+For the 64² opaque source-over fixture the two independent run medians are:
+C++ kernel call **30.827/30.786 µs**, Skia direct draw-only **6.129/3.015 µs**,
+and Python Skia direct create+copy+draw **25.678/15.523 µs**. By contrast,
+premultiplied full-image conversion+render+unconversion costs
+**4,004.64/3,644.276 µs** in this deliberately naïve Python path. These
+clocks have *different* setup, language and memory-copy boundaries; there is
+no valid native performance ranking or claim of user-visible acceleration.
+
+**Decision by operation:** keep canonical Godot/direct C++ pixel publication
+for exact source-over/replace, hidden alpha, masks, and undo. Direct Skia
+RGBA8 is interesting for noncanonical previews or later vector AA/shape
+support, but its 0-alpha source replacement and rare source-over rounding
+must be addressed and independently retested before any canonical backend
+consideration. Retain Skia as an optional comparator only; no binary or
+runtime dependency was added to the shipped application. Outstanding:
+matched native C++ Skia/marshalling benchmarks, real brush/path masks and
+transforms, portable Godot extension/standalone builds, Windows and Linux
+physical end-to-visible p95 and RAM/VRAM/multithread results. **T-068 stays
+In Progress.** Raw evidence: [Skia CPU JSON](benchmarks/T068_2026-11-04_skia_cpu.json).
