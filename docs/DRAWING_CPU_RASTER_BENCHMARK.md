@@ -1827,3 +1827,42 @@ claimed to be GPU display-region dimensions**.
 [Raw, checked two-run JSON](benchmarks/T068_2026-11-04_native_process_memory.json) ·
 [offline tamper-rejecting tests](../tests/test_t068_native_memory.py).
 Native dependencies remain optional research fixtures; T-068 is In Progress.
+
+
+## 2026-11-04 T-068 — software-rendered visual timing with a CPU-busy process
+
+The [opt-in X11 diagnostic](../tools/benchmarks/t068_visual_contention.py) launches
+**two fresh Godot 4.8 beta 2** `drawing_latency_stress_visual.gd` sessions:
+idle, followed by an independent CPU-busy Python process. The CPU worker's
+Linux `/proc` tick counter increases from **94 to 279** during the latter
+session. Both processes pass all **81/81 canonical framebuffer and document
+revision checks**. Each of the five brush cases retains five raw CPU-dispatch
+and event-to-`frame_post_draw` samples per phase; derived medians and p95,
+whole-process RSS/HWM series and software GPU identity are independently
+rechecked. The separate worker is **not** an isolated Godot brush thread.
+
+| Workload | Idle software frame median | Loaded software frame median | Loaded minus idle |
+| --- | ---: | ---: | ---: |
+| 4px dab | 14.210 ms | 13.150 ms | −1.060 ms |
+| 32px dab | 27.879 ms | 23.582 ms | −4.297 ms |
+| 64px dab | 84.411 ms | 54.548 ms | −29.863 ms |
+| 4px long stroke | 28.549 ms | 20.684 ms | −7.865 ms |
+| 4px crossing stroke | 28.882 ms | 20.503 ms | −8.379 ms |
+
+These are **sequential, non-counterbalanced** runs with only five synthetic
+samples per workload under Xvfb/Mesa **llvmpipe**; differences cannot be
+attributed to CPU contention; the systematically lower loaded phase is
+consistent with order/warm-up bias, not an actual load benefit. One attempted
+capture with inconsistent RSS/HWM samples was rejected and replaced by a
+complete fresh capture. These data cannot support a robust p95 or jitter
+regression threshold. Worker activity does not establish shared-core scheduling. Time
+ends at Godot `frame_post_draw`, not physical scan-out. The whole-Godot-process
+memory high-water marks were **287,796 KiB idle** and **287,504 KiB loaded**;
+they do not isolate brush RAM and are not GPU VRAM. The design explicitly
+fails closed on omitted phases, altered raw samples/statistics, absent worker
+activity, fabricated hardware labels, and altered process-memory series.
+
+[Full software-only record](benchmarks/T068_2026-11-04_visual_contention_software.json) ·
+[offline contracts](../tests/test_t068_visual_contention.py). No production
+raster path or native dependency changed; T-068 remains In Progress pending
+physical Windows/Linux hardware measurements and the backend decision.

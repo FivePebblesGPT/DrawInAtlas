@@ -90,6 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p test_t068_visual_device.py -v
+          python3 -m unittest discover -s tests -p test_t068_visual_contention.py -v
           timeout --signal=TERM --kill-after=5s 180s xvfb-run -a \
             -s '-screen 0 1400x900x24' env LIBGL_ALWAYS_SOFTWARE=1 \
             python3 tools/benchmarks/t068_visual_device.py \
@@ -97,6 +98,17 @@ jobs:
               --output /tmp/t068-visual-software.json
           python3 tools/benchmarks/t068_visual_device.py \
             --evidence /tmp/t068-visual-software.json
+      - name: Compare software frame jitter under external CPU activity
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 360s xvfb-run -a \
+            -s '-screen 0 1400x900x24' env LIBGL_ALWAYS_SOFTWARE=1 \
+            python3 tools/benchmarks/t068_visual_contention.py \
+              --godot "$(command -v godot)" \
+              --output /tmp/t068-visual-contention-software.json
+          python3 tools/benchmarks/t068_visual_contention.py \
+            --evidence /tmp/t068-visual-contention-software.json
       - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -109,4 +121,5 @@ jobs:
             /tmp/t068-gdextension-quad-publication.json
             /tmp/t068-gdextension-large.json
             /tmp/t068-visual-software.json
+            /tmp/t068-visual-contention-software.json
           if-no-files-found: warn

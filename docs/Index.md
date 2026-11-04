@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 software-rendered visual-frame contention diagnostic (2026-11-04; In Progress):**
+An opt-in Linux X11 experiment now runs **two fresh 25-gesture Godot 4.8b2
+framebuffer witnesses**, first idle and then with a verified CPU-busy
+subprocess. Both pass **81/81 canonical framebuffer/revision assertions** and
+retain per-gesture dispatch/frame samples plus whole-Godot-process RSS/HWM.
+The background worker consumed 185 Linux CPU ticks; all loaded-phase
+five-sample frame medians were lower, a result strongly susceptible to fixed
+phase order/cache effects, so no attributable speedup or jitter bound exists.
+The complete source-pinned software-only record has replay/tamper checks and cannot count for physical input-to-photon,
+GPU/VRAM, Windows, or native backend acceptance. T-068 remains In Progress.
+[Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_visual_contention_software.json).
+
+
 **T-068 Godot visual-frame and process-RSS diagnostic (2026-11-04; In Progress):**
 An opt-in X11 runner now captures **25 paired synthetic input-to-`frame_post_draw` / CPU-dispatch trials**, Godot framebuffer-pixel and revision checks (81/81), and sampled **whole-Godot-process VmRSS/VmHWM**. The pinned Xvfb/Mesa llvmpipe run is **software-only**; derived medians/p95, sample maxima, source hashes, and GPU identity gates have fail-closed replay tests. This is neither a physical input-to-photon or VRAM measurement nor a native backend decision. [Ticket](Tickets/T-068.md) · [software evidence](benchmarks/T068_2026-11-04_visual_process_software.json).
 

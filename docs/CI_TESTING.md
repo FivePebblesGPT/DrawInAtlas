@@ -118,6 +118,15 @@
   without a native extension; the explicit `--quad-publication-only --runs 2`
   bridge mode runs in the manual-only native CI job. The temporary extension
   does not prove deployed Atlas UI behavior or physical GPU performance.
+- T-068 opt-in **software-only** frame-jitter/CPU-load diagnostic:
+  `tests/test_t068_visual_contention.py` replays two source-pinned 25-gesture
+  Godot 4.8b2 X11 sessions (idle and with a separate CPU-busy subprocess),
+  checks the recorded `/proc` worker CPU ticks, raw frame/dispatch statistics,
+  llvmpipe adapter, canonical framebuffer checks and process RSS/HWM.
+  Replay is fast-CI safe; the real two-process Xvfb run is only in the
+  workflow-dispatch bridge job. Sequential nonrandomized phases and five
+  samples per case do **not** establish load causation, stable p95, physical
+  input-to-photon, GPU VRAM, or Windows/production backend acceptance.
 - T-068 visual/X11 process-memory diagnostic:
   `tests/test_t068_visual_device.py` replays a **source-pinned Xvfb/llvmpipe**
   25-trial Godot input-to-`frame_post_draw` witness and independently validates
