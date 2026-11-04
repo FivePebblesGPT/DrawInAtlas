@@ -52,6 +52,13 @@ class ScalarBrush:
                                   ctypes.c_void_p, ctypes.c_uint64,
                                   ctypes.c_int32, ctypes.c_void_p, ctypes.c_uint64,
                                   ctypes.c_int32, ctypes.c_double)
+        self.composite_function = native.t068_scalar_hard_brush_rgba8
+        self.composite_function.restype = ctypes.c_int32
+        self.composite_function.argtypes = (
+            ctypes.c_void_p, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_uint64,
+            ctypes.c_void_p, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_uint64,
+            ctypes.c_int32, ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32,
+            ctypes.c_double, ctypes.c_void_p, ctypes.c_uint64, ctypes.c_int32)
 
     def render(self, side: int, path: list[list[float]], width: float,
                selection: bytes) -> bytes:
@@ -73,6 +80,39 @@ class ScalarBrush:
                 coverage.count(0) + coverage.count(255) != len(coverage)):
             raise AssertionError("Incomplete/nonbinary native scalar coverage")
         return coverage
+
+    def composite(self, source: bytes, side: int, path: list[list[float]],
+                  width: float, selection: bytes, paint: tuple[int, int, int, int],
+                  erase: bool) -> tuple[bytes, bytes]:
+        """Return canonical pixels and complete coverage from one native call."""
+        if (len(source) != side * side * 4 or len(selection) != side * side or
+                any(type(channel) is not int or not 0 <= channel <= 255 for channel in paint)
+                or len(paint) != 4):
+            raise ValueError("Invalid native scalar compositing buffers")
+        # Reuse the public coverage facade's parameter checks without a second
+        # raster call; the C++ entrypoint independently validates all inputs.
+        if (not 1 <= side <= 2048 or not 1 <= len(path) <= 128 or
+                not math.isfinite(width) or not 0 < width <= 512 or
+                selection.count(0) + selection.count(1) != len(selection) or
+                any(len(p) != 2 or any(not math.isfinite(v) or not -2 * side <= v <= 3 * side
+                                        for v in p) for p in path)):
+            raise ValueError("Invalid native scalar compositing parameters")
+        points = (ctypes.c_double * (2 * len(path)))(*(v for pair in path for v in pair))
+        selected = (ctypes.c_uint8 * len(selection)).from_buffer_copy(selection)
+        original = (ctypes.c_uint8 * len(source)).from_buffer_copy(source)
+        color = (ctypes.c_uint8 * 4)(*paint)
+        pixels = (ctypes.c_uint8 * len(source))()
+        coverage = (ctypes.c_uint8 * len(selection))()
+        count = self.composite_function(
+            pixels, len(pixels), coverage, len(coverage), original, len(original),
+            selected, len(selected), side, points, ctypes.sizeof(points),
+            len(path), width, color, 4, int(erase))
+        if count < 0:
+            raise RuntimeError(f"Native scalar compositor returned {count}")
+        mask = bytes(coverage)
+        if count != mask.count(255) or mask.count(0) + count != len(mask):
+            raise AssertionError("Incomplete native scalar coverage")
+        return bytes(pixels), mask
 
 
 def pinned_oracles() -> tuple[int, bytes, list[dict[str, Any]], dict[tuple[int, str], set[int]]]:

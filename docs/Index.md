@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 scalar native hard-brush canonical RGBA8 checkpoint (2026-11-04; In Progress):**
+The detached C++17 hard-brush comparator now returns both the full 0/255
+gesture coverage bitmap and detached **straight-RGBA8 pixels**. Two passes
+over 28 pinned Godot geometry cases show **56/56 exact coverage and RGBA8
+comparisons**, including source-over, erasure, transparent hidden RGB,
+selection masks, crossing and 512/1024/2048-scale strokes. The 16 small cases
+match **actual Godot output hashes**; the 12 large Godot oracles supply
+coverage only, with compositing independently checked on the native scaling
+benchmark's patterned source. C++ rejects buffer aliases and malformed input
+atomically; no Godot GDExtension, document publication, texture upload,
+hardware-performance or release acceptance is claimed. [T-068](Tickets/T-068.md),
+[two-run compositing evidence](benchmarks/T068_2026-11-04_scalar_rgba8.json).
+
 **T-068 dependency-free C++ hard-brush geometry parity (2026-11-04; In Progress):**
 A detached scalar C++17 pixel-center / swept-segment comparator now returns
 exact binary once-per-gesture coverage with checked input buffers and local

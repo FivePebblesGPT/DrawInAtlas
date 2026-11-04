@@ -1325,3 +1325,27 @@ hard-pixel edits while evaluating a *narrow optional scalar/SIMD native path*
 for the same semantics. Blend2D remains a candidate for future AA/vector
 work, not the canonical hard-brush replacement. Physical and release gates
 still block T-068 closure.
+
+## T-068 — isolated scalar native hard-brush and straight-RGBA8 compositing (2026-11-04)
+
+The standalone `t068_scalar_hard_brush.cpp` now exposes a second ABI that
+returns detached full-tile RGBA8 and a postselection coverage bitmap from the
+same checked C++17 geometry comparator. It blends each covered pixel exactly
+once against the original straight RGBA8 source, using Godot's half-away
+channel rounding; alpha-zero source-over retains hidden RGB, and erasure clears
+all four channels. All caller dimensions, byte capacities, mask values,
+geometry parameters, output/input aliases and operation flags must validate
+before either output can be modified.
+
+Two independent passes matched **56/56** complete expected coverage and RGBA8
+outputs across 28 pinned cases: 16 small Godot oracles including real
+`DrawingEditSession` full-pixel hashes; 12 large (512²/1024²/2048²) Godot
+*coverage-only* oracles with independent patterned-source pixel reconstruction.
+Outputs are hashed and replayed from pinned sources, including changed counts
+and selections. See [raw evidence](benchmarks/T068_2026-11-04_scalar_rgba8.json),
+[tests](../tests/test_t068_scalar_rgba8.py) and the T-068 ticket.
+
+This is a **functional/parity checkpoint**, not a benchmark speed comparison.
+There are no matched Godot-native timings, full-size Godot pixel witnesses,
+physical input-to-visible p95, RAM/VRAM or GPU publication results; no production
+backend was selected. T-068 remains **In Progress**.

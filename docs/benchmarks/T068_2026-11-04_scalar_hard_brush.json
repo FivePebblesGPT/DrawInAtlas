@@ -6,7 +6,7 @@
     "No physical Windows/Linux input-to-visible p95, memory, GPU or standalone export validation"
   ],
   "method": "local float32 pixel-center to round swept-segment distance; binary selections",
-  "native_source_sha256": "7356099f5294d034b5a2aa21baeed5f925ffe8e536dcfd2cb599432025e9ba9e",
+  "native_source_sha256": "1575397edb69cee58f2847ffafc43e2d9a2399011474d8ef328615123fc6fa0c",
   "runs": [
     [
       {

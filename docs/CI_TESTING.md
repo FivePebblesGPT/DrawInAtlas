@@ -44,6 +44,15 @@
   Blend2D job compiles the isolated `t068_blend2d_quad_selection` ABI and
   checks failure atomicity, mask-to-brush handoff and 30 exact parity comparisons.
   Exact polygon-edge and vertex ties are covered; near-boundary floating-point tolerance and hardware/release gates remain open.
+- T-068 detached scalar C++17 hard-brush compositing:
+  `tests/test_t068_scalar_hard_brush.py` and `tests/test_t068_scalar_rgba8.py`
+  compile the dependency-free, non-shipping scalar research ABI. The latter
+  replays two runs of 28 pinned cases with exact coverage and straight-RGBA8
+  parity, verifies small-case real Godot output and large-case independent
+  patterned-source compositing, and tests fail-closed buffer aliases,
+  malformed inputs and error atomicity. It is included in the existing T-068
+  fast CI step without introducing any native runtime dependency or claiming
+  physical performance or publication acceptance.
 - T-068 verified cached flood-fill sources:
   `tests/drawing_fill_tile_cache_smoke.gd` (**30** fast-CI assertions) checks
   four-connected fills on verified lazy Object tiles as well as resident

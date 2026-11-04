@@ -45,6 +45,27 @@ bool touched(Point center, const std::vector<Point>& path, float radius) noexcep
     }
     return false;
 }
+
+uint8_t round_channel(double value) noexcept {
+    return uint8_t(std::clamp(std::lround(value), 0L, 255L));
+}
+
+// DrawingEditSession's straight-RGBA8 source-over, never a premultiplied
+// transfer. An alpha-zero paint must not destroy transparent hidden RGB.
+void composite(uint8_t* destination, const uint8_t* paint, bool erase) noexcept {
+    if (erase) {
+        std::memset(destination, 0, 4);
+        return;
+    }
+    const double sa = double(paint[3]) / 255.0;
+    if (sa <= 0.0) return;
+    const double da = double(destination[3]) / 255.0;
+    const double inv = da * (1.0 - sa);
+    const double alpha = sa + inv;
+    for (int c = 0; c < 3; ++c)
+        destination[c] = round_channel((paint[c] * sa + destination[c] * inv) / alpha);
+    destination[3] = round_channel(alpha * 255.0);
+}
 } // namespace
 
 /// Research-only, scalar, local-pixel hard brush ABI. Return the complete 0/255
@@ -88,6 +109,55 @@ T068_EXPORT int32_t t068_scalar_hard_brush(
             }
         }
         std::memcpy(output, staged.data(), size_t(count));
+        return covered;
+    } catch (const std::bad_alloc&) {
+        return -4;
+    }
+}
+
+
+/// Research-only complete hard-brush raster+composite ABI. On success output
+/// contains detached canonical straight-RGBA8 and coverage has 0/255 bytes.
+/// Source/selection/paint/points are read-only. No output changes on failure,
+/// including a malformed selection or any aliased output/input range.
+/// This does NOT commit a DrawingDocument transaction or upload a texture.
+/// @return Covered pixels; -1 malformed buffer/alias/operation, -3 bad mask,
+///         -4 allocation failure. Outputs remain unchanged for all errors.
+T068_EXPORT int32_t t068_scalar_hard_brush_rgba8(
+    uint8_t* output, uint64_t output_bytes,
+    uint8_t* coverage, uint64_t coverage_bytes,
+    const uint8_t* source, uint64_t source_bytes,
+    const uint8_t* selection, uint64_t selection_bytes,
+    int32_t side, const double* points, uint64_t point_bytes,
+    int32_t point_count, double width,
+    const uint8_t* paint, uint64_t paint_bytes, int32_t erase) noexcept {
+    if (!output || !coverage || !source || !selection || !points || !paint ||
+        side < 1 || side > 2048 || (erase != 0 && erase != 1)) return -1;
+    const uint64_t count = uint64_t(side) * uint64_t(side);
+    const uint64_t rgba_bytes = count * 4U;
+    if (output_bytes != rgba_bytes || source_bytes != rgba_bytes ||
+        coverage_bytes != count || selection_bytes != count || paint_bytes != 4 ||
+        overlap(output, rgba_bytes, coverage, count) ||
+        overlap(output, rgba_bytes, source, rgba_bytes) ||
+        overlap(output, rgba_bytes, selection, count) ||
+        overlap(output, rgba_bytes, points, point_bytes) ||
+        overlap(output, rgba_bytes, paint, 4) ||
+        overlap(coverage, count, source, rgba_bytes) ||
+        overlap(coverage, count, selection, count) ||
+        overlap(coverage, count, points, point_bytes) ||
+        overlap(coverage, count, paint, 4)) return -1;
+    try {
+        std::vector<uint8_t> staged_coverage(size_t(count), 0);
+        const int32_t covered = t068_scalar_hard_brush(
+            staged_coverage.data(), count, selection, selection_bytes,
+            side, points, point_bytes, point_count, width);
+        if (covered < 0) return covered;
+        std::vector<uint8_t> staged_rgba(source, source + rgba_bytes);
+        for (uint64_t i = 0; i < count; ++i)
+            if (staged_coverage[size_t(i)] != 0)
+                composite(staged_rgba.data() + size_t(i * 4), paint, erase != 0);
+        std::memcpy(output, staged_rgba.data(), size_t(rgba_bytes));
+        std::memcpy(coverage, staged_coverage.data(), size_t(count));
         return covered;
     } catch (const std::bad_alloc&) {
         return -4;
