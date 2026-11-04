@@ -118,6 +118,15 @@
   without a native extension; the explicit `--quad-publication-only --runs 2`
   bridge mode runs in the manual-only native CI job. The temporary extension
   does not prove deployed Atlas UI behavior or physical GPU performance.
+- T-068 counterbalanced **software-only** frame-load witness:
+  `tests/test_t068_visual_counterbalanced.py` replays the source-pinned
+  four-session ABBA `idle/loaded/loaded/idle` experiment. It checks raw
+  timing/median/p95 pairs, two loaded-minus-idle contrasts per workload,
+  activity of both CPU workers, identical software GPU identity and
+  whole-Godot-process RSS/HWM. The Xvfb run is opt-in through
+  `godot-native-t068-bridge.yml`; fast CI only replays evidence. Four fresh
+  Godot processes pass 324 checks. Run order is counterbalanced but not
+  randomized; no physical input-to-photon, Windows or VRAM gate is satisfied.
 - T-068 opt-in **software-only** frame-jitter/CPU-load diagnostic:
   `tests/test_t068_visual_contention.py` replays two source-pinned 25-gesture
   Godot 4.8b2 X11 sessions (idle and with a separate CPU-busy subprocess),

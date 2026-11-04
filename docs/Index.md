@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 counterbalanced software-frame contention witness (2026-11-04; In Progress):**
+A separate opt-in Linux X11 **idle → loaded → loaded → idle** experiment runs
+four fresh 25-gesture Godot 4.8b2 framebuffer witnesses (324/324 checks), with
+two independently verified CPU-busy workers. Both order-specific loaded-minus-idle
+contrasts are retained per workload; the two-run contrast averages range from
+**+2.768 to +10.553 ms** here, opposite in direction to the earlier fixed-order
+software witness. This exposes measurement sensitivity, **not a causal load penalty**:
+five samples/workload/session, software llvmpipe, session drift, and no physical
+pointer-to-photon/VRAM/Windows measurements remain. Source-pinned replay checks
+all 100 synthetic gestures, raw timing statistics, RSS/HWM, worker activity,
+GPU profile and counterbalance order. T-068 remains In Progress.
+[Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_visual_counterbalanced_software.json).
+
 **T-068 software-rendered visual-frame contention diagnostic (2026-11-04; In Progress):**
 An opt-in Linux X11 experiment now runs **two fresh 25-gesture Godot 4.8b2
 framebuffer witnesses**, first idle and then with a verified CPU-busy

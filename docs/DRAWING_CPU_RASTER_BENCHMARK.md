@@ -1829,6 +1829,40 @@ claimed to be GPU display-region dimensions**.
 Native dependencies remain optional research fixtures; T-068 is In Progress.
 
 
+## 2026-11-04 T-068 — counterbalanced software-only frame load (not closure)
+
+The new [opt-in ABBA witness](../tools/benchmarks/t068_visual_counterbalanced.py)
+uses four **fresh** Godot 4.8b2 X11 processes: idle, loaded, loaded, idle.
+Both loaded phases run a separate CPU-busy worker (verified at **+222** and
+**+199 `/proc` CPU ticks**). All four phases passed **81/81** canonical
+framebuffer/document assertions (324 total), and all **100 synthetic gestures**
+retain raw dispatch and `frame_post_draw` samples and whole-process RSS/HWM.
+For each workload, two contrasts are calculated: loaded-after-idle in phases
+1→2, and loaded-before-idle in phases 3→4. The average is descriptive, not
+an effect-size estimate.
+
+| Workload | Idle-first loaded−idle | Loaded-first loaded−idle | Mean contrast |
+| --- | ---: | ---: | ---: |
+| 4px dab | +5.347 ms | +4.242 ms | +4.795 ms |
+| 32px dab | +7.827 ms | +1.602 ms | +4.715 ms |
+| 64px dab | +16.858 ms | +4.248 ms | +10.553 ms |
+| 4px long stroke | +7.029 ms | +5.124 ms | +6.076 ms |
+| 4px crossing stroke | +0.088 ms | +5.448 ms | +2.768 ms |
+
+Unlike the earlier fixed-order run below (where every loaded median was
+lower), this ABBA capture has higher loaded medians. The sign reversal is
+strong evidence that **these small software-only sessions are unstable**;
+it does not establish that the background worker causes longer frames.
+ABBA does not eliminate thermal/session drift, OS scheduling, or warm-up,
+and five samples per case are inadequate for a dependable tail-latency bound.
+The workers' tick counts demonstrate activity but not core contention.
+Godot's `frame_post_draw` is **not physical display presentation**; Mesa
+llvmpipe is **not hardware GPU** and process HWM is **not VRAM**.
+
+[Source-pinned full record](benchmarks/T068_2026-11-04_visual_counterbalanced_software.json) ·
+[offline evidence contracts](../tests/test_t068_visual_counterbalanced.py).
+The earlier two-phase record is retained unchanged. T-068 stays In Progress.
+
 ## 2026-11-04 T-068 — software-rendered visual timing with a CPU-busy process
 
 The [opt-in X11 diagnostic](../tools/benchmarks/t068_visual_contention.py) launches
