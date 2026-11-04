@@ -315,6 +315,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_cairo_cpu.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py
+          python3 -m unittest discover -s tests -p test_t068_matched_brush.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py
           python3 -m unittest discover -s tests -p test_t068_scalar_hard_brush.py

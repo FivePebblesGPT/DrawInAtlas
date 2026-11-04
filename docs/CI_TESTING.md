@@ -37,6 +37,15 @@
   SHA-256-pinned source, builds Blend2D with its bundled AsmJit, and records
   two 9-trial runs plus raw JSON diagnostics. No library is shipped or loaded
   into Drawing, and timing boundaries are not considered equivalent.
+- T-068 matched native scalar/Blend2D hard-brush ABI calls:
+  `tests/test_t068_matched_brush.py` replays two source-pinned runs of six 32²
+  and four 512² Godot-authored brush cases without requiring any native
+  dependency on push CI. Exact pixel/mask hashes, missing/extra coverage,
+  backend call orders, trial counts and medians are checked; tampering fails.
+  The manual-only Blend2D workflow builds the pinned source and scalar C++
+  kernel and reruns both against the same buffers in alternating order.
+  This is an isolated Python→C++ call timing, **not** publication, real
+  hardware, Windows or production backend acceptance.
 - T-068 detached transformed four-corner convex selection comparison:
   `tests/test_t068_blend2d_quad.py` replays 15 Godot-authored 64² masks
   for transformed polygonal scope checks and validates the two-run native

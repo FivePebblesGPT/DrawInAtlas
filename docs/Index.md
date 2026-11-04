@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 matched scalar/Blend2D brush benchmark (2026-11-04; In Progress):**
+A new opt-in, counterbalanced 2-run comparison times the **same preallocated
+Python→C++ ABI call boundary** for the detached scalar brush and Blend2D 0.21.2
+at threshold 128. Ten Godot-authored hard-brush cases (six 32² and four 512²)
+are validated against identical canonical straight-RGBA8 inputs, paths,
+selections and publication-free outputs, with five trials per backend/run.
+Scalar matches **20/20** Godot coverage/pixel cases; Blend2D matches **14/20**
+(the three non-parity 512² geometries repeat across both runs). This is not a
+production speedup or backend decision: the Blend2D mismatches, ctypes overhead,
+small samples, no hardware presentation and no Windows evidence remain. T-068
+stays In Progress. [Ticket](Tickets/T-068.md) ·
+[evidence](benchmarks/T068_2026-11-04_matched_brush.json).
+
 **T-068 detached scalar fast-math failure-atomicity fix (2026-11-04; In Progress):**
 The C++ scalar brush coverage/RGBA8/sparse-delta research ABI now **rejects
 `-Ofast` / `-ffast-math` builds at compile time**. A GCC `-Ofast` reproducer

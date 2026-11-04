@@ -1734,3 +1734,38 @@ finite screen. The source- and oracle-pinned
 [contracts](../tests/test_t068_quad_stress.py) reproduce the result and reject
 tampering. These are **correctness comparisons only**: no timing, production
 native extension, cross-OS parity or release validation is implied.
+
+
+## 2026-11-04 T-068 — matched scalar/Blend2D hard-brush native-call screen
+
+The previous detached scalar and Blend2D brush studies were **not matched
+benchmarks**. The new [opt-in matched runner](../tools/benchmarks/t068_matched_brush.py)
+uses the same source/mask/path/paint data and preallocated outputs, then
+alternates call order within each workload. It measures five paired
+**Python→native ABI roundtrips** per workload in two independent runs, not
+separate initialization or texture update costs. Complete outputs are checked
+against Godot-generated coverage and straight-RGBA8 oracles after every call;
+the timed interval itself does not include these Python checks.
+
+| Workload | Scalar native-call median range | Blend2D native-call median range | Blend2D Godot-pixel mismatch |
+| --- | ---: | ---: | ---: |
+| 32² stationary dab | 0.011–0.013 ms | 0.012–0.015 ms | 0 |
+| 32² self-crossing | 0.036–0.040 ms | 0.024–0.030 ms | 0 |
+| 512² 4px stroke | 0.783–0.786 ms | 0.607–0.613 ms | 0 |
+| 512² 256px dab | 2.365–2.374 ms | 1.896–2.357 ms | 36 |
+| 512² sparse crossing erase | 1.423–1.892 ms | 0.699–0.742 ms | 15 |
+| 512² transparent no-op | 0.769–0.797 ms | 0.593–0.614 ms | 0 (22 coverage mismatches) |
+
+Ten cases, two runs, five trials per backend make **200 timed calls**. Scalar
+matches all 20 oracle cases; Blend2D geometry matches 14/20. Blend2D's
+per-call times are lower here, but the large dab and sparse erase produce
+**incorrect final pixels**, so a backend speedup claim is not justified.
+Float formatting, CPU scaling, cache state and engine integration are not
+controlled sufficiently for confidence intervals or real hardware/p95
+claims. The Blend2D shim also uses different internal allocation and
+antialiasing strategies. These results concern this experimental brush
+implementation only—not Blend2D shape/text rendering capabilities.
+
+[Raw two-run evidence](benchmarks/T068_2026-11-04_matched_brush.json) ·
+[Fail-closed replay and opt-in live test](../tests/test_t068_matched_brush.py).
+No production native library is selected or shipped; T-068 stays In Progress.
