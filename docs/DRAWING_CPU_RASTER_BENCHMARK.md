@@ -2,6 +2,28 @@
 
 **Measured 2026-11-02 on a Linux x86_64 sandbox, Godot 4.8.beta2, G++ 14.2, Mesa llvmpipe 25.0.7.** Engineering evidence only. No native backend has been selected, linked into Godot, exported to Windows, or shipped. T-068 remains **In Progress** because the full gate requires actual third-party CPU raster runs, input-event-to-present profiling, native extension boundary, and multi-thread/Windows memory-jitter evidence. This is not an owner-review gate.
 
+## Detached scalar brush strict floating-point safety (2026-11-04)
+
+A direct GCC `-Ofast` build of the detached `t068_scalar_hard_brush.cpp`
+accepted a NaN width, returned zero (instead of `-1`) and changed the coverage
+output canary. `-Ofast` can assume finite floating-point values and remove the
+ABI's explicit `std::isfinite()` checks. The scalar source now rejects
+`__FAST_MATH__` at compile time, matching the previously protected native
+four-corner mask kernel. GCC `-Ofast` and Clang `-O3 -ffast-math` builds
+must fail; GCC/Clang `-O0/-O2/-O3` were tested with invalid NaN/Inf width
+and coordinate inputs across the coverage, RGBA8 and sparse entrypoints.
+All rejected calls left output canaries unchanged. The test is
+`python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py -v`.
+
+The pinned scalar and bridge evidence was **regenerated from actual native
+runs after the source change**, not edited to substitute a new source hash.
+The Godot 4.8b2 temporary bridge still passes its canonical integration,
+atomicity, four-corner publication and large-tile publication checks; benchmark
+timings are fresh diagnostic samples, not measured input-to-visible latency.
+This improvement prevents one known unsafe build configuration, but does not
+establish platform-wide FP compatibility or permission to install a native
+backend. [Ticket](Tickets/T-068.md).
+
 ## Native four-corner scope to document publication checkpoint (2026-11-04)
 
 The opt-in GDExtension now connects two previously tested detached C++17

@@ -324,6 +324,7 @@ jobs:
           T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_quad_differential.py
           T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_quad_stress.py
           python3 -m unittest discover -s tests -p test_t068_quad_compiler_matrix.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py
           python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py
           python3 -m unittest discover -s tests -p test_t068_skia_cpu.py
           T068_GODOT=godot python3 -m unittest discover -s tests -p test_t068_skia_brush.py

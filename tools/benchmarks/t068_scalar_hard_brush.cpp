@@ -8,6 +8,13 @@
 #include <new>
 #include <vector>
 
+// The hard brush validates NaN/Inf widths and pointer samples before writing.
+// Fast-math can remove these checks (GCC -Ofast accepts NaN and overwrites
+// the output), violating the detached ABI's failure-atomicity contract.
+#if defined(__FAST_MATH__)
+#error "T-068 scalar brush requires strict floating-point semantics (no -ffast-math/-Ofast)"
+#endif
+
 #if defined(_WIN32)
 #define T068_EXPORT extern "C" __declspec(dllexport)
 #else

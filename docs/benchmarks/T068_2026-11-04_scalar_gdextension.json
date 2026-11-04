@@ -1,54 +1,54 @@
 {
-  "ticket": "T-068",
-  "mode": "isolated, opt-in Godot 4.8 beta 2 GDExtension scalar hard-brush sparse ABI",
-  "godot_version": "4.8.beta2.official.cafc17a19",
-  "scalar_source_sha256": "526fff803f891ea7a2b3e66ec2c6b1868c423bd2cfa4bb092ded3a135e34843b",
   "generated_header_sha256": "c312ed1dfe6bba973018f0937b38220069467c000ee2aa3f23c34997b56f299a",
-  "runs": [
-    {
-      "scalar_checks": 31,
-      "scalar_evidence": {
-        "changed": 63,
-        "checks": 31,
-        "erase_sparse_bytes": 16,
-        "masked_sparse_bytes": 16,
-        "no_op_bytes": 4,
-        "path_bytes": 48,
-        "source_bytes": 1024,
-        "sparse_bytes": 760
-      },
-      "legacy_bridge_checks": 443,
-      "legacy_sparse_checks": 173,
-      "canonical_document_checks": 219,
-      "revision_checks": 370,
-      "marshal_checks": 731,
-      "batch_checks": 128
-    },
-    {
-      "scalar_checks": 31,
-      "scalar_evidence": {
-        "changed": 63,
-        "checks": 31,
-        "erase_sparse_bytes": 16,
-        "masked_sparse_bytes": 16,
-        "no_op_bytes": 4,
-        "path_bytes": 48,
-        "source_bytes": 1024,
-        "sparse_bytes": 760
-      },
-      "legacy_bridge_checks": 443,
-      "legacy_sparse_checks": 173,
-      "canonical_document_checks": 219,
-      "revision_checks": 370,
-      "marshal_checks": 731,
-      "batch_checks": 128
-    }
-  ],
-  "scope": "Each run compares one crossing 4px brush to real DrawingEditSession.paint_path output, validates the complete 63-change sparse wire before staging one checked DrawingDocument revision, then checks undo/redo, hidden RGB, mask, erase, zero-alpha no-op, malformed inputs, and capacity bounds.",
+  "godot_version": "4.8.beta2.official.cafc17a19",
   "limitations": [
     "Not installed in either standalone Drawing or Atlas app; bridge binary and descriptor exist only in a temporary Linux test project.",
     "Caller supplies already-transformed raster-local path samples, byte-packed little-endian float64; full transformed mask creation is separate.",
     "The test recomputes canonical Godot brush pixels before accepting the native wire, so it is a correctness witness rather than a standalone secure production adapter.",
     "No native-call timing, full gesture performance gain, physical GPU memory, pointer-to-visible p95, Windows build, or standalone binary portability claim."
-  ]
+  ],
+  "mode": "isolated, opt-in Godot 4.8 beta 2 GDExtension scalar hard-brush sparse ABI",
+  "runs": [
+    {
+      "batch_checks": 128,
+      "canonical_document_checks": 219,
+      "legacy_bridge_checks": 443,
+      "legacy_sparse_checks": 173,
+      "marshal_checks": 731,
+      "revision_checks": 370,
+      "scalar_checks": 31,
+      "scalar_evidence": {
+        "changed": 63,
+        "checks": 31,
+        "erase_sparse_bytes": 16,
+        "masked_sparse_bytes": 16,
+        "no_op_bytes": 4,
+        "path_bytes": 48,
+        "source_bytes": 1024,
+        "sparse_bytes": 760
+      }
+    },
+    {
+      "batch_checks": 128,
+      "canonical_document_checks": 219,
+      "legacy_bridge_checks": 443,
+      "legacy_sparse_checks": 173,
+      "marshal_checks": 731,
+      "revision_checks": 370,
+      "scalar_checks": 31,
+      "scalar_evidence": {
+        "changed": 63,
+        "checks": 31,
+        "erase_sparse_bytes": 16,
+        "masked_sparse_bytes": 16,
+        "no_op_bytes": 4,
+        "path_bytes": 48,
+        "source_bytes": 1024,
+        "sparse_bytes": 760
+      }
+    }
+  ],
+  "scalar_source_sha256": "48e731354c4bec55f046f11324650e41f31c94cc528eebb31fa94e4e5643a7bf",
+  "scope": "Each run compares one crossing 4px brush to real DrawingEditSession.paint_path output, validates the complete 63-change sparse wire before staging one checked DrawingDocument revision, then checks undo/redo, hidden RGB, mask, erase, zero-alpha no-op, malformed inputs, and capacity bounds.",
+  "ticket": "T-068"
 }

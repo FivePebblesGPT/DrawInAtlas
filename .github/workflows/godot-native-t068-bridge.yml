@@ -43,6 +43,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py -v
           python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py -v
           python3 tools/benchmarks/t068_native_sanitizer.py \
             --output /tmp/t068-native-sanitizer.json

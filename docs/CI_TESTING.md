@@ -53,6 +53,13 @@
   The fast push/PR T-068 contracts and the manual-only bridge workflow both
   exercise this matrix. This is Linux C++ ABI safety, not native deployment,
   Windows support, a measured speedup, or physical GPU evidence.
+- T-068 scalar strict-FP build safety: `tests/test_t068_scalar_strict_fp.py`
+  ensures GCC `-Ofast` and Clang `-O3 -ffast-math` **fail compilation**, then
+  verifies six strict GCC/Clang builds reject NaN/Inf widths and pointer
+  samples without changing coverage, RGBA8 or sparse outputs. A documented
+  GCC `-Ofast` failure of the old code motivates the source-local guard.
+  No experimental extension is installed or selected. The scalar and native
+  bridge records were freshly regenerated for the changed source checksum.
 - T-068 detached C++ ASan/UBSan safety screen:
   `tests/test_t068_native_sanitizer.py` builds two instrumented
   standalone executables (GCC and Clang `-O1`), each run twice,

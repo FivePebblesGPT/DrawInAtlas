@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 detached scalar fast-math failure-atomicity fix (2026-11-04; In Progress):**
+The C++ scalar brush coverage/RGBA8/sparse-delta research ABI now **rejects
+`-Ofast` / `-ffast-math` builds at compile time**. A GCC `-Ofast` reproducer
+accepted a NaN brush width (returned zero rather than an input error) and
+wrote over the caller's output canary. GCC and Clang strict `-O0/-O2/-O3`
+builds instead reject NaN/Inf widths and pointer samples atomically through
+all three entrypoints. The full scalar/bridge/sanitizer evidence has been
+regenerated against the guarded source, including two isolated Godot 4.8b2
+runs per publication mode. This **does not enable or approve** a native
+runtime backend or satisfy Windows/hardware acceptance; T-068 remains
+In Progress. [Ticket](Tickets/T-068.md) ·
+[benchmark report](DRAWING_CPU_RASTER_BENCHMARK.md).
+
 **T-068 detached native ASan/UBSan checkpoint (2026-11-04; In Progress):**
 A standalone C++17 harness now instruments the four-corner selection
 and scalar hard-brush coverage, RGBA8 and sparse-delta ABIs with

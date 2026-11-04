@@ -4,7 +4,7 @@
   "sources": {
     "tools/benchmarks/t068_native_sanitizer_smoke.cpp": "7c0583dc47d55653be009f5b8e8f03c96f37f58b8b6afcdd213d3724afbb33fd",
     "tools/benchmarks/t068_quad_scope_kernel.cpp": "95094bfb518dc1b7289e53e9ef767bbf6705166a444a734b861dbe527ce64466",
-    "tools/benchmarks/t068_scalar_hard_brush.cpp": "526fff803f891ea7a2b3e66ec2c6b1868c423bd2cfa4bb092ded3a135e34843b"
+    "tools/benchmarks/t068_scalar_hard_brush.cpp": "48e731354c4bec55f046f11324650e41f31c94cc528eebb31fa94e4e5643a7bf"
   },
   "compiler_flags": [
     "-std=c++17",

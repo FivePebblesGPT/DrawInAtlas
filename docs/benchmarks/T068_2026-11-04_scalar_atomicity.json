@@ -3,7 +3,7 @@
   "godot_version": "4.8.beta2.official.cafc17a19",
   "bridge_sha256": "37055ba1a0494a9cc1aeaf9e170f9f71b3b1e27b9a2451dd896d4af5b148f2ab",
   "atomicity_script_sha256": "b1584d5d1f290aeb764728d066328532a3c190f4b3b356712bc22f0adb1cc79b",
-  "scalar_source_sha256": "526fff803f891ea7a2b3e66ec2c6b1868c423bd2cfa4bb092ded3a135e34843b",
+  "scalar_source_sha256": "48e731354c4bec55f046f11324650e41f31c94cc528eebb31fa94e4e5643a7bf",
   "runs": [
     {
       "checks": 37,
