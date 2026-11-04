@@ -306,6 +306,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_checked_abi.py
           python3 -m unittest discover -s tests -p test_t068_bridge_runner.py
           python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_atomicity.py
           python3 -m unittest discover -s tests -p test_t068_scalar_publication.py
           python3 -m unittest discover -s tests -p test_t068_scalar_large_publication.py
           python3 -m unittest discover -s tests -p test_t068_scalar_transform.py

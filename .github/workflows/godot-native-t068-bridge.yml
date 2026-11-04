@@ -24,6 +24,7 @@ jobs:
           g++ --version
           python3 -m unittest discover -s tests -p test_t068_bridge_runner.py -v
           python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py -v
+          python3 -m unittest discover -s tests -p test_t068_scalar_atomicity.py -v
           python3 -m unittest discover -s tests -p test_t068_scalar_transform.py -v
           python3 -m unittest discover -s tests -p test_t068_quad_gdextension.py -v
       - name: Build and verify isolated native, texture, document, and scalar sparse brush paths
@@ -35,6 +36,15 @@ jobs:
               --godot "$(command -v godot)" --runs 2 \
               --output /tmp/t068-gdextension-bridge.json
           test -s /tmp/t068-gdextension-bridge.json
+      - name: Check native sparse cancellation, stale revision, and source conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 --atomic-only \
+              --output /tmp/t068-gdextension-atomicity.json
+          test -s /tmp/t068-gdextension-atomicity.json
       - name: Compare 512/1024/2048 CPU publication in a separate isolated build
         shell: bash
         run: |
@@ -52,5 +62,6 @@ jobs:
           name: t068-gdextension-isolated-evidence
           path: |
             /tmp/t068-gdextension-bridge.json
+            /tmp/t068-gdextension-atomicity.json
             /tmp/t068-gdextension-large.json
           if-no-files-found: warn

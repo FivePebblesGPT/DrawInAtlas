@@ -37,6 +37,8 @@ TRANSFORM_EVIDENCE_RE = re.compile(r"^T068_SCALAR_TRANSFORM_EVIDENCE: (.+)$", re
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_TIMING_RE = re.compile(r"^T068_SCALAR_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
+ATOMICITY_RE = re.compile(r"^T068_SCALAR_ATOMICITY_PASSED: (\d+) checks$", re.MULTILINE)
+ATOMICITY_EVIDENCE_RE = re.compile(r"^T068_SCALAR_ATOMICITY_EVIDENCE: (.+)$", re.MULTILINE)
 LARGE_PUBLICATION_RE = re.compile(r"^T068_LARGE_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
 LARGE_PUBLICATION_TIMING_RE = re.compile(r"^T068_LARGE_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
 MARSHAL_TIMING_RE = re.compile(r"^T068_MARSHAL_TIMING: (.+)$", re.MULTILINE)
@@ -56,7 +58,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_LARGE_PUBLICATION_FAIL:|T068_LARGE_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:|T068_QUAD_BRIDGE_FAIL:|T068_QUAD_BRIDGE_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_LARGE_PUBLICATION_FAIL:|T068_LARGE_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:|T068_QUAD_BRIDGE_FAIL:|T068_QUAD_BRIDGE_FAILED:|T068_SCALAR_ATOMICITY_FAIL:|T068_SCALAR_ATOMICITY_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -326,7 +328,45 @@ def validate_scalar_transform(cases: Any) -> None:
         raise ValueError("Missing transformed native cases")
 
 
-def execute(godot: str, *, runs: int = 1, large_only: bool = False) -> dict[str, Any]:
+def validate_scalar_atomicity(cases: Any) -> None:
+    """Reject incomplete or forged native cancellation/conflict witness records."""
+    expected_names = ("cancel", "stale_before", "stale_during", "forged_before")
+    if not isinstance(cases, list) or len(cases) != len(expected_names):
+        raise ValueError("Expected four native atomicity scenarios")
+    # Independent 16x16 oracle: seed one hidden-RGB pixel, then paint the
+    # hard brush along the self-overlapping 3-point polyline once per pixel.
+    original = bytearray(16 * 16 * 4)
+    original[(3 * 16 + 2) * 4:(3 * 16 + 2) * 4 + 4] = b"\x44\x33\x22\x00"
+    published = original.copy()
+    changed = 0
+    for y in range(16):
+        for x in range(16):
+            dx, dy = x + .5 - 2.5, y + .5 - 3.5
+            t = max(0., min(1., (dx * 10. + dy * 8.) / 164.))
+            if (dx - 10. * t) ** 2 + (dy - 8. * t) ** 2 <= 4.:
+                published[(y * 16 + x) * 4:(y * 16 + x) * 4 + 4] = b"\xcc\xaa\x44\x80"
+                changed += 1
+    source_hash = hashlib.sha256(original).hexdigest()
+    output_hash = hashlib.sha256(published).hexdigest()
+    expected_checks = (11, 21, 30, 37)
+    for name, check_count, case in zip(expected_names, expected_checks, cases):
+        if not isinstance(case, dict) or set(case) != {
+                "name", "changed", "payload_bytes", "source_sha256",
+                "canonical_sha256", "checks_after"}:
+            raise ValueError("Malformed scalar atomicity case")
+        if (type(case["name"]) is not str or case["name"] != name or
+                type(case["changed"]) is not int or case["changed"] != changed or
+                type(case["payload_bytes"]) is not int or
+                case["payload_bytes"] != 4 + 12 * changed or
+                case["source_sha256"] != source_hash or
+                case["canonical_sha256"] != output_hash or
+                type(case["checks_after"]) is not int or
+                case["checks_after"] != check_count):
+            raise ValueError("Invalid native atomicity results or provenance")
+
+
+def execute(godot: str, *, runs: int = 1, large_only: bool = False,
+            atomic_only: bool = False) -> dict[str, Any]:
     """Build against Godot's own header and verify actual Godot Variant calls."""
     version = checked_run([godot, "--version"], cwd=ROOT, timeout=15).strip()
     if EXPECTED_VERSION not in version:
@@ -395,11 +435,40 @@ def execute(godot: str, *, runs: int = 1, large_only: bool = False) -> dict[str,
         shutil.copyfile(BRIDGE / "t068_document_sparse_smoke.gd", project / "sparse_test.gd")
         shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_atomicity_smoke.gd", project / "scalar_atomicity.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_publication_profile.gd", project / "scalar_publication.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_large_publication.gd", project / "scalar_large.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_transform_smoke.gd", project / "scalar_transform.gd")
         shutil.copyfile(BRIDGE / "t068_quad_scope_smoke.gd", project / "quad_scope.gd")
         shutil.copyfile(ROOT / "tools/benchmarks/t068_quad_scope_oracle.json", project / "quad_oracle.json")
+        if atomic_only:
+            observations: list[dict[str, Any]] = []
+            for _ in range(runs):
+                raw = checked_run([godot, "--headless", "--path", str(project),
+                                   "--audio-driver", "Dummy", "--script",
+                                   "res://scalar_atomicity.gd"], cwd=project, timeout=120)
+                passed = ATOMICITY_RE.search(raw)
+                evidence = ATOMICITY_EVIDENCE_RE.search(raw)
+                if passed is None or evidence is None:
+                    raise RuntimeError(f"Missing scalar atomicity proof:\n{raw[-5000:]}")
+                cases = json.loads(evidence.group(1))
+                validate_scalar_atomicity(cases)
+                if int(passed.group(1)) != cases[-1]["checks_after"]:
+                    raise RuntimeError("Atomicity assertion count differs from raw evidence")
+                observations.append({"checks": int(passed.group(1)), "cases": cases})
+            return {
+                "ticket": "T-068", "godot_version": version,
+                "bridge_sha256": hashlib.sha256((BRIDGE / "t068_bridge.cpp").read_bytes()).hexdigest(),
+                "atomicity_script_sha256": hashlib.sha256(
+                    (BRIDGE / "t068_scalar_atomicity_smoke.gd").read_bytes()).hexdigest(),
+                "scalar_source_sha256": hashlib.sha256(
+                    (ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+                "runs": observations,
+                "limitations": [
+                    "Isolated 16x16 native sparse publication safety; not a production backend",
+                    "Synthetic single-thread revision races, not concurrent stress or hardware latency",
+                ],
+            }
         if large_only:
             # Explicitly opt in: large cases must not lengthen existing CI or
             # silently mutate its previously pinned publication evidence.
@@ -585,16 +654,26 @@ def main() -> None:
     parser.add_argument("--godot", required=True, help="Godot 4.8 beta 2 executable")
     parser.add_argument("--runs", type=int, default=1, choices=[1, 2, 3])
     parser.add_argument("--output", type=Path, help="Write raw JSON evidence outside repository")
+    parser.add_argument("--atomic-only", action="store_true",
+                        help="Run only native brush cancellation and conflict guards")
     parser.add_argument("--large-only", action="store_true",
                         help="Run only the opt-in 512/1024/2048 publication comparison")
     args = parser.parse_args()
     executable = shutil.which(args.godot)
     if executable is None:
         parser.error(f"Godot executable not found: {args.godot}")
-    evidence = execute(executable, runs=args.runs, large_only=args.large_only)
+    if args.atomic_only and args.large_only:
+        parser.error("Choose at most one isolated benchmark mode")
+    evidence = execute(executable, runs=args.runs, large_only=args.large_only,
+                       atomic_only=args.atomic_only)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    if args.atomic_only:
+        counts = ", ".join(str(item["checks"]) for item in evidence["runs"])
+        print(f"T068_SCALAR_ATOMICITY_INTEGRATION_PASSED: {counts} checks per run")
+        print("Isolated revision/cancellation safety only; no runtime backend enabled.")
+        return
     counts = ", ".join(str(item["checks"]) for item in evidence["measurements"])
     if args.large_only:
         print(f"T068_LARGE_GDEXTENSION_PASSED: {counts} checks per run")

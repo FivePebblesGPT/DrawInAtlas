@@ -1545,3 +1545,27 @@ uploads. No standalone binary is shipped.
 [Raw two-run stage timings and full-RGBA8 hashes](benchmarks/T068_2026-11-04_scalar_large_publication.json)
 · [replay validator](../tests/test_t068_scalar_large_publication.py)
 · [manual `--large-only` mode](../tools/benchmarks/t068_bridge/run_bridge.py).
+
+
+## 2026-11-04 — native sparse publication conflict/cancellation checkpoint (T-068)
+
+The temporary Godot 4.8b2 C++17 scalar brush bridge now has an **opt-in
+publication atomicity witness** independent of the existing performance
+benchmarks. Every scenario starts from the same 16×16 hidden-RGB source, uses
+63 real native changed-pixel records (760 bytes), and checks complete final
+RGBA8 against canonical `DrawingEditSession.paint_path()` before invoking
+`DrawingDocument` publication. Two runs both pass **37/37 assertions** with
+identical four-scenario output hashes. Cancellation leaves source/history
+untouched and allows a clean retry; pre-begin stale revisions, mid-staging
+revision changes and forged original bytes all fail atomically. A winning
+competing edit remains separately undoable.
+
+[Two-run evidence](benchmarks/T068_2026-11-04_scalar_atomicity.json) ·
+[fail-closed independent RGBA8 replay](../tests/test_t068_scalar_atomicity.py) ·
+[isolated runner](../tools/benchmarks/t068_bridge/run_bridge.py).
+
+This is **correctness only**, no CPU timing: tests force deterministic
+interleavings in a headless, temporary Godot project. They do not simulate
+preemptive worker cancellation, physical input-to-visible latency, software
+presentation, GPU allocation, Windows binaries or production backend usage.
+T-068 therefore remains In Progress.

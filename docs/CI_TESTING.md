@@ -53,6 +53,15 @@
   remains manual-only in `godot-native-t068-bridge.yml`. It neither loads
   the extension at application startup nor establishes native backend,
   physical GPU, Windows or release acceptance.
+- T-068 native scalar sparse publication **cancellation/conflict**:
+  `tests/test_t068_scalar_atomicity.py` checks source-pinned two-run
+  37-assertion Godot evidence and independently reconstructs canonical
+  RGBA8 for four cancel/stale-before/stale-during/forged-original cases.
+  Tampered raw evidence fails closed in fast CI without loading a native
+  extension. The real 4-case `--atomic-only --runs 2` GDExtension test is
+  opt-in under `godot-native-t068-bridge.yml`. This proves deterministic
+  `DrawingDocument` publication rejection in a test project, not thread
+  safety of the production app or a performance result.
 - T-068 temporary Godot↔native transformed sparse brush comparison:
   `tests/test_t068_scalar_transform.py` verifies source-pinned, two-run
   110-check native GDExtension evidence for transformed view-space strokes,

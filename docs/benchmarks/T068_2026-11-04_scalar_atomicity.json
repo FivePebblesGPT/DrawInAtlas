@@ -1,0 +1,87 @@
+{
+  "ticket": "T-068",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "bridge_sha256": "37055ba1a0494a9cc1aeaf9e170f9f71b3b1e27b9a2451dd896d4af5b148f2ab",
+  "atomicity_script_sha256": "b1584d5d1f290aeb764728d066328532a3c190f4b3b356712bc22f0adb1cc79b",
+  "scalar_source_sha256": "526fff803f891ea7a2b3e66ec2c6b1868c423bd2cfa4bb092ded3a135e34843b",
+  "runs": [
+    {
+      "checks": 37,
+      "cases": [
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 11,
+          "name": "cancel",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        },
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 21,
+          "name": "stale_before",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        },
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 30,
+          "name": "stale_during",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        },
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 37,
+          "name": "forged_before",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        }
+      ]
+    },
+    {
+      "checks": 37,
+      "cases": [
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 11,
+          "name": "cancel",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        },
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 21,
+          "name": "stale_before",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        },
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 30,
+          "name": "stale_during",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        },
+        {
+          "canonical_sha256": "3dcbdca5a19be6107752398f8eda795aa3843baa37e47c79551eaa6efd9cc763",
+          "changed": 63,
+          "checks_after": 37,
+          "name": "forged_before",
+          "payload_bytes": 760,
+          "source_sha256": "49bdf8cf2bacb7f0735d520cb191623eecd20f3c7f9abac3f0425c7fd7c835ec"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Isolated 16x16 native sparse publication safety; not a production backend",
+    "Synthetic single-thread revision races, not concurrent stress or hardware latency"
+  ]
+}

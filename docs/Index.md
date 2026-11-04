@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 native sparse-brush cancellation/conflict gate (2026-11-04; In Progress):**
+A **separate opt-in Godot↔C++ sparse brush publication witness** now checks
+actual C++ changed-pixel records against a Godot-authored paint oracle before
+publication, then exercises cancellation, stale revisions **before** and
+**after** detached staging, and forged source-before pixels at an unchanged
+revision. Two isolated Godot 4.8 beta 2 runs pass **37/37 assertions each**;
+no rejected candidate modifies published pixels or history, and the competing
+successful edit remains undoable. An independent Python RGBA8 reconstruction
+and tamper validator check all four recorded cases. This is not a production
+backend, parallel thread stress, hardware timing, or manual acceptance.
+[T-068](Tickets/T-068.md) ·
+[two-run evidence](benchmarks/T068_2026-11-04_scalar_atomicity.json).
+
 **T-068 512/1024/2048 native sparse brush document publication (2026-11-04; In Progress):**
 An opt-in **separate large-tile Godot↔C++ benchmark** now compares canonical
 `DrawingEditSession.paint_path()` + commit against native sparse generation,
