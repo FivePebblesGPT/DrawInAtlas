@@ -1,0 +1,855 @@
+{
+  "ticket": "T-068",
+  "mode": "optional, isolated Linux GDExtension (not production)",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "generated_header_sha256": "c312ed1dfe6bba973018f0937b38220069467c000ee2aa3f23c34997b56f299a",
+  "test_method": "Checked native batch, detached texture adapter, and real single/multiple-tile DrawingDocument transactions",
+  "measurements": [
+    {
+      "checks": 443,
+      "marshal_checks": 731,
+      "marshal_cases": [
+        {
+          "density": "single",
+          "full_output_bytes": 4096,
+          "input_mask_bytes": 1024,
+          "input_points_bytes": 8,
+          "input_rgba_bytes": 4096,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            }
+          },
+          "requested_points": 1,
+          "side": 32,
+          "sparse_output_bytes": 16,
+          "unique_changed_pixels": 1
+        },
+        {
+          "density": "sparse",
+          "full_output_bytes": 4096,
+          "input_mask_bytes": 1024,
+          "input_points_bytes": 1176,
+          "input_rgba_bytes": 4096,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 4,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 4,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 5,
+              "median_us": 4,
+              "min_us": 4,
+              "p95_us": 5,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 4,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 4,
+              "trials": 16
+            }
+          },
+          "requested_points": 147,
+          "side": 32,
+          "sparse_output_bytes": 1216,
+          "unique_changed_pixels": 101
+        },
+        {
+          "density": "dense",
+          "full_output_bytes": 4096,
+          "input_mask_bytes": 1024,
+          "input_points_bytes": 2344,
+          "input_rgba_bytes": 4096,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 8,
+              "median_us": 7,
+              "min_us": 6,
+              "p95_us": 8,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 52,
+              "median_us": 7,
+              "min_us": 6,
+              "p95_us": 52,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 8,
+              "median_us": 7,
+              "min_us": 7,
+              "p95_us": 8,
+              "trials": 16
+            }
+          },
+          "requested_points": 293,
+          "side": 32,
+          "sparse_output_bytes": 2428,
+          "unique_changed_pixels": 202
+        },
+        {
+          "density": "single",
+          "full_output_bytes": 65536,
+          "input_mask_bytes": 16384,
+          "input_points_bytes": 8,
+          "input_rgba_bytes": 65536,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 35,
+              "median_us": 5,
+              "min_us": 4,
+              "p95_us": 35,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 5,
+              "median_us": 4,
+              "min_us": 4,
+              "p95_us": 5,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            }
+          },
+          "requested_points": 1,
+          "side": 128,
+          "sparse_output_bytes": 16,
+          "unique_changed_pixels": 1
+        },
+        {
+          "density": "sparse",
+          "full_output_bytes": 65536,
+          "input_mask_bytes": 16384,
+          "input_points_bytes": 1176,
+          "input_rgba_bytes": 65536,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 8,
+              "median_us": 8,
+              "min_us": 7,
+              "p95_us": 8,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 9,
+              "median_us": 8,
+              "min_us": 7,
+              "p95_us": 9,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 4,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 4,
+              "trials": 16
+            }
+          },
+          "requested_points": 147,
+          "side": 128,
+          "sparse_output_bytes": 1228,
+          "unique_changed_pixels": 102
+        },
+        {
+          "density": "dense",
+          "full_output_bytes": 65536,
+          "input_mask_bytes": 16384,
+          "input_points_bytes": 37456,
+          "input_rgba_bytes": 65536,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 169,
+              "median_us": 99,
+              "min_us": 98,
+              "p95_us": 169,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 266,
+              "median_us": 107,
+              "min_us": 99,
+              "p95_us": 266,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 199,
+              "median_us": 103,
+              "min_us": 102,
+              "p95_us": 199,
+              "trials": 16
+            }
+          },
+          "requested_points": 4682,
+          "side": 128,
+          "sparse_output_bytes": 39328,
+          "unique_changed_pixels": 3277
+        },
+        {
+          "density": "single",
+          "full_output_bytes": 262144,
+          "input_mask_bytes": 65536,
+          "input_points_bytes": 8,
+          "input_rgba_bytes": 262144,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 101,
+              "median_us": 15,
+              "min_us": 15,
+              "p95_us": 101,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 16,
+              "median_us": 16,
+              "min_us": 15,
+              "p95_us": 16,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            }
+          },
+          "requested_points": 1,
+          "side": 256,
+          "sparse_output_bytes": 16,
+          "unique_changed_pixels": 1
+        },
+        {
+          "density": "sparse",
+          "full_output_bytes": 262144,
+          "input_mask_bytes": 65536,
+          "input_points_bytes": 1176,
+          "input_rgba_bytes": 262144,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 94,
+              "median_us": 19,
+              "min_us": 18,
+              "p95_us": 94,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 53,
+              "median_us": 19,
+              "min_us": 18,
+              "p95_us": 53,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 4,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 4,
+              "trials": 16
+            }
+          },
+          "requested_points": 147,
+          "side": 256,
+          "sparse_output_bytes": 1228,
+          "unique_changed_pixels": 102
+        },
+        {
+          "density": "dense",
+          "full_output_bytes": 262144,
+          "input_mask_bytes": 65536,
+          "input_points_bytes": 149800,
+          "input_rgba_bytes": 262144,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 556,
+              "median_us": 412,
+              "min_us": 392,
+              "p95_us": 556,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 2003,
+              "median_us": 422,
+              "min_us": 391,
+              "p95_us": 2003,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 778,
+              "median_us": 502,
+              "min_us": 409,
+              "p95_us": 778,
+              "trials": 16
+            }
+          },
+          "requested_points": 18725,
+          "side": 256,
+          "sparse_output_bytes": 157276,
+          "unique_changed_pixels": 13106
+        }
+      ],
+      "sparse_checks": 173,
+      "sparse_benchmark": {
+        "128": {
+          "full_median_us": 58518,
+          "full_output_bytes": 65536,
+          "samples_per_mode": 5,
+          "sparse_median_us": 109,
+          "sparse_output_bytes": 16
+        },
+        "32": {
+          "full_median_us": 3607,
+          "full_output_bytes": 4096,
+          "samples_per_mode": 5,
+          "sparse_median_us": 72,
+          "sparse_output_bytes": 16
+        },
+        "64": {
+          "full_median_us": 13252,
+          "full_output_bytes": 16384,
+          "samples_per_mode": 5,
+          "sparse_median_us": 78,
+          "sparse_output_bytes": 16
+        }
+      },
+      "revision_checks": 370,
+      "document_checks": 219,
+      "batch_checks": 128,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 19,
+          "p95_us": 20,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 10,
+          "p95_us": 31,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 17,
+          "p95_us": 18,
+          "trials": 31
+        }
+      }
+    },
+    {
+      "checks": 443,
+      "marshal_checks": 731,
+      "marshal_cases": [
+        {
+          "density": "single",
+          "full_output_bytes": 4096,
+          "input_mask_bytes": 1024,
+          "input_points_bytes": 8,
+          "input_rgba_bytes": 4096,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 1,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 57,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 57,
+              "trials": 16
+            }
+          },
+          "requested_points": 1,
+          "side": 32,
+          "sparse_output_bytes": 16,
+          "unique_changed_pixels": 1
+        },
+        {
+          "density": "sparse",
+          "full_output_bytes": 4096,
+          "input_mask_bytes": 1024,
+          "input_points_bytes": 1176,
+          "input_rgba_bytes": 4096,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 35,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 35,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 27,
+              "median_us": 4,
+              "min_us": 4,
+              "p95_us": 27,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 4,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 4,
+              "trials": 16
+            }
+          },
+          "requested_points": 147,
+          "side": 32,
+          "sparse_output_bytes": 1216,
+          "unique_changed_pixels": 101
+        },
+        {
+          "density": "dense",
+          "full_output_bytes": 4096,
+          "input_mask_bytes": 1024,
+          "input_points_bytes": 2344,
+          "input_rgba_bytes": 4096,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 9,
+              "median_us": 7,
+              "min_us": 7,
+              "p95_us": 9,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 8,
+              "median_us": 7,
+              "min_us": 7,
+              "p95_us": 8,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 172,
+              "median_us": 7,
+              "min_us": 7,
+              "p95_us": 172,
+              "trials": 16
+            }
+          },
+          "requested_points": 293,
+          "side": 32,
+          "sparse_output_bytes": 2428,
+          "unique_changed_pixels": 202
+        },
+        {
+          "density": "single",
+          "full_output_bytes": 65536,
+          "input_mask_bytes": 16384,
+          "input_points_bytes": 8,
+          "input_rgba_bytes": 65536,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 5,
+              "median_us": 4,
+              "min_us": 4,
+              "p95_us": 5,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 5,
+              "median_us": 4,
+              "min_us": 4,
+              "p95_us": 5,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            }
+          },
+          "requested_points": 1,
+          "side": 128,
+          "sparse_output_bytes": 16,
+          "unique_changed_pixels": 1
+        },
+        {
+          "density": "sparse",
+          "full_output_bytes": 65536,
+          "input_mask_bytes": 16384,
+          "input_points_bytes": 1176,
+          "input_rgba_bytes": 65536,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 29,
+              "median_us": 7,
+              "min_us": 7,
+              "p95_us": 29,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 8,
+              "median_us": 7,
+              "min_us": 7,
+              "p95_us": 8,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 4,
+              "median_us": 4,
+              "min_us": 3,
+              "p95_us": 4,
+              "trials": 16
+            }
+          },
+          "requested_points": 147,
+          "side": 128,
+          "sparse_output_bytes": 1228,
+          "unique_changed_pixels": 102
+        },
+        {
+          "density": "dense",
+          "full_output_bytes": 65536,
+          "input_mask_bytes": 16384,
+          "input_points_bytes": 37456,
+          "input_rgba_bytes": 65536,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 151,
+              "median_us": 99,
+              "min_us": 98,
+              "p95_us": 151,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 317,
+              "median_us": 99,
+              "min_us": 99,
+              "p95_us": 317,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 159,
+              "median_us": 103,
+              "min_us": 103,
+              "p95_us": 159,
+              "trials": 16
+            }
+          },
+          "requested_points": 4682,
+          "side": 128,
+          "sparse_output_bytes": 39328,
+          "unique_changed_pixels": 3277
+        },
+        {
+          "density": "single",
+          "full_output_bytes": 262144,
+          "input_mask_bytes": 65536,
+          "input_points_bytes": 8,
+          "input_rgba_bytes": 262144,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 24,
+              "median_us": 16,
+              "min_us": 15,
+              "p95_us": 24,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 17,
+              "median_us": 16,
+              "min_us": 15,
+              "p95_us": 17,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 1,
+              "median_us": 1,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            }
+          },
+          "requested_points": 1,
+          "side": 256,
+          "sparse_output_bytes": 16,
+          "unique_changed_pixels": 1
+        },
+        {
+          "density": "sparse",
+          "full_output_bytes": 262144,
+          "input_mask_bytes": 65536,
+          "input_points_bytes": 1176,
+          "input_rgba_bytes": 262144,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 55,
+              "median_us": 19,
+              "min_us": 18,
+              "p95_us": 55,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 183,
+              "median_us": 19,
+              "min_us": 19,
+              "p95_us": 183,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 53,
+              "median_us": 4,
+              "min_us": 4,
+              "p95_us": 53,
+              "trials": 16
+            }
+          },
+          "requested_points": 147,
+          "side": 256,
+          "sparse_output_bytes": 1228,
+          "unique_changed_pixels": 102
+        },
+        {
+          "density": "dense",
+          "full_output_bytes": 262144,
+          "input_mask_bytes": 65536,
+          "input_points_bytes": 149800,
+          "input_rgba_bytes": 262144,
+          "measurements_us": {
+            "copy": {
+              "max_us": 1,
+              "median_us": 0,
+              "min_us": 0,
+              "p95_us": 1,
+              "trials": 16
+            },
+            "full_ptrcall": {
+              "max_us": 726,
+              "median_us": 456,
+              "min_us": 393,
+              "p95_us": 726,
+              "trials": 16
+            },
+            "full_variant": {
+              "max_us": 750,
+              "median_us": 451,
+              "min_us": 392,
+              "p95_us": 750,
+              "trials": 16
+            },
+            "sparse_ptrcall": {
+              "max_us": 657,
+              "median_us": 434,
+              "min_us": 405,
+              "p95_us": 657,
+              "trials": 16
+            }
+          },
+          "requested_points": 18725,
+          "side": 256,
+          "sparse_output_bytes": 157276,
+          "unique_changed_pixels": 13106
+        }
+      ],
+      "sparse_checks": 173,
+      "sparse_benchmark": {
+        "128": {
+          "full_median_us": 56035,
+          "full_output_bytes": 65536,
+          "samples_per_mode": 5,
+          "sparse_median_us": 105,
+          "sparse_output_bytes": 16
+        },
+        "32": {
+          "full_median_us": 3355,
+          "full_output_bytes": 4096,
+          "samples_per_mode": 5,
+          "sparse_median_us": 61,
+          "sparse_output_bytes": 16
+        },
+        "64": {
+          "full_median_us": 13570,
+          "full_output_bytes": 16384,
+          "samples_per_mode": 5,
+          "sparse_median_us": 88,
+          "sparse_output_bytes": 16
+        }
+      },
+      "revision_checks": 370,
+      "document_checks": 219,
+      "batch_checks": 128,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 19,
+          "p95_us": 84,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 8,
+          "p95_us": 10,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 17,
+          "p95_us": 103,
+          "trials": 31
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
+    "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
+    "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
+    "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
+    "Software runner only; no physical Windows/Linux hardware or GPU timings",
+    "Temporary binary is not bundled in the repository or loaded at normal startup"
+  ]
+}

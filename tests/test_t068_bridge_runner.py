@@ -1,7 +1,9 @@
 """T-068: isolated GDExtension runner contracts; no Godot/native UI in push CI."""
 from __future__ import annotations
 
+import copy
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -30,6 +32,7 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertTrue((bridge.BRIDGE / "t068_document_batch_smoke.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_document_sparse_adapter.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_document_sparse_smoke.gd").is_file())
+        self.assertTrue((bridge.BRIDGE / "t068_marshal_profile.gd").is_file())
         self.assertTrue((ROOT / "tools/benchmarks/t068_raster_kernel.cpp").is_file())
         self.assertFalse(list(ROOT.rglob("*.gdextension")),
                          "The experimental native extension must not load at app startup")
@@ -51,6 +54,11 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertIsNone(bridge.SPARSE_RE.search("T068_SPARSE_FAILED: 1/173"))
         self.assertIsNotNone(bridge.SPARSE_TIMING_RE.search(
             'T068_SPARSE_TIMING: {"32":{"full_median_us":100}}\n'))
+        self.assertEqual(bridge.MARSHAL_RE.search(
+            "T068_MARSHAL_PASSED: 731 checks\n").group(1), "731")
+        self.assertIsNone(bridge.MARSHAL_RE.search("T068_MARSHAL_FAILED: 1/731"))
+        self.assertIsNotNone(bridge.MARSHAL_TIMING_RE.search(
+            'T068_MARSHAL_TIMING: [{"side":32}]\n'))
         self.assertIsNotNone(bridge.TIMING_RE.search(
             'T068_BRIDGE_TIMING: {"32":{"median_us":8}}\n'))
 
@@ -71,7 +79,9 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
                                "T068_BATCH_FAIL: partial publication",
                                "T068_BATCH_FAILED: 1/128",
                                "T068_SPARSE_FAIL: malicious delta",
-                               "T068_SPARSE_FAILED: 1/173"):
+                               "T068_SPARSE_FAILED: 1/173",
+                               "T068_MARSHAL_FAIL: changed pixels",
+                               "T068_MARSHAL_FAILED: 1/731"):
                 with self.subTest(diagnostic=diagnostic), self.assertRaises(RuntimeError):
                     bridge.checked_run([sys.executable, "-c",
                                         f"print({diagnostic!r})"], cwd=wd, timeout=10)
@@ -157,6 +167,41 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertNotIn("pull_request:", workflow)
         self.assertNotIn("push:", workflow)
         self.assertIn("run_bridge.py", workflow)
+
+    def test_marshal_proof_is_isolated_and_rejects_truncated_evidence(self) -> None:
+        profile = (bridge.BRIDGE / "t068_marshal_profile.gd").read_text(encoding="utf-8")
+        for required in ("DrawingEditSession._blend", "_decode_sparse", "_canonical",
+                         "source == original", "apply_checked", "apply_sparse_checked",
+                         "T068_MARSHAL_TIMING", "T068_MARSHAL_PASSED", "T068_MARSHAL_FAIL"):
+            self.assertIn(required, profile)
+        self.assertNotIn("ImageTexture", profile)
+        self.assertNotIn("DrawingDocument.new", profile)
+        self.assertIn('"res://marshal_test.gd"', SOURCE.read_text(encoding="utf-8"))
+        self.assertIn('"marshal_checks": int(marshal_match.group(1))',
+                      SOURCE.read_text(encoding="utf-8"))
+
+        # Static runner validation has no native binary dependency. The
+        # committed evidence also proves these are fully populated workloads.
+        path = ROOT / "docs/benchmarks/T068_2026-11-04_gdextension_marshal.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(len(evidence["measurements"]), 2)
+        for observation in evidence["measurements"]:
+            self.assertGreaterEqual(observation["marshal_checks"], 700)
+            cases = observation["marshal_cases"]
+            bridge.validate_marshal_evidence(cases)
+            for mutation in (
+                lambda d: d.pop(),
+                lambda d: d[0].update(side=128),
+                lambda d: d[0].update(sparse_output_bytes=0),
+                lambda d: d[0]["measurements_us"].pop("sparse_ptrcall"),
+                lambda d: d[0]["measurements_us"]["copy"].update(trials=2),
+                lambda d: d[0]["measurements_us"]["full_ptrcall"].update(
+                    min_us=1000000),
+            ):
+                broken = copy.deepcopy(cases)
+                mutation(broken)
+                with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                    bridge.validate_marshal_evidence(broken)
 
     def test_revision_checks_require_native_renderer_and_isolation(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")

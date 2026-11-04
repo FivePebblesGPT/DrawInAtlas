@@ -6,6 +6,19 @@
 
 ## Kanban summary
 
+**T-068 measured Godot↔C++ transfer boundary (2026-11-04; In Progress):**
+The isolated pinned Godot 4.8b2 GDExtension now runs a fail-closed transfer
+microbenchmark on 32²/128²/256² canonical tiles, with one-point, sparse and
+dense overlapping masked source-over workloads. Both runs pass **731/731**
+marshal checks, in addition to the existing native/document witnesses. Exact
+RGBA8 and sparse-delta completeness are checked against independent full-buffer
+reconstruction *before timing*. For 256²/one-change, the native sparse return
+is **16 bytes versus 262,144 bytes** for whole-tile output, and its call median
+was **1 µs versus 15–16 µs** across the two runs; at 256²/dense, sparse was
+not consistently faster. These isolated, precovered calls are **not**
+canonical document-publication or physical input-to-display measurements.
+[T-068](Tickets/T-068.md), [two-run evidence](benchmarks/T068_2026-11-04_gdextension_marshal.json).
+
 **T-068 transformed Skia brush/selection oracle (2026-11-04; In Progress):**
 Five new fixtures send **non-identity view-space pointer samples** through
 Godot's real `DrawingEditSession` (zoom/pan, 90° rotation, x-mirroring,

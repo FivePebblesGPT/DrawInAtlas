@@ -26,6 +26,8 @@ DOCUMENT_RE = re.compile(r"^T068_DOCUMENT_PASSED: (\d+) checks$", re.MULTILINE)
 BATCH_RE = re.compile(r"^T068_BATCH_PASSED: (\d+) checks$", re.MULTILINE)
 SPARSE_RE = re.compile(r"^T068_SPARSE_PASSED: (\d+) checks$", re.MULTILINE)
 SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
+MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
+MARSHAL_TIMING_RE = re.compile(r"^T068_MARSHAL_TIMING: (.+)$", re.MULTILINE)
 CANONICAL_SCRIPTS = (
     "document", "edit_session", "signed_tiles", "layer_node", "raster_tile",
     "result", "delta", "dirty_region", "selection", "history_context",
@@ -42,9 +44,48 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
+
+
+
+def validate_marshal_evidence(cases: Any) -> None:
+    """Reject truncated or inconsistent native transfer evidence."""
+    expected_cases = {(side, density) for side in (32, 128, 256)
+                      for density in ("single", "sparse", "dense")}
+    modes = {"copy", "full_ptrcall", "full_variant", "sparse_ptrcall"}
+    if not isinstance(cases, list) or len(cases) != len(expected_cases):
+        raise ValueError("Marshal results must contain nine complete workloads")
+    observed: set[tuple[int, str]] = set()
+    for case in cases:
+        try:
+            identity = (case["side"], case["density"])
+            if identity not in expected_cases or identity in observed:
+                raise ValueError("Unknown or duplicate marshal workload")
+            observed.add(identity)
+            pixels = case["side"] ** 2
+            changed = case["unique_changed_pixels"]
+            if (not isinstance(changed, int) or changed < 1 or changed > pixels
+                    or case["requested_points"] < changed
+                    or case["input_rgba_bytes"] != pixels * 4
+                    or case["input_mask_bytes"] != pixels
+                    or case["input_points_bytes"] != case["requested_points"] * 8
+                    or case["full_output_bytes"] != pixels * 4
+                    or case["sparse_output_bytes"] != 4 + changed * 12):
+                raise ValueError("Inconsistent marshal byte or delta counts")
+            measurements = case["measurements_us"]
+            if set(measurements) != modes:
+                raise ValueError("Incomplete marshal timing modes")
+            for record in measurements.values():
+                if (record["trials"] != 16 or not
+                        (0 <= record["min_us"] <= record["median_us"]
+                         <= record["p95_us"] <= record["max_us"])):
+                    raise ValueError("Invalid marshal timing distribution")
+        except (KeyError, TypeError) as exc:
+            raise ValueError("Malformed marshal evidence") from exc
+    if observed != expected_cases:
+        raise ValueError("Missing marshal workloads")
 
 
 def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
@@ -112,6 +153,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_document_batch_smoke.gd", project / "batch_test.gd")
         shutil.copyfile(BRIDGE / "t068_document_sparse_adapter.gd", project / "sparse_adapter.gd")
         shutil.copyfile(BRIDGE / "t068_document_sparse_smoke.gd", project / "sparse_test.gd")
+        shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -158,7 +200,20 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             sparse_benchmark = json.loads(sparse_timing.group(1))
             if any(str(side) not in sparse_benchmark for side in (32, 64, 128)):
                 raise RuntimeError("Sparse benchmark omitted a test size")
-            observations.append({"checks": count, "sparse_checks": int(sparse_match.group(1)),
+            marshal_output = checked_run([godot, "--headless", "--path", str(project),
+                                          "--audio-driver", "Dummy", "--script",
+                                          "res://marshal_test.gd"], cwd=project, timeout=120)
+            marshal_match = MARSHAL_RE.search(marshal_output)
+            marshal_timing = MARSHAL_TIMING_RE.search(marshal_output)
+            if marshal_match is None or int(marshal_match.group(1)) < 700 or marshal_timing is None:
+                raise RuntimeError(f"Missing or insufficient marshal proof/timing:\n{marshal_output[-4000:]}")
+            marshal_cases = json.loads(marshal_timing.group(1))
+            try:
+                validate_marshal_evidence(marshal_cases)
+            except ValueError as exc:
+                raise RuntimeError("Marshal evidence rejected") from exc
+            observations.append({"checks": count, "marshal_checks": int(marshal_match.group(1)),
+                                 "marshal_cases": marshal_cases, "sparse_checks": int(sparse_match.group(1)),
                                  "sparse_benchmark": sparse_benchmark, "revision_checks": int(revision_match.group(1)),
                                  "document_checks": int(document_match.group(1)),
                                  "batch_checks": int(batch_match.group(1)),
@@ -171,6 +226,7 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
             "limitations": [
                 "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
                 "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
+                "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
                 "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
                 "Software runner only; no physical Windows/Linux hardware or GPU timings",
                 "Temporary binary is not bundled in the repository or loaded at normal startup",
@@ -197,6 +253,7 @@ def main() -> None:
     print("Canonical DrawingDocument transactions:", ", ".join(str(item["document_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Godot native marshal screens:", ", ".join(str(item["marshal_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Timings are diagnostic only; no production backend enabled.")
 
 
