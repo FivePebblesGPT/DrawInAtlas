@@ -37,6 +37,8 @@ TRANSFORM_EVIDENCE_RE = re.compile(r"^T068_SCALAR_TRANSFORM_EVIDENCE: (.+)$", re
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_TIMING_RE = re.compile(r"^T068_SCALAR_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
+LARGE_PUBLICATION_RE = re.compile(r"^T068_LARGE_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
+LARGE_PUBLICATION_TIMING_RE = re.compile(r"^T068_LARGE_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
 MARSHAL_TIMING_RE = re.compile(r"^T068_MARSHAL_TIMING: (.+)$", re.MULTILINE)
 CANONICAL_SCRIPTS = (
     "document", "edit_session", "signed_tiles", "layer_node", "raster_tile",
@@ -54,7 +56,7 @@ def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
         env=environment,
     )
     combined = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:|T068_QUAD_BRIDGE_FAIL:|T068_QUAD_BRIDGE_FAILED:)", combined):
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_LARGE_PUBLICATION_FAIL:|T068_LARGE_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:|T068_QUAD_BRIDGE_FAIL:|T068_QUAD_BRIDGE_FAILED:)", combined):
         raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
     return combined
 
@@ -159,6 +161,73 @@ def validate_scalar_evidence(record: dict[str, int]) -> None:
 
 
 
+def validate_large_publication(cases: Any) -> None:
+    """Reconstruct full RGBA8 oracles and recompute paired CPU timing summaries."""
+    expected_sides = (512, 1024, 2048)
+    phases = ("godot_stage", "godot_commit", "native_call", "native_decode",
+              "native_stage", "native_commit")
+    totals = {"godot_total": phases[:2], "native_total": phases[2:]}
+    if not isinstance(cases, list) or len(cases) != len(expected_sides):
+        raise ValueError("Missing large publication workloads")
+    for side, record in zip(expected_sides, cases):
+        if not isinstance(record, dict) or set(record) != {
+                "side", "gesture", "source_bytes", "path_bytes", "changed",
+                "sparse_bytes", "canonical_sha256", "samples_us", "measurements_us"}:
+            raise ValueError("Malformed large publication workload")
+        if type(record["side"]) is not int or record["side"] != side or (
+                record["gesture"] != "long_horizontal" or
+                type(record["source_bytes"]) is not int or
+                record["source_bytes"] != side * side * 4 or
+                type(record["path_bytes"]) is not int or record["path_bytes"] != 32):
+            raise ValueError("Inconsistent large publication dimensions")
+        # Independent horizontal capsule coverage: only five rows can be hit.
+        # The canonical source contains one out-of-stroke hidden-RGB pixel.
+        oracle = bytearray(side * side * 4)
+        oracle[(side + 1) * 4:(side + 1) * 4 + 4] = b"\x33\x22\x11\x00"
+        changed = 0
+        y_center = side // 2 + 0.5
+        for y in range(side // 2 - 2, side // 2 + 3):
+            for x in range(side):
+                px = x + 0.5
+                nearest = min(max(px, 3.5), side - 3.5)
+                if (px - nearest) ** 2 + (y + 0.5 - y_center) ** 2 <= 4.0:
+                    oracle[(y * side + x) * 4:(y * side + x) * 4 + 4] = b"\xcc\xaa\x44\x80"
+                    changed += 1
+        if (type(record["changed"]) is not int or record["changed"] != changed or
+                type(record["sparse_bytes"]) is not int or
+                record["sparse_bytes"] != 4 + 12 * changed or
+                record["canonical_sha256"] != hashlib.sha256(oracle).hexdigest()):
+            raise ValueError("Large native result differs from independent pixel oracle")
+        samples = record["samples_us"]
+        if not isinstance(samples, list) or len(samples) != 4:
+            raise ValueError("Expected four counterbalanced large-tile pairs")
+        buckets: dict[str, list[int]] = {key: [] for key in (*phases, *totals)}
+        for i, sample in enumerate(samples):
+            if not isinstance(sample, dict) or set(sample) != {
+                    "trial", "order", *phases, *totals}:
+                raise ValueError("Malformed large-tile timing sample")
+            if type(sample["trial"]) is not int or sample["trial"] != i or (
+                    sample["order"] != ("native_first" if i % 2 == 0 else "godot_first")):
+                raise ValueError("Incorrect paired trial order")
+            for key in phases:
+                if type(sample[key]) is not int or sample[key] < 0:
+                    raise ValueError("Negative or noninteger native timing")
+            for key, components in totals.items():
+                if type(sample[key]) is not int or sample[key] != sum(sample[part] for part in components):
+                    raise ValueError("Forged aggregate native timing")
+            for key in buckets:
+                buckets[key].append(sample[key])
+        summary = record["measurements_us"]
+        if not isinstance(summary, dict) or set(summary) != set(buckets):
+            raise ValueError("Missing large-tile phase summary")
+        for key, values in buckets.items():
+            ordered = sorted(values)
+            expected = {"trials": 4, "min_us": ordered[0],
+                        "median_us": ordered[2], "max_us": ordered[-1]}
+            if summary[key] != expected:
+                raise ValueError("Large-tile sample summary does not match raw trials")
+
+
 def validate_scalar_publication(cases: Any) -> None:
     """Validate raw paired trials and recompute every published timing summary."""
     expected = {(side, gesture) for side in (32, 128, 256)
@@ -257,7 +326,7 @@ def validate_scalar_transform(cases: Any) -> None:
         raise ValueError("Missing transformed native cases")
 
 
-def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
+def execute(godot: str, *, runs: int = 1, large_only: bool = False) -> dict[str, Any]:
     """Build against Godot's own header and verify actual Godot Variant calls."""
     version = checked_run([godot, "--version"], cwd=ROOT, timeout=15).strip()
     if EXPECTED_VERSION not in version:
@@ -327,9 +396,41 @@ def execute(godot: str, *, runs: int = 1) -> dict[str, Any]:
         shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_publication_profile.gd", project / "scalar_publication.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_large_publication.gd", project / "scalar_large.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_transform_smoke.gd", project / "scalar_transform.gd")
         shutil.copyfile(BRIDGE / "t068_quad_scope_smoke.gd", project / "quad_scope.gd")
         shutil.copyfile(ROOT / "tools/benchmarks/t068_quad_scope_oracle.json", project / "quad_oracle.json")
+        if large_only:
+            # Explicitly opt in: large cases must not lengthen existing CI or
+            # silently mutate its previously pinned publication evidence.
+            measurements: list[dict[str, Any]] = []
+            for _ in range(runs):
+                raw = checked_run([godot, "--headless", "--path", str(project),
+                                   "--audio-driver", "Dummy", "--script",
+                                   "res://scalar_large.gd"], cwd=project, timeout=240)
+                passed = LARGE_PUBLICATION_RE.search(raw)
+                timing = LARGE_PUBLICATION_TIMING_RE.search(raw)
+                if passed is None or timing is None:
+                    raise RuntimeError(f"Missing large publication proof:\n{raw[-5000:]}")
+                cases = json.loads(timing.group(1))
+                validate_large_publication(cases)
+                if int(passed.group(1)) != 2 + 3 * (3 + 9 * 5):
+                    raise RuntimeError("Insufficient large publication assertions")
+                measurements.append({"checks": int(passed.group(1)), "cases": cases})
+            return {
+                "schema_version": 1, "ticket": "T-068", "godot_version": version,
+                "mode": "isolated C++/Godot large-tile headless publication",
+                "scalar_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+                "bridge_source_sha256": hashlib.sha256((BRIDGE / "t068_bridge.cpp").read_bytes()).hexdigest(),
+                "profile_sha256": hashlib.sha256((BRIDGE / "t068_scalar_large_publication.gd").read_bytes()).hexdigest(),
+                "measurements": measurements,
+                "limitations": [
+                    "Synthetic CPU-only headless tile tests, not physical GPU or actual input-to-visible latency",
+                    "All trials use a single horizontal 4px path; no p95 or speedup inference from four paired samples",
+                    "Tile/source construction, oracle validation, undo and redo happen outside timing",
+                    "The GDExtension lives in a temporary Linux project and is not a production or portable release",
+                ],
+            }
         observations: list[dict[str, Any]] = []
         for _ in range(runs):
             output = checked_run([godot, "--headless", "--path", str(project),
@@ -484,15 +585,21 @@ def main() -> None:
     parser.add_argument("--godot", required=True, help="Godot 4.8 beta 2 executable")
     parser.add_argument("--runs", type=int, default=1, choices=[1, 2, 3])
     parser.add_argument("--output", type=Path, help="Write raw JSON evidence outside repository")
+    parser.add_argument("--large-only", action="store_true",
+                        help="Run only the opt-in 512/1024/2048 publication comparison")
     args = parser.parse_args()
     executable = shutil.which(args.godot)
     if executable is None:
         parser.error(f"Godot executable not found: {args.godot}")
-    evidence = execute(executable, runs=args.runs)
+    evidence = execute(executable, runs=args.runs, large_only=args.large_only)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
     counts = ", ".join(str(item["checks"]) for item in evidence["measurements"])
+    if args.large_only:
+        print(f"T068_LARGE_GDEXTENSION_PASSED: {counts} checks per run")
+        print("Large full-tile RGBA8 publication is CPU-only and research-only.")
+        return
     print(f"T068_GDEXTENSION_INTEGRATION_PASSED: {counts} native parity checks per run")
     print("Revision-guarded publication adapter:", ", ".join(str(item["revision_checks"]) for item in evidence["measurements"]), "checks per run")
     print("Canonical DrawingDocument transactions:", ", ".join(str(item["document_checks"]) for item in evidence["measurements"]), "checks per run")

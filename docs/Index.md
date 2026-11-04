@@ -6,6 +6,21 @@
 
 ## Kanban summary
 
+**T-068 512/1024/2048 native sparse brush document publication (2026-11-04; In Progress):**
+An opt-in **separate large-tile Godot↔C++ benchmark** now compares canonical
+`DrawingEditSession.paint_path()` + commit against native sparse generation,
+checked decode, detached staging and the same revision-checked commit.
+One 4px horizontal stroke per 512²/1024²/2048² storage tile is independently
+reconstructed to exact source-over RGBA8, including an untouched alpha-zero
+hidden-RGB pixel. Two complete runs pass **146/146 correctness checks each**;
+each case retains four alternating-order paired CPU timings, exact published
+pixels, Undo/Redo, wire sizes, source digests and capacity rejection. Native
+path medians are **slower at 1024² and 2048²** in both runs. These are
+headless CPU diagnostics, **not a native-backend performance win**, physical
+input-to-visible latency, VRAM or release acceptance. No production extension
+or ticket status was changed. [T-068](Tickets/T-068.md) ·
+[two-run raw evidence](benchmarks/T068_2026-11-04_scalar_large_publication.json).
+
 **T-068 native four-corner Atlas scope through Godot GDExtension (2026-11-04; In Progress):**
 The temporary, explicit-load Godot 4.8 beta 2 extension now exposes a checked
 C++17 **native convex polygon/whole-pixel selection-mask builder**, then feeds

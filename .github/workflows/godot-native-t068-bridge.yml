@@ -35,10 +35,22 @@ jobs:
               --godot "$(command -v godot)" --runs 2 \
               --output /tmp/t068-gdextension-bridge.json
           test -s /tmp/t068-gdextension-bridge.json
+      - name: Compare 512/1024/2048 CPU publication in a separate isolated build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_scalar_large_publication.py -v
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 --large-only \
+              --output /tmp/t068-gdextension-large.json
+          test -s /tmp/t068-gdextension-large.json
       - name: Upload diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t068-gdextension-isolated-evidence
-          path: /tmp/t068-gdextension-bridge.json
+          path: |
+            /tmp/t068-gdextension-bridge.json
+            /tmp/t068-gdextension-large.json
           if-no-files-found: warn

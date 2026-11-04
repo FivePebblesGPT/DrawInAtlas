@@ -500,3 +500,21 @@ totals, and independently recomputed min/median/max. Tampered measurements,
 missing trials and fake distributions fail closed. This is CPU-only
 research; the test cannot establish physical input-to-present latency or
 portable native release eligibility. No extension is loaded in the apps.
+
+
+### T-068 isolated 512/1024/2048 native brush publication (2026-11-04)
+
+A distinct `--large-only` `t068_bridge/run_bridge.py` mode builds a temporary
+Godot 4.8b2/Linux GDExtension and runs
+`t068_scalar_large_publication.gd`: one horizontal 4px stroke per full-size
+storage tile, four alternating-order timed pairs plus a warmup, and exact
+canonical whole-tile source, native wire, published pixels and Undo/Redo.
+The two independent pinned runs each pass **146 checks**; oversized
+`max_changes > 65536` and insufficient-capacity native requests must reject.
+Fast push CI runs `test_t068_scalar_large_publication.py` without building or
+loading the extension; the manual `godot-native-t068-bridge.yml` additionally
+runs the two-run live check in a **separate opt-in build** and uploads JSON.
+It remains a headless CPU-only comparison, not Windows/Linux physical
+input-to-visible p95, hardware RAM/VRAM, application backend acceptance, or
+a deployable native export. The 1024²/2048² matched native timings are slower
+than canonical Godot in both pinned runs.

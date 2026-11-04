@@ -1513,3 +1513,35 @@ separate DrawingSelection source, path inverse mapping, revision-checked
 publication, full 512/1024/2048-scale workloads, hardware rendering and
 Windows/portable releases remain outside this new test. T-068 remains
 **In Progress**, without any native dependency selection or speedup claim.
+
+
+## 2026-11-04 — large-tile matched Godot/native publication, separate opt-in run
+
+The isolated C++17 Godot 4.8b2 bridge extends its correctness and CPU
+publication screen to 512²/1024²/2048² with a 4px horizontal long stroke,
+on independently initialized identical `DrawingDocument` sources. Complete
+RGBA8, a hidden-RGB pixel, exact sparse before/after records, atomic
+publication and native Undo/Redo are checked before retaining timing records.
+One untimed canonical oracle is computed per tile; four counterbalanced
+measured pairs per size (two orders each) follow a warmup. Two independent
+runs pass **146 assertions each**. Source/document construction, the trusted
+oracle, full-tile validation and Undo/Redo are outside the timed regions.
+
+| Tile side | Changed pixels | Sparse wire | Full RGBA8 | Canonical median (two runs) | Native total median (two runs) |
+|---|---:|---:|---:|---:|---:|
+| 512 | 2,538 | 30,460 B | 1 MiB | 21.962–25.631 ms | 21.648–22.177 ms |
+| 1024 | 5,098 | 61,180 B | 4 MiB | 44.980–46.033 ms | 49.698–51.239 ms |
+| 2048 | 10,218 | 122,620 B | 16 MiB | 99.977–116.247 ms | 126.292–145.914 ms |
+
+The native path measured native call, strict byte decoding, publication
+staging and native document commit. The 2048² native call alone has 55.455–59.307
+ms run medians and dominates much of its native-path total. **No blanket native
+speedup exists in this dataset.** Bounded sparse return bytes do not eliminate
+full-tile native traversal or Godot's separate staging/publication work.
+The four-pair sample is not adequate for p95 or confidence intervals; these
+are headless CPU diagnostics, not physical input-to-present times or GPU
+uploads. No standalone binary is shipped.
+
+[Raw two-run stage timings and full-RGBA8 hashes](benchmarks/T068_2026-11-04_scalar_large_publication.json)
+· [replay validator](../tests/test_t068_scalar_large_publication.py)
+· [manual `--large-only` mode](../tools/benchmarks/t068_bridge/run_bridge.py).
