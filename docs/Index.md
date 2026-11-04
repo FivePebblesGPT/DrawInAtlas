@@ -6,6 +6,20 @@
 
 ## Kanban summary
 
+**T-068 large-tile Godot-vs-native brush geometry checkpoint (2026-11-04; In Progress):**
+A Godot 4.8b2 `DrawingEditSession` oracle at signed anchors beyond 2^53
+now covers all **12 full-size 512²/1024²/2048²** Blend2D scaling workloads,
+with zoom, 90° rotation, shear, masks, erasure and transparent no-op. Comparing
+its independently compressed coverage against both verified native runs yields
+**24 comparisons: 18 coverage non-parity and 12 canonical final-pixel
+non-parity cases** at 50% A8. All six 4px-stroke comparisons match; 256px
+dabs each miss 36 covered pixels, and the no-op retains exact RGBA8 despite a
+coverage difference. This reuses the old native timing runs, **not** matched
+Godot timing or transformed four-corner selection clipping. T-068 remains open
+for those and hardware/release gates. [T-068](Tickets/T-068.md),
+[comparison evidence](benchmarks/T068_2026-11-04_blend2d_large_parity.json).
+
+
 **T-068 native Blend2D 512/1024/2048 scaling checkpoint (2026-11-04; In Progress):**
 The pinned detached C++ A8 brush shim now accepts bounded **512², 1024² and
 2048²** straight-RGBA8 tiles (including allocation and timing-pointer alias

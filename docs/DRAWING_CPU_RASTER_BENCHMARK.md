@@ -1201,3 +1201,56 @@ publication experiments before considering native adoption. Transformed
 four-corner selection/Godot brush parity, Skia native C++ matching, real
 Godot marshaling, physical Windows/Linux p95/RAM/VRAM and standalone release
 validation remain open. T-068 is **In Progress**.
+
+
+## 2026-11-04 actual large-tile Godot hard-brush parity (not a speed benchmark)
+
+The previous 512/1024/2048 benchmark measured isolated native CPU work and
+reconstructed its straight-RGBA8 output, but the input stencil came from
+Blend2D itself. The new
+[`drawing_t068_blend2d_large_oracle.gd`](../tests/drawing_t068_blend2d_large_oracle.gd)
+compares those **same geometries and masks** against actual Godot 4.8b2
+`DrawingEditSession` hard-brush coverage, at signed world anchors
+`9007199254740993,-9007199254740993`. Every storage side uses a centered
+128/256 pixel-local eligibility region; each gesture's view path is
+transformed and inversed inside Godot (zoom, 90° rotation, shear, identity).
+The Godot document begins *blank* and its detached gesture is cancelled
+after recording coverage; this is a geometry oracle, **not a full real-Godot
+mixed-opacity source/output comparison**. For final-pixel mismatch counts,
+Python applies the independent canonical straight-RGBA8 blend/erase oracle
+to the same mixed-opacity input as the already verified native runs.
+
+**50% native A8 threshold; two independent stored native runs, 12 cases each:**
+
+| Workload | Godot covered / size | Native covered / size | Missing native coverage (512/1024/2048) | Extra native coverage | Canonical final-pixel mismatches (per run) |
+|---|---:|---:|---:|---:|---:|
+| 4px long stroke | 460 | 460 | 0 / 0 / 0 | 0 | 0 / 0 / 0 |
+| 256px round dab | 51,468 | 51,432 | 36 / 36 / 36 | 0 | 36 / 36 / 36 |
+| 64px sparse crossing erase | 27,258 / 27,137 / 27,258 | 27,243 / 27,114 / 27,243 | 15 / 23 / 15 | 0 | 15 / 23 / 15 |
+| Transparent no-op | 7,068 | 7,046 | 22 / 22 / 22 | 0 | 0 / 0 / 0 |
+
+**Across both runs:** 24 comparisons, 18 coverage non-parity cases, 12
+RGBA8 non-parity cases, 454 missing native-covered pixels and zero extras.
+An alpha-zero no-op still tests stencil footprint but, correctly, does not
+modify hidden RGB. The complete compressed masks are replayed (not inferred
+from these summary counts). Fail-closed tests check the binary DEFLATE length,
+strict case set, transform inversion, exact selection containment, source
+specification, representative full-buffer pixels and evidence-tampering.
+Regenerate the Godot fixture and compare JSON payloads with:
+
+```bash
+T068_LARGE_GODOT=/path/to/Godot_v4.8-beta2_linux.x86_64 \
+  python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py -v
+python3 tools/benchmarks/t068_blend2d_large_parity.py \
+  --output /tmp/t068-blend2d-large-parity.json
+```
+
+The [raw 24-row cross-implementation evidence](benchmarks/T068_2026-11-04_blend2d_large_parity.json)
+links SHA-256 digests of both the Godot and native scaling fixtures; the
+optional Blend2D workflow also accepts **fresh checked native runs**. No
+new native timing or Godot/GDExtension/physical presentation numbers arise
+from the comparison. The observed 256px-edge misses prohibit treating an
+A8 threshold of 128 as exact Godot hard-brush semantics. T-068 remains
+In Progress pending transformed four-corner clipping, native Skia C++ and
+matched publication benchmarks, physical Windows/Linux RAM/VRAM/p95 and
+standalone-release validation. No production backend was changed.

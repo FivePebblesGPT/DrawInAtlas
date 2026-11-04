@@ -309,6 +309,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py
+          python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py
           python3 -m unittest discover -s tests -p test_t068_skia_cpu.py
           T068_GODOT=godot python3 -m unittest discover -s tests -p test_t068_skia_brush.py
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_dab_geometry_smoke.gd 2>&1 | tee /tmp/godot-t068-dab.log
