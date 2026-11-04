@@ -33,6 +33,8 @@ SCALAR_EVIDENCE_RE = re.compile(r"^T068_SCALAR_BRIDGE_EVIDENCE: (.+)$", re.MULTI
 TRANSFORM_RE = re.compile(r"^T068_SCALAR_TRANSFORM_PASSED: (\d+) checks$", re.MULTILINE)
 QUAD_RE = re.compile(r"^T068_QUAD_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
 QUAD_EVIDENCE_RE = re.compile(r"^T068_QUAD_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
+QUAD_PUBLICATION_RE = re.compile(r"^T068_QUAD_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
+QUAD_PUBLICATION_EVIDENCE_RE = re.compile(r"^T068_QUAD_PUBLICATION_EVIDENCE: (.+)$", re.MULTILINE)
 TRANSFORM_EVIDENCE_RE = re.compile(r"^T068_SCALAR_TRANSFORM_EVIDENCE: (.+)$", re.MULTILINE)
 MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
 PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
@@ -105,6 +107,44 @@ def validate_quad_bridge(cases: Any) -> None:
                 any(c not in "0123456789abcdef" for c in actual["pixels_sha256"]) or
                 actual["pixels_sha256"] != hashlib.sha256(expected_pixels).hexdigest()):
             raise ValueError("Native quad output differs from pinned Godot mask")
+
+
+def validate_quad_publication(cases: Any) -> None:
+    """Replay canonical brush geometry and atomic document publication proof."""
+    if not isinstance(cases, list) or len(cases) != 15:
+        raise ValueError("Missing native quad publication cases")
+    expected_keys = {"id", "allowed", "mask_sha256", "changed", "sparse_bytes",
+                     "pixels_sha256", "source_sha256", "undo_sha256", "redo_sha256",
+                     "history_delta", "revision_delta", "checks_after"}
+    original = bytearray(64 * 64 * 4)
+    original[(22 * 64 + 22) * 4:(22 * 64 + 22) * 4 + 4] = bytes((0x44, 0x33, 0x22, 0))
+    original_hash = hashlib.sha256(original).hexdigest()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != expected_keys:
+            raise ValueError("Malformed quad publication record")
+    # The independent Godot-authored masks and per-pixel canonical compositing
+    # are checked by the existing fail-closed native quad validator.
+    validate_quad_bridge([{key: row[key] for key in
+        ("id", "allowed", "mask_sha256", "changed", "sparse_bytes", "pixels_sha256")}
+        for row in cases])
+    prior = 3  # load, register and verify the pinned fixture
+    for case in cases:
+        changed = case["changed"]
+        advance = int(changed > 0)
+        # Each Godot scenario performs ten independent assertions, including
+        # two history checks for success or for the NO_CHANGE rejection.
+        expected_checks = prior + 10
+        if (any(type(case[k]) is not str or case[k] != original_hash
+                for k in ("source_sha256", "undo_sha256")) or
+                case["redo_sha256"] != case["pixels_sha256"] or
+                type(case["history_delta"]) is not int or
+                case["history_delta"] != advance or
+                type(case["revision_delta"]) is not int or
+                case["revision_delta"] != advance or
+                type(case["checks_after"]) is not int or
+                case["checks_after"] != expected_checks):
+            raise ValueError("Invalid quad publication history or source evidence")
+        prior = case["checks_after"]
 
 
 def validate_marshal_evidence(cases: Any) -> None:
@@ -366,7 +406,7 @@ def validate_scalar_atomicity(cases: Any) -> None:
 
 
 def execute(godot: str, *, runs: int = 1, large_only: bool = False,
-            atomic_only: bool = False) -> dict[str, Any]:
+            atomic_only: bool = False, quad_publication_only: bool = False) -> dict[str, Any]:
     """Build against Godot's own header and verify actual Godot Variant calls."""
     version = checked_run([godot, "--version"], cwd=ROOT, timeout=15).strip()
     if EXPECTED_VERSION not in version:
@@ -440,7 +480,38 @@ def execute(godot: str, *, runs: int = 1, large_only: bool = False,
         shutil.copyfile(BRIDGE / "t068_scalar_large_publication.gd", project / "scalar_large.gd")
         shutil.copyfile(BRIDGE / "t068_scalar_transform_smoke.gd", project / "scalar_transform.gd")
         shutil.copyfile(BRIDGE / "t068_quad_scope_smoke.gd", project / "quad_scope.gd")
+        shutil.copyfile(BRIDGE / "t068_quad_publication_smoke.gd", project / "quad_publication.gd")
         shutil.copyfile(ROOT / "tools/benchmarks/t068_quad_scope_oracle.json", project / "quad_oracle.json")
+        if quad_publication_only:
+            observations: list[dict[str, Any]] = []
+            for _ in range(runs):
+                raw = checked_run([godot, "--headless", "--path", str(project),
+                                   "--audio-driver", "Dummy", "--script",
+                                   "res://quad_publication.gd"], cwd=project, timeout=150)
+                passed = QUAD_PUBLICATION_RE.search(raw)
+                evidence = QUAD_PUBLICATION_EVIDENCE_RE.search(raw)
+                if passed is None or evidence is None:
+                    raise RuntimeError(f"Missing quad publication proof:\n{raw[-5000:]}")
+                cases = json.loads(evidence.group(1))
+                validate_quad_publication(cases)
+                if int(passed.group(1)) != cases[-1]["checks_after"]:
+                    raise RuntimeError("Quad publication assertion count differs")
+                observations.append({"checks": int(passed.group(1)), "cases": cases})
+            return {
+                "schema_version": 1, "ticket": "T-068", "godot_version": version,
+                "mode": "isolated native quad mask and brush to DrawingDocument publication",
+                "quad_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_kernel.cpp").read_bytes()).hexdigest(),
+                "scalar_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+                "bridge_source_sha256": hashlib.sha256((BRIDGE / "t068_bridge.cpp").read_bytes()).hexdigest(),
+                "profile_sha256": hashlib.sha256((BRIDGE / "t068_quad_publication_smoke.gd").read_bytes()).hexdigest(),
+                "oracle_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_oracle.json").read_bytes()).hexdigest(),
+                "runs": observations,
+                "limitations": [
+                    "Temporary Linux Godot bridge; not production Atlas or Drawing runtime integration",
+                    "The 64x64 masks are pinned Godot-authored AtlasFill oracles, not a live Atlas UI path",
+                    "No physical GPU input-to-visible measurements or portable Windows release verification",
+                ],
+            }
         if atomic_only:
             observations: list[dict[str, Any]] = []
             for _ in range(runs):
@@ -654,6 +725,8 @@ def main() -> None:
     parser.add_argument("--godot", required=True, help="Godot 4.8 beta 2 executable")
     parser.add_argument("--runs", type=int, default=1, choices=[1, 2, 3])
     parser.add_argument("--output", type=Path, help="Write raw JSON evidence outside repository")
+    parser.add_argument("--quad-publication-only", action="store_true",
+                        help="Run native four-corner masks through a canonical document commit")
     parser.add_argument("--atomic-only", action="store_true",
                         help="Run only native brush cancellation and conflict guards")
     parser.add_argument("--large-only", action="store_true",
@@ -662,13 +735,19 @@ def main() -> None:
     executable = shutil.which(args.godot)
     if executable is None:
         parser.error(f"Godot executable not found: {args.godot}")
-    if args.atomic_only and args.large_only:
+    if sum((args.atomic_only, args.large_only, args.quad_publication_only)) > 1:
         parser.error("Choose at most one isolated benchmark mode")
     evidence = execute(executable, runs=args.runs, large_only=args.large_only,
-                       atomic_only=args.atomic_only)
+                       atomic_only=args.atomic_only,
+                       quad_publication_only=args.quad_publication_only)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    if args.quad_publication_only:
+        counts = ", ".join(str(item["checks"]) for item in evidence["runs"])
+        print(f"T068_QUAD_PUBLICATION_INTEGRATION_PASSED: {counts} checks per run")
+        print("Temporary native Atlas scope publication only; no application backend enabled.")
+        return
     if args.atomic_only:
         counts = ", ".join(str(item["checks"]) for item in evidence["runs"])
         print(f"T068_SCALAR_ATOMICITY_INTEGRATION_PASSED: {counts} checks per run")

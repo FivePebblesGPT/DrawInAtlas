@@ -2,6 +2,33 @@
 
 **Measured 2026-11-02 on a Linux x86_64 sandbox, Godot 4.8.beta2, G++ 14.2, Mesa llvmpipe 25.0.7.** Engineering evidence only. No native backend has been selected, linked into Godot, exported to Windows, or shipped. T-068 remains **In Progress** because the full gate requires actual third-party CPU raster runs, input-event-to-present profiling, native extension boundary, and multi-thread/Windows memory-jitter evidence. This is not an owner-review gate.
 
+## Native four-corner scope to document publication checkpoint (2026-11-04)
+
+The opt-in GDExtension now connects two previously tested detached C++17
+kernels to **real `DrawingDocument` revision-checked publication**, not to
+Atlas runtime. It first checks a 64² binary four-corner selection mask against
+15 independently Godot-authored `AtlasFill._allows_pixel()` fixtures. It then
+validates bounded, sorted native sparse brush records and source-before bytes,
+stages them atomically and checks the complete committed RGBA8 and Undo/Redo.
+**Both runs pass 153/153 checks**, including exact transparent hidden RGB and
+`NO_CHANGE` rejection for two zero-record scenarios. This is strictly
+correctness evidence; there are **no new performance results**.
+
+Run explicitly with pinned Godot 4.8 beta 2 and C++17:
+
+```sh
+python3 -m unittest discover -s tests -p test_t068_quad_publication.py -v
+python3 tools/benchmarks/t068_bridge/run_bridge.py \
+  --godot /path/to/Godot_v4.8-beta2_linux.x86_64 --quad-publication-only --runs 2 \
+  --output /tmp/t068-quad-publication.json
+```
+
+[Full source-pinned raw cases](benchmarks/T068_2026-11-04_quad_publication.json)
+· [ticket scope and remaining gates](Tickets/T-068.md).
+A temporary explicit-load extension and pinned Godot-generated masks do not
+measure real Atlas pointer delivery, physical presentation latency, VRAM,
+concurrent workers, native release compatibility or an approved backend.
+
 ## Reproduction
 
 From the repository root, with `godot`, `g++` and Python 3 installed:

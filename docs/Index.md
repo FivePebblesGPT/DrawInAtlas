@@ -6,6 +6,21 @@
 
 ## Kanban summary
 
+**T-068 native four-corner scope to revision-checked document publication (2026-11-04; In Progress):**
+A new explicit-load, temporary Godot 4.8 beta 2 GDExtension witness
+composes the already checked **native convex four-corner selection mask** with
+native scalar sparse brush records, then validates and stages them through
+**actual `DrawingDocument` atomic publication**. All 15 independently
+Godot-authored 64² scope cases pass **153/153 checks in each of two runs**,
+including exact RGBA8, hidden-RGB source preservation, one transaction,
+Undo/Redo, and `NO_CHANGE` rejection without history or revision updates for
+zero-record masks. A source-pinned, independently reconstructed Python replay
+rejects modified geometry, pixels, source, history or assertion counts.
+This is a test-only Linux extension, **not** deployed Atlas integration,
+physical latency evidence, or acceptance of the native backend.
+[T-068](Tickets/T-068.md) ·
+[two-run evidence](benchmarks/T068_2026-11-04_quad_publication.json).
+
 **T-068 native sparse-brush cancellation/conflict gate (2026-11-04; In Progress):**
 A **separate opt-in Godot↔C++ sparse brush publication witness** now checks
 actual C++ changed-pixel records against a Godot-authored paint oracle before

@@ -53,6 +53,17 @@
   remains manual-only in `godot-native-t068-bridge.yml`. It neither loads
   the extension at application startup nor establishes native backend,
   physical GPU, Windows or release acceptance.
+- T-068 native Atlas four-corner **document publication**:
+  `tests/test_t068_quad_publication.py` checks pinned two-run,
+  **153-assertion-per-run** Godot evidence for 15 exact native selection masks,
+  ordered sparse records, before pixels, canonical straight-RGBA8,
+  revision/history increments, Undo/Redo and `NO_CHANGE` without publication.
+  The Python replay reconstructs every expected final pixel from the
+  independent Godot-authored mask fixture and rejects malformed source,
+  output, history, revisions and evidence counts. Fast CI checks evidence
+  without a native extension; the explicit `--quad-publication-only --runs 2`
+  bridge mode runs in the manual-only native CI job. The temporary extension
+  does not prove deployed Atlas UI behavior or physical GPU performance.
 - T-068 native scalar sparse publication **cancellation/conflict**:
   `tests/test_t068_scalar_atomicity.py` checks source-pinned two-run
   37-assertion Godot evidence and independently reconstructs canonical

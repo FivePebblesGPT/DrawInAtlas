@@ -27,6 +27,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_scalar_atomicity.py -v
           python3 -m unittest discover -s tests -p test_t068_scalar_transform.py -v
           python3 -m unittest discover -s tests -p test_t068_quad_gdextension.py -v
+          python3 -m unittest discover -s tests -p test_t068_quad_publication.py -v
       - name: Build and verify isolated native, texture, document, and scalar sparse brush paths
         shell: bash
         run: |
@@ -45,6 +46,15 @@ jobs:
               --godot "$(command -v godot)" --runs 2 --atomic-only \
               --output /tmp/t068-gdextension-atomicity.json
           test -s /tmp/t068-gdextension-atomicity.json
+      - name: Verify native four-corner masks through canonical document publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 --quad-publication-only \
+              --output /tmp/t068-gdextension-quad-publication.json
+          test -s /tmp/t068-gdextension-quad-publication.json
       - name: Compare 512/1024/2048 CPU publication in a separate isolated build
         shell: bash
         run: |
@@ -63,5 +73,6 @@ jobs:
           path: |
             /tmp/t068-gdextension-bridge.json
             /tmp/t068-gdextension-atomicity.json
+            /tmp/t068-gdextension-quad-publication.json
             /tmp/t068-gdextension-large.json
           if-no-files-found: warn
