@@ -23,7 +23,7 @@ class BrushFixtureContracts(unittest.TestCase):
 
     def test_real_godot_fixture_is_independently_rgba8_exact(self) -> None:
         self.assertEqual(self.side, 32)
-        self.assertEqual(len(self.cases), 11)
+        self.assertEqual(len(self.cases), 16)
         self.assertTrue(any(c["selection"] == "sparse" for c in self.cases))
         self.assertTrue(any(c["selection"] == "inverted" for c in self.cases))
         self.assertTrue(any(c["erase"] for c in self.cases))
@@ -35,6 +35,45 @@ class BrushFixtureContracts(unittest.TestCase):
                 self.assertEqual(BRUSH._sha(output), case["after_sha256"])
                 self.assertTrue(all(BRUSH._allowed(i, self.side, case["selection"])
                                     for i in case["coverage_indices"]))
+
+    def test_nonidentity_transform_cases_keep_raster_local_scope(self) -> None:
+        transforms = {c["id"]: c for c in self.cases if "transform" in c}
+        self.assertEqual(set(transforms), {"zoom_pan_rect", "rotation90_inverted",
+                                           "mirrored_crossing", "nonuniform_sparse", "shear_erase"})
+        reference = {c["id"]: c for c in self.cases}
+        for name, base in (("zoom_pan_rect", "rect_selection"),
+                           ("rotation90_inverted", "inverted_selection"),
+                           ("mirrored_crossing", "self_crossing"),
+                           ("nonuniform_sparse", "sparse_selection"),
+                           ("shear_erase", "erase_hidden_rgb")):
+            with self.subTest(name=name):
+                case = transforms[name]
+                self.assertNotEqual(case["path"], case["view_path"])
+                self.assertEqual(BRUSH.raster_path(case), case["path"])
+                for field in ("coverage_indices", "changed_indices", "after_sha256"):
+                    self.assertEqual(case[field], reference[base][field])
+
+    def test_transform_decoder_rejects_corruption_without_silent_identity_fallback(self) -> None:
+        payload = json.loads(BRUSH.ORACLE_FILE.read_text())
+        for mutation, expected in (({"transform": [1, 0, 0, 0, 2, 3]}, "Singular"),
+                                   ({"transform": [1, 0, 0, 1, 3]}, "Invalid view transform"),
+                                   ({"view_path": [[0, 0]]}, "Invalid transformed view path")):
+            with self.subTest(mutation=mutation):
+                candidate = copy.deepcopy(payload)
+                case = next(c for c in candidate["cases"] if c["id"] == "zoom_pan_rect")
+                case.update(mutation)
+                with self.assertRaisesRegex(ValueError, expected):
+                    self._load_mutated(candidate)
+        shifted = copy.deepcopy(payload)
+        case = next(c for c in shifted["cases"] if c["id"] == "nonuniform_sparse")
+        case["view_path"][0][0] += 1
+        with self.assertRaisesRegex(ValueError, "does not invert"):
+            self._load_mutated(shifted)
+        no_transform = copy.deepcopy(payload)
+        case = next(c for c in no_transform["cases"] if c["id"] == "shear_erase")
+        del case["transform"]
+        with self.assertRaisesRegex(ValueError, "Unexpected view path"):
+            self._load_mutated(no_transform)
 
     def test_unsigned_or_aliasing_anchor_is_not_accepted(self) -> None:
         payload = json.loads(BRUSH.ORACLE_FILE.read_text())
@@ -88,7 +127,7 @@ class BrushFixtureContracts(unittest.TestCase):
                 capture_output=True, text=True, timeout=120, check=False,
             )
             self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
-            self.assertIn("T068_SKIA_BRUSH_ORACLE_PASSED: 11", process.stdout)
+            self.assertIn("T068_SKIA_BRUSH_ORACLE_PASSED: 16", process.stdout)
             self.assertEqual(json.loads(destination.read_text()),
                              json.loads(BRUSH.ORACLE_FILE.read_text()))
 
@@ -131,18 +170,20 @@ class BrushSkiaLiveContracts(unittest.TestCase):
     def test_hard_coverage_has_documented_one_pixel_crossing_counterexample(self) -> None:
         report = BRUSH.screen(self.renderer, trials=3)
         cases = {c["id"]: c for c in report["cases"]}
-        self.assertEqual(len(cases), 11)
+        self.assertEqual(len(cases), 16)
         for name in ("stationary_dab", "horizontal_fractional", "vertical_reverse", "diagonal",
-                     "rect_selection", "sparse_selection", "inverted_selection", "erase_hidden_rgb"):
+                     "rect_selection", "sparse_selection", "inverted_selection", "erase_hidden_rgb",
+                     "zoom_pan_rect", "rotation90_inverted", "nonuniform_sparse", "shear_erase"):
             with self.subTest(name=name):
                 self.assertEqual(cases[name]["missing_godot_coverage"], 0)
                 self.assertEqual(cases[name]["extra_skia_coverage"], 0)
                 self.assertEqual(cases[name]["direct_rgba8_mismatched_pixels"], 0)
-        for name in ("self_crossing", "self_crossing_batched", "zero_alpha_noop"):
+        for name in ("self_crossing", "self_crossing_batched", "zero_alpha_noop", "mirrored_crossing"):
             with self.subTest(name=name):
                 self.assertEqual(cases[name]["missing_godot_coverage"], 1)
                 self.assertEqual(cases[name]["extra_skia_coverage"], 0)
         self.assertEqual(cases["self_crossing"]["direct_rgba8_mismatched_pixels"], 1)
+        self.assertEqual(cases["mirrored_crossing"]["direct_rgba8_mismatched_pixels"], 1)
         self.assertEqual(cases["zero_alpha_noop"]["direct_rgba8_mismatched_pixels"], 0)
 
     def test_independent_coverage_mask_and_direct_rgba_are_deterministic(self) -> None:

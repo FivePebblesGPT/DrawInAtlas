@@ -984,3 +984,54 @@ transformed masks, clipping and same-gesture repeated-sample cases, and must
 measure native C++ and Godot upload boundaries before any integration decision.
 Physical Windows/Linux p95 and memory/VRAM, standalone release packaging and
 user-facing latency gates also remain open. **T-068 is In Progress.**
+
+
+## 2026-11-04 Skia vs transformed Godot brush follow-up (not adoption)
+
+A schema-2 regeneration of `tools/benchmarks/t068_skia_brush_oracle.json`
+adds five real `DrawingEditSession` non-identity view transforms. Godot
+receives the **transformed view-space** points and freezes a transform for
+the gesture; the source tile and `DrawingSelection` remain **raster-local**
+and use signed global anchors beyond 2^53. The five transformations are
+uniform zoom/pan with rectangular selection, 90° rotation with inverted
+selection, x-mirroring with self-overlap, nonuniform scaling with a sparse
+pixel mask, and shear while erasing pixels that may contain hidden RGB.
+Brush width is deliberately raster-local, as it is in the canonical API;
+this comparison does not model screen-space brush scaling or rotated grid
+cells from Atlas.
+
+The independent Python reader now inverts all serialized view samples,
+rejects malformed/singular matrices or inconsistent local paths, verifies
+canonical source-over and checked Godot output digests, and insists that
+each transformed case matches its untransformed geometric baseline. These
+are deterministic exact-pixel **correctness** fixtures, not native-compute
+or hardware-timing measurements. Reproduction:
+
+```bash
+godot --headless --path . --script res://tests/drawing_t068_skia_brush_oracle.gd -- /tmp/t068-transform-oracle.json
+T068_GODOT=godot python3 -m unittest discover -s tests -p test_t068_skia_brush.py -v
+# For live Skia checks, add externally installed 144.1 to PYTHONPATH and set T068_SKIA_WHEEL.
+python3.13 tools/benchmarks/t068_skia_brush.py \
+  --wheel /path/to/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl \
+  --runs 2 --trials 7 --output /tmp/t068-skia-brush.json
+```
+
+| Additional transform case | Coverage difference per run | Direct RGBA8 difference | Interpretation |
+|---|---:|---:|---|
+| Zoom/pan + raster-local rectangle | 0 | 0 | Tested view-to-local coordinates, not native clip |
+| 90° rotation + inverted rectangle | 0 | 0 | Same local coverage as untransformed case |
+| Mirrored self-crossing | 1 Godot pixel missing | 1 pixel | Mirrors existing Skia stencil counterexample |
+| Nonuniform scale + sparse postmask | 0 | 0 | Tested declared raster-local width |
+| Shear + hidden-RGB erase | 0 | 0 | No untouched byte changed |
+
+Across **16 cases/run × 2 independent seven-trial runs** (32 total), **eight**
+cases have noncanonical Skia coverage, and **six** have noncanonical
+straight-RGBA8 output; the same discrepancies repeat both runs. Of those,
+the five new transform cases add one coverage and one final-pixel mismatch
+per run. Skia A8 and direct RGBA8 still draw in **raster-local coordinates**
+after Python inverse mapping; selection is applied afterward in Python.
+Thus this check neither implements native Skia transforms/clipping nor tests
+GDExtension marshaling and does not resolve physical Linux/Windows latency,
+RAM/VRAM or portable-release acceptance. The pinned two-run JSON was refreshed
+in [`T068_2026-11-04_skia_brush.json`](benchmarks/T068_2026-11-04_skia_brush.json).
+**Keep canonical Godot brushes and T-068 In Progress.**

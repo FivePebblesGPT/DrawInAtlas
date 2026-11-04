@@ -50,7 +50,7 @@ jobs:
             --wheel /tmp/skia_python-144.1-cp313-cp313-manylinux_2_28_x86_64.whl \
             --runs 2 --trials 7 --output /tmp/t068-skia-brush.json \
             | tee /tmp/t068-skia-brush.log
-          grep -q 'T068_SKIA_BRUSH_SCREEN_PASSED: 22 Godot brush/mask comparisons;' /tmp/t068-skia-brush.log
+          grep -q 'T068_SKIA_BRUSH_SCREEN_PASSED: 32 Godot brush/mask comparisons;' /tmp/t068-skia-brush.log
           test -s /tmp/t068-skia-brush.json
       - name: Upload Skia parity and timing diagnostics
         if: always()

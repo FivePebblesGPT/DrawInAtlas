@@ -54,6 +54,25 @@ func _cases() -> Array[Dictionary]:
 		{"id": "zero_alpha_noop", "path": [[5.0, 6.0], [28.0, 27.0],
 			[5.0, 27.0], [28.0, 6.0]], "width": 3.5,
 			"paint": [101, 223, 52, 0], "erase": false, "selection": "none"},
+		# All paths above and below are in raster-local coordinates. These five
+		# gestures send view-space points through a frozen non-identity transform;
+		# selection bounds remain raster-local, even under rotation/mirroring.
+		{"id": "zoom_pan_rect", "path": [[6.5, 7.0], [25.5, 24.5]],
+			"width": 7.0, "paint": [39, 190, 111, 200], "erase": false,
+			"selection": "rect", "transform": [2.0, 0.0, 0.0, 2.0, 4.0, -6.0]},
+		{"id": "rotation90_inverted", "path": [[6.5, 7.0], [25.5, 24.5]],
+			"width": 7.0, "paint": [39, 190, 111, 200], "erase": false,
+			"selection": "inverted", "transform": [0.0, 1.0, -1.0, 0.0, 30.0, 2.0]},
+		{"id": "mirrored_crossing", "path": [[5.0, 6.0], [28.0, 27.0],
+			[5.0, 27.0], [28.0, 6.0]], "width": 3.5,
+			"paint": [219, 41, 87, 129], "erase": false, "selection": "none",
+			"transform": [-1.0, 0.0, 0.0, 1.0, 32.0, 0.0]},
+		{"id": "nonuniform_sparse", "path": [[6.5, 7.0], [25.5, 24.5]],
+			"width": 7.0, "paint": [39, 190, 111, 200], "erase": false,
+			"selection": "sparse", "transform": [2.0, 0.0, 0.0, 0.5, 0.0, 4.0]},
+		{"id": "shear_erase", "path": [[4.5, 3.0], [27.0, 23.5]],
+			"width": 4.0, "paint": [0, 0, 0, 0], "erase": true,
+			"selection": "none", "transform": [1.0, 0.0, 0.5, 1.0, -5.0, 2.0]},
 	]
 
 
@@ -100,13 +119,21 @@ func _witness(spec: Dictionary, source: PackedByteArray) -> Dictionary:
 		return {}
 	if not seed.commit().ok:
 		return {}
+	var coefficients: Array = spec.get("transform", [1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+	var view: Transform2D = Transform2D(
+		Vector2(float(coefficients[0]), float(coefficients[1])),
+		Vector2(float(coefficients[2]), float(coefficients[3])),
+		Vector2(float(coefficients[4]), float(coefficients[5])))
 	var session: DrawingEditSession = document.begin_edit(layer, document.revision,
-		Transform2D.IDENTITY, ANCHOR_X, ANCHOR_Y).value as DrawingEditSession
+		view, ANCHOR_X, ANCHOR_Y).value as DrawingEditSession
 	if session == null:
 		return {}
 	var path: PackedVector2Array = PackedVector2Array()
+	var view_path: Array[Array] = []
 	for point: Array in spec["path"]:
-		path.append(Vector2(float(point[0]), float(point[1])))
+		var transformed: Vector2 = view * Vector2(float(point[0]), float(point[1]))
+		path.append(transformed)
+		view_path.append([transformed.x, transformed.y])
 	var channels: Array = spec["paint"]
 	var rgba: int = int(channels[0]) | (int(channels[1]) << 8) | (int(channels[2]) << 16) | (int(channels[3]) << 24)
 	var selection: DrawingSelection = _selection(String(spec["selection"]))
@@ -147,6 +174,8 @@ func _witness(spec: Dictionary, source: PackedByteArray) -> Dictionary:
 			after[index * 4 + channel] = (value >> (channel * 8)) & 255
 	changed.sort()
 	var output: Dictionary = spec.duplicate(true)
+	if spec.has("transform"):
+		output["view_path"] = view_path
 	output["coverage_indices"] = coverage
 	output["changed_indices"] = changed
 	output["after_sha256"] = _sha256(after)
@@ -169,7 +198,7 @@ func _generate() -> void:
 			return
 		cases.append(witness)
 	var payload: Dictionary = {
-		"schema": 1, "side": SIDE, "source": "t068_cairo_cpu.fixture(side, False)",
+		"schema": 2, "side": SIDE, "source": "t068_cairo_cpu.fixture(side, False)",
 		"source_sha256": _sha256(source),
 		"anchor_x": str(ANCHOR_X), "anchor_y": str(ANCHOR_Y),
 		"generator": "tests/drawing_t068_skia_brush_oracle.gd",

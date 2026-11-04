@@ -15,7 +15,7 @@ import json
 import statistics
 import time
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from t068_cairo_cpu import RGBA, fixture, source_over
 from t068_skia_cpu import SkiaCPU, verify_wheel
@@ -27,6 +27,8 @@ ORACLE_FILE = ROOT / "tools/benchmarks/t068_skia_brush_oracle.json"
 class BrushSpec(TypedDict):
     id: str
     path: list[list[float]]
+    transform: NotRequired[list[float]]
+    view_path: NotRequired[list[list[float]]]
     width: float
     paint: list[int]
     erase: bool
@@ -67,6 +69,42 @@ def canonical_pixels(source: bytes, coverage: set[int], paint: RGBA,
     return bytes(output)
 
 
+def raster_path(case: BrushSpec) -> list[list[float]]:
+    """Inverse-map frozen view samples to local raster space, not signed world.
+
+    The view matrix is serialized as [xx, xy, yx, yy, tx, ty]. With no
+    transform the original local path is the tested identity baseline.
+    Explicit view samples are required for non-identity matrices; we never
+    silently assume a transformed gesture was issued in local coordinates.
+    """
+    transform = case.get("transform")
+    if transform is None:
+        if "view_path" in case:
+            raise ValueError(f"Unexpected view path without transform: {case['id']}")
+        return case["path"]
+    if (not isinstance(transform, list) or len(transform) != 6
+            or any(type(value) not in (float, int) or not -1000 <= value <= 1000
+                   for value in transform)):
+        raise ValueError(f"Invalid view transform: {case['id']}")
+    xx, xy, yx, yy, tx, ty = transform
+    determinant = xx * yy - yx * xy
+    if abs(determinant) < 0.001:
+        raise ValueError(f"Singular view transform: {case['id']}")
+    view_path = case.get("view_path")
+    if (not isinstance(view_path, list) or len(view_path) != len(case["path"])
+            or any(not isinstance(point, list) or len(point) != 2
+                   or any(type(v) not in (int, float) or not -2000 <= v <= 2000 for v in point)
+                   for point in view_path)):
+        raise ValueError(f"Invalid transformed view path: {case['id']}")
+    local = [[(yy * (x - tx) - yx * (y - ty)) / determinant,
+              (xx * (y - ty) - xy * (x - tx)) / determinant]
+             for x, y in view_path]
+    if any(abs(a - b) > 0.00001 for actual, pinned in zip(local, case["path"])
+           for a, b in zip(actual, pinned)):
+        raise ValueError(f"View path does not invert to pinned raster path: {case['id']}")
+    return local
+
+
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -79,7 +117,7 @@ def load_oracle(path: Path = ORACLE_FILE) -> tuple[int, bytes, list[BrushSpec]]:
     """
     payload = json.loads(path.read_text(encoding="utf-8"))
     side = payload["side"]
-    if payload["schema"] != 1 or side != 32 or payload["source"] != "t068_cairo_cpu.fixture(side, False)":
+    if payload["schema"] != 2 or side != 32 or payload["source"] != "t068_cairo_cpu.fixture(side, False)":
         raise ValueError("Unsupported Godot brush fixture schema or side")
     if payload["anchor_x"] != "9007199254740993" or payload["anchor_y"] != "-9007199254740993":
         raise ValueError("Fixture lacks tested signed anchor")
@@ -89,7 +127,7 @@ def load_oracle(path: Path = ORACLE_FILE) -> tuple[int, bytes, list[BrushSpec]]:
     if _sha(source) != payload["source_sha256"]:
         raise ValueError("Fixture source does not match canonical RGBA8 bytes")
     cases: list[BrushSpec] = payload["cases"]
-    if len(cases) != 11 or len({case["id"] for case in cases}) != len(cases):
+    if len(cases) != 16 or len({case["id"] for case in cases}) != len(cases):
         raise ValueError("Fixture cases are missing or duplicated")
     for case in cases:
         paint = case["paint"]
@@ -98,6 +136,7 @@ def load_oracle(path: Path = ORACLE_FILE) -> tuple[int, bytes, list[BrushSpec]]:
                 or not 0 < case["width"] <= side or case["selection"] not in ("none", "rect", "sparse", "inverted")
                 or any(len(point) != 2 or not all(0 <= coord <= side for coord in point) for point in path_points)):
             raise ValueError(f"Invalid brush case: {case['id']}")
+        raster_path(case)  # Validate every transform and view/local-path pair.
         coverage = case["coverage_indices"]
         changed = case["changed_indices"]
         for indices in (coverage, changed):
@@ -115,6 +154,10 @@ def load_oracle(path: Path = ORACLE_FILE) -> tuple[int, bytes, list[BrushSpec]]:
         raise ValueError("Godot's continuous and batched stroke coverage disagrees")
     if pair["zero_alpha_noop"]["changed_indices"]:
         raise ValueError("Godot's alpha-zero source-over altered original pixels")
+    transformed = {case["id"] for case in cases if "transform" in case}
+    if transformed != {"zoom_pan_rect", "rotation90_inverted", "mirrored_crossing",
+                       "nonuniform_sparse", "shear_erase"}:
+        raise ValueError("Expected transformed brush cases are missing")
     return side, source, cases
 
 
@@ -155,8 +198,10 @@ def skia_coverage(renderer: SkiaCPU, side: int, case: BrushSpec) -> tuple[set[in
     surface = skia.Surface.MakeRasterDirect(image, data, side)
     if surface is None:
         raise RuntimeError("Skia rejected hard brush A8 mask")
+    # Exclude the Python view-to-raster conversion from the draw-only timer.
+    local_path = raster_path(case)
     start = time.perf_counter_ns()
-    _draw_stroke(surface.getCanvas(), skia, case["path"], case["width"],
+    _draw_stroke(surface.getCanvas(), skia, local_path, case["width"],
                  _stroke_paint(skia, case, True))
     elapsed_us = (time.perf_counter_ns() - start) / 1000.0
     if any(value not in (0, 255) for value in data):
@@ -169,8 +214,10 @@ def skia_direct(renderer: SkiaCPU, source: bytes, side: int,
     skia = renderer.skia
     data = bytearray(source)
     surface = renderer._surface(data, side, side, premul=False)
+    # Exclude the Python view-to-raster conversion from the draw-only timer.
+    local_path = raster_path(case)
     start = time.perf_counter_ns()
-    _draw_stroke(surface.getCanvas(), skia, case["path"], case["width"],
+    _draw_stroke(surface.getCanvas(), skia, local_path, case["width"],
                  _stroke_paint(skia, case, False))
     elapsed_us = (time.perf_counter_ns() - start) / 1000.0
     # This explicitly simulates a *post* pixel-selection pass in Python;
@@ -217,6 +264,7 @@ def screen(renderer: SkiaCPU, trials: int = 7,
             raise AssertionError(f"Direct Skia modified pixels outside its non-AA mask: {case['id']}")
         output.append({
             "id": case["id"], "paint_alpha": case["paint"][3],
+            "view_transform": case.get("transform", [1, 0, 0, 1, 0, 0]),
             "erase": case["erase"], "selection": case["selection"],
             "godot_covered": len(expected_coverage), "skia_covered": len(coverage),
             "missing_godot_coverage": len(expected_coverage - coverage),
@@ -230,10 +278,11 @@ def screen(renderer: SkiaCPU, trials: int = 7,
     return {
         "ticket": "T-068", "godot_fixture_sha256": _sha(oracle_path.read_bytes()),
         "skia_version": renderer.version, "oracle": str(oracle_path.relative_to(ROOT)) if oracle_path.is_relative_to(ROOT) else oracle_path.name,
-        "scope": "Skia hard-path coverage, postmasked direct RGBA8 and oracle blending; no native C++ or physical timing",
+        "scope": "Skia raster-local hard-path coverage including inverse-transformed view paths, postmasked direct RGBA8 and oracle blending; no native C++ or physical timing",
         "warnings": [
             "Godot fixture is authoritative for hard brush, once coverage, selection, signed anchor and unchanged hidden RGB",
             "Skia selections are post-processed in Python, not implemented as native clip masks",
+            "View transforms are inverted in Python before drawing; this does not test native Godot/Skia marshaling",
             "Skia shape and blend discrepancies are research results; no automatic change to canonical Drawing pixels",
             "Python shape timings exclude surface creation, selection and Godot/GDExtension publication",
         ],
