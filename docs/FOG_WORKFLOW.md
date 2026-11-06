@@ -1,5 +1,11 @@
 # Floor fog / reveal regions (T-042 engineering checkpoint)
 
+## Current source, privacy and platform boundary (T-075, 2026-11-02)
+
+The floor-level `AtlasFogRegion` operations documented here are **Atlas-owned GM overlay state**, not `DrawingDocument` brush layers. Atlas currently composes sparse per-detail DrawingDocuments through `AtlasDrawingRegistry` and linked `AtlasObjectLibrary` assets; the isolated `AtlasPlayerProjection` proof masks **legacy granted raster `AtlasLayer` chunks**, not all newly composed Drawing tiles, object source variants, editable text or fonts ([world mapping](DRAWING_WORLD_MAPPING.md), [Object Assets](OBJECT_ASSETS_WORKFLOW.md)). Until a trusted publication bridge verifies every reachable source and floor/detail, **do not publish a preview, cached GM image, or native player frame** based on this proof. An unseen content layer beneath opaque fog is not equivalent to filtering its source bytes.
+
+Current campaign saving uses T-066's `Campaign.atlas.json` generation and retains the legacy `campaign.scn` scene metadata *inside* that generation ([storage](DRAWING_STORAGE_CONTRACT.md)); the `.scn`-only scenarios below document the historical native codec. Windows/Linux native desktop are the active targets; [T-044 Web](Archive/Web/T-044.md) is Archived. [T-039](Tickets/T-039.md) must still approve fog/publication policy, and [T-043](Tickets/T-043.md) requires independent player-surface acceptance. An in-flight-fingerprint check alone cannot revoke an already displayed frozen image: a future trusted controller must invalidate and blank it on every policy, fog, text/object or artwork change.
+
 **Status:** GM editor authoring and native saving are implemented; fog-filtered raster capture is available through the isolated T-039/T-040 projection proof. **The actual player projector remains disconnected from the production editor**, since publication grants and the policy in T-039 are not approved. T-042 remains open for design/usability/privacy acceptance.
 
 ## GM editing
@@ -8,9 +14,9 @@ In **Tools → Player visibility (GM only)** choose **Fog reveal/hide (G)**. Dra
 
 Coordinates are **continuous board units**, including negative and fractional values. Rectangle operations are ordered and the newest covering operation wins. The fog belongs to the **floor**, not a specific artwork layer or authored D0/D1 group, so changing detail level cannot reveal a concealed location. Editing honors the selected grid-cell edit mask: the **whole** rectangle must fit inside the active scope or the change is rejected atomically. There are at most 256 operations per floor. To undo the first reveal (and turn fog off again), undo that initial history command. A reset/clear-fog UI and arbitrary polygon brushes are not part of this checkpoint.
 
-## Data model and native save
+## Data model and legacy native scene component
 
-`AtlasFloor` owns `fog_enabled` and ordered `AtlasFogRegion` Resources (`Rect2` plus `reveal: bool`). The regions are independent of layer order and tokens. Native `.scn` saves embed validated resources with finite, bounded board coordinates. The dictionary clone/digest validates the complete sequence; native saving, backups, floor reordering and independent reload retain it. Missing fields in legacy saves default to disabled/empty. Disabled/empty fog fields are omitted from canonical dictionaries, preserving the integrity digest used by older `.scn` files; a campaign written with the T-041 checkpoint was successfully loaded by the T-042 engine. The optional fog fields do not change the campaign schema version. Editing commands bind the original map/floor resource identity and full prior snapshot, rejecting stale or redirected edits.
+`AtlasFloor` owns `fog_enabled` and ordered `AtlasFogRegion` Resources (`Rect2` plus `reveal: bool`). The regions are independent of layer order and tokens. The legacy native `.scn` codec embeds validated resources with finite, bounded board coordinates; T-066 wraps the scene component in a portable generation rather than saving a standalone `.scn` as the authoritative campaign. The dictionary clone/digest validates the complete sequence; native saving, backups, floor reordering and independent reload retain it. Missing fields in legacy saves default to disabled/empty. Disabled/empty fog fields are omitted from canonical dictionaries, preserving the integrity digest used by older `.scn` files; a campaign written with the T-041 checkpoint was successfully loaded by the T-042 engine. The optional fog fields do not change the campaign schema version. Editing commands bind the original map/floor resource identity and full prior snapshot, rejecting stale or redirected edits.
 
 ## Player privacy proof and limits
 

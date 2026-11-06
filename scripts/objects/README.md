@@ -149,3 +149,166 @@ python3 tools/build_drawing_app.py --in-place
 godot --headless --editor --path drawing --import --quit
 godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd
 ```
+
+## T-064 bounded nested source rendering (2026-11-03)
+
+A published Object source can reference ordered child Object sources via the
+existing Atlas registry. `render_source_tree(source_id, local_rect)` draws
+the root, then visible descendants (depth-first, later siblings on top),
+using composed parent-local affine transforms and the same canonical
+`DrawingRenderer` as flat assets. `render_instance` uses that path only when
+a source has children; flat placement and independent Drawing still work as
+before. Missing/NULL children use a bounded visible marker rather than
+looking up stale pixels. `composed_bounds` returns the union of transformed
+child frames; `hit_test_path` returns a stable root-to-child ID path so a
+future editor can distinguish parent selection from child selection.
+
+The renderer refuses unsafe source/view sizes (1,048,576 output pixels,
+2,048 visible nodes, 4,194,304 total sampled and composited pixels), and
+uses a traversal-path cycle guard as a second line of defense. Atlas preview
+invalidation follows child-graph mutation and published asset Save; unsaved
+child drafts remain invisible to parents. Run the focused headless witness:
+
+```sh
+godot --headless --path . --script res://tests/object_child_render_smoke.gd
+```
+
+The nested editor-selection and Undo/Redo paths were implemented in later
+T-064 milestones. The single-source Save As/export graph-copy policy remains
+undecided; none of these engineering tests is owner acceptance.
+
+
+## Copy a published nested Objects component (T-064)
+
+`AtlasObjectLibrary.copy_objects_to(destination_campaign_path)` creates the
+`Objects/` component for an **already-existing target campaign directory**.
+The destination `Objects/` folder must not exist. The caller separately copies
+or saves the actual campaign `.scn` and other campaign components; this helper
+preserves currently indexed source revision bytes, source IDs, nested reference
+IDs/transforms and map-instance records without importing or flattening them.
+It validates published hashes, refuses symlinked output paths and concurrent
+index changes, then promotes a verified staging directory. A failure does not
+publish a partial `Objects/`. Old unindexed revision backups and live drafts
+are not copied. This does not implement nested single-source Save As or export:
+those graph-copy policy decisions are still open in T-064.
+
+Run `godot --headless --path . --script res://tests/object_nested_project_copy_smoke.gd`
+to exercise clone/reload, edits isolated from the original project and
+corrupt/stale collision checks. CI runs the same headless witness.
+
+
+## Complete saved portable campaign copy (T-064 engineering milestone)
+
+`AtlasCampaignStore.copy_portable(source_campaign_path, new_campaign_path)`
+(`AtlasCampaignCopy.copy_portable` for a fault-injection callback) clones an
+**already checkpointed** T-066 bundle into a **new project directory**. The
+parent directory must exist; the destination project folder must not. Source
+and destination paths must be canonical absolute `.scn` filenames, with no
+linked ancestors. It validates the current and backup generations, refuses a
+transitional Objects index newer than the saved root, recursively copies
+`Drawings/`, `Objects/` (including retained old revisions), `Fonts/` and the
+portable root/recovery pointers, retargets the campaign-named Objects index,
+and validates the new project before a single final directory rename. Every
+file is checked against the source digest. Symlinks, component-copy failures,
+source-root changes and destination collisions prevent publication and clean
+up the private staging folder. This copies only the canonical bundle data,
+not unrelated files, unsaved edits or the editor's in-memory history; no
+per-object graph duplication policy is chosen. The destination is a separate,
+editable project and never shares canonical source files with the original.
+
+`godot --headless --path . --script res://tests/object_nested_campaign_copy_smoke.gd`
+runs the 46-check cross-generation, nested references, undo-safe publication,
+backup, failure/corruption and clone-independence witness. This backend API
+now also has an Atlas-facing File → **Copy saved campaign…** action
+(Ctrl/Cmd+Shift+S), with a destination parent picker and a new folder and
+`.scn` name. This command refuses unsaved Atlas/Drawing/Object Editor edits,
+works only from a published checkpoint, and keeps the original campaign open.
+It is **not** the unresolved nested single-source Save As/export policy and
+it has no owner UX signoff. `tests/object_nested_campaign_copy_ui_smoke.gd`
+verifies the UI guard and exact copied registry/pixel contents.
+
+## Nested source NULL repair (T-064 engineering milestone)
+
+Deleting a published source with the retain-NULL policy keeps child-instance
+ID, generation, local transform and missing source key. The nested inspector's
+**Repair NULL with source** action chooses an available replacement by its
+published ID; it never guesses a same-named source. The library endpoint
+`repair_child_placeholder(parent_id, child_id, expected_parent_revision,
+expected_generation, expected_child_revision, replacement_source_id)` verifies
+identity, revision, source hash and acyclicity, publishes the whole registry
+atomically and records `null_origin_source_id` without rewriting artwork.
+The parent-local `AtlasObjectChildEditSession.repair_selected()` participates
+in the same Undo/Redo timeline as structure and transforms. A stale session
+must reload; a live child is not eligible for repair. Export/Save As nested
+copying policy remains an explicit separate product decision.
+
+
+## Nested child visibility (T-064 engineering milestone)
+
+`AtlasObjectChildInspector` exposes **Hide selected / Show selected** for
+published child instances. The source's immutable pixels are untouched;
+`AtlasObjectLibrary.set_child_visibility()` validates exact graph revision,
+child generation and revision before committing the parent's `visible` field.
+Hidden children and all descendants are omitted from render/hit traversal,
+but their IDs/transforms remain selectable in the parent inspector for later
+re-show. The existing child-edit session records the action with reversible
+Undo/Redo; graph-change signaling invalidates Atlas previews. The dedicated
+`tests/object_child_visibility_smoke.gd` is CI-gated. This does not settle
+nested source Save As/export policy or owner interaction acceptance.
+
+## Nested child scaling (T-064 engineering milestone)
+
+The nested parent inspector's **Shrink 10%** and **Grow 10%** buttons call
+`AtlasObjectChildEditSession.scale_selected(factor)` through the existing
+optimistic `transform_child` transaction. Scaling multiplies the child-local
+basis vectors, leaving its parent-local origin intact, and preserving source
+artwork, stable child IDs, descendants and any mirrored or nonuniform basis.
+Zero/negative/nonfinite factors fail, as do stale parent writers and rejected
+registry publications. The existing transform history supports Undo/Redo and
+Atlas source-change invalidation. `tests/object_child_scale_smoke.gd` is a
+fast-CI headless witness; native screenshots are targeted. This is not an
+owner-approved nested Save As/export policy or hardware UX signoff.
+
+
+### Nested child sibling painter order (T-064, engineering candidate)
+
+Child records in a published parent's `children` list have an ordered
+painter/hit priority: **later siblings are above earlier siblings**. In the
+Object Manager's nested inspector, select a child and use **Send backward**
+or **Bring forward** (Ctrl+Alt+Up/Down). Moves are parent-local index
+transactions; they do not replace child IDs or modify the immutable Drawing
+source. Undo/Redo, stale parent/child checks and cache invalidation reuse the
+same child graph contract as transforms and visibility. Outer/inner boundary
+moves do not create empty history entries. The new source-level and live
+inspector witness is `tests/object_child_order_smoke.gd` (51 headless; 52
+with native screenshot). The still-unapproved nested Save As/export policy
+and hardware/owner UX acceptance are separate requirements.
+
+### Optional labels for nested child instances (T-064 engineering candidate)
+
+In Object Manager → Nested children, select a child, edit **Instance label**
+and press **Apply label** or Enter. This names the *instance within the
+parent*, not the shared published Object source. Empty labels fall back to
+the source's name; labels longer than 64 characters or containing surrounding
+whitespace/control characters cannot be published. The optional label lives
+in the child record's existing scalar metadata, retaining all other metadata,
+stable IDs, placement, visibility and published source bytes. Undo/Redo and
+stale-edit rejection use the existing parent-local history. Labels survive
+Object registry reload and portable component copying. The fast-CI witness
+is `tests/object_child_label_smoke.gd`; native UI and physical owner acceptance
+remain separate, and no nested single-source Save As policy is implied.
+
+
+### Duplicate a nested child placement (T-064 engineering)
+
+In the Object Manager's nested child inspector, select a **linked** child and
+choose **Duplicate selected** (or Ctrl+Alt+D). This inserts a separate instance
+immediately above the selected child with its own stable ID and parent-local
+transform displaced by (1, 1); the inspector selects the new child. Both
+instances share the exact same verified published Object source pixels.
+Visibility, label and primitive metadata are copied, but subsequent edits to
+the instances remain separate. Undo/Redo restores the duplicate's identity
+and original selection; a missing/NULL reference must be repaired before it
+can be duplicated. This does **not** implement nested Object Asset Save As,
+graph duplication, or any unapproved source-copy policy. The safe graph
+capacity and owner physical-hardware review remain separate.

@@ -1,6 +1,6 @@
 extends Control
 
-enum FileAction { SAVE, LOAD, RESET_SAMPLE, NEW_BOARD }
+enum FileAction { SAVE, LOAD, RESET_SAMPLE, NEW_BOARD, COPY_SAVED }
 enum EditAction { UNDO, REDO, COPY, CUT, PASTE, SELECT_ALL, DELETE }
 enum ViewAction { SIDEBAR, GRID, BACK, LINKS }
 
@@ -34,6 +34,7 @@ func _build_menus() -> void:
 	_file_menu.add_item("New board…", FileAction.NEW_BOARD, modifier | KEY_N)
 	_file_menu.add_item("Save campaign", FileAction.SAVE, modifier | KEY_S)
 	_file_menu.add_item("Load campaign", FileAction.LOAD)
+	_file_menu.add_item("Copy saved campaign…", FileAction.COPY_SAVED, modifier | KEY_MASK_SHIFT | KEY_S)
 	_file_menu.add_separator()
 	_file_menu.add_item("Reset sample campaign", FileAction.RESET_SAMPLE)
 	_edit_menu.add_item("Undo", EditAction.UNDO, modifier | KEY_Z)
@@ -75,6 +76,8 @@ func _on_file_menu(id: int) -> void:
 			_editor._on_save()
 		FileAction.LOAD:
 			_editor._on_load()
+		FileAction.COPY_SAVED:
+			_editor._request_campaign_copy()
 		FileAction.RESET_SAMPLE:
 			_editor._on_sample()
 

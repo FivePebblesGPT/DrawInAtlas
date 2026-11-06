@@ -37,21 +37,24 @@ its Godot template on the build host.
 
 ## Working with the editor
 
-- **File** New, Open, Save, Save As use independent `.drawing` files; multiple
-  documents open as tabs with a dirty `*` indicator.
-- **Tools** Brush, Eraser, Select (drag rectangle), Move (drag previously selected
+- **File** New, Open, Save, Save As use independent `.drawing` files; **Ctrl/Cmd+Shift+S opens Save As**, with Ctrl/Cmd+Y as the primary redo shortcut (Shift+Z alias). The eight-menu compact header keeps File/Edit/View visible and moves additional commands into More at narrow widths; per-tool options scroll through chevrons or wheel rather than wrapping. Multiple
+  documents open as tabs with a dirty `*` indicator. To remove the row labeled
+  `Untitled`, uncheck **Window → Show document tabs**; use Ctrl/Cmd+Tab or
+  Ctrl/Cmd+Shift+Tab to change documents without the strip. The active filename
+  and dirty marker remain in the status bar; visibility resets on app restart.
+- **Tools** The compact left rail has icon-only, keyboard-focusable Brush,
+  Eraser, Select, Move, Text and Pan buttons; hover or focus for tool names.
+  Brush, Eraser, Select (drag rectangle), Move (drag previously selected
   pixels), Pan (left drag); middle drag pans in any tool. Scroll zooms around
   the pointer. A 1–96px brush-width field, optional generic 8px snap and color
   picker control the Drawing core's gestures.
 - **Layer** Add group, add raster, toggle visibility, remove selected; tree
   selection chooses a raster paint target. Undo and redo apply to raster gestures.
-  The **Record selection changes in Undo History** checkbox (OFF by default)
+  The History dock's **Record selection changes in Undo History** checkbox (OFF by default)
   optionally adds completed selections as separate clean, reversible steps;
   content undo restores layer/selection/tool context regardless of the toggle.
-  Structural layer operations are dirty but are not yet undoable (T-063 and
-  follow-up layer feature work).
-- **Keyboard** Ctrl/Cmd+N, O, S, Z, Shift+Z, Y for New, Open, Save,
-  Undo, Redo. Hover status reports revision, dirty state, zoom and layer ID.
+  Structural layer operations are dirty but are not yet undoable (follow-up layer feature work).
+- **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock stacks independently collapsible groups and scrolls at short heights. Use **Window → Minimize/expand panel dock** (or the dock's own button) to switch between the expanded groups and a narrow icon rail. Each attached panel has an icon with a tooltip; adjacent icons in a group share one flyout/tab set, while a separator denotes a different group. The flyout overlays the drawing canvas without changing its layout or creating an OS window; click the active icon to close it. Collapse and active tab state survive minimize/restore during the session. **Drag a panel icon** to another tab position, another group, or a between-group insertion marker; **drag the ↕ handle** to reorder or merge its whole group. The in-app hint appears only for valid drops; Esc and leaving the dock cancel without layout changes. The group **⋮ Arrange** menu provides keyboard-accessible move/split/merge actions. On a focused panel icon use `Ctrl+Alt+Left/Right` to reorder, `Ctrl+Alt+Up/Down` to move to an adjacent group and `Ctrl+Alt+S` to split; on a focused ↕ handle, `Ctrl+Alt+Shift+Up/Down` reorders groups. Large tab strips scroll horizontally, and dragging near the top/bottom of the dock scrolls through offscreen group targets. Use **Window → Float selected dock group** after focusing a dock tab/group handle (otherwise the first attached group is chosen) to move all its current tabs into a floating **in-app Control**. Drag the host's ⠿ title grip to move, its ◢ lower-right grip to resize, and its floating tab icons to reorder within the host; each floating group's ⋮ menu also moves, splits and merges local groups. Close × **hides** the host without redocking or discarding its panels; **Window → Show hidden floating panels** recovers every hidden host. Each host can contain multiple ordered groups, independently collapsed. Drag a floating tab or whole group onto the expanded dock, a minimized-rail group gap, or another floating host to transfer the **original** panel(s), preserving relative tab order. Drop on the bare canvas to create an in-app floating host; Esc or an invalid drop leaves both sides unchanged. The dock and floating-host ⋮ menus offer keyboard-accessible cross-container moves; a focused floating tab can use Ctrl+Alt+D, or focused group handle Ctrl+Alt+Shift+D, to redock at the end of the right dock. The original floating container disappears when all its groups have moved away. Dock/group/flyout/floating-host layout is now saved across application relaunches as a **workspace preference** (never inside `.drawing` documents). **Window → Reset workspace layout** restores Colors/Layers/History singleton groups and resets floating hosts without discarding edits. Settings are stored in the Godot user data directory (`user://drawing-workspace-dock-v1.json`); corrupt/unsupported files return to safe defaults, and offscreen hosts are clamped on restart or resize. Hidden floating panels still recover from Window. A host that embeds the shared editor can override `layout_settings_path` to isolate separate workspaces, and can register optional panels by stable ID before restore. The complete Drawing feature inventory and Asset Browser implementation remain separate tickets; **T-083 awaits explicit owner UX review**, and automated tests do not approve it.
 
 ## File format and boundaries
 
@@ -68,9 +71,9 @@ currently capped at 128 MiB and 4096 chunks; writes use a same-directory
 This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,
 retention, backup, migration or recovery from T-066. It is not yet a complete
-production drawing editor: advanced tool/options layout,
-full structural history and performance/native acceleration belong to later
-tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
+production drawing editor: the compact T-063 layout does not implement
+all approved tools/advanced options, and full structural history and
+performance/native acceleration belong to later tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
 
 ## Verification
 
@@ -147,8 +150,50 @@ selection through `AtlasObjectEditorBridge`; ordinary source Save refreshes
 all linked placements and instance-launched Save As publishes B and rebinds
 only the origin, with one Atlas history command. Undo retains the saved B.
 
-Atlas main-canvas `Edit Source` menu, object placement/Asset Browser and
-campaign-wide atomic save remain T-055/T-065/T-066, respectively. The
+**Asset Browser (T-065 engineering preview):** Choose **Window → Asset Browser…**
+and select an existing absolute `Objects/` directory from a portable project.
+The resulting panel is a normal, movable/collapsible dock peer of Colors,
+Layers and History. It searches source *names* and stable *IDs*, lists loose
+`Objects/*.drawing` and the newest `Objects/<id>/vNNNNNN.drawing`, and opens
+selected sources in an independent Object Editor tab via **Edit Source**.
+The source path appears as a tooltip; **Refresh** rechecks the folder. A
+host embedding this workspace may set `initial_asset_browser_root` before
+`add_child()` so the panel is registered before the T-083 layout restore.
+The browser currently indexes source metadata on explicit refresh. Visible
+rows render transparent 48×48 thumbnails from actual source pixels with a
+bounded 192×192 center crop for oversized frames; a missing/empty authoring
+frame previews a 128×128 neighborhood of the Object origin. At most two new
+thumbnails are decoded per process frame; a 24-image content-hash cache is
+invalidated on refresh or successful local Object Editor publication. External
+changes require **Refresh** and cannot be opened from a stale listing. This
+is **not yet** an Atlas instance-placement, source-deletion or NULL-repair UI.
+**Import…** copies a separate valid `.drawing` into a standalone portable
+`Objects/` root under its embedded stable ID; it refuses duplicate identities
+and an Atlas-managed registry root because that requires campaign registration.
+**Export…** writes the selected indexed source as a new portable `.drawing`
+file, rejecting stale source bytes and existing destinations rather than
+silently replacing files. Both commands use ordinary Godot file dialogs, not
+a web runtime, and never delete artwork or create Atlas instances. Do not use source names as IDs
+or take its list as authorization to delete unused variants. Atlas placement
+and NULL repair/delete policy are still T-065 work; no automatic asset
+relinking, deletion or publication is triggered by browsing.
+
+**Atlas host behavior (T-065):** In Atlas's **Layers** sidebar, use
+**Browse published Object sources** to see registry-backed assets and usage,
+then drag an Object source over the map or select it and choose **Place at
+view center**. The source creates one linked Atlas instance at the drop
+coordinate, not another Drawing document. **Edit Source** opens the shared
+Object Editor. Atlas's separate **Object Assets and missing links…** manager
+owns campaign Import/Export, Source Delete (Remove/NULL/Cancel) and deliberate
+NULL repair. A registry asset ID need not equal the embedded Drawing document
+ID; the browser retains both, and Atlas validates path/hash/revision before
+placement. The shared browser does not auto-import an unknown source.
+Actual physical pointer gesture acceptance, large-library review and explicit
+owner UX approval are still pending under T-065.
+
+Atlas main-canvas `Edit Source` integration, instance placement, complete
+Asset Browser/NULL management and campaign-wide atomic saves remain scoped
+to T-055/T-065/T-066, respectively. The
 Object Editor's initial UI is a reversible engineering implementation; owner
 acceptance remains under T-056/T-059.
 

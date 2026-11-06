@@ -1,5 +1,10 @@
 # Terrain artwork retirement and future procedural map tools
 
+> [!important] Authority and implemented boundary (2026-11-02)
+> Decision record: [[DECISIONS_DRAWING_ATLAS_2026-11-01]]. The `AtlasTerrainLayer` retirement was implemented under T-050. `addons/drawing/` uses raster/text/semantic layers; `AtlasDrawingRegistry` maps a generic document to each internal `(map,floor,detail)` without creating any terrain-cell or per-hex document type. The old `TILES` persistence references below describe history only. The campaign now uses verified sparse `Drawings/` generations (T-066), not a single embedded-WebP `.scn` head. No user-save migration is required.
+>
+> **Not yet delivered:** a 5-foot PCG tool, semantic classification/type masks and native GPU raster backend (T-068 remains In Progress); T-049 remains a separate authoring-default workflow ticket. Grid and entrance overlays stay in Atlas, independent of drawing pixels. See [architecture](ARCHITECTURE.md), [storage](DRAWING_STORAGE_CONTRACT.md) and [feature inventory](DRAWING_FEATURE_INVENTORY.md).
+
 **Owner decision (2026-10-31):** DrawInAtlas is a digital substitute for a traditionally drawn map. **Retire the palette-cell `AtlasTerrainLayer` (`TILES` in the former wire format) from the target artwork architecture.** The grid and hex-region properties are separate concerns (some region-property workflows remain future work). Raster is primary for painting the visual map, while vector is retained for editable semantic objects. Implementation completed under [[T-050]]; raster-first *authoring defaults* remain pending under [[T-049]].
 
 ## Distinct responsibilities

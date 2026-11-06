@@ -201,19 +201,58 @@ func _run() -> void:
 	_check(AtlasGridSnap.point(canvas.map.grid, raw) == raw, "gridless snap never moves artwork")
 	editor.apply_grid(saved_grid)
 	_check(not toggle.disabled, "grid-backed board restores snapping control")
-	# Pen remains free, even while the snap checkbox is enabled.
+	# Pen stays free even with snap enabled. The current Atlas editor routes
+	# freehand through the canonical Drawing composition, not _draft_stroke.
 	toggle.button_pressed = true
 	editor._choose_tool(AtlasCanvas.Tool.PEN)
 	_check(not toggle.is_visible_in_tree(), "pen is not an implicitly snapping tool")
-	var pen_start: Vector2 = Vector2(5.34, 8.29)
-	var pen_end: Vector2 = Vector2(15.82, 17.15)
+	var pen_start: Vector2 = Vector2(305.34, 208.29)
+	var pen_end: Vector2 = Vector2(315.82, 217.15)
 	canvas.camera_center = (pen_start + pen_end) * 0.5
-	before = canvas.floor.raster_layer()
+	canvas.brush_width = 1.5
+	var document_before_result: DrawingResult = editor.drawing_composition.registry.document_at(
+		canvas.map.id, canvas.floor.id, canvas.presented_detail_level)
+	var document_before: DrawingDocument = document_before_result.value as DrawingDocument if document_before_result.ok else null
+	var revision_before: int = document_before.revision if document_before != null else -1
 	_button(canvas, canvas.document_to_local(pen_start), true)
 	_motion(canvas, canvas.document_to_local(pen_end))
-	_check(canvas._draft_stroke.points[-1].distance_to(pen_end) < 0.01, "pen draft never snaps")
+	_check(canvas._canonical_paint and editor.drawing_composition.stroke_active()
+		and canvas._draft_stroke == null, "pen uses the canonical unsnapped Drawing gesture")
 	_button(canvas, canvas.document_to_local(pen_end), false)
-	_check(_matches(canvas, before, AtlasStroke.new(PackedVector2Array([pen_start, pen_end]), canvas.brush_color, canvas.brush_width)), "pen paints unsnapped samples")
+	var document_after_result: DrawingResult = editor.drawing_composition.registry.document_at(
+		canvas.map.id, canvas.floor.id, canvas.presented_detail_level)
+	var document_after: DrawingDocument = document_after_result.value as DrawingDocument if document_after_result.ok else null
+	var children: Array[String] = document_after.list_children() if document_after != null else []
+	var layer_id: String = children[0] if not children.is_empty() else ""
+	var pen_pixel: DrawingResult = DrawingResult.failure("MISSING_LAYER", "no Drawing raster layer")
+	if document_after != null and not layer_id.is_empty():
+		pen_pixel = document_after.read_pixel(layer_id, floori(pen_end.x), floori(pen_end.y))
+	_check(document_after != null and document_after.revision > revision_before and pen_pixel.ok
+		and int(pen_pixel.value) != 0, "pen paints the unsnapped endpoint in canonical Drawing")
+	var snapped_end: Vector2 = AtlasGridSnap.point(grid, pen_end)
+	var snapped_pixel: DrawingResult = DrawingResult.failure("MISSING_LAYER", "no Drawing raster layer")
+	if document_after != null and not layer_id.is_empty():
+		snapped_pixel = document_after.read_pixel(layer_id, floori(snapped_end.x), floori(snapped_end.y))
+	_check(snapped_end.distance_to(pen_end) > 2.0 * canvas.brush_width and snapped_pixel.ok
+		and int(snapped_pixel.value) == 0, "pen does not paint the snapped endpoint")
+	editor._choose_tool(AtlasCanvas.Tool.ERASER)
+	_check(not toggle.is_visible_in_tree(), "eraser also stays free of implicit snapping")
+	_button(canvas, canvas.document_to_local(pen_start), true)
+	_motion(canvas, canvas.document_to_local(pen_end))
+	_check(canvas._canonical_paint and editor.drawing_composition.stroke_active()
+		and canvas._draft_stroke == null, "eraser also uses the canonical freehand gesture")
+	_button(canvas, canvas.document_to_local(pen_end), false)
+	var cleared_pixel: DrawingResult = DrawingResult.failure("MISSING_LAYER", "no Drawing raster layer")
+	if document_after != null and not layer_id.is_empty():
+		cleared_pixel = document_after.read_pixel(layer_id, floori(pen_end.x), floori(pen_end.y))
+	_check(cleared_pixel.ok and int(cleared_pixel.value) == 0,
+		"eraser clears the actual unsnapped endpoint")
+	_check(editor.edits.undo(), "freehand erasure remains undoable")
+	var restored_pixel: DrawingResult = DrawingResult.failure("MISSING_LAYER", "no Drawing raster layer")
+	if document_after != null and not layer_id.is_empty():
+		restored_pixel = document_after.read_pixel(layer_id, floori(pen_end.x), floori(pen_end.y))
+	_check(restored_pixel.ok and int(restored_pixel.value) != 0,
+		"undo restores original canonical pen pixel")
 	# Grid edits change only the grid; existing strokes remain in board coordinates.
 	var original: Dictionary = ink.to_dict()
 	grid.rotation = deg_to_rad(77.0)

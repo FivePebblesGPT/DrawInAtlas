@@ -1,0 +1,59 @@
+{
+  "backend": "compatibility-or-headless",
+  "cases": [
+    {
+      "force_draw": {
+        "median_ms": 2.166,
+        "p95_ms": 26.103
+      },
+      "rgba8_upload_mib": 0.25,
+      "stride": 256,
+      "update": {
+        "median_ms": 0.02,
+        "p95_ms": 0.043
+      },
+      "video_memory_bytes_estimate": 262144
+    },
+    {
+      "force_draw": {
+        "median_ms": 2.082,
+        "p95_ms": 2.444
+      },
+      "rgba8_upload_mib": 1.0,
+      "stride": 512,
+      "update": {
+        "median_ms": 0.042,
+        "p95_ms": 0.286
+      },
+      "video_memory_bytes_estimate": 1048576
+    },
+    {
+      "force_draw": {
+        "median_ms": 2.237,
+        "p95_ms": 2.353
+      },
+      "rgba8_upload_mib": 4.0,
+      "stride": 1024,
+      "update": {
+        "median_ms": 0.171,
+        "p95_ms": 0.209
+      },
+      "video_memory_bytes_estimate": 4194304
+    },
+    {
+      "force_draw": {
+        "median_ms": 2.362,
+        "p95_ms": 2.938
+      },
+      "rgba8_upload_mib": 16.0,
+      "stride": 2048,
+      "update": {
+        "median_ms": 0.966,
+        "p95_ms": 1.232
+      },
+      "video_memory_bytes_estimate": 16777216
+    }
+  ],
+  "failures": 0,
+  "schema": "t067-software-upload-v1"
+}

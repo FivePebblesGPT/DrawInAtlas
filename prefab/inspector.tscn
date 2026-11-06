@@ -358,29 +358,25 @@ custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 11
-text = "LINKS & REFERENCES"
+text = "MAP NAVIGATION"
 autowrap_mode = 3
 
 [node name="PreviewLabel" type="Label" parent="Scroll/Margin/Sections/ReferenceSection" unique_id=940283412]
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
-text = "Child map previews"
+text = "Link markers"
 autowrap_mode = 3
 
 [node name="PreviewPicker" type="OptionButton" parent="Scroll/Margin/Sections/ReferenceSection" unique_id=1706946970]
 unique_name_in_owner = true
 layout_mode = 2
-selected = 3
-tooltip_text = "Registered links show transparent board-aligned detail; links without placement stay markers. Up to eight previews at once."
-item_count = 4
+selected = 1
+tooltip_text = "Navigation links are independent map markers. Retired spatial placements do not overlay artwork."
+item_count = 2
 popup/item_0/text = "Off"
 popup/item_0/id = 0
 popup/item_1/text = "Markers"
 popup/item_1/id = 1
-popup/item_2/text = "Aligned faint"
-popup/item_2/id = 2
-popup/item_3/text = "Aligned overlay"
-popup/item_3/id = 3
 fit_to_longest_item = false
 
 [node name="ManageLinks" type="Button" parent="Scroll/Margin/Sections/ReferenceSection"]
@@ -396,18 +392,21 @@ text = "Back to previous view"
 
 [node name="ReferenceCheckbox" type="CheckBox" parent="Scroll/Margin/Sections/ReferenceSection" unique_id=485968111]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 button_pressed = true
 text = "Read-only parent reference"
 
 [node name="OpacityLabel" type="Label" parent="Scroll/Margin/Sections/ReferenceSection" unique_id=899516154]
 custom_minimum_size = Vector2(1, 0)
+visible = false
 layout_mode = 2
 text = "Parent reference opacity"
 autowrap_mode = 3
 
 [node name="OpacitySlider" type="HSlider" parent="Scroll/Margin/Sections/ReferenceSection" unique_id=1165534444]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 max_value = 1.0
 step = 0.05
@@ -420,23 +419,27 @@ text = "Automatic linked-map zoom"
 
 [node name="ParentSourceLabel" type="Label" parent="Scroll/Margin/Sections/ReferenceSection"]
 custom_minimum_size = Vector2(1, 0)
+visible = false
 layout_mode = 2
 text = "Parent reference entrance / source floor"
 autowrap_mode = 3
 
 [node name="ReferenceSourcePicker" type="OptionButton" parent="Scroll/Margin/Sections/ReferenceSection"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 fit_to_longest_item = false
 clip_text = true
 
 [node name="ReferenceFloorPicker" type="OptionButton" parent="Scroll/Margin/Sections/ReferenceSection"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 fit_to_longest_item = false
 clip_text = true
 
 [node name="FreezeReference" type="CheckBox" parent="Scroll/Margin/Sections/ReferenceSection"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 text = "Freeze parent snapshot"

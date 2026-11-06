@@ -255,17 +255,28 @@ static func save(document: DrawingDocument, path: String,
 	return published
 
 
-static func open(path: String) -> DrawingResult:
+## Parse the bounded JSON envelope once. Object Editor source opening must inspect
+## its metadata and decode canonical pixels from this *same* envelope: reading
+## the file a second time could observe unrelated bytes from another writer.
+static func read_payload(path: String) -> DrawingResult:
 	if not FileAccess.file_exists(path):
 		return DrawingResult.failure("OPEN", "Drawing file does not exist")
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return DrawingResult.failure("OPEN", "Unable to read Drawing file")
 	if file.get_length() > MAX_FILE_BYTES:
+		file.close()
 		return DrawingResult.failure("FILE_LIMIT", "Drawing file exceeds standalone limit")
 	var text_data: String = file.get_as_text()
 	file.close()
 	var json: JSON = JSON.new()
 	if json.parse(text_data) != OK or not json.data is Dictionary:
 		return DrawingResult.failure("FILE", "Invalid Drawing JSON")
-	return decode(json.data)
+	return DrawingResult.success(json.data)
+
+
+static func open(path: String) -> DrawingResult:
+	var payload: DrawingResult = read_payload(path)
+	if not payload.ok:
+		return payload
+	return decode(payload.value)

@@ -1,0 +1,45 @@
+{
+  "camera_pan_zoom_frame_post_draw": {
+    "median_ms": 14.822,
+    "p95_ms": 24.558,
+    "worst_ms": 26.568
+  },
+  "checks": 36,
+  "display": "X11",
+  "engine": {
+    "build": "official",
+    "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+    "hex": 264192,
+    "major": 4,
+    "minor": 8,
+    "patch": 0,
+    "status": "beta2",
+    "string": "4.8-beta2 (official)",
+    "timestamp": 0
+  },
+  "failures": 0,
+  "float_camera_distinguishes_2pow24_plus_one": false,
+  "frames": 21,
+  "limits": "Mesa/Xvfb post_draw; reported VRAM is a software-renderer accounting estimate, not physical GPU VRAM or photons. Atlas Vector2 1-unit precision eventually fails at huge anchors.",
+  "renderer": "gl_compatibility",
+  "reported_texture_memory_peak_sampled_bytes": 5053187,
+  "reported_video_memory_peak_sampled_bytes": 11479179.0,
+  "schema": "t057-lod-native-v1",
+  "signed_camera_probes": [
+    {
+      "anchor": -1048576.0,
+      "world_8px_delta_screen": "(32.0, -16.0)"
+    },
+    {
+      "anchor": 1048576.0,
+      "world_8px_delta_screen": "(32.0, -16.0)"
+    }
+  ],
+  "static_memory_monitor_bytes": 97972970.0,
+  "static_memory_peak_sampled_bytes": 97972970.0,
+  "vram_monitor_bytes": 11378511.0,
+  "window": [
+    800,
+    600
+  ]
+}

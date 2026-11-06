@@ -1,5 +1,22 @@
 # Semantic Zoom, Navigation and Cross-Map Previews
 
+## Current zoom and navigation boundaries — T-070 (2026-11-02)
+
+**Authority:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[DRAWING_WORLD_MAPPING]], [[DRAWING_ATLAS_COMPOSITION]] and [[ZOOM_AND_ARTWORK_LOD]]. The old **semantic zoom = child-map transition** concept below describes existing **legacy link navigation**, *not* the authored-detail model or an accepted default.
+
+| Mechanism | What it changes | What it must not change |
+| --- | --- | --- |
+| **Geometric camera zoom/pan** | Atlas view center and scale within the same map-world frame; current navigator max is **24×** | Stored artwork, grid units, selected Drawing layer/document or floor |
+| **Authored D-level presentation** | Which **one internal DrawingDocument per `(map_id, floor_id, detail_id)`** is viewed; D0–D32 have distinct sparse pixels and explicit rational densities in the **same 1024-tick signed map-world frame** | Camera origin, editable target mid-gesture or another independent map |
+| **Derived previews / overview LOD** | Read-only, bounded sampling/caching for map thumbnails or linked Object Assets | Any editable layer, raster pixels, document identity or input ownership |
+| **Entrance / floor-link navigation** | On an explicit valid entrance action, the originating Atlas map/floor/view can change to a different independent destination | Making a new per-hex map, treating D1 as another map, or painting through an entrance click |
+
+An **explicitly selected empty D1** shows no D0 artwork, but the grid, entrance markers, hit tests and navigation overlays remain usable above the transparent art. Automatic authored artwork selection may instead present D0 when no higher-detail art exists locally; this is not image fallback inside D1. Brush/Pen and Eraser clicks always edit, even on entrances; qualifying same-entrance double-click navigation belongs to Selection, Object Selection or Pan. The optional old **three-extra-wheel-step** linked-map gate is **off by default** and separate from automatic artwork LOD. Floor-link usability remains pending [[T-017]].
+
+### Historical linked-document semantic-zoom specification
+
+The rest of this page records the milestone-6 link-navigation design and proposals (animations, underlays and child-map discovery). It is **not** a plan to implement per-hex DrawingDocuments or to use a linked-map transition as the new D-level switch. Search-related terminology/actions require [[T-009]] approval.
+
 > [!important] Linked-document reference, not requested artwork LOD
 > The user clarified that automatic “layer zoom” means artwork-layer LOD on the continuous board, not document switching. The three-step linked-document navigation described below is existing/earlier behavior, not an inherited requirement for [[T-004]] or [[T-005]]. Current decisions: [[E-002]], [[E-006]]; completion: [[Index]].
 

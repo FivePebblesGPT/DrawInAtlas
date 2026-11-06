@@ -1,0 +1,175 @@
+{
+  "cases": [
+    {
+      "cache_32mib_max_tiles": 64,
+      "committed_pixel_changes": 598,
+      "document_tiles": 40,
+      "edit": {
+        "median_ms": 0.846,
+        "p95_ms": 1.171
+      },
+      "load_metadata": {
+        "median_ms": 1.776,
+        "p95_ms": 3.719
+      },
+      "max_decoded_tile_mib": 0.25,
+      "rounds": 13,
+      "save": {
+        "median_ms": 11.667,
+        "p95_ms": 11.939
+      },
+      "stride": 256,
+      "undo_encoded_delta_bytes_max": 5008,
+      "undo_encoded_delta_bytes_sum": 65104,
+      "undo_redo": {
+        "median_ms": 0.865,
+        "p95_ms": 1.116
+      },
+      "viewport": {
+        "median_ms": 3.3,
+        "p95_ms": 3.699
+      },
+      "zstd_bytes": [
+        34,
+        34,
+        34
+      ],
+      "zstd_encode": {
+        "median_ms": 0.049,
+        "p95_ms": 0.136
+      }
+    },
+    {
+      "cache_32mib_max_tiles": 32,
+      "committed_pixel_changes": 598,
+      "document_tiles": 40,
+      "edit": {
+        "median_ms": 0.834,
+        "p95_ms": 1.044
+      },
+      "load_metadata": {
+        "median_ms": 1.86,
+        "p95_ms": 1.933
+      },
+      "max_decoded_tile_mib": 1.0,
+      "rounds": 13,
+      "save": {
+        "median_ms": 25.726,
+        "p95_ms": 25.921
+      },
+      "stride": 512,
+      "undo_encoded_delta_bytes_max": 5008,
+      "undo_encoded_delta_bytes_sum": 65104,
+      "undo_redo": {
+        "median_ms": 0.826,
+        "p95_ms": 0.991
+      },
+      "viewport": {
+        "median_ms": 3.167,
+        "p95_ms": 3.539
+      },
+      "zstd_bytes": [
+        58,
+        58,
+        58
+      ],
+      "zstd_encode": {
+        "median_ms": 0.192,
+        "p95_ms": 0.389
+      }
+    },
+    {
+      "cache_32mib_max_tiles": 8,
+      "committed_pixel_changes": 598,
+      "document_tiles": 40,
+      "edit": {
+        "median_ms": 0.877,
+        "p95_ms": 1.019
+      },
+      "load_metadata": {
+        "median_ms": 2.17,
+        "p95_ms": 2.324
+      },
+      "max_decoded_tile_mib": 4.0,
+      "rounds": 13,
+      "save": {
+        "median_ms": 89.72,
+        "p95_ms": 90.529
+      },
+      "stride": 1024,
+      "undo_encoded_delta_bytes_max": 5008,
+      "undo_encoded_delta_bytes_sum": 65104,
+      "undo_redo": {
+        "median_ms": 0.852,
+        "p95_ms": 0.921
+      },
+      "viewport": {
+        "median_ms": 3.258,
+        "p95_ms": 3.663
+      },
+      "zstd_bytes": [
+        155,
+        155,
+        155
+      ],
+      "zstd_encode": {
+        "median_ms": 0.874,
+        "p95_ms": 1.007
+      }
+    },
+    {
+      "cache_32mib_max_tiles": 2,
+      "committed_pixel_changes": 598,
+      "document_tiles": 40,
+      "edit": {
+        "median_ms": 0.825,
+        "p95_ms": 0.91
+      },
+      "load_metadata": {
+        "median_ms": 2.506,
+        "p95_ms": 2.567
+      },
+      "max_decoded_tile_mib": 16.0,
+      "rounds": 13,
+      "save": {
+        "median_ms": 300.902,
+        "p95_ms": 301.969
+      },
+      "stride": 2048,
+      "undo_encoded_delta_bytes_max": 5008,
+      "undo_encoded_delta_bytes_sum": 65104,
+      "undo_redo": {
+        "median_ms": 0.847,
+        "p95_ms": 2.141
+      },
+      "viewport": {
+        "median_ms": 3.312,
+        "p95_ms": 3.706
+      },
+      "zstd_bytes": [
+        539,
+        539,
+        539
+      ],
+      "zstd_encode": {
+        "median_ms": 3.494,
+        "p95_ms": 3.606
+      }
+    }
+  ],
+  "checks": 386,
+  "engine": {
+    "build": "official",
+    "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+    "hex": 264192,
+    "major": 4,
+    "minor": 8,
+    "patch": 0,
+    "status": "beta2",
+    "string": "4.8-beta2 (official)",
+    "timestamp": 0
+  },
+  "failures": 0,
+  "rounds": 13,
+  "schema": "t067-native-godot-v1"
+}

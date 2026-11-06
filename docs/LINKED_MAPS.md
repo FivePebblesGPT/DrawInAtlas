@@ -1,5 +1,18 @@
 # Linked maps, placements and references
 
+## Current Atlas entrance and floor-link boundary — T-070 (2026-11-02)
+
+**Authority:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[DRAWING_WORLD_MAPPING]], [[DRAWING_ATLAS_COMPOSITION]], [[DRAWING_STORAGE_CONTRACT]]. The milestone-6 interface below remains a **legacy compatibility workflow**, not the architecture for authored local detail and not owner-approved floor-link usability ([[T-017]]).
+
+- **Maps versus details:** Atlas owns genuine independent map identities and elevation **floor IDs**. Within a map/floor, **D0–D32 are internal generic DrawingDocuments keyed by `(map_id, floor_id, detail_id)`**; none is a per-hex child map or a linked battlemat. Every D-level uses the same **1024-tick signed map-world frame** with its own rational raster density. A floor link changes location/map/floor and its destination camera when valid; a D-level switch changes **only authored artwork presentation**. No automatic per-cell map creation or raster resampling occurs.
+- **Blank-detail navigation:** an explicitly presented unpainted D1 has **no D0 underlay**, but Atlas draws grid, entrance, selection and navigation overlays over the empty surface, with hit-testing still active. Derived map previews and linked Object Asset instances are **read-only in this context**, not a replacement source layer or a coordinate transform for the artwork.
+- **Input and staleness:** Pen/Eraser clicks paint even over entrance markers; only a qualifying same-entrance double-click in Selection/Object Selection/Pan navigates. Atlas captures the active document for a gesture; no navigation/LOD action may retarget a stroke. Existing legacy link forms and Search actions revalidate stale source/destination identities before performing an operation. The old automatic three-extra-wheel-step map-navigation gate is off by default and not the automatic authored-LOD controller.
+- **Save:** the current campaign root is `Campaign.atlas.json` and publishes sparse `Drawings/`, `Objects/` and licensed font content through generation-based recovery, while legacy `.scn` resources and spatial/symbolic footprint code remain as **compatibility/history**, not the canonical new map-detail model. There is no historical user-save migration mandate.
+
+### Historical milestone-6 linked-map authoring and references
+
+The following **Linked maps…**, spatial/symbolic footprint, map-capture and `.scn` details describe the older editor workflow and its tested guards. Do not treat the battlemap drag-creation path as a new recommended D-level authoring path. Owner acceptance of the long-term floor-link workflow is still pending [[T-017]]; Search/Find naming and result actions remain pending [[T-009]].
+
 > [!important] Existing workflow, rejected as current UX acceptance
 > This records the implemented milestone-6 interface. [[ManualReview_2026-10-30]] and later decisions require shared-board, separately authored artwork LOD with explicit editing targets. Battlemats are retired, including the intermediate within-map-container proposal; projection framing is in [[E-007]]. Follow [[E-002]], [[E-006]], [[T-018]] and [[Index]] for current work.
 

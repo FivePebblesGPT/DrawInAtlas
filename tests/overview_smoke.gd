@@ -124,21 +124,21 @@ func _spatial() -> void:
 	for mode: Overview.Filter in [Overview.Filter.VISIBLE, Overview.Filter.CELL]:
 		_check(_ids(Overview.query(c, "a", "ground", mode, "", _box(0, 0, 1, 1))) == ["circle"], "circle edge tangency includes anchor outside region")
 		_check(Overview.query(c, "a", "ground", mode, "", _box(0.01, 0, 1, 1)).entries.is_empty(), "circle just outside region misses")
-		_check(_ids(Overview.query(c, "a", "ground", mode, "", _box(11.2, 11.8, 0.1, 0.1))) == ["placed", "descendant"], "rotated footprint accepts region inside; descendants ignore region")
+		_check(Overview.query(c, "a", "ground", mode, "", _box(11.2, 11.8, 0.1, 0.1)).entries.is_empty(), "retired footprint cannot match a spatial query")
 		_check(Overview.query(c, "a", "ground", mode, "", _box(9.4, 12, 0.1, 0.1)).entries.is_empty(), "rotated AABB false positive rejected")
-		_check(_ids(Overview.query(c, "a", "ground", mode, "", _box(8, 8, 8, 8), false)) == ["placed"], "region encloses full footprint")
+		_check(Overview.query(c, "a", "ground", mode, "", _box(8, 8, 8, 8), false).entries.is_empty(), "retired footprint does not become visible just because region encloses it")
 		var empty: AtlasOverviewResult = Overview.query(c, "a", "ground", mode)
 		_check(empty.entries.is_empty() and not empty.message.is_empty(), "spatial mode requires region")
 	_check(Overview.query(c, "a", "ground", Overview.Filter.CELL).message.contains("Select a cell"), "selected-cell explanation")
 	var r: AtlasOverviewResult = Overview.query(c, "a", "ground", Overview.Filter.MAP)
-	_check(r.entries[1].source_focus.is_equal_approx(p.local_to_parent() * Vector2(2, 0.5)) and r.entries[1].can_focus, "placement focus is rotated center including origin")
+	_check(r.entries[1].source_focus == placed.anchor and not r.entries[1].can_focus and not r.entries[1].broken_reason.is_empty(), "archived placement has no active spatial focus")
 	_check(r.entries[0].source_focus == circle.anchor and r.entries[0].can_focus, "anchor source focus preserved")
 	var diamond: PackedVector2Array = PackedVector2Array([Vector2(-0.5, 0.5), Vector2(0.5, -0.5), Vector2(1.5, 0.5), Vector2(0.5, 1.5)])
 	_check(_ids(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", diamond)) == ["circle"], "convex nonrectangular document region")
 	diamond.reverse()
 	diamond.append(diamond[0])
 	_check(_ids(Overview.query(c, "a", "ground", Overview.Filter.CELL, "", diamond)) == ["circle"], "clockwise closed polygon accepted")
-	_check(_ids(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", _box(9, 11.5, 5, 0.01), false)) == ["placed"], "footprint edges cross region without vertex containment")
+	_check(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", _box(9, 11.5, 5, 0.01), false).entries.is_empty(), "footprint edge cannot trigger retired spatial selection")
 	_check(_ids(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", _box(-0.9, 0.4, 0.1, 0.1))) == ["circle"], "circle encloses region")
 	_check(_ids(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", _box(-2, -2, 4, 4))) == ["circle"], "region contains circle center")
 	for region: PackedVector2Array in [PackedVector2Array(), PackedVector2Array([Vector2.ZERO, Vector2.ONE]), PackedVector2Array([Vector2.ZERO, Vector2.ONE, Vector2(2, 2)]), _box(INF, 0, 1, 1), PackedVector2Array([Vector2.ZERO, Vector2(2, 0), Vector2(0.5, 0.5), Vector2(0, 2)]), PackedVector2Array([Vector2.ZERO, Vector2.ONE, Vector2(1, 0), Vector2(0, 1)])]:
@@ -164,11 +164,11 @@ func _broken() -> void:
 	var r: AtlasOverviewResult = Overview.query(c, "a", "ground", Overview.Filter.MAP)
 	_check(r.entries.size() == 4 and r.visited_count == 1, "broken refs produce placeholders and never queue")
 	for entry: AtlasOverviewEntry in r.entries:
-		_check(not entry.broken_reason.is_empty() and entry.can_focus and entry.source_focus == Vector2.ZERO, "broken target retains valid source focus: " + entry.link_id)
+		_check(not entry.broken_reason.is_empty() and entry.source_focus == Vector2.ZERO and (entry.can_focus == (entry.link_id.begins_with("1-") or entry.link_id.begins_with("2-"))), "broken target respects archived-link focus: " + entry.link_id)
 	p.parent_map_id = "a"
 	p.child_map_id = "c"
 	_check(not Overview.query(c, "a", "ground", Overview.Filter.MAP).entries[3].broken_reason.is_empty(), "placement child ownership validated")
-	_check(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", _box(-0.5, -0.5, 1, 1)).entries.size() == 4, "broken placement fallback uses anchor circle")
+	_check(Overview.query(c, "a", "ground", Overview.Filter.VISIBLE, "", _box(-0.5, -0.5, 1, 1)).entries.size() == 2, "archived placement has no fallback marker hit")
 	_link(c, "orphan", "absent", "b")
 	_link(c, "orphan-floor", "a", "b", "absent")
 	for source: String in ["absent", "a"]:

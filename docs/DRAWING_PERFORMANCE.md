@@ -1,5 +1,14 @@
 # Drawing performance and pointer sampling
 
+**Evidence boundary (T-077, 2026-11-02):** the following first section
+describes the **historical Atlas-native raster/preview path**, not the current
+canonical `addons/drawing/` pipeline. Its local samples are retained as
+pre-split diagnostics. For present-day reproducible tests and Windows/Linux
+reviewer handoff, use [DRAWING_TEST_PLAN](DRAWING_TEST_PLAN.md). The new
+Drawing/Atlas package contract is [ADR_DRAWING_DOCUMENT_CONTRACT](ADR_DRAWING_DOCUMENT_CONTRACT.md).
+
+## Historical 2026-10-31 Atlas-native findings
+
 The 2026-10-31 report described progressively falling frame rates while drawing,
 including inside one hex, and missing mouse motion between frames.
 
@@ -63,3 +72,35 @@ byte-for-byte against whole-path coverage, including self-overlap, paint/erase,
 signed chunks, partial images, affine transforms and cell masks. Existing
 brush, pen-turn, eraser, continuous-canvas, selection and semantic-shape native
 checks cover the surrounding editing and rendering behavior.
+
+
+## Implemented canonical Drawing pipeline and current evidence
+
+On `aidev` after T-052/T-055, the **one canonical** engine under
+`addons/drawing/` owns sparse raster transactions, pixel edits, histories and
+bounded CPU rendering; Atlas owns map/floor/detail selection, entrance/grid
+composition, Object Asset instances and global history. Legacy
+`AtlasRasterBrush` still exists for compatibility and legacy tests, but its
+historical 12 ms batch sample above is **not** the new compositor's runtime
+budget or current release-wide FPS.
+
+| Question | Implemented evidence | Interpretation and limits |
+| --- | --- | --- |
+| Sparse storage stride/packing (T-067) | [48 layout cases, 386 Godot checks](DRAWING_CHUNK_GEOMETRY_BENCHMARK.md), raw CSV in `benchmarks/` | 512×512 **future default** recommended; existing campaigns retain their versioned stride, and T-066 still writes separately hashed `.zst` blobs. File count and save latency are not GPU-frame latency. |
+| CPU compositor (T-068) | [A/B tile-run renderer and Godot/C++ benchmarks](DRAWING_CPU_RASTER_BENCHMARK.md) | Bounded 96×96 CPU viewport showed ~16× optimized compositor improvement on Mesa-era Linux; byte-equivalent pixels in that fixture. No claim of 16× full-app FPS. |
+| Native raster edits (T-068) | Isolated C++ scalar batch and sparse-delta prototypes, exact blend vectors, reference Godot parity | **Prototype only**: no GDExtension marshal timing, Blend2D/Skia executable comparison or adopted native backend. T-068 stays **In Progress**. |
+| Synthetic event→frame submission (T-068) | 21 X11 gestures, 68 checks, median ~0.45 ms dispatch / ~10.4 ms `frame_post_draw` | A **software-rendered frame-submission proxy**; not physical scanout/input latency, GPU VRAM, or Windows measurements. |
+| Huge-map GPU/LOD (T-057) | Separate [Ready ticket](Tickets/T-057.md), no accepted full hardware results | Map view texture update, derived display LOD and GPU upload topology must be benchmarked independently. |
+
+Storage **chunk size**, CPU **dirty edit region** and GPU **upload tile** may all
+differ. The `ImageTexture.update()` operation updates a full texture: touched
+pixels do not imply a subrectangle GPU upload. Once-per-gesture coverage,
+straight RGBA8 (including hidden RGB under zero alpha), mask quad validity,
+source revisions, cancellation and deterministic undo are hard correctness
+gates on any proposed optimization. See the [cross-platform test matrix](DRAWING_TEST_PLAN.md)
+for commands and [T-068](Tickets/T-068.md) for missing comparison work.
+
+**No benchmark here establishes a Windows win, a production native backend,
+user-facing UX acceptance or an approved automatic retiling rollout.** Those
+questions belong respectively to T-057/T-068, T-056/T-059 and follow-on
+storage engineering; the [ticket Kanban](Index.md) records their actual state.

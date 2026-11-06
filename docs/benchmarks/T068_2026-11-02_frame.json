@@ -1,0 +1,17 @@
+{
+  "checks": 68,
+  "cpu_input_dispatch": {
+    "median_ms": 0.445,
+    "p95_ms": 0.597
+  },
+  "driver": "X11",
+  "failures": 0,
+  "input_to_frame_post_draw": {
+    "median_ms": 10.358,
+    "p95_ms": 12.96
+  },
+  "limitations": "X11 synthetic events; post_draw submission, not photons, hardware GPU or OS mouse latency",
+  "renderer": "gl_compatibility",
+  "schema": "t068-native-frame-v1",
+  "trials": 21
+}

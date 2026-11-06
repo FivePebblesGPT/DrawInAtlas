@@ -12,6 +12,9 @@ var anchor_y: int = 0
 var _before: Dictionary[String, int] = {}
 var _after: Dictionary[String, int] = {}
 var _covered: Dictionary[String, bool] = {}
+# An edit sees one immutable source revision; avoid re-resolving its tile for
+# each covered pixel. Cache successful absent tiles (null), never failed loads.
+var _source_tiles: Dictionary[String, Variant] = {}
 var _closed: bool = false
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
@@ -35,6 +38,7 @@ func cancel() -> void:
 	_before.clear()
 	_after.clear()
 	_covered.clear()
+	_source_tiles.clear()
 	_closed = true
 
 
@@ -46,6 +50,7 @@ func commit() -> DrawingResult:
 	_before.clear()
 	_after.clear()
 	_covered.clear()
+	_source_tiles.clear()
 	return result
 
 
@@ -64,10 +69,16 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	var key: String = "%d,%d" % [global_x, global_y]
 	if once and _covered.has(key):
 		return DrawingResult.success()
-	var source: DrawingResult = document.read_pixel(layer_id, global_x, global_y)
-	if not source.ok:
-		return source
-	var old: int = int(source.value)
+	var stride: int = document.tile_stride
+	var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+	if not _source_tiles.has(tile_key):
+		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+		if not resolved.ok:
+			return resolved
+		_source_tiles[tile_key] = resolved.value
+	var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+	var old: int = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
+		if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
 	if once:
 		_covered[key] = true
@@ -182,10 +193,15 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
 			selection, max_candidates, depth + 1)
+	# A stationary dab has no segment projection. Avoid a native geometry call
+	# per candidate while retaining the same closed-circle coverage threshold.
+	var stationary: bool = start == finish
+	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
 		for x: int in range(left, right):
 			var center: Vector2 = Vector2(x + 0.5, y + 0.5)
-			if center.distance_squared_to(Geometry2D.get_closest_point_to_segment(center, start, finish)) > radius * radius:
+			var nearest: Vector2 = start if stationary else Geometry2D.get_closest_point_to_segment(center, start, finish)
+			if center.distance_squared_to(nearest) > radius_squared:
 				continue
 			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
 				selection, true, not erase)

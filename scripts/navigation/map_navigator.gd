@@ -109,11 +109,12 @@ func enter_link(link: AtlasMapLink) -> bool:
 	if destination == null or destination.floor_by_id(link.target_floor_id) == null:
 		message.emit("Broken map link: %s" % link.target_map_id)
 		return false
+	# Historical placement links have no active navigation semantics. Keep
+	# the current view and Back stack unchanged instead of treating their
+	# obsolete footprint as a modern marker.
 	if not link.placement_id.is_empty():
-		var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
-		if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
-			message.emit("Broken footprint; the current view and history were kept.")
-			return false
+		message.emit("Retired footprint link; create a new marker to navigate.")
+		return false
 	push_history()
 	var destination_preferences: AtlasViewState = views.resolve(campaign, destination.id, link.target_floor_id, link.target_focus, link.target_zoom)
 	show_map(destination, link.target_focus, link.target_zoom, link.target_floor_id, destination_preferences.layer_id, link.id)

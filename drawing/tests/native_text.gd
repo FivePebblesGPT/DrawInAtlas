@@ -34,6 +34,7 @@ func run() -> void:
 	root.size = Vector2i(1100, 720)
 	root.mode = Window.MODE_WINDOWED
 	var app: Control = load("res://main.tscn").instantiate()
+	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await frames(8)
 	var canvas: Control = app.canvas

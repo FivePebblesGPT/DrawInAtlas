@@ -2,7 +2,7 @@ class_name AtlasCampaign
 extends Resource
 
 ## Mutable runtime graph of independent map documents. A link is a directed
-## navigation edge; an optional placement describes a spatial battlemap footprint.
+## navigation edge. Historical placements are retained only for archival reads.
 ## AtlasCampaignStore owns saving/loading; callers do not choose its serializer.
 
 const SCHEMA_VERSION: int = 7
@@ -14,8 +14,9 @@ const SCHEMA_VERSION: int = 7
 var maps: Dictionary = {} # map ID -> AtlasMapDocument
 ## Directed navigation edges between independent documents (not artwork LOD).
 @export_storage var links: Array[AtlasMapLink] = []
-## Legacy optional parent-board footprints. Keep for old-save compatibility;
-## a symbolic link does not thereby acquire a spatial footprint.
+## Archived legacy footprints for inspecting old saves. No supported authoring,
+## navigation, preview, or search operation reads this array. Preserve it in
+## native saves so opening an old file does not silently destroy its metadata.
 @export_storage var placements: Array[AtlasPlacement] = []
 
 
@@ -67,12 +68,9 @@ func find_links_at(map_id: String, point: Vector2, floor_id: String = "") -> Arr
 		var target: AtlasMapDocument = get_map(link.target_map_id)
 		if target == null or target.floor_by_id(link.target_floor_id) == null:
 			continue
-		if not link.placement_id.is_empty():
-			var placement: AtlasPlacement = placement_by_id(link.placement_id)
-			if (placement != null and placement.parent_map_id == map_id
-					and placement.child_map_id == link.target_map_id and placement.contains_parent_point(point)):
-				matches.append(link)
-		elif link.contains_marker_point(point):
+		# A historical link remains in the saved graph, but its placement is
+		# inert: never reinterpret its footprint as a modern marker.
+		if link.placement_id.is_empty() and link.contains_marker_point(point):
 			matches.append(link)
 	return matches
 
