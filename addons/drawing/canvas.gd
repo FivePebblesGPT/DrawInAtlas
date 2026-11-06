@@ -28,7 +28,14 @@ var tool: String = "Brush":
 		tool = value
 var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
-var grid_spacing: int = 0
+## Workspace presentation, independent of the unbounded document. Atlas hosts
+## leave image_bounds empty unless they explicitly want an authoring frame.
+var image_bounds: Rect2i = Rect2i()
+var show_grid: bool = false
+var snap_to_grid: bool = false
+var grid_spacing: int = 8
+var grid_origin: Vector2i = Vector2i.ZERO
+var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
 		if session != null and value != zoom:
@@ -95,6 +102,11 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	set_process_input(true)
 	set_process(true)
+	var checker: Image = Image.create_empty(32, 32, false, Image.FORMAT_RGBA8)
+	for y: int in range(32):
+		for x: int in range(32):
+			checker.set_pixel(x, y, Color8(207, 211, 218) if ((x / 16 + y / 16) % 2 == 0) else Color8(164, 170, 180))
+	_checker_texture = ImageTexture.create_from_image(checker)
 	RenderingServer.frame_post_draw.connect(_on_frame_post_draw)
 
 
@@ -119,7 +131,7 @@ func _on_frame_post_draw() -> void:
 
 func source_position(position: Vector2) -> Vector2:
 	var local: Vector2 = (position - size * 0.5) / zoom + camera
-	if grid_spacing > 0:
+	if snap_to_grid and grid_spacing > 0:
 		var snapped: Vector2i = position_to_pixel(position)
 		return Vector2(snapped) + Vector2(0.5, 0.5)
 	return local
@@ -127,9 +139,9 @@ func source_position(position: Vector2) -> Vector2:
 
 func position_to_pixel(position: Vector2) -> Vector2i:
 	var local: Vector2 = (position - size * 0.5) / zoom + camera
-	if grid_spacing > 0:
+	if snap_to_grid and grid_spacing > 0:
 		local = DrawingSnap.point(local, Vector2(grid_spacing, grid_spacing),
-			Vector2.ZERO, PackedFloat32Array(), PackedFloat32Array(),
+			Vector2(grid_origin), PackedFloat32Array(), PackedFloat32Array(),
 			PackedVector2Array(), float(grid_spacing) * 0.5)
 	return Vector2i(floori(local.x), floori(local.y))
 
@@ -263,6 +275,50 @@ func _reserve_display_slot(visible_tile_range: Rect2i) -> bool:
 	return true
 
 
+## Draw the transparency guide in fixed *screen* pixels, not source pixels.
+## It is a backdrop only: sparse tiles outside this frame are still visible.
+func _draw_image_backdrop() -> void:
+	if not image_bounds.has_area() or _checker_texture == null:
+		return
+	var frame: Rect2 = Rect2(pixel_to_position(Vector2(image_bounds.position)),
+		Vector2(image_bounds.size) * zoom)
+	var visible: Rect2 = frame.intersection(Rect2(Vector2.ZERO, size))
+	if visible.has_area():
+		draw_texture_rect(_checker_texture, visible, true)
+
+
+func _draw_grid_overlay() -> void:
+	if not show_grid or grid_spacing < 2 or not image_bounds.has_area():
+		return
+	var frame: Rect2 = Rect2(pixel_to_position(Vector2(image_bounds.position)),
+		Vector2(image_bounds.size) * zoom)
+	var visible: Rect2 = frame.intersection(Rect2(Vector2.ZERO, size))
+	if not visible.has_area():
+		return
+	var source_start: Vector2 = (visible.position - size * 0.5) / zoom + camera
+	var source_end: Vector2 = (visible.end - size * 0.5) / zoom + camera
+	# A zoomed-out canvas must never draw thousands of subpixel lines. Every
+	# displayed line still falls on an actual editable grid intersection.
+	var stride: int = maxi(1, ceili(9.0 / (float(grid_spacing) * zoom)))
+	var step: int = grid_spacing * stride
+	var first_x: int = ceili((source_start.x - grid_origin.x) / float(step))
+	var first_y: int = ceili((source_start.y - grid_origin.y) / float(step))
+	var end_x: int = floori((source_end.x - grid_origin.x) / float(step))
+	var end_y: int = floori((source_end.y - grid_origin.y) / float(step))
+	var line_color: Color = Color(0.13, 0.26, 0.35, 0.44)
+	var origin_color: Color = Color(0.03, 0.48, 0.59, 0.8)
+	for index: int in range(first_x, mini(first_x + 500, end_x + 1)):
+		var world: int = grid_origin.x + index * step
+		var x: float = pixel_to_position(Vector2(world, 0)).x
+		draw_line(Vector2(x, visible.position.y), Vector2(x, visible.end.y),
+			origin_color if world == grid_origin.x else line_color, 1.0)
+	for index: int in range(first_y, mini(first_y + 500, end_y + 1)):
+		var world: int = grid_origin.y + index * step
+		var y: float = pixel_to_position(Vector2(0, world)).y
+		draw_line(Vector2(visible.position.x, y), Vector2(visible.end.x, y),
+			origin_color if world == grid_origin.y else line_color, 1.0)
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -276,6 +332,7 @@ func _draw() -> void:
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
 		last_frame_metrics = metrics
 		return
+	_draw_image_backdrop()
 	_sync_display_cache()
 	var left_top: Vector2i = Vector2i(floori(camera.x - size.x / zoom * 0.5),
 		floori(camera.y - size.y / zoom * 0.5))
@@ -348,6 +405,10 @@ func _draw() -> void:
 	last_frame_metrics = metrics
 	_last_frame_submit_us = int(metrics["submit_us"])
 
+	_draw_grid_overlay()
+	if image_bounds.has_area():
+		draw_rect(Rect2(pixel_to_position(Vector2(image_bounds.position)),
+			Vector2(image_bounds.size) * zoom), Color(0.92, 0.94, 0.96), false, 1.5)
 	if asset_bounds.has_area():
 		draw_rect(Rect2(pixel_to_position(Vector2(asset_bounds.position)),
 			Vector2(asset_bounds.size) * zoom), Color(0.2, 0.8, 0.5, 0.8), false, 1.5)

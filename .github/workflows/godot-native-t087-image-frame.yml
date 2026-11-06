@@ -1,0 +1,39 @@
+name: Godot T-087 image frame and grid (on demand, software only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  image-frame-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install software-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Stage and import standalone Drawing package
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Verify image bounds, 16px checker, grid alignment and native snapped pointer
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/image_frame_native.gd \
+            2>&1 | tee /tmp/t087-native.log
+          grep -q 'T087_NATIVE_PASSED' /tmp/t087-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T087_NATIVE_FAILED:' /tmp/t087-native.log; then exit 1; fi
+      - name: Upload software-only diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t087-xvfb-image-frame-grid
+          path: /tmp/t087-native.log
+          if-no-files-found: warn

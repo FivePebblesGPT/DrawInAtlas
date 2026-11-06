@@ -47,6 +47,22 @@ witness also exercises a >144-tile conservative fallback without destroying
 previously cached in-view textures; its transient frame references may exceed
 the fixed retained-cache payload budget.
 
+## T-087 standalone image-frame and independent grid
+
+Fast push/PR CI stages/imports the canonical Drawing package and executes
+`drawing/tests/image_frame_smoke.gd` (47 checks: optional signed frame metadata,
+legacy read, byte-exact outside-frame pixels, invalid envelope rejection,
+workspace dirty/save/open and tab-local grid options). The **on-demand**
+`.github/workflows/godot-native-t087-image-frame.yml` adds
+`drawing/tests/image_frame_native.gd` (36 Xvfb/Mesa framebuffer/input checks)
+for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
+pan/grid alignment, native snapped pointer, off-frame editing and undo.
+The 43-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
+includes the new bounded model step and prevents silent runaway push CI.
+Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
+engineering ticket is physical Windows/Linux owner approval. Owner findings
+#02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
+
 ## Required CI
 
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.

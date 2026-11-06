@@ -44,6 +44,16 @@ one-pixel-edit frames improve **253.09ms → 22.96ms median**, and idle frames
 (144.22ms → 165.52ms, one sample). No real Linux/Windows physical latency or
 large dense reference-window acceptance is claimed. [Ticket and evidence](Tickets/T-086.md).
 
+**T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
+An optional validated `.drawing` image frame records origin/size without
+clipping canonical signed sparse pixels, Object Assets or Atlas document space.
+Ordinary New/Open fits a visible edge and screen-space 16px checkerboard;
+View controls toggle grid independently of snap and configure signed origin
+and spacing. Clean-import model 47/47, native Xvfb/Mesa 36/36 (including
+real pointer snap and 25/50/100/200% zoom) pass. Physical Windows/Linux
+owner UX for findings 02/16 remains **PENDING**, separately gated by T-059.
+[Ticket](Tickets/T-087.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 is In Progress with source-space cache software witnesses; T-068 native research remains conditional.
 
 ## Kanban summary
@@ -1012,7 +1022,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Ready | — | [T-063](Tickets/T-063.md) |

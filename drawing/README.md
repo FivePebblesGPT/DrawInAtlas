@@ -71,10 +71,56 @@ its Godot template on the build host.
   Structural layer operations are dirty but are not yet undoable (follow-up layer feature work).
 - **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock stacks independently collapsible groups and scrolls at short heights. Use **Window → Minimize/expand panel dock** (or the dock's own button) to switch between the expanded groups and a narrow icon rail. Each attached panel has an icon with a tooltip; adjacent icons in a group share one flyout/tab set, while a separator denotes a different group. The flyout overlays the drawing canvas without changing its layout or creating an OS window; click the active icon to close it. Collapse and active tab state survive minimize/restore during the session. **Drag a panel icon** to another tab position, another group, or a between-group insertion marker; **drag the ↕ handle** to reorder or merge its whole group. The in-app hint appears only for valid drops; Esc and leaving the dock cancel without layout changes. The group **⋮ Arrange** menu provides keyboard-accessible move/split/merge actions. On a focused panel icon use `Ctrl+Alt+Left/Right` to reorder, `Ctrl+Alt+Up/Down` to move to an adjacent group and `Ctrl+Alt+S` to split; on a focused ↕ handle, `Ctrl+Alt+Shift+Up/Down` reorders groups. Large tab strips scroll horizontally, and dragging near the top/bottom of the dock scrolls through offscreen group targets. Use **Window → Float selected dock group** after focusing a dock tab/group handle (otherwise the first attached group is chosen) to move all its current tabs into a floating **in-app Control**. Drag the host's ⠿ title grip to move, its ◢ lower-right grip to resize, and its floating tab icons to reorder within the host; each floating group's ⋮ menu also moves, splits and merges local groups. Close × **hides** the host without redocking or discarding its panels; **Window → Show hidden floating panels** recovers every hidden host. Each host can contain multiple ordered groups, independently collapsed. Drag a floating tab or whole group onto the expanded dock, a minimized-rail group gap, or another floating host to transfer the **original** panel(s), preserving relative tab order. Drop on the bare canvas to create an in-app floating host; Esc or an invalid drop leaves both sides unchanged. The dock and floating-host ⋮ menus offer keyboard-accessible cross-container moves; a focused floating tab can use Ctrl+Alt+D, or focused group handle Ctrl+Alt+Shift+D, to redock at the end of the right dock. The original floating container disappears when all its groups have moved away. Dock/group/flyout/floating-host layout is now saved across application relaunches as a **workspace preference** (never inside `.drawing` documents). **Window → Reset workspace layout** restores Colors/Layers/History singleton groups and resets floating hosts without discarding edits. Settings are stored in the Godot user data directory (`user://drawing-workspace-dock-v1.json`); corrupt/unsupported files return to safe defaults, and offscreen hosts are clamped on restart or resize. Hidden floating panels still recover from Window. A host that embeds the shared editor can override `layout_settings_path` to isolate separate workspaces, and can register optional panels by stable ID before restore. The complete Drawing feature inventory and Asset Browser implementation remain separate tickets; **T-083 awaits explicit owner UX review**, and automated tests do not approve it.
 
+## Standalone image frame, checkerboard and grid (T-087)
+
+New ordinary Drawing tabs start with a **512×512 image frame at (-256,-256)**,
+fit to the viewport. A thin visible edge separates the intended image extent
+from the darker surrounding workspace. A two-tone transparency checkerboard
+appears **only behind the frame**, with **16-pixel squares in screen space**:
+zooming changes image pixel scale, not checker square size. It is a UI backdrop,
+not a raster layer or exported pixel data. Sparse pixels **outside the frame**
+remain editable, visible and saved; the frame is deliberately **not a crop**.
+
+- **Image → Drawing image frame…** changes the signed image origin and positive
+  width/height (up to 1,000,000 px). This is a metadata-only edit, flagged as
+  unsaved until a successful Save. It does **not** scale, resample, clip, erase,
+  resize source tiles, or change the canonical document revision/history.
+  Actual destructive crop/resize is not implemented; a later dedicated feature
+  must specify how to handle outside pixels and history before offering it.
+- **View → Show grid** toggles source-space lines inside the image frame;
+  **View → Grid spacing and origin…** chooses 2–4096 source pixels and signed
+  X/Y origin. The Brush/Eraser/Select/Move/Text tool option **Snap** is
+  independent of grid visibility. At very small zooms, closely spaced grid
+  lines are visually thinned to whole multiples of the chosen spacing to
+  avoid subpixel clutter; snapping still uses every actual intersection.
+  The status bar reports cursor, image origin/size, grid spacing/origin and
+  snap state. Grid/snap toggles and spacing are per-tab *session* preferences,
+  not `.drawing` raster data; object/world/Atlas grids are not modified.
+- New-format `.drawing` envelopes may include an optional `image_frame` with
+  **signed decimal-string origin** and validated integer size. Old files without
+  it still load: the workspace computes a conservative guide around occupied
+  source tiles/text (minimum 512px); extremely distant sparse content falls
+  back to the default centered guide, **without discarding any pixels**. Object
+  Asset `origin`/`bounds` continue using their own existing semantics, and
+  generic Atlas canvas consumers default to no standalone image frame.
+
+Verification after staging and editor import:
+
+```sh
+godot --headless --path drawing --script res://tests/image_frame_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/image_frame_native.gd
+```
+
+The second test captures real X11/Mesa framebuffer pixels and delivers mouse
+input through a Godot viewport. It is a **software-only** witness; physical
+Windows/Linux owner usability still belongs to the separate review gates.
+
 ## File format and boundaries
 
 The app's single-file `.drawing` schema `drawing-standalone-v1` wraps the shared
-`DrawingDocument.export_manifest()` tree and inline base64 **straight RGBA8**
+`DrawingDocument.export_manifest()` tree, optional non-destructive image
+frame metadata, and inline base64 **straight RGBA8**
 chunks addressed by SHA-256 of dimension + format + original pixel bytes.
 Chunk coordinates are signed decimal strings on disk (no 64-bit truncation
 through JSON floats). Load validates the **whole** tree, every referenced blob,

@@ -3,6 +3,7 @@ extends Control
 ## No campaign, map, Atlas registry or history imports in this UI.
 
 const CANVAS_SCRIPT: Script = preload("res://addons/drawing/canvas.gd")
+const IMAGE_FRAME: Script = preload("res://addons/drawing/image_frame.gd")
 const TOP_BAR_SCRIPT: Script = preload("res://addons/drawing/editor_top_bar.gd")
 const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd")
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
@@ -43,6 +44,10 @@ var layers: Tree
 var status: Label
 var width_spin: SpinBox
 var snap_toggle: CheckButton
+var grid_dialog: ConfirmationDialog
+var grid_fields: Array[SpinBox] = []
+var image_frame_dialog: ConfirmationDialog
+var image_frame_fields: Array[SpinBox] = []
 var top_bar: HBoxContainer
 var inspector: ScrollContainer
 var dock_panels: VBoxContainer
@@ -138,11 +143,15 @@ func _build_interface() -> void:
 		"Record selection changes in Undo History"],
 		[Callable(self, "_undo"), Callable(self, "_redo"),
 		Callable(self, "_toggle_selection_history")])
-	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view"],
+	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
+		"Show grid", "Grid spacing and origin…"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
-		func() -> void: _reset_view()])
-	top_bar.add_menu_spec("Image", ["Rasterize text layer", "Object frame…"],
-		[Callable(self, "_rasterize_text"), Callable(self, "_ask_object_frame")])
+		func() -> void: _reset_view(), Callable(self, "_toggle_grid"),
+		Callable(self, "_ask_grid_settings")])
+	top_bar.add_menu_spec("Image", ["Rasterize text layer", "Object frame…",
+		"Drawing image frame…"],
+		[Callable(self, "_rasterize_text"), Callable(self, "_ask_object_frame"),
+		Callable(self, "_ask_image_frame")])
 	top_bar.add_menu_spec("Layers", ["Add group", "Add raster layer",
 		"Remove selected", "Toggle visibility"],
 		[Callable(self, "_add_group"), Callable(self, "_add_layer"),
@@ -177,8 +186,8 @@ func _build_interface() -> void:
 		top_bar.consume_option_wheel(event, width_spin))
 	snap_toggle = CheckButton.new()
 	snap_toggle.text = "Snap (8 px)"
-	snap_toggle.tooltip_text = "Generic Drawing grid snap"
-	snap_toggle.toggled.connect(func(enabled: bool) -> void: canvas.grid_spacing = 8 if enabled else 0)
+	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
+	snap_toggle.toggled.connect(_set_snap_enabled)
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
 	tabs_line.name = "DocumentTabs"
@@ -231,6 +240,7 @@ func _build_interface() -> void:
 	canvas.view_changed.connect(_update_status)
 	canvas.cursor_moved.connect(_update_status)
 	canvas.resized.connect(_update_status)
+	canvas.resized.connect(_maybe_fit_image_frame)
 	canvas.resized.connect(_layout_dock_flyout)
 	canvas.text_requested.connect(_edit_text_at)
 	canvas.gui_input.connect(func(event: InputEvent) -> void:
@@ -390,6 +400,42 @@ func _build_interface() -> void:
 	frame_info.text = "Empty bounds = unrestricted sparse canvas; guides never clip pixels."
 	frame_dialog.add_child(frame_info)
 	frame_dialog.confirmed.connect(_change_object_frame)
+	grid_dialog = ConfirmationDialog.new()
+	grid_dialog.title = "Drawing grid (view only)"
+	add_child(grid_dialog)
+	var grid_form: GridContainer = GridContainer.new()
+	grid_form.columns = 2
+	grid_dialog.add_child(grid_form)
+	for label_text: String in ["Spacing (source px)", "Grid origin X", "Grid origin Y"]:
+		var field_label: Label = Label.new()
+		field_label.text = label_text
+		grid_form.add_child(field_label)
+		var field: SpinBox = SpinBox.new()
+		field.min_value = 2 if grid_fields.is_empty() else -1000000000
+		field.max_value = 4096 if grid_fields.is_empty() else 1000000000
+		field.step = 1
+		field.custom_minimum_size.x = 185
+		grid_form.add_child(field)
+		grid_fields.append(field)
+	grid_dialog.confirmed.connect(_apply_grid_settings)
+	image_frame_dialog = ConfirmationDialog.new()
+	image_frame_dialog.title = "Standalone image frame — guide, not crop"
+	add_child(image_frame_dialog)
+	var image_form: GridContainer = GridContainer.new()
+	image_form.columns = 2
+	image_frame_dialog.add_child(image_form)
+	for label_text: String in ["Image left X", "Image top Y", "Width (px)", "Height (px)"]:
+		var field_label: Label = Label.new()
+		field_label.text = label_text
+		image_form.add_child(field_label)
+		var field: SpinBox = SpinBox.new()
+		field.min_value = 1 if image_frame_fields.size() >= 2 else -1000000000
+		field.max_value = 1000000 if image_frame_fields.size() >= 2 else 1000000000
+		field.step = 1
+		field.custom_minimum_size.x = 185
+		image_form.add_child(field)
+		image_frame_fields.append(field)
+	image_frame_dialog.confirmed.connect(_apply_image_frame)
 	variant_dialog = ConfirmationDialog.new()
 	variant_dialog.title = "Save Object as independent asset"
 	add_child(variant_dialog)
@@ -1301,7 +1347,9 @@ func new_drawing() -> void:
 	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Group 1")
 	var raster: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1", String(group.value))
 	tabs.append({"document": document, "path": "", "title": "Untitled %d" % new_counter,
-		"layer": raster.value, "saved": -1})
+		"layer": raster.value, "saved": -1, "frame": IMAGE_FRAME.DEFAULT_BOUNDS,
+		"saved_frame": IMAGE_FRAME.DEFAULT_BOUNDS,
+		"frame_dirty": false, "fit_pending": true})
 	tab_bar.add_tab("Untitled %d *" % new_counter)
 	_activate(tabs.size() - 1)
 
@@ -1499,7 +1547,8 @@ func _request_close_tab(index: int) -> void:
 	_close_after_save = false
 	var session: DrawingObjectEditorSession = tabs[index].get("object") as DrawingObjectEditorSession
 	if session != null and session.is_dirty() or (session == null and
-		(tabs[index]["document"] as DrawingDocument).is_dirty()):
+		((tabs[index]["document"] as DrawingDocument).is_dirty() or
+		bool(tabs[index].get("frame_dirty", false)))):
 		close_dialog.popup_centered()
 	else:
 		_close_index(index)
@@ -1544,7 +1593,7 @@ func _close_if_saved() -> void:
 		return
 	var session: DrawingObjectEditorSession = current_object()
 	if session == null or not session.is_dirty():
-		if not current_document().is_dirty():
+		if not current_document().is_dirty() and not bool(tabs[active_tab].get("frame_dirty", false)):
 			_close_index(active_tab)
 
 
@@ -1567,6 +1616,9 @@ func _sync_object_tab() -> void:
 func _activate(index: int) -> void:
 	if index < 0 or index >= tabs.size():
 		return
+	if active_tab >= 0 and active_tab < tabs.size() and active_tab != index:
+		tabs[active_tab]["camera"] = canvas.camera
+		tabs[active_tab]["zoom"] = canvas.zoom
 	active_tab = index
 	tab_bar.current_tab = index
 	canvas.document = current_document()
@@ -1574,11 +1626,22 @@ func _activate(index: int) -> void:
 	var object_session: DrawingObjectEditorSession = current_object()
 	canvas.asset_origin = object_session.origin if object_session != null else Vector2i.ZERO
 	canvas.asset_bounds = object_session.bounds if object_session != null else Rect2i()
+	canvas.image_bounds = tabs[index].get("frame", Rect2i()) as Rect2i
+	canvas.show_grid = bool(tabs[index].get("show_grid", false))
+	canvas.snap_to_grid = bool(tabs[index].get("snap", false))
+	canvas.grid_spacing = int(tabs[index].get("grid_spacing", 8))
+	canvas.grid_origin = tabs[index].get("grid_origin", Vector2i.ZERO) as Vector2i
+	snap_toggle.set_pressed_no_signal(canvas.snap_to_grid)
+	snap_toggle.text = "Snap (%d px)" % canvas.grid_spacing
+	top_bar.set_menu_checked("View", 3, canvas.show_grid)
+	canvas.camera = tabs[index].get("camera", Vector2.ZERO) as Vector2
+	canvas.zoom = float(tabs[index].get("zoom", 4.0))
 	canvas.selected = Rect2i()
 	canvas.session = null
 	canvas.queue_redraw()
 	_refresh_layers()
 	_last_selection_context = _capture_context()
+	_maybe_fit_image_frame()
 	_update_status()
 
 
@@ -1933,7 +1996,8 @@ func _update_status() -> void:
 		return
 	var document: DrawingDocument = current_document()
 	var session: DrawingObjectEditorSession = current_object()
-	var dirty: bool = session.is_dirty() if session != null else document.is_dirty()
+	var dirty: bool = session.is_dirty() if session != null else (document.is_dirty() or
+		bool(tabs[active_tab].get("frame_dirty", false)))
 	tab_bar.set_tab_title(active_tab, String(tabs[active_tab]["title"]) + (" *" if dirty else ""))
 	var origin: String = " | instance %s @ %s" % [session.origin_instance_id,
 		session.origin_map_id] if session != null and not session.origin_instance_id.is_empty() else ""
@@ -1946,10 +2010,103 @@ func _update_status() -> void:
 		ceili(canvas.size.y / canvas.zoom))
 	# Retain document identity and dirty indication while the tab strip is hidden.
 	var tab_identity: String = String(tabs[active_tab]["title"]) + (" *" if dirty else "")
-	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%% | revision %d | %s" % [
+	var guide: String = " | image %d×%d @ %d,%d" % [canvas.image_bounds.size.x,
+		canvas.image_bounds.size.y, canvas.image_bounds.position.x,
+		canvas.image_bounds.position.y] if canvas.image_bounds.has_area() else ""
+	var grid_info: String = " | grid %dpx @ %d,%d (%s, snap %s)" % [canvas.grid_spacing,
+		canvas.grid_origin.x, canvas.grid_origin.y,
+		"shown" if canvas.show_grid else "hidden", "on" if canvas.snap_to_grid else "off"]
+	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%%%s%s | revision %d | %s" % [
 		tab_identity, source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
-		canvas.zoom * 100.0, document.revision,
+		canvas.zoom * 100.0, guide, grid_info, document.revision,
 		"Unsaved changes" if dirty else "Saved"]
+	status.tooltip_text = status.text
+
+
+func _set_snap_enabled(enabled: bool) -> void:
+	canvas.snap_to_grid = enabled
+	if active_tab >= 0:
+		tabs[active_tab]["snap"] = enabled
+	canvas.queue_redraw()
+	_update_status()
+
+
+func _toggle_grid() -> void:
+	if active_tab < 0:
+		return
+	canvas.show_grid = not canvas.show_grid
+	tabs[active_tab]["show_grid"] = canvas.show_grid
+	top_bar.set_menu_checked("View", 3, canvas.show_grid)
+	canvas.queue_redraw()
+	_update_status()
+
+
+func _ask_grid_settings() -> void:
+	if active_tab < 0:
+		return
+	for index: int in range(3):
+		grid_fields[index].value = [canvas.grid_spacing, canvas.grid_origin.x,
+			canvas.grid_origin.y][index]
+	grid_dialog.popup_centered()
+
+
+func _apply_grid_settings() -> void:
+	if active_tab < 0:
+		return
+	canvas.grid_spacing = int(grid_fields[0].value)
+	canvas.grid_origin = Vector2i(int(grid_fields[1].value), int(grid_fields[2].value))
+	tabs[active_tab]["grid_spacing"] = canvas.grid_spacing
+	tabs[active_tab]["grid_origin"] = canvas.grid_origin
+	snap_toggle.text = "Snap (%d px)" % canvas.grid_spacing
+	canvas.queue_redraw()
+	_update_status()
+
+
+func _ask_image_frame() -> void:
+	if active_tab < 0 or current_object() != null:
+		_show_error("Image frame is for standalone Drawing tabs; use Object frame for Objects")
+		return
+	var bounds: Rect2i = canvas.image_bounds
+	var values: Array[int] = [bounds.position.x, bounds.position.y,
+		bounds.size.x, bounds.size.y]
+	for index: int in range(image_frame_fields.size()):
+		image_frame_fields[index].value = values[index]
+	image_frame_dialog.popup_centered()
+
+
+func _apply_image_frame() -> void:
+	if active_tab < 0 or current_object() != null:
+		return
+	var frame: Rect2i = Rect2i(int(image_frame_fields[0].value),
+		int(image_frame_fields[1].value), int(image_frame_fields[2].value),
+		int(image_frame_fields[3].value))
+	var checked: DrawingResult = IMAGE_FRAME.decode(IMAGE_FRAME.encode(frame))
+	if not checked.ok:
+		_show_error(checked.message)
+		return
+	if frame == canvas.image_bounds:
+		return
+	tabs[active_tab]["frame"] = frame
+	tabs[active_tab]["frame_dirty"] = frame != tabs[active_tab].get("saved_frame", frame)
+	canvas.image_bounds = frame
+	canvas.queue_redraw()
+	_update_status()
+
+
+func _maybe_fit_image_frame() -> void:
+	if active_tab >= 0 and bool(tabs[active_tab].get("fit_pending", false)):
+		_fit_image_frame()
+
+
+func _fit_image_frame() -> void:
+	if not canvas.image_bounds.has_area() or canvas.size.x < 40 or canvas.size.y < 40:
+		return
+	var bounds: Rect2i = canvas.image_bounds
+	canvas.camera = Vector2(bounds.position) + Vector2(bounds.size) * 0.5
+	canvas.zoom = clampf(minf(canvas.size.x / float(bounds.size.x),
+		canvas.size.y / float(bounds.size.y)) * 0.85, 0.25, 24.0)
+	tabs[active_tab]["fit_pending"] = false
+	canvas.queue_redraw()
 
 
 func _undo() -> void:
@@ -1981,8 +2138,11 @@ func _zoom(factor: float) -> void:
 
 
 func _reset_view() -> void:
-	canvas.zoom = 4.0
-	canvas.camera = Vector2.ZERO
+	if canvas.image_bounds.has_area():
+		_fit_image_frame()
+	else:
+		canvas.zoom = 4.0
+		canvas.camera = Vector2.ZERO
 	canvas.queue_redraw()
 	_update_status()
 
@@ -2052,8 +2212,11 @@ func _save_file(path: String) -> void:
 		_publish_object(_local_save_as)
 		_local_save_as = false
 		return
-	var result: DrawingResult = DrawingFileIO.save(current_document(), path)
+	var result: DrawingResult = DrawingFileIO.save(current_document(), path,
+		{"image_frame": IMAGE_FRAME.encode(canvas.image_bounds)})
 	if result.ok:
+		tabs[active_tab]["saved_frame"] = canvas.image_bounds
+		tabs[active_tab]["frame_dirty"] = false
 		tabs[active_tab]["path"] = path
 		tabs[active_tab]["title"] = path.get_file()
 		_update_status()
@@ -2064,17 +2227,20 @@ func _save_file(path: String) -> void:
 
 
 func _open_file(path: String) -> void:
-	var opened: DrawingResult = DrawingFileIO.open(path)
+	var opened: DrawingResult = DrawingFileIO.open_with_frame(path)
 	if not opened.ok:
 		_show_error(opened.message)
 		return
-	var document: DrawingDocument = opened.value as DrawingDocument
+	var content: Dictionary = opened.value
+	var document: DrawingDocument = content["document"] as DrawingDocument
 	document.record_selection_history = record_selection_history
 	var raster: String = _first_editable(document, DrawingDocument.ROOT_ID)
 	if raster.is_empty():
 		var added: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1")
 		raster = added.value
-	tabs.append({"document": document, "path": path, "title": path.get_file(), "layer": raster})
+	tabs.append({"document": document, "path": path, "title": path.get_file(), "layer": raster,
+		"frame": content["image_frame"], "saved_frame": content["image_frame"],
+		"frame_dirty": false, "fit_pending": true})
 	tab_bar.add_tab(path.get_file())
 	_activate(tabs.size() - 1)
 
