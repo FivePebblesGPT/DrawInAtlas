@@ -6,6 +6,26 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-086 shared frame source-chunk parity — 2026-11-06
+
+After staging and **importing** the standalone Drawing package:
+
+```sh
+godot --headless --path drawing --script res://tests/renderer_shared_chunks_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd
+```
+
+The 31-check model proves byte-exact adjacent display-tile parity, 8→2
+source-chunk resolution calls on a two-layer/four-tile example, a hard
+256-reference frame-plan cap, live detached preview updates and proper
+stale-epoch/corrupt-lazy-source rejection. The native witness passes 76
+framebuffer assertions and records `source_chunks_shared`. The existing
+`ci_t086_viewport_cache_model` step runs the model and validates its success
+marker; no required CI check ID was added. These are **local headless and
+software-GL** tests, not a large dense first-zoom frame timing or physical
+GPU acceptance. T-086 stays In Progress.
+
 ## T-086 detached preview index parity — 2026-11-06
 
 After staging **and importing** the standalone Drawing package, run:

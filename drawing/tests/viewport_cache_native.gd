@@ -92,6 +92,9 @@ func run() -> void:
 		"initial cache respects hard texture count")
 	check(int(first.get("visible_layer_plan_builds", -1)) <= 1,
 		"cold frame compiles no more than one visible-layer plan")
+	check(int(first.get("source_chunks_shared", 0)) > 0 and
+		int(first.get("source_chunks_shared", 0)) <= 256,
+		"cold frame shares a bounded number of canonical source chunks")
 	var red: Color = sample(canvas, Vector2(-3.5, -3.5))
 	var blue: Color = sample(canvas, Vector2(4.5, 4.5))
 	check(red.r > 0.8 and red.g < 0.35 and blue.b > 0.75,
@@ -218,7 +221,7 @@ func run() -> void:
 	check(int(quarter_held.get("preview_index_built", 0)) == 1
 		and int(quarter_held.get("preview_index_keys", 0)) > 0
 		and int(quarter_held.get("preview_index_fallback", 0)) == 0,
-		"25% signed preview builds bounded display stamp index: %s" % quarter_held)
+		"25%% signed preview builds bounded display stamp index: %s" % quarter_held)
 	check(sample(canvas, Vector2(-120.5, -120.5)).r > 0.7,
 		"25% negative signed source tile previews in native framebuffer")
 	canvas.cancel_gesture()
@@ -227,7 +230,7 @@ func run() -> void:
 	await frames(3)
 	var canceled_quarter: Color = sample(canvas, Vector2(-120.5, -120.5))
 	check(doc.revision == prior_quarter and canceled_quarter.r < 0.5,
-		"25% canceled preview leaves no ghost pixels or history: %s" % canceled_quarter)
+		"25%% canceled preview leaves no ghost pixels or history: %s" % canceled_quarter)
 	canvas.zoom = 1.0
 	canvas.queue_redraw()
 	await frames(3)

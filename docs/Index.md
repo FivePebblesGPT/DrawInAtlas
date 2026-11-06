@@ -158,6 +158,16 @@ this is **not** complete frame, hardware or cold-zoom evidence. T-086 stays
 In Progress; physical acceptance remains open.
 [T-086](Tickets/T-086.md).
 
+**T-086 shared cold-frame source-chunk references (2026-11-06; In Progress):**
+Neighboring 128px display-tile renders now reuse up to 256 read-only,
+revision/source-epoch-pinned canonical storage chunk references per cold
+frame; no RGBA8 is duplicated and detached preview changes remain separate.
+A 31/31 headless parity/invalid-source/cap witness reduced source resolves
+8→2 across four adjacent display tiles; the native Xvfb framebuffer suite
+passes 76/76 after clean standalone import. This does **not** prove large
+dense cold-zoom or physical Windows/Linux latency, and T-086 remains
+In Progress. [Ticket](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.

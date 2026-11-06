@@ -356,7 +356,7 @@ func _draw() -> void:
 	var draw_start: int = Time.get_ticks_usec()
 	var metrics: Dictionary[String, Variant] = {"zoom": zoom, "tiles_visible": 0,
 		"cache_hits": 0, "tiles_composited": 0, "source_pixels_rendered": 0,
-		"visible_layer_plan_builds": 0,
+		"visible_layer_plan_builds": 0, "source_chunks_shared": 0,
 		"preview_index_built": 0, "preview_index_keys": 0, "preview_index_fallback": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
@@ -454,6 +454,8 @@ func _draw() -> void:
 			_frame_references.append(entry["texture"] as ImageTexture)
 			draw_texture_rect(entry["texture"] as ImageTexture,
 				Rect2(pixel_to_position(Vector2(area.position)), Vector2(area.size) * zoom), false)
+	if not visible_plan.is_empty():
+		metrics["source_chunks_shared"] = (visible_plan["source_chunks"] as Dictionary).size()
 	metrics["cache_tiles"] = _display_tiles.size()
 	metrics["cache_bytes_estimate"] = _display_tiles.size() * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4
 	metrics["frame_reference_bytes_upper_bound"] = _frame_references.size() * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4

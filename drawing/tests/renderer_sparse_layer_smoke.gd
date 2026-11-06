@@ -118,8 +118,8 @@ func run() -> void:
 			(ordinary_preview.value as Image).get_data() ==
 			(optimized_preview.value as Image).get_data(),
 			"planned empty-layer detached preview equals direct composite")
-		check(doc.resolve_calls == 16,
-			"preview layer is never skipped just because committed source is absent")
+		check(doc.resolve_calls == 4,
+			"preview layer still resolves four absent chunks; other layers reuse prepared frame cache")
 		preview.cancel()
 		check(doc.revision == int(plan["revision"]), "cancellation does not commit")
 		check(doc.revision == int(plan["revision"]),

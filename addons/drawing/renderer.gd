@@ -13,7 +13,10 @@ static func prepare_visible_layers(document: DrawingDocument) -> Dictionary:
 	var layers: Array[String] = []
 	_collect_visible(document, DrawingDocument.ROOT_ID, layers)
 	return {"document": document, "revision": document.revision,
-		"source_epoch": document.display_source_epoch, "layers": layers}
+		"source_epoch": document.display_source_epoch, "layers": layers,
+		# A frame-local read-only cache shared by adjacent display tiles. 256
+		# references maximum; canonical sparse tiles remain document-owned.
+		"source_chunks": {}}
 
 
 static func render(document: DrawingDocument, view: Rect2i,
@@ -36,6 +39,9 @@ static func render(document: DrawingDocument, view: Rect2i,
 		if not (visible_plan.get("layers") is Array):
 			return DrawingResult.failure("RENDER_PLAN_INVALID", "Visible layer plan is malformed")
 		leaf_layers = visible_plan["layers"] as Array[String]
+		if not visible_plan.get("source_chunks") is Dictionary:
+			return DrawingResult.failure("RENDER_PLAN_INVALID", "Source cache must be a dictionary")
+	var shared_source_chunks: Dictionary = visible_plan.get("source_chunks", {})
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(view.size.x * view.size.y * 4)
 	# Keep 64-bit camera anchors out of Vector2i, which truncates at 32 bits.
@@ -71,7 +77,7 @@ static func render(document: DrawingDocument, view: Rect2i,
 		# Resolve at most one source tile per scanline run, not once per pixel.
 		# The region is still bounded; source tiles stay immutable throughout render.
 		var raster: DrawingResult = _composite_raster(document, layer_id,
-			world_x, world_y, view.size, bytes, active_preview)
+			world_x, world_y, view.size, bytes, active_preview, shared_source_chunks)
 		if not raster.ok:
 			return raster
 	var rendered: DrawingResult = DrawingResult.success(Image.create_from_data(view.size.x, view.size.y,
@@ -98,7 +104,8 @@ static func _collect_visible(document: DrawingDocument, parent_id: String,
 ## for every visible pixel. Do not convert 64-bit anchors through Vector2i.
 static func _composite_raster(document: DrawingDocument, layer_id: String,
 		world_x: int, world_y: int, size: Vector2i, bytes: PackedByteArray,
-		preview: DrawingEditSession = null) -> DrawingResult:
+		preview: DrawingEditSession = null,
+		shared_chunks: Dictionary = {}) -> DrawingResult:
 	var stride: int = document.tile_stride
 	# The source revision is fixed for this bounded render. Reuse each resolved
 	# storage tile (including an absent/null tile) and detached preview patch
@@ -107,6 +114,7 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 	# extremely wide view must not accumulate up to max_pixels cache entries.
 	# A failed lazy resolution must still abort rather than cache a blank tile.
 	const MAX_SOURCE_TILE_REFS: int = 256
+	const MAX_FRAME_SOURCE_REFS: int = 256
 	var source_tiles: Dictionary[String, Variant] = {}
 	var preview_patches: Dictionary[String, Dictionary] = {}
 	var cached_row: int = -9223372036854775807
@@ -130,10 +138,22 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				tile = source_tiles[key] as DrawingRasterTile
 				patch = preview_patches.get(key, {})
 			else:
-				var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
-				if not fetched.ok:
-					return fetched
-				tile = fetched.value as DrawingRasterTile
+				# Adjacent 128px display tiles often share a 256px storage
+				# chunk. The revision/epoch-pinned visible plan can reuse the
+				# resolved canonical reference across their separate renders.
+				# Null (absent) chunks are cached too; errors are never cached.
+				var shared_key: String = layer_id + ":" + key
+				if shared_chunks.has(shared_key):
+					tile = shared_chunks[shared_key] as DrawingRasterTile
+				else:
+					var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
+					if not fetched.ok:
+						return fetched
+					tile = fetched.value as DrawingRasterTile
+					if shared_chunks.size() < MAX_FRAME_SOURCE_REFS:
+						shared_chunks[shared_key] = tile
+				# A preview patch is not canonical; always read the current
+				# detached edit even when its source chunk was cached before.
 				if preview != null:
 					patch = preview.preview_tile(key)
 				if stride > 1 and source_tiles.size() < MAX_SOURCE_TILE_REFS:
