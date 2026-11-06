@@ -28,6 +28,23 @@ T-059, T-065 or T-083. T-094 remains In Progress until remote CI and
 future Linux/Windows owner-witness rows are evidenced; don't change
 review flags merely because this patch's local tests pass.
 
+## T-094 fail-closed check accounting and physical evidence capture
+
+The fast CI terminal summary now derives **all expected `ci_` step IDs** from
+its checked-in `.github/workflows/godot-check.yml`; an absent, skipped,
+malformed or unexpected check fails the final job rather than being omitted
+from a misleading “all passed” count. Duplicate IDs are rejected. This does
+not remove `continue-on-error` or stop later jobs from collecting their logs.
+Regression contracts: `tests/test_godot_ci_fail_late.py`.
+
+Owner-run native evidence is documented in the
+[23-finding matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md). The offline
+`tools/drawing_owner_evidence.py` creates per-OS **NOT RUN** manifests and
+verifies hashed artifacts and metadata. Its tests run in the existing T-073
+fail-late CI step (`tests/test_t094_owner_evidence.py`), not an extra fast CI
+step. A structurally valid JSON manifest cannot approve the four owner-gated
+tickets, validate a physical pointer or substitute for remote CI success.
+
 ## T-086 persistent source-space viewport cache
 
 Fast push/PR CI stages/imports the independent Drawing package and runs

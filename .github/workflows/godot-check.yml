@@ -496,6 +496,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_t073_feature_ux_docs.py' -v
           python3 -m unittest discover -s tests -p 'test_t094_owner_matrix.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_owner_evidence.py' -v
       - name: Verify T-063 compact Drawing workspace and shortcut contract
         id: ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract
         if: ${{ !cancelled() }}

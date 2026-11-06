@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "godot-check.yml"
 sys.path.insert(0, str(ROOT / "tools"))
-from report_godot_ci import summarize  # noqa: E402
+from report_godot_ci import expected_check_ids, summarize  # noqa: E402
 
 
 class GodotCIFailLateTests(unittest.TestCase):
@@ -102,6 +102,36 @@ class GodotCIFailLateTests(unittest.TestCase):
         self.assertNotIn("`ci_03_good` |", report)
         self.assertFalse(summarize({})[1])
         self.assertTrue(summarize({"ci_03_good": {"outcome": "success"}})[1])
+
+    def test_summary_fails_closed_when_workflow_step_is_missing_or_unexpected(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        ids = expected_check_ids(workflow)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertGreaterEqual(len(ids), 40)
+        all_good = {name: {"outcome": "success", "conclusion": "success"} for name in ids}
+        self.assertTrue(summarize(all_good, expected_ids=ids)[1])
+
+        for omitted in (ids[0], ids[-1]):
+            with self.subTest(omitted=omitted):
+                missing = dict(all_good)
+                del missing[omitted]
+                report, passed = summarize(missing, expected_ids=ids)
+                self.assertFalse(passed)
+                self.assertIn(f"`{omitted}` | **missing**", report)
+
+        unexpected = dict(all_good, ci_accidental_extra={"outcome": "success"})
+        report, passed = summarize(unexpected, expected_ids=ids)
+        self.assertFalse(passed)
+        self.assertIn("`ci_accidental_extra` | **unexpected**", report)
+        self.assertFalse(summarize({**all_good, ids[3]: {"outcome": "skipped"}}, ids)[1])
+        self.assertFalse(summarize({**all_good, ids[3]: {"conclusion": "success"}}, ids)[1])
+
+    def test_workflow_id_extraction_rejects_duplicate_or_missing_ids(self) -> None:
+        self.assertEqual(expected_check_ids("        id: ci_a\n        id: ci_b\n"), ["ci_a", "ci_b"])
+        with self.assertRaises(ValueError):
+            expected_check_ids("        id: ci_a\n        id: ci_a\n")
+        with self.assertRaises(ValueError):
+            expected_check_ids("name: no checks\n")
 
     def test_bash_group_continues_after_command_and_marker_failures(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

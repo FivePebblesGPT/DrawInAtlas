@@ -9,6 +9,40 @@
 3. For each row collect **before and after** screen recording with visible pointer/button state, before-release framebuffer readback when relevant, an exact pixel comparison or command result, a failure/repro log, and a named native test path. Record observations as `PASS`, `FAIL`, or `NOT RUN` separately for Linux and Windows, with the test commit/OS/GPU/size/DPI/zoom. For pointer/paint performance record per-phase samples and **median/p95** for down→first-uncommitted-visible-pixel, motion→visible-pixel, release→commit and frame submission; do not call frame submission physical input-to-photon latency.
 4. The existing `drawing/tests/standalone_smoke.gd` is a headless model/GUI dispatch witness (including an exact `.drawing` roundtrip), and `drawing/tests/native_pointer.gd` is an earlier native pointer witness. Neither establishes continuous uncommitted paint, Windows presentation latency, or all 23 outcomes. Re-run the full standalone and Atlas regression when the dependent implementation milestones land. Keep every outstanding review gate unapproved until the owner explicitly accepts the demonstrated result.
 
+## Recording physical results without implied signoff
+
+T-094 includes a **local, non-uploading** evidence helper. Its templates are
+explicitly `NOT RUN` for every finding; a test runner must never manufacture a
+PASS. On each **actual hardware** test host, from the same source checkout:
+
+```sh
+python3 tools/drawing_owner_evidence.py init --os Linux --output /tmp/drawing-owner-linux.json
+# On Windows, use: --os Windows --output path/to/drawing-owner-windows.json
+# Fill environment fields, each finding's observed outcome, and evidence.
+python3 tools/drawing_owner_evidence.py verify /tmp/drawing-owner-linux.json
+python3 tools/drawing_owner_evidence.py verify --require-complete \
+  /path/to/drawing-owner-linux.json /path/to/drawing-owner-windows.json
+```
+
+`verify` checks all 23 IDs and current ticket mappings, rejects missing or
+duplicate outcomes, requires a physical display/OS/device/Godot/commit/
+window/scale/refresh/timestamp for any `PASS` or `FAIL`, and SHA-256 checks
+every relative screenshot/log/video artifact against the exact bytes beside
+the JSON. A `NOT RUN` row cannot contain old observations or artifacts.
+Findings #01/#15 additionally need 25/50/100% zoom and five numeric samples
+in each of the down→preview, motion→preview and release→commit phases.
+Use timing arrays in **milliseconds**, and label the measurement method in
+`observed`; Godot frame callbacks still are not physical input-to-photon proof.
+The strict switch requires 23 physical `PASS` rows on *each* OS. A failed or
+incomplete run is retained as a real `FAIL`/`NOT RUN`, never silently excluded.
+
+The helper is a **format/integrity check**, not a cryptographic hardware or
+owner-identity attestation; its `physical_display` field is self-reported.
+Commit-specific OS evidence must still be independently reviewed with the
+owner, and separate `manual_review: true` gates must be changed only with
+explicit owner authorization. Keep private campaigns, personally identifying
+screenshots, and platform-generated credentials out of Git and CI artifacts.
+
 ## Finding-by-finding owner check
 
 In the **State** column, `PENDING` means a target ticket still owes a fresh interactive witness; `OWNER PASS / REGRESSION` is the reported positive tested flow, not universal file compatibility; `MODEL EXPECTED / UI PENDING` separates correct internal revision semantics from the unresolved display issue. The **Expected** column is the concrete pass criterion, not an assertion of current behavior. Each row must eventually receive a dated Linux/Windows result in owner review evidence.

@@ -20,6 +20,17 @@ Atlas composition, and Xvfb/Mesa software pointer checks pass. Remote CI
 against this patch, owner hardware UX and pending corrective ticket findings
 are **not yet passed**; T-094 stays In Progress. [Checkpoint](Tickets/T-094.md).
 
+**T-094 fail-closed CI summary/evidence capture checkpoint (2026-11-06; In Progress):**
+The fast-CI reporter now compares all expected check IDs from the committed
+workflow against the GitHub step outcomes, so missing/skipped steps cannot
+look green. A local physical-evidence manifest tool tracks 23 dated finding
+results independently for Linux/Windows with SHA-256 artifact validation and
+strict coverage mode; its generated rows begin **NOT RUN**, never auto-pass.
+Reporter and manifest contracts run inside existing fail-late CI steps.
+Remote patched CI, actual hardware/pointer evidence and explicit owner review
+remain unverified. [T-094](Tickets/T-094.md) ·
+[owner runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples
