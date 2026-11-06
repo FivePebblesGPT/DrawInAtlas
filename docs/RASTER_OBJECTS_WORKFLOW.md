@@ -1,4 +1,22 @@
-# Raster drawing and Objects
+# Raster drawing and reusable Object Assets
+
+## Current Drawing/Atlas boundary — T-074 (2026-11-02)
+
+**Authority:** the [owner-approved Drawing/Atlas decisions](DECISIONS_DRAWING_ATLAS_2026-11-01.md), the [Object Assets workflow](OBJECT_ASSETS_WORKFLOW.md), the [portable campaign storage contract](DRAWING_STORAGE_CONTRACT.md), and the tested implementation in `addons/drawing/` and `scripts/objects/`. The material under **Historical raster/Objects prototype** below describes the former single-project editor; it is not the canonical model for new authored content.
+
+- **Background artwork:** Atlas owns an *internal* `DrawingDocument` for each `(map_id, floor_id, detail_id)`. Those documents are represented by sparse manifests/chunks beneath sibling `Drawings/` and the Layers hierarchy; they are **not** independently opened user tabs or Object Assets. Missing higher-detail artwork stays blank rather than inheriting D0 pixels ([T-061](Tickets/T-061.md), [T-066](Tickets/T-066.md)).
+- **Reusable source artwork:** `AtlasObjectLibrary` publishes **versioned Object Assets** under sibling `Objects/<asset-id>/vNNNNNN.drawing`. Each source is edited using the **same canonical Drawing engine** through a dedicated Object Editor tab; there is no duplicate raster engine or whole-map source link ([T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md)).
+- **Placements:** each `AtlasObjectInstance` has its own immutable `instance_id` and generation token, a `source_id`, target map/floor/detail, affine transform, visibility and revision. Moving or rotating an instance changes its placement **without editing its source**. Multiple instances can link to one published source across maps/details ([T-055](Tickets/T-055.md)).
+- **Publication:** Object Editor changes are **private drafts** until **Save** publishes a new immutable version of the same source. Linked instances show the last published revision during edits and refresh **only after Save**. **Save As through an Atlas instance** creates a fresh source Variant B and rebinds **only the captured originating instance**; independent Save As creates B with no Atlas rebind. Undo of the bound Save As restores the old link **but leaves B saved**; redo uses B's existing ID. See the [worked lifecycle](OBJECT_ASSETS_WORKFLOW.md#worked-example-castle-a-variant-b-and-broken-links).
+- **Deletion / broken references:** the registry implements `delete_asset(asset_id, "cancel" | "remove" | "null")`. `"remove"` deletes linked placement records, `"null"` retains stable placement IDs/transforms/source keys as **selectable, bounded `NULL` placeholders**, and `"cancel"` makes no change. A missing or corrupt source also resolves to NULL, never an arbitrary same-named replacement. The **three-choice dialog, visible repair/relink affordances, and Asset Browser dock are not implemented**; they are T-065 ([Object Assets workflow](OBJECT_ASSETS_WORKFLOW.md#deletion-null-and-explicit-repair)).
+- **Not yet implemented:** nested Object Asset references (parent/child transforms, direct/indirect cycle rejection and transitive cache invalidation) belong to **T-064**. UI completion and owner hands-on acceptance remain **T-065 / T-059**, respectively. Neither the existence of a generic `OBJECTS` layer nor legacy embedded image props proves nested linking is implemented.
+
+**Portable project layout:** Atlas's logical campaign path `Campaign.scn` is a compatibility input, *not* the authoritative saved file. `Campaign.atlas.json` points to immutable generations, which include the Object Asset/instance snapshot. Sibling `Drawings/`, `Objects/` and licensed `Fonts/` travel with the campaign; the old `.scn` single-file invariant no longer applies. Consult [T-066's storage format](DRAWING_STORAGE_CONTRACT.md) before hand-editing files.
+
+## Historical raster/Objects prototype — not the current Drawing engine
+
+The following October-era rules and legacy resources remain useful for old tests and the former editor. They must **not** be used to infer support in standalone Drawing or the canonical Atlas main canvas. The first section's tool routing/density assertions describe design intent from the earlier prototype, not blanket acceptance of the new program's feature inventory.
+
 
 The owner's 2026-10-31 clarification supersedes the former mixed Ink drawing
 workflow: ordinary artwork is raster, including lines and shapes. Independently

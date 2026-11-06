@@ -6,6 +6,8 @@ signal gesture_committed(result: DrawingResult)
 signal selection_changed(area: Rect2i)
 signal canvas_error(message: String)
 signal view_changed()
+## Used by the shared workspace status bar; never creates history or content edits.
+signal cursor_moved()
 signal text_requested(pixel: Vector2i)
 
 var document: DrawingDocument
@@ -28,6 +30,9 @@ var selecting: bool = false
 var moving: bool = false
 var gesture_start: Vector2i
 var last_mouse: Vector2 = Vector2.ZERO
+## Latest delivered canvas-relative input, including synthetic native test events.
+var last_pointer_position: Vector2 = Vector2.ZERO
+var pointer_known: bool = false
 var _frame_textures: Array[ImageTexture] = []
 var _reported_render_errors: Dictionary[String, bool] = {}
 
@@ -92,6 +97,9 @@ func _draw() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var button: InputEventMouseButton = event
+		last_pointer_position = button.position
+		pointer_known = true
+		cursor_moved.emit()
 		if button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if button.pressed:
 				var before: Vector2 = (button.position - size * 0.5) / zoom + camera
@@ -114,6 +122,8 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 	elif event is InputEventMouseMotion:
 		var motion: InputEventMouseMotion = event
+		last_pointer_position = motion.position
+		pointer_known = true
 		if panning:
 			camera -= (motion.position - last_mouse) / zoom
 			last_mouse = motion.position
@@ -121,6 +131,7 @@ func _gui_input(event: InputEvent) -> void:
 			view_changed.emit()
 		elif dragging:
 			update_gesture(motion.position)
+		cursor_moved.emit()
 		accept_event()
 
 

@@ -11,6 +11,8 @@ const BROWSER_SCENE: PackedScene = preload("res://prefab/campaign_browser.tscn")
 const LAYER_PANEL_SCENE: PackedScene = preload("res://prefab/layer_panel.tscn")
 const OVERVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/overview_panel.tscn")
 const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn")
+const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
+const ASSET_BROWSER_PAGES_SCRIPT: Script = preload("res://scripts/objects/object_browser_pages.gd")
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
@@ -20,11 +22,20 @@ const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn"
 var campaign: AtlasCampaign
 var drawing_composition: AtlasDrawingComposition
 var object_editor_window: AtlasObjectEditorWindow
+var object_source_manager: AtlasObjectSourceManager
+var asset_browser_panel: DrawingAssetBrowserPanel
+var asset_browser_toggle: Button
+var _asset_browser_page: int = 0
 var edits: AtlasEditHistory = AtlasEditHistory.new()
 var store_io: AtlasStoreIO
 var _restored_bundle: AtlasStoreResult
 var _discard_drawing_dialog: ConfirmationDialog
 var _pending_discard_action: Callable
+var _campaign_copy_dialog: ConfirmationDialog
+var _campaign_copy_parent_picker: FileDialog
+var _campaign_copy_parent: LineEdit
+var _campaign_copy_folder: LineEdit
+var _campaign_copy_filename: LineEdit
 var browser: AtlasCampaignBrowser
 var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
@@ -142,6 +153,7 @@ func _ready() -> void:
 	_discard_drawing_dialog.dialog_text = "Discard unsaved Drawing edits? The last saved campaign generation will remain intact."
 	add_child(_discard_drawing_dialog)
 	_discard_drawing_dialog.confirmed.connect(_confirm_drawing_discard)
+	_build_campaign_copy_dialog()
 	text_editor = AtlasTextEditorPopup.new()
 	add_child(text_editor)
 	text_editor.text_confirmed.connect(_confirm_text_edit)
@@ -191,19 +203,29 @@ func _bind_drawing_composition() -> void:
 				layer_panel.set_drawing_registry(drawing_composition.registry, drawing_composition.library))
 		canvas.drawing_error.connect(_message)
 		canvas.object_instance_selected.connect(_on_object_instance_selected)
+		canvas.object_child_hit_requested.connect(_on_object_child_hit_requested)
+		canvas.object_child_drag_requested.connect(func(context: Dictionary, released_at: Vector2) -> void:
+			var result: DrawingResult = _on_object_child_drag_requested(context, released_at)
+			if not result.ok:
+				_message(result.message))
+		canvas.object_source_dropped.connect(_on_browser_source_drop)
 		canvas.object_instance_edit_requested.connect(func(_id: String) -> void:
 			var opened: DrawingResult = open_selected_object_editor()
 			if not opened.ok:
 				_message(opened.message))
 		edits.changed.connect(drawing_composition.invalidate)
 		drawing_composition.library.asset_published.connect(func(_id: String, _rev: int) -> void:
-			canvas._refresh_composition_view())
+			canvas._refresh_composition_view()
+			_refresh_asset_browser())
 		layer_panel.drawing_layer_selected.connect(_on_drawing_layer_selected)
 	if _restored_bundle != null and _restored_bundle.registry != null:
 		drawing_composition.cancel_stroke()
 		drawing_composition.registry = _restored_bundle.registry
 		drawing_composition.set_library(_restored_bundle.library)
 		_restored_bundle = null
+	if object_source_manager != null:
+		object_source_manager.bind_library(drawing_composition.library)
+	_refresh_asset_browser()
 	canvas.drawing_composition = drawing_composition
 	var attached: DrawingResult = drawing_composition.attach_campaign(campaign)
 	if not attached.ok:
@@ -228,7 +250,125 @@ func _on_object_instance_selected(id: String) -> void:
 	if drawing_composition == null:
 		return
 	var info: Dictionary = drawing_composition.library.instance_info(id)
-	_message("Object %s selected — use Open Object Editor to edit its source." % info.get("source_id", ""))
+	_message("Object %s selected — Alt+click a nested child to inspect; Alt+drag it to move. Open Object Editor to edit source pixels." % info.get("source_id", ""))
+
+
+## Re-resolve the Alt+click against the active map, selected placement and
+## current published graph. The canvas does not own graph/editor state.
+func _on_object_child_hit_requested(instance_id: String, world_point: Vector2) -> DrawingResult:
+	if drawing_composition == null or drawing_composition.library == null or \
+			canvas.map == null or canvas.floor == null or not world_point.is_finite() or \
+			drawing_composition.selected_instance_id != instance_id:
+		return DrawingResult.failure("CHILD", "Nested selection no longer matches the active map")
+	var library: AtlasObjectLibrary = drawing_composition.library
+	if not library._index_unchanged():
+		return DrawingResult.failure("STALE_CHILDREN", "Published Object registry changed; reload before selecting")
+	var instance: Dictionary = library.instance_info(instance_id)
+	if instance.is_empty() or not bool(instance.get("visible", false)) or \
+			instance.get("status") != "linked" or \
+			instance.get("map_id") != canvas.map.id or \
+			instance.get("floor_id") != canvas.floor.id or \
+			instance.get("detail_id") != "D%d" % canvas.presented_detail_level:
+		return DrawingResult.failure("CHILD", "Nested selection is no longer visible here")
+	var hit: DrawingResult = library.hit_test_path(instance_id, world_point)
+	if not hit.ok:
+		return hit
+	if not hit.value is Dictionary:
+		return DrawingResult.failure("CHILD", "No published Object artwork at that point")
+	var path: PackedStringArray = hit.value.get("path", PackedStringArray())
+	if path.is_empty():
+		return DrawingResult.failure("CHILD", "Alt+click a nested child; normal click selects the parent")
+	var parent_id: String = String(instance["source_id"])
+	var selected_child: String = ""
+	for depth: int in range(path.size()):
+		selected_child = path[depth]
+		var found: Dictionary = {}
+		for row: Dictionary in library.children_for_asset(parent_id):
+			if row["id"] == selected_child:
+				found = row
+				break
+		if found.is_empty() or not bool(found.get("visible", false)):
+			return DrawingResult.failure("STALE_CHILDREN", "Nested child changed before selection")
+		if depth < path.size() - 1:
+			if found["status"] != "linked":
+				return DrawingResult.failure("STALE_CHILDREN", "Nested ancestor source is unavailable")
+			parent_id = String(found["source_id"])
+	# The source manager is the single owner of the nested inspector.
+	_ensure_object_source_manager()
+	if object_source_manager.library != library:
+		object_source_manager.bind_library(library)
+	var focused: DrawingResult = object_source_manager.focus_child_from_canvas(parent_id, selected_child)
+	if not focused.ok:
+		_message(focused.message)
+	return focused
+
+
+## Commit a nested-child canvas drag only if the press-time registry, map and
+## placement are unchanged. Convert the world-space displacement into the
+## immediate owning parent's coordinates, including all ancestor transforms.
+## The existing inspector owns the single history entry and stale-child gate.
+func _on_object_child_drag_requested(context: Dictionary, released_at: Vector2) -> DrawingResult:
+	if drawing_composition == null or drawing_composition.library == null or \
+			canvas.map == null or canvas.floor == null or not released_at.is_finite():
+		return DrawingResult.failure("CHILD_DRAG", "The canvas drag is no longer valid")
+	var library: AtlasObjectLibrary = drawing_composition.library
+	var instance_id: String = String(context.get("instance_id", ""))
+	var start: Variant = context.get("start")
+	var path: Variant = context.get("path")
+	if not start is Vector2 or not (start as Vector2).is_finite() or \
+			not path is PackedStringArray or (path as PackedStringArray).is_empty() or \
+			context.get("map_id") != canvas.map.id or \
+			context.get("floor_id") != canvas.floor.id or \
+			context.get("detail") != canvas.presented_detail_level or \
+			drawing_composition.selected_instance_id != instance_id or \
+			not library._index_unchanged() or context.get("registry_hash") != library._index_hash:
+		return DrawingResult.failure("STALE_CHILDREN", "Map or Object source changed during drag")
+	var instance: Dictionary = library.instance_info(instance_id)
+	if instance.is_empty() or instance != context.get("instance") or \
+			instance.get("status") != "linked" or not bool(instance.get("visible", false)):
+		return DrawingResult.failure("STALE_INSTANCE", "The selected Object placement changed")
+	var hit: DrawingResult = library.hit_test_path(instance_id, start)
+	if not hit.ok or not hit.value is Dictionary or \
+			(hit.value as Dictionary).get("path") != path:
+		return DrawingResult.failure("STALE_CHILDREN", "The original nested hit changed")
+	var root: Array = instance["transform"]
+	var parent_world: Transform2D = Transform2D(Vector2(float(root[0]), float(root[1])),
+		Vector2(float(root[2]), float(root[3])), Vector2(float(root[4]), float(root[5])))
+	var parent_id: String = String(instance["source_id"])
+	var selected_child: Dictionary = {}
+	for depth: int in range((path as PackedStringArray).size()):
+		selected_child = {}
+		for row: Dictionary in library.children_for_asset(parent_id):
+			if row["id"] == path[depth]:
+				selected_child = row
+				break
+		if selected_child.is_empty() or not bool(selected_child.get("visible", false)):
+			return DrawingResult.failure("STALE_CHILDREN", "Nested ancestor changed")
+		if depth < (path as PackedStringArray).size() - 1:
+			if selected_child.get("status") != "linked":
+				return DrawingResult.failure("STALE_CHILDREN", "Nested ancestor is unavailable")
+			parent_world = parent_world * AtlasObjectChildEditSession._transform(selected_child)
+			parent_id = String(selected_child["source_id"])
+	var delta: Vector2 = parent_world.affine_inverse().basis_xform(released_at - (start as Vector2))
+	if not delta.is_finite() or absf(delta.x) > 1000000000.0 or absf(delta.y) > 1000000000.0:
+		return DrawingResult.failure("COORD_RANGE", "Nested transform exceeds safe coordinates")
+	if delta.length_squared() < 0.000001:
+		return DrawingResult.success(false)
+	# Do not open an inspector for an invalid move. Focus only after every
+	# optimistic snapshot and coordinate check above has succeeded.
+	var focused: DrawingResult = _on_object_child_hit_requested(instance_id, start)
+	if not focused.ok:
+		return focused
+	var session: AtlasObjectChildEditSession = object_source_manager.child_inspector.session
+	if session.parent_source_id != parent_id or \
+			session.selected_child_id != path[(path as PackedStringArray).size() - 1]:
+		return DrawingResult.failure("CHILD", "Nested inspector focus changed")
+	var moved: Transform2D = AtlasObjectChildEditSession._transform(selected_child)
+	moved.origin += delta
+	var committed: DrawingResult = session.set_selected_transform(moved)
+	if committed.ok:
+		object_source_manager.child_inspector.refresh()
+	return committed
 
 
 func open_selected_object_editor() -> DrawingResult:
@@ -240,6 +380,189 @@ func open_selected_object_editor() -> DrawingResult:
 		object_editor_window.configure(drawing_composition.library, edits,
 			Callable(self, "_capture_instance_history_context"))
 	return object_editor_window.open_instance(drawing_composition.selected_instance_id)
+
+
+## Atlas owns linked placements. The shared Drawing browser never assumes a
+## campaign context, while this explicit Atlas manager binds to the active one.
+func _ensure_object_source_manager() -> void:
+	if object_source_manager != null:
+		return
+	object_source_manager = AtlasObjectSourceManager.new()
+	add_child(object_source_manager)
+	object_source_manager.open_source_requested.connect(_open_object_source)
+	object_source_manager.place_source_requested.connect(_place_object_source)
+	object_source_manager.registry_mutated.connect(func(summary: String) -> void:
+		drawing_composition.invalidate()
+		_refresh_asset_browser()
+		_message(summary))
+
+
+func _open_object_source_manager() -> void:
+	if drawing_composition == null or drawing_composition.library == null:
+		_message("Atlas Object registry is unavailable")
+		return
+	_ensure_object_source_manager()
+	if object_source_manager.library != drawing_composition.library:
+		object_source_manager.bind_library(drawing_composition.library)
+	object_source_manager.popup_centered()
+
+
+func _open_object_source(source_id: String) -> void:
+	if drawing_composition == null or not drawing_composition.library.asset_exists(source_id):
+		_message("Object source changed; refresh the source manager")
+		return
+	if object_editor_window == null:
+		object_editor_window = AtlasObjectEditorWindow.new()
+		add_child(object_editor_window)
+		object_editor_window.configure(drawing_composition.library, edits,
+			Callable(self, "_capture_instance_history_context"))
+	var opened: DrawingResult = object_editor_window.open_source(source_id)
+	if not opened.ok:
+		_message(opened.message)
+
+
+func _place_object_source(source_id: String) -> void:
+	if drawing_composition == null or canvas.map == null or canvas.floor == null:
+		_message("Choose a map and floor before placing an Object Asset")
+		return
+	var center: Vector2 = canvas.local_to_document(canvas.size * 0.5)
+	if not center.is_finite():
+		_message("Current view cannot be used for placement")
+		return
+	var placed: DrawingResult = drawing_composition.place_asset(source_id,
+		canvas.map.id, canvas.floor.id, canvas.presented_detail_level,
+		Transform2D.IDENTITY.translated(center))
+	if not placed.ok:
+		_message(placed.message)
+		return
+	drawing_composition.selected_instance_id = String(placed.value)
+	_message("Placed Object source %s in the current map" % source_id)
+
+
+## One shared portable browser view, bound to the active Atlas registry.
+## Its scanned file listing is never authoritative for a linked placement.
+func _toggle_published_asset_browser() -> void:
+	if asset_browser_panel == null:
+		return
+	asset_browser_panel.visible = not asset_browser_panel.visible
+	if asset_browser_panel.visible:
+		_refresh_asset_browser()
+	asset_browser_toggle.text = "Hide Object Browser ▴" if asset_browser_panel.visible else \
+		"Browse published Object sources ▾"
+	if asset_browser_panel.visible and asset_browser_panel.search != null:
+		asset_browser_panel.search.grab_focus()
+
+
+func _asset_browser_query_changed(_query: String) -> void:
+	_asset_browser_page = 0
+	_refresh_asset_browser()
+
+
+func _asset_browser_page_requested(offset: int) -> void:
+	_asset_browser_page = maxi(0, _asset_browser_page + offset)
+	_refresh_asset_browser()
+
+
+func _refresh_asset_browser() -> void:
+	if asset_browser_panel == null or drawing_composition == null or \
+			drawing_composition.library == null or not asset_browser_panel.visible:
+		return
+	var library: AtlasObjectLibrary = drawing_composition.library
+	var catalog: Array[Dictionary] = []
+	var warnings: Array[String] = []
+	if not library._index_unchanged():
+		asset_browser_panel.set_published_entries(library.root_path, catalog, warnings)
+		return # Unverified registry state is never presented as drop-authorized.
+	# Search and sort *registry metadata* before opening any source documents.
+	# This keeps the entire campaign searchable even beyond the old 512-source
+	# cutoff, while bounding the costly hash/decode work to one visible page.
+	var metadata: Array[Dictionary] = []
+	for source_id: String in library.asset_ids():
+		var item: Dictionary = library.asset_info(source_id)
+		metadata.append({"id": source_id, "name": String(item["name"])})
+	var selected: Dictionary = ASSET_BROWSER_PAGES_SCRIPT.select_page(
+		metadata, asset_browser_panel.search.text, _asset_browser_page)
+	_asset_browser_page = int(selected["page"])
+	for summary: Dictionary in selected["records"]:
+		var source_id: String = String(summary["id"])
+		var item: Dictionary = library.asset_info(source_id)
+		if not library.asset_exists(source_id):
+			warnings.append("Skipped unavailable published source: " + source_id)
+			continue
+		var path: String = library._absolute(String(item["path"]))
+		var embedded: DrawingResult = DrawingObjectEditorFile.inspect_metadata(path)
+		if not embedded.ok:
+			warnings.append("Skipped unreadable published source: " + source_id)
+			continue
+		var data: Dictionary = embedded.value
+		var count: int = int(library.source_usage(source_id)["total"])
+		catalog.append({"id": source_id, "name": item["name"],
+			"revision": item["revision"], "path": path, "sha256": item["sha256"],
+			"bounds": data["bounds"], "embedded_id": data["source_id"],
+			"embedded_revision": data["source_revision"],
+			"usage": "unused" if count == 0 else "%d in use" % count})
+	asset_browser_panel.set_published_entries(library.root_path, catalog, warnings,
+		_asset_browser_page, int(selected["pages"]), int(selected["total"]))
+
+
+func _valid_browser_source(token: Dictionary) -> bool:
+	if asset_browser_panel == null or asset_browser_panel.index == null or \
+			drawing_composition == null or drawing_composition.library == null:
+		return false
+	var library: AtlasObjectLibrary = drawing_composition.library
+	var source_id: String = String(token.get("id", ""))
+	var published: Dictionary = library.asset_info(source_id)
+	if published.is_empty() or not library._index_unchanged() or \
+			asset_browser_panel.index.root_path != library.root_path:
+		return false
+	if String(token.get("kind", "")) != "drawing-object-source-v1" or \
+			int(token.get("revision", -1)) != int(published.get("revision", -2)) or \
+			String(token.get("sha256", "")) != String(published.get("sha256", "")) or \
+			String(token.get("path", "")) != library._absolute(String(published.get("path", ""))):
+		return false
+	if not asset_browser_panel.index.safe_to_open(token) or not library.asset_exists(source_id):
+		return false
+	var on_disk: DrawingResult = DrawingObjectEditorFile.open(String(token["path"]))
+	return on_disk.ok and String(on_disk.value["source_id"]) == String(token.get("embedded_id", "")) and \
+		int(on_disk.value["source_revision"]) == int(token.get("embedded_revision", -1))
+
+
+func _on_browser_open_source(_path: String) -> void:
+	var source_id: String = asset_browser_panel.selected_asset_id()
+	var selected: PackedInt32Array = asset_browser_panel.assets.get_selected_items()
+	if selected.is_empty() or selected[0] >= asset_browser_panel._visible_entries.size():
+		return
+	var token: Dictionary = asset_browser_panel._drag_entry_for_row(selected[0])
+	if _valid_browser_source(token):
+		_open_object_source(source_id)
+	else:
+		_message("Object source changed or is not published here; refresh before editing")
+
+
+func _on_browser_place_source(token: Dictionary) -> void:
+	_on_browser_source_drop(token, canvas.size * 0.5)
+
+
+func _on_browser_source_drop(token: Dictionary, local_position: Vector2) -> void:
+	if canvas.map == null or canvas.floor == null or canvas.is_editing() or \
+			not local_position.is_finite() or \
+			not Rect2(Vector2.ZERO, canvas.size).has_point(local_position) or \
+			not _valid_browser_source(token):
+		_message("Object drop rejected: refresh the published source or finish the current edit")
+		return
+	var world: Vector2 = canvas.local_to_document(local_position)
+	if not world.is_finite():
+		_message("Object drop rejected: invalid map coordinate")
+		return
+	var source_id: String = String(token["id"])
+	var placed: DrawingResult = drawing_composition.place_asset(source_id,
+		canvas.map.id, canvas.floor.id, canvas.presented_detail_level,
+		Transform2D.IDENTITY.translated(world))
+	if not placed.ok:
+		_message(placed.message)
+		return
+	drawing_composition.selected_instance_id = String(placed.value)
+	_message("Placed linked Object %s at the drop position" % source_id)
 
 
 func _capture_instance_history_context() -> DrawingHistoryContext:
@@ -270,6 +593,29 @@ func _mount_sidebar_views() -> void:
 	layers_view.get_node("Heading").hide()
 	layers_view.get_node("Description").hide()
 	layer_panel = LAYER_PANEL_SCENE.instantiate() as AtlasLayerPanel
+	var objects_button: Button = Button.new()
+	objects_button.name = "ObjectAssetManagerButton"
+	objects_button.text = "Object Assets and missing links…"
+	objects_button.tooltip_text = "Published sources, source-delete choices and explicit NULL-instance repair (Ctrl+Shift+B)"
+	layers_view.add_child(objects_button)
+	objects_button.pressed.connect(_open_object_source_manager)
+	asset_browser_toggle = Button.new()
+	asset_browser_toggle.name = "BrowsePublishedObjectsButton"
+	asset_browser_toggle.text = "Browse published Object sources ▾"
+	asset_browser_toggle.tooltip_text = "Browse thumbnails and drag a source onto the map, or place by keyboard"
+	asset_browser_toggle.pressed.connect(_toggle_published_asset_browser)
+	layers_view.add_child(asset_browser_toggle)
+	asset_browser_panel = ASSET_BROWSER_SCRIPT.new() as DrawingAssetBrowserPanel
+	asset_browser_panel.atlas_host_mode = true
+	asset_browser_panel.name = "PublishedAssetBrowser"
+	asset_browser_panel.custom_minimum_size.y = 290
+	asset_browser_panel.visible = false
+	asset_browser_panel.open_requested.connect(_on_browser_open_source)
+	asset_browser_panel.place_requested.connect(_on_browser_place_source)
+	asset_browser_panel.refresh_requested.connect(_refresh_asset_browser)
+	asset_browser_panel.query_changed.connect(_asset_browser_query_changed)
+	asset_browser_panel.page_requested.connect(_asset_browser_page_requested)
+	layers_view.add_child(asset_browser_panel)
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.object_selected.connect(_select_hierarchy_object)
@@ -712,6 +1058,9 @@ func _on_sample(discard_unsaved: bool = false) -> void:
 		# Resetting the document must not silently disable the root-concurrency lease.
 		drawing_composition.registry._loaded_root_digest = previous_root
 		drawing_composition.set_library(AtlasObjectLibrary.new(ProjectSettings.globalize_path(save_path)))
+		if object_source_manager != null:
+			object_source_manager.bind_library(drawing_composition.library)
+		_refresh_asset_browser()
 		drawing_composition.active_layer_by_detail.clear()
 		drawing_composition.selected_instance_id = ""
 		drawing_composition.invalidate()
@@ -732,6 +1081,118 @@ func _on_save() -> void:
 		return
 	edits.mark_saved()
 	_message("Saved generation %s (campaign, sparse Drawings and Object Assets)." % saved.value["generation"])
+
+
+## Copy only an existing, fully saved generation. An independent project copy is
+## not a nested single-source Save As; no source binding or live draft changes.
+func _build_campaign_copy_dialog() -> void:
+	_campaign_copy_dialog = ConfirmationDialog.new()
+	_campaign_copy_dialog.title = "Copy saved campaign"
+	_campaign_copy_dialog.get_ok_button().text = "Copy"
+	add_child(_campaign_copy_dialog)
+	_campaign_copy_dialog.confirmed.connect(_confirm_campaign_copy)
+	var fields: GridContainer = GridContainer.new()
+	fields.columns = 2
+	_campaign_copy_dialog.add_child(fields)
+	var note: Label = Label.new()
+	note.text = "Saved data only; original stays open"
+	fields.add_child(note)
+	fields.add_child(Control.new())
+	var parent_label: Label = Label.new()
+	parent_label.text = "Destination parent"
+	fields.add_child(parent_label)
+	var row: HBoxContainer = HBoxContainer.new()
+	fields.add_child(row)
+	_campaign_copy_parent = LineEdit.new()
+	_campaign_copy_parent.custom_minimum_size.x = 150.0
+	_campaign_copy_parent.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_campaign_copy_parent.tooltip_text = "Existing directory that will contain the new project folder"
+	row.add_child(_campaign_copy_parent)
+	var browse: Button = Button.new()
+	browse.text = "Browse…"
+	row.add_child(browse)
+	browse.pressed.connect(_browse_campaign_copy_parent)
+	var folder_label: Label = Label.new()
+	folder_label.text = "New folder"
+	fields.add_child(folder_label)
+	_campaign_copy_folder = LineEdit.new()
+	_campaign_copy_folder.tooltip_text = "A new folder name; an existing project is never overwritten"
+	fields.add_child(_campaign_copy_folder)
+	var filename_label: Label = Label.new()
+	filename_label.text = "Campaign filename"
+	fields.add_child(filename_label)
+	_campaign_copy_filename = LineEdit.new()
+	_campaign_copy_filename.tooltip_text = "Portable campaign filename ending in .scn"
+	fields.add_child(_campaign_copy_filename)
+	_campaign_copy_parent_picker = FileDialog.new()
+	_campaign_copy_parent_picker.title = "Choose destination parent directory"
+	_campaign_copy_parent_picker.access = FileDialog.ACCESS_FILESYSTEM
+	_campaign_copy_parent_picker.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	_campaign_copy_parent_picker.use_native_dialog = false
+	add_child(_campaign_copy_parent_picker)
+	_campaign_copy_parent_picker.dir_selected.connect(_on_campaign_copy_parent_selected)
+
+
+func _campaign_copy_is_saved() -> bool:
+	return drawing_composition != null and campaign != null and not edits.is_dirty() \
+		and not _dirty_drawing_documents() and not _dirty_object_drafts() \
+		and not canvas.is_editing()
+
+
+func _request_campaign_copy() -> void:
+	if not _campaign_copy_is_saved():
+		_message("Save the campaign and all open Object Editor drafts before copying the saved project.")
+		return
+	var source: String = ProjectSettings.globalize_path(save_path)
+	if not FileAccess.file_exists(AtlasCampaignBundle.root_path(source)):
+		_message("Save the campaign before copying; no portable generation exists yet.")
+		return
+	_campaign_copy_parent.text = source.get_base_dir().get_base_dir()
+	_campaign_copy_folder.text = source.get_base_dir().get_file() + "-copy"
+	_campaign_copy_filename.text = source.get_file()
+	_campaign_copy_dialog.popup_centered(Vector2i(mini(650, maxi(380, int(size.x) - 24)), 240))
+
+
+func _browse_campaign_copy_parent() -> void:
+	_campaign_copy_parent_picker.current_dir = _campaign_copy_parent.text
+	_campaign_copy_parent_picker.popup_centered_ratio(0.65)
+
+
+func _on_campaign_copy_parent_selected(path: String) -> void:
+	_campaign_copy_parent.text = path
+
+
+## Keep user-provided names single-component: copy_portable handles the final
+## filesystem trust boundary, but the dialog must not assemble a traversing path.
+func _campaign_copy_destination() -> DrawingResult:
+	var parent: String = _campaign_copy_parent.text.strip_edges()
+	var folder: String = _campaign_copy_folder.text.strip_edges()
+	var filename: String = _campaign_copy_filename.text.strip_edges()
+	if not parent.is_absolute_path() or parent != parent.simplify_path() or \
+			folder.is_empty() or folder in [".", ".."] or \
+			filename in [".", ".."] or not filename.ends_with(".scn") or \
+			filename.length() <= 4 or \
+			"/" in folder or "\\" in folder or ":" in folder or \
+			"/" in filename or "\\" in filename or ":" in filename:
+		return DrawingResult.failure("COPY_NAME", "Choose an existing absolute parent and single-component project folder and .scn filename")
+	return DrawingResult.success(parent.path_join(folder).path_join(filename))
+
+
+func _confirm_campaign_copy() -> void:
+	# Recheck after the dialog was opened: edits may have occurred while it was up.
+	if not _campaign_copy_is_saved():
+		_message("Campaign changed while choosing a destination. Save all edits before copying.")
+		return
+	var destination: DrawingResult = _campaign_copy_destination()
+	if not destination.ok:
+		_message("Campaign copy refused: " + destination.message)
+		return
+	var copied: DrawingResult = AtlasCampaignStore.copy_portable(save_path, str(destination.value))
+	if not copied.ok:
+		_message("Campaign copy failed: %s %s" % [copied.code, copied.message])
+		return
+	_message("Copied saved campaign to %s (%d files). Original project remains open." % [
+		str(destination.value), int(copied.value["files"])])
 
 
 func _on_load(discard_unsaved: bool = false) -> void:
@@ -1218,7 +1679,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				else:
 					_on_undo()
 			KEY_Y: _on_redo()
-			KEY_S: _on_save()
+			KEY_S:
+				if event.shift_pressed:
+					_request_campaign_copy()
+				else:
+					_on_save()
 			KEY_N: open_board_dialog()
 			KEY_A: select_all_artwork()
 			KEY_D: canvas.clear_selection()
@@ -1226,6 +1691,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_X: cut_selection()
 			KEY_V: paste_selection()
 			KEY_F: sidebar.select_view(&"Search")
+			KEY_B:
+				if event.shift_pressed:
+					_open_object_source_manager()
+				else:
+					return
 			_: return
 		get_viewport().set_input_as_handled()
 		return

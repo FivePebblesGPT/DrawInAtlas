@@ -1,5 +1,16 @@
 # Manual review at milestone 6
 
+> **Historical primary-source review, 2026-10-30.** The observations and
+> language below are preserved as the owner's original snapshot; they are
+> **not a description of the current Drawing/Atlas UI or a new signoff**.
+> Check [the live Kanban](Index.md) and [the validation/reviewer handoff](DRAWING_TEST_PLAN.md)
+> for current evidence. Code readability's independent review remains
+> **T-038: Manual Review**; the standalone/Atlas owner UX check remains
+> **T-056: Ready, manual approval outstanding**. Neither is self-approved by
+> documentation or automated test runs. The current implementation and
+> performance contracts are in [CODE_READIBILITY](CODE_READIBILITY.md) and
+> [DRAWING_PERFORMANCE](DRAWING_PERFORMANCE.md).
+
 ## Usability testing
 
 1. The map preview is terrible. The map inside the hex should be aligned to it, not a random non-transparent picture without proper zooming floating besides it.

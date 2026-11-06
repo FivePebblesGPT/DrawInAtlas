@@ -19,6 +19,7 @@ func _initialize() -> void:
 func _run() -> void:
 	root.size = Vector2i(1100, 720)
 	var app: Control = load("res://main.tscn").instantiate()
+	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await process_frame
 	await process_frame

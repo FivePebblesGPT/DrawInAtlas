@@ -34,6 +34,11 @@ signal token_rejected(reason: String)
 signal fog_edit_requested(bounds: Rect2, reveal: bool)
 signal drawing_error(message: String)
 signal object_instance_selected(id: String)
+## Alt+click requests a nested hit; the editor rechecks location and ownership.
+signal object_child_hit_requested(instance_id: String, world_point: Vector2)
+## A completed Alt+drag requests one validated parent-scoped child transform.
+signal object_child_drag_requested(context: Dictionary, released_at: Vector2)
+signal object_source_dropped(token: Dictionary, local_position: Vector2)
 signal object_instance_edit_requested(id: String)
 
 enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG, PAN }
@@ -60,6 +65,11 @@ var _previous_entrance_local: Vector2 = Vector2.ZERO
 var _previous_object_id: String = ""
 var _previous_object_at: int = -1
 var _previous_object_local: Vector2 = Vector2.ZERO
+## Press-time snapshot. Movement is only a guide until editor-side validation on release.
+var _nested_drag: Dictionary = {}
+var _nested_drag_end: Vector2 = Vector2.ZERO
+var _nested_drag_moved: bool = false
+const NESTED_DRAG_THRESHOLD_PX: float = 4.0
 ## Presentation only: never changes the authored layer, floor, map or camera.
 ## Automatic LOD (T-004/T-005) must use set_presented_detail_level so an
 ## in-progress gesture cannot be redirected or visually interrupted.
@@ -266,6 +276,8 @@ func _ready() -> void:
 ## and no artwork is written into editor chrome.
 func _on_canvas_mouse_exited() -> void:
 	_clear_brush_cursor()
+	# A drop outside the canvas must never reposition a published nested source.
+	_clear_nested_drag()
 	if _canonical_paint:
 		commit_edit()
 
@@ -314,13 +326,14 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return _canonical_paint or _fog_drag_active or _token_drag_before != null or _frame_drag != FrameDrag.NONE \
+	return not _nested_drag.is_empty() or _canonical_paint or _fog_drag_active or _token_drag_before != null or _frame_drag != FrameDrag.NONE \
 		or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending \
 		or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() \
 		or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
+	_clear_nested_drag()
 	if _canonical_paint and drawing_composition != null:
 		drawing_composition.cancel_stroke()
 	_canonical_paint = false
@@ -792,6 +805,14 @@ func _finish_token_drag(position: Vector2) -> void:
 func _draw_overlays(item: Node2D) -> void:
 	if map == null or floor == null:
 		return
+	if _nested_drag_moved and not _nested_drag.is_empty():
+		# Transient screen-space motion guide, not a duplicated child renderer.
+		# The overlay Node2D is already camera-scaled into document space.
+		var begin: Vector2 = _nested_drag["start"]
+		var tint: Color = Color(0.30, 0.82, 0.98, 0.95)
+		item.draw_line(begin, _nested_drag_end, tint, 2.0 / camera_zoom, true)
+		item.draw_arc(_nested_drag_end, 5.0 / camera_zoom, 0.0, TAU,
+			24, tint, 2.0 / camera_zoom, true)
 	if render_grid and show_grid:
 		_draw_grid(item)
 	_draw_links(item)
@@ -811,14 +832,8 @@ func _draw_overlays(item: Node2D) -> void:
 	if not _moving_link_id.is_empty():
 		var link: AtlasMapLink = campaign.link_by_id(_moving_link_id)
 		if link != null:
-			var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
 			var offset: Vector2 = _link_move_end - _link_move_start
-			if placement != null:
-				var points: PackedVector2Array = placement.corners()
-				for index: int in range(points.size()):
-					points[index] += offset
-				_stroke_polygon(points, Color("#f9cc65"), 2.0 / camera_zoom, item)
-			else:
+			if link.placement_id.is_empty():
 				item.draw_arc(link.anchor + offset, link.hit_radius, 0, TAU, 48, Color("#f9cc65"), 2.0 / camera_zoom)
 	if _manipulation == Manipulation.MARQUEE:
 		item.draw_rect(Rect2(_gesture_start, _gesture_end - _gesture_start).abs(), Color(0.3, 0.7, 1.0, 0.15))
@@ -1156,22 +1171,14 @@ func _draw_links(item: Node2D) -> void:
 		var target: AtlasMapDocument = campaign.get_map(link.target_map_id)
 		if target == null:
 			continue
+		# Archived footprint links cannot be drawn as selectable placements.
 		if not link.placement_id.is_empty():
-			var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
-			if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
-				continue
-			var corners: PackedVector2Array = placement.corners()
-			var fill: Color = Color(0.24, 0.70, 0.82, 0.15)
-			item.draw_colored_polygon(corners, fill)
-			_stroke_polygon(corners, Color("#f9cc65") if link.id == selected_link_id else Color("#63d3e5"), 2.0 / camera_zoom, item)
-			item.draw_string(ThemeDB.fallback_font, placement.origin, target.display_name,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
-		else:
-			item.draw_circle(link.anchor, 18.0 / camera_zoom, Color("#efd797"))
-			item.draw_arc(link.anchor, 18.0 / camera_zoom, 0.0, TAU, 24,
-				Color("#395760"), 2.0 / camera_zoom)
-			item.draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
-				target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+			continue
+		item.draw_circle(link.anchor, 18.0 / camera_zoom, Color("#efd797"))
+		item.draw_arc(link.anchor, 18.0 / camera_zoom, 0.0, TAU, 24,
+			Color("#395760"), 2.0 / camera_zoom)
+		item.draw_string(ThemeDB.fallback_font, link.anchor + Vector2(20.0 / camera_zoom, 0.0),
+			target.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
 
 
 func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, item: Node2D) -> void:
@@ -1292,6 +1299,12 @@ func _update_projector_frame_drag(position: Vector2) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if map == null:
 		return
+	if event is InputEventKey and not _nested_drag.is_empty():
+		var key: InputEventKey = event as InputEventKey
+		if key.pressed and key.keycode == KEY_ESCAPE:
+			cancel_edit()
+			accept_event()
+			return
 	if projector_frame_active and _handle_projector_frame_input(event):
 		return
 	if _handle_gesture(event):
@@ -1384,7 +1397,9 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	if drawing_composition != null and tool in [Tool.PEN, Tool.ERASER]:
 		var color: Color = brush_color
 		var packed: int = color.r8 | (color.g8 << 8) | (color.b8 << 16) | (color.a8 << 24)
-		var point: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+		# Pen and Eraser are always freehand; snap applies to shape drafts and
+		# selection moves, never to canonical raster brush samples.
+		var point: Vector2 = position
 		var started: DrawingResult = drawing_composition.start_stroke(map.id, floor.id,
 			presented_detail_level, point, packed, brush_width, tool == Tool.ERASER,
 			edit_scope.polygon, edit_scope.enabled)
@@ -1408,6 +1423,11 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			_previous_object_at = now
 			_previous_object_local = mouse.position
 			object_instance_selected.emit(instance_id)
+			if mouse.alt_pressed:
+				# Delay the inspector popup until release, otherwise its OS window
+				# steals focus during a real pointer drag. Nothing is published here.
+				_begin_nested_drag(instance_id, position)
+				return
 			if mouse.double_click and repeated:
 				object_instance_edit_requested.emit(instance_id)
 			return
@@ -1546,14 +1566,57 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 	return false
 
 
+func _clear_nested_drag() -> void:
+	_nested_drag.clear()
+	_nested_drag_moved = false
+	if _overlay != null:
+		_overlay.queue_redraw()
+
+
+func _begin_nested_drag(instance_id: String, at: Vector2) -> void:
+	_clear_nested_drag()
+	if drawing_composition == null or drawing_composition.library == null:
+		return
+	var library: AtlasObjectLibrary = drawing_composition.library
+	if not library._index_unchanged():
+		return
+	var hit: DrawingResult = library.hit_test_path(instance_id, at)
+	if not hit.ok or not hit.value is Dictionary:
+		return
+	var path: PackedStringArray = (hit.value as Dictionary).get("path", PackedStringArray())
+	if path.is_empty():
+		return
+	_nested_drag = {"instance_id": instance_id, "path": path.duplicate(),
+		"start": at, "map_id": map.id, "floor_id": floor.id,
+		"detail": presented_detail_level, "instance": library.instance_info(instance_id),
+		"registry_hash": library._index_hash}
+	_nested_drag_end = at
+
+
+func _finish_nested_drag(mouse: InputEventMouseButton) -> void:
+	var context: Dictionary = _nested_drag.duplicate(true)
+	var moved: bool = _nested_drag_moved or mouse.position.distance_to(
+		document_to_local(context["start"])) >= NESTED_DRAG_THRESHOLD_PX
+	var valid_release: bool = Rect2(Vector2.ZERO, size).has_point(mouse.position)
+	var released_at: Vector2 = local_to_document(mouse.position)
+	_clear_nested_drag()
+	if valid_release:
+		if moved:
+			object_child_drag_requested.emit(context, released_at)
+		else:
+			object_child_hit_requested.emit(String(context["instance_id"]), context["start"])
+	interaction_finished.emit()
+
+
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
+	if not _nested_drag.is_empty():
+		_finish_nested_drag(mouse)
+		return
 	if _canonical_paint:
 		# A synthetic/re-routed release can arrive outside this Control. Never
 		# extend the stroke through editor panels or off the visible canvas.
 		if Rect2(Vector2.ZERO, size).has_point(mouse.position):
 			var point: Vector2 = local_to_document(mouse.position)
-			if snap_to_grid:
-				point = AtlasGridSnap.point(map.grid, point)
 			if drawing_composition != null:
 				var staged: DrawingResult = drawing_composition.append_stroke(point)
 				if not staged.ok:
@@ -1606,6 +1669,16 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 
 
 func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
+	if not _nested_drag.is_empty():
+		if not Rect2(Vector2.ZERO, size).has_point(motion.position):
+			_clear_nested_drag()
+		else:
+			_nested_drag_end = local_to_document(motion.position)
+			if motion.position.distance_to(document_to_local(_nested_drag["start"])) >= NESTED_DRAG_THRESHOLD_PX:
+				_nested_drag_moved = true
+			_overlay.queue_redraw()
+		accept_event()
+		return
 	_brush_cursor_local = motion.position
 	_brush_cursor_inside = Rect2(Vector2.ZERO, size).has_point(motion.position)
 	_overlay.queue_redraw()
@@ -1618,8 +1691,6 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 			accept_event()
 			return
 		var point: Vector2 = local_to_document(motion.position)
-		if snap_to_grid:
-			point = AtlasGridSnap.point(map.grid, point)
 		var drawn: DrawingResult = drawing_composition.append_stroke(point)
 		if not drawn.ok:
 			drawing_error.emit(drawn.message)
@@ -1901,3 +1972,17 @@ func _update_polygon_preview(local_position: Vector2) -> void:
 			_preview_textures.clear()
 			_render_states.erase(active_layer_id)
 	queue_redraw()
+
+
+## Godot's native Control drag/drop path is separate from the ordinary painting
+## gesture path. Only an explicit, versioned browser token is preview-eligible;
+## the Atlas host must still revalidate ownership and publication on release.
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	return map != null and floor != null and not is_editing() and \
+		Rect2(Vector2.ZERO, size).has_point(at_position) and data is Dictionary and \
+		String((data as Dictionary).get("kind", "")) == "drawing-object-source-v1"
+
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	if _can_drop_data(at_position, data):
+		object_source_dropped.emit((data as Dictionary).duplicate(true), at_position)

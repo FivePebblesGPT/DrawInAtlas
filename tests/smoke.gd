@@ -51,19 +51,16 @@ func _test_grids() -> void:
 
 
 func _test_placements() -> void:
-	var placement: AtlasPlacement = AtlasPlacement.new()
-	placement.origin = Vector2(84.0, -17.0)
-	placement.rotation = deg_to_rad(37.0)
-	placement.parent_units_per_cell = 24.0
-	placement.child_units_per_cell = 64.0
-	placement.columns = 20
-	placement.rows = 15
-	var parent_position: Vector2 = placement.local_to_parent() * Vector2(8.0, 6.0)
-	_check(placement.contains_parent_point(parent_position), "rotated placement hit test")
-	_check(placement.parent_to_local(parent_position).distance_to(Vector2(8.0, 6.0)) < 0.001,
-		"rotated placement inverse")
-	_check(not placement.contains_parent_point(placement.local_to_parent() * Vector2(-1.0, 8.0)),
-		"placement rejects outside")
+	# T-015: independent-map entrances are circle markers, not child footprints.
+	var marker: AtlasMapLink = AtlasMapLink.new()
+	marker.anchor = Vector2(84.0, -17.0)
+	marker.hit_radius = 24.0
+	_check(marker.contains_marker_point(marker.anchor + Vector2(14, 0)),
+		"marker hit within source-board units")
+	_check(marker.contains_marker_point(marker.anchor + Vector2(24, 0)),
+		"marker edge is included")
+	_check(not marker.contains_marker_point(marker.anchor + Vector2(25, 0)),
+		"marker excludes out-of-range hit")
 
 
 func _test_zoom_gate() -> void:
@@ -177,34 +174,31 @@ func _test_editor_workflow() -> void:
 
 	var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
 	var parent_before: Dictionary = city.to_dict().duplicate(true)
-	# Import a historical battlemap graph via the low-level command; the UI no
-	# longer offers creation, but old saves must remain navigable and editable.
-	var legacy_child: AtlasMapDocument = AtlasMapDocument.new("legacy-encounter", "Saved encounter")
-	legacy_child.kind = "BATTLEMAP"
-	legacy_child.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 24.0)
-	var legacy_link: AtlasMapLink = AtlasMapLink.new()
-	legacy_link.id = "legacy-entrance"
-	legacy_link.source_map_id = city.id
-	legacy_link.source_floor_id = canvas.floor.id
-	legacy_link.target_map_id = legacy_child.id
-	legacy_link.target_floor_id = legacy_child.default_floor_id
-	legacy_link.anchor = Vector2(-100, -70)
-	legacy_link.placement_id = "legacy-placement"
-	var legacy_placement: AtlasPlacement = AtlasPlacement.new()
-	legacy_placement.id = legacy_link.placement_id
-	legacy_placement.parent_map_id = city.id
-	legacy_placement.child_map_id = legacy_child.id
-	legacy_placement.origin = legacy_link.anchor
-	legacy_placement.rotation = deg_to_rad(37)
-	_check(editor.edits.execute(AtlasLinkEdit.new(city.id, null, legacy_link, null, legacy_placement, legacy_child)),
-		"legacy fixture imports a saved footprint and independent child document")
-	_check(editor.linked_maps.submit(legacy_link, legacy_placement, legacy_child) == false,
-		"public linked-map facade refuses new battlemap creation")
-	editor.linked_maps.enter(legacy_link.id)
-	_check(canvas.map.id == legacy_child.id, "legacy battlemap remains navigable")
-	_check(editor.campaign.placements.size() == 1, "legacy placement retained")
-	_check(is_equal_approx(rad_to_deg(editor.campaign.placements[0].rotation), 37.0),
-		"legacy rotation retained")
+	# New independent maps are created explicitly, never as children of a
+	# navigation link. A link is a marker into the existing destination.
+	var encounter: AtlasMapDocument = AtlasMapDocument.new("independent-encounter", "Independent encounter")
+	encounter.kind = "BOARD"
+	encounter.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 24.0)
+	_check(editor.edits.execute(AtlasCreateMap.new(city.id, encounter)),
+		"independent encounter is created by its own map command")
+	var entrance: AtlasMapLink = AtlasMapLink.new()
+	entrance.id = "independent-entrance"
+	entrance.source_map_id = city.id
+	entrance.source_floor_id = canvas.floor.id
+	entrance.target_map_id = encounter.id
+	entrance.target_floor_id = encounter.default_floor_id
+	entrance.anchor = Vector2(-100, -70)
+	_check(editor.edits.execute(AtlasLinkEdit.new(city.id, null, entrance)),
+		"existing independent map can be linked without a footprint")
+	var forbidden: AtlasPlacement = AtlasPlacement.new()
+	forbidden.parent_map_id = city.id
+	forbidden.child_map_id = encounter.id
+	_check(not editor.linked_maps.submit(entrance, forbidden, encounter),
+		"public facade refuses bundled document and spatial footprint")
+	editor.linked_maps.enter(entrance.id)
+	_check(canvas.map.id == encounter.id, "independent linked map remains navigable")
+	_check(editor.campaign.placements.is_empty() and entrance.placement_id.is_empty(),
+		"independent entrance has no battlemat ownership or footprint")
 
 	# Child edits do not create palette-cell terrain or modify parent artwork.
 	editor._choose_tool(AtlasCanvas.Tool.PEN)
@@ -216,7 +210,7 @@ func _test_editor_workflow() -> void:
 	pointer = canvas.size * 0.5
 	editor._on_wheel_step(-1, pointer)
 	editor._on_wheel_step(-1, pointer)
-	_check(canvas.map.kind == "BATTLEMAP", "two blocked outward steps stay in battlemap")
+	_check(canvas.map.id == encounter.id, "two blocked outward steps stay on linked independent map")
 	editor._on_wheel_step(-1, pointer)
 	_check(canvas.map.id == "greyhaven", "third blocked outward step returns to city")
 	editor.sidebar.select_view(&"Maps")

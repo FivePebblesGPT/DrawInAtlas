@@ -221,9 +221,9 @@ func _overview_ui() -> bool:
 		"document marker maps to canvas-local pixels independently of sidebar offset")
 	panel.recursive_checkbox.button_pressed = false
 	_mode(panel, AtlasOverview.Filter.VISIBLE)
-	var visible_ids: Array[String] = ["01-door", "02-door", "03-edge", "05-cell-aabb-decoy", "08-placed"]
+	var visible_ids: Array[String] = ["01-door", "02-door", "03-edge", "05-cell-aabb-decoy"]
 	_expect_ids(panel, visible_ids,
-		"VISIBLE maps canvas corners to document units; includes circle overlap/placement, excludes pixels/offscreen/inactive floor")
+		"VISIBLE maps canvas document corners and excludes archived footprint, pixels, offscreen and inactive floors")
 	_check(not panel.recursive_checkbox.disabled and panel.result_list.item_count == visible_ids.size(),
 		"VISIBLE enables recursion control and populates native ItemList")
 	panel.recursive_checkbox.button_pressed = true
@@ -251,7 +251,7 @@ func _overview_ui() -> bool:
 	await _settle()
 	_check(is_equal_approx(canvas.camera_zoom, 2.04) and canvas.camera_center.is_equal_approx(center),
 		"native wheel dispatch reaches navigator and keeps center pointer anchored")
-	var zoomed_ids: Array[String] = ["01-door", "02-door", "05-cell-aabb-decoy", "08-placed"]
+	var zoomed_ids: Array[String] = ["01-door", "02-door", "05-cell-aabb-decoy"]
 	_expect_ids(panel, zoomed_ids, "VISIBLE refreshes automatically after user zooms")
 	_mode(panel, AtlasOverview.Filter.MAP)
 	_mode(panel, AtlasOverview.Filter.VISIBLE)
@@ -271,7 +271,7 @@ func _overview_ui() -> bool:
 	await _settle()
 	_check(canvas.size.x > old_canvas_size.x + 500 and canvas.camera_center.is_equal_approx(center),
 		"native window resize expands the real canvas without moving document center")
-	var resized_ids: Array[String] = ["01-door", "02-door", "03-edge", "04-outside", "05-cell-aabb-decoy", "08-placed"]
+	var resized_ids: Array[String] = ["01-door", "02-door", "03-edge", "04-outside", "05-cell-aabb-decoy"]
 	_expect_ids(panel, resized_ids, "VISIBLE refreshes automatically after viewport resize")
 	_mode(panel, AtlasOverview.Filter.MAP)
 	_mode(panel, AtlasOverview.Filter.VISIBLE)
@@ -286,7 +286,7 @@ func _overview_ui() -> bool:
 	_click(canvas, canvas.document_to_local(center))
 	_check(canvas.has_selected_cell and canvas.selected_cell == cell,
 		"native SELECT click converts camera pixels through rotated/translated board grid")
-	var cell_ids: Array[String] = ["01-door", "02-door", "08-placed"]
+	var cell_ids: Array[String] = ["01-door", "02-door"]
 	_expect_ids(panel, cell_ids, "CELL uses the selected rotated polygon, excluding its AABB decoy and distant entrances")
 	panel.recursive_checkbox.button_pressed = true
 	_expect_ids(panel, cell_ids + ["09-descendant"], "CELL checkbox refresh includes descendants outside the selected region")
@@ -316,10 +316,12 @@ func _overview_ui() -> bool:
 	_select_entry(panel, first.id)
 	_click(focus_button, focus_button.size * 0.5)
 	_check(canvas.camera_center.is_equal_approx(first.anchor), "the other duplicate focuses its distinct source anchor")
+	_mode(panel, AtlasOverview.Filter.MAP)
 	_select_entry(panel, placed.id)
-	_click(focus_button, focus_button.size * 0.5)
-	_check(canvas.camera_center.is_equal_approx(placement.local_to_parent() * Vector2(1, 0.5)),
-		"placed entrance Focus uses transformed footprint center instead of remote anchor")
+	_check(panel.selected_entry() != null and not panel.selected_entry().can_focus
+		and focus_button.disabled and not panel.selected_entry().broken_reason.is_empty(),
+		"archived placement is listed as an inert relationship, not a focus target")
+	_mode(panel, AtlasOverview.Filter.VISIBLE)
 	_select_entry(panel, second.id)
 	_click(open_button, open_button.size * 0.5)
 	_check(canvas.map.id == target.id and canvas.floor.id == "ground" and editor.history.size() == 1,
@@ -370,9 +372,10 @@ func _broken_ui(editor: AtlasEditor, center: Vector2) -> bool:
 		editor.open_map("source", "ground")
 		_select_entry(panel, link.id)
 		var entry: AtlasOverviewEntry = panel.selected_entry()
+		var archived: bool = not link.placement_id.is_empty()
 		_check(entry != null and entry.link_id == link.id and not entry.broken_reason.is_empty()
-			and open_button.disabled and not focus_button.disabled,
-			"broken target disables Open but retains usable source Focus: " + link.id)
+			and open_button.disabled and focus_button.disabled == archived,
+			"broken target blocks Open; only ordinary marker source Focus remains: " + link.id)
 		var before_map: String = canvas.map.id
 		var before_floor: String = canvas.floor.id
 		var before_center: Vector2 = canvas.camera_center
@@ -390,9 +393,11 @@ func _broken_ui(editor: AtlasEditor, center: Vector2) -> bool:
 			and canvas.camera_center == before_center and editor.history == before_history,
 			"broken row activation also rejects navigation: " + link.id)
 		_click(focus_button, focus_button.size * 0.5)
-		_check(canvas.map.id == link.source_map_id and canvas.floor.id == link.source_floor_id
-			and canvas.camera_center.is_equal_approx(link.anchor),
-			"native Focus reaches exact valid source map/floor/anchor despite broken target: " + link.id)
+		_check((canvas.map.id == before_map and canvas.floor.id == before_floor
+			and canvas.camera_center == before_center) if archived else
+			(canvas.map.id == link.source_map_id and canvas.floor.id == link.source_floor_id
+			and canvas.camera_center.is_equal_approx(link.anchor)),
+			"native Focus is marker-only even when the destination is broken: " + link.id)
 	_check(editor.history.size() == 1 and editor.history[-1]["map_id"] == "source"
 		and editor.history[-1]["floor_id"] == "ground", "cross-board broken-source Focus records the return view")
 	editor._on_back()

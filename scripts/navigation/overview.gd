@@ -88,13 +88,12 @@ static func _walk(campaign: AtlasCampaign, map_id: String, floor_id: String,
 			# outgoing_links treats an empty floor as a wildcard; overview never does.
 			if link.source_floor_id != parent.floor_id:
 				continue
-			var placement: AtlasPlacement = _owned_placement(campaign, link)
-			if spatial and parent.depth == 0 and not _hits(link, placement, region):
+			if spatial and parent.depth == 0 and not _hits(link, region):
 				continue
 			if parent.depth >= max_depth:
 				result.truncated = true
 				continue
-			var entry: AtlasOverviewEntry = _link_entry(campaign, link, placement, parent)
+			var entry: AtlasOverviewEntry = _link_entry(campaign, link, parent)
 			if _matches(campaign, entry, tokens) and not _append(result, entry, limit):
 				return
 			if not recursive or not entry.broken_reason.is_empty():
@@ -150,13 +149,12 @@ static func _destination(campaign: AtlasCampaign, map_id: String, floor_id: Stri
 
 
 static func _link_entry(campaign: AtlasCampaign, link: AtlasMapLink,
-		placement: AtlasPlacement, parent: AtlasOverviewEntry) -> AtlasOverviewEntry:
+		parent: AtlasOverviewEntry) -> AtlasOverviewEntry:
 	var entry: AtlasOverviewEntry = _destination(campaign, link.target_map_id, link.target_floor_id)
 	entry.source_map_id = link.source_map_id
 	entry.source_floor_id = link.source_floor_id
 	entry.link_id = link.id
 	entry.link_snapshot = link.to_dict().duplicate(true)
-	entry.placement_snapshot = placement.to_dict().duplicate(true) if placement != null else {}
 	entry.source_label_snapshot = _label(campaign, link.source_map_id, link.source_floor_id)
 	var source_map: AtlasMapDocument = campaign.get_map(link.source_map_id)
 	if source_map != null:
@@ -166,7 +164,7 @@ static func _link_entry(campaign: AtlasCampaign, link: AtlasMapLink,
 			entry.source_floor_instance_id = source_floor.get_instance_id()
 	entry.path_snapshots = parent.path_snapshots.duplicate(true)
 	entry.path_snapshots.append({
-		"id": entry.link_id, "link": entry.link_snapshot, "placement": entry.placement_snapshot,
+		"id": entry.link_id, "link": entry.link_snapshot,
 		"source_map": entry.source_map_instance_id, "source_floor": entry.source_floor_instance_id,
 		"target_map": entry.target_map_instance_id, "target_floor": entry.target_floor_instance_id,
 		"source_label": entry.source_label_snapshot, "target_caption": entry.caption
@@ -174,19 +172,18 @@ static func _link_entry(campaign: AtlasCampaign, link: AtlasMapLink,
 	entry.depth = parent.depth + 1
 	entry.breadcrumb = parent.breadcrumb + " → " + entry.breadcrumb
 	entry.source_focus = link.anchor
-	if placement != null:
-		entry.source_focus = placement.local_to_parent() * (Vector2(placement.columns, placement.rows) * 0.5)
 	var source: AtlasMapDocument = campaign.get_map(link.source_map_id)
 	entry.can_focus = source != null and source.floor_by_id(link.source_floor_id) != null and entry.source_focus.is_finite()
 	if not entry.can_focus:
 		entry.broken_reason = _reason(entry.broken_reason, "Missing or invalid source map/floor: %s / %s" % [link.source_map_id, link.source_floor_id])
-	if not link.placement_id.is_empty() and placement == null:
-		entry.broken_reason = _reason(entry.broken_reason, "Missing or mismatched placement: " + link.placement_id)
+	if not link.placement_id.is_empty():
+		entry.can_focus = false
+		entry.broken_reason = _reason(entry.broken_reason, "Retired placement link: " + link.id)
 	return entry
 
 
 ## Reject stale UI actions even when a link retains its ID after being moved,
-## retargeted, replaced or associated with a changed legacy footprint.
+## retargeted or replaced. Legacy placements are never active navigation.
 ## This only validates existing overview results; it does not define a future
 ## place-search ontology or change persistent data.
 static func entry_is_current(campaign: AtlasCampaign, entry: AtlasOverviewEntry) -> bool:
@@ -202,15 +199,12 @@ static func entry_is_current(campaign: AtlasCampaign, entry: AtlasOverviewEntry)
 		var source_floor: AtlasFloor = source_map.floor_by_id(edge.source_floor_id) if source_map != null else null
 		var target_map: AtlasMapDocument = campaign.get_map(edge.target_map_id)
 		var target_level: AtlasFloor = target_map.floor_by_id(edge.target_floor_id) if target_map != null else null
-		var placement: AtlasPlacement = _owned_placement(campaign, edge)
-		var placement_state: Dictionary = placement.to_dict() if placement != null else {}
 		if (_instance_id(source_map) != step["source_map"]
 				or _instance_id(source_floor) != step["source_floor"]
 				or _instance_id(target_map) != step["target_map"]
 				or _instance_id(target_level) != step["target_floor"]
 				or _label(campaign, edge.source_map_id, edge.source_floor_id) != step["source_label"]
-				or _destination(campaign, edge.target_map_id, edge.target_floor_id).caption != step["target_caption"]
-				or placement_state != step["placement"]):
+				or _destination(campaign, edge.target_map_id, edge.target_floor_id).caption != step["target_caption"]):
 			return false
 	var target: AtlasMapDocument = campaign.get_map(entry.map_id)
 	if _destination(campaign, entry.map_id, entry.floor_id).caption != entry.caption:
@@ -234,9 +228,7 @@ static func entry_is_current(campaign: AtlasCampaign, entry: AtlasOverviewEntry)
 	var floor: AtlasFloor = source.floor_by_id(entry.source_floor_id) if source != null else null
 	if _instance_id(floor) != entry.source_floor_instance_id:
 		return false
-	var placement: AtlasPlacement = _owned_placement(campaign, link)
-	var current_placement: Dictionary = placement.to_dict() if placement != null else {}
-	return current_placement == entry.placement_snapshot
+	return link.placement_id.is_empty()
 
 
 static func _instance_id(object: Object) -> int:
@@ -284,26 +276,16 @@ static func _link_less(a: AtlasMapLink, b: AtlasMapLink) -> bool:
 	return a.id < b.id
 
 
-static func _owned_placement(campaign: AtlasCampaign, link: AtlasMapLink) -> AtlasPlacement:
-	if link.placement_id.is_empty():
-		return null
-	var placement: AtlasPlacement = campaign.placement_by_id(link.placement_id)
-	if placement == null or placement.parent_map_id != link.source_map_id or placement.child_map_id != link.target_map_id:
-		return null
-	return placement
-
-
-static func _hits(link: AtlasMapLink, placement: AtlasPlacement, region: PackedVector2Array) -> bool:
-	if placement != null:
-		var corners: PackedVector2Array = placement.corners()
-		return not _separated(corners, region) and not _separated(region, corners)
-	# A broken placement retains the link's anchor marker as its source hit region.
-	if not link.anchor.is_finite() or not is_finite(link.hit_radius) or link.hit_radius < 0.0:
+static func _hits(link: AtlasMapLink, region: PackedVector2Array) -> bool:
+	# Spatial filtering covers marker circles, not retired placement geometry.
+	if not link.placement_id.is_empty() or not link.anchor.is_finite() \
+			or not is_finite(link.hit_radius) or link.hit_radius < 0.0:
 		return false
 	if Geometry2D.is_point_in_polygon(link.anchor, region):
 		return true
 	for index: int in range(region.size()):
-		var closest: Vector2 = Geometry2D.get_closest_point_to_segment(link.anchor, region[index], region[(index + 1) % region.size()])
+		var closest: Vector2 = Geometry2D.get_closest_point_to_segment(
+			link.anchor, region[index], region[(index + 1) % region.size()])
 		if closest.distance_squared_to(link.anchor) <= link.hit_radius * link.hit_radius:
 			return true
 	return false

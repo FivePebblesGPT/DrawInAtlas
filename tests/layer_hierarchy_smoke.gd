@@ -190,7 +190,7 @@ func _count_layer_strokes(panel: AtlasLayerPanel, layer_id: String) -> int:
 
 
 ## A hierarchy row can outlive an edited entrance. No button may act on the
-## new link/placement/target using the old row, even if the IDs are unchanged.
+## new link/target using the old row, even if the IDs are unchanged.
 func _test_stale_link_rows(editor: AtlasEditor, panel: AtlasLayerPanel) -> void:
 	var link: AtlasMapLink = editor.campaign.links[0] if not editor.campaign.links.is_empty() else null
 	_check(link != null and link.source_map_id == editor.canvas.map.id,
@@ -237,29 +237,17 @@ func _test_stale_link_rows(editor: AtlasEditor, panel: AtlasLayerPanel) -> void:
 		target.display_name = original_name
 		panel.set_navigation_context(editor.campaign, editor.canvas.map)
 
-	# A legacy footprint can change without changing the link resource itself.
-	var original_placement_id: String = link.placement_id
-	var placement: AtlasPlacement = editor.campaign.placement_by_id(link.placement_id)
-	var temporary_placement: bool = placement == null
-	if temporary_placement:
-		placement = AtlasPlacement.new()
-		placement.id = "hierarchy-stale-footprint"
-		placement.parent_map_id = link.source_map_id
-		placement.child_map_id = link.target_map_id
-		link.placement_id = placement.id
-		editor.campaign.placements.append(placement)
+	# An archived footprint ID cannot be introduced into a fresh row. The
+	# link snapshot, not historical geometry, is the stale-action authority.
 	panel.set_navigation_context(editor.campaign, editor.canvas.map)
 	row = _find(panel.hierarchy.get_root(), "link", link.id)
-	var original_origin: Vector2 = placement.origin
-	placement.origin += Vector2(25, 75)
+	var original_placement_id: String = link.placement_id
+	link.placement_id = "retired-footprint"
 	panel._on_hierarchy_button(row, 0, AtlasLayerPanel.LINK_ENTER, 1)
 	_check(actions.size() == 1 and editor.canvas.map.id == link.source_map_id,
-		"old entrance row cannot enter after its footprint changes")
+		"old entrance row cannot enter after its archived reference changes")
 	await process_frame
-	placement.origin = original_origin
-	if temporary_placement:
-		editor.campaign.placements.erase(placement)
-		link.placement_id = original_placement_id
+	link.placement_id = original_placement_id
 	panel.set_navigation_context(editor.campaign, editor.canvas.map)
 
 	row = _find(panel.hierarchy.get_root(), "link", link.id)

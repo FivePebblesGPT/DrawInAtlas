@@ -1,0 +1,73 @@
+{
+	"description": "Headless, new empty document per sample; per-commit CPU wall time, not input latency",
+	"engine": "4.8-beta2 (official)",
+	"failures": 0,
+	"results": [
+		{
+			"changed_pixels": 4096,
+			"median_ms": 59.225,
+			"samples_ms": [
+				52.669,
+				59.225,
+				68.828
+			],
+			"stride": 512,
+			"width": 64
+		},
+		{
+			"changed_pixels": 16384,
+			"median_ms": 224.672,
+			"samples_ms": [
+				214.29,
+				224.672,
+				241.691
+			],
+			"stride": 512,
+			"width": 128
+		},
+		{
+			"changed_pixels": 4096,
+			"median_ms": 53.453,
+			"samples_ms": [
+				52.142,
+				53.453,
+				59.346
+			],
+			"stride": 1024,
+			"width": 64
+		},
+		{
+			"changed_pixels": 16384,
+			"median_ms": 216.894,
+			"samples_ms": [
+				209.266,
+				216.894,
+				227.988
+			],
+			"stride": 1024,
+			"width": 128
+		},
+		{
+			"changed_pixels": 4096,
+			"median_ms": 51.222,
+			"samples_ms": [
+				45.076,
+				51.222,
+				57.277
+			],
+			"stride": 2048,
+			"width": 64
+		},
+		{
+			"changed_pixels": 16384,
+			"median_ms": 210.705,
+			"samples_ms": [
+				209.36,
+				210.705,
+				222.046
+			],
+			"stride": 2048,
+			"width": 128
+		}
+	]
+}

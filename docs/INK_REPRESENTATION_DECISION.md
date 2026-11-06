@@ -1,12 +1,17 @@
 # T-028 — Ink representation audit and approved decision
 
-**Status:** owner decision **approved on 2026-10-31**. This comparison records the decision; editor defaults and UI changes are separate implementation work under [[T-049]]. See [[T-028]] and [[Index]].
+> [!important] Decision and implementation boundary (2026-11-02)
+> Owner authority: [[DECISIONS_DRAWING_ATLAS_2026-11-01]] and [[T-028]]. The **raster-dominant semantic-vector** policy is approved. The performance/ownership tables below are an **October 2026 `AtlasInkLayer`/`AtlasRasterLayer` audit**: they are retained as historical evidence, not a current profile of `DrawingDocument`.
 
-## Question and what the code actually owns
+**Implemented now:** generic raster/text/semantic Drawing layers in `addons/drawing/`; the independently runnable Drawing editor (T-053), Atlas main-canvas composition (T-055), text rasterization (T-058), sparse generation storage (T-066), and optimized tile-run composition (T-068). Legacy `AtlasInkLayer`, `AtlasStroke` and embedded WebP remain code paths for compatibility/tests; the old `AtlasFloor.strokes` is not the generic Drawing layer model. Each Atlas `(map,floor,detail)` maps to one generic document, and Object Assets are independent reusable sources, **not** linked whole-map raster layers. The approved floor/detail structure and source ownership are in [architecture](ARCHITECTURE.md).
+
+**Pending:** the T-049 default/tool affordance ticket, T-068 native backend choice, T-056/T-059 owner usability acceptance. Web is archived, not an active native backend portability requirement. No user-save migration is required.
+
+## Historical prototype audit — question and observed ownership
 
 The question in [[ManualReview_2026-10-30#Code review|Code review, item 1]] is why `AtlasInkLayer` holds `Array[AtlasStroke]` instead of a raster image. This was not simply a legacy serialization convenience:
 
-| Component / path | Current responsibility and observable cost |
+| Prototype component / path | Responsibility and cost at time of the audit (not current Drawing core) |
 | --- | --- |
 | `scripts/artwork/ink_layer.gd`, `stroke.gd` | Each ink object stores board-space `PackedVector2Array` control/sample points, RGBA, width, and metadata for solid polygon, editable wall path, or editable text. Sparse marks need no raster extent. Every object is a `Resource`; object count and samples have allocation/serialization costs. `to_dict` materializes all points for validation/digests/clipboard-related paths. |
 | `scripts/interface/canvas.gd` (`_draw_content_layer`, `_draw_stroke`) | Iterates the visible detail group's strokes and issues Godot draw primitives. Round-ended vector strokes may require a generated polygon silhouette; text is drawn from font metadata; filled polygons are shapes. The current path has **no per-object spatial index or viewport culling** beyond layer/detail visibility and text readability. High object/point counts may make redraws expensive. GPU/render time was not measured in this audit. |
@@ -56,7 +61,7 @@ The policy establishes:
 4. **No representation migration:** no real user artwork exists to migrate, and this approval does not authorize a legacy-data conversion workflow. Retired battlemat migration work is likewise unnecessary by separate owner direction. Keep native save fidelity and existing regression fixtures intact while changing defaults; do not rewrite saved pixels, vector metadata, or edit history on load.
 5. **Performance and fidelity:** raster chunk storage, pixel resolution, alpha, undo memory and browser performance still require measurement on representative content. Raster is the preferred user experience **by design**, not because unmeasured performance superiority has been established. Pixel-region selection is currently missing and should not be claimed as implemented.
 
-### Current implementation versus approved target
+### Prototype implementation versus approved target (historical)
 
 The repository already has separately typed lossless chunked raster layers, raster brush/erase/fill, vector semantic objects and native persistence. However, `scripts/campaign/floor.gd` currently constructs terrain + ink for a new floor, `scripts/interface/canvas.gd` starts with `active_layer_id = "ink"`, `scripts/interface/editor.gd::_refresh_layers()` prefers ink as a fallback, and `scripts/interface/artwork_editor.gd::choose_tool()` falls back to ink for Pen/Eraser. These are **implementation gaps**, not evidence that the approval has already been applied.
 

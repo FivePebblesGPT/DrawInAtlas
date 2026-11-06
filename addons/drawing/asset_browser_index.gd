@@ -1,0 +1,153 @@
+class_name DrawingAssetBrowserIndex
+extends RefCounted
+## Read-only index of portable Objects/ sources. Does not mutate the campaign,
+## publish sources, delete unreferenced assets, or interpret Atlas placements.
+
+const MAX_ASSETS: int = 512
+const MAX_CANDIDATES: int = 2048
+const MAX_OBJECT_BYTES: int = 64 * 1024 * 1024
+
+var root_path: String = ""
+var entries: Array[Dictionary] = []
+var warnings: Array[String] = []
+
+
+func scan(objects_path: String) -> DrawingResult:
+	var base: String = objects_path.simplify_path()
+	if not base.is_absolute_path() or base.get_file() != "Objects":
+		return DrawingResult.failure("ASSET_PATH", "Choose an absolute Objects/ directory")
+	var parent: DirAccess = DirAccess.open(base.get_base_dir())
+	if parent == null or parent.is_link("Objects"):
+		return DrawingResult.failure("ASSET_PATH", "Unsafe or missing Objects/ directory")
+	var directory: DirAccess = DirAccess.open(base)
+	if directory == null:
+		return DrawingResult.failure("ASSET_PATH", "Objects/ directory is missing")
+	var next: Array[Dictionary] = []
+	var issues: Array[String] = []
+	var seen: Dictionary = {}
+	var candidates: int = 0
+	var child_names: PackedStringArray = directory.get_directories()
+	child_names.sort()
+	for child_name: String in child_names:
+		candidates += 1
+		if candidates > MAX_CANDIDATES:
+			issues.append("Asset scan candidate limit reached")
+			break
+		if next.size() >= MAX_ASSETS:
+			issues.append("Asset index limit reached")
+			break
+		if not DrawingDocument.valid_identifier(child_name) or directory.is_link(child_name):
+			issues.append("Skipped unsafe asset directory")
+			continue
+		var asset_directory: DirAccess = DirAccess.open(base.path_join(child_name))
+		if asset_directory == null:
+			continue
+		var latest: int = 0
+		var chosen: String = ""
+		for filename: String in asset_directory.get_files():
+			if asset_directory.is_link(filename) or not filename.begins_with("v") or \
+					not filename.ends_with(".drawing"):
+				continue
+			var digits: String = filename.substr(1, filename.length() - 9)
+			if digits.length() != 6 or not digits.is_valid_int():
+				continue
+			var revision: int = int(digits)
+			if revision > latest and revision <= 999999:
+				latest = revision
+				chosen = filename
+		if chosen.is_empty():
+			continue
+		_read_source(base.path_join(child_name).path_join(chosen), seen, next, issues, child_name)
+	# Standalone Drawing can publish individual Objects/*.drawing files, while
+	# Atlas's immutable revisions live in Objects/<id>/vNNNNNN.drawing.
+	var standalone_files: PackedStringArray = directory.get_files()
+	standalone_files.sort()
+	for filename: String in standalone_files:
+		candidates += 1
+		if candidates > MAX_CANDIDATES:
+			issues.append("Asset scan candidate limit reached")
+			break
+		if next.size() >= MAX_ASSETS:
+			issues.append("Asset index limit reached")
+			break
+		if filename.ends_with(".drawing") and not directory.is_link(filename):
+			_read_source(base.path_join(filename), seen, next, issues)
+	next.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return String(a["name"]).nocasecmp_to(String(b["name"])) < 0 if a["name"] != b["name"] else String(a["id"]) < String(b["id"]))
+	root_path = base
+	entries = next
+	warnings = issues
+	return DrawingResult.success(entries.size())
+
+
+func _read_source(path: String, seen: Dictionary, target: Array[Dictionary],
+		issues: Array[String], directory_id: String = "") -> void:
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null or file.get_length() > MAX_OBJECT_BYTES:
+		issues.append("Skipped unreadable or oversized Object source")
+		return
+	file.close()
+	var loaded: DrawingResult = DrawingObjectEditorFile.open(path)
+	if not loaded.ok:
+		issues.append("Skipped invalid Object source: " + path.get_file())
+		return
+	var data: Dictionary = loaded.value
+	var source_id: String = String(data["source_id"])
+	if not DrawingDocument.valid_identifier(source_id) or \
+			(not directory_id.is_empty() and source_id != directory_id):
+		issues.append("Skipped source with mismatched identity")
+		return
+	if not directory_id.is_empty() and int(path.get_file().substr(1, 6)) != int(data["source_revision"]):
+		issues.append("Skipped versioned source with inconsistent revision")
+		return
+	if seen.has(source_id):
+		issues.append("Duplicate Object source identity: " + source_id)
+		# Do not silently choose a potentially incorrect source for Open.
+		for index: int in range(target.size() - 1, -1, -1):
+			if target[index]["id"] == source_id:
+				target.remove_at(index)
+		seen[source_id] = false
+		return
+	if seen.get(source_id, true) == false:
+		return
+	seen[source_id] = true
+	target.append({"id": source_id, "name": String(data["name"]),
+		"revision": int(data["source_revision"]), "path": path,
+		"bounds": data["bounds"], "sha256": FileAccess.get_sha256(path)})
+
+
+## Listings are not authority to open files after filesystem changes.
+func safe_to_open(entry: Dictionary) -> bool:
+	if root_path.is_empty() or not entry.get("path") is String or not entry.get("sha256") is String:
+		return false
+	var path: String = String(entry["path"])
+	if not path.begins_with(root_path + "/") or path != path.simplify_path():
+		return false
+	var relative: String = path.substr(root_path.length() + 1)
+	var parts: PackedStringArray = relative.split("/")
+	if parts.size() not in [1, 2] or not parts[-1].ends_with(".drawing"):
+		return false
+	if parts.size() == 2 and (parts[0] != entry.get("id") or not parts[1].begins_with("v")):
+		return false
+	var parent: DirAccess = DirAccess.open(root_path.get_base_dir())
+	var directory: DirAccess = DirAccess.open(root_path)
+	if parent == null or parent.is_link("Objects") or directory == null:
+		return false
+	if parts.size() == 2:
+		if directory.is_link(parts[0]):
+			return false
+		directory = DirAccess.open(root_path.path_join(parts[0]))
+	if directory == null or directory.is_link(parts[-1]):
+		return false
+	return FileAccess.file_exists(path) and FileAccess.get_sha256(path) == entry["sha256"]
+
+
+func filtered(query: String) -> Array[Dictionary]:
+	var needle: String = query.strip_edges().to_lower()
+	if needle.is_empty():
+		return entries.duplicate(true)
+	var result: Array[Dictionary] = []
+	for entry: Dictionary in entries:
+		if needle in String(entry["name"]).to_lower() or needle in String(entry["id"]).to_lower():
+			result.append(entry.duplicate(true))
+	return result

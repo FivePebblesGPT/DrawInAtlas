@@ -1,6 +1,27 @@
-# Editable text — T-027 implementation candidate
+# Editable text — current Drawing/Atlas workflow (T-072)
 
-## Interaction proposal (owner approval pending)
+**Authority and availability (2026-11-02).** The owner-approved [47 Essential / 34 Later / 18 Skip inventory](DRAWING_FEATURE_INVENTORY.md) defines *scope*, not shipped tools or final UX acceptance. The [decision record](DECISIONS_DRAWING_ATLAS_2026-11-01.md), [canonical Drawing package](../addons/drawing/README.md), [test plan](DRAWING_TEST_PLAN.md) and [Kanban](Index.md) take precedence over the archived workflow below.
+
+The independently runnable `DrawingWorkspace` in `addons/drawing/workspace.gd` currently exposes **Brush, Eraser, Select, Move, Text, Pan**. Atlas embeds the same Drawing engine for raster editing (`T-055`), while some *older Atlas tools and tests* still execute against legacy `AtlasLayer` / `AtlasRasterLayer` paths. A working legacy test does not prove the corresponding standalone tool is shipped. Atlas owns map/floor/detail, selected-cell mask constraints, entrance navigation, and the global chronological history (`T-054`); Drawing owns generic documents, tools, local edit sessions, and snapping. **No per-hex DrawingDocument** exists.
+
+A content gesture uses `DrawingDocument.begin_edit()` → bounded `DrawingEditSession` staging → `commit()` (one undoable operation), or `cancel()` (no changes). Atlas embeds with `set_external_history(true)` and registers the edit with `AtlasEditHistory.commit_drawing()`; standalone Drawing keeps local history. Selection-only history is an **application-level opt-in, OFF by default**, not an automatic content edit. When Atlas history replays, it restores the valid originating map/floor/detail, selection and mode, preserves zoom, and pans only if content is not visible. Navigation-only actions do not create undo entries.
+
+The once-per-gesture swept brush, exact straight **RGBA8 including hidden RGB on unchanged transparent pixels**, per-pixel edit-scope clipping, and only-touched-tile copy-on-write are generic Drawing behaviors. `DrawingEditSession.apply_region(Rect2i, PackedByteArray)` is the **bounded edit-region native-acceleration boundary**, not evidence that Blend2D, Skia or a C++ GDExtension has shipped. `T-068` is **In Progress**; no native backend is selected. Source storage uses T-066's portable `Drawings/` generations rather than a current single-file native `.scn` raster save.
+
+## Current editable-text lifecycle (T-058) versus T-027 candidate
+
+**Available now in standalone Drawing and the shared Object Editor:** choose **Text** → click position → enter nonempty text → Apply. `DrawingDocument.commit_text()` creates **exactly one editable text element per text layer on the first successful content commit**, not when the Text tool is selected or the dialog opens. Cancel / empty invalid input adds no layer or history entry. Reopen that text layer → edit and Apply updates the *same* layer; `rasterize_text()` explicitly converts to pixels as a separate **undoable** operation, and undo restores the editable text/ID. Atlas hosts these generic documents but the full Atlas-native T-027 label-placement UI and 9px cull/shortcut policy below still await their own acceptance.
+
+**Portability:** the bundled redistributable **Lato OFL** font files use stable IDs, exact-binary checks and license metadata. Portable standalone `.drawing` and Atlas `Fonts/` storage do not silently substitute arbitrary OS fonts. Unsupported glyphs use a visible replacement plus warning; missing/corrupt required font data is rejected. These are **T-058** behaviors, not the historical T-027 proposal's Sans/Serif/Monospace system font assumptions. **Witnesses:** `tests/drawing_text_smoke.gd`, `drawing/tests/text_editor_smoke.gd`, `drawing/tests/packaged_fonts_smoke.gd`, `tests/object_editor_smoke.gd`. `tests/text_smoke.gd` and `tests/text_visual.gd` cover a **legacy candidate**, including old `.scn` and 9px behavior; their historical assertions are not proof of the canonical UI.
+
+---
+
+## Historical Atlas-era workflow and candidate notes (not a current Drawing UX contract)
+
+The following is preserved for original ticket/acceptance traceability. Its use of **“current”, “implemented”, “native save”, tool shortcuts and old test counts refers to the pre-separation Atlas-era prototype**, unless a statement is explicitly confirmed in the current section above. See `docs/Index.md` for the actual ticket status.
+
+
+### Interaction proposal (owner approval pending)
 
 - Choose **Text (T)** in the Tools sidebar, then click the current **visible, unlocked ink layer** to place text. Click inside an existing text object's rendered bounds with Text selected to reopen it instead of creating a second object. Text supports multiline input.
 - The in-editor dialog edits **content**, **font family** (Sans / Serif / Monospace), **font size** (6–256 board units), **Bold**, **Italic**, and **RGBA color**. Apply is one history command; Cancel or Escape discards changes. Each dialog is bound to the original map, floor and Objects layer **instances** and a snapshot of its effective selected-cell edit-mask polygon. If the target is replaced (even under the same ID), the edit mask changes while the dialog is open, the original text changes in history, the layer becomes protected, or the current mask rejects the result, Apply refuses without closing the dialog or losing its typed content; an inline message explains the rejection. A successful retry closes the editor; an unchanged revision closes without an extra history command. The dialog explicitly suppresses global tool shortcuts while typing; the underlying canvas cannot receive pointer edits through the overlay.
@@ -9,7 +30,7 @@
 - Text renders only when **font size × viewport zoom ≥ 9 screen pixels**, regardless of detail level. A native framebuffer check showed the same 20-unit text culled at 0.4× (8 px) and readable at 0.5× (10 px). This is a proposed readability threshold, subject to manual device/display tuning. Culling affects only presentation: it never removes text or affects selection, persistence, references, or edit-target availability. D0 and D1 checks exercise same-coordinate independently authored text.
 - Existing saves and ink strokes retain their shape; new text adds `text`, `font_family`, `text_bold`, `text_italic`, and optional `text_rotation` fields to the existing validated ink-object record. The same fields are copied and serialized for native saves and versioned ink clipboard payloads. Empty/malformed/oversized text and unsupported style metadata are rejected rather than flattened.
 
-## Verification and limitations
+### Verification and limitations
 
 Tests: `tests/text_smoke.gd` (70 assertions: schema, edit and history, concurrent/stale modal revisions, cross-map/layer placement guards, retry on unlocked layer, eraser isolation, clipboard, masks, moves/rotation, D0/D1, native save) and `tests/text_visual.gd` (22 assertions: native pointer, editable/rejected modal screenshots, selected-cell mask rejection and retry at 800×600, cull threshold, D0/D1 and 800×600 layout). Both are in CI. Closing the dialog releases the stored map/floor/layer and mask references. The 9 px visibility threshold and native save schema are unchanged.
 

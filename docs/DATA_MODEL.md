@@ -1,79 +1,54 @@
 # Campaign Data Model and Persistence
 
-> [!important] Current representation and explicitly archived earlier schema designs
-> This describes the implementation, not the revised canvas contract. [[E-002]] and [[E-006]] record the shared board, separately authored artwork LOD and retirement of battlemats; [[E-007]] owns projection framing. [[E-003]] and [[E-SAVE]] track model and persistence cleanup. Existing dictionary helpers are under investigation in [[T-029]]. Completion is tracked in [[Index]].
+> [!important] Current contract (2026-11-02)
+> The approved architecture is [[DECISIONS_DRAWING_ATLAS_2026-11-01]]; API/lifecycle ownership is [ADR](ADR_DRAWING_DOCUMENT_CONTRACT.md), [map/world registry](DRAWING_WORLD_MAPPING.md), [object sources](../scripts/objects/README.md) and [T-066 storage](DRAWING_STORAGE_CONTRACT.md). Earlier single-file `.scn` formats and the examples in the historical section below are **not** the present campaign Save contract.
 
-**Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, verified on Godot 4.8-beta2. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
+## Current typed model and identity
 
-## Current native checkpoint contract (native v2; T-050)
+| Authority | Identity and content | Implemented owner |
+| --- | --- | --- |
+| Atlas campaign | Stable map IDs, map links/entrances, floor metadata, grids, tokens/fog and navigation | `scripts/campaign/` and `scripts/navigation/` |
+| Drawing registry | Unique internal `(map_id, floor_id, detail_id)` → stable `DrawingDocument` ID; per-detail rational density and persisted tile stride | `scripts/campaign/drawing_registry.gd` |
+| Drawing document | Generic ordered groups/layers, sparse signed RGBA8 tiles, editable text and semantic elements, edit revisions/deltas | `addons/drawing/`; **no Atlas map/floor/grid subclasses** |
+| Object source | Stable asset ID, independent versioned `.drawing` source, published revision | `scripts/objects/object_library.gd` and `Objects/` |
+| Object instance | Independent instance ID, source asset ID, Atlas map/detail placement, transform and metadata | `scripts/objects/object_instance.gd` |
+| Atlas history | Global committed operations with originating map/floor/detail, selection/mode context | `scripts/editing/history.gd` + Drawing history coordinator |
 
-Keep native resource/scene serialization behind `AtlasCampaignStore`. Floor,
-overview and editing code operate on typed runtime objects and stable IDs;
-they must not infer identity from a resource filename or a node path. Multiple
-entrances still reference one independent destination map, including its
-explicit floor and arrival camera.
+**Option B** is the accepted map model: *Map → Floor group → Detail group → Layers*. Every D-level in one map uses shared signed world coordinates but may have its own rational pixel density. One floor may have many **internal** DrawingDocuments (one per D-level); an empty higher detail has no authored D0 underlay and need not allocate any tile data. These internal documents are not user-facing files/tabs. An ordinary standalone Drawing document and an Object Editor source document use the same generic Drawing package without an Atlas campaign. Grids, entrance overlays and map links remain Atlas metadata, never painted terrain-cell or floor-specific Drawing types.
 
-Persist canonical campaign/map/floor/layer/link/placement content. Do not pack
-the running editor workspace into a save: its selected floor/layer, camera,
-Back history, gesture state and private preview renderers belong to the viewer.
-Preview images are derived data, never substitutes for the original artwork.
-The data-only save root owns map-document nodes whose embedded Resources supply
-the map registry. Map IDs, rather than child order, are canonical; floor/layer
-array order remains significant. The binary `.scn` embeds every map and lossless
-WebP chunk and uses whole-scene ResourceSaver compression. Native version **2**,
-domain validation, exact RGBA8 hashes and a deterministic semantic digest gate
-activation. No user artwork sidecars or JSON schema are written inside the file.
+`AtlasMapDocument` and `AtlasFloor` still exist as Atlas map/navigation metadata and as legacy native scene fields. `AtlasRasterLayer`/`AtlasInkLayer` and the `AtlasCampaignStore` native `.scn` codec are compatibility and regression-test paths, **not** a claim that the canonical Painting tool writes into those legacy layers. The removed palette-cell `AtlasTerrainLayer` and `TILES` discriminator are not supported artwork authoring targets. No per-hex or recursively parent-owned drawing document graph exists.
 
-`AtlasCampaignStore` stages and verifies candidates, retains the previous
-validated generation beside the campaign as `.bak.scn`, and replaces the head.
-`.pending.scn` and `.bak.pending.scn` are never automatic recovery candidates.
-Only a valid head may rotate into the backup. Failure leaves active work intact;
-backup recovery carries diagnostics and requires a new save to clear dirty state.
+## Current portable project format (T-066)
 
-All raster payloads reconstruct exact RGBA8 bytes including transparent RGB;
-the decoded Image is a runtime cache. Repeated loads isolate mutable nested
-Resources and Images. Shipped application scripts are permitted external
-dependencies; arbitrary external artwork/campaign dependencies are rejected.
-Old JSON saves remain untouched, with **no legacy user-save importer**.
+```text
+Project/
+  Campaign.atlas.json            current atomically published root pointer
+  Campaign.atlas.bak.json        independently checked previous root pointer
+  Drawings/
+    generations/<generation-id>/generation.json   generation index
+    generations/<generation-id>/campaign.scn       Atlas-native metadata, not all raster pixels
+    generations/<generation-id>/registry.json      map/floor/detail -> DrawingDocument
+    generations/<generation-id>/objects.json       linked instances + version refs
+    manifests/<document-id>/<hash>.json            immutable sparse layer/tree manifest
+    chunks/<prefix>/<digest>.zst                   compressed straight RGBA8 pixels
+  Objects/<asset-id>/vNNNNNN.drawing               immutable published source versions
+  Fonts/<licensed-font-id>.ttf
+  Fonts/OFL-1.1.txt
+```
 
-Whole-file save/load and eager hydration costs, codec selection AD-10 and
-measured fidelity/size/memory trade-offs are in [archived benchmarks](Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md).
-See [archived native-save report](Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.md) for transaction details and
-portability evidence. Browser smoke remains deferred; Windows/macOS replacement
-and physical-media power-loss durability are not claimed.
+The editor may accept a `Campaign.scn` logical path when invoking Save, but its **authoritative result** is the `.atlas.json` root and referenced versioned project directory. It validates relative paths, hashes, metadata and source/font files before promoting a root generation, retains a previous valid root for recovery and lazily decodes sparse raster tiles. Exact RGBA8 includes hidden RGB behind zero alpha; signed tile addresses are preserved even beyond JSON float precision using decimal strings. Old `.scn` single-file saves remain a historical codec; there is **no historical user-save migration requirement**. Copy the complete enclosing project directory, not only a root pointer. Atomic rename tests are not a laboratory guarantee about power failure on every filesystem.
 
-Milestone 6 originally used native format v1; T-050 subsequently advanced the supported native format to v2 with no terrain artwork. `AtlasLinkEdit` atomically changes one source-owned entrance,
-its footprint and an optional new independent document. Reference sources,
-frozen images, preview crops and traversed-entrance history are viewer state,
-not extra Resources in the campaign file. See [linked maps](LINKED_MAPS.md).
+**Unfixed optimization choices:** the existing per-document tile stride is versioned; T-067 measured 256, 512, 1024, 2048 and recommends **512 as a future default**, but current files are not automatically retiled. Per-file compressed blobs are deployed; immutable indexed packs are a recommendation, **not** a shipped writer. The optimized GDScript compositor is implemented; T-068 native backend selection remains In Progress. See [storage benchmark](DRAWING_CHUNK_GEOMETRY_BENCHMARK.md) and [CPU benchmark](DRAWING_CPU_RASTER_BENCHMARK.md).
 
-### Current dictionary validation schema (v7; not a native file format)
+## Runtime session and history boundaries
 
-Before native saves, the store wrote a checksummed JSON head, `.bak` and immutable
-`.assets/<pixel-sha256>.webp` chunks. That user-file path has been retired, not
-converted. Only v7 is accepted by the current in-memory dictionary decoder used for validation, cloning and tests; it is not the native container schema. Versions 1–6 are historical and intentionally unsupported. No prototype-data migration is implemented.
+Viewer camera/zoom, preview-cache images, current tool/selection and navigation-only events are not canonical artwork. Atlas's global undo restores originating map/floor/detail and valid selection/mode without changing zoom; standalone Drawing has independent local undo. Selection-only history is optional and OFF by default. Object Editor drafts do not update published sources until Save; Save As from a captured instance produces a new source and a single-instance binding change, retaining the new source on undo. See [T-054](Tickets/T-054.md), [T-060](Tickets/T-060.md) and [T-062](Tickets/T-062.md).
 
-Each floor owns an ordered `layers` array (back to front): `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration; `OBJECTS` contains independently editable walls, text and image props; `TOKENS` owns GM tabletop markers with stable IDs, document-space centers/radii, label and tint (T-041). Brush, eraser, line and shape tools write raster pixels. `INK` is a deprecated Resource discriminator retained for prototype reading, not a new authoring target. The obsolete `TILES` type is rejected. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths. New painting layers use 4 pixels per board unit on both axes. Token layers are independent of drawing/Objects layers; the renderer and native save honor their usual floor, LOD, order, lock, visibility and opacity properties. **Token layer visibility does not grant publication to players.** See [GM token workflow](TOKEN_WORKFLOW.md).
-
-Raster affine `transform` is recorded as six finite numbers (basis X, basis Y, origin) and singular transforms are rejected. Moving/scaling/rotating an asset does not rewrite chunk pixels or their hashes. A floor has no terrain palette or frozen terrain basis. Grid geometry is independent map metadata; cell-scoped editing uses this grid without making it an artwork layer. The legacy `strokes` access helper refers to the default Objects layer's ordered records. Image props retain lossless `prop_webp` bytes, original `prop_size` and `prop_rotation`; their single anchor and display width are board-space placement. Dictionary/clipboard adapters encode these bytes as base64; native Resources embed them directly. Raster hashes cover canonical RGBA8 bytes and dimensions. See [raster/Objects workflow](RASTER_OBJECTS_WORKFLOW.md).
-
-The current schema retains map `tags` and explicit `source_floor_id` and
-`target_floor_id` fields on links. When missing, link floor IDs default to
-`ground` during dictionary decoding. Floor order and `default_floor_id` are persistent metadata, while the
-currently viewed floor/camera/layer are workspace state. Renaming/reordering or
-choosing a default never rebases artwork, grid geometry or native measurement
-units. Missing target map/floor/placement references remain representable for
-overview placeholders and source Focus actions.
-
-Clipboard payloads use a separate `drawinatlas.clipboard` v1 envelope, not campaign IDs or file paths. Ink coordinates are relative to the copied bounds; raster chunks carry self-contained verified lossless WebP bytes. Obsolete `TILES` clipboard payloads are rejected. Paste assigns fresh raster layer IDs and does not harmonize native units. Viewer selections, gesture previews and edit scopes remain transient and are never saved as artwork.
-
-Neither the historical checkpoint nor the native replacement implements a full
-journal or autosave. Native recovery retains one complete previous generation;
-artwork is embedded rather than stored as immutable sidecars.
+**Pending rather than approved:** owner privacy policy T-039, independent T-038/T-056 acceptance, nested Object Assets T-064, Asset Browser T-065, and production GPU/native work T-057/T-068. Atlas-only features must not be inferred from generic `DrawingDocument` metadata.
 
 ## Historical conceptual schemas (not supported runtime formats)
 
-The following early sketches predate native saves and the removal of battlemats
+The following early sketches predate current generation-based saving, the Drawing/Atlas separation, and the removal of battlemats
 and palette-cell terrain artwork. They are retained for design history only.
 `TILES`, `BattlemapPlacement` and other examples below must **not** be used
 as current API or persistence documentation.
@@ -106,7 +81,7 @@ A `MapDocument` may have zero or more incoming links. Do not embed documents rec
 
 ## 2. Historical illustrative JSON package
 
-This earlier proposal is superseded by the single binary `.scn` contract above.
+This early JSON layout and the later single-file `.scn` checkpoint are both superseded by the versioned multi-file campaign-generation contract described above.
 Its following examples describe graph relationships rather than prescribe
 the format of new saves.
 
@@ -136,8 +111,7 @@ campaign/
 ```
 
 The earlier layout used JSON metadata and **lossless .webp** raster chunks,
-with optional lossy derived thumbnails. Native scene packaging now embeds
-metadata Resources and lossless WebP bytes without turning thumbnails into artwork.
+with optional lossy derived thumbnails. The intermediate native scene package embedded metadata Resources and lossless WebP bytes. Current T-066 generations instead store sparse verified `.zst` chunks with manifests; the following example is not a supported layout.
 
 ## 3. Manifest example
 
@@ -295,13 +269,13 @@ Store deliberate persistent document metadata separately: actual raster/ink laye
 - Enforce referential integrity: missing target maps should display broken-link placeholders and repair actions, not crash or silently delete links.
 - Handle orphan maps explicitly; a map without incoming links can still be found in campaign search and linked later.
 
-## 10. Unresolved schema details
+## 10. Historical open questions (resolved or superseded where noted)
 
-- Best chunk size (initial trial: 256 or 512 pixels/cells depending on layer type).
-- Format for sparse tiles, vector geometry and large clipboard payloads (raster chunks are WebP).
+- Original tile-size question: T-067 benchmarked 256/512/1024/2048 and recommends 512 for **future** documents; existing manifests keep their recorded stride.
+- Original codec question: T-066 now uses sparse `.zst` chunks and checked manifests. The older native WebP codec remains for compatibility/tests.
 - Whether battlemap reference is live by default or a frozen snapshot.
 - Which authorization metadata belongs to campaign files versus hosted-session policy.
-- How to package/share assets without violating their licenses.
+- Assets/fonts: T-066 records Object source refs and legally redistributable font bytes/licenses in the project; broader asset governance is still a separate decision.
 
 These are implementation experiments, not blockers for defining document and link IDs now.
 

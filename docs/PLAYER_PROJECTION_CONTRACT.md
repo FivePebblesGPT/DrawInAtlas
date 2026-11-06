@@ -1,6 +1,14 @@
 # T-039 — Player-output projection and privacy contract (approval candidate)
 
-**Status (2026-11-01): proposed; NOT an accepted player privacy policy or a working projector.** The confirmed design in [[E-007]] is a movable, resizable frame on the GM board that controls **player framing only**. Projector-window size and physical tabletop calibration are separate from the frame and from artwork transforms. Implementation of T-013/T-040–T-044 remains gated on the product decisions below and acceptance of the core UX.
+## Current Drawing/Atlas privacy boundary (T-075, 2026-11-02)
+
+**Desktop Windows/Linux is the active product target.** T-044's single-window/Web fallback is **Archived** ([ticket](Archive/Web/T-044.md)); the `open_embedded` prototype and old Web tests remain historical engineering evidence, **not** a supported browser release or a second active privacy-acceptance path. The approved owner decisions for publication are still pending at [T-039](Tickets/T-039.md); the independent player-output/privacy signoff at [T-043](Tickets/T-043.md) is still blocked.
+
+The active Atlas editor now composes generic `DrawingDocument` raster/text/group content through `AtlasDrawingRegistry` for each `(map_id, floor_id, detail_id)`, with linked `AtlasObjectLibrary` sources and instances and T-066's portable `Campaign.atlas.json` generation store (see [world mapping](DRAWING_WORLD_MAPPING.md), [Object Assets](OBJECT_ASSETS_WORKFLOW.md) and [storage](DRAWING_STORAGE_CONTRACT.md)). **The sanitizer below does not consume that new composed Drawing/Asset graph.** It accepts a legacy `AtlasMapDocument`/`AtlasCampaign` with `AtlasLayer` grants and emits a detached sanitized legacy campaign for the isolated test harness. A successful legacy grant test is not evidence that new Drawing pixels, editable text, fonts, Object Asset variants, NULL placeholders or previews can safely reach a projector.
+
+**Threat and required bridge:** a trusted GM-only policy controller must explicitly authorize a bounded, current map/floor/detail snapshot *before* rendering, export or network serialization. Deny by default if any referenced Drawing layer, linked asset, text/font, fog, token, policy revision or cache entry cannot be filtered and verified. Never send a `DrawingDocument`, `AtlasDrawingRegistry`, `AtlasObjectLibrary`, GM canvas texture, `AtlasPreviewCache`, save manifest, or private asset ID to a player surface. Copying a frame to an untrusted display or transport is irreversible; revocation must prevent *subsequent* frames, including frozen and in-flight frames, but cannot recall pixels already copied outside the app. The actual player publishing bridge, controls and privacy acceptance are **not implemented**.
+
+**Status (2026-11-01): proposed; NOT an accepted player privacy policy or a working projector.** The confirmed design in [[E-007]] is a movable, resizable frame on the GM board that controls **player framing only**. Projector-window size and physical tabletop calibration are separate from the frame and from artwork transforms. Production integration of T-013/T-040–T-043 remains gated on the product decisions below and acceptance of the core UX; T-044 (Web fallback) is Archived.
 
 ## Audience and explicit trust boundary
 
@@ -27,7 +35,7 @@ The map/floor/layer names and IDs are replaced, as are tags, measurement labels 
 3. **Frame and camera:** T-013's GM-board frame tracks the player output aspect ratio. Moving it pans, resizing it changes the shown document rectangle at unchanged artwork coordinates. GM and player cameras can diverge. A proposed **follow** mode tracks the frame live; **freeze** holds a *previously authorized* image and camera only until a visibility/permission/fog change, after which it must be blanked or rebuilt through the current policy. No stale secret pixels may remain on a second monitor.
 4. **Fog/visibility:** fog must filter or occlude every relevant LOD and derivative preview; decide whether opaque cover is sufficient for a local projector versus filtering source pixels before any export/network byte path. Cross-floor and cross-LOD grants are independent; a different detail group must not reveal the same secret via a preview.
 5. **Cache lifetime:** split/label entries by audience **and policy revision**, map, floor, LOD, crop and content signature; after any grant revocation, token movement, fog change or private/public edit, discard untrusted player imagery and in-flight render requests. `AtlasPreviewCache` remains editor-only unless this is implemented. Never reuse a cached GM image under a different audience string.
-6. **Output/export/transport:** sanitize first, render second. Future network replicators must serialize only filtered DTOs and approved image bytes. Native projectors may render sanitized input in a separate `SubViewport`/window; Web fallback must use the same policy and not silently downgrade to editor capture. Explicit cancellation and blank-frame behavior on renderer errors/disconnects.
+6. **Output/export/transport:** sanitize first, render second. Future network replicators must serialize only filtered DTOs and approved image bytes. Native projectors may render sanitized input in a separate `SubViewport`/window. The archived Web fallback proof is retained as historical evidence only; no Web downgrade or editor capture is approved. Explicit cancellation and blank-frame behavior on renderer errors/disconnects.
 7. **Calibration:** output-window pixels, physical cell-size calibration and board frame width are separate. The only accepted frame relationship so far is its matching aspect ratio; no physical DPI assumptions or implicit artwork scaling.
 
 ## Test/acceptance matrix for T-043
@@ -42,7 +50,7 @@ The map/floor/layer names and IDs are replaced, as are tags, measurement labels 
 | Secret tokens or labels move | Unauthorized state never emitted or reintroduced from a stale capture |
 | Permission toggles while rendering or frozen | In-flight old images rejected and caches cleared before another public frame |
 | GM-only linked maps and reference previews | No private links, map titles, previews, or reference images in output inputs |
-| Native second display vs Web fallback | Same filtered content, with explicit platform/brightness/scaling limitations |
+| Native separate display vs archived Web proof | Windows/Linux native source filtering and physical-display/privacy tests remain pending; archived Web proof provides no current release acceptance |
 
 ## Decisions needed from the owner before production wiring
 

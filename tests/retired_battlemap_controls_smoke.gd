@@ -74,13 +74,14 @@ func _run() -> void:
 
 	editor.linked_maps.open()
 	var dialog: AtlasLinkDialog = editor.link_dialog
-	_check(dialog.target_picker.item_count == maps_before and dialog.mode_picker.disabled
-		and dialog.mode_picker.selected == AtlasLinkDialog.LinkMode.MARKER,
-		"new links can only target existing maps using marker mode")
+	_check(dialog.target_picker.item_count == maps_before
+		and dialog.get_node_or_null("Scroll/Form/ModePicker") == null,
+		"new links target existing independent maps with no footprint mode")
 	_check(dialog.get_node_or_null("Scroll/Form/NewDocument") == null,
 		"linked-map dialog cannot create another document")
-	dialog.mode_picker.select(AtlasLinkDialog.LinkMode.SPATIAL)
-	_check(dialog.draft().is_empty(), "forcing disabled spatial mode still produces no new placement")
+	var link_draft: Array[Resource] = dialog.draft()
+	_check(link_draft.size() == 3 and link_draft[1] == null and link_draft[2] == null,
+		"marker-only form cannot draft spatial placements")
 	dialog.hide()
 	var snapshot: Dictionary = editor.campaign.to_dict()
 	var link: AtlasMapLink = AtlasMapLink.new()

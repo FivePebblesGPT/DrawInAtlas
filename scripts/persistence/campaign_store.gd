@@ -15,6 +15,13 @@ static func save_portable(campaign: AtlasCampaign, registry: AtlasDrawingRegistr
 		ProjectSettings.globalize_path(path), io)
 
 
+## Clone a published portable campaign into a new project folder. Dirty
+## editor state must be saved or discarded first; no live draft is captured.
+static func copy_portable(source_path: String, destination_path: String) -> DrawingResult:
+	return AtlasCampaignCopy.copy_portable(ProjectSettings.globalize_path(source_path),
+		ProjectSettings.globalize_path(destination_path))
+
+
 static func load_portable_result(path: String = DEFAULT_PATH,
 		io: AtlasStoreIO = null) -> AtlasStoreResult:
 	return AtlasCampaignBundle.load(ProjectSettings.globalize_path(path), io)

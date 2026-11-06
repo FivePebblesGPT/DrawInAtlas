@@ -1,139 +1,68 @@
 # Product Design Specification
 
-> [!important] Earlier proposal — current decisions take precedence
-> The manual review and subsequent decisions supersede conflicting assumptions here. Hexes share a continuous chunked board; automatic zoom presents separately authored artwork LOD with an explicit editing target. Battlemats are retired, and a projector framing object controls the player view. Paint.net is the primary interaction reference. See [[E-002]], [[E-006]], [[E-007]], [[E-TOOLS]], [[ManualReview_2026-10-30]] and [[Index]].
-
-**Status:** proposed design, October 2026. Nothing here implies that the feature is already implemented.
+> [!important] Active product contract and evidence (2026-11-02)
+> The owner-approved decisions are [[DECISIONS_DRAWING_ATLAS_2026-11-01]] and the approved feature inventory is [[DRAWING_FEATURE_INVENTORY]]. This page describes the current **two-application** target and verified implementation. The compact BarDivider workspace now has a tested T-063 engineering prototype, but the original UI layout proposal ([[DRAW_MODULE_UI_SPEC]]) still lacks hands-on owner approval. T-056/T-059 retain final UX signoff; T-009 retains Search/Find naming and scope approval.
 
 ## 1. Purpose and audience
 
-DrawInAtlas is a map-centric creative editor and tabletop presentation application built with Godot. It is optimized for West Marches campaigns, where a GM needs to maintain a large, explorable hexcrawl while also drawing settlements, dungeons, building floors, and one-off encounter maps. The central product metaphor is **a whiteboard of connected, independently editable maps**.
+DrawInAtlas serves a GM authoring a continuous map/world for local tabletop play, alongside an independently usable **Drawing** editor for raster art, text and reusable objects. A West Marches campaign may contain multiple independently navigable maps, but detail within one map is *not* a tree of per-hex child documents. Local Windows/Linux desktops are the active release target. Web is archived under T-044; network multiplayer and projector privacy gates are not complete.
 
-Primary user: a GM preparing and running a local table with a projector. Secondary users: remote players, assistants/co-GMs, and collaborative worldbuilders. The initial release should not try to replace a full rules-engine VTT.
+The product separates **Atlas** (campaigns, map graph, floors, authored-detail selection, grids, entrances, linked objects, global history, player presentation) from the **generic Drawing package** (drawing documents, layer/group tree, brush and selection transactions, text, snapping, rendering, standalone file I/O and local history). Both applications use the same source package `addons/drawing/`; the standalone project's build stages that package without Atlas code. See [architecture](ARCHITECTURE.md).
 
-## 2. Non-negotiable interaction rules
+## 2. Current and approved interaction rules
 
-1. **Exactly one active editable `MapDocument` per editor workspace.** Parent/child art shown concurrently is read-only.
-2. **Map scale is not the same as floor elevation.** A tower's floors are contained in a map, not represented by repeatedly zooming geographically.
-3. **Links need not imply physical correspondence.** A city symbol inside one six-mile hex may link to a freeform city map of unrelated dimensions. Geographically aligned links are optional.
-4. **Any map can host battlemap placements.** The user draws and rotates a footprint to instantiate a child battlemap with its own workspace, layers, grid, and objects.
-5. **Automatic semantic zoom is opt-in and off by default.** When enabled it uses a three-wheel-step buffer at both maximum (enter child) and minimum (return) zoom boundaries. The wheel input that first reaches a boundary does not count. Ordinary drawing-board zoom never changes maps by default.
-6. **Child maps are discoverable without visiting them.** Provide markers, thumbnails, spatial previews where meaningful, and a searchable overview of child maps.
-7. **Tile editing is unrestricted by default.** An optional selected-cell lock clips edits to one hex/square, while allowing camera navigation and selection outside it.
-8. **The projector never exposes GM-only layers or unrevealed previews.** Player presentation and editor state are different views.
+1. **Map → Floor → Detail → Layers.** Atlas owns map IDs and floor IDs; the `(map_id, floor_id, D-level)` registry resolves exactly one **internal** `DrawingDocument` per detail. These are not user-facing files/tabs. Standalone Drawing owns independent ordinary document tabs. A floor is an Atlas metadata grouping, not a Drawing-specific type. ([T-051](Tickets/T-051.md), [T-061](Tickets/T-061.md))
+2. **Continuous signed space and explicit densities.** All D0–D32 of one map align in the same world coordinates. Each detail may use a different rational pixel density. A hex selects or constrains content; it never owns a separate drawing document. ([world mapping](DRAWING_WORLD_MAPPING.md))
+3. **Blank missing detail.** Switching to an unpainted D-level shows no D0 art as an underlay. Grid, entrance and navigation overlays remain functional. Derived preview LOD is a different mechanism from authored D-level selection.
+4. **Paint first; navigate deliberately.** Painting over an entrance paints; qualified double-click in Selection/Object Selection or Pan may navigate. Atlas owns the same-entrance arbitration, not Drawing's brush. ([composition](DRAWING_ATLAS_COMPOSITION.md))
+5. **Object reuse is source/instance based.** Create a Drawing-powered Object Asset; place distinct Atlas instances with IDs and transforms. Editing a draft does not publish. Save updates linked instances, Save As from instance A creates new asset B and rebinds A alone; undo rebinds A without deleting B. Nested assets/Asset Browser remain T-064/T-065 work. ([asset guide](../scripts/objects/README.md))
+6. **History belongs to the host.** Standalone Drawing has local undo/redo; Atlas has one global chronological undo across maps/details and restores the originating editing context. Navigation alone does not add history entries; zoom remains unchanged during undo. Selection-only history is optional and OFF by default. ([T-054](Tickets/T-054.md))
+7. **One text element per text layer.** Selection of Text does not create a layer; successful text commit does. Rasterization is explicit and undoable; portable licensed font bytes are saved. ([T-058](Tickets/T-058.md))
+8. **Publishing and privacy remain gated.** Player/projector views must be authorized at the data boundary, but T-039/T-043 have not received required approval. No test fixture or feature-inventory approval grants publication permission.
 
-## 3. Key workflows
+## 3. Supported end-to-end user flows versus remaining scope
 
-### 3.1 Draw a hexcrawl, then add detail
+### 3.1 Author a world and detail (implemented minimum path)
 
-1. Open or create a campaign; create a world map with six-mile hexes.
-2. Paint terrain into hex cells; optionally paint roads/rivers across neighbors.
-3. Place a settlement marker inside a hex and link it to a new city document.
-4. Enter the city by clicking its marker or by deliberately zooming through the semantic boundary.
-5. Draw the city with independent layers, assets, and a square or gridless reference grid.
-6. Return to the original world camera position via Back or zooming out through the buffered boundary.
+1. Create/open an Atlas campaign and select a map, Atlas floor and D-level; select the canonical raster editing target.
+2. Paint or erase in the active DrawingDocument. Edit transactions pin the starting map/floor/detail even if the view changes mid-gesture; the same gesture is one Atlas history command.
+3. Switch from authored D0 to an empty D1: D1 artwork is transparent; the grid and entrances remain visible. Switch back to D0 to see D0 art.
+4. Save the **entire portable project directory**, not just a `Campaign.scn` path. `Campaign.atlas.json` points to immutable `Drawings/` generations, linked `Objects/` versions and licensed `Fonts/`. Reopen and verify exact pixels, stable IDs, and a blank untouched D-level. ([T-066](Tickets/T-066.md))
 
-### 3.2 Create a battlemap anywhere
+### 3.2 Edit reusable art (implemented lifecycle, future browser)
 
-1. In the active parent map select **Create Battlemap Grid**.
-2. Drag a rectangular footprint; rotate freely with a handle or shortcut, optionally snap angle.
-3. Choose columns/rows, grid cell size, and whether the footprint is **spatially aligned** or **symbolic**.
-4. Choose persistent battlemap or temporary encounter (later milestone).
-5. Enter the new **independent** battlemap document. Only its content is editable.
-6. By default, show the parent artwork as a translucent **read-only reference underlay**; permit hiding it and changing opacity.
-7. Paint encounter detail and place objects/tokens without changing the parent map.
-8. Return to the parent view; moving/rotating the footprint on the parent need not destructively resample the child art.
+1. Open a dedicated Object Editor for an object source/instance; paint, edit text or modify layers in a private Drawing draft.
+2. **Save** publishes the source version to all its linked instances. **Save As** from instance A publishes B and rebinds only A; undo/redo changes the binding without removing B.
+3. Nested reusable assets, cycle-safe dependencies and the complete Asset Browser dock are **not yet delivered** (T-064/T-065). The T-063 compact workspace prototype is implemented; its owner UX acceptance remains T-059.
 
-### 3.3 Find an old encounter map
+### 3.3 Independent Drawing (implemented minimum witness)
 
-1. On the current region or world map enable child-map markers or thumbnails.
-2. Inspect adjacent hexes without entering each one.
-3. Open a **Map Overview** listing descendants attached to the visible area, selected cell, or entire map.
-4. Filter by name, tags, kind, or path; hover/expand for preview.
-5. Click a result to focus its anchor or enter its document. Ambiguous overlapping links are selectable, never chosen silently.
+Start the standalone Drawing Godot project without the Atlas root. Create group/layers; brush and erase; select/move pixels; undo/redo; save and reopen a portable `.drawing` file. Text can be edited and rasterized explicitly. Its minimum end-to-end witness is **not** equivalent to completion of all 47 Essential inventory items or the owner's final UX approval.
 
-### 3.4 Constrain edits while painting a single tile
+### 3.4 Navigation, projected play and discovery (mixed)
 
-1. Select a hex or square using the selection tool.
-2. Toggle **Lock edits to selected cell**. If no cell is selected, the locked state blocks edits rather than silently choosing one.
-3. Brush strokes, fills, cuts, pastes, object placements, and spatial battlemap footprints obey the selected-cell boundary.
-4. Toggle the lock off to continue painting roads or rivers across neighbors (default behavior).
-5. Camera movement, preview inspection, and choosing a different selected cell always remain available.
+Atlas map links are independent navigation targets and can have multiple incoming entrances. The historic rotated child-battlemap footprint is compatibility geometry, **not** the preferred new art-reuse workflow. An authored higher-detail level lives on the same map/world reference, and a linked city/dungeon is a separately navigable map with its own coordinates. Existing navigation and previews have test coverage, but Search/Find product purpose is pending T-009; projector privacy and publishing are pending T-039/T-043. The Web client is not an active deliverable.
 
-### 3.5 Run a projected encounter
+## 4. Product scope and acceptance boundaries
 
-1. GM uses a full editor/control view; projector runs a separate fullscreen player view.
-2. Player view contains only allowed map layers, revealed fog, tokens, and approved labels.
-3. GM controls player camera/map independently (with optional follow-GM behavior).
-4. Calibrate the projected grid to physical miniature size.
-5. Later: join remote clients, sync approved operations, and enforce the same visibility model at the network boundary.
-
-## 4. Feature catalogue and release priority
-
-| Area | Main features | Target |
+| Area | Proven implementation | Still pending / requires other ticket |
 | --- | --- | --- |
-| Campaign management | Documents, links, names/tags, searchable index, assets | MVP |
-| Canvas | Pan, geometric zoom, cursor-centric zoom, grid overlays, fit view | MVP |
-| Tile editing | Brush, eraser, bucket, line, tile palettes, selection | MVP |
-| Raster/object editing | Raster brush, layer selection, cut/copy/paste, props | MVP/next |
-| Layers | Ordered stacks, visibility, lock, opacity, rename | MVP |
-| Grids | Hex pointy/flat, square, gridless, distance units, snapping | MVP |
-| Battlemap creation | Drag/resize/rotate grid; separate document and reference | MVP |
-| Navigation | Manual links, history, three-step buffered semantic zoom | MVP |
-| Discovery | Markers, thumbnails, overview/search; spatial overlays | MVP/next |
-| Vertical floors | Independent floor layers, basement/roof, floor switch | Next |
-| Persistence | Save/load, autosave, undo/redo, chunking | MVP/next |
-| Projector | Dual views, grid calibration, fog and secret visibility | Next |
-| Multiplayer | Hosted sessions, cursors, synced commands, owner/role ACL | Later |
-| Advanced VTT | Initiative, measurement shapes, lights, dynamic LOS, dice | Optional |
+| Canvas and Painting | Canonical shared raster editing, layers/groups, selection/move, text, signed sparse tiles | Full 47-Essential inventory, polish and T-059 owner acceptance |
+| Map/Detail/Navigation | Atlas floor/detail registry, blank D-levels, grids, entrances, bounded previews | UX acceptance T-056, T-017 floor link validation |
+| Reusable art | Object source/instance registry, dedicated editor, Save and Save As | T-064 nested assets; T-065 browser dock |
+| Storage | T-066 versioned root pointers, immutable sparse blobs and recovery | Future physical packs, 512 default adoption, arbitrary-power-loss verification |
+| Performance | T-067 tile benchmark, T-068 optimized tile-run renderer | T-068 native library and GDExtension comparison; T-057 GPU research |
+| Player, Search, Collaboration | Separate engineering proofs and current navigation functionality | T-009/T-039/T-043/T-048 review gates and production integration |
 
-The MVP should prioritize the architectural vertical slice over large brush libraries or an advanced VTT rules system.
+**Historical proposal (superseded):** the October 2026 concept used Create Battlemap Grid, nested child battlemap footprints, a default parent-art underlay, palette-painted terrain hexes and linked whole-map drawings as the main art reuse mechanism. Those are **not** the active accepted authoring contract. New authoring uses shared-world D-levels and linked Object Assets. The old placement audit remains only a read-only/historical diagnostic; see [legacy placement](LEGACY_PLACEMENT_MIGRATION.md). The desired user-facing compact UI is still a proposal, not automatically accepted.
 
-## 5. UI and interaction model
+## 5. Practical acceptance examples
 
-Suggested desktop layout:
-- Left: campaign/map graph and location search.
-- Center: active canvas; cursor hints and three-step boundary progress appear non-modally.
-- Right: context panel (layers, floor, selected cell, Map Overview, object properties).
-- Top: selection, painting, grid-placement, and reference/preview tools.
-- Bottom: active map, grid/distance, layer, edit-scope, preview mode, zoom, and save state.
+- A stroke crossing a hex boundary reaches both cells when the selected-cell edit mask is off; when on, it clips without creating per-hex documents.
+- Switching to an unpainted higher D-level exposes blank pixels but preserves entrance navigation overlays.
+- Two Atlas maps place the same published Object Asset; a private edit changes neither until Save, then both resolve the new version. Save As from one placement produces independent B and undo retains B.
+- Undo an edit originally made on another map: show the originating map/detail without changing zoom, and pan only if affected content was not already partly visible.
+- Move a saved project directory: manifests, signed raster addresses, Object Asset links and font license survive. A missing referenced file generates a diagnostic rather than a fabricated blank image.
+- Publish GM-only content to player/projector **only after** independent policy/security acceptance under T-039/T-043, not on the strength of editor tests.
 
-### Preview modes on a parent map
-
-- **Off:** no child indication.
-- **Markers:** child existence/type/count; best for broad hexcrawls.
-- **Thumbnails:** cached read-only images anchored near relevant locations.
-- **Overlay:** spatially aligned child previews transformed over the parent's canvas; symbolic links fall back to pinned thumbnails.
-
-For multiple linked documents at one anchor, display a collapsible stack. Show map name and breadcrumbs on hover. The overview panel can search recursively with bounded depth; render no unauthorized GM previews for player clients.
-
-### Reference modes inside a child map
-
-- Parent reference appears behind editable child content.
-- Default semitransparent; independently set visibility and opacity.
-- Crop, origin, and rotation are retained as reference settings.
-- For spatial placements, crop/transform derive from footprint geometry.
-- For symbolic placements, choose a reference region manually; no false claim of real-world alignment.
-- References do not participate in selection, bucket fill, clipboard, or ordinary exports unless intentionally flattened by the user.
-
-## 6. Explicit non-goals for the first release
-
-- Full D&D character sheet, combat system, automation and initiative tracker.
-- Physically accurate cross-scale projection for every link.
-- Automatic continuous blending of all hand-drawn art at every scale.
-- Real-time multi-writer CRDT editing in the first implementation.
-- Dynamic light/vision simulation in the MVP.
-- Seamless editing of multiple map levels at once.
-
-## 7. UX acceptance criteria
-
-- A world hex links to a city with its own grid and arbitrary canvas size.
-- A city contains two overlapping, differently rotated battlemap footprints; choosing one is deterministic.
-- The battlemap has an independent editable workspace with adjustable read-only parent underlay.
-- A three-step inward wheel buffer never switches maps before its third **additional** step; outward uses the same rule.
-- The viewer returns to its previous map and camera via history.
-- The map overview finds encounters under multiple adjacent hexes without entering any of them.
-- With cell lock OFF, a road stroke crosses a hex border; with lock ON it is clipped to the selected hex.
-- The GM's secret content is absent from unauthorized projector/network previews.
-
-See [Architecture](ARCHITECTURE.md), [Maps and grids](MAPS_AND_GRIDS.md), and [Semantic zoom](SEMANTIC_ZOOM.md) for implementable contracts.
+See [architecture](ARCHITECTURE.md), [data model](DATA_MODEL.md), [Drawing inventory](DRAWING_FEATURE_INVENTORY.md), and [verification plan](DRAWING_TEST_PLAN.md).

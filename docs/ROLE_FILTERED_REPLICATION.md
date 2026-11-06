@@ -1,9 +1,15 @@
 # T-046 — Host roles and filtered replication proof
 
+## Current ownership and authorization boundary (T-075, 2026-11-02)
+
+`AtlasHostSession` / `AtlasSessionClient` implement **in-process, trusted-controller simulation only**. The filtered viewer `png_base64` payload is produced by `AtlasPlayerProjection` from **legacy `AtlasLayer` raster data**: the host is not connected to the production editor's `DrawingDocument` / `AtlasDrawingRegistry` authored details, linked `AtlasObjectLibrary` instances, Object Editor private drafts, or T-066 generation files ([composition](DRAWING_ATLAS_COMPOSITION.md), [objects](OBJECT_ASSETS_WORKFLOW.md), [storage](DRAWING_STORAGE_CONTRACT.md)). The tests do **not** establish that the *current* Drawing/Atlas scene is safe to replicate. A future publisher must explicitly authorize and sanitize reachable assets, editable text/fonts and per-floor/detail content before any DTO or image is sent, failing closed on unhandled types or stale grants.
+
+Role assignments and grants are mutable through a **trusted local controller**, not independently authenticated. There is no socket/TLS layer, real remote player, permission subscription from the editor, production cache lifecycle or transport packet size enforcement. Player/spectator cannot edit *in this harness*, but a raw host reference must never be exposed to an untrusted recipient. [T-039](Tickets/T-039.md) remains an owner-only policy gate, [T-043](Tickets/T-043.md) a blocked independent native privacy gate, and [T-048](Tickets/T-048.md) a blocked collaboration acceptance gate. Windows/Linux desktop is the target; [T-044](Archive/Web/T-044.md) is Archived. The following payload limits apply to the **test serializer** and are not guarantees for an unimplemented network.
+
 **Status:** isolated, trusted in-process engineering checkpoint; **not** an approved
 player publication policy, authenticated multiplayer channel, or production UI.
 This extends [AUTHORITATIVE_SESSIONS](AUTHORITATIVE_SESSIONS.md) without changing
-any native `.scn` persistence fields.
+the legacy native `campaign.scn` component inside T-066 generation saving.
 
 ## Trust boundary and roles
 

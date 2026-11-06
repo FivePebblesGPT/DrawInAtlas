@@ -80,8 +80,8 @@ func _run() -> void:
 	placement.parent_units_per_cell = 32.0
 	placement.child_units_per_cell = 64.0
 	var corners: PackedVector2Array = placement.corners()
-	var points: PackedVector2Array = AtlasMapReferences._rect_points(placement.child_bounds())
-	var uv: PackedVector2Array = AtlasMapReferences._uvs(points, placement.child_bounds())
+	var points: PackedVector2Array = _rect_points(placement.child_bounds())
+	var uv: PackedVector2Array = _uvs(points, placement.child_bounds())
 	for i: int in range(4):
 		_check((placement.child_to_parent() * points[i]).distance_to(corners[i]) < 0.0001,
 			"rotated placement maps child artwork corner %d to board" % i)
@@ -90,3 +90,17 @@ func _run() -> void:
 	canvas.free()
 	print("ATLAS_ALIGNED_DETAIL_PREVIEWS_PASSED checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)
+
+
+## Pure archival placement math is still tested here, but no editor preview
+## component depends on this geometry or uses it for live canvas overlays.
+func _rect_points(rect: Rect2) -> PackedVector2Array:
+	return PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y),
+		rect.end, Vector2(rect.position.x, rect.end.y)])
+
+
+func _uvs(points: PackedVector2Array, rect: Rect2) -> PackedVector2Array:
+	var result: PackedVector2Array = PackedVector2Array()
+	for point: Vector2 in points:
+		result.append((point - rect.position) / rect.size)
+	return result
