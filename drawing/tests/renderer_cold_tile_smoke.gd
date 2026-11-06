@@ -128,6 +128,49 @@ func run() -> void:
 		check(doc.redo().ok and DrawingRenderer.render(doc, view).value.get_data() == draft.value.get_data(),
 			"redo restores committed preview bytes")
 
+	# Four densely occupied layers on signed storage seams exercise the
+	# compositor's direct sparse map reads without bypassing the public oracle.
+	# Transparent pixels with nonzero RGB must remain canonical source bytes,
+	# even when the frame compositor correctly omits their alpha-zero color.
+	var dense: CountingDocument = CountingDocument.new("t086-dense", 8)
+	var dense_layers: Array[String] = []
+	for layer_number: int in range(4):
+		var dense_layer: String = String(dense.create_layer(DrawingLayerNode.RASTER,
+			"Dense-%d" % layer_number).value)
+		dense_layers.append(dense_layer)
+		seed_layer(dense, dense_layer, Rect2i(-12 + layer_number,
+			-9 + layer_number, 32, 27), 2 + layer_number * 11)
+	var dense_view: Rect2i = Rect2i(-10, -10, 26, 24)
+	var resident: DrawingRasterTile = dense._resolve_chunk(dense_layers[1], "0,0").value as DrawingRasterTile
+	var original_bytes: PackedByteArray = resident.to_rgba8()
+	var dense_revision: int = dense.revision
+	var dense_frame: DrawingResult = DrawingRenderer.render(dense, dense_view)
+	check(dense_frame.ok and (dense_frame.value as Image).get_data() == reference(dense, dense_view),
+		"four dense layers preserve all source-over bytes across signed seams")
+	check(dense.revision == dense_revision and resident.to_rgba8() == original_bytes,
+		"direct indexed reads do not mutate source pixels or revision")
+	var dense_started: DrawingResult = dense.begin_edit(dense_layers[1], dense.revision)
+	check(dense_started.ok, "start lower dense-layer detached preview")
+	if dense_started.ok:
+		var dense_preview: DrawingEditSession = dense_started.value as DrawingEditSession
+		check(dense_preview.apply_region(Rect2i(0, 0, 2, 2), PackedByteArray([
+			99, 22, 88, 0, 42, 12, 190, 255,
+			4, 55, 71, 127, 100, 35, 96, 254])).ok,
+			"stage hidden-RGB, opaque and fractional-alpha preview pixels")
+		var dense_draft: DrawingResult = DrawingRenderer.render(dense,
+			dense_view, 0, 0, 1048576, dense_preview)
+		check(dense_draft.ok and (dense_draft.value as Image).get_data()
+			== reference(dense, dense_view, 0, 0, dense_preview),
+			"four-layer preview overrides source map without leaking to other layers")
+		check(dense.revision == dense_revision and resident.to_rgba8() == original_bytes,
+			"detached preview preserves immutable committed source map")
+		dense_preview.cancel()
+		check(dense.revision == dense_revision and resident.to_rgba8() == original_bytes,
+			"cancel keeps canonical dense source and revision unchanged")
+		check(DrawingRenderer.render(dense, dense_view).value.get_data()
+			== dense_frame.value.get_data(),
+			"cancel restores multi-layer framebuffer without history or pixels")
+
 	var far: CountingDocument = CountingDocument.new("t086-anchor", 4)
 	var layer: String = String(far.create_layer(DrawingLayerNode.RASTER, "Far").value)
 	var large: int = 5000000000

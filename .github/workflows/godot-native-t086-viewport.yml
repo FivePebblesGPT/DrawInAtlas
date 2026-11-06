@@ -45,6 +45,10 @@ jobs:
             --godot godot 2>&1 | tee /tmp/t086-cold-comparison.log
           grep -q 'T086_COLD_COMPARISON_PASSED' /tmp/t086-cold-comparison.log
           if grep -E 'SCRIPT ERROR:|Traceback|T086_COLD_BENCH_FAILED:' /tmp/t086-cold-comparison.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 330s python3 tools/benchmarks/t086_compare_cold_composite.py \
+            --godot godot --baseline pre-indexed-read 2>&1 | tee /tmp/t086-direct-sparse-comparison.log
+          grep -q 'T086_COLD_COMPARISON_PASSED' /tmp/t086-direct-sparse-comparison.log
+          if grep -E 'SCRIPT ERROR:|Traceback|T086_COLD_BENCH_FAILED:' /tmp/t086-direct-sparse-comparison.log; then exit 1; fi
       - name: Upload native software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,4 +58,5 @@ jobs:
             /tmp/t086-native.log
             /tmp/t086-comparison.log
             /tmp/t086-cold-comparison.log
+            /tmp/t086-direct-sparse-comparison.log
           if-no-files-found: warn

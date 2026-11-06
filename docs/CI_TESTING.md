@@ -9,7 +9,7 @@
 ## T-086 cold compositor regression and opt-in measurement — 2026-11-06
 
 The existing `ci_t086_viewport_cache_model` fail-late step also runs
-`drawing/tests/renderer_cold_tile_smoke.gd` (25 exact model assertions),
+`drawing/tests/renderer_cold_tile_smoke.gd` (45 exact model assertions),
 so the **46 required check IDs do not change**. Its success marker is
 validated with `tools/check_godot_model_log.py`, which rejects script or
 runtime defects and reports only the known post-success Godot exit leaks.
@@ -23,6 +23,21 @@ framebuffer witness and the older pre-cache full-frame benchmark. It builds
 isolated standalone projects and verifies the archived baseline's hash; it
 never asserts physical display latency, GPU memory bounds or hardware owner
 acceptance. T-086's remaining cold zoom/large dense hardware gates stay open.
+
+The follow-up direct sparse-map read optimization also has a separately
+SHA-256-pinned immediate-predecessor fixture. Compare this narrower CPU change
+without conflating it with the earlier storage-row cache and opaque fast path:
+
+```sh
+python3 tools/benchmarks/t086_compare_cold_composite.py --godot godot \
+  --baseline pre-indexed-read
+```
+
+The fast T-086 step now checks both fixture digests and fails before launching
+Godot if either pinned source is corrupted. The manual-only T-086 workflow
+runs both CPU comparisons and retains separate before/after logs. The new
+four-dense-layer model tests confirm exact source-over/preview parity, but CPU
+medians do not imply full cold-zoom frame speed or GPU scan-out performance.
 
 ## T-094 strict-native and owner evidence checkpoint — 2026-11-06
 

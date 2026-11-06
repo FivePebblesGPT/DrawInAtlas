@@ -110,9 +110,20 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 					if preview != null:
 						preview_patches[key] = patch
 			if tile != null or not patch.is_empty():
+				# Both the detached source tile and preview patch are immutable for
+				# this synchronous render. Read the canonical sparse RGBA map by
+				# linear tile index: the public coordinate-checked getter otherwise
+				# adds a GDScript call and two assertions for *every* dense pixel.
+				# Never alter the owned map or let preview pixels escape into it.
+				var source_pixels: Dictionary[int, int] = {}
+				if tile != null:
+					source_pixels = tile._pixels
+				var has_preview_patch: bool = not patch.is_empty()
 				for offset: int in range(run_length):
 					var pixel_index: int = local_y * stride + local_x + offset
-					var source: int = int(patch[pixel_index]) if patch.has(pixel_index) else (tile.get_rgba(local_x + offset, local_y) if tile != null else 0)
+					var source: int = int(source_pixels.get(pixel_index, 0))
+					if has_preview_patch and patch.has(pixel_index):
+						source = int(patch[pixel_index])
 					if (source & 0xff000000) == 0:
 						continue
 					var index: int = (y * size.x + x + offset) * 4

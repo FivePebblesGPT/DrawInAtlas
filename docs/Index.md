@@ -117,6 +117,17 @@ improves, and an all-transparent case is essentially unchanged. This is
 latency acceptance is complete; T-086 remains In Progress.
 [Ticket/measurement](Tickets/T-086.md).
 
+**T-086 direct indexed source-pixel CPU improvement (2026-11-06; In Progress):**
+The canonical raster compositor now reads resolved sparse tile maps by linear
+indices without per-pixel checked GDScript accessors; detached preview patches
+remain separate and alpha/layer semantics unchanged. A new four-dense-layer
+signed-seam oracle raises the T-086 cold model to **45/45** checks; the existing
+68/68 native framebuffer witness passes after a clean standalone import.
+Against the SHA-256-pinned immediate predecessor, two nine-sample headless
+paired runs show opaque CPU medians 54.94→25.86ms and 57.19→26.89ms, with
+exact output hashes. This does **not** close cold GPU zoom, dense reference
+hardware or physical input-latency gates. [T-086](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.
