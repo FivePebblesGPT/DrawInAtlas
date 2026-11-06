@@ -80,3 +80,5 @@ __pycache__/
 
 # Godot-generated font import metadata; the source fonts and licenses are tracked.
 /addons/drawing/fonts/*.ttf.import
+
+.opencode/
