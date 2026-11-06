@@ -4,9 +4,14 @@ extends RefCounted
 
 
 static func render(document: DrawingDocument, view: Rect2i,
-		origin_x: int = 0, origin_y: int = 0, max_pixels: int = 1048576) -> DrawingResult:
+		origin_x: int = 0, origin_y: int = 0, max_pixels: int = 1048576,
+		preview: DrawingEditSession = null) -> DrawingResult:
 	if document == null or view.size.x <= 0 or view.size.y <= 0 or view.size.x > max_pixels or view.size.y > max_pixels / view.size.x:
 		return DrawingResult.failure("RENDER_LIMIT", "Viewport must be bounded")
+	# Never mix a stale or unrelated edit with committed document pixels.
+	if preview != null and (preview.document != document or
+			preview.expected_revision != document.revision):
+		return DrawingResult.failure("PREVIEW_REVISION", "Preview source revision is stale")
 	var leaf_layers: Array[String] = []
 	_collect_visible(document, DrawingDocument.ROOT_ID, leaf_layers)
 	var bytes: PackedByteArray = PackedByteArray()
@@ -33,8 +38,9 @@ static func render(document: DrawingDocument, view: Rect2i,
 			continue
 		# Resolve at most one source tile per scanline run, not once per pixel.
 		# The region is still bounded; source tiles stay immutable throughout render.
+		var active_preview: DrawingEditSession = preview if preview != null and preview.layer_id == layer_id else null
 		var raster: DrawingResult = _composite_raster(document, layer_id,
-			world_x, world_y, view.size, bytes)
+			world_x, world_y, view.size, bytes, active_preview)
 		if not raster.ok:
 			return raster
 	var rendered: DrawingResult = DrawingResult.success(Image.create_from_data(view.size.x, view.size.y,
@@ -60,7 +66,8 @@ static func _collect_visible(document: DrawingDocument, parent_id: String,
 ## Tile-run compositor: avoids allocating DrawingResult and parsing signed keys
 ## for every visible pixel. Do not convert 64-bit anchors through Vector2i.
 static func _composite_raster(document: DrawingDocument, layer_id: String,
-		world_x: int, world_y: int, size: Vector2i, bytes: PackedByteArray) -> DrawingResult:
+		world_x: int, world_y: int, size: Vector2i, bytes: PackedByteArray,
+		preview: DrawingEditSession = null) -> DrawingResult:
 	var stride: int = document.tile_stride
 	for y: int in range(size.y):
 		var local_y: int = posmod(world_y + y, stride)
@@ -74,9 +81,11 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 			if not fetched.ok:
 				return fetched
 			var tile: DrawingRasterTile = fetched.value as DrawingRasterTile
-			if tile != null:
+			var patch: Dictionary = preview.preview_tile(key) if preview != null else {}
+			if tile != null or not patch.is_empty():
 				for offset: int in range(run_length):
-					var source: int = tile.get_rgba(local_x + offset, local_y)
+					var pixel_index: int = local_y * stride + local_x + offset
+					var source: int = int(patch[pixel_index]) if patch.has(pixel_index) else (tile.get_rgba(local_x + offset, local_y) if tile != null else 0)
 					if (source & 0xff000000) == 0:
 						continue
 					var index: int = (y * size.x + x + offset) * 4

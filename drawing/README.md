@@ -102,6 +102,29 @@ xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
 T-060 notes: `.drawing` semantic objects now preserve non-Object Godot Variant
 values with a checksummed payload; older JSON records remain readable.
 
+## Live paint-preview verification (T-085)
+
+Brush and Eraser show a detached, layer-correct draft while the left button
+is still pressed, including the stationary first dab. Raw canvas-source
+samples are queued and timestamped, then staged in bounded frames. A long
+release may finish its queue over subsequent frames before the single normal
+commit; **Esc cancels**, changing tool/layer/document/zoom cancels, and
+releasing outside the canvas finishes the captured path. No uncommitted bytes
+are written to `.drawing`. Brush footprint is outlined at the pointer.
+
+```sh
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/live_stroke_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/live_stroke_native.gd
+```
+
+The Xvfb framebuffer test samples pixels **while mouse-down remains active**
+at 100%, 50% and 25% zoom. It is software rendering only and does not replace
+physical Windows/Linux usability validation or T-086's dirty-tile viewport
+cache. See [T-085 evidence](../docs/Tickets/T-085.md).
+
 ## Editable text (T-058)
 
 Choose **Text** then click the canvas to open a text dialog; **Cancel** or an

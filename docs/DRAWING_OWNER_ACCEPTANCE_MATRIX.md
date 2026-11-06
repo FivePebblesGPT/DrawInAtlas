@@ -15,7 +15,7 @@ In the **State** column, `PENDING` means a target ticket still owes a fresh inte
 
 | # | Target ticket | Physical action / setup | Expected result and native witness to add or rerun | Existing evidence limit | State |
 | --- | --- | --- | --- | --- | --- |
-| 01 | T-085, T-086 | On middle layer, hold 4px Brush still, then drag before release; test eraser too | First dab and motion visible **while held** without committing source/history; native framebuffer and timing 100/50/25% | T-053 pointer smoke only publishes on release | PENDING |
+| 01 | T-085, T-086 | On middle layer, hold 4px Brush still, then drag before release; test eraser too | First dab and motion visible **while held** without committing source/history; native framebuffer and timing 100/50/25% | T-085 Xvfb/Mesa held-button frame and layer-aware model pass; physical OS/GPU input-to-photon still untested | PENDING |
 | 02 | T-087 | New transparent 256² frame over neutral workspace; pan to every corner | Distinct image edge and checkerboard, signed sparse pixels still valid; native framebuffer corners | Old solid background is not acceptance | PENDING |
 | 03 | T-090 | Resize physical window 1920×1080→1280×720, 100/150% scale | No letterbox/black side bars, usable tools and canvas; native window screenshots | Existing compact shell tests do not cover scale | PENDING |
 | 04 | T-090 | Hover brush-size field and wheel both directions, then paint | Value changes predictably or clearly routes to document zoom by documented design; native wheel/input readback | SpinBox wheel previously consumed | PENDING |
@@ -29,7 +29,7 @@ In the **State** column, `PENDING` means a target ticket still owes a fresh inte
 | 12 | T-091 | Float dock; grip drag, × close, resize each edge and corner | Minimal grip+tabs+× header, edge/corner resizing, subtle corner hint; native pointer/screenshot | Native dock smoke does not attest new UX | PENDING |
 | 13 | T-088 | Select nonempty mask, click truly blank canvas with Select | Deselects without selecting single pixel; inspect native selection state | Marquee currently creates 1px rectangle | PENDING |
 | 14 | T-088 | Create mask, paint/erase across mask edge on non-top layer | Independent selection channel constrains exact RGBA8 edits; compare framebuffer and layer bytes | Selection-aware edit API not yet wired through UI | PENDING |
-| 15 | T-085, T-086 | Draw fast loops/self-crossing curve at 100/50/25% | All delivered samples/endpoints preserved, continuous visual motion, per-stage p50/p95 recorded | No current hardware latency evidence | PENDING |
+| 15 | T-085, T-086 | Draw fast loops/self-crossing curve at 100/50/25% | All delivered samples/endpoints preserved, continuous visual motion, per-stage p50/p95 recorded | T-085 software 100/50/25% sample and p50/p95 recorded; hardware rapid strokes pending, T-086 viewport cache not delivered | PENDING |
 | 16 | T-087 | Toggle Show Grid and Snap independently while zooming/panning | Grid visibility independent from snap, 8px snap observable and named; native pixel/coordinate check | Old single unclear grid-snap command | PENDING |
 | 17 | T-088 | Select a painted region, choose Move, drag to empty area | Drag preview, exact translation, one Undo and Redo; native pointer + before/after pixels | Existing rectangle Move smoke lacks usable feedback | PENDING |
 | 18 | T-088 | With mask, Delete/Cut/Copy/Paste/Move then Undo/Redo | Correct clipboard pixels/alpha/mask constraint and edit history; native model + GUI witness | Complete selection workflow missing | PENDING |

@@ -23,7 +23,7 @@ class GodotCIFailLateTests(unittest.TestCase):
         self.assertGreaterEqual(len(blocks), 20)
         # Keep push CI bounded while permitting new focused, fast model
         # witnesses (e.g. the T-065 large-library paging regression).
-        self.assertLessEqual(len(blocks), 40)
+        self.assertLessEqual(len(blocks), 41)
         for name, block in blocks:
             if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
                 continue

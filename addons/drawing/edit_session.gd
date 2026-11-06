@@ -15,6 +15,12 @@ var _covered: Dictionary[String, bool] = {}
 # An edit sees one immutable source revision; avoid re-resolving its tile for
 # each covered pixel. Cache successful absent tiles (null), never failed loads.
 var _source_tiles: Dictionary[String, Variant] = {}
+## Detached preview indexed by storage tile + pixel offset; never stored on the document.
+var _preview_tiles: Dictionary[String, Dictionary] = {}
+## Only touched pixels need rollback. A full triple-dictionary duplicate per motion
+## event grew quadratically over long strokes.
+var _paint_journal: Dictionary[String, Array] = {}
+var _journaling: bool = false
 var _closed: bool = false
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
@@ -34,11 +40,63 @@ func change_count() -> int:
 	return _after.size()
 
 
+## Renderer reads only this session's detached patch; a closed/stale session is blank.
+func preview_tile(tile_key: String) -> Dictionary:
+	if _closed or document.revision != expected_revision:
+		return {}
+	return _preview_tiles.get(tile_key, {})
+
+
+func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) -> void:
+	var tile_patch: Dictionary = _preview_tiles.get(tile_key, {})
+	if _after.has(pixel_key):
+		tile_patch[local_index] = _after[pixel_key]
+		_preview_tiles[tile_key] = tile_patch
+	else:
+		tile_patch.erase(local_index)
+		if tile_patch.is_empty():
+			_preview_tiles.erase(tile_key)
+
+
+## Rare failure path for the other edit APIs which still use full snapshots.
+## Their preview index must never outlive a rolled-back staging dictionary.
+func _rebuild_preview_tiles() -> void:
+	_preview_tiles.clear()
+	for key: String in _after:
+		var parts: PackedStringArray = key.split(",")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		var stride: int = document.tile_stride
+		_sync_preview_pixel(DrawingDocument.TILES.tile_key64(x, y, stride),
+			posmod(y, stride) * stride + posmod(x, stride), key)
+
+
+func _rollback_paint() -> void:
+	for key: String in _paint_journal:
+		var snapshot: Array = _paint_journal[key]
+		if snapshot[0]:
+			_before[key] = snapshot[1]
+		else:
+			_before.erase(key)
+		if snapshot[2]:
+			_after[key] = snapshot[3]
+		else:
+			_after.erase(key)
+		if not snapshot[4]:
+			_covered.erase(key)
+		_sync_preview_pixel(String(snapshot[5]), int(snapshot[6]), key)
+	_paint_journal.clear()
+	_journaling = false
+
+
 func cancel() -> void:
 	_before.clear()
 	_after.clear()
 	_covered.clear()
 	_source_tiles.clear()
+	_preview_tiles.clear()
+	_paint_journal.clear()
+	_journaling = false
 	_closed = true
 
 
@@ -51,6 +109,8 @@ func commit() -> DrawingResult:
 	_after.clear()
 	_covered.clear()
 	_source_tiles.clear()
+	_preview_tiles.clear()
+	_paint_journal.clear()
 	return result
 
 
@@ -85,6 +145,13 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		old = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
 			if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
+	var stride_local: int = document.tile_stride
+	var preview_tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride_local)
+	var local_index: int = posmod(global_y, stride_local) * stride_local + posmod(global_x, stride_local)
+	if _journaling and not _paint_journal.has(key):
+		_paint_journal[key] = [_before.has(key), _before.get(key, 0),
+			_after.has(key), _after.get(key, 0), _covered.has(key),
+			preview_tile_key, local_index]
 	if once:
 		_covered[key] = true
 	if not _before.has(key):
@@ -94,6 +161,7 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		_before.erase(key)
 	else:
 		_after[key] = replacement
+	_sync_preview_pixel(preview_tile_key, local_index, key)
 	return DrawingResult.success()
 
 
@@ -117,6 +185,7 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 			if not result.ok:
 				_before = old_before
 				_after = old_after
+				_rebuild_preview_tiles()
 				return result
 	return DrawingResult.success(_after.size())
 
@@ -133,6 +202,7 @@ func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 			if not result.ok:
 				_before = old_before
 				_after = old_after
+				_rebuild_preview_tiles()
 				return result
 	return DrawingResult.success(_after.size())
 
@@ -152,28 +222,25 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 	if rgba < 0 or rgba > 0xffffffff:
 		return DrawingResult.failure("RGBA", "Invalid straight RGBA8 color")
 	var inverse: Transform2D = view_transform.affine_inverse()
-	var old_before: Dictionary[String, int] = _before.duplicate()
-	var old_after: Dictionary[String, int] = _after.duplicate()
-	var old_covered: Dictionary[String, bool] = _covered.duplicate()
+	_journaling = true
+	_paint_journal.clear()
 	var previous: Vector2 = _last
 	for index: int in range(path.size()):
 		var position: Vector2 = inverse * path[index]
 		if not position.is_finite() or absf(position.x) > 1000000000.0 or absf(position.y) > 1000000000.0:
-			_before = old_before
-			_after = old_after
-			_covered = old_covered
+			_rollback_paint()
 			return DrawingResult.failure("COORD_RANGE", "Brush point is outside the view-relative range")
 		var start: Vector2 = previous if index > 0 or _has_last else position
 		var touched: DrawingResult = _paint_segment(start, position, width * 0.5, rgba,
 			erase, selection, max_candidates)
 		if not touched.ok:
-			_before = old_before
-			_after = old_after
-			_covered = old_covered
+			_rollback_paint()
 			return touched
 		previous = position
 	_has_last = true
 	_last = previous
+	_paint_journal.clear()
+	_journaling = false
 	return DrawingResult.success(_after.size())
 
 
@@ -291,6 +358,7 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 			if not result.ok:
 				_before = old_before
 				_after = old_after
+				_rebuild_preview_tiles()
 				return result
 	return DrawingResult.success(_after.size())
 
@@ -341,6 +409,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		if head >= limit:
 			_before = old_before
 			_after = old_after
+			_rebuild_preview_tiles()
 			return DrawingResult.failure("FILL_LIMIT", "Fill was cancelled at the pixel budget")
 		var point: Vector2i = frontier[head]
 		head += 1
@@ -350,6 +419,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		if not current.ok:
 			_before = old_before
 			_after = old_after
+			_rebuild_preview_tiles()
 			return current
 		if int(current.value) == 0 or current.value != original.value:
 			continue
@@ -358,6 +428,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		if not staged.ok:
 			_before = old_before
 			_after = old_after
+			_rebuild_preview_tiles()
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset

@@ -20,7 +20,18 @@ Atlas composition, and Xvfb/Mesa software pointer checks pass. Remote CI
 against this patch, owner hardware UX and pending corrective ticket findings
 are **not yet passed**; T-094 stays In Progress. [Checkpoint](Tickets/T-094.md).
 
-**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085/T-086 remain Ready for GDScript-first fixes; T-068 native research remains conditional.
+**T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
+An immediate stationary dab and layer-correct detached Brush/Eraser preview
+now render **before release**. Ordered, timestamped source-float mouse samples
+are drained in bounded chunks; brush sessions use touched-pixel rollback rather
+than copying three growing dictionaries every event. The new 40/40 headless
+model witness and 55/55 Xvfb/Mesa native held-button framebuffer witness pass,
+including 100/50/25% zoom, cancellation, crossing strokes and one-step Undo.
+Software first-frame samples still reach **119.841 ms at 25%** (one trial per
+zoom); the display-tile work remains T-086, and owner Windows/Linux hardware
+and physical input-to-photon evidence are **not claimed**. [Checkpoint](Tickets/T-085.md).
+
+**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 remains Ready for display-cache fixes; T-068 native research remains conditional.
 
 ## Kanban summary
 
@@ -986,7 +997,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | In Progress | **Owner** | [T-082](Tickets/T-082.md) |
 
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
-| [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
