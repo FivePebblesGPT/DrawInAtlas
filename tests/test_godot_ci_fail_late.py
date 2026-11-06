@@ -23,14 +23,15 @@ class GodotCIFailLateTests(unittest.TestCase):
         self.assertGreaterEqual(len(blocks), 20)
         # Keep push CI bounded while permitting new focused, fast model
         # witnesses (T-065 paging, T-086 cache, T-087 frame, T-088 selection,
-        # T-089 layers, T-090 workspace, T-091 docking and T-092 Colors/History).
-        self.assertLessEqual(len(blocks), 48)
+        # T-089 layers, T-090 workspace, T-091 docking, T-092 Colors/History and T-093 discovery).
+        self.assertLessEqual(len(blocks), 49)
         self.assertIn("Verify T-086 source-space dirty-display tile invalidation", workflow)
         self.assertIn("Verify T-088 selection channel, clipboard, and transaction history", workflow)
         self.assertIn("Verify T-089 layer hierarchy, row actions, and structural history", workflow)
         self.assertIn("Verify T-090 responsive workspace, command routing, and licensed tool icon contracts", workflow)
         self.assertIn("Verify T-091 one-group floating dock and legacy settings migration", workflow)
         self.assertIn("Verify T-092 compact Colors, history cursor, and isolated app preferences", workflow)
+        self.assertIn("Verify T-093 Object source discovery, recent-root consent, image import and safe Open", workflow)
         for name, block in blocks:
             if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
                 continue

@@ -11,6 +11,7 @@ const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
 const WORKSPACE_PREFERENCES: Script = preload("res://addons/drawing/workspace_preferences.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
+const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
 
@@ -27,6 +28,9 @@ var initial_extra_panels: Dictionary = {} # Stable id -> Control
 var initial_asset_browser_root: String = ""
 var asset_browser: DrawingAssetBrowserPanel
 var asset_browser_directory_dialog: FileDialog
+var recent_objects_root_settings_path: String = "user://drawing-recent-objects-root-v1.json"
+var _recent_objects_root: String = ""
+var image_import_dialog: FileDialog
 var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered new ID
 var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
 var preferences_persistence_enabled: bool = true
@@ -151,6 +155,7 @@ const ROW_PAGE: int = 200
 
 
 func _ready() -> void:
+	_recent_objects_root = ROOT_HISTORY.read_file(recent_objects_root_settings_path)
 	_load_preferences()
 	_build_interface()
 	if not initial_asset_browser_root.is_empty():
@@ -168,14 +173,16 @@ func _build_interface() -> void:
 	root.add_child(top_bar)
 	# Object source file commands belong under File, while Window only changes
 	# workspaces and document navigation (no separate command toolbar).
-	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
+	top_bar.add_menu_spec("File", ["New Drawing  Ctrl+N", "Open Drawing…  Ctrl+O", "Save  Ctrl+S",
 		"Save As…  Ctrl+Shift+S", "Close tab  Ctrl+W", "Object › New source",
-		"Object › Open source…", "Object › Rename source…", "Object › Save source As…"],
+		"Object › Open source…", "Object › Rename source…", "Object › Save source As…",
+		"Import Image as Drawing…", "Object › Browse saved sources…"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
 		Callable(self, "_request_close_current"), Callable(self, "new_object"),
 		Callable(self, "_ask_open_object"), Callable(self, "_ask_rename_object"),
-		Callable(self, "_ask_save")])
+		Callable(self, "_ask_save"), Callable(self, "_ask_import_image"),
+		Callable(self, "_show_asset_browser_empty")])
 	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
 		"Preferences…", "Copy  Ctrl+C", "Cut  Ctrl+X",
 		"Paste  Ctrl+V", "Delete selected pixels  Del"],
@@ -429,16 +436,26 @@ func _build_interface() -> void:
 	about.dialog_text = "Independent Drawing / Object Editor workspace.\nHelp: File, Edit, View, Image, Layers, Select, Window."
 	add_child(about)
 	open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
+	open_dialog.title = "Open ordinary .drawing file (no Object source binding)"
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	save_dialog.file_selected.connect(_save_file)
 	save_dialog.canceled.connect(_cancel_pending_close)
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
+	object_open_dialog.title = "Open portable Object source in its own editor tab"
 	object_open_dialog.file_selected.connect(_open_object_file)
+	image_import_dialog = FileDialog.new()
+	image_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	image_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	image_import_dialog.filters = PackedStringArray(["*.png ; PNG", "*.webp ; WebP", "*.jpg, *.jpeg ; JPEG"])
+	image_import_dialog.title = "Import bitmap as new Drawing (not an Object source)"
+	image_import_dialog.file_selected.connect(_import_image_file)
+	add_child(image_import_dialog)
 	asset_browser_directory_dialog = FileDialog.new()
 	asset_browser_directory_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
 	asset_browser_directory_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	asset_browser_directory_dialog.dir_selected.connect(show_asset_browser)
+	asset_browser_directory_dialog.title = "Choose existing project Objects/ directory (not the project root)"
+	asset_browser_directory_dialog.dir_selected.connect(_chosen_objects_root)
 	add_child(asset_browser_directory_dialog)
 	close_dialog = ConfirmationDialog.new()
 	close_dialog.title = "Unsaved Object/Drawing changes"
@@ -1722,26 +1739,77 @@ func new_object() -> void:
 
 
 func _ask_asset_browser() -> void:
+	# Existing Window command remains a shortcut to the discoverable browser.
+	_show_asset_browser_empty()
+
+
+func _ensure_asset_browser() -> bool:
+	if asset_browser != null:
+		return true
+	asset_browser = ASSET_BROWSER_SCRIPT.new() as DrawingAssetBrowserPanel
+	asset_browser.open_requested.connect(_open_object_file)
+	asset_browser.choose_root_requested.connect(_choose_objects_root)
+	asset_browser.recent_root_requested.connect(_use_recent_objects_root)
+	if not dock_layout.register_panel("asset_browser") or \
+			not dock_layout.attach_panel("asset_browser", "right", "asset_browser"):
+		asset_browser.queue_free()
+		asset_browser = null
+		return false
+	dock_views["asset_browser"] = asset_browser
+	dock_stash.add_child(asset_browser)
+	asset_browser.set_recent_root(_recent_objects_root)
+	return true
+
+
+func _show_asset_browser_empty() -> void:
+	if _ensure_asset_browser():
+		_render_dock()
+		call_deferred("_reveal_asset_browser")
+		# The browser owns the explanation and root-chooser buttons. No file is
+		# scanned and no previously remembered Atlas project is silently opened.
+
+
+func _reveal_asset_browser() -> void:
+	if asset_browser != null and asset_browser.is_visible_in_tree() and \
+			inspector != null and inspector.is_ancestor_of(asset_browser):
+		inspector.ensure_control_visible(asset_browser.choose_root_button)
+
+
+func _choose_objects_root() -> void:
 	asset_browser_directory_dialog.popup_centered_ratio(0.7)
 
 
-## The Asset Browser becomes an ordinary T-078 dock-owned panel. A project
-## chooses its Objects/ folder explicitly; we never guess an Atlas campaign.
+func _chosen_objects_root(path: String) -> void:
+	if not show_asset_browser(path):
+		return
+	# Only a successful, explicit directory choice updates recent-root history.
+	if ROOT_HISTORY.save_file(recent_objects_root_settings_path, path.simplify_path()):
+		_recent_objects_root = path.simplify_path()
+		asset_browser.set_recent_root(_recent_objects_root)
+	else:
+		_show_error("Objects/ opened, but the last-used folder preference could not be saved")
+
+
+func _use_recent_objects_root() -> void:
+	if _recent_objects_root.is_empty():
+		_show_error("No previously chosen Objects/ folder; choose one first")
+		return
+	# The user must explicitly invoke this action, including after relaunch.
+	show_asset_browser(_recent_objects_root)
+
+
+## Standalone and Atlas share the dock peer. Only the user-chosen directory
+## (or the host-provided initial_asset_browser_root) is ever scanned.
 func show_asset_browser(objects_root: String) -> bool:
-	if asset_browser == null:
-		asset_browser = ASSET_BROWSER_SCRIPT.new() as DrawingAssetBrowserPanel
-		asset_browser.open_requested.connect(_open_object_file)
-		if not dock_layout.register_panel("asset_browser") or \
-				not dock_layout.attach_panel("asset_browser", "right", "asset_browser"):
-			asset_browser.queue_free()
-			asset_browser = null
-			return false
-		dock_views["asset_browser"] = asset_browser
-		dock_stash.add_child(asset_browser)
+	if not _ensure_asset_browser():
+		return false
 	var result: DrawingResult = asset_browser.set_objects_root(objects_root)
 	_render_dock()
+	if result.ok:
+		call_deferred("_reveal_asset_browser")
 	if not result.ok:
-		_show_error(result.message)
+		_show_error("Cannot open Object source folder: " + result.message +
+			". Select an existing absolute Objects/ directory, not a .drawing file or project root.")
 	return result.ok
 
 
@@ -2847,6 +2915,48 @@ func _reset_view() -> void:
 		canvas.camera = Vector2.ZERO
 	canvas.queue_redraw()
 	_update_status()
+
+
+func _ask_import_image() -> void:
+	image_import_dialog.popup_centered_ratio(0.7)
+
+
+func _import_image_file(path: String) -> void:
+	var extension: String = path.get_extension().to_lower()
+	if extension not in ["png", "webp", "jpg", "jpeg"]:
+		_show_error("Unsupported image type. Import PNG, WebP or JPEG; Open Drawing handles .drawing files.")
+		return
+	var stream: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if stream == null or stream.get_length() > 64 * 1024 * 1024:
+		_show_error("Image missing, unreadable or larger than the 64 MiB import limit")
+		return
+	stream.close()
+	var image: Image = Image.load_from_file(path)
+	if image == null or image.is_empty():
+		_show_error("Cannot decode image. Source file is missing or corrupt; no Drawing was created.")
+		return
+	if image.get_width() > 4096 or image.get_height() > 4096 or \
+			image.get_width() * image.get_height() > 16777216:
+		_show_error("Image exceeds the 4096px-per-side / 16.8M-pixel import limit")
+		return
+	var document: DrawingDocument = DrawingDocument.new()
+	document.record_selection_history = record_selection_history
+	var created: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Imported image")
+	if not created.ok:
+		_show_error(created.message)
+		return
+	var raster: String = String(created.value)
+	var imported: DrawingResult = DrawingRasterImport.import_image(document, raster,
+		image, 0, 0, document.revision)
+	if not imported.ok and imported.code != "NO_CHANGE":
+		_show_error("Image import failed: " + imported.message + ". No Drawing was created.")
+		return
+	var image_bounds: Rect2i = Rect2i(0, 0, image.get_width(), image.get_height())
+	tabs.append({"document": document, "path": "", "title": "Imported: " + path.get_file(),
+		"layer": raster, "selected_node": raster, "saved": -1, "frame": image_bounds,
+		"saved_frame": image_bounds, "frame_dirty": false, "fit_pending": true})
+	tab_bar.add_tab("Imported: " + path.get_file())
+	_activate(tabs.size() - 1)
 
 
 func _ask_open() -> void:

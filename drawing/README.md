@@ -309,9 +309,31 @@ selection through `AtlasObjectEditorBridge`; ordinary source Save refreshes
 all linked placements and instance-launched Save As publishes B and rebinds
 only the origin, with one Atlas history command. Undo retains the saved B.
 
+**Object source discovery (T-093):** Use **File → Open Drawing…** for an ordinary
+`.drawing` file and its independent Save/Save As; **File → Object › Open source…**
+opens a portable source in its dedicated Object Editor tab, while
+**File → Object › New source** creates a new source with a separate identity.
+**File → Import Image as Drawing…** loads a bounded PNG/WebP/JPEG as a new
+ordinary Drawing tab (never a linked Atlas placement); fully transparent
+images still receive an authoring frame. These actions are deliberately distinct
+from browsing saved sources. Choose **File → Object › Browse saved sources…**
+(or **Window → Asset Browser…**) for an empty-state walkthrough with **Choose
+Objects/ folder…** and the current project/Objects root label. Hover or use **Copy root path**
+for the exact absolute path. Opening the browser scrolls the right dock to
+its chooser when attached. Select an *existing*
+project's `Objects/` subdirectory; do **not** select the project root or guess
+from the drawing filename. After one successful explicit choice, **Use last
+folder** offers that path on subsequent launches, but opening the app alone
+never scans or binds the saved root. An invalid or missing folder explains
+how to recover without changing the previous valid listing; corrupt and
+duplicate sources are skipped with warnings. Edit Source opens a source tab,
+while Atlas **Place at view center** links an instance on a map and is not
+offered in standalone. Unreferenced saved sources are not automatically deleted;
+missing/NULL links and source removal/repair require Atlas's explicit manager.
+
 **Asset Browser (T-065 engineering preview):** Choose **Window → Asset Browser…**
-and select an existing absolute `Objects/` directory from a portable project.
-The resulting panel is a normal, movable/collapsible dock peer of Colors,
+to reveal the browser's root selection controls, then select an existing
+absolute `Objects/` directory from a portable project. The resulting panel is a normal, movable/collapsible dock peer of Colors,
 Layers and History. It searches source *names* and stable *IDs*, lists loose
 `Objects/*.drawing` and the newest `Objects/<id>/vNNNNNN.drawing`, and opens
 selected sources in an independent Object Editor tab via **Edit Source**.

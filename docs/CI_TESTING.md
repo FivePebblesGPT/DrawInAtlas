@@ -58,10 +58,29 @@ workspace dirty/save/open and tab-local grid options). The **on-demand**
 for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
 pan/grid alignment, native snapped pointer, off-frame editing and undo.
 The bounded fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
-includes the model steps and prevents silent runaway push CI (currently 47 steps).
+includes the model steps and prevents silent runaway push CI (currently 49 steps).
 Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
 #02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
+
+## T-093 Object source discovery and safe portable open
+
+Fast push/PR CI runs `drawing/tests/object_discovery_smoke.gd` (**56**
+headless checks, no GUI input acceptance), plus
+`tests/test_t093_object_discovery.py` (CI, root-preference and fail-closed
+native-log contracts) as one new fail-late step. The fast workflow is bounded
+to **49** steps. The on-demand
+`.github/workflows/godot-native-t093-object-sources.yml` first stages/imports
+standalone fonts and SVG resources; `drawing/tests/object_discovery_native.gd`
+then exercises **27 native Xvfb/Mesa pointer/framebuffer checks** with optional
+screenshots, validated by `tools/check_native_t093_log.py`. Directory selection
+inside the separate OS/FileDialog viewport is covered by its callback, *not*
+by a real OS pointer click. The verifier rejects any runtime errors before
+success and retains known post-success GL/RID leak diagnostics. Existing T-065
+portable source and Atlas registry/NULL tests must remain green; T-065 and
+finding #21 require owner hardware review independently. No proof of physical
+Windows/Linux UX, input-to-photon latency or campaign-wide NULL usability
+follows from software rendering.
 
 ## T-092 compact color controls, cursor history and app preferences
 

@@ -82,6 +82,17 @@ Hardware Windows/Linux owner findings **#03/#04/#06/#08/#09 remain PENDING**;
 no manual review was approved. [Ticket](Tickets/T-090.md) ·
 [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-093 discoverable standalone Object sources (2026-11-06; engineering Done):**
+File now distinguishes Drawing open, portable Object source open/new, and bitmap
+import; the Asset Browser has a visible exact `Objects/` root, choose-folder
+button, empty/invalid/duplicate source explanations, and opt-in recent root.
+The versioned recent-folder preference is app-only and **never automatically
+binds or scans** an Atlas project at launch. A 56-check headless model plus
+27 native Xvfb/Mesa pointer/framebuffer checks pass locally; old T-065
+portable and Atlas source tests remain separate. T-065 manual review and
+owner finding #21 remain **PENDING**, and no NULL-placement policy is changed.
+[Ticket](Tickets/T-093.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 is In Progress with source-space cache software witnesses; T-068 native research remains conditional.
 
 ## Kanban summary
@@ -1056,7 +1067,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | — | [T-082](Tickets/T-082.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Done | — | [T-063](Tickets/T-063.md) |
-| [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
 
 ## Epics
