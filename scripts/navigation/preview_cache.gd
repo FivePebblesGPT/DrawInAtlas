@@ -3,7 +3,9 @@ extends RefCounted
 ## Editor artwork snapshots. Audience partitions entries; it does not filter content.
 
 var _max_entries: int
+## Derived rendered previews keyed by audience/map/view; not canonical art.
 var _entries: Dictionary[String, Dictionary] = {}
+## Least-recently-used key order, not a persisted order of saved documents.
 var _lru: Array[String] = []
 
 
@@ -22,10 +24,7 @@ func signature(document: AtlasMapDocument, floor_id: String) -> String:
 		if not layer.visible or layer.opacity <= 0.0:
 			continue
 		var saved: Dictionary = layer.to_dict()
-		if layer is AtlasTileLayer:
-			var grid: AtlasGrid = layer.grid if layer.grid != null else document.get_terrain_grid(floor_id)
-			saved["grid"] = grid.to_dict() if grid != null else null
-		elif layer is AtlasRasterLayer:
+		if layer is AtlasRasterLayer:
 			# Asset hashes cover in-place pixel edits; residency affects what can be drawn.
 			var resident: Array[bool] = []
 			var keys: Array[String] = layer.chunks.keys()

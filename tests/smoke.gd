@@ -37,13 +37,13 @@ func _check(condition: bool, description: String) -> void:
 
 func _test_grids() -> void:
 	for kind in [AtlasGrid.Kind.SQUARE, AtlasGrid.Kind.HEX_POINTY, AtlasGrid.Kind.HEX_FLAT]:
-		var grid := AtlasGrid.new(kind, 42.0)
+		var grid: AtlasGrid = AtlasGrid.new(kind, 42.0)
 		grid.origin = Vector2(97.0, -28.0)
 		grid.rotation = deg_to_rad(37.0)
 		for x in range(-4, 5):
 			for y in range(-4, 5):
-				var cell := Vector2i(x, y)
-				var center := grid.cell_to_document(cell)
+				var cell: Vector2i = Vector2i(x, y)
+				var center: Vector2 = grid.cell_to_document(cell)
 				_check(grid.document_to_cell(center) == cell, "grid roundtrip %s %s" % [kind, cell])
 				_check(grid.cell_polygon(cell).size() >= 4, "grid polygon is available")
 		_check(grid.neighbors(Vector2i.ZERO).size() == (4 if kind == AtlasGrid.Kind.SQUARE else 6),
@@ -51,14 +51,14 @@ func _test_grids() -> void:
 
 
 func _test_placements() -> void:
-	var placement := AtlasPlacement.new()
+	var placement: AtlasPlacement = AtlasPlacement.new()
 	placement.origin = Vector2(84.0, -17.0)
 	placement.rotation = deg_to_rad(37.0)
 	placement.parent_units_per_cell = 24.0
 	placement.child_units_per_cell = 64.0
 	placement.columns = 20
 	placement.rows = 15
-	var parent_position := placement.local_to_parent() * Vector2(8.0, 6.0)
+	var parent_position: Vector2 = placement.local_to_parent() * Vector2(8.0, 6.0)
 	_check(placement.contains_parent_point(parent_position), "rotated placement hit test")
 	_check(placement.parent_to_local(parent_position).distance_to(Vector2(8.0, 6.0)) < 0.001,
 		"rotated placement inverse")
@@ -67,7 +67,7 @@ func _test_placements() -> void:
 
 
 func _test_zoom_gate() -> void:
-	var gate := AtlasZoomGate.new()
+	var gate: AtlasZoomGate = AtlasZoomGate.new()
 	_check(not gate.accept_blocked_step(1, "city", 1000), "step one does not transition")
 	_check(not gate.accept_blocked_step(1, "city", 1100), "step two does not transition")
 	_check(gate.accept_blocked_step(1, "city", 1200), "step three transitions")
@@ -82,18 +82,18 @@ func _test_zoom_gate() -> void:
 
 
 func _test_campaign_roundtrip() -> void:
-	var sample := AtlasCampaign.sample()
-	var raw := JSON.stringify(sample.to_dict())
+	var sample: AtlasCampaign = AtlasCampaign.sample()
+	var raw: String = JSON.stringify(sample.to_dict())
 	var parsed: Variant = JSON.parse_string(raw)
-	var restored := AtlasCampaign.from_dict(parsed)
+	var restored: AtlasCampaign = AtlasCampaign.from_dict(parsed)
 	_check(restored != null, "campaign restore")
 	if restored == null:
 		return
 	_check(restored.maps.size() == 2, "campaign has world and city")
-	var world := restored.get_map("world")
-	var anchor := world.grid.cell_to_document(Vector2i(2, 0))
+	var world: AtlasMapDocument = restored.get_map("world")
+	var anchor: Vector2 = world.grid.cell_to_document(Vector2i(2, 0))
 	_check(restored.find_links_at("world", anchor).size() == 1, "city link index works")
-	_check(world.floors[0].get_terrain(Vector2i.ZERO) > 0, "tile paint survives JSON")
+	_check(world.floors[0].layers[0] is AtlasRasterLayer and world.floors[0].ink_layer() != null, "raster and semantic ink survive JSON")
 	_check(AtlasCampaign.from_dict({"schema_version": 999}) == null, "version mismatch fails")
 	var city: AtlasMapDocument = restored.get_map("greyhaven")
 	city.grid.distance_per_cell = 7.5
@@ -113,11 +113,11 @@ func _test_campaign_roundtrip() -> void:
 
 
 func _test_webp() -> void:
-	var image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	var image: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.2, 0.4, 0.6, 1.0))
-	var file_path := "user://atlas_smoke.webp"
+	var file_path: String = "user://atlas_smoke.webp"
 	_check(AtlasWebPStore.write_image(file_path, image) == OK, "lossless WebP save")
-	var restored := AtlasWebPStore.read_image(file_path)
+	var restored: Image = AtlasWebPStore.read_image(file_path)
 	_check(restored != null, "lossless WebP decode")
 	if restored != null:
 		_check(restored.get_pixel(3, 3).is_equal_approx(image.get_pixel(3, 3)),
@@ -144,19 +144,19 @@ func _test_editor_workflow() -> void:
 	_check(editor.search_map_ids == ["greyhaven"], "sidebar search filters campaign maps")
 	editor._refresh_search_list("")
 
-	# At max zoom: exactly three *additional* logical steps enter the city.
+	# At the expanded camera limit: three *additional* blocked steps enter the city.
 	var canvas: AtlasCanvas = editor.canvas
 	var world: AtlasMapDocument = editor.campaign.get_map("world")
 	canvas.camera_center = world.grid.cell_to_document(Vector2i(2, 0))
-	canvas.camera_zoom = 3.0
-	var pointer := canvas.size * 0.5
+	canvas.camera_zoom = AtlasEditor.MAX_ZOOM
+	var pointer: Vector2 = canvas.size * 0.5
 	for step: int in range(5):
 		editor._on_wheel_step(1, pointer)
 	_check(canvas.map.id == "world", "repeated boundary scroll stays on board unless enabled")
 	editor.automatic_navigation = true
 	editor._on_wheel_step(1, pointer)
 	editor._on_wheel_step(1, pointer)
-	editor._on_pointer_moved(pointer + Vector2(500, 500))
+	editor._on_pointer_moved(pointer + Vector2(3000, 3000))
 	_check(editor.zoom_gate.count == 0, "leaving a link discards pending automatic navigation")
 	editor._on_wheel_step(1, pointer)
 	editor._on_wheel_step(1, pointer)
@@ -176,24 +176,41 @@ func _test_editor_workflow() -> void:
 	_check(city_units == "ft", "sample maps start with independent native units")
 
 	var city: AtlasMapDocument = editor.campaign.get_map("greyhaven")
-	var parent_before := JSON.stringify(city.floors[0].terrain)
-	editor._on_create_battlemap(Vector2(-100, -70), Vector2(150, 125), deg_to_rad(37))
-	_check(canvas.map.kind == "BATTLEMAP", "drag creation opens a child battlemap workspace")
-	_check(editor.campaign.placements.size() == 1, "child has a placement")
-	if not editor.campaign.placements.is_empty():
-		var placement: AtlasPlacement = editor.campaign.placements[0]
-		_check(not placement.symbolic, "city placement uses spatial reference")
-		_check(is_equal_approx(rad_to_deg(placement.rotation), 37.0), "battlemap angle persists")
+	var parent_before: Dictionary = city.to_dict().duplicate(true)
+	# Import a historical battlemap graph via the low-level command; the UI no
+	# longer offers creation, but old saves must remain navigable and editable.
+	var legacy_child: AtlasMapDocument = AtlasMapDocument.new("legacy-encounter", "Saved encounter")
+	legacy_child.kind = "BATTLEMAP"
+	legacy_child.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 24.0)
+	var legacy_link: AtlasMapLink = AtlasMapLink.new()
+	legacy_link.id = "legacy-entrance"
+	legacy_link.source_map_id = city.id
+	legacy_link.source_floor_id = canvas.floor.id
+	legacy_link.target_map_id = legacy_child.id
+	legacy_link.target_floor_id = legacy_child.default_floor_id
+	legacy_link.anchor = Vector2(-100, -70)
+	legacy_link.placement_id = "legacy-placement"
+	var legacy_placement: AtlasPlacement = AtlasPlacement.new()
+	legacy_placement.id = legacy_link.placement_id
+	legacy_placement.parent_map_id = city.id
+	legacy_placement.child_map_id = legacy_child.id
+	legacy_placement.origin = legacy_link.anchor
+	legacy_placement.rotation = deg_to_rad(37)
+	_check(editor.edits.execute(AtlasLinkEdit.new(city.id, null, legacy_link, null, legacy_placement, legacy_child)),
+		"legacy fixture imports a saved footprint and independent child document")
+	_check(editor.linked_maps.submit(legacy_link, legacy_placement, legacy_child) == false,
+		"public linked-map facade refuses new battlemap creation")
+	editor.linked_maps.enter(legacy_link.id)
+	_check(canvas.map.id == legacy_child.id, "legacy battlemap remains navigable")
+	_check(editor.campaign.placements.size() == 1, "legacy placement retained")
+	_check(is_equal_approx(rad_to_deg(editor.campaign.placements[0].rotation), 37.0),
+		"legacy rotation retained")
 
-	editor._on_tool_changed(AtlasCanvas.Tool.PAINT)
-	editor._on_select(Vector2i(0, 0))
-	editor.locked_to_cell = true
-	editor._on_paint(Vector2i(1, 0))
-	_check(canvas.floor.get_terrain(Vector2i(1, 0)) == 0, "cell lock blocks neighbor edit")
-	editor._on_paint(Vector2i(0, 0))
-	_check(canvas.floor.get_terrain(Vector2i(0, 0)) == editor.palette_id, "cell lock permits selected cell")
-	_check(JSON.stringify(city.floors[0].terrain) == parent_before,
-		"painting child does not change parent")
+	# Child edits do not create palette-cell terrain or modify parent artwork.
+	editor._choose_tool(AtlasCanvas.Tool.PEN)
+	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(2, 3)])), false)
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "child raster remains independently editable")
+	_check(city.to_dict() == parent_before, "painting child does not change parent")
 
 	canvas.camera_zoom = 0.5
 	pointer = canvas.size * 0.5
@@ -226,7 +243,6 @@ func _test_drawing_input() -> void:
 		await process_frame
 	var canvas: AtlasCanvas = editor.canvas
 	canvas.map.grid.kind = AtlasGrid.Kind.GRIDLESS
-	canvas.floor.terrain.clear()
 	canvas.camera_center = Vector2(-100.25, 50.125)
 	canvas.camera_zoom = 2.0
 	editor.edits.reset(editor.campaign, true)
@@ -259,36 +275,36 @@ func _test_drawing_input() -> void:
 	var expected_start: Vector2 = canvas.local_to_document(start)
 	_pointer_button(canvas, start, true)
 	_pointer_motion(canvas, middle)
-	_check(canvas.floor.strokes.is_empty(), "in-flight drawing is preview only")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "in-flight drawing is preview only")
 	_check(not editor.edits.is_dirty(), "preview alone does not dirty the document")
 	_pointer_motion(canvas, finish)
 	_pointer_button(canvas, finish, false)
-	_check(canvas.floor.strokes.size() == 1, "one full input gesture commits one stroke")
-	if canvas.floor.strokes.is_empty():
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "one full input gesture commits raster pixels")
+	if canvas.floor.raster_layer().chunks.is_empty():
 		root.remove_child(scene)
 		scene.free()
 		return
-	_check(canvas.floor.strokes[0].points[0].is_equal_approx(expected_start),
+	_check(_pixel(canvas.floor.raster_layer(), expected_start).a > 0,
 		"input is transformed into continuous negative document coordinates")
-	_check(canvas.floor.terrain.is_empty(), "gridless drawing never fabricates a terrain cell")
-	var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	_check(canvas.floor.layers[0] is AtlasRasterLayer, "gridless drawing retains independent raster support")
+	var original: Dictionary = canvas.floor.raster_layer().to_dict()
 	_check(editor.edits.is_dirty(), "drawing marks unsaved work")
 	_check(not edit_menu.is_item_disabled(0) and edit_menu.is_item_disabled(1),
 		"Edit menu reflects current drawing history")
 	_check(editor.title_label.text.begins_with("* "), "single menubar title shows unsaved work")
 	editor.brush_width_spinner.get_line_edit().grab_focus()
 	_key(KEY_Z, true)
-	_check(AtlasStroke.same_artwork(original, canvas.floor.strokes),
+	_check(canvas.floor.raster_layer().to_dict() == original,
 		"menu accelerator hints do not steal undo from a focused numeric input")
 	canvas.grab_focus()
 	_key(KEY_Z, true)
-	_check(canvas.floor.strokes.is_empty() and not editor.edits.is_dirty(),
+	_check(canvas.floor.raster_layer().chunks.is_empty() and not editor.edits.is_dirty(),
 		"Ctrl+Z undoes entire gesture back to clean state")
 	_key(KEY_Z, true, true)
-	_check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "Ctrl+Shift+Z restores exact artwork")
+	_check(canvas.floor.raster_layer().to_dict() == original, "Ctrl+Shift+Z restores exact artwork")
 	_pointer_button(canvas, Vector2(90, 80), true)
 	_pointer_button(canvas, Vector2(90, 80), false)
-	_check(canvas.floor.strokes.size() == 2 and canvas.floor.strokes[-1].points.size() == 1,
+	_check(canvas.floor.raster_layer().to_dict() != original and _pixel(canvas.floor.raster_layer(), canvas.local_to_document(Vector2(90, 80))).a > 0,
 		"a click without motion commits an undoable ink dot")
 	editor._on_undo()
 	_key(KEY_E)
@@ -296,14 +312,14 @@ func _test_drawing_input() -> void:
 	_pointer_button(canvas, Vector2(140, 60), true)
 	_pointer_motion(canvas, Vector2(140, 140))
 	_pointer_button(canvas, Vector2(140, 140), false)
-	_check(canvas.floor.strokes.size() == 2, "eraser gesture cuts a real gap into ink")
+	_check(_pixel(canvas.floor.raster_layer(), canvas.local_to_document(middle)).a == 0, "eraser gesture cuts a real gap into raster")
 	edit_menu.id_pressed.emit(0)
-	_check(AtlasStroke.same_artwork(original, canvas.floor.strokes), "eraser undo restores unsplit ink")
+	_check(canvas.floor.raster_layer().to_dict() == original, "eraser undo restores exact pixels")
 	edit_menu.id_pressed.emit(1)
 	file_menu.id_pressed.emit(0)
 	_check(not editor.edits.is_dirty(), "successful Save establishes a clean checkpoint")
 	_check(not editor.title_label.text.begins_with("* "), "File Save clears the global dirty marker")
-	var saved: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
+	var saved: Dictionary = canvas.floor.raster_layer().to_dict()
 	editor._on_undo()
 	_check(editor.edits.is_dirty(), "undo away from saved state is dirty")
 	editor.store_io = FailedSaveIO.new()
@@ -312,7 +328,7 @@ func _test_drawing_input() -> void:
 	editor.store_io = null
 	file_menu.id_pressed.emit(1)
 	_check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "Load starts a fresh clean history")
-	_check(AtlasStroke.same_artwork(saved, canvas.floor.strokes), "Save/Load preserves erased vector geometry")
+	_check(canvas.floor.raster_layer().to_dict() == saved, "Save/Load preserves erased pixels")
 	_key(KEY_B)
 	_pointer_button(canvas, start, true)
 	_pointer_motion(canvas, finish)
@@ -326,13 +342,14 @@ func _test_drawing_input() -> void:
 		"wheel zoom cannot distort an in-flight document-space stroke")
 	_key(KEY_ESCAPE)
 	_pointer_button(canvas, finish, false)
-	_check(AtlasStroke.same_artwork(saved, canvas.floor.strokes) and not editor.edits.is_dirty(),
+	_check(canvas.floor.raster_layer().to_dict() == saved and not editor.edits.is_dirty(),
 		"Escape cancels a preview without adding history")
+	canvas.brush_color = Color.BLUE
+	var chrome_start: Vector2 = canvas.local_to_document(start)
 	_pointer_button(canvas, start, true)
 	_pointer_motion(canvas, Vector2(canvas.size.x + 20, 100))
 	_pointer_button(canvas, Vector2(canvas.size.x + 20, 100), false)
-	_check(canvas.floor.strokes.size() == saved.size() + 1
-		and canvas.floor.strokes[-1].points.size() == 1,
+	_check(canvas.floor.raster_layer().to_dict() != saved and _pixel(canvas.floor.raster_layer(), chrome_start).b > 0.9,
 		"dragging into editor chrome never records off-canvas points")
 	editor._on_undo()
 	_pointer_button(canvas, start, true)
@@ -340,11 +357,18 @@ func _test_drawing_input() -> void:
 	var original_floor: AtlasFloor = canvas.floor
 	editor._show_map(editor.campaign.get_map("greyhaven"))
 	_pointer_button(canvas, finish, false)
-	_check(AtlasStroke.same_artwork(saved, original_floor.strokes) and canvas.floor.strokes.is_empty(),
+	_check(original_floor.raster_layer().to_dict() == saved and canvas.floor.raster_layer().chunks.is_empty(),
 		"map switch cancels pending ink instead of committing into another document")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(editor.save_path))
 	root.remove_child(scene)
 	scene.free()
+
+
+func _pixel(layer: AtlasRasterLayer, position: Vector2) -> Color:
+	var pixel: Vector2i = Vector2i((position * layer.pixels_per_unit).floor())
+	var coord: Vector2i = AtlasRasterLayer.pixel_to_chunk(pixel)
+	var chunk: AtlasRasterChunk = layer.chunks.get("%d,%d" % [coord.x, coord.y])
+	return chunk.image.get_pixelv(pixel - coord * AtlasRasterChunk.SIZE) if chunk != null else Color(0, 0, 0, 0)
 
 
 func _pointer_button(canvas: AtlasCanvas, local_position: Vector2, pressed: bool) -> void:
@@ -407,7 +431,7 @@ func _test_board_workflow() -> void:
 	_check(editor.campaign.maps.size() == 3 and editor.canvas.map.display_name == "Exploration",
 		"dialog creates and opens a named independent board")
 	_check(editor.canvas.map.grid.same_as(grid) and editor.canvas.floor.strokes.is_empty()
-		and editor.canvas.floor.terrain.is_empty(), "new board keeps chosen grid/units without copying artwork")
+		and (editor.canvas.floor.layers[0] as AtlasRasterLayer).chunks.is_empty(), "new board keeps chosen grid/units without copying artwork")
 	_check(editor.campaign.links.size() == 1 and editor.campaign.placements.is_empty(),
 		"blank board creation does not invent links or placements")
 	editor._on_undo()
@@ -417,7 +441,8 @@ func _test_board_workflow() -> void:
 	_check(editor.canvas.map.id == id and editor.canvas.map.grid.same_as(grid),
 		"redo creation restores the same board identity and configuration")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-10.125, 3.25), Vector2(45.5, -30.75)])), false)
-	var ink_before: Array[AtlasStroke] = AtlasStroke.clone_all(editor.canvas.floor.strokes)
+	var ink_before: Dictionary = editor.canvas.floor.raster_layer().to_dict()
+	editor.open_grid_settings()
 	editor.grid_controls.size_spinner.value = 120.0
 	editor.grid_controls.rotation_spinner.value = 37.0
 	editor.grid_controls.origin_x_spinner.value = 50.25
@@ -431,10 +456,10 @@ func _test_board_workflow() -> void:
 	var updated: AtlasGrid = editor.canvas.map.grid
 	_check(updated.kind == AtlasGrid.Kind.SQUARE and updated.cell_size == 120.0
 		and updated.origin == Vector2(50.25, -80.5) and is_equal_approx(rad_to_deg(updated.rotation), 37.0),
-		"inspector edits grid shape, spacing, origin and rotation")
+		"popup edits grid shape, spacing, origin and rotation")
 	_check(updated.distance_per_cell == 2.5 and updated.distance_unit == "km" and not updated.visible,
 		"native units and visibility belong to this board")
-	_check(AtlasStroke.same_artwork(ink_before, editor.canvas.floor.strokes), "grid controls never rescale ink")
+	_check(editor.canvas.floor.raster_layer().to_dict() == ink_before, "grid controls never rescale raster")
 	_check(editor.campaign.get_map("world").to_dict() == source_before, "grid editing leaves source artwork and units untouched")
 	var saved_grid: AtlasGrid = updated.copy()
 	editor._on_save()
@@ -442,7 +467,7 @@ func _test_board_workflow() -> void:
 	var restored: AtlasMapDocument = editor.campaign.get_map(id)
 	_check(restored != null and restored.grid.same_as(saved_grid), "board identity and all grid settings survive Save/Load")
 	if restored != null:
-		_check(AtlasStroke.same_artwork(restored.floors[0].strokes, ink_before), "board artwork survives grid configuration roundtrip")
+		_check(restored.floors[0].raster_layer().to_dict() == ink_before, "board artwork survives grid configuration roundtrip")
 	_check(not editor.edits.is_dirty() and not editor.edits.can_undo(), "loading starts a clean board history")
 	editor.open_board_dialog()
 	editor.board_dialog.hide()

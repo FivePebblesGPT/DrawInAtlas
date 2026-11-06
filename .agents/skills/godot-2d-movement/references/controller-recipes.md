@@ -19,8 +19,8 @@ func _physics_process(delta: float) -> void:
 ## Jump buffering (press slightly before landing still jumps)
 
 ```gdscript
-@export var buffer_time := 0.1
-var _buffer := 0.0
+@export var buffer_time: float = 0.1
+var _buffer: float = 0.0
 
 func _physics_process(delta: float) -> void:
     if Input.is_action_just_pressed("jump"):
@@ -57,8 +57,8 @@ When you want full control (custom bounce, no sliding), use `move_and_collide()`
 
 ```gdscript
 func _physics_process(delta: float) -> void:
-    var motion := velocity * delta                 # here you DO scale by delta
-    var collision := move_and_collide(motion)
+    var motion: Vector2 = velocity * delta                 # here you DO scale by delta
+    var collision: KinematicCollision2D = move_and_collide(motion)
     if collision:
         # Reflect velocity off the surface normal (a simple bounce).
         velocity = velocity.bounce(collision.get_normal())
@@ -72,11 +72,11 @@ func _physics_process(delta: float) -> void:
 Instead of snapping `velocity.x` to `dir * speed`, ramp it for weightier movement:
 
 ```gdscript
-@export var accel := 1500.0
-@export var friction := 1800.0
+@export var accel: float = 1500.0
+@export var friction: float = 1800.0
 
 func _physics_process(delta: float) -> void:
-    var dir := Input.get_axis("move_left", "move_right")
+    var dir: float = Input.get_axis("move_left", "move_right")
     if dir != 0.0:
         velocity.x = move_toward(velocity.x, dir * speed, accel * delta)
     else:

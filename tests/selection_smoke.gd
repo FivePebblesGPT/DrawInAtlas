@@ -8,6 +8,8 @@ var _failures: int = 0
 func _initialize() -> void:
 	_shapes()
 	_selection()
+	_geometry_contracts()
+	_combination()
 	_guards()
 	_ink_transforms()
 	_raster_transforms()
@@ -94,10 +96,72 @@ func _selection() -> void:
 		indices.assign(raw)
 		_check(G.select_indices(layer, indices).is_empty(), "invalid index selection rejects atomically: " + str(raw))
 	_check(G.select_indices(layer, []).is_empty() and G.select_all(AtlasInkLayer.new()).is_empty(), "empty ink selection")
-	_check(G.select_all(null).is_empty() and G.select_all(AtlasTileLayer.new()).is_empty(), "null/tiles have no artwork selection")
+	_check(G.select_all(null).is_empty() and G.select_all(AtlasRasterLayer.new()).is_empty(), "null/tiles have no artwork selection")
 	layer.strokes[0].points[0] = Vector2(9, 9)
 	_check(selection.source.strokes[0].points[0] == [-1.75, -0.75] and not selection.matches(layer), "snapshot is detached and detects stale geometry")
 	_check(G.transformed(layer, selection, Transform2D.IDENTITY) == null, "stale transform rejected")
+
+
+## Additional non-visual contracts for sparse raster coordinates and whole-object
+## selection. These guard the intent of the T-035 readability split.
+func _geometry_contracts() -> void:
+	var ink: AtlasInkLayer = AtlasInkLayer.new()
+	var line: AtlasStroke = AtlasStroke.new(PackedVector2Array([Vector2(0, 0), Vector2(10, 0)]), Color.WHITE, 2)
+	var filled: AtlasStroke = AtlasStroke.new(PackedVector2Array([
+		Vector2(3, -3), Vector2(8, -3), Vector2(5, 3)
+	]), Color.RED, 0.5, true)
+	ink.strokes = [line, filled]
+	_check(G.select_point(ink, Vector2(5, -1), 0).stroke_indices == [1],
+		"filled interior hits the uppermost ink object")
+	_check(G.select_point(ink, Vector2(5, 0), 0).stroke_indices == [1],
+		"filled polygon takes precedence over overlapping lower stroke")
+	_check(G.select_point(ink, Vector2(1, 0), 0).stroke_indices == [0],
+		"lower stroke remains pickable outside the filled shape")
+	_check(G.select_rect(ink, Rect2(3, -3, 5, 6)).is_empty(),
+		"marquee must enclose stroke width as well as path points")
+
+	var raster: AtlasRasterLayer = AtlasRasterLayer.new()
+	raster.pixels_per_unit = 4.0
+	raster.transform = Transform2D(Vector2(1, 0.5), Vector2(-0.25, 2), Vector2(7, -3))
+	var negative_image: Image = Image.create(5, 3, false, Image.FORMAT_RGBA8)
+	negative_image.fill(Color(0.1, 0.2, 0.3, 0.4))
+	var positive_image: Image = Image.create(2, 4, false, Image.FORMAT_RGBA8)
+	positive_image.fill(Color(0.7, 0.8, 0.9, 1))
+	raster.chunks["-2,-1"] = AtlasRasterChunk.new(Vector2i(-2, -1), negative_image)
+	raster.chunks["1,0"] = AtlasRasterChunk.new(Vector2i(1, 0), positive_image)
+	var local_bounds: Rect2 = G.raster_local_bounds(raster)
+	_check(local_bounds == Rect2(-128, -64, 192.5, 65),
+		"signed sparse chunk origins and partial extents convert to local board units")
+	var selected: AtlasSelection = G.select_all(raster)
+	_check(selected.raster_selected and selected.stroke_indices.is_empty() and selected.matches(raster),
+		"raster identity captures the entire layer, not individual chunks")
+	_check(selected.bounds.is_equal_approx(Rect2(-121.25, -195, 208.75, 226.25)),
+		"transformed raster envelope accounts for the opposite affine corner")
+	_check(G.select_point(raster, raster.transform * Vector2(-127.5, -63.5), 0).raster_selected,
+		"point picking reverses affine placement into local raster units")
+	_check(G.select_point(raster, raster.transform * Vector2(0, -20), 0).raster_selected,
+		"raster selection uses the sparse envelope, not an individual chunk hit")
+	_check(G.select_point(raster, raster.transform * Vector2(100, 20), 0).is_empty(),
+		"raster pick outside the local envelope misses")
+	_check(G.select_rect(raster, selected.bounds).raster_selected and
+		G.select_rect(raster, selected.bounds.grow(-0.25)).is_empty(),
+		"affine raster marquee requires complete document-space AABB")
+
+	var before: Dictionary = raster.to_dict().duplicate(true)
+	var offset: Vector2 = Vector2(25, -12)
+	var delta: Transform2D = Transform2D(0.0, offset)
+	var destination: Rect2 = Rect2(selected.bounds.position + offset, selected.bounds.size)
+	var moved: AtlasRasterLayer = G.transformed(raster, selected, delta,
+		_scope(selected.bounds.merge(destination))) as AtlasRasterLayer
+	_check(moved != null and moved.transform.is_equal_approx(delta * raster.transform),
+		"raster transform composes without resampling when both footprints fit")
+	if moved != null:
+		moved.chunks["-2,-1"].image.fill(Color.GREEN)
+		_check(raster.to_dict() == before, "transformed raster owns detached image bytes")
+	_check(G.transformed(raster, selected, delta, _scope(selected.bounds)) == null and
+		G.transformed(raster, selected, delta, _scope(destination)) == null,
+		"edit mask rejects both destination-only and source-only footprints")
+	_check(raster.to_dict() == before, "denied mask transforms leave live raster unchanged")
 
 func _guards() -> void:
 	for layer: AtlasLayer in [_ink(), _raster()]:
@@ -117,6 +181,32 @@ func _guards() -> void:
 		layer.id += "-other"
 		_check(not selection.matches(layer) and G.transformed(layer, selection, Transform2D.IDENTITY) == null, "wrong layer identity rejected")
 	_check(G.transformed(_ink(), AtlasSelection.new(), Transform2D.IDENTITY) == null, "empty transform selection denied")
+
+
+func _combination() -> void:
+	var layer: AtlasInkLayer = _ink()
+	var a: AtlasSelection = G.select_indices(layer, [0])
+	var b: AtlasSelection = G.select_indices(layer, [1])
+	var add: AtlasSelection = G.combined(layer, a, b, G.CombineMode.ADD)
+	_check(add.stroke_indices == [0, 1], "add selection preserves original painter order")
+	_check(G.combined(layer, add, b, G.CombineMode.ADD).stroke_indices == [0, 1], "add ignores duplicate objects")
+	_check(G.combined(layer, add, a, G.CombineMode.SUBTRACT).stroke_indices == [1], "subtract removes selected stroke")
+	_check(G.combined(layer, add, b, G.CombineMode.SUBTRACT).stroke_indices == [0], "subtract keeps unrelated stroke")
+	_check(G.combined(layer, a, AtlasSelection.new(), G.CombineMode.SUBTRACT).stroke_indices == [0], "subtract missed hit is no-op")
+	_check(G.combined(layer, a, AtlasSelection.new(), G.CombineMode.ADD).stroke_indices == [0], "add missed hit is no-op")
+	_check(G.combined(layer, add, AtlasSelection.new(), G.CombineMode.REPLACE).is_empty(), "replace missed hit deselects")
+	var other: AtlasInkLayer = _ink()
+	other.id = "other"
+	_check(G.combined(other, a, G.select_indices(other, [1]), G.CombineMode.ADD).stroke_indices == [1], "selection cannot leak between layers")
+	layer.strokes[0].width += 0.125
+	_check(G.combined(layer, a, b, G.CombineMode.ADD).is_empty(), "stale original and incoming cannot select changed layer")
+	var refreshed: AtlasSelection = G.select_indices(layer, [1])
+	_check(G.combined(layer, a, refreshed, G.CombineMode.ADD).stroke_indices == [1], "stale original is discarded")
+	var raster: AtlasRasterLayer = _raster()
+	var raster_all: AtlasSelection = G.select_all(raster)
+	_check(G.combined(raster, raster_all, raster_all, G.CombineMode.SUBTRACT).is_empty(), "raster whole-layer subtract")
+	_check(G.combined(raster, raster_all, AtlasSelection.new(), G.CombineMode.SUBTRACT).raster_selected, "raster subtract miss preserves selection")
+	_check(G.combined(raster, AtlasSelection.new(), raster_all, G.CombineMode.ADD).raster_selected, "raster add selects complete layer")
 
 func _ink_transforms() -> void:
 	var layer: AtlasInkLayer = _ink()
@@ -193,7 +283,7 @@ func _store() -> void:
 	campaign.add_map(AtlasMapDocument.new("world", "Selection persistence"))
 	campaign.get_map("world").floors[0].layers = [moved, placed]
 	var path: String = "user://selection_smoke_%d_%d.scn" % [OS.get_process_id(), Time.get_ticks_usec()]
-	_check(AtlasCampaign.SCHEMA_VERSION == 6 and placed.to_dict().transform.size() == 6, "schema6 serializes six affine floats")
+	_check(AtlasCampaign.SCHEMA_VERSION == 7 and placed.to_dict().transform.size() == 6, "current schema serializes six affine floats")
 	_check(AtlasCampaignStore.save_campaign(campaign, path) == OK, "real store saves shapes/transforms/WebP")
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(path)
 	_check(loaded != null and loaded.to_dict() == campaign.to_dict(), "real store roundtrips geometry, style, order, placement")

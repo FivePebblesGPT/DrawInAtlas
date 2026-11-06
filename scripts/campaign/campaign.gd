@@ -5,12 +5,17 @@ extends Resource
 ## navigation edge; an optional placement describes a spatial battlemap footprint.
 ## AtlasCampaignStore owns saving/loading; callers do not choose its serializer.
 
-const SCHEMA_VERSION: int = 6
+const SCHEMA_VERSION: int = 7
 
 @export_storage var display_name: String = "West Marches"
 @export_storage var root_map_id: String = "world"
+## Canonical runtime document graph keyed by stable map ID; reconstructed from
+## native-save nodes rather than directly exported as a Resource property.
 var maps: Dictionary = {} # map ID -> AtlasMapDocument
+## Directed navigation edges between independent documents (not artwork LOD).
 @export_storage var links: Array[AtlasMapLink] = []
+## Legacy optional parent-board footprints. Keep for old-save compatibility;
+## a symbolic link does not thereby acquire a spatial footprint.
 @export_storage var placements: Array[AtlasPlacement] = []
 
 
@@ -63,7 +68,7 @@ func find_links_at(map_id: String, point: Vector2, floor_id: String = "") -> Arr
 		if target == null or target.floor_by_id(link.target_floor_id) == null:
 			continue
 		if not link.placement_id.is_empty():
-			var placement := placement_by_id(link.placement_id)
+			var placement: AtlasPlacement = placement_by_id(link.placement_id)
 			if (placement != null and placement.parent_map_id == map_id
 					and placement.child_map_id == link.target_map_id and placement.contains_parent_point(point)):
 				matches.append(link)
@@ -106,7 +111,7 @@ func to_dict() -> Dictionary:
 ## so the overview can report them rather than destroying user content.
 static func from_dict(data: Dictionary) -> AtlasCampaign:
 	var version: Variant = data.get("schema_version")
-	if not AtlasData.integer(version) or int(version) < 1 or int(version) > SCHEMA_VERSION:
+	if not AtlasData.integer(version) or int(version) != SCHEMA_VERSION:
 		return null
 	var raw_maps: Variant = data.get("maps")
 	var raw_links: Variant = data.get("links", [])
@@ -115,7 +120,7 @@ static func from_dict(data: Dictionary) -> AtlasCampaign:
 		return null
 	if not AtlasData.text(data.get("root_map_id")) or not AtlasData.text(data.get("name", "West Marches")):
 		return null
-	var campaign := AtlasCampaign.new()
+	var campaign: AtlasCampaign = AtlasCampaign.new()
 	campaign.display_name = str(data.get("name", "West Marches"))
 	campaign.root_map_id = str(data.get("root_map_id", "world"))
 	for saved_map: Variant in raw_maps:

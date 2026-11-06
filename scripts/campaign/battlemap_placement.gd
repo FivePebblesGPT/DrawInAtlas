@@ -10,11 +10,16 @@ extends Resource
 @export var parent_map_id: String = ""
 @export var child_map_id: String = ""
 @export var origin: Vector2 = Vector2.ZERO
+## Rotation in radians around origin, in the parent board's coordinate frame.
 @export var rotation: float = 0.0
+## Positive footprint dimensions in cell counts, not board units.
 @export var columns: int = 10
 @export var rows: int = 10
+## Positive length of a footprint cell in each distinct document's board units;
+## old placement conversion depends on their ratio and must not guess a scale.
 @export var parent_units_per_cell: float = 24.0
 @export var child_units_per_cell: float = 64.0
+## Nonspatial reference: do not interpret this placement as a hit-testable area.
 @export var symbolic: bool = false
 
 
@@ -27,7 +32,7 @@ func parent_to_local(position: Vector2) -> Vector2:
 
 
 func contains_parent_point(position: Vector2) -> bool:
-	var local := parent_to_local(position)
+	var local: Vector2 = parent_to_local(position)
 	return local.x >= 0.0 and local.y >= 0.0 and local.x < columns and local.y < rows
 
 
@@ -47,7 +52,7 @@ func child_bounds() -> Rect2:
 
 
 func corners() -> PackedVector2Array:
-	var transform := local_to_parent()
+	var transform: Transform2D = local_to_parent()
 	return PackedVector2Array([
 		transform * Vector2.ZERO,
 		transform * Vector2(columns, 0),
@@ -83,7 +88,7 @@ static func from_dict(data: Dictionary) -> AtlasPlacement:
 			return null
 	if not data.get("symbolic", false) is bool:
 		return null
-	var result := AtlasPlacement.new()
+	var result: AtlasPlacement = AtlasPlacement.new()
 	result.id = str(data.get("id", ""))
 	result.parent_map_id = str(data.get("parent_map_id", ""))
 	result.child_map_id = str(data.get("child_map_id", ""))

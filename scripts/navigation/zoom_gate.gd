@@ -26,7 +26,7 @@ func accept_blocked_step(next_direction: int, next_candidate: String, now_ms: in
 	if next_direction == 0 or next_candidate.is_empty():
 		reset()
 		return false
-	var expired := last_step_ms >= 0 and now_ms - last_step_ms > RESET_TIMEOUT_MS
+	var expired: bool = last_step_ms >= 0 and now_ms - last_step_ms > RESET_TIMEOUT_MS
 	if expired or direction != next_direction or candidate_id != next_candidate:
 		reset()
 		direction = next_direction

@@ -26,7 +26,7 @@ func _run() -> void:
 	editor.use_system_clipboard = false
 	second.use_system_clipboard = false
 	var payload: String = AtlasClipboard.encode_ink(
-		[AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(10, 5)]))], [0], Vector2.ZERO)
+		[AtlasEditablePath.make(PackedVector2Array([Vector2.ZERO, Vector2(10, 5)]), Color.WHITE, 2.0, false)], [0], Vector2.ZERO)
 	editor.clipboard_text = payload
 	editor.locked_to_cell = true
 	_check(editor.clipboard_text == payload and editor.locked_to_cell,
@@ -45,8 +45,8 @@ func _run() -> void:
 
 	_check(editor.inspector.scene_file_path == "res://prefab/inspector.tscn",
 		"fixed inspector is independently scene-authored")
-	_check(editor.tool_picker.owner == editor.inspector and editor.floor_picker.owner == editor.inspector,
-		"public controls reference the inspector's nodes")
+	_check(editor.tool_palette.get_parent() == editor.sidebar.get_view_content(&"Tools") and editor.floor_picker.owner == editor.inspector,
+		"palette is mounted in sidebar and floor controls remain inspector-owned")
 	_check(editor.browser.scene_file_path == "res://prefab/campaign_browser.tscn"
 		and editor.map_name_input.owner == editor.browser, "map form is independently scene-authored")
 	_check(editor.navigator.views == editor.view_session and editor.navigator.history == editor.history,
@@ -90,7 +90,8 @@ func _run() -> void:
 
 	var blank: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.GRIDLESS, 64.0)
 	_check(editor.create_board("Module sketch", blank), "create a blank editing target")
-	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO, Vector2(20, 10)])), false)
+	editor._choose_tool(AtlasCanvas.Tool.WALL_PATH)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([Vector2.ZERO, Vector2(20, 10)]), Color.WHITE, 2.0, false))
 	editor.select_all_artwork()
 	var original: Array[AtlasStroke] = AtlasStroke.clone_all(canvas.floor.strokes)
 	editor.move_x_spinner.value = 30.0
@@ -111,13 +112,12 @@ func _run() -> void:
 	editor.preview_picker.item_selected.emit(0)
 	editor.reference_checkbox.button_pressed = false
 	editor.opacity_slider.value = 0.6
-	editor.angle_spinner.value = 35.0
 	editor.brush_width_spinner.value = 12.0
 	editor.brush_color_picker.color_changed.emit(Color.BLUE)
 	_check(canvas.preview == AtlasCanvas.Preview.OFF and not canvas.show_reference
 		and is_equal_approx(canvas.reference_opacity, 0.6), "reference/preview controls update only the active canvas")
-	_check(is_equal_approx(canvas.battle_rotation, deg_to_rad(35.0)) and canvas.brush_width == 12.0
-		and canvas.brush_color == Color.BLUE, "placement and brush controls keep their signal wiring")
+	_check(canvas.brush_width == 12.0 and canvas.brush_color == Color.BLUE,
+		"brush controls keep their signal wiring without placement UI")
 	_check(editor.campaign.to_dict() == canonical and editor.edits.get_undo_command() == command,
 		"presentation and brush preferences never create document edits")
 
@@ -163,13 +163,13 @@ func _check_sidebar_expansion(editor: AtlasEditor) -> void:
 	editor.sidebar.select_view(&"Layers")
 	for frame: int in range(6):
 		await process_frame
-	var layers_height: float = editor.layer_panel.layer_list.size.y
+	var layers_height: float = editor.layer_panel.hierarchy.size.y
 	root.content_scale_size.y += 200
 	root.size = root.content_scale_size
 	for frame: int in range(6):
 		await process_frame
-	_check(editor.layer_panel.layer_list.size.y > layers_height + 100,
-		"Layers list expands into additional sidebar height")
+	_check(editor.layer_panel.hierarchy.size.y > layers_height + 100,
+		"Layer hierarchy expands into additional sidebar height")
 	root.content_scale_size = previous_scale
 	root.size = previous_size
 	editor.sidebar.select_view(&"Maps")

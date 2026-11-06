@@ -37,7 +37,6 @@ func _campaign() -> AtlasCampaign:
 	map.floors.append(AtlasFloor.new())
 	map.floors[1].id = "upper"
 	for floor: AtlasFloor in map.floors:
-		floor.paint(Vector2i(-2, 3), 7)
 		floor.strokes.append(AtlasStroke.new(PackedVector2Array([
 			Vector2(-12.875, 0.125), Vector2(0.375, -3.625), Vector2(55.25, 9.5)
 		]), Color(0.125, 0.375, 0.625, 0.5), 2.123456789012345))
@@ -63,7 +62,7 @@ func _creation() -> void:
 			var expected: Dictionary = input.to_dict()
 			var command: AtlasCreateMap = AtlasCreateMap.new("world", input)
 			input.grid.cell_size = 999.0
-			input.floors[0].paint(Vector2i.ZERO, 99)
+			input.floors[0].strokes.append(AtlasStroke.new(PackedVector2Array([Vector2.ZERO])))
 			input.display_name = "Caller mutation"
 			_check(history.execute(command), "create kind %d / native %s" % [kind, unit])
 			var created: AtlasMapDocument = campaign.get_map(command.new_map_id)
@@ -87,9 +86,9 @@ func _creation_guards() -> void:
 		_check(not history.execute(AtlasCreateMap.new("world", document)), "reject duplicate ID, blank name/ID or invalid grid")
 	_check(campaign.to_dict() == baseline and not history.is_dirty() and not history.can_undo(), "rejections are atomic")
 	_check(history.execute(AtlasCreateMap.new("world", AtlasMapDocument.new("new", "New"))), "stale-undo setup")
-	campaign.get_map("new").floors[0].paint(Vector2i.ZERO, 4)
+	campaign.get_map("new").floors[0].strokes.append(AtlasStroke.new(PackedVector2Array([Vector2.ZERO])))
 	_check(not history.undo() and campaign.get_map("new") != null, "changed created map prevents stale undo")
-	campaign.get_map("new").floors[0].terrain.clear()
+	campaign.get_map("new").floors[0].strokes.clear()
 	var link: AtlasMapLink = AtlasMapLink.new()
 	for outgoing: bool in [false, true]:
 		link.source_map_id = "new" if outgoing else "world"
@@ -100,26 +99,13 @@ func _creation_guards() -> void:
 	_check(history.undo() and campaign.to_dict() == baseline, "failed stale undo preserves history cursor")
 
 
-func _polygons(map: AtlasMapDocument) -> Array[PackedVector2Array]:
-	var result: Array[PackedVector2Array] = []
-	for floor: AtlasFloor in map.floors:
-		var keys: Array = floor.terrain.keys()
-		keys.sort()
-		for key: String in keys:
-			var xy: PackedStringArray = key.split(",")
-			result.append(map.get_terrain_grid().cell_polygon(Vector2i(int(xy[0]), int(xy[1]))))
-	return result
-
-
 func _overlay() -> void:
 	var campaign: AtlasCampaign = _campaign()
 	var map: AtlasMapDocument = campaign.get_map("world")
 	var history: AtlasEditHistory = _history(campaign)
 	var floors: Array = map.to_dict()["floors"]
-	var polygons: Array[PackedVector2Array] = _polygons(map)
 	var other: Dictionary = campaign.get_map("greyhaven").to_dict()
 	var original: AtlasGrid = map.grid.copy()
-	_check(map.terrain_grid == null and map.get_terrain_grid() == map.grid, "legacy terrain initially uses overlay basis")
 	var changes: Dictionary = {"cell_size": 17.25, "kind": AtlasGrid.Kind.HEX_FLAT,
 		"origin": Vector2(-29.5, 33.125), "rotation": -0.987654321098765,
 		"distance_per_cell": 0.375, "distance_unit": "km", "visible": false}
@@ -138,8 +124,7 @@ func _overlay() -> void:
 		detached.origin = Vector2(999.0, 999.0)
 		_check(history.redo() and map.grid.same_as(expected), "redo independent of detached/caller grids: " + field)
 		history.active_map_id = "world"
-		_check(map.get_terrain_grid().same_as(original), "terrain basis remains frozen: " + field)
-		_check(map.to_dict()["floors"] == floors and _polygons(map) == polygons, "exact strokes, terrain and polygon locations: " + field)
+		_check(map.to_dict()["floors"] == floors, "grid edits leave authored raster/ink unchanged: " + field)
 		_check(campaign.get_map("greyhaven").to_dict() == other, "other map artwork and native units unchanged: " + field)
 	history.mark_saved()
 	_check(not history.is_dirty() and history.undo() and history.is_dirty(), "undo away from saved grid is dirty")
@@ -184,41 +169,32 @@ func _validation() -> void:
 
 func _persistence() -> void:
 	var defaults: AtlasGrid = AtlasGrid.from_dict({})
-	_check(defaults != null and defaults.same_as(AtlasGrid.new()), "missing legacy grid fields default consistently")
-	for version: int in [1, 2]:
-		var legacy: Dictionary = {"schema_version": version, "root_map_id": "world",
-			"maps": [{"id": "world", "name": "Legacy", "grid": {}, "floors": [{"terrain": {"-2,3": 7}}]}]}
-		var loaded: AtlasCampaign = AtlasCampaign.from_dict(legacy)
-		_check(loaded != null, "read legacy schema %d" % version)
-		if loaded != null:
-			var map: AtlasMapDocument = loaded.get_map("world")
-			_check(map.grid.same_as(defaults) and map.get_terrain_grid().same_as(defaults)
-				and map.floors[0].strokes.is_empty() and map.floors[0].get_terrain(Vector2i(-2, 3)) == 7, "legacy artwork and frozen basis defaults")
+	_check(defaults != null and defaults.same_as(AtlasGrid.new()), "missing grid fields use explicit defaults")
+	for version: int in [1, 2, 3, 6]:
+		var legacy: Dictionary = _campaign().to_dict()
+		legacy.schema_version = version
+		_check(AtlasCampaign.from_dict(legacy) == null, "old prototype campaign schema rejected %d" % version)
 	var campaign: AtlasCampaign = _campaign()
 	var map: AtlasMapDocument = campaign.get_map("world")
 	var overlay: AtlasGrid = map.grid.copy()
 	overlay.rotation = -0.987654321098765
 	overlay.kind = AtlasGrid.Kind.SQUARE
-	_check(_history(campaign).execute(AtlasGridEdit.new("world", map.grid, overlay)), "persistence freezes distinct terrain basis")
+	_check(_history(campaign).execute(AtlasGridEdit.new("world", map.grid, overlay)), "grid edit recorded independently of artwork")
 	var restored: AtlasCampaign = AtlasCampaign.from_dict(campaign.to_dict())
 	_check(restored != null and restored.to_dict() == campaign.to_dict()
 		and campaign.to_dict()["schema_version"] == AtlasCampaign.SCHEMA_VERSION, "current schema dictionary roundtrip")
 	for field: String in ["grid", "terrain_grid"]:
 		var bad: Dictionary = campaign.to_dict()
-		bad["maps"][0][field] = {"rotation": NAN}
-		_check(AtlasCampaign.from_dict(bad) == null, "campaign rejects invalid " + field)
+		bad["maps"][0][field] = {"rotation": NAN} if field == "grid" else AtlasGrid.new().to_dict()
+		_check(AtlasCampaign.from_dict(bad) == null, "reject invalid or retired " + field)
 	var path: String = "user://board_grid_smoke_%d_%d.scn" % [OS.get_process_id(), Time.get_ticks_usec()]
 	_check(AtlasCampaignStore.save_campaign(campaign, path) == OK, "real store writes unique test file")
 	restored = AtlasCampaignStore.load_campaign(path)
-	_check(restored != null, "real store reloads schema 3 campaign")
+	_check(restored != null, "real store reloads current schema")
 	if restored != null:
 		var loaded: AtlasMapDocument = restored.get_map("world")
-		_check(loaded.grid.same_as(map.grid) and loaded.get_terrain_grid().same_as(map.get_terrain_grid()), "real store preserves exact full-precision overlay and terrain rotations")
+		_check(loaded.grid.same_as(map.grid), "real store preserves exact grid geometry and native units")
 		for index: int in range(map.floors.size()):
-			_check(AtlasStroke.same_artwork(loaded.floors[index].strokes, map.floors[index].strokes), "real store preserves exact stroke points, width and color")
-			# JSON numbers load as floats; compare palette values, not Variant types.
-			_check(loaded.floors[index].terrain.size() == map.floors[index].terrain.size(), "real store preserves terrain count")
-			for key: String in map.floors[index].terrain:
-				_check(loaded.floors[index].terrain.has(key) and loaded.floors[index].terrain[key] == map.floors[index].terrain[key], "real store preserves terrain cell " + key)
-		_check(_polygons(loaded) == _polygons(map), "real store preserves legacy polygon locations")
+			_check(AtlasStroke.same_artwork(loaded.floors[index].strokes, map.floors[index].strokes), "real store preserves vector artwork")
+			_check(loaded.floors[index].layers[0] is AtlasRasterLayer, "real store preserves first-class raster")
 	_check(DirAccess.remove_absolute(ProjectSettings.globalize_path(path)) == OK, "remove unique persistence fixture")
