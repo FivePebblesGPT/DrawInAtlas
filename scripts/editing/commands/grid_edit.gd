@@ -26,7 +26,5 @@ func _replace(campaign: AtlasCampaign, expected: AtlasGrid, replacement: AtlasGr
 		return false
 	if expected.same_as(replacement) or not document.grid.same_as(expected):
 		return false
-	if document.terrain_grid == null:
-		document.terrain_grid = document.grid.copy()
 	document.grid = replacement.copy()
 	return true

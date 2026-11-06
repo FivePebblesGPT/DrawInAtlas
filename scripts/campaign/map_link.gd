@@ -13,9 +13,12 @@ extends Resource
 ## Pointer hit-test tolerance for a marker-only entrance in source document units.
 ## Do not confuse this with a viewport-pixel radius or a placed battlemap size.
 @export_range(0.001, 1000000.0, 0.001, "or_greater") var hit_radius: float = 48.0
+## Saved arrival camera focus in TARGET document units (not source coordinates).
 @export var target_focus: Vector2 = Vector2.ZERO
+## Target camera magnification, positive screen-pixels-per-board-unit scale.
 @export var target_zoom: float = 1.0
 @export var target_floor_id: String = "ground"
+## Optional legacy footprint ID; empty means a simple source-board marker.
 @export var placement_id: String = ""
 
 
@@ -51,7 +54,7 @@ static func from_dict(data: Dictionary) -> AtlasMapLink:
 		return null
 	if not AtlasData.text(data.get("target_floor_id", "ground")) or not data.get("placement_id", "") is String:
 		return null
-	var link := AtlasMapLink.new()
+	var link: AtlasMapLink = AtlasMapLink.new()
 	link.id = str(data.get("id", ""))
 	link.source_map_id = str(data.get("source_map_id", ""))
 	link.source_floor_id = data.get("source_floor_id", "ground")

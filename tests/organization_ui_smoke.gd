@@ -37,14 +37,14 @@ func _run() -> void:
 	var upper_id: String = canvas.floor.id
 	_check(world.default_floor_id == "ground" and upper_id != "ground" and world.floors.size() == 2,
 		"adding/activating floor does not change document default")
-	_check(canvas.floor.strokes.is_empty() and canvas.floor.terrain.is_empty(), "new floor copies no artwork")
+	_check(canvas.floor.strokes.is_empty() and (canvas.floor.layers[0] as AtlasRasterLayer).chunks.is_empty(), "new floor copies no artwork")
 	_check(canvas.camera_center == Vector2(-20.5, 14.25) and canvas.camera_zoom == 1.7,
 		"first visit inherits camera for aligned floors")
 	canvas.camera_center = Vector2(140, -75)
 	canvas.camera_zoom = 2.3
-	editor.layer_panel._add_ink()
+	editor.layer_panel._add_objects()
 	var upper_layer: String = canvas.active_layer_id
-	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-1.25, 0.5), Vector2(24.125, 12.75)])), false)
+	editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([Vector2(-1.25, 0.5), Vector2(24.125, 12.75)]), Color.WHITE, 2.0, false))
 	editor.edits.mark_saved()
 	var canonical: Dictionary = editor.campaign.to_dict()
 	_check(editor.switch_floor("ground"), "existing floor activates")
@@ -52,8 +52,8 @@ func _run() -> void:
 		and canvas.camera_zoom == 1.7, "ground camera is restored exactly")
 	_check(editor.campaign.to_dict() == canonical and not editor.edits.is_dirty(), "floor navigation never dirties canonical data")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2.ZERO]), Color.RED), false)
-	_check((world.floor_by_id(upper_id).layer_by_id(upper_layer) as AtlasInkLayer).strokes.size() == 1
-		and world.floor_by_id("ground").strokes.size() == 1, "artwork edit targets only the active floor")
+	_check((world.floor_by_id(upper_id).layer_by_id(upper_layer) as AtlasObjectsLayer).strokes.size() == 1
+		and not world.floor_by_id("ground").raster_layer().chunks.is_empty(), "artwork edit targets only the active floor")
 	_check(editor.switch_floor(upper_id) and canvas.camera_center == Vector2(140, -75)
 		and canvas.camera_zoom == 2.3 and canvas.active_layer_id == upper_layer, "return restores floor camera and layer preference")
 	editor.floor_name_input.text = "Tower top"
@@ -65,9 +65,8 @@ func _run() -> void:
 	_check(editor.move_floor(-1) and world.floors[0].id == upper_id and canvas.floor.id == upper_id,
 		"floor reorder keeps the viewer on the same stable identity")
 	_check(editor.make_floor_default() and world.default_floor_id == upper_id, "default floor changes only on explicit action")
-	_check(world.get_terrain_grid("ground").kind == AtlasGrid.Kind.HEX_POINTY
-		and world.get_terrain_grid("ground").cell_size == 45.0
-		and world.get_terrain_grid(upper_id).cell_size == 80.0, "default/reorder never rebase legacy terrain geometry")
+	_check(world.grid.kind == AtlasGrid.Kind.SQUARE and world.grid.cell_size == 80.0,
+		"default/reorder retain independent board overlay")
 	_check(world.grid.cell_size == 80.0 and world.grid.distance_unit == "mi" and world.grid.distance_per_cell == 3.0,
 		"floor controls never change board grid or exploration scale")
 	_check(editor.open_map("greyhaven") and editor.create_floor("Roof"), "another board has its own floor set")
@@ -283,8 +282,7 @@ func _overview_ui() -> bool:
 		and open_button.disabled and focus_button.disabled,
 		"CELL without selection explains empty results and disables both actions")
 	# Select through the real tool picker and viewport, not by setting cell state.
-	editor.tool_picker.select(AtlasCanvas.Tool.SELECT)
-	editor.tool_picker.item_selected.emit(AtlasCanvas.Tool.SELECT)
+	editor.tool_palette.button_for(AtlasCanvas.Tool.SELECT).pressed.emit()
 	_click(canvas, canvas.document_to_local(center))
 	_check(canvas.has_selected_cell and canvas.selected_cell == cell,
 		"native SELECT click converts camera pixels through rotated/translated board grid")

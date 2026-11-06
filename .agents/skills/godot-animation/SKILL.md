@@ -85,7 +85,7 @@ func update_locomotion(input_dir: Vector2) -> void:
 func pop_in(node: Control) -> void:
     node.scale = Vector2.ZERO
     node.modulate.a = 0.0
-    var tw := create_tween()                          # bound to this node's tree
+    var tw: Tween = create_tween()                          # bound to this node's tree
     tw.set_parallel(true)                             # run the two tweens together
     tw.tween_property(node, "scale", Vector2.ONE, 0.2) \
       .set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)

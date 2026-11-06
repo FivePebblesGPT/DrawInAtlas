@@ -103,13 +103,13 @@ func _physics_process(_delta: float) -> void:
 
 func _physics_process(_delta: float) -> void:
     if ray.is_colliding():
-        var hit := ray.get_collider()
-        var point := ray.get_collision_point()
+        var hit: Object = ray.get_collider()
+        var point: Vector2 = ray.get_collision_point()
 
 # B) One-shot query from code (no node needed).
 func ground_under(global_from: Vector2) -> Dictionary:
-    var space := get_world_2d().direct_space_state
-    var query := PhysicsRayQueryParameters2D.create(global_from, global_from + Vector2(0, 64))
+    var space: PhysicsDirectSpaceState2D = get_world_2d().direct_space_state
+    var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(global_from, global_from + Vector2(0, 64))
     query.collision_mask = 1                 # only layer 1
     return space.intersect_ray(query)        # {} if nothing hit, else collider/position/normal
 ```

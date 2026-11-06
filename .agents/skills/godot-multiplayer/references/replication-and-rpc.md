@@ -46,7 +46,7 @@ Auto-instantiates scenes on remote peers when the authority spawns them.
 @onready var spawner: MultiplayerSpawner = $MultiplayerSpawner
 
 func server_spawn_player(id: int) -> void:
-    var p := preload("res://player.tscn").instantiate()
+    var p: Node = preload("res://player.tscn").instantiate()
     p.name = str(id)                 # deterministic name = authority id
     $Players.add_child(p, true)      # true = readable, replicated name
 ```
@@ -69,7 +69,7 @@ Replicates chosen properties from the authority to other peers each network tick
   `public_visibility` is off:
   ```gdscript
   sync.set_visibility_for(peer_id, true)
-  sync.add_visibility_filter(func(peer): return _can_see(peer))
+  sync.add_visibility_filter(func(peer: int) -> bool: return _can_see(peer))
   sync.update_visibility()
   ```
 
@@ -82,7 +82,7 @@ Protect RPCs from unauthenticated peers using the built-in handshake:
 
 ```gdscript
 # Both sides set auth_callback BEFORE assigning multiplayer_peer.
-@onready var sm := multiplayer as SceneMultiplayer   # auth API lives on SceneMultiplayer
+@onready var sm: SceneMultiplayer = multiplayer as SceneMultiplayer   # auth API lives on SceneMultiplayer
 
 func setup_server_auth() -> void:
     sm.auth_timeout = 3.0
@@ -96,7 +96,7 @@ func setup_client_auth() -> void:
     sm.auth_callback = func(_peer_id: int, _data: PackedByteArray) -> void:
         pass                                 # read the server's reply here, if any
     sm.peer_authenticating.connect(func(peer_id: int) -> void:
-        var payload := JSON.stringify({"token": _token}).to_utf8_buffer()
+        var payload: PackedByteArray = JSON.stringify({"token": _token}).to_utf8_buffer()
         sm.send_auth(peer_id, payload)
         sm.complete_auth(peer_id)            # the client must complete its side too
     )

@@ -60,6 +60,12 @@ tooltip_text = "Remove this entrance and its unshared footprint, keeping the des
 layout_mode = 2
 text = "Destination document and floor"
 
+[node name="NewLinkHelp" type="Label" parent="Scroll/Form"]
+layout_mode = 2
+text = "New links use markers to existing maps. To create another independent board, use File → New Board. Existing saved footprints remain editable."
+custom_minimum_size = Vector2(1, 0)
+autowrap_mode = 3
+
 [node name="TargetPicker" type="OptionButton" parent="Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -78,73 +84,16 @@ layout_mode = 2
 fit_to_longest_item = false
 selected = 0
 item_count = 3
-popup/item_0/text = "Spatial footprint"
+popup/item_0/text = "Spatial footprint (legacy edit only)"
 popup/item_0/id = 0
-popup/item_1/text = "Symbolic footprint (not aligned)"
+popup/item_1/text = "Symbolic footprint (legacy edit only)"
 popup/item_1/id = 1
 popup/item_2/text = "Marker / portal"
 popup/item_2/id = 2
 
-[node name="NewDocument" type="VBoxContainer" parent="Scroll/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="NameInput" type="LineEdit" parent="Scroll/Form/NewDocument"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "New independent document name"
-
-[node name="KindPicker" type="OptionButton" parent="Scroll/Form/NewDocument"]
-unique_name_in_owner = true
-layout_mode = 2
-selected = 0
-item_count = 4
-popup/item_0/text = "BATTLEMAP"
-popup/item_0/id = 0
-popup/item_1/text = "CITY"
-popup/item_1/id = 1
-popup/item_2/text = "DUNGEON"
-popup/item_2/id = 2
-popup/item_3/text = "BOARD"
-popup/item_3/id = 3
-
-[node name="NativeLabel" type="Label" parent="Scroll/Form/NewDocument"]
-layout_mode = 2
-text = "New document native distance per cell (never converted)"
-custom_minimum_size = Vector2(1, 0)
-autowrap_mode = 3
-
-[node name="NativeRow" type="HBoxContainer" parent="Scroll/Form/NewDocument"]
-layout_mode = 2
-
-[node name="NativeDistance" type="SpinBox" parent="Scroll/Form/NewDocument/NativeRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-min_value = 0.001
-max_value = 1000000.0
-step = 0.001
-value = 5.0
-
-[node name="NativeUnit" type="OptionButton" parent="Scroll/Form/NewDocument/NativeRow"]
-unique_name_in_owner = true
-layout_mode = 2
-selected = 0
-item_count = 5
-popup/item_0/text = "ft"
-popup/item_0/id = 0
-popup/item_1/text = "m"
-popup/item_1/id = 1
-popup/item_2/text = "mi"
-popup/item_2/id = 2
-popup/item_3/text = "km"
-popup/item_3/id = 3
-popup/item_4/text = "tiles"
-popup/item_4/id = 4
-
 [node name="PositionLabel" type="Label" parent="Scroll/Form"]
 layout_mode = 2
-text = "Source anchor / footprint origin (board units)"
+text = "Source anchor / legacy footprint origin (board units)"
 
 [node name="PositionRow" type="HBoxContainer" parent="Scroll/Form"]
 layout_mode = 2

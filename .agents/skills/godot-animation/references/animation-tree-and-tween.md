@@ -69,7 +69,7 @@ flag. Alternatively, keyframe `frame` / `region_rect` in an `AnimationPlayer`.
 ## Tween (create_tween) details
 
 ```gdscript
-var tw := create_tween()
+var tw: Tween = create_tween()
 tw.tween_property(obj, "position", target, 0.5)        # interpolate a property
 tw.tween_property(obj, "modulate:a", 0.0, 0.3)         # sub-property
 tw.tween_interval(0.2)                                 # wait

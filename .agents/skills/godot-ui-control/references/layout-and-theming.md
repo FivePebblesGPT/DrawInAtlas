@@ -54,10 +54,10 @@ A `Theme` resource maps (control type, property name) → value. Property kinds:
 `constant`, `font`, `font_size`, `icon`, `stylebox`.
 
 ```gdscript
-var theme := Theme.new()
+var theme: Theme = Theme.new()
 theme.set_color("font_color", "Button", Color.WHITE)
 theme.set_font_size("font_size", "Button", 18)
-var sb := StyleBoxFlat.new()
+var sb: StyleBoxFlat = StyleBoxFlat.new()
 sb.bg_color = Color(0.1, 0.1, 0.15)
 sb.set_corner_radius_all(8)
 sb.set_content_margin_all(12)

@@ -2,20 +2,21 @@ class_name AtlasInspector
 extends PanelContainer
 ## Keep form state local so editor commands remain the only document-edit boundary.
 
-signal tool_selected(index: int)
 signal floor_selected(id: String)
 signal floor_created(name: String)
 signal floor_renamed(name: String)
 signal floor_moved(direction: int)
 signal floor_default_requested()
 signal floor_removed()
-signal grid_changed(grid: AtlasGrid)
 signal scope_toggled(enabled: bool)
 signal selection_transform_requested(offset: Vector2, factor: float, radians: float)
 signal brush_color_changed(color: Color)
 signal brush_width_changed(value: float)
-signal palette_selected(index: int)
-signal placement_rotation_changed(radians: float)
+signal fill_tolerance_changed(value: float)
+signal fill_global_changed(enabled: bool)
+signal grid_snapping_toggled(enabled: bool)
+signal polygon_fill_toggled(enabled: bool)
+signal wall_restyle_requested
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
 signal reference_opacity_changed(value: float)
@@ -25,15 +26,17 @@ signal back_requested
 signal reference_source_changed(link_id: String, floor_id: String)
 signal reference_freeze_toggled(enabled: bool)
 
-@onready var tool_picker: OptionButton = %ToolPicker
 @onready var preview_picker: OptionButton = %PreviewPicker
-@onready var angle_spinner: SpinBox = %AngleSpinner
 @onready var lock_checkbox: CheckBox = %LockCheckbox
 @onready var reference_checkbox: CheckBox = %ReferenceCheckbox
 @onready var opacity_slider: HSlider = %OpacitySlider
-@onready var grid_controls: AtlasGridControls = %GridControls
 @onready var brush_color_picker: ColorPickerButton = %BrushColorPicker
 @onready var brush_width_spinner: SpinBox = %BrushWidthSpinner
+@onready var fill_tolerance_spinner: SpinBox = %FillTolerance
+@onready var fill_global_checkbox: CheckBox = %FillGlobal
+@onready var _bucket_section: VBoxContainer = %BucketSection
+@onready var _bucket_hint: Label = %BucketHint
+@onready var _bucket_tolerance_label: Label = %FillToleranceLabel
 @onready var selection_label: Label = %SelectionLabel
 @onready var move_x_spinner: SpinBox = %MoveXSpinner
 @onready var move_y_spinner: SpinBox = %MoveYSpinner
@@ -42,9 +45,15 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var floor_picker: OptionButton = %FloorPicker
 @onready var floor_name_input: LineEdit = %FloorNameInput
 
+@onready var snap_checkbox: CheckBox = %SnapCheckbox
+@onready var _snap_section: VBoxContainer = %SnapSection
 @onready var _ink_section: VBoxContainer = %InkSection
-@onready var _terrain_section: VBoxContainer = %TerrainSection
-@onready var _placement_section: VBoxContainer = %PlacementSection
+@onready var _ink_heading: Label = $Scroll/Margin/Sections/InkSection/Heading
+@onready var _ink_color_label: Label = $Scroll/Margin/Sections/InkSection/ColorLabel
+@onready var _eraser_hint: Label = %EraserHint
+@onready var _line_hint: Label = %LineHint
+@onready var _polygon_hint: Label = %PolygonHint
+@onready var polygon_fill_checkbox: CheckBox = %PolygonFill
 @onready var _selection_section: VBoxContainer = %SelectionSection
 @onready var _transform_button: Button = %TransformButton
 @onready var _floor_add: Button = %FloorAdd
@@ -53,21 +62,36 @@ signal reference_freeze_toggled(enabled: bool)
 @onready var _floor_down: Button = %FloorDown
 @onready var _floor_remove: Button = %FloorRemove
 @onready var _floor_default: Button = %FloorDefault
-@onready var _palette_picker: OptionButton = %PalettePicker
 @onready var _navigation_toggle: CheckBox = %NavigationToggle
 @onready var reference_source_picker: OptionButton = %ReferenceSourcePicker
 @onready var reference_floor_picker: OptionButton = %ReferenceFloorPicker
 @onready var freeze_checkbox: CheckBox = %FreezeReference
+
+@onready var _active_tool_label: Label = %ActiveToolLabel
 
 var _floor_ids: Array[String] = []
 var _reference_ids: Array[String] = []
 var _reference_floors: Array[String] = []
 var _reference_campaign: AtlasCampaign
 var _automatic_reference: String = ""
+var _current_tool: AtlasCanvas.Tool = AtlasCanvas.Tool.PEN
+var _wall_controls: VBoxContainer
+var _wall_restyle_button: Button
 
 
 func _ready() -> void:
-	tool_picker.item_selected.connect(tool_selected.emit)
+	_wall_controls = VBoxContainer.new()
+	var hint: Label = Label.new()
+	hint.text = "Wall path: click points, Enter finishes open, right-click closes. Drag a blue node to move it; Shift+click an edge inserts, Alt+click a node deletes."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.custom_minimum_size = Vector2(1, 0)
+	_wall_controls.add_child(hint)
+	_wall_restyle_button = Button.new()
+	_wall_restyle_button.text = "Apply color & width to selected path"
+	_wall_restyle_button.pressed.connect(wall_restyle_requested.emit)
+	_wall_controls.add_child(_wall_restyle_button)
+	_ink_section.add_child(_wall_controls)
+	_wall_controls.hide()
 	floor_picker.item_selected.connect(_on_floor_selected)
 	floor_name_input.text_submitted.connect(func(_text: String) -> void: floor_renamed.emit(floor_name_input.text))
 	_floor_add.pressed.connect(func() -> void: floor_created.emit(floor_name_input.text))
@@ -76,13 +100,17 @@ func _ready() -> void:
 	_floor_down.pressed.connect(floor_moved.emit.bind(-1))
 	_floor_default.pressed.connect(floor_default_requested.emit)
 	_floor_remove.pressed.connect(floor_removed.emit)
-	grid_controls.settings_changed.connect(grid_changed.emit)
 	lock_checkbox.toggled.connect(scope_toggled.emit)
+	snap_checkbox.toggled.connect(grid_snapping_toggled.emit)
+	polygon_fill_checkbox.toggled.connect(polygon_fill_toggled.emit)
 	_transform_button.pressed.connect(_on_transform_requested)
 	brush_color_picker.color_changed.connect(brush_color_changed.emit)
 	brush_width_spinner.value_changed.connect(brush_width_changed.emit)
-	_palette_picker.item_selected.connect(palette_selected.emit)
-	angle_spinner.value_changed.connect(_on_placement_rotation_changed)
+	fill_tolerance_spinner.value_changed.connect(func(value: float) -> void: fill_tolerance_changed.emit(value / 100.0))
+	fill_global_checkbox.toggled.connect(fill_global_changed.emit)
+	# SpinBox has an inner LineEdit; both it and the arrows receive wheel input separately.
+	brush_width_spinner.gui_input.connect(_on_brush_width_wheel)
+	brush_width_spinner.get_line_edit().gui_input.connect(_on_brush_width_wheel)
 	preview_picker.item_selected.connect(preview_changed.emit)
 	reference_checkbox.toggled.connect(reference_toggled.emit)
 	opacity_slider.value_changed.connect(reference_opacity_changed.emit)
@@ -119,20 +147,44 @@ func refresh_floors(map: AtlasMapDocument, floor: AtlasFloor) -> void:
 
 
 func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
+	_current_tool = tool
+	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.FILL]
-	brush_color_picker.disabled = tool == AtlasCanvas.Tool.ERASER
-	brush_width_spinner.editable = tool != AtlasCanvas.Tool.FILL
-	_terrain_section.visible = tool in [AtlasCanvas.Tool.PAINT, AtlasCanvas.Tool.FILL]
-	_placement_section.visible = tool == AtlasCanvas.Tool.BATTLEMAP
-	_selection_section.visible = tool == AtlasCanvas.Tool.ART_SELECT
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT] or tool == AtlasCanvas.Tool.FILL
+	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
+	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "TEXT COLOR" if tool == AtlasCanvas.Tool.TEXT else "BRUSH & STROKE")
+	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
+	_bucket_hint.text = "Raster: stored pixels on the active layer only. A blank raster has nothing to fill. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode."
+	_bucket_tolerance_label.visible = true
+	fill_tolerance_spinner.visible = true
+	fill_global_checkbox.visible = true
+	_eraser_hint.visible = erasing
+	_line_hint.visible = tool == AtlasCanvas.Tool.LINE
+	_wall_controls.visible = tool == AtlasCanvas.Tool.WALL_PATH
+	_polygon_hint.visible = tool == AtlasCanvas.Tool.POLYGON
+	polygon_fill_checkbox.visible = tool == AtlasCanvas.Tool.POLYGON
+	_ink_color_label.visible = not erasing
+	brush_color_picker.visible = not erasing
+	brush_color_picker.disabled = erasing
+	brush_width_spinner.editable = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
+	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
+	brush_width_spinner.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
+	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
+		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+	snap_checkbox.disabled = not grid_available
 
 
 func refresh_selection(selection: AtlasSelection, can_modify: bool) -> void:
-	selection_label.text = "Drag a marquee or click ink / a raster asset."
+	selection_label.text = ("Move: click an object and drag; V selects groups. Escape cancels."
+		if _current_tool == AtlasCanvas.Tool.MOVE else
+		"Objects: drag or click; Ctrl add, Alt subtract, Ctrl+D clear, Delete removes selected objects.")
 	if not selection.is_empty():
-		selection_label.text = "Raster asset selected" if selection.raster_selected else "%d strokes selected" % selection.stroke_indices.size()
+		var count: int = selection.stroke_indices.size()
+		var object_name: String = "Raster asset" if selection.raster_selected else "%d object%s" % [count, "" if count == 1 else "s"]
+		selection_label.text = ("%s selected · drag to move" % object_name
+			if _current_tool == AtlasCanvas.Tool.MOVE else "%s selected" % object_name)
 	move_x_spinner.set_value_no_signal(0.0)
 	move_y_spinner.set_value_no_signal(0.0)
 	scale_spinner.set_value_no_signal(1.0)
@@ -148,6 +200,21 @@ func sync_brush(color: Color, width: float) -> void:
 	brush_width_spinner.set_value_no_signal(width)
 
 
+func _on_brush_width_wheel(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if not mouse.pressed or mouse.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		return
+	if not brush_width_spinner.editable:
+		return
+	var direction: float = 1.0 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else -1.0
+	# Consume only wheel events over the field, so the parent ScrollContainer never scrolls here.
+	brush_width_spinner.value = clampf(brush_width_spinner.value + direction * brush_width_spinner.step,
+		brush_width_spinner.min_value, brush_width_spinner.max_value)
+	get_viewport().set_input_as_handled()
+
+
 func _on_floor_selected(index: int) -> void:
 	if index >= 0 and index < _floor_ids.size():
 		floor_selected.emit(_floor_ids[index])
@@ -156,10 +223,6 @@ func _on_floor_selected(index: int) -> void:
 func _on_transform_requested() -> void:
 	selection_transform_requested.emit(Vector2(move_x_spinner.value, move_y_spinner.value),
 		scale_spinner.value, deg_to_rad(artwork_rotation_spinner.value))
-
-
-func _on_placement_rotation_changed(value: float) -> void:
-	placement_rotation_changed.emit(deg_to_rad(value))
 
 
 func refresh_references(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor,

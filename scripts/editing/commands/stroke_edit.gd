@@ -8,7 +8,7 @@ var layer_id: String
 
 
 func _init(target_map: String, target_floor: String, before: Array[AtlasStroke],
-		after: Array[AtlasStroke], target_layer: String = "ink") -> void:
+		after: Array[AtlasStroke], target_layer: String = "objects") -> void:
 	map_id = target_map
 	floor_id = target_floor
 	layer_id = target_layer
@@ -31,7 +31,7 @@ func _replace(campaign: AtlasCampaign, expected: Array[AtlasStroke], replacement
 	var floor: AtlasFloor = document.floor_by_id(floor_id)
 	if floor == null:
 		return false
-	var layer: AtlasInkLayer = floor.layer_by_id(layer_id) as AtlasInkLayer
+	var layer: AtlasObjectsLayer = floor.layer_by_id(layer_id) as AtlasObjectsLayer
 	if layer == null or (validate_target and not layer.is_editable()):
 		return false
 	if not AtlasStroke.same_artwork(layer.strokes, expected):

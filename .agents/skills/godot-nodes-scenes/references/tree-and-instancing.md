@@ -15,10 +15,10 @@ Depth companion to `godot-nodes-scenes`.
 ## Loading and instancing
 
 ```gdscript
-const SCENE := preload("res://enemy.tscn")   # constant path, loaded with the script
-var dynamic := load(path_variable)            # runtime path, may be a variable
+const SCENE: PackedScene = preload("res://enemy.tscn")   # constant path, loaded with the script
+var dynamic: Resource = load(path_variable)            # runtime path, may be a variable
 
-var e := SCENE.instantiate()                  # PackedScene -> Node
+var e: Node = SCENE.instantiate()                  # PackedScene -> Node
 add_child(e)                                  # enters tree, _ready() fires
 # To instance with the editor state of exported sub-resources, instantiate() is enough.
 ```
@@ -33,11 +33,11 @@ To build a scene in code and save it, every node you want serialized must have i
 
 ```gdscript
 func save_built_scene() -> void:
-    var root := Node2D.new()
-    var child := Sprite2D.new()
+    var root: Node2D = Node2D.new()
+    var child: Sprite2D = Sprite2D.new()
     root.add_child(child)
     child.owner = root                 # without this, child is NOT saved
-    var packed := PackedScene.new()
+    var packed: PackedScene = PackedScene.new()
     packed.pack(root)
     ResourceSaver.save(packed, "res://generated.tscn")
 ```

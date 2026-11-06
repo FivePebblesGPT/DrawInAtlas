@@ -6,9 +6,11 @@ extends RefCounted
 ## the document or change the default floor written to the save file.
 
 class MapViews extends RefCounted:
+	## Snapshot by floor ID; nested MapViews values are session-only copies.
 	var floors: Dictionary[String, AtlasViewState] = {}
 	var last_floor_id: String = ""
 
+## Ephemeral map-ID -> remembered floor views; deliberately not exported.
 var _maps: Dictionary[String, MapViews] = {}
 
 
@@ -51,7 +53,8 @@ func resolve(campaign: AtlasCampaign, map_id: String, floor_id: String = "", fal
 	if not _valid_state(state):
 		return null
 	if floor.layer_by_id(state.layer_id) == null:
-		state.layer_id = "ink" if floor.layer_by_id("ink") != null else ""
+		var raster: AtlasRasterLayer = floor.raster_layer()
+		state.layer_id = raster.id if raster != null else ""
 		if state.layer_id.is_empty() and not floor.layers.is_empty():
 			state.layer_id = floor.layers.back().id
 	remember(state)

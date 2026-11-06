@@ -50,9 +50,9 @@ signal _race_finished(signal_won: bool)
 
 ## Returns true if `sig` fired within `seconds`, false on timeout.
 func await_signal_or_timeout(sig: Signal, seconds: float) -> bool:
-    var on_signal := func(..._args: Array) -> void: _race_finished.emit(true)
-    var on_timeout := func() -> void: _race_finished.emit(false)
-    var timer := get_tree().create_timer(seconds)
+    var on_signal: Callable = func(..._args: Array) -> void: _race_finished.emit(true)
+    var on_timeout: Callable = func() -> void: _race_finished.emit(false)
+    var timer: SceneTreeTimer = get_tree().create_timer(seconds)
     sig.connect(on_signal, CONNECT_ONE_SHOT)
     timer.timeout.connect(on_timeout, CONNECT_ONE_SHOT)
     var won: bool = await _race_finished
