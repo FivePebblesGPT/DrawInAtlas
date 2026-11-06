@@ -9,6 +9,7 @@ signal automatic_detail_toggled(enabled: bool)
 signal show_editing_detail_requested
 signal object_selected(layer_id: String, stroke_index: int)
 signal link_action_requested(link_id: String, action: StringName)
+signal link_action_rejected
 
 const LINK_FOCUS: int = 1
 const LINK_EDIT: int = 2
@@ -43,6 +44,8 @@ var _building: bool = false
 var _settings_open: bool = false
 var _layer_rows: Dictionary[String, TreeItem] = {}
 var _stroke_rows: Dictionary[String, TreeItem] = {}
+var _pinned_stroke_layer: String = ""
+var _pinned_stroke_index: int = -1
 
 
 func _ready() -> void:
@@ -183,27 +186,42 @@ func set_navigation_context(campaign: AtlasCampaign, map: AtlasMapDocument) -> v
 
 
 func sync_object_selection(selection: AtlasSelection) -> void:
-	# A cleared or multi-object selection must not leave one stale stroke highlighted.
-	if selection == null or selection.is_empty() or selection.stroke_indices.size() != 1:
+	var layer: AtlasLayer = _floor.layer_by_id(selection.layer_id) if _floor != null and selection != null else null
+	var single_stroke: bool = (selection != null and selection.stroke_indices.size() == 1
+		and not selection.is_empty() and layer is AtlasObjectsLayer and selection.matches(layer))
+	var index: int = selection.stroke_indices[0] if single_stroke else -1
+	var layer_id: String = selection.layer_id if single_stroke else ""
+	var key: String = "%s:%d" % [layer_id, index]
+
+	# The extra row is only needed while its exact live object is selected.
+	# Dropping it on deselect or a stale snapshot prevents false highlights.
+	if _pinned_stroke_index >= 0 and (_pinned_stroke_layer != layer_id or _pinned_stroke_index != index):
+		_pinned_stroke_layer = ""
+		_pinned_stroke_index = -1
+		_rebuild_hierarchy()
+	if not single_stroke:
 		if _layer_rows.has(_selected):
 			_building = true
 			(_layer_rows[_selected] as TreeItem).select(0)
 			_building = false
 		return
-	var key: String = "%s:%d" % [selection.layer_id, selection.stroke_indices[0]]
+	if not _stroke_rows.has(key):
+		_pinned_stroke_layer = layer_id
+		_pinned_stroke_index = index
+		_rebuild_hierarchy()
 	if not _stroke_rows.has(key):
 		return
+
 	var row: TreeItem = _stroke_rows[key]
 	_building = true
 	var layer_row: TreeItem = row.get_parent()
 	var group: TreeItem = layer_row.get_parent()
 	group.collapsed = false
 	layer_row.collapsed = false
-	_collapsed["layer:" + selection.layer_id] = false
-	var selected_layer: AtlasLayer = _floor.layer_by_id(selection.layer_id)
-	if selected_layer != null:
-		_collapsed["detail:%d" % selected_layer.detail_level] = false
+	_collapsed["layer:" + layer_id] = false
+	_collapsed["detail:%d" % layer.detail_level] = false
 	row.select(0)
+	hierarchy.scroll_to_item(row)
 	_building = false
 
 
@@ -226,6 +244,23 @@ func _make_row(parent: TreeItem, label: String, metadata: Dictionary, tooltip: S
 	if not tooltip.is_empty():
 		row.set_tooltip_text(0, tooltip)
 	return row
+
+
+func _visible_stroke_indices(total: int, layer_id: String) -> Array[int]:
+	# Keep the hierarchy bounded while showing both old and newly added objects.
+	# A canvas-selected object in the omitted middle gets one temporary row.
+	var indices: Array[int] = []
+	var head: int = mini(total, MAX_STROKE_ROWS / 2)
+	var tail_start: int = maxi(head, total - (MAX_STROKE_ROWS - head))
+	for index: int in range(head):
+		indices.append(index)
+	for index: int in range(tail_start, total):
+		indices.append(index)
+	if _pinned_stroke_layer == layer_id and _pinned_stroke_index >= head \
+			and _pinned_stroke_index < tail_start:
+		indices.append(_pinned_stroke_index)
+		indices.sort()
+	return indices
 
 
 func _rebuild_hierarchy() -> void:
@@ -259,14 +294,21 @@ func _rebuild_hierarchy() -> void:
 				badges += " [hidden]"
 			var entry: TreeItem = _make_row(group, "%s · %s%s" % [
 				"Objects" if layer is AtlasObjectsLayer and layer.display_name == "Ink" else layer.display_name,
-				"objects" if layer is AtlasObjectsLayer else "raster", badges], {"kind": "layer", "id": layer.id},
+				"objects" if layer is AtlasObjectsLayer else "tokens" if layer is AtlasTokenLayer else "raster", badges], {"kind": "layer", "id": layer.id},
 				"%s · D%d · %s\nSelect to edit on the continuous board." % [layer.display_name, level, layer.kind])
 			_layer_rows[layer.id] = entry
 			entry.add_button(0, ICON_EDIT, LAYER_SETTINGS, false, "Select layer and open its settings")
 			entry.collapsed = _collapsed.get("layer:" + layer.id, true)
 			if layer is AtlasObjectsLayer:
 				var ink: AtlasObjectsLayer = layer as AtlasObjectsLayer
-				for stroke_index: int in range(mini(ink.strokes.size(), MAX_STROKE_ROWS)):
+				var previous_index: int = -1
+				for stroke_index: int in _visible_stroke_indices(ink.strokes.size(), layer.id):
+					if stroke_index > previous_index + 1:
+						var omitted: int = stroke_index - previous_index - 1
+						var summary: TreeItem = _make_row(entry, "… %d objects (select on canvas)" % omitted,
+							{"kind": "summary"})
+						summary.set_selectable(0, false)
+					previous_index = stroke_index
 					var stroke: AtlasStroke = ink.strokes[stroke_index]
 					var title: String
 					if stroke.is_prop():
@@ -281,10 +323,11 @@ func _rebuild_hierarchy() -> void:
 					var item: TreeItem = _make_row(entry, title, {"kind": "stroke", "id": layer.id,
 						"index": stroke_index}, "Select this object for whole-object edits")
 					_stroke_rows["%s:%d" % [layer.id, stroke_index]] = item
-				if ink.strokes.size() > MAX_STROKE_ROWS:
-					var more: TreeItem = _make_row(entry, "… %d more strokes (use Select tool)" %
-						(ink.strokes.size() - MAX_STROKE_ROWS), {"kind": "summary"})
-					more.set_selectable(0, false)
+				# Omitted middle objects remain selectable directly on the canvas.
+			elif layer is AtlasTokenLayer:
+				var markers: AtlasTokenLayer = layer as AtlasTokenLayer
+				_make_row(entry, "%d GM tokens · canvas selection" % markers.tokens.size(),
+					{"kind": "summary"}, "Token placement, drag, and deletion use the Token tool")
 			elif layer is AtlasRasterLayer:
 				var raster: AtlasRasterLayer = layer as AtlasRasterLayer
 				if not raster.chunks.is_empty():
@@ -300,10 +343,22 @@ func _rebuild_hierarchy() -> void:
 	heading.collapsed = _collapsed.get(links_key, false)
 	for link: AtlasMapLink in links:
 		var target: AtlasMapDocument = _campaign.get_map(link.target_map_id)
+		var target_floor: AtlasFloor = target.floor_by_id(link.target_floor_id) if target != null else null
+		var placement: AtlasPlacement = (
+			_campaign.placement_by_id(link.placement_id) if not link.placement_id.is_empty() else null)
 		var label: String = "%s / %s" % [target.display_name if target != null else "Missing destination",
 			link.target_floor_id]
-		var row: TreeItem = _make_row(heading, label,
-			{"kind": "link", "id": link.id}, "Independent destination: %s / %s\nEntrance at %s\nLinks navigate documents; they are not detail layers" % [target.display_name if target != null else "Missing map", link.target_floor_id, link.anchor])
+		# Tree rows survive until the next refresh, but their destinations may not.
+		# Save immutable values and source identities so a stale click cannot act
+		# on a different entrance or map with the same IDs.
+		var snapshot: Dictionary = {"kind": "link", "id": link.id,
+			"campaign": _campaign, "map": _map, "floor": _floor,
+			"link_ref": link, "link": link.to_dict().duplicate(true),
+			"placement_ref": placement, "placement": placement.to_dict().duplicate(true) if placement != null else {},
+			"target": target, "target_floor": target_floor,
+			"target_name": target.display_name if target != null else ""}
+		var row: TreeItem = _make_row(heading, label, snapshot,
+			"Independent destination: %s / %s\nEntrance at %s\nLinks navigate documents; they are not detail layers" % [target.display_name if target != null else "Missing map", link.target_floor_id, link.anchor])
 		row.add_button(0, ICON_FOCUS, LINK_FOCUS, false, "Locate on this board")
 		row.add_button(0, ICON_EDIT, LINK_EDIT, false, "Edit link")
 		row.add_button(0, ICON_ENTER, LINK_ENTER, target == null or target.floor_by_id(link.target_floor_id) == null, "Enter destination map")
@@ -339,6 +394,32 @@ func _on_hierarchy_selected() -> void:
 			object_selected.emit.call_deferred(str(data.get("id", "")), -1)
 
 
+## Link rows are action handles, not authority to navigate. The document and
+## destination can change while the Tree is on screen, even without a redraw.
+func _link_row_is_current(data: Dictionary) -> bool:
+	if _campaign == null or _map == null or _floor == null or data.get("campaign") != _campaign \
+			or data.get("map") != _map or data.get("floor") != _floor:
+		return false
+	if _campaign.get_map(_map.id) != _map or _map.floor_by_id(_floor.id) != _floor:
+		return false
+	var link: AtlasMapLink = _campaign.link_by_id(str(data.get("id", "")))
+	if link == null or link != data.get("link_ref") or link.source_map_id != _map.id \
+			or link.source_floor_id != _floor.id or link.to_dict() != data.get("link"):
+		return false
+	var placement: AtlasPlacement = (
+		_campaign.placement_by_id(link.placement_id) if not link.placement_id.is_empty() else null)
+	if placement != data.get("placement_ref") \
+			or (placement.to_dict() if placement != null else {}) != data.get("placement"):
+		return false
+	var target: AtlasMapDocument = _campaign.get_map(link.target_map_id)
+	if target != data.get("target"):
+		return false
+	if target != null:
+		return target.display_name == data.get("target_name") \
+			and target.floor_by_id(link.target_floor_id) == data.get("target_floor")
+	return data.get("target_name") == "" and data.get("target_floor") == null
+
+
 func _on_hierarchy_button(item: TreeItem, _column: int, id: int, _mouse_button_index: int) -> void:
 	var data: Dictionary = item.get_metadata(0) if item.get_metadata(0) is Dictionary else {}
 	if data.get("kind") == "layer" and id == LAYER_SETTINGS:
@@ -347,6 +428,11 @@ func _on_hierarchy_button(item: TreeItem, _column: int, id: int, _mouse_button_i
 		_update_layer_settings()
 		return
 	if data.get("kind") != "link":
+		return
+	if not _link_row_is_current(data):
+		# Rebuilding inside a Tree button signal can invalidate the clicked item.
+		_rebuild_hierarchy.call_deferred()
+		link_action_rejected.emit()
 		return
 	var link_id: String = str(data.get("id", ""))
 	match id:

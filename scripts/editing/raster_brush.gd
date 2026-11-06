@@ -66,8 +66,10 @@ func append(path: PackedVector2Array) -> AtlasFillResult:
 	return result
 
 
-## path/width are in document-board units; candidate coordinates and limit
-## are in raster PIXELS after inverse transform and pixels_per_unit scaling.
+## path/width are in document-board units; candidate coordinates are raster
+## PIXELS after inverse transform and pixels_per_unit scaling. `limit` caps each
+## *candidate scan window*, not the total pixels painted by a long gesture;
+## oversized segments are subdivided, while oversized stationary dots fail.
 ## The resulting layer is detached; no source pixels are modified in place.
 static func paint(layer: AtlasRasterLayer, path: PackedVector2Array, color: Color,
 		width: float, erase: bool, scope: AtlasEditScope = null,
@@ -99,9 +101,10 @@ static func paint_stroke(layer: AtlasRasterLayer, stroke: AtlasStroke, erase: bo
 	return AtlasFill._failure(error) if not error.is_empty() else AtlasFill._paint_pixel_colors(layer, changes)
 
 
-## Stage one swept leg of the gesture. A window wider than the pixel limit is
-## split at its midpoint instead of failing the whole session, so long loops and
-## sparse leg jumps stay bounded; coverage math is unchanged by the split.
+## Stage one swept leg of the gesture. If its candidate scan exceeds the
+## pixel budget, split the *segment*, not its already-staged pixel results.
+## `_covered` makes repeated boundary pixels and self-overlaps blend once.
+## A stationary dot cannot be subdivided and must fail when over budget.
 func _stage_segment(start: Vector2, end: Vector2, replacement: Color,
 		changes: Dictionary[Vector2i, Color]) -> String:
 	var pixels: Rect2i = _pixel_bounds(Rect2(start, Vector2.ZERO).expand(end).grow(_width * 0.5))
@@ -111,6 +114,8 @@ func _stage_segment(start: Vector2, end: Vector2, replacement: Color,
 	var failure: String = _error
 	if failure != "Brush exceeds the candidate pixel limit." or end == start:
 		return failure
+	# Only the per-window limit is recoverable. Clear the error before
+	# recursing; other invalid bounds/path errors remain sticky for the session.
 	_error = ""
 	var middle: Vector2 = (start + end) * 0.5
 	var first_error: String = _stage_segment(start, middle, replacement, changes)

@@ -212,9 +212,33 @@ func _test_raster_brush() -> void:
 		"pen scope filters entire pixel quads")
 	_rejected(AtlasRasterBrush.paint(empty, path, Color.RED, 1.0, false,
 		_rect_scope(Rect2(-0.9, -0.9, 0.8, 0.8))), "scope containing center but not quad rejects brush")
-	_rejected(AtlasRasterBrush.paint(empty, path, Color.RED, 1.0, false, null, 2),
-		"large brush candidate area rejects atomically")
-	_check(empty.chunks.is_empty(), "rejected brush allocates no source chunks")
+	# The limit bounds each scanned candidate window, not a complete gesture.
+	# Splitting long legs must preserve pixel coverage and one-time alpha blending.
+	var doubled_back: PackedVector2Array = path.duplicate()
+	doubled_back.append(path[0])
+	var translucent: Color = Color(1.0, 0.0, 0.0, 0.5)
+	var split: AtlasFillResult = AtlasRasterBrush.paint(empty, doubled_back,
+		translucent, 1.0, false, null, 2)
+	var reference: AtlasFillResult = AtlasRasterBrush.paint(empty, doubled_back,
+		translucent, 1.0, false, null, 1024)
+	var exact: bool = split.ok and reference.ok and split.layer != null \
+		and reference.layer != null
+	if exact:
+		exact = split.layer.chunks.size() == reference.layer.chunks.size()
+		for key: String in reference.layer.chunks:
+			if not split.layer.chunks.has(key) \
+					or split.layer.chunks[key].asset_id != reference.layer.chunks[key].asset_id:
+				exact = false
+	_check(exact, "small candidate windows split long brush legs without changing RGBA pixels")
+	if split.ok:
+		_check(_pixel(split.layer, Vector2i(-2, -1)).a > 0.49 \
+			and _pixel(split.layer, Vector2i(1, -1)).a > 0.49 \
+			and _pixel(split.layer, Vector2i(0, -1)).a < 0.51,
+			"long split and doubled-back legs paint both ends without accumulating alpha")
+	# A stationary dot cannot be bisected; an over-budget footprint still fails.
+	_rejected(AtlasRasterBrush.paint(empty, PackedVector2Array([Vector2.ZERO]),
+		Color.RED, 2.0, false, null, 2), "oversized dot rejects atomically")
+	_check(empty.chunks.is_empty(), "split and rejected brush leave source chunks untouched")
 	_rejected(AtlasRasterBrush.paint(empty, path, Color.RED, 1.0, true),
 		"eraser on absent raster pixels is a no-op")
 	_rejected(AtlasRasterBrush.paint(painted.layer, path, Color.RED, 1.0, false),

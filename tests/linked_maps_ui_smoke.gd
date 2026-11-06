@@ -163,6 +163,41 @@ func _forms_and_history() -> bool:
 	var wrong_floor: AtlasMapLink = AtlasMapLink.from_dict(current.to_dict())
 	wrong_floor.source_floor_id = "ground"
 	_check(not editor.linked_maps.submit(wrong_floor, calibrated), "active child/source-floor context cannot modify another floor's entrance")
+	# A form opened before a graph edit must not delete or navigate from stale data.
+	editor.linked_maps.open()
+	var stale_link: AtlasMapLink = editor.campaign.link_by_id(_entrance_id)
+	var state_before_stale_actions: AtlasEditCommand = editor.edits.get_undo_command()
+	var camera_before_stale_actions: Vector2 = canvas.camera_center
+	stale_link.hit_radius += 2.0
+	dialog.remove_button.pressed.emit()
+	_check(editor.campaign.link_by_id(_entrance_id) == stale_link and dialog.visible
+		and not dialog.error_label.text.is_empty() and editor.edits.get_undo_command() == state_before_stale_actions,
+		"stale Remove keeps the entrance, history and dialog intact")
+	dialog.focus_button.pressed.emit()
+	_check(canvas.camera_center == camera_before_stale_actions and dialog.visible,
+		"stale Focus does not move the camera")
+	dialog.enter_button.pressed.emit()
+	_check(canvas.map.id == "world" and canvas.floor.id == _upper_id and dialog.visible,
+		"stale Enter does not navigate to a changed destination")
+	stale_link.hit_radius -= 2.0
+	dialog.hide()
+	editor.linked_maps.open()
+	var stale_placement: AtlasPlacement = editor.campaign.placement_by_id(footprint.id)
+	stale_placement.origin += Vector2(5, -3)
+	_check(not editor.linked_maps.remove(_entrance_id) and editor.campaign.link_by_id(_entrance_id) != null
+		and dialog.visible and not dialog.error_label.text.is_empty(),
+		"stale legacy footprint also blocks destructive unlink")
+	stale_placement.origin -= Vector2(5, -3)
+	dialog.hide()
+	editor.linked_maps.open()
+	var removed_index: int = editor.campaign.links.find(stale_link)
+	editor.campaign.links.remove_at(removed_index)
+	dialog.remove_button.pressed.emit()
+	_check(dialog.visible and not dialog.error_label.text.is_empty()
+		and editor.edits.get_undo_command() == state_before_stale_actions,
+		"removed entrance is reported as stale rather than silently accepted")
+	editor.campaign.links.insert(removed_index, stale_link)
+	dialog.hide()
 	editor.linked_maps.open()
 	dialog.remove_button.pressed.emit()
 	_check(editor.campaign.link_by_id(_entrance_id) == null and editor.campaign.get_map("greyhaven") != null, "Unlink keeps the independently editable destination")

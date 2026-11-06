@@ -63,6 +63,32 @@ func _run() -> void:
 	raster.pixels_per_unit = 2.0
 	raster.chunks["-2,3"] = AtlasRasterChunk.new(Vector2i(-2, 3), image)
 	child.floors[0].layers.append(raster)
+	# A nonempty local image fits the registered crop, while a fully transparent
+	# image outside it must not be misdiagnosed as lost painted artwork.
+	var interior: AtlasRasterLayer = AtlasRasterLayer.new("inside-raster", "Inside crop")
+	var inside_pixels: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	inside_pixels.fill(Color(1.0, 0.2, 0.1, 0.6))
+	interior.chunks["0,0"] = AtlasRasterChunk.new(Vector2i.ZERO, inside_pixels)
+	var transparent_pixels: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	transparent_pixels.fill(Color.TRANSPARENT)
+	interior.chunks["-12,-6"] = AtlasRasterChunk.new(Vector2i(-12, -6), transparent_pixels)
+	child.floors[0].layers.append(interior)
+	var rotated: AtlasRasterLayer = AtlasRasterLayer.new("rotated-raster", "Rotated crop")
+	rotated.transform = Transform2D(PI * 0.5, Vector2.ONE, 0.0, Vector2(4, 4))
+	rotated.chunks["0,0"] = AtlasRasterChunk.new(Vector2i.ZERO, inside_pixels)
+	child.floors[0].layers.append(rotated)
+	# Ordinary geometry crossing the origin and more complex semantic objects
+	# have different preservation risks from signed raster chunks.
+	ink.strokes.append(AtlasStroke.new(PackedVector2Array([
+		Vector2(12, 12), Vector2(32, 18)]), Color.WHITE, 2.0))
+	var label: AtlasStroke = AtlasStroke.new(PackedVector2Array([Vector2(20, 20)]),
+		Color.WHITE, 12.0)
+	label.text = "Ruins"
+	ink.strokes.append(label)
+	var tokens: AtlasTokenLayer = AtlasTokenLayer.new("legacy-tokens", "Legacy GM tokens")
+	tokens.tokens.append(AtlasToken.new("legacy-token", Vector2(90, 10), "Sentinel"))
+	child.floors[0].layers.append(tokens)
+	child.floors[0].fog_enabled = true
 	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	upper.display_name = "Upper"
@@ -139,6 +165,19 @@ func _run() -> void:
 		if layer["kind"] == "OBJECTS" and layer["stroke_count"] == ink.strokes.size():
 			ink_found = true
 	_check(ink_found, "ink count is inventoried")
+	_check(child_record["floors"][0]["fog_enabled"]
+		and child_record["floors"][0]["fog_region_count"] == 0,
+		"floor privacy state is included in the conversion inventory")
+	var typed_counts_ok: bool = false
+	var token_count_ok: bool = false
+	for layer: Dictionary in layers:
+		if layer["kind"] == "OBJECTS":
+			typed_counts_ok = (layer["text_count"] == 1
+				and layer["prop_count"] == 0 and layer["wall_path_count"] == 0)
+		elif layer["kind"] == "TOKENS":
+			token_count_ok = layer["token_count"] == 1
+	_check(typed_counts_ok and token_count_ok,
+		"migration inventory distinguishes text, walls, props, and GM tokens")
 
 	var spatial_record: Dictionary = _placement_record(report, "spatial")
 	_check(spatial_record["link_ids"].size() == 3 and spatial_record["child_units_per_cell"] == 64.0,
@@ -147,11 +186,42 @@ func _run() -> void:
 	_check(is_equal_approx(matrix[0], 0.375) and is_zero_approx(matrix[1])
 		and matrix[4] == 23.0 and matrix[5] == -11.0,
 		"candidate affine transform is recorded without applying it")
+	var crop_warnings: Array = spatial_record["artwork_crop_warnings"]
+	var outside_raster: bool = false
+	var inside_raster_warning: bool = false
+	var outside_object: bool = false
+	var rotated_raster_warning: bool = false
+	var unassessed_label: bool = false
+	for warning: Dictionary in crop_warnings:
+		if warning["reason"] == "raster_outside_registered_crop" and warning["layer_id"] == "legacy-raster":
+			outside_raster = warning["chunk_key"] == "-2,3"
+		if warning.has("layer_id") and warning["layer_id"] == "inside-raster":
+			inside_raster_warning = true
+		if warning["reason"] == "raster_outside_registered_crop" \
+				and warning["layer_id"] == "rotated-raster":
+			rotated_raster_warning = true
+		if warning["reason"] == "object_outside_registered_crop":
+			outside_object = true
+		if warning["reason"] == "semantic_extent_requires_review":
+			unassessed_label = true
+	_check(outside_raster and outside_object,
+		"signed nontransparent raster and path outside the registered crop are flagged")
+	_check(not inside_raster_warning,
+		"interior pixels and distant transparent chunks cause no crop warning")
+	_check(rotated_raster_warning,
+		"rotated pixel bounds are transformed before checking crop intersection")
+	_check(unassessed_label and _has_risk(report, "fog_policy_requires_review", "spatial")
+		and _has_risk(report, "token_policy_requires_review", "spatial"),
+		"unassessed text extents, floor fog, and GM tokens cannot silently migrate")
+	_check(_has_risk(report, "raster_outside_registered_crop", "spatial")
+		and _has_risk(report, "object_outside_registered_crop", "spatial"),
+		"crop findings appear in the top-level conversion risk list")
 	_check(_has_risk(report, "shared_placement", "spatial")
 		and _has_risk(report, "placement_link_mismatch", "conflicting"),
 		"shared and conflicting placements require explicit review")
-	_check(_has_risk(report, "symbolic_no_spatial_registration", "symbolic"),
-		"symbolic placement is never treated as a registered canvas transform")
+	_check(_has_risk(report, "symbolic_no_spatial_registration", "symbolic")
+		and (_placement_record(report, "symbolic")["artwork_crop_warnings"] as Array).is_empty(),
+		"symbolic placement has no registered crop or implied conversion extent")
 	_check(_has_risk(report, "orphan_placement", "orphan")
 		and _has_risk(report, "missing_link_placement", "missing-placement"),
 		"orphan and missing placements are reported rather than discarded")

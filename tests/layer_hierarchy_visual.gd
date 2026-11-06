@@ -71,6 +71,42 @@ func _run() -> void:
 	_check(panel.hierarchy.size.x > 80.0, "tree retains usable horizontal width")
 	_check(root.get_texture().get_image().save_png("user://validation/layer-hierarchy-800.png") == OK,
 		"native compact-width screenshot")
+	# A large layer must keep recently authored objects accessible; selecting an
+	# omitted middle object should scroll its temporary row into the Tree view.
+	panel._add_objects()
+	var layer: AtlasObjectsLayer = editor.canvas.floor.layer_by_id(editor.canvas.active_layer_id) as AtlasObjectsLayer
+	for index: int in range(110):
+		var x: float = float(index) * 4.0
+		layer.strokes.append(AtlasStroke.new(PackedVector2Array([
+			Vector2(x, 200.0), Vector2(x + 2.0, 200.0)]), Color.WHITE, 1.0))
+	editor._refresh_layers()
+	editor.canvas.selection = AtlasSelectionGeometry.select_indices(layer, [55])
+	editor.canvas.selection_changed.emit()
+	await _frames(5)
+	var focused: TreeItem = panel.hierarchy.get_selected()
+	_check(focused != null and focused.get_metadata(0).get("index") == 55,
+		"native tree highlights the omitted object selected on canvas")
+	if focused != null:
+		var focused_rect: Rect2 = panel.hierarchy.get_item_area_rect(focused, 0)
+		_check(focused_rect.position.y >= 0.0 and focused_rect.end.y <= panel.hierarchy.size.y,
+			"selected object scrolls within the compact hierarchy viewport")
+	_check(root.get_texture().get_image().save_png("user://validation/layer-hierarchy-overflow-800.png") == OK,
+		"native large-layer selection screenshot")
+	# Link buttons operate on the displayed snapshot, never a silently changed
+	# destination. The rejected button must refresh the native Tree row.
+	var link: AtlasMapLink = editor.campaign.links[0] if not editor.campaign.links.is_empty() else null
+	var link_group: TreeItem = panel.hierarchy.get_root().get_child(panel.hierarchy.get_root().get_child_count() - 1)
+	var link_row: TreeItem = link_group.get_first_child() if link_group != null else null
+	_check(link != null and link_row != null, "native link row exists")
+	if link != null and link_row != null:
+		var center: Vector2 = editor.canvas.camera_center
+		link.anchor += Vector2(83.0, -29.0)
+		panel._on_hierarchy_button(link_row, 0, AtlasLayerPanel.LINK_FOCUS, 1)
+		_check(editor.canvas.camera_center == center, "stale native link button cannot move the camera")
+		await _frames(3)
+		link_row = panel.hierarchy.get_root().get_child(panel.hierarchy.get_root().get_child_count() - 1).get_first_child()
+		_check(link_row != null and str(link_row.get_tooltip_text(0)).contains(str(link.anchor)),
+			"native link row refreshes after rejected click")
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_LAYER_HIERARCHY_VISUAL_%s (%d checks)" % ["PASSED" if failures == 0 else "FAILED", checks])

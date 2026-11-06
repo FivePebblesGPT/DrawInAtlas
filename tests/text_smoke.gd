@@ -107,6 +107,61 @@ func _run() -> void:
 	_check(active.strokes.size() == 1 and active.strokes[0].text == "Revised label", "revision changes existing object")
 	_check(editor.edits.undo() and active.strokes[0].text == "A persistent label", "revision undo")
 	_check(editor.edits.redo() and active.strokes[0].text == "Revised label", "revision redo")
+	# The modal never discards typed text when a target or history guard fails.
+	canvas._begin_text_edit(origin + Vector2(250, 100))
+	editor.text_editor.text_input.text = "  "
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and active.strokes.size() == 1, "invalid content preserves the draft and history")
+	editor.text_editor.close_editor()
+	canvas._begin_text_edit(origin + Vector2(4, 4))
+	var external_original: AtlasStroke = active.strokes[0].copy()
+	var external_update: AtlasStroke = external_original.copy()
+	external_update.text = "A newer revision"
+	_check(editor.artwork.edit_text(0, external_original, external_update), "interleaved text change commits")
+	editor.text_editor.text_input.text = "Uncommitted draft"
+	editor.text_editor.confirm_text()
+	_check(active.strokes[0].text == "A newer revision" and editor.text_editor.visible
+		and editor.text_editor.error_label.visible and editor.text_editor.text_input.text == "Uncommitted draft",
+		"stale revision cannot overwrite later history or lose the draft")
+	editor.text_editor.close_editor()
+	_check(editor.edits.undo() and active.strokes[0].text == "Revised label",
+		"rejected revision created no extra undo command")
+	canvas._begin_text_edit(origin + Vector2(250, 100))
+	editor.text_editor.text_input.text = "Wrong target"
+	var initial_layer_id: String = canvas.active_layer_id
+	editor.layer_panel._add_objects()
+	var alternate: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
+	_check(alternate != null and canvas.active_layer_id != initial_layer_id, "layer changed during modal")
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and alternate.strokes.is_empty() and active.strokes.size() == 1,
+		"pending placement cannot move to a different Objects layer")
+	editor.text_editor.close_editor()
+	editor.select_layer(initial_layer_id)
+	active = canvas.floor.layer_by_id(initial_layer_id) as AtlasObjectsLayer
+	editor._choose_tool(AtlasCanvas.Tool.TEXT)
+	canvas._begin_text_edit(origin + Vector2(250, 100))
+	editor.text_editor.text_input.text = "Retry when unlocked"
+	active.locked = true
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and active.strokes.size() == 1, "locked target rejects placement without closing")
+	active.locked = false
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and active.strokes.size() == 2
+		and active.strokes[-1].text == "Retry when unlocked", "retry applies preserved text once unlocked")
+	_check(editor.edits.undo() and active.strokes.size() == 1, "recovery placement undo")
+	var unchanged_cursor: int = editor.edits._cursor
+	canvas._begin_text_edit(origin + Vector2(4, 4))
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and editor.edits._cursor == unchanged_cursor,
+		"unchanged text closes without making a redundant history command")
+	var wrong_floor_text: AtlasStroke = AtlasTextLayout.make(origin + Vector2(260, 100),
+		"Wrong floor", "Sans", 18, Color.WHITE)
+	_check(not editor.artwork.edit_text_in_context(-1, null, wrong_floor_text,
+		canvas.map.id, "another-floor", active.id) and active.strokes.size() == 1,
+		"modal submission rejects a different floor even with the same layer id")
 	canvas._begin_text_edit(origin + Vector2(4, 4))
 	editor.text_editor.close_editor()
 	_check(active.strokes[0].text == "Revised label", "cancel never alters artwork")
@@ -145,6 +200,92 @@ func _run() -> void:
 	var both: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
 	var persisted: AtlasObjectsLayer = both.get_map(canvas.map.id).floor_by_id(canvas.floor.id).layer_by_id(detail_id) as AtlasObjectsLayer if both != null else null
 	_check(persisted != null and persisted.strokes.size() == 1 and persisted.strokes[0].text == "Street name", "D1 native save preserves text")
+	# A map change can reuse an object index: the modal must still bind to its source map.
+	editor._choose_tool(AtlasCanvas.Tool.TEXT)
+	canvas._begin_text_edit(origin + Vector2(280, 160))
+	editor.text_editor.text_input.text = "Never place on another board"
+	var previous_map_id: String = canvas.map.id
+	_check(editor.create_board("Another text board", AtlasGrid.new(AtlasGrid.Kind.GRIDLESS))
+		and canvas.map.id != previous_map_id, "switch boards with text editor open")
+	editor.text_editor.confirm_text()
+	var other_layer: AtlasObjectsLayer = canvas.floor.objects_layer()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and (other_layer == null or other_layer.strokes.is_empty()),
+		"pending text cannot be placed in another map")
+	editor.text_editor.close_editor()
+	# Text is modal: an edit mask is captured at opening, not silently
+	# re-evaluated against a later selected cell or rotated grid on Apply.
+	_check(editor.create_board("Text edit-scope board", AtlasGrid.new(AtlasGrid.Kind.SQUARE, 200)),
+		"create grid board for modal scope checks")
+	editor._choose_tool(AtlasCanvas.Tool.TEXT)
+	var scope_cell: Vector2i = Vector2i(0, 0)
+	var scope_anchor: Vector2 = canvas.map.grid.cell_to_document(scope_cell) - Vector2(30, 12)
+	editor._on_select(scope_cell)
+	editor._on_scope_toggled(true)
+	var scope_layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
+	var scope_before: Dictionary = scope_layer.to_dict()
+	var scope_cursor: int = editor.edits._cursor
+	canvas._begin_text_edit(scope_anchor)
+	editor.text_editor.text_input.text = "Cell note"
+	editor.text_editor.size_input.value = 12
+	_check(editor._text_scope_at_open != null and editor._text_scope_at_open.enabled,
+		"opening text modal snapshots enabled cell scope")
+	editor._on_select(scope_cell + Vector2i(2, 0))
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and "edit mask" in editor.text_editor.error_label.text
+		and editor.text_editor.text_input.text == "Cell note",
+		"changed selected cell rejects modal placement without discarding draft")
+	_check(scope_layer.to_dict() == scope_before and editor.edits._cursor == scope_cursor,
+		"stale text placement does not change objects or undo history")
+	editor._on_select(scope_cell)
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and scope_layer.strokes.size() == 1
+		and scope_layer.strokes[0].text == "Cell note" and editor.edits._cursor == scope_cursor + 1,
+		"restored original cell mask accepts exactly one placement")
+	canvas._begin_text_edit(scope_anchor + Vector2(2, 2))
+	editor.text_editor.text_input.text = "Changed style"
+	var previous_grid_rotation: float = canvas.map.grid.rotation
+	canvas.map.grid.rotation += PI / 6.0
+	editor.artwork.refresh_scope()
+	var revision_before: Dictionary = scope_layer.to_dict()
+	var revision_cursor: int = editor.edits._cursor
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and scope_layer.to_dict() == revision_before
+		and editor.edits._cursor == revision_cursor,
+		"rotated selected-cell grid rejects stale text revision")
+	canvas.map.grid.rotation = previous_grid_rotation
+	editor.artwork.refresh_scope()
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and scope_layer.strokes[0].text == "Changed style",
+		"restored original grid permits text revision")
+	# Disabled masking makes the selected cell immaterial to authorization.
+	editor._on_scope_toggled(false)
+	var unrestricted_cursor: int = editor.edits._cursor
+	canvas._begin_text_edit(scope_anchor + Vector2(2, 2))
+	editor.text_editor.text_input.text = "Unmasked revision"
+	editor._on_select(scope_cell + Vector2i(3, 0))
+	editor.text_editor.confirm_text()
+	_check(not editor.text_editor.visible and scope_layer.strokes[0].text == "Unmasked revision"
+		and editor.edits._cursor == unrestricted_cursor + 1,
+		"selected-cell changes do not reject text while masking is disabled")
+	# Replacing an Objects layer with the same ID cannot inherit a modal's grant.
+	canvas._begin_text_edit(scope_anchor + Vector2(2, 2))
+	editor.text_editor.text_input.text = "Old layer edit"
+	var layer_index: int = canvas.floor.layers.find(scope_layer)
+	var replacement_layer: AtlasObjectsLayer = AtlasObjectsLayer.new(scope_layer.id, scope_layer.display_name)
+	replacement_layer.strokes = AtlasStroke.clone_all(scope_layer.strokes)
+	canvas.floor.layers[layer_index] = replacement_layer
+	var identity_cursor: int = editor.edits._cursor
+	editor.text_editor.confirm_text()
+	_check(editor.text_editor.visible and replacement_layer.strokes[0].text == "Unmasked revision"
+		and editor.edits._cursor == identity_cursor,
+		"same-id replacement layer cannot receive an old text edit")
+	editor.text_editor.close_editor()
+	_check(editor._text_scope_at_open == null and editor._text_layer_at_open == null
+		and editor._text_map_at_open == null and editor._text_floor_at_open == null,
+		"closing rejected modal releases original authorization references")
+	canvas.floor.layers[layer_index] = scope_layer
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_TEXT_PASSED checks=%d failures=%d" % [checks, failures])

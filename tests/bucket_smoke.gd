@@ -166,6 +166,135 @@ func _editor_preview() -> void:
 	_check(saved != null and _pixel(saved, Vector2i(0, 0)) == canvas.brush_color,
 		"native save roundtrips filled RGBA bytes")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(slot))
+	# A preview must not overwrite a subsequent history command, even if the
+	# target ID and D-level are unchanged when pointer release arrives.
+	canvas.brush_color = Color(0.15, 0.9, 0.2, 1.0)
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"stale-history case starts from a valid detached Bucket preview")
+	var next_layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
+	var new_raster: AtlasRasterLayer = next_layers[canvas.floor.layers.find(canvas.floor.layer_by_id(raster.id))] as AtlasRasterLayer
+	new_raster.chunks["0,0"].image.set_pixel(0, 0, Color(0.5, 0.1, 0.8, 1))
+	_check(editor.apply_layers(next_layers, raster.id), "newer raster edit accepted through history")
+	var newer_command: AtlasEditCommand = editor.edits.get_undo_command()
+	var newer_bytes: PackedByteArray = (canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data()
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == newer_bytes
+		and editor.edits.get_undo_command() == newer_command,
+		"stale Bucket release does not overwrite pixels or append history")
+	_check(editor.artwork._pending_fill == null and editor.artwork._pending_fill_source.is_empty(),
+		"stale Bucket release discards the candidate and snapshot")
+	# Detect mutations to a live image as well as replacement by a command.
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"in-place-mutation case starts from a valid preview")
+	var live_raster: AtlasRasterLayer = canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer
+	live_raster.chunks["0,0"].image.set_pixel(1, 0, Color(0.8, 0.4, 0.1, 1))
+	var live_bytes: PackedByteArray = live_raster.chunks["0,0"].image.get_data()
+	editor.artwork.commit_preview_fill()
+	_check(live_raster.chunks["0,0"].image.get_data() == live_bytes
+		and editor.edits.get_undo_command() == newer_command,
+		"stale Bucket release detects in-place image changes")
+	# Selecting another authoring target must also block an otherwise valid
+	# candidate, even when both layers belong to the same detail level.
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"other-target case starts from a valid preview")
+	canvas.active_layer_id = canvas.floor.ink_layer().id
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == live_bytes
+		and editor.edits.get_undo_command() == newer_command,
+		"Bucket release rejects a changed active target without mutation")
+	canvas.active_layer_id = raster.id
+	# A different floor can legally reuse the same layer IDs and image bytes.
+	# The pending snapshot belongs to its original floor, never the new one.
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"other-floor case starts from a valid preview")
+	var source_floor: AtlasFloor = canvas.floor
+	var alternate_floor: AtlasFloor = AtlasFloor.new()
+	alternate_floor.id = "t023-other-floor"
+	alternate_floor.layers = AtlasLayerCodec.clone_all(source_floor.layers)
+	canvas.map.floors.append(alternate_floor)
+	canvas.floor = alternate_floor
+	var alternate_bytes: PackedByteArray = (alternate_floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data()
+	editor.artwork.commit_preview_fill()
+	_check((alternate_floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == alternate_bytes
+		and editor.edits.get_undo_command() == newer_command,
+		"stale Bucket preview cannot apply on another floor using the same IDs")
+	canvas.floor = source_floor
+	canvas.map.floors.erase(alternate_floor)
+	# A change to a different layer must *not* reject a legitimate raster fill
+	# or be reverted when the fill commits.
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"unrelated-layer edit starts from a valid Bucket preview")
+	var renamed_layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(source_floor.layers)
+	var objects_id: String = source_floor.ink_layer().id
+	renamed_layers[source_floor.layers.find(source_floor.ink_layer())].display_name = "Objects renamed during fill"
+	_check(editor.apply_layers(renamed_layers, raster.id), "other-layer metadata edit is accepted")
+	var rename_command: AtlasEditCommand = editor.edits.get_undo_command()
+	editor.artwork.commit_preview_fill()
+	_check(_pixel(source_floor.layer_by_id(raster.id) as AtlasRasterLayer, Vector2i(2, 2)).g > 0.85
+		and source_floor.layer_by_id(objects_id).display_name == "Objects renamed during fill"
+		and editor.edits.get_undo_command() != rename_command,
+		"valid Bucket commit preserves interleaved edits to other layers")
+	# The preview was computed under a specific mask. Changing the selection
+	# while the mouse is held must not apply pixels outside the new cell.
+	canvas.brush_color = Color(0.1, 0.3, 0.95, 1.0)
+	editor.artwork.locked_to_cell = true
+	canvas.selected_cell = Vector2i.ZERO
+	canvas.has_selected_cell = true
+	editor.artwork.refresh_scope()
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"selected-cell mask allows a valid pending Bucket preview")
+	var mask_source: PackedByteArray = (canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data()
+	var mask_undo: AtlasEditCommand = editor.edits.get_undo_command()
+	editor._on_select(Vector2i(2, 0))
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == mask_source
+		and editor.edits.get_undo_command() == mask_undo
+		and editor.artwork._pending_fill == null,
+		"changing the selected cell rejects a staged fill without history mutation")
+	# Changing grid geometry also changes the mask footprint, even when the
+	# selected cell ID and raster source remain identical.
+	canvas.selected_cell = Vector2i.ZERO
+	editor.artwork.refresh_scope()
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"grid-change case starts from a valid selected-cell preview")
+	var old_rotation: float = canvas.map.grid.rotation
+	canvas.map.grid.rotation = 0.15
+	editor.artwork.refresh_scope()
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() == mask_source
+		and editor.edits.get_undo_command() == mask_undo,
+		"rotating the cell mask rejects a preview even with unchanged raster bytes")
+	canvas.map.grid.rotation = old_rotation
+	editor.artwork.refresh_scope()
+	# A fresh preview under the restored mask still commits normally.
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"fresh preview under the restored mask is valid")
+	editor.artwork.commit_preview_fill()
+	_check((canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer).chunks["0,0"].image.get_data() != mask_source
+		and editor.edits.get_undo_command() != mask_undo,
+		"valid masked Bucket fill commits one history command after retry")
+	editor.artwork.locked_to_cell = false
+	editor.artwork.refresh_scope()
+	# With the mask disabled, moving the highlighted grid cell must not
+	# invalidate a fill: no eligibility boundary has changed.
+	canvas.brush_color = Color(0.92, 0.18, 0.3, 1.0)
+	editor.artwork.preview_fill(Vector2(0.5, 0.5))
+	_check(editor.artwork._pending_fill != null and editor.artwork._pending_fill.ok,
+		"unrestricted Bucket preview is valid")
+	editor._on_select(Vector2i(3, 0))
+	var unrestricted_before: AtlasEditCommand = editor.edits.get_undo_command()
+	editor.artwork.commit_preview_fill()
+	_check(editor.edits.get_undo_command() != unrestricted_before
+		and _pixel(canvas.floor.layer_by_id(raster.id) as AtlasRasterLayer, Vector2i(2, 2)).r > 0.9,
+		"highlighted-cell changes do not reject unrestricted fills")
 	# No implicit fallback to a palette-cell layer when an incompatible target is chosen.
 	editor.select_layer(canvas.floor.ink_layer().id)
 	_check(canvas.tool == AtlasCanvas.Tool.ART_SELECT and not editor.inspector._bucket_section.visible,

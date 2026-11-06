@@ -74,6 +74,21 @@ func _run() -> void:
 	await _frames(5)
 	var ink: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
 	_check(ink.strokes.size() == 1 and ink.strokes[0].is_text(), "native placement and editable metadata")
+	# A refused commit stays in the native editor with readable feedback.
+	canvas._begin_text_edit(anchor + Vector2(240, 150))
+	editor.text_editor.text_input.text = "Pending native label"
+	ink.locked = true
+	editor.text_editor.confirm_text()
+	await _frames(4)
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and editor.text_editor.error_label.text.contains("not applied")
+		and editor.text_editor.text_input.text == "Pending native label" and ink.strokes.size() == 1,
+		"native refused placement keeps the modal and its draft")
+	_check(root.get_texture().get_image().save_png("user://validation/text-editor-rejected.png") == OK,
+		"native rejected submission screenshot")
+	ink.locked = false
+	editor.text_editor.close_editor()
+	await _frames(3)
 	canvas.camera_center = anchor + Vector2(80, 6)
 	canvas.camera_zoom = 0.4
 	canvas.queue_redraw()
@@ -118,6 +133,38 @@ func _run() -> void:
 	await _frames(9)
 	_check(canvas.size.x >= 200, "compact window retains drawing space")
 	_check(root.get_texture().get_image().save_png("user://validation/text-native-800.png") == OK, "compact screenshot")
+	# A modal must refuse submission after selected-cell authorization moves,
+	# and show a recoverable error in the actual native editor framebuffer.
+	_check(editor.create_board("Native text mask", AtlasGrid.new(AtlasGrid.Kind.SQUARE, 200)),
+		"native text mask board")
+	editor._choose_tool(AtlasCanvas.Tool.TEXT)
+	var cell: Vector2i = Vector2i.ZERO
+	var masked_anchor: Vector2 = canvas.map.grid.cell_to_document(cell) - Vector2(24, 10)
+	editor._on_select(cell)
+	editor._on_scope_toggled(true)
+	var masked_layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
+	var before_history: int = editor.edits._cursor
+	canvas._begin_text_edit(masked_anchor)
+	editor.text_editor.text_input.text = "Native note"
+	editor.text_editor.size_input.value = 12
+	editor._on_select(cell + Vector2i(2, 0))
+	editor.text_editor.confirm_text()
+	await _frames(5)
+	_check(editor.text_editor.visible and editor.text_editor.error_label.visible
+		and "selected-cell edit mask" in editor.text_editor.error_label.text
+		and editor.text_editor.text_input.text == "Native note",
+		"native stale-mask rejection retains the text and readable explanation")
+	_check(masked_layer.strokes.is_empty() and editor.edits._cursor == before_history,
+		"rejected native modal makes no artwork or undo edits")
+	_check(root.get_texture().get_image().save_png("user://validation/text-mask-rejected-800.png") == OK,
+		"native mask-rejection screenshot")
+	editor._on_select(cell)
+	editor.text_editor.confirm_text()
+	await _frames(3)
+	_check(not editor.text_editor.visible and masked_layer.strokes.size() == 1
+		and masked_layer.strokes[0].text == "Native note",
+		"restored native cell mask accepts the preserved modal draft")
+	editor._on_scope_toggled(false)
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_TEXT_VISUAL_%s checks=%d failures=%d" % ["PASSED" if failures == 0 else "FAILED", checks, failures])

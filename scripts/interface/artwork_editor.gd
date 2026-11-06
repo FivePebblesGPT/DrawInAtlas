@@ -15,6 +15,14 @@ var _paste_count: int = 0
 ## or history entry until release, and switching layers cancels the candidate.
 var _pending_fill: AtlasFillResult
 var _pending_fill_layer_id: String = ""
+## The preview is a candidate against one exact source snapshot and board/floor.
+## A history change between press and release must not overwrite newer pixels.
+var _pending_fill_map_id: String = ""
+var _pending_fill_floor_id: String = ""
+var _pending_fill_source: Dictionary = {}
+## An edit mask is part of a fill candidate's authorization. Selecting a new
+## cell or changing the grid while the preview is staged must not broaden it.
+var _pending_fill_scope: AtlasEditScope
 var _canvas: AtlasCanvas
 var _edits: AtlasEditHistory
 var _routing_tool: bool = false
@@ -52,6 +60,8 @@ static func tool_layer_kind(tool: AtlasCanvas.Tool) -> String:
 		return "RASTER"
 	if tool in [AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]:
 		return "OBJECTS"
+	if tool == AtlasCanvas.Tool.TOKEN:
+		return "TOKENS"
 	return ""
 
 
@@ -73,7 +83,10 @@ func _route_tool(tool: AtlasCanvas.Tool, create: bool = true) -> void:
 	_routing_tool = true
 	if target == null:
 		var id: String = kind.to_lower() + "-" + Crypto.new().generate_random_bytes(16).hex_encode()
-		target = AtlasRasterLayer.paint_layer(id) if kind == "RASTER" else AtlasObjectsLayer.new(id)
+		match kind:
+			"RASTER": target = AtlasRasterLayer.paint_layer(id)
+			"TOKENS": target = AtlasTokenLayer.new(id)
+			"OBJECTS": target = AtlasObjectsLayer.new(id)
 		target.detail_level = level
 		var layers: Array[AtlasLayer] = AtlasLayerCodec.clone_all(_canvas.floor.layers)
 		layers.append(target)
@@ -90,8 +103,13 @@ func _route_tool(tool: AtlasCanvas.Tool, create: bool = true) -> void:
 
 
 static func _eligible_target(layer: AtlasLayer, kind: String, level: int) -> bool:
-	return (layer != null and layer.is_editable() and layer.detail_level == level
-		and ((layer is AtlasRasterLayer) if kind == "RASTER" else (layer is AtlasObjectsLayer)))
+	if layer == null or not layer.is_editable() or layer.detail_level != level:
+		return false
+	match kind:
+		"RASTER": return layer is AtlasRasterLayer
+		"OBJECTS": return layer is AtlasObjectsLayer
+		"TOKENS": return layer is AtlasTokenLayer
+	return false
 
 
 func select_layer(id: String) -> void:
@@ -107,10 +125,9 @@ func select_layer(id: String) -> void:
 	if not _routing_tool:
 		var layer: AtlasLayer = _canvas.floor.layer_by_id(id)
 		var required: String = tool_layer_kind(_canvas.tool)
-		if required == "OBJECTS" and layer is AtlasRasterLayer:
-			tool_requested.emit(AtlasCanvas.Tool.PEN)
-		elif required == "RASTER" and layer is AtlasObjectsLayer:
-			tool_requested.emit(AtlasCanvas.Tool.ART_SELECT)
+		if not _eligible_target(layer, required, layer.detail_level) and not required.is_empty():
+			tool_requested.emit(AtlasCanvas.Tool.TOKEN if layer is AtlasTokenLayer else
+				AtlasCanvas.Tool.ART_SELECT if layer is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
 	message.emit("Selected layer: %s" % _canvas.floor.layer_by_id(id).display_name)
 
 
@@ -125,9 +142,12 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	layers_changed.emit(selected_id)
 	var selected: AtlasLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id)
 	if new_layer and not _routing_tool:
-		tool_requested.emit(AtlasCanvas.Tool.ART_SELECT if selected is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
+		tool_requested.emit(AtlasCanvas.Tool.TOKEN if selected is AtlasTokenLayer else
+			AtlasCanvas.Tool.ART_SELECT if selected is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
 	_canvas.queue_redraw()
-	if not _canvas.editing_target_is_presented():
+	if _routing_tool and selected is AtlasTokenLayer:
+		message.emit("GM Token layer ready. Tokens are private until explicitly authorized by a future player-output policy.")
+	elif not _canvas.editing_target_is_presented():
 		message.emit("Layer changed. Editing target is in D%d, but D%d is displayed; select its detail level before drawing." % [
 			_canvas.floor.layer_by_id(_canvas.active_layer_id).detail_level, _canvas.presented_detail_level])
 	else:
@@ -186,32 +206,49 @@ func edit_path(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> v
 		message.emit("Editable wall path updated.")
 
 
+## A modal submission must still address its original map/floor/layer.
+## New text has no expected object snapshot, so it needs this separate guard.
+func edit_text_in_context(index: int, expected: AtlasStroke, replacement: AtlasStroke,
+		map_id: String, floor_id: String, layer_id: String) -> bool:
+	if _canvas.map == null or _canvas.floor == null or map_id.is_empty() \
+			or floor_id.is_empty() or layer_id.is_empty() \
+			or _canvas.map.id != map_id or _canvas.floor.id != floor_id \
+			or _canvas.active_layer_id != layer_id:
+		message.emit("Text not applied: its original editing target changed.")
+		return false
+	return edit_text(index, expected, replacement)
+
+
 ## One guarded snapshot per placement/revision; text is never flattened.
-func edit_text(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> void:
+func edit_text(index: int, expected: AtlasStroke, replacement: AtlasStroke) -> bool:
 	if not _canvas.editing_target_is_presented():
-		return
+		return false
 	var layer: AtlasObjectsLayer = _canvas.floor.layer_by_id(_canvas.active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable() or replacement == null or not replacement.is_text() or not replacement.is_valid():
-		return
+		return false
 	if index < -1 or index >= layer.strokes.size():
-		return
+		return false
 	if index >= 0 and (expected == null or not expected.is_text() or layer.strokes[index].to_dict() != expected.to_dict()):
-		return
+		return false
 	var active_scope: AtlasEditScope = scope()
 	if not active_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(replacement)):
 		message.emit("Text must fit inside the edit mask.")
-		return
+		return false
 	if expected != null and not active_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(expected)):
 		message.emit("Cannot edit text crossing the edit mask.")
-		return
+		return false
+	if index >= 0 and layer.strokes[index].to_dict() == replacement.to_dict():
+		return true
 	var after: Array[AtlasStroke] = AtlasStroke.clone_all(layer.strokes)
 	if index == -1:
 		after.append(replacement.copy())
 	else:
 		after[index] = replacement.copy()
-	if _edits.execute(AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, layer.strokes, after, layer.id)):
-		_canvas.queue_redraw()
-		message.emit("Editable text updated.")
+	if not _edits.execute(AtlasStrokeEdit.new(_canvas.map.id, _canvas.floor.id, layer.strokes, after, layer.id)):
+		return false
+	_canvas.queue_redraw()
+	message.emit("Editable text updated.")
+	return true
 
 
 func _compute_fill(point: Vector2, inverted_global: bool = false) -> AtlasFillResult:
@@ -241,6 +278,11 @@ func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
 	if not _pending_fill.ok:
 		message.emit(_pending_fill.message)
 		return
+	_pending_fill_map_id = _canvas.map.id
+	_pending_fill_floor_id = _canvas.floor.id
+	_pending_fill_source = _canvas.floor.layer_by_id(_pending_fill_layer_id).to_dict()
+	var mask: AtlasEditScope = scope()
+	_pending_fill_scope = AtlasEditScope.new(mask.polygon, mask.enabled)
 	_canvas._preview_layer = _pending_fill.layer
 	_canvas._raster_textures.clear()
 	_canvas.queue_redraw()
@@ -250,6 +292,10 @@ func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
 func cancel_preview_fill() -> void:
 	_pending_fill = null
 	_pending_fill_layer_id = ""
+	_pending_fill_map_id = ""
+	_pending_fill_floor_id = ""
+	_pending_fill_source.clear()
+	_pending_fill_scope = null
 	_canvas._preview_layer = null
 	_canvas._raster_textures.clear()
 	_canvas.queue_redraw()
@@ -260,9 +306,26 @@ func commit_preview_fill() -> void:
 		return
 	var result: AtlasFillResult = _pending_fill
 	var id: String = _pending_fill_layer_id
+	var source: Dictionary = _pending_fill_source.duplicate(true)
+	var mask: AtlasEditScope = scope()
+	var same_scope: bool = (_pending_fill_scope != null
+		and mask.enabled == _pending_fill_scope.enabled
+		and mask.polygon == _pending_fill_scope.polygon)
+	var same_context: bool = (_canvas.map != null and _canvas.floor != null
+		and _canvas.map.id == _pending_fill_map_id
+		and _canvas.floor.id == _pending_fill_floor_id
+		and _canvas.active_layer_id == id)
 	cancel_preview_fill()
-	if result.ok:
-		_apply_fill_result(result, id)
+	if not result.ok:
+		return
+	var current: AtlasLayer = _canvas.floor.layer_by_id(id) if same_context else null
+	if current == null or current.to_dict() != source:
+		message.emit("Fill target changed since preview; nothing applied.")
+		return
+	if not same_scope:
+		message.emit("Fill edit mask changed since preview; nothing applied.")
+		return
+	_apply_fill_result(result, id)
 
 
 func fill_at(point: Vector2) -> bool:

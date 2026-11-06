@@ -16,6 +16,7 @@ signal fill_tolerance_changed(value: float)
 signal fill_global_changed(enabled: bool)
 signal grid_snapping_toggled(enabled: bool)
 signal polygon_fill_toggled(enabled: bool)
+signal token_restyle_requested
 signal wall_restyle_requested
 signal preview_changed(index: int)
 signal reference_toggled(enabled: bool)
@@ -77,6 +78,10 @@ var _automatic_reference: String = ""
 var _current_tool: AtlasCanvas.Tool = AtlasCanvas.Tool.PEN
 var _wall_controls: VBoxContainer
 var _wall_restyle_button: Button
+var token_name_input: LineEdit
+var token_radius_spinner: SpinBox
+var _token_controls: VBoxContainer
+var token_apply_button: Button
 
 
 func _ready() -> void:
@@ -92,6 +97,36 @@ func _ready() -> void:
 	_wall_controls.add_child(_wall_restyle_button)
 	_ink_section.add_child(_wall_controls)
 	_wall_controls.hide()
+	_token_controls = VBoxContainer.new()
+	var name_caption: Label = Label.new()
+	name_caption.text = "TOKEN LABEL"
+	_token_controls.add_child(name_caption)
+	token_name_input = LineEdit.new()
+	token_name_input.text = "Token"
+	token_name_input.max_length = AtlasToken.MAX_LABEL
+	token_name_input.placeholder_text = "Token"
+	_token_controls.add_child(token_name_input)
+	var radius_caption: Label = Label.new()
+	radius_caption.text = "TOKEN RADIUS (BOARD UNITS)"
+	_token_controls.add_child(radius_caption)
+	token_radius_spinner = SpinBox.new()
+	token_radius_spinner.min_value = AtlasToken.MIN_RADIUS
+	token_radius_spinner.max_value = AtlasToken.MAX_RADIUS
+	token_radius_spinner.step = 1.0
+	token_radius_spinner.value = 16.0
+	_token_controls.add_child(token_radius_spinner)
+	token_apply_button = Button.new()
+	token_apply_button.text = "Update selected token"
+	token_apply_button.tooltip_text = "Apply the label, radius and color above to the selected GM token"
+	token_apply_button.pressed.connect(token_restyle_requested.emit)
+	_token_controls.add_child(token_apply_button)
+	var privacy_hint: Label = Label.new()
+	privacy_hint.text = "GM only: tokens are excluded from player capture, even if the layer is visible."
+	privacy_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	privacy_hint.custom_minimum_size = Vector2(1, 0)
+	_token_controls.add_child(privacy_hint)
+	_ink_section.add_child(_token_controls)
+	_token_controls.hide()
 	floor_picker.item_selected.connect(_on_floor_selected)
 	floor_name_input.text_submitted.connect(func(_text: String) -> void: floor_renamed.emit(floor_name_input.text))
 	_floor_add.pressed.connect(func() -> void: floor_created.emit(floor_name_input.text))
@@ -151,9 +186,9 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	_active_tool_label.text = "Active: %s · Tools in left sidebar" % AtlasToolPalette.description_for(tool)
 	lock_checkbox.disabled = not grid_available
 	_ink_section.visible = tool in [AtlasCanvas.Tool.PEN, AtlasCanvas.Tool.ERASER, AtlasCanvas.Tool.LINE,
-		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT] or tool == AtlasCanvas.Tool.FILL
+		AtlasCanvas.Tool.RECTANGLE, AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.TOKEN] or tool == AtlasCanvas.Tool.FILL
 	var erasing: bool = tool == AtlasCanvas.Tool.ERASER
-	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "TEXT COLOR" if tool == AtlasCanvas.Tool.TEXT else "BRUSH & STROKE")
+	_ink_heading.text = "ERASER" if erasing else ("BUCKET COLOR" if tool == AtlasCanvas.Tool.FILL else "TEXT COLOR" if tool == AtlasCanvas.Tool.TEXT else "TOKEN COLOR" if tool == AtlasCanvas.Tool.TOKEN else "BRUSH & STROKE")
 	_bucket_section.visible = tool == AtlasCanvas.Tool.FILL
 	_bucket_hint.text = "Raster: stored pixels on the active layer only. A blank raster has nothing to fill. Press to preview, release to apply; Esc cancels. 4-connected or global; Shift reverses mode."
 	_bucket_tolerance_label.visible = true
@@ -162,17 +197,18 @@ func refresh_tool(tool: AtlasCanvas.Tool, grid_available: bool) -> void:
 	_eraser_hint.visible = erasing
 	_line_hint.visible = tool == AtlasCanvas.Tool.LINE
 	_wall_controls.visible = tool == AtlasCanvas.Tool.WALL_PATH
+	_token_controls.visible = tool == AtlasCanvas.Tool.TOKEN
 	_polygon_hint.visible = tool == AtlasCanvas.Tool.POLYGON
 	polygon_fill_checkbox.visible = tool == AtlasCanvas.Tool.POLYGON
 	_ink_color_label.visible = not erasing
 	brush_color_picker.visible = not erasing
 	brush_color_picker.disabled = erasing
-	brush_width_spinner.editable = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
-	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
-	brush_width_spinner.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT]
+	brush_width_spinner.editable = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.TOKEN]
+	$Scroll/Margin/Sections/InkSection/WidthLabel.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.TOKEN]
+	brush_width_spinner.visible = tool not in [AtlasCanvas.Tool.FILL, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.TOKEN]
 	_selection_section.visible = tool in [AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
 	_snap_section.visible = tool in [AtlasCanvas.Tool.LINE, AtlasCanvas.Tool.RECTANGLE,
-		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE]
+		AtlasCanvas.Tool.ELLIPSE, AtlasCanvas.Tool.POLYGON, AtlasCanvas.Tool.WALL_PATH, AtlasCanvas.Tool.TEXT, AtlasCanvas.Tool.ART_SELECT, AtlasCanvas.Tool.MOVE, AtlasCanvas.Tool.TOKEN]
 	snap_checkbox.disabled = not grid_available
 
 

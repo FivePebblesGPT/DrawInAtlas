@@ -293,6 +293,10 @@ func is_current(link: AtlasMapLink, placement: AtlasPlacement) -> bool:
 		and (placement.to_dict() if placement != null else {}) == _expected_placement)
 
 
+func source_matches(campaign: AtlasCampaign, map: AtlasMapDocument, floor: AtlasFloor) -> bool:
+	return _campaign == campaign and _source_id == map.id and _source_floor == floor.id
+
+
 func _preserved_number(control: SpinBox, key: String, original: float) -> float:
 	# Display precision must not round untouched native settings on Apply.
 	return original if control.value == _displayed_values.get(key, control.value) else control.value

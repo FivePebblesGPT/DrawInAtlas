@@ -84,18 +84,48 @@ func _run() -> void:
 	canvas._gui_input(motion)
 	_check(canvas._draft_stroke != null and canvas._draft_stroke.points == AtlasShapes.polygon(triangle, canvas.brush_color, canvas.brush_width, false).points,
 		"pending fourth vertex never changes the Enter-to-commit preview")
+	canvas._process(0.0)
+	var old_preview: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	var restyled_color: Color = Color(0.15, 0.85, 0.35, 0.8)
+	var restyled_width: float = 15.0
+	# Inspector events must repaint a fixed polygon without adding a fourth vertex.
+	editor.inspector.brush_width_spinner.value = restyled_width
+	editor.inspector.brush_color_changed.emit(restyled_color)
+	_check(canvas._polygon_vertices == triangle and canvas._draft_stroke != null and
+		canvas._draft_stroke.color == restyled_color and canvas._draft_stroke.width == restyled_width,
+		"stationary outline draft follows live color and width")
+	canvas._process(0.0)
+	var outline_expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(
+		AtlasRasterLayer.paint_layer(), AtlasShapes.polygon(triangle, restyled_color, restyled_width, false))
+	_check(outline_expected.ok and canvas._preview_layer != null and
+		canvas._preview_layer.to_dict() == outline_expected.layer.to_dict(),
+		"outline preview repaints exact styled pixels without pointer motion")
+	_check(canvas._preview_layer.to_dict() != old_preview and canvas.floor.raster_layer().chunks.is_empty(),
+		"restyling changes only detached preview, not artwork")
 	_key(canvas, KEY_ENTER)
 	_check(not canvas.is_editing() and not canvas.floor.raster_layer().chunks.is_empty(), "Enter commits raster polygon")
-	_check(_matches(canvas, triangle, false), "default outline pixels persisted")
+	_check(_matches(canvas, triangle, false), "restyled outline pixels persisted")
 	_check(editor.edits.undo() and canvas.floor.raster_layer().chunks.is_empty(), "outline is one undo")
 	_check(editor.edits.redo() and not canvas.floor.raster_layer().chunks.is_empty(), "outline redo")
 	_check(editor.edits.undo(), "clear before next test")
 
-	# Fill control is wired to the canvas and stored in one shape, not a raster island.
+	# Fill style is live as well, and must leave exactly the fixed vertices.
 	editor.inspector.polygon_fill_checkbox.button_pressed = true
 	_check(canvas.polygon_solid_fill, "inspector fill mode connects to input")
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
+	canvas._process(0.0)
+	var fill_before: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	var fill_color: Color = Color(0.8, 0.25, 0.8, 0.65)
+	editor.inspector.brush_color_changed.emit(fill_color)
+	canvas._process(0.0)
+	var fill_expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(
+		AtlasRasterLayer.paint_layer(), AtlasShapes.polygon(triangle, fill_color, restyled_width, true))
+	_check(canvas._polygon_vertices == triangle and canvas._draft_stroke != null and canvas._draft_stroke.filled,
+		"stationary filled polygon retains fixed vertices and fill mode")
+	_check(fill_expected.ok and canvas._preview_layer != null and canvas._preview_layer.to_dict() == fill_expected.layer.to_dict(),
+		"filled preview repaints exact live color before close")
+	_check(canvas._preview_layer.to_dict() != fill_before, "filled preview no longer shows the old color")
 	_mouse(canvas, triangle[0], true)
 	_mouse(canvas, triangle[0], false)
 	_check(_matches(canvas, triangle, true) and not canvas.is_editing(), "close by first vertex paints solid raster")
@@ -140,7 +170,84 @@ func _run() -> void:
 		_vertex(canvas, point)
 	_key(canvas, KEY_ENTER)
 	_check(canvas.floor.raster_layer().chunks.is_empty(), "cell mask rejects filled polygon outside mask")
+	# T-025: a multi-click Polygon may only close in the scope where its
+	# first vertex was placed. No later cell selection may retarget its fill.
+	var active_cell: Vector2i = Vector2i(2, 2)
+	editor._on_select(active_cell)
+	var masked_center: Vector2 = canvas.map.grid.cell_to_document(active_cell)
+	var masked_triangle: PackedVector2Array = PackedVector2Array([
+		masked_center + Vector2(-8, -8), masked_center + Vector2(8, -8),
+		masked_center + Vector2(0, 7)])
+	var before_masked: Dictionary = canvas.floor.raster_layer().to_dict()
+	var before_history: int = editor.edits._cursor
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	canvas._process(0.0)
+	_check(canvas._preview_layer != null and canvas._polygon_scope_at_start != null
+		and canvas._polygon_scope_at_start.enabled, "Polygon preview records its first selected-cell mask")
+	editor._on_select(active_cell + Vector2i(3, 0))
+	_key(canvas, KEY_ENTER)
+	_check(canvas.floor.raster_layer().to_dict() == before_masked and editor.edits._cursor == before_history,
+		"changed cell rejects Polygon without raster or undo mutation")
+	_check(not canvas.is_editing() and canvas._preview_layer == null
+		and canvas._polygon_scope_at_start == null and "edit mask changed" in editor.status_label.text,
+		"rejected Polygon clears preview and reports changed mask")
+
+	# Changing eligibility between vertex clicks must reject the entire draft,
+	# not silently accept the next vertex under a new selection.
+	editor._on_select(active_cell)
+	_vertex(canvas, masked_triangle[0]); _vertex(canvas, masked_triangle[1])
+	editor._on_select(active_cell + Vector2i(1, 0))
+	_vertex(canvas, masked_triangle[2])
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().to_dict() == before_masked
+		and editor.edits._cursor == before_history, "stale next vertex cancels the Polygon atomically")
+
+	# Same selected cell, different rotated-grid polygon is a different mask.
+	editor._on_select(active_cell)
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	var original_rotation: float = canvas.map.grid.rotation
+	canvas.map.grid.rotation += deg_to_rad(17.0)
+	editor.artwork.refresh_scope()
+	_key(canvas, KEY_ENTER)
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().to_dict() == before_masked
+		and editor.edits._cursor == before_history, "rotated edit-mask rejects pending Polygon")
+	canvas.map.grid.rotation = original_rotation
+	editor.artwork.refresh_scope()
+
+	# An active-layer switch outside the tool also must not redirect the draft.
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	var raster_id: String = canvas.active_layer_id
+	canvas.active_layer_id = canvas.floor.objects_layer().id
+	_key(canvas, KEY_ENTER)
+	_check(not canvas.is_editing() and canvas.floor.raster_layer().to_dict() == before_masked
+		and editor.edits._cursor == before_history, "changed layer rejects pending Polygon")
+	canvas.active_layer_id = raster_id
+
+	# A new gesture with a current, unchanged mask still commits once.
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	canvas._process(0.0)
+	var authorized_preview: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	_key(canvas, KEY_ENTER)
+	_check(canvas.floor.raster_layer().to_dict() == authorized_preview
+		and canvas.floor.raster_layer().to_dict() != before_masked
+		and editor.edits._cursor == before_history + 1, "fresh Polygon commits only authorized preview pixels")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().to_dict() == before_masked,
+		"masked Polygon undo restores unchanged source")
+
 	editor._on_scope_toggled(false)
+	# Changing the highlighted cell while masking is OFF is not a veto.
+	for point: Vector2 in masked_triangle:
+		_vertex(canvas, point)
+	editor._on_select(active_cell + Vector2i(5, 5))
+	_key(canvas, KEY_ENTER)
+	_check(canvas.floor.raster_layer().to_dict() != before_masked
+		and editor.edits._cursor == before_history + 1,
+		"unlocked cell selection does not reject an unmasked Polygon")
+	_check(editor.edits.undo() and canvas.floor.raster_layer().to_dict() == before_masked,
+		"unmasked Polygon undo restores source")
 	# Clicking twice on final vertex should not create a duplicate invalid edge.
 	for point: Vector2 in triangle:
 		_vertex(canvas, point)
@@ -167,6 +274,27 @@ func _run() -> void:
 	_key(canvas, KEY_ENTER)
 	_check(_matches(canvas, snapped, true), "snapped polygon pixels match authored vertices")
 	_check(editor.edits.undo(), "snapped polygon undo")
+
+	# A first polygon on another authored detail uses a separate raster target.
+	_check(canvas.set_presented_detail_level(1), "present D1 for Polygon")
+	editor._choose_tool(AtlasCanvas.Tool.POLYGON)
+	var detail_raster: AtlasRasterLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasRasterLayer
+	_check(detail_raster != null and detail_raster.detail_level == 1 and detail_raster.pixels_per_unit == 4.0,
+		"Polygon routing selects a paint-density D1 raster")
+	for point: Vector2 in triangle:
+		_vertex(canvas, point)
+	canvas._process(0.0)
+	var detail_expected: AtlasFillResult = AtlasRasterBrush.paint_stroke(detail_raster,
+		AtlasShapes.polygon(triangle, canvas.brush_color, canvas.brush_width, true))
+	_check(detail_expected.ok and canvas._preview_layer != null and
+		canvas._preview_layer.to_dict() == detail_expected.layer.to_dict(),
+		"D1 Polygon preview paints only the selected detail raster")
+	_key(canvas, KEY_ENTER)
+	_check(detail_expected.ok and canvas.floor.layer_by_id(detail_raster.id).to_dict() == detail_expected.layer.to_dict(),
+		"D1 polygon commit equals isolated preview")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "D1 polygon leaves D0 pixels unchanged")
+	_check(editor.edits.undo() and canvas.floor.layer_by_id(detail_raster.id).to_dict() == detail_raster.to_dict(),
+		"D1 polygon undo restores its original target")
 
 	root.remove_child(scene)
 	scene.free()
