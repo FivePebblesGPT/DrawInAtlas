@@ -6,6 +6,28 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-094 strict-native and owner evidence checkpoint — 2026-11-06
+
+The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)
+remains **red**: a detached GCC/Clang strict quad-stress mask and stale T-064
+status assumptions in T-073 are reproducible issues, not legitimate owner UX
+failures. The stress harness now explicitly compiles with
+`-ffp-contract=off` and tests a real `-O3 -mfma` profile on capable Linux
+hosts: contraction changed convex validation outcomes in a local reproducer.
+It retains 96-case exact parity per profile, source pins and atomic rejection
+assertions; detailed case/return diagnostics help triage a future regression.
+T-073/T-074 verify **ticket obligations**, not frozen Kanban stages.
+
+The [23-finding native acceptance runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+is guarded by `tests/test_t094_owner_matrix.py` inside the existing fail-late
+T-073 documentation job. It records real pointer/framebuffer/hardware and
+owner evidence **separately** from fast deterministic checks. The local
+standalone `.drawing` regression, Linux export/isolated run, and Xvfb
+software-pointer sanity checks are not substitute approval for T-056,
+T-059, T-065 or T-083. T-094 remains In Progress until remote CI and
+future Linux/Windows owner-witness rows are evidenced; don't change
+review flags merely because this patch's local tests pass.
+
 ## Required CI
 
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.

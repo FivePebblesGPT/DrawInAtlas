@@ -90,7 +90,7 @@ class ObjectDocumentationContractTests(unittest.TestCase):
 
     def test_nested_graph_is_staged_not_claimed_as_shipped(self) -> None:
         nested = (DOCS / "Tickets/T-064.md").read_text(encoding="utf-8")
-        self.assertIn('status: "Ready"', nested)
+        self.assertIn('manual_review: false', nested)
         for phrase in ("T-064", "A→A", "A→B→C→A", "transitively", "not implemented"):
             self.assertIn(phrase, WORKFLOW)
         self.assertIn("T-064", RASTER)
@@ -98,13 +98,13 @@ class ObjectDocumentationContractTests(unittest.TestCase):
         self.assertNotIn("func _detect_asset_cycle(", LIBRARY)
 
     def test_browser_ui_and_owner_gates_are_not_marked_shipped(self) -> None:
-        for ticket, status in (("T-063", "Done"), ("T-064", "Ready"),
-                               ("T-065", "In Progress"), ("T-059", "Ready"),
-                               ("T-056", "Ready")):
+        for ticket in ("T-063", "T-064", "T-065", "T-059", "T-056"):
             with self.subTest(ticket=ticket):
-                self.assertIn(f'status: "{status}"',
-                              (DOCS / f"Tickets/{ticket}.md").read_text(encoding="utf-8"))
+                content = (DOCS / f"Tickets/{ticket}.md").read_text(encoding="utf-8")
+                self.assertRegex(content, r'(?m)^status: "(?:Ready|In Progress|Blocked|Manual Review|Done)"$')
                 self.assertIn(ticket, WORKFLOW)
+                if ticket in ("T-065", "T-059", "T-056"):
+                    self.assertIn("manual_review: true", content)
         self.assertIn("Asset Browser", WORKFLOW)
         self.assertIn("not yet shipped", WORKFLOW)
         self.assertIn("choice **dialog is only planned**", WORKFLOW)

@@ -66,11 +66,18 @@ def load_oracle() -> list[dict[str, Any]]:
     return envelope["cases"]
 
 
-def build(compiler: str, optimization: str, directory: Path) -> Path:
+def build(compiler: str, optimization: str, directory: Path,
+          extra_flags: tuple[str, ...] = ()) -> Path:
     """Compile the detached ABI without modifying the repository or editor."""
-    library = directory / f"quad_{compiler.replace('+', 'p')}_{optimization[1:]}.so"
-    subprocess.run([compiler, "-std=c++17", optimization, "-fPIC", "-shared",
-                    "-Wall", "-Wextra", "-Werror", str(SOURCE), "-o", str(library)],
+    library = directory / f"quad_{compiler.replace('+', 'p')}_{optimization[1:]}" \
+        f"{'_'.join(flag.strip('-') for flag in extra_flags) or 'baseline'}.so"
+    # Godot's Vector2/Geometry2D oracle uses separate float32 operations.
+    # FMA contraction can flip near-collinear orientation signs and cause
+    # legitimate convex stress polygons to be rejected as invalid (-3).
+    # The detached benchmark is *strict-FP* by contract, not fast-math.
+    subprocess.run([compiler, "-std=c++17", optimization, *extra_flags,
+                    "-ffp-contract=off", "-fPIC", "-shared", "-Wall", "-Wextra", "-Werror",
+                    str(SOURCE), "-o", str(library)],
                    capture_output=True, text=True, check=True, timeout=60)
     return library
 
@@ -88,7 +95,12 @@ def native_mask(native: NativeQuad, case: dict[str, Any]) -> bytes:
                                int(case["enabled"]))
     actual = bytes(output)
     if returned < 0 or set(actual) - {0, 1} or actual.count(1) != returned:
-        raise ValueError("Native stress ABI rejected or corrupted a mask")
+        raise ValueError(
+            f"Native stress ABI rejected or corrupted {case['id']}: "
+            f"return={returned}, output_unchanged={actual == bytes([0xA5]) * len(actual)}, "
+            f"invalid_bytes={sorted(set(actual) - {0, 1})}, "
+            f"selected_bytes={actual.count(1)}"
+        )
     return actual
 
 

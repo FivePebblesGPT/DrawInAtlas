@@ -1,6 +1,6 @@
 # Ticket Kanban Index
 
-**As of 2026-11-05 · owner usability review against `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+**As of 2026-11-06 · merged owner review and T-094 validation checkpoint.** This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
@@ -9,6 +9,16 @@
 **Standalone Drawing usability is NOT accepted.** The owner reproduced missing live paint feedback, ~1-second strokes, zoom-out lag, insufficient selection and Move, opaque/unclear canvas bounds, ineffective layer hierarchy/visibility, cramped floating docks, responsive layout defects, and poor Object discovery. `.drawing` save/open **worked** in the exercised flow; undo's monotonic internal revision is **not itself a bug**. This assessment supersedes any implication that T-053/T-063/T-078–T-083 engineering checks constitute final interactive UX approval. [Full 23-finding matrix and milestones](DRAWING_USABILITY_REVIEW_2026-11-05.md).
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
+
+**T-094 CI/acceptance baseline in progress (2026-11-06):** Remote baseline
+`main` CI is red; a strict-FP/FMA-native mask reproducer is fixed in the
+T-068 stress **test build**, stale T-064 documentation status assertions are
+removed, and an [actionable 23-finding Linux/Windows owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+now preserves #22 save/open success and #23 expected monotonic revisions.
+Local strict native tests, Drawing clean staging/roundtrip/Linux export,
+Atlas composition, and Xvfb/Mesa software pointer checks pass. Remote CI
+against this patch, owner hardware UX and pending corrective ticket findings
+are **not yet passed**; T-094 stays In Progress. [Checkpoint](Tickets/T-094.md).
 
 **T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085/T-086 remain Ready for GDScript-first fixes; T-068 native research remains conditional.
 
@@ -985,7 +995,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | Ready | — | [T-082](Tickets/T-082.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Ready | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
-| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | Ready | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
+| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
 
 ## Epics
 
