@@ -28,6 +28,13 @@ nothing changes until a valid Apply/Create command succeeds.
 - Use **Select / enter** to click and drag a marker or footprint on its source.
   Numeric controls resize/rotate footprints, retarget entrances and set arrivals.
   Unchanged fields retain their native precision even when their display rounds.
+
+An open form is also a snapshot for **Unlink**, **Focus**, and **Enter**:
+if an entrance or its legacy footprint changed since opening, these actions
+are rejected with an error instead of deleting or navigating using stale data.
+Reopen the form to inspect the current link before retrying. This protects the
+legacy workflow without endorsing it as the final navigation UX (T-017).
+
 - **Unlink** removes the entrance and an otherwise unreferenced footprint; it
   keeps the independent destination. Shared footprints survive unlinking one
   entrance; changing shared geometry through one entrance is rejected.

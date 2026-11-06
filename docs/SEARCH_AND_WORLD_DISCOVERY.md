@@ -111,3 +111,33 @@ The missing item is a user/product decision, not a failing engine test. Leave
 [[T-009]] unchecked in [[Index]] until it is explicitly confirmed; do not
 interpret passing the legacy-search witness as acceptance of the proposed
 world-discovery design.
+
+## Existing Search action-safety follow-up — 2026-11-01 (not UX approval)
+
+The current legacy link browser is still in use while the shared-board place
+search policy awaits owner agreement. Its detached search results can become
+stale if a link is moved, retargeted or deleted, a legacy placement changes,
+or an independent map/floor is replaced before the GM presses **Open** or
+**Focus**. Previously the old result could navigate to an obsolete source
+position or destination.
+
+The existing Search actions now revalidate the displayed result against the
+current campaign object, map/floor identities, complete link metadata,
+legacy-placement state, displayed destination context and every ancestor
+entrance in a recursive discovery path before issuing a navigation request. A stale action is
+rejected without mutating the map or camera. The panel refreshes, displays
+an explanation, and clears the selection so **Open** and **Focus** stay disabled
+until the GM deliberately chooses a current result. Unchanged results still
+work, including **Focus** for a link with a missing target but valid source.
+
+`tests/search_stale_actions_smoke.gd` covers named lookup without internal IDs,
+moved marker anchors, retargeting, changed hit radius, deleted links, rotated
+placement footprints, same-ID map replacement, entire campaign replacement,
+recursive ancestor edits, outdated labels, UI reselection, history preservation
+and broken-target focus. CI runs this
+bounded action-safety test, **not** the older T-009 research probe.
+
+This hardens the currently available controls only. It does **not** endorse
+the descendant-map navigation ontology, add searchable places or change the
+proposed **Find in world** design. Owner acceptance of naming, entity scope,
+result context and actions is still mandatory before building that UX.

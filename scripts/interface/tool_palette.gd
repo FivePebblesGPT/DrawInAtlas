@@ -19,8 +19,12 @@ const CATEGORIES: Array[Dictionary] = [
 	{"title": "OBJECTS", "tools": [
 		{"id": AtlasCanvas.Tool.WALL_PATH, "name": "Wall path", "key": "W", "icon": "wall-path", "hint": "Objects layer selected automatically. Click vertices, Enter finish, right-click close; drag nodes, Shift insert, Alt delete"},
 		{"id": AtlasCanvas.Tool.TEXT, "name": "Text", "key": "T", "icon": "text", "hint": "Place editable text on Objects; click existing text to edit"},
+		{"id": AtlasCanvas.Tool.TOKEN, "name": "GM token", "key": "K", "icon": "token", "hint": "Place a tabletop marker on a dedicated GM-only token layer; drag to move, Delete to remove; change label/color/size in the inspector"},
 		{"id": AtlasCanvas.Tool.ART_SELECT, "name": "Select objects", "key": "V", "icon": "select", "hint": "Objects layer selected automatically. Drag/select, Ctrl add, Alt subtract; Delete removes objects"},
 		{"id": AtlasCanvas.Tool.MOVE, "name": "Move objects", "key": "M", "icon": "move", "hint": "Objects layer selected automatically. Pick an object or drag its selection; Escape cancels"},
+	]},
+	{"title": "PLAYER VISIBILITY (GM ONLY)", "tools": [
+		{"id": AtlasCanvas.Tool.FOG, "name": "Fog reveal/hide", "key": "G", "icon": "fog", "hint": "Drag to reveal a rectangle; Shift-drag to hide it again. First edit enables deny-by-default fog on this floor, across every detail level. Esc cancels; Ctrl+Z undoes. No live player publication."},
 	]},
 	{"title": "GRID", "tools": [
 		{"id": AtlasCanvas.Tool.SELECT, "name": "Select grid cell", "key": "", "icon": "cell", "hint": "Choose the cell used by the edit-scope mask"},

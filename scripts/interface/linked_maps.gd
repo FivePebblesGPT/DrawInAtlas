@@ -46,9 +46,13 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 	if new_map != null or (placement != null and old == null):
 		_rejected()
 		return false
-	if dialog.visible and dialog.selected_id == link.id and not dialog.is_current(before, old):
-		_rejected()
-		return false
+	if dialog.visible:
+		if not dialog.source_matches(_canvas.campaign, _canvas.map, _canvas.floor):
+			_rejected()
+			return false
+		if dialog.selected_id == link.id and not dialog.is_current(before, old):
+			_rejected()
+			return false
 	var command: AtlasLinkEdit = AtlasLinkEdit.new(_canvas.map.id, before, link, old, placement, new_map, _canvas.edit_scope)
 	if not _history.execute(command):
 		_rejected()
@@ -63,8 +67,12 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 func remove(id: String) -> bool:
 	var link: AtlasMapLink = _canvas.campaign.link_by_id(id)
 	if not _owns(link):
+		if dialog.visible and dialog.selected_id == id:
+			_rejected()
 		return false
 	var placement: AtlasPlacement = _canvas.campaign.placement_by_id(link.placement_id)
+	if not _dialog_action_is_fresh(id, link, placement):
+		return false
 	if not _history.execute(AtlasLinkEdit.new(_canvas.map.id, link, null, placement, null, null, _canvas.edit_scope)):
 		_rejected()
 		return false
@@ -77,15 +85,24 @@ func remove(id: String) -> bool:
 
 func enter(id: String) -> void:
 	var link: AtlasMapLink = _canvas.campaign.link_by_id(id)
-	if _owns(link) and _navigator.enter_link(link):
+	if not _owns(link):
+		if dialog.visible and dialog.selected_id == id:
+			_rejected()
+		return
+	var placement: AtlasPlacement = _canvas.campaign.placement_by_id(link.placement_id)
+	if _dialog_action_is_fresh(id, link, placement) and _navigator.enter_link(link):
 		dialog.hide()
 
 
 func focus(id: String) -> void:
 	var link: AtlasMapLink = _canvas.campaign.link_by_id(id)
 	if not _owns(link):
+		if dialog.visible and dialog.selected_id == id:
+			_rejected()
 		return
 	var placement: AtlasPlacement = _canvas.campaign.placement_by_id(link.placement_id)
+	if not _dialog_action_is_fresh(id, link, placement):
+		return
 	_canvas.camera_center = placement.child_to_parent() * placement.child_bounds().get_center() if placement != null else link.anchor
 	_canvas.selected_link_id = link.id
 	_navigator.zoom_gate.reset()
@@ -108,6 +125,15 @@ func move(id: String, offset: Vector2) -> bool:
 
 func _owns(link: AtlasMapLink) -> bool:
 	return link != null and link.source_map_id == _canvas.map.id and link.source_floor_id == _canvas.floor.id
+
+
+func _dialog_action_is_fresh(id: String, link: AtlasMapLink, placement: AtlasPlacement) -> bool:
+	# A stale open form must not unlink or navigate using a replaced entrance.
+	if dialog.visible and dialog.selected_id == id:
+		if not dialog.source_matches(_canvas.campaign, _canvas.map, _canvas.floor) or not dialog.is_current(link, placement):
+			_rejected()
+			return false
+	return true
 
 
 func _rejected() -> void:

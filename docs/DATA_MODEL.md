@@ -53,7 +53,7 @@ Before native saves, the store wrote a checksummed JSON head, `.bak` and immutab
 `.assets/<pixel-sha256>.webp` chunks. That user-file path has been retired, not
 converted. Only v7 is accepted by the current in-memory dictionary decoder used for validation, cloning and tests; it is not the native container schema. Versions 1–6 are historical and intentionally unsupported. No prototype-data migration is implemented.
 
-Each floor owns an ordered `layers` array (back to front): `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration; `OBJECTS` contains independently editable walls, text and image props. Brush, eraser, line and shape tools write raster pixels. `INK` is a deprecated Resource discriminator retained for prototype reading, not a new authoring target. The obsolete `TILES` type is rejected. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths. New painting layers use 4 pixels per board unit on both axes.
+Each floor owns an ordered `layers` array (back to front): `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration; `OBJECTS` contains independently editable walls, text and image props; `TOKENS` owns GM tabletop markers with stable IDs, document-space centers/radii, label and tint (T-041). Brush, eraser, line and shape tools write raster pixels. `INK` is a deprecated Resource discriminator retained for prototype reading, not a new authoring target. The obsolete `TILES` type is rejected. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths. New painting layers use 4 pixels per board unit on both axes. Token layers are independent of drawing/Objects layers; the renderer and native save honor their usual floor, LOD, order, lock, visibility and opacity properties. **Token layer visibility does not grant publication to players.** See [GM token workflow](TOKEN_WORKFLOW.md).
 
 Raster affine `transform` is recorded as six finite numbers (basis X, basis Y, origin) and singular transforms are rejected. Moving/scaling/rotating an asset does not rewrite chunk pixels or their hashes. A floor has no terrain palette or frozen terrain basis. Grid geometry is independent map metadata; cell-scoped editing uses this grid without making it an artwork layer. The legacy `strokes` access helper refers to the default Objects layer's ordered records. Image props retain lossless `prop_webp` bytes, original `prop_size` and `prop_rotation`; their single anchor and display width are board-space placement. Dictionary/clipboard adapters encode these bytes as base64; native Resources embed them directly. Raster hashes cover canonical RGBA8 bytes and dimensions. See [raster/Objects workflow](RASTER_OBJECTS_WORKFLOW.md).
 
@@ -304,3 +304,15 @@ Store deliberate persistent document metadata separately: actual raster/ink laye
 - How to package/share assets without violating their licenses.
 
 These are implementation experiments, not blockers for defining document and link IDs now.
+
+
+## GM fog (T-042 engineering checkpoint)
+
+A floor additionally owns `fog_enabled: bool` and ordered `fog_regions:
+Array[AtlasFogRegion]`. Each region is a finite board-space `Rect2` and a
+reveal/hide operation; latest covering operation wins. This state is shared by
+all authored detail levels on that floor, independent of layers and tokens.
+Legacy saves default to fog disabled. The native scene validator/digest checks
+that the complete operation list is bounded and well-formed. The isolated
+player projection removes hidden raster pixels and disallows semantic-object
+grants when fog is active; this is not an approved production publication policy.

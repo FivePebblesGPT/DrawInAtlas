@@ -18,7 +18,7 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	var layer: AtlasLayer
 	match data.get("kind"):
 		"OBJECTS", "INK":
-			if _has_any(data, ["terrain", "grid", "chunks", "pixels_per_unit", "transform"]):
+			if _has_any(data, ["terrain", "grid", "chunks", "pixels_per_unit", "transform", "tokens"]):
 				return null
 			var ink: AtlasObjectsLayer = (AtlasObjectsLayer.new(data.id, data.name)
 				if data.get("kind") == "OBJECTS" else AtlasInkLayer.new(data.id, data.name))
@@ -33,8 +33,23 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 					return null
 				ink.strokes.append(stroke)
 			layer = ink
+		"TOKENS":
+			if _has_any(data, ["strokes", "terrain", "grid", "chunks", "pixels_per_unit", "transform"]):
+				return null
+			var token_layer: AtlasTokenLayer = AtlasTokenLayer.new(data.id, data.name)
+			var items: Variant = data.get("tokens", [])
+			if not items is Array or items.size() > AtlasTokenLayer.MAX_TOKENS:
+				return null
+			for raw: Variant in items:
+				if not raw is Dictionary:
+					return null
+				var token: AtlasToken = AtlasToken.from_dict(raw)
+				if token == null or token_layer.token_by_id(token.id) != null:
+					return null
+				token_layer.tokens.append(token)
+			layer = token_layer
 		"RASTER":
-			if _has_any(data, ["strokes", "terrain", "grid"]):
+			if _has_any(data, ["strokes", "terrain", "grid", "tokens"]):
 				return null
 			var raster: AtlasRasterLayer = AtlasRasterLayer.new(data.id, data.name)
 			var scale: Variant = data.get("pixels_per_unit", 1.0)
@@ -89,6 +104,8 @@ static func _has_any(data: Dictionary, keys: Array[String]) -> bool:
 ## detect a stale in-memory dictionary key or malformed decoded Image.
 static func _validated_metadata(layer: AtlasLayer) -> AtlasLayer:
 	if layer == null or not layer.has_valid_type_marker():
+		return null
+	if layer is AtlasTokenLayer and not AtlasTokenLayer.valid_tokens((layer as AtlasTokenLayer).tokens):
 		return null
 	if layer is AtlasRasterLayer:
 		for key: String in layer.chunks:

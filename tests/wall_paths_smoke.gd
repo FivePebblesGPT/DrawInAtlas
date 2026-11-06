@@ -90,8 +90,26 @@ func _run() -> void:
 	_click(canvas, a)
 	_click(canvas, b)
 	_check(live.strokes.is_empty() and canvas.is_editing(), "unfinished path never changes document")
+	_check(canvas._wall_draft != null and canvas._wall_draft.points.size() == 2
+		and canvas._wall_draft.points[0].distance_to(a) < 0.001
+		and canvas._wall_draft.points[1].distance_to(b) < 0.001,
+		"completed draft edges are a typed wall before commit")
+	var original_color: Color = canvas.brush_color
+	var original_width: float = canvas.brush_width
+	var old_draft: AtlasStroke = canvas._wall_draft
+	canvas.brush_color = Color(0.2, 0.85, 0.3, 0.7)
+	canvas.brush_width = 13.0
+	_check(canvas._wall_draft != old_draft and canvas._wall_draft.color == canvas.brush_color
+		and canvas._wall_draft.width == canvas.brush_width,
+		"stationary pointer restyles confirmed wall draft edges")
+	_check(live.strokes.is_empty(), "preview restyling does not commit or mutate the layer")
+	var final_draft: Dictionary = canvas._wall_draft.to_dict()
 	_key(canvas, KEY_ENTER)
 	_check(live.strokes.size() == 1 and live.strokes[0].editable_path and not live.strokes[0].closed_path, "Enter finishes open wall in one command")
+	_check(live.strokes[0].to_dict() == final_draft and canvas._wall_draft == null,
+		"committed open path exactly matches its styled draft and clears the preview")
+	canvas.brush_color = original_color
+	canvas.brush_width = original_width
 	_check(editor.edits.undo() and live.strokes.is_empty(), "open creation undo")
 	_check(editor.edits.redo() and live.strokes.size() == 1, "open creation redo")
 	_check(editor.edits.undo(), "clear path before closed test")
@@ -134,8 +152,13 @@ func _run() -> void:
 	# Cancellation, layer protections and scope denial must not create history.
 	canvas.cancel_edit()
 	_click(canvas, Vector2(-40, -20))
+	_click(canvas, Vector2(-10, -20))
+	_check(canvas._wall_draft != null, "two pending vertices produce a draft")
+	_key(canvas, KEY_BACKSPACE)
+	_check(canvas._wall_draft == null and canvas._wall_vertices.size() == 1,
+		"Backspace invalidates committed-edge preview after removing a vertex")
 	_key(canvas, KEY_ESCAPE)
-	_check(live.strokes.size() == 1, "Escape cancels construction")
+	_check(canvas._wall_draft == null and live.strokes.size() == 1, "Escape cancels construction and preview")
 	live.locked = true
 	_click(canvas, Vector2(-40, -20)); _click(canvas, Vector2(-10, -20)); _key(canvas, KEY_ENTER)
 	_check(live.strokes.size() == 1, "locked ink denies new paths")
@@ -172,6 +195,82 @@ func _run() -> void:
 	_check(live.strokes[0].points[1].distance_to(AtlasGridSnap.point(rotated, snap_target)) < 0.001,
 		"dragging vertex respects rotated-grid snapping")
 	_check(editor.edits.undo() and live.strokes[0].points[1] == untouched, "snapped move undo restores original")
+
+
+	# A wall gesture is a multi-click operation. Its scope must not expand to a
+	# different cell between the first vertex and Enter/right-click closure.
+	editor.apply_grid(AtlasGrid.new(AtlasGrid.Kind.SQUARE, 200.0))
+	canvas.snap_to_grid = false
+	editor._on_select(Vector2i.ZERO)
+	editor._on_scope_toggled(true)
+	var wall_count_before: int = live.strokes.size()
+	var history_before: int = editor.edits._cursor
+	_click(canvas, Vector2(20, 110))
+	_click(canvas, Vector2(55, 110))
+	_check(canvas._wall_draft != null and canvas._wall_vertices.size() == 2,
+		"masked wall draft holds two vertices before a selection change")
+	editor._on_select(Vector2i(1, 0))
+	_key(canvas, KEY_ENTER)
+	_check(live.strokes.size() == wall_count_before and editor.edits._cursor == history_before,
+		"changed cell rejects open wall without a history command")
+	_check(canvas._wall_vertices.is_empty() and canvas._wall_draft == null
+		and canvas._wall_scope_at_start == null, "stale open wall clears its preview and context")
+	# The same restriction applies to the separate right-click closure path.
+	editor._on_select(Vector2i.ZERO)
+	_click(canvas, Vector2(20, 110))
+	_click(canvas, Vector2(55, 110))
+	_click(canvas, Vector2(55, 145))
+	editor._on_select(Vector2i(1, 0))
+	_mouse(canvas, Vector2(55, 145), true, false, false, false, MOUSE_BUTTON_RIGHT)
+	_check(live.strokes.size() == wall_count_before and editor.edits._cursor == history_before
+		and canvas._wall_vertices.is_empty(), "stale closed wall cannot bypass scope guard")
+	# The retry is intentionally allowed when its *new* source cell is current.
+	_click(canvas, Vector2(220, 110))
+	_click(canvas, Vector2(255, 110))
+	_key(canvas, KEY_ENTER)
+	_check(live.strokes.size() == wall_count_before + 1 and editor.edits._cursor == history_before + 1,
+		"fresh wall in the current cell succeeds after rejection")
+	_check(editor.edits.undo(), "valid retry remains one undoable command")
+	# Vertex drags carry the original mask as well, not just their expected
+	# before/after geometry. A release under a different mask is a no-op.
+	editor._on_select(Vector2i.ZERO)
+	var first_before: Dictionary = live.strokes[0].to_dict().duplicate(true)
+	var drag_cursor: int = editor.edits._cursor
+	_mouse(canvas, a, true)
+	_check(canvas._wall_drag_vertex == 0, "wall vertex drag starts under original scope")
+	editor._on_select(Vector2i(1, 0))
+	_mouse(canvas, a + Vector2(8, 8), false)
+	_check(live.strokes[0].to_dict() == first_before and editor.edits._cursor == drag_cursor,
+		"changed cell rejects vertex drag without modifying the wall or history")
+	_check(canvas._wall_drag_vertex == -1 and canvas._wall_preview == null,
+		"stale drag clears vertex handles and preview")
+	# Lock and layer changes must fail even if the cell selection remains the same.
+	editor._on_select(Vector2i.ZERO)
+	_click(canvas, Vector2(20, 110))
+	_click(canvas, Vector2(55, 110))
+	live.locked = true
+	_key(canvas, KEY_ENTER)
+	_check(live.strokes.size() == wall_count_before and canvas._wall_vertices.is_empty(),
+		"locking original Objects layer invalidates a pending path")
+	live.locked = false
+	_click(canvas, Vector2(20, 110))
+	_click(canvas, Vector2(55, 110))
+	var saved_layer_id: String = canvas.active_layer_id
+	canvas.active_layer_id = "replaced-layer"
+	_key(canvas, KEY_ENTER)
+	_check(live.strokes.size() == wall_count_before and canvas._wall_vertices.is_empty(),
+		"switching Objects layer identity invalidates a pending path")
+	canvas.active_layer_id = saved_layer_id
+	# With the mask turned off, cell focus is not an authorization boundary.
+	editor._on_scope_toggled(false)
+	_click(canvas, Vector2(-75, -40))
+	_click(canvas, Vector2(-45, -40))
+	editor._on_select(Vector2i(1, 0))
+	_key(canvas, KEY_ENTER)
+	_check(live.strokes.size() == wall_count_before + 1,
+		"unrestricted path may finish after only cell focus changes")
+	_check(editor.edits.undo() and live.strokes.size() == wall_count_before,
+		"unrestricted path stays undoable")
 
 	root.remove_child(scene)
 	scene.free()
