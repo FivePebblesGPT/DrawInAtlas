@@ -1,0 +1,34 @@
+extends Node
+## Third project uses only the Drawing package, not the standalone editor or Atlas.
+
+func _ready() -> void:
+	var document: DrawingDocument = DrawingDocument.new("consumer-standalone", 16)
+	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Nested")
+	var layer: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Exact", group.value)
+	if not group.ok or not layer.ok:
+		get_tree().quit(1)
+		return
+	var x: int = -12345678901234
+	var edit: DrawingEditSession = document.begin_edit(String(layer.value), document.revision,
+		Transform2D.IDENTITY, x, -17).value
+	var rgba: PackedByteArray = PackedByteArray([17, 34, 51, 0])
+	if not edit.apply_region(Rect2i(0, 0, 1, 1), rgba).ok or not edit.commit().ok:
+		get_tree().quit(1)
+		return
+	var encoded: DrawingResult = DrawingFileIO.encode(document)
+	if not encoded.ok:
+		get_tree().quit(1)
+		return
+	var decoded: DrawingResult = DrawingFileIO.decode(encoded.value)
+	if not decoded.ok:
+		printerr(decoded.code, ": ", decoded.message)
+		get_tree().quit(1)
+		return
+	var reopened: DrawingDocument = decoded.value as DrawingDocument
+	var pixel: DrawingResult = reopened.read_pixel(String(layer.value), x, -17)
+	var valid: bool = reopened.id == document.id and reopened.list_children()[0] == group.value and \
+		reopened.list_children(String(group.value))[0] == layer.value and pixel.ok and \
+		int(pixel.value) == 0x00332211
+	if valid:
+		print("DRAWING_THIRD_CONSUMER_PASSED")
+	get_tree().quit(0 if valid else 1)

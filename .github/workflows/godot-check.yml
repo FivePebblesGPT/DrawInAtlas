@@ -23,12 +23,111 @@ jobs:
         run: godot --version | grep -E '^4\.8\.beta2\.official\.'
       - name: Enforce explicit types in owned GDScript and skill examples
         run: python3 tests/check_explicit_types.py
+      - name: Verify T-051 isolated Drawing contract consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_contract.py' -v
+      - name: Verify T-052 extracted independent Drawing core
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_core.py' -v
+      - name: Verify T-053 isolated standalone Drawing and third package consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_app.py' -v
+      - name: Verify T-053 standalone Linux release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/drawing-dist
+          python3 tools/build_drawing_app.py --output /tmp/drawing-dist/project
+          godot --headless --editor --path /tmp/drawing-dist/project --import --quit
+          godot --headless --path /tmp/drawing-dist/project --export-release Linux /tmp/drawing-dist/Drawing.x86_64
+          test -s /tmp/drawing-dist/Drawing.x86_64
+          test -s /tmp/drawing-dist/Drawing.pck
+          # Godot keeps font bytes inside imported .fontdata, not raw .ttf paths.
+          # Run a source-side probe against the exported PCK (never the editor tree).
+          godot --headless --path /tmp/drawing-dist --main-pack /tmp/drawing-dist/Drawing.pck \
+            --script /tmp/drawing-dist/project/tests/packaged_fonts_smoke.gd \
+            2>&1 | tee /tmp/godot-export-fonts.log
+          grep -q 'DRAWING_PACK_FONT_PASSED' /tmp/godot-export-fonts.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-export-fonts.log; then exit 1; fi
+      - name: Verify T-054 Drawing/Atlas chronological history
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/drawing_history_smoke.gd 2>&1 | tee /tmp/godot-drawing-history.log
+          grep -q 'DRAWING_HISTORY_PASSED' /tmp/godot-drawing-history.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|failed;' /tmp/godot-drawing-history.log; then exit 1; fi
+          godot --headless --path . --script res://tests/drawing_history_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-history-editor.log
+          grep -q 'DRAWING_HISTORY_EDITOR_PASSED' /tmp/godot-drawing-history-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-history-editor.log; then exit 1; fi
       - name: Import resources and parse scripts
         shell: bash
         run: |
           set -euo pipefail
           godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Verify T-058 editable text, font integrity and undoable rasterization
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
+          grep -q 'DRAWING_TEXT_PASSED' /tmp/godot-drawing-text.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text.log; then exit 1; fi
+          python3 tools/build_drawing_app.py --in-place
+          # Staging refreshes font files: let Godot generate their imported FontFile resources.
+          godot --headless --editor --path drawing --import --quit
+          godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
+          grep -q 'DRAWING_TEXT_UI_PASSED' /tmp/godot-drawing-text-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text-ui.log; then exit 1; fi
+      - name: Verify T-060 reusable Object Assets and atomic Save As
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
+          grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
+      - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
+          grep -q 'OBJECT_EDITOR_PASSED' /tmp/godot-object-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_EDITOR_FAILED:' /tmp/godot-object-editor.log; then exit 1; fi
+          python3 tools/build_drawing_app.py --in-place
+          # Staged licensed fonts must be imported before UI text editing.
+          godot --headless --editor --path drawing --import --quit
+          godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
+          grep -q 'DRAWING_OBJECT_UI_PASSED' /tmp/godot-object-editor-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|DRAWING_OBJECT_UI_FAILED:' /tmp/godot-object-editor-ui.log; then exit 1; fi
+      - name: Verify T-061 signed floor/detail world mapping and blank D-levels
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/drawing_world_mapping_smoke.gd 2>&1 | tee /tmp/godot-world-mapping.log
+          grep -q 'T061_WORLD_MAPPING_PASSED' /tmp/godot-world-mapping.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T061_FAILED:' /tmp/godot-world-mapping.log; then exit 1; fi
+      - name: Verify T-055 Atlas canonical Drawing composition and input
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
+          grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
+      - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/campaign_bundle_smoke.gd 2>&1 | tee /tmp/godot-t066-bundle.log
+          grep -q 'ATLAS_BUNDLE_PASSED' /tmp/godot-t066-bundle.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_FAILED:|ATLAS_BUNDLE_FAILED' /tmp/godot-t066-bundle.log; then exit 1; fi
+          godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
+          grep -q 'ATLAS_BUNDLE_EDITOR_PASSED' /tmp/godot-t066-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then exit 1; fi
       - name: Run domain smoke tests
         shell: bash
         run: |
@@ -379,6 +478,38 @@ jobs:
           if grep -E 'SCRIPT ERROR:|^ERROR:|COLLABORATION ACCEPTANCE FAILED:' /tmp/godot-collaboration-acceptance.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+      - name: Verify T-055 native Atlas renderer, overlays and history
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script res://tests/drawing_composition_visual.gd 2>&1 | tee /tmp/godot-t055-native.log
+          grep -q 'T055_NATIVE_PASSED' /tmp/godot-t055-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T055_NATIVE_FAILED:' /tmp/godot-t055-native.log; then exit 1; fi
+      - name: Verify T-053 native Drawing pointer and framebuffer
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_pointer.gd 2>&1 | tee /tmp/drawing-native.log
+          grep -q 'DRAWING_NATIVE_PASSED' /tmp/drawing-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_NATIVE_FAILED:' /tmp/drawing-native.log; then exit 1; fi
+      - name: Verify T-058 native framebuffer glyphs and explicit conversion
+        timeout-minutes: 4
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path drawing --script res://tests/native_text.gd 2>&1 | tee /tmp/drawing-native-text.log
+          grep -q 'DRAWING_TEXT_NATIVE_PASSED' /tmp/drawing-native-text.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|DRAWING_TEXT_NATIVE_FAILED:' /tmp/drawing-native-text.log; then exit 1; fi
       - name: Verify editable text and screen-space culling (T-027)
         shell: bash
         run: |
@@ -393,7 +524,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke player_projection_visual projector_frame_visual player_output_session_visual token_visual fog_visual player_privacy_acceptance_visual player_web_fallback_visual collaboration_acceptance_visual; do
+          for suite in drawing_world_visual visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke player_projection_visual projector_frame_visual player_output_session_visual token_visual fog_visual player_privacy_acceptance_visual player_web_fallback_visual collaboration_acceptance_visual; do
             xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
           done

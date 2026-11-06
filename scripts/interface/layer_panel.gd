@@ -10,6 +10,7 @@ signal show_editing_detail_requested
 signal object_selected(layer_id: String, stroke_index: int)
 signal link_action_requested(link_id: String, action: StringName)
 signal link_action_rejected
+signal drawing_layer_selected(map_id: String, floor_id: String, level: int, layer_id: String)
 
 const LINK_FOCUS: int = 1
 const LINK_EDIT: int = 2
@@ -34,6 +35,8 @@ const ICON_ENTER: Texture2D = preload("res://img/controls/raise.svg")
 @onready var show_editing_detail: Button = $ShowEditingDetail
 @onready var _up: Button = $Order/RaiseButton
 @onready var _down: Button = $Order/LowerButton
+var _drawing_registry: AtlasDrawingRegistry
+var _drawing_library: AtlasObjectLibrary
 var _floor: AtlasFloor
 var _selected: String = ""
 var _ids: Array[String] = []
@@ -95,8 +98,9 @@ func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0, auto
 			layer_list.select(layer_list.item_count - 1)
 	var current: AtlasLayer = floor.layer_by_id(_selected)
 	var hidden_target: bool = current != null and current.detail_level != view_level
-	detail_status.text = ("Viewing D%d · Editing %s (D%d, hidden)" % [view_level, current.display_name, current.detail_level]
-		if hidden_target else "Viewing D%d · Editing %s" % [view_level, current.display_name if current != null else "none"])
+	var empty_label: String = " · empty" if not _has_authored_detail(floor, view_level) else ""
+	detail_status.text = ("Viewing D%d%s · Editing %s (D%d, hidden)" % [view_level, empty_label, current.display_name, current.detail_level]
+		if hidden_target else "Viewing D%d%s · Editing %s" % [view_level, empty_label, current.display_name if current != null else "none"])
 	show_editing_detail.visible = hidden_target
 	name_input.editable = current != null
 	visibility_checkbox.disabled = current == null
@@ -116,6 +120,42 @@ func set_floor(floor: AtlasFloor, selected_id: String, view_level: int = 0, auto
 	var index: int = _index()
 	_up.disabled = index < 0 or index == floor.layers.size() - 1
 	_down.disabled = index <= 0
+
+
+## The composed Drawing tree is authoritative for new strokes. The older
+## legacy tree remains visible during gradual compatibility extraction.
+## An empty high detail is not missing/lost artwork: navigation/grid overlays
+## are separate and remain interactive even without authored pixels.
+func _has_authored_detail(floor: AtlasFloor, level: int) -> bool:
+	for layer: AtlasLayer in floor.layers:
+		if layer.detail_level != level:
+			continue
+		if layer is AtlasRasterLayer and not (layer as AtlasRasterLayer).chunks.is_empty():
+			return true
+		if layer is AtlasObjectsLayer and not (layer as AtlasObjectsLayer).strokes.is_empty():
+			return true
+		if layer is AtlasTokenLayer and not (layer as AtlasTokenLayer).tokens.is_empty():
+			return true
+	return false
+
+
+func set_drawing_registry(registry: AtlasDrawingRegistry,
+		library: AtlasObjectLibrary = null) -> void:
+	_drawing_registry = registry
+	_drawing_library = library
+	_rebuild_hierarchy()
+
+
+func _drawing_rows(parent: TreeItem, document: DrawingDocument,
+		parent_id: String, map_id: String, floor_id: String, level: int) -> void:
+	for layer_id: String in document.list_children(parent_id):
+		var meta: Dictionary = document.node_metadata(layer_id)
+		var entry: TreeItem = _make_row(parent, "%s · %s%s" % [meta["name"], meta["kind"],
+			" [hidden]" if not meta["visible"] else ""],
+			{"kind": "drawing-layer", "map": map_id, "floor": floor_id,
+			"level": level, "id": layer_id}, "Canonical Drawing package layer")
+		if meta["kind"] == DrawingLayerNode.GROUP:
+			_drawing_rows(entry, document, layer_id, map_id, floor_id, level)
 
 
 func _index() -> int:
@@ -271,6 +311,32 @@ func _rebuild_hierarchy() -> void:
 	_layer_rows.clear()
 	_stroke_rows.clear()
 	var root: TreeItem = hierarchy.create_item()
+	if _drawing_registry != null and _map != null:
+		var map_group: TreeItem = _make_row(root, "DRAWING · MAP / FLOOR / DETAIL / LAYERS",
+			{"kind": "group"}, "The canonical shared Drawing engine")
+		map_group.set_selectable(0, false)
+		for group: Dictionary in _drawing_registry.projection(_map.id):
+			var floor_group: TreeItem = _make_row(map_group, "FLOOR · %s" % group["name"],
+				{"kind": "group"})
+			floor_group.set_selectable(0, false)
+			for detail: Dictionary in group["details"]:
+				var section: TreeItem = _make_row(floor_group, "%s%s" % [detail["id"],
+					" · empty" if detail["blank"] else " · authored"], {"kind": "group"})
+				section.set_selectable(0, false)
+				# Do not open all archived detail sources simply to build the sidebar.
+				# Only the viewed detail (or a previously resident one) needs rows.
+				var active: bool = detail["level"] == int(view_detail_spinner.value) \
+					or _drawing_registry._documents.has(detail["document_id"])
+				if active:
+					var fetched: DrawingResult = _drawing_registry.document_at(_map.id, group["id"], detail["level"])
+					if fetched.ok and fetched.value != null:
+						_drawing_rows(section, fetched.value, DrawingDocument.ROOT_ID,
+							_map.id, group["id"], detail["level"])
+				if _drawing_library != null:
+					for instance_id: String in _drawing_registry.visible_placements(_drawing_library,
+							_map.id, group["id"], detail["level"]):
+						_make_row(section, "Object · %s" % instance_id.substr(0, 18),
+							{"kind": "object-instance", "id": instance_id})
 	var levels: Array[int] = []
 	for layer: AtlasLayer in _floor.layers:
 		if not levels.has(layer.detail_level):
@@ -386,6 +452,9 @@ func _on_hierarchy_selected() -> void:
 	var data: Dictionary = row.get_metadata(0) if row.get_metadata(0) is Dictionary else {}
 	# Selection listeners can rebuild this Tree, which Godot forbids during mouse events.
 	match str(data.get("kind", "")):
+		"drawing-layer":
+			drawing_layer_selected.emit.call_deferred(str(data.get("map", "")),
+				str(data.get("floor", "")), int(data.get("level", 0)), str(data.get("id", "")))
 		"layer":
 			layer_selected.emit.call_deferred(str(data.get("id", "")))
 		"stroke":

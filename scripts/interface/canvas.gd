@@ -32,8 +32,11 @@ signal projector_frame_changed
 signal token_edit_requested(before: AtlasToken, after: AtlasToken)
 signal token_rejected(reason: String)
 signal fog_edit_requested(bounds: Rect2, reveal: bool)
+signal drawing_error(message: String)
+signal object_instance_selected(id: String)
+signal object_instance_edit_requested(id: String)
 
-enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG }
+enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG, PAN }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
 enum FrameDrag { NONE, MOVE, RESIZE }
@@ -42,6 +45,21 @@ var campaign: AtlasCampaign
 var map: AtlasMapDocument
 var floor: AtlasFloor
 var active_layer_id: String = "raster"
+## T-055: the canonical Drawing renderer and gestures are composed in Atlas.
+## A standalone AtlasCanvas without this adapter retains its legacy test/editor
+## path. The DrawingDocument itself never imports any Atlas UI code.
+var drawing_composition: AtlasDrawingComposition
+var _composition_drawer: Node2D
+var _composition_textures: Array[ImageTexture] = []
+var _canonical_paint: bool = false
+var entrance_double_click_ms: int = 450
+var entrance_double_click_pixels: float = 10.0
+var _previous_entrance_id: String = ""
+var _previous_entrance_at: int = -1
+var _previous_entrance_local: Vector2 = Vector2.ZERO
+var _previous_object_id: String = ""
+var _previous_object_at: int = -1
+var _previous_object_local: Vector2 = Vector2.ZERO
 ## Presentation only: never changes the authored layer, floor, map or camera.
 ## Automatic LOD (T-004/T-005) must use set_presented_detail_level so an
 ## in-progress gesture cannot be redirected or visually interrupted.
@@ -54,6 +72,9 @@ func set_presented_detail_level(level: int) -> bool:
 	if presented_detail_level != level:
 		clear_selection()
 	presented_detail_level = level
+	if drawing_composition != null and map != null and floor != null:
+		drawing_composition.registry.ensure_detail(map.id, floor.id, level)
+	_refresh_composition_view()
 	queue_redraw()
 	return true
 
@@ -77,6 +98,7 @@ var camera_center: Vector2 = Vector2.ZERO:
 			return
 		camera_center = value
 		view_region_changed.emit()
+		_refresh_composition_view()
 ## View-only scale (screen pixels per board unit); not a D-level selector.
 var camera_zoom: float = 1.0:
 	set(value):
@@ -84,6 +106,7 @@ var camera_zoom: float = 1.0:
 			return
 		camera_zoom = value
 		view_region_changed.emit()
+		_refresh_composition_view()
 var selected_cell: Vector2i = Vector2i.ZERO
 var has_selected_cell: bool = false
 var reference_opacity: float = 0.35
@@ -226,11 +249,30 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	resized.connect(_on_resized)
 	get_window().focus_exited.connect(cancel_edit)
-	mouse_exited.connect(_clear_brush_cursor)
+	mouse_exited.connect(_on_canvas_mouse_exited)
 	_overlay = Node2D.new()
-	_overlay.z_index = 1
+	_overlay.z_index = 2
 	_overlay.draw.connect(_draw_overlays.bind(_overlay))
 	add_child(_overlay)
+	_composition_drawer = Node2D.new()
+	_composition_drawer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_composition_drawer.z_index = 1
+	_composition_drawer.draw.connect(_draw_canonical_composition.bind(_composition_drawer))
+	add_child(_composition_drawer)
+
+
+## A pointer release over another dock is not guaranteed to reach this
+## Control. Commit the last in-bounds sample on exit so no gesture stays open
+## and no artwork is written into editor chrome.
+func _on_canvas_mouse_exited() -> void:
+	_clear_brush_cursor()
+	if _canonical_paint:
+		commit_edit()
+
+
+func _refresh_composition_view() -> void:
+	if _composition_drawer != null and is_instance_valid(_composition_drawer):
+		_composition_drawer.queue_redraw()
 
 
 func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floor_id: String = "") -> bool:
@@ -254,6 +296,11 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	clear_selection()
 	has_selected_cell = false
 	selected_link_id = ""
+	_previous_entrance_id = ""
+	_previous_object_id = ""
+	if drawing_composition != null:
+		drawing_composition.registry.attach_campaign(current_campaign)
+	_refresh_composition_view()
 	queue_redraw()
 	return true
 
@@ -267,13 +314,16 @@ func choose_tool(value: Tool) -> void:
 
 
 func is_editing() -> bool:
-	return _fog_drag_active or _token_drag_before != null or _frame_drag != FrameDrag.NONE \
+	return _canonical_paint or _fog_drag_active or _token_drag_before != null or _frame_drag != FrameDrag.NONE \
 		or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending \
 		or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() \
 		or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
+	if _canonical_paint and drawing_composition != null:
+		drawing_composition.cancel_stroke()
+	_canonical_paint = false
 	_fog_drag_active = false
 	_clear_token_drag_context()
 	cancel_projector_frame_drag()
@@ -306,6 +356,14 @@ func cancel_edit() -> void:
 
 
 func commit_edit() -> void:
+	if _canonical_paint and drawing_composition != null:
+		_canonical_paint = false
+		var completed: DrawingResult = drawing_composition.finish_stroke()
+		if not completed.ok:
+			drawing_error.emit(completed.message)
+		_refresh_composition_view()
+		interaction_finished.emit()
+		return
 	if _shape_kind == "LINE" and not _line_context_matches():
 		cancel_edit()
 		line_rejected.emit("Line target or edit mask changed since preview; nothing painted.")
@@ -433,6 +491,7 @@ func _finish_manipulation() -> void:
 
 func _on_resized() -> void:
 	cancel_edit()
+	_refresh_composition_view()
 	queue_redraw()
 	view_region_changed.emit()
 
@@ -445,6 +504,53 @@ func local_to_document(local_position: Vector2) -> Vector2:
 
 func document_to_local(position: Vector2) -> Vector2:
 	return (position - camera_center) * camera_zoom + size * 0.5
+
+
+## The engine is rendered into bounded, short-lived GPU tiles. Atlas overlays
+## still draw above this node and are not part of its DrawingDocument.
+func _draw_canonical_composition(item: Node2D) -> void:
+	_composition_textures.clear()
+	if drawing_composition == null or map == null or floor == null \
+			or size.x <= 0.0 or size.y <= 0.0 or camera_zoom <= 0.0:
+		return
+	var projection: Array[Dictionary] = drawing_composition.registry.projection(map.id)
+	var density: float = 0.0
+	for group: Dictionary in projection:
+		if group["id"] != floor.id:
+			continue
+		for detail: Dictionary in group["details"]:
+			if detail["level"] == presented_detail_level:
+				density = float(detail["density"][0]) / float(detail["density"][1])
+	if density <= 0.0:
+		return
+	var screen_scale: float = camera_zoom / density
+	if screen_scale <= 0.0:
+		return
+	var center_x: int = floori(camera_center.x * density)
+	var center_y: int = floori(camera_center.y * density)
+	var start: Vector2i = Vector2i(floori(-size.x * 0.5 / screen_scale),
+		floori(-size.y * 0.5 / screen_scale))
+	var total: Vector2i = Vector2i(ceili(size.x / screen_scale) + 2,
+		ceili(size.y / screen_scale) + 2)
+	# Do not scan millions of pixels at high detail/low zoom. High-LOD
+	# sparse sampling/accelerated LOD selection is benchmarked in T-057/T-068.
+	if total.x <= 0 or total.y <= 0 or total.x > 4096 or total.y > 4096 \
+			or total.x * total.y > 2097152:
+		return
+	for y: int in range(0, total.y, AtlasDrawingComposition.TILE_VIEW):
+		for x: int in range(0, total.x, AtlasDrawingComposition.TILE_VIEW):
+			var area: Rect2i = Rect2i(start + Vector2i(x, y),
+				Vector2i(mini(AtlasDrawingComposition.TILE_VIEW, total.x - x),
+					mini(AtlasDrawingComposition.TILE_VIEW, total.y - y)))
+			var frame: DrawingResult = drawing_composition.render_region(map.id, floor.id,
+				presented_detail_level, area, center_x, center_y)
+			if not frame.ok:
+				drawing_error.emit(frame.message)
+				return
+			var texture: ImageTexture = ImageTexture.create_from_image(frame.value)
+			_composition_textures.append(texture)
+			item.draw_texture_rect(texture, Rect2(size * 0.5 + Vector2(area.position) * screen_scale,
+				Vector2(area.size) * screen_scale), false)
 
 
 func _draw() -> void:
@@ -761,11 +867,14 @@ func _draw_overlays(item: Node2D) -> void:
 ## A pointer ring shows the active Brush or Eraser diameter at any zoom.
 ## Keep it out of authored ink/raster, captured references and saved scenes.
 func _draw_brush_cursor(item: Node2D) -> void:
-	if not _brush_cursor_inside or tool not in [Tool.PEN, Tool.ERASER] or not editing_target_is_presented():
+	if not _brush_cursor_inside or tool not in [Tool.PEN, Tool.ERASER]:
 		return
-	var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
-	if not layer is AtlasRasterLayer or not layer.is_editable():
-		return
+	if drawing_composition == null:
+		if not editing_target_is_presented():
+			return
+		var layer: AtlasLayer = floor.layer_by_id(active_layer_id)
+		if not layer is AtlasRasterLayer or not layer.is_editable():
+			return
 	var center: Vector2 = local_to_document(_brush_cursor_local)
 	var radius: float = brush_width * 0.5
 	if radius <= 0.0:
@@ -1270,9 +1379,41 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	interaction_started.emit()
 	grab_focus()
 	var position: Vector2 = local_to_document(mouse.position)
+	# Painting wins entrance arbitration. Its target is frozen before any
+	# navigation/selection event is considered.
+	if drawing_composition != null and tool in [Tool.PEN, Tool.ERASER]:
+		var color: Color = brush_color
+		var packed: int = color.r8 | (color.g8 << 8) | (color.b8 << 16) | (color.a8 << 24)
+		var point: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+		var started: DrawingResult = drawing_composition.start_stroke(map.id, floor.id,
+			presented_detail_level, point, packed, brush_width, tool == Tool.ERASER,
+			edit_scope.polygon, edit_scope.enabled)
+		if not started.ok:
+			drawing_error.emit(started.message)
+		else:
+			_canonical_paint = true
+		return
 	if _begin_link_press(mouse, position):
 		return
+	if drawing_composition != null and tool in [Tool.SELECT, Tool.ART_SELECT, Tool.MOVE]:
+		var selected: DrawingResult = drawing_composition.select_instance(map.id,
+			floor.id, presented_detail_level, position)
+		if selected.ok and not String(selected.value).is_empty():
+			var instance_id: String = String(selected.value)
+			var now: int = Time.get_ticks_msec()
+			var repeated: bool = instance_id == _previous_object_id and _previous_object_at >= 0 \
+				and now - _previous_object_at <= entrance_double_click_ms \
+				and mouse.position.distance_to(_previous_object_local) <= entrance_double_click_pixels
+			_previous_object_id = instance_id
+			_previous_object_at = now
+			_previous_object_local = mouse.position
+			object_instance_selected.emit(instance_id)
+			if mouse.double_click and repeated:
+				object_instance_edit_requested.emit(instance_id)
+			return
 	match tool:
+		Tool.PAN:
+			_panning = true
 		Tool.FOG:
 			_fog_start = position
 			_fog_end = position
@@ -1374,13 +1515,28 @@ func _begin_artwork_move(position: Vector2) -> void:
 
 
 func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
-	if campaign == null or tool != Tool.SELECT:
+	if campaign == null or tool not in [Tool.SELECT, Tool.ART_SELECT, Tool.MOVE, Tool.PAN]:
 		return false
 	var links: Array[AtlasMapLink] = campaign.find_links_at(map.id, position, floor.id)
-	if mouse.double_click and not links.is_empty():
+	if drawing_composition != null:
+		# Genuine same-entrance double click, not merely the OS's double_click
+		# flag. Deterministic overlap choice and stale-target protection.
+		links.sort_custom(func(a: AtlasMapLink, b: AtlasMapLink) -> bool: return a.id < b.id)
+		var next_id: String = links[0].id if not links.is_empty() else ""
+		var now: int = Time.get_ticks_msec()
+		var same: bool = not next_id.is_empty() and next_id == _previous_entrance_id \
+			and _previous_entrance_at >= 0 and now - _previous_entrance_at <= entrance_double_click_ms \
+			and mouse.position.distance_to(_previous_entrance_local) <= entrance_double_click_pixels
+		_previous_entrance_id = next_id
+		_previous_entrance_at = now
+		_previous_entrance_local = mouse.position
+		if mouse.double_click and same and campaign.link_by_id(next_id) != null:
+			link_candidates_requested.emit(links)
+			return true
+	elif mouse.double_click and not links.is_empty():
 		link_candidates_requested.emit(links)
 		return true
-	selected_link_id = links[0].id if links.size() == 1 else ""
+	selected_link_id = links[0].id if tool == Tool.SELECT and links.size() == 1 else ""
 	link_selected.emit(selected_link_id)
 	if not selected_link_id.is_empty():
 		_moving_link_id = selected_link_id
@@ -1391,6 +1547,25 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 
 
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
+	if _canonical_paint:
+		# A synthetic/re-routed release can arrive outside this Control. Never
+		# extend the stroke through editor panels or off the visible canvas.
+		if Rect2(Vector2.ZERO, size).has_point(mouse.position):
+			var point: Vector2 = local_to_document(mouse.position)
+			if snap_to_grid:
+				point = AtlasGridSnap.point(map.grid, point)
+			if drawing_composition != null:
+				var staged: DrawingResult = drawing_composition.append_stroke(point)
+				if not staged.ok:
+					drawing_error.emit(staged.message)
+					cancel_edit()
+					return
+		commit_edit()
+		return
+	if _panning and tool == Tool.PAN:
+		_panning = false
+		interaction_finished.emit()
+		return
 	if _fog_drag_active:
 		_fog_end = local_to_document(mouse.position)
 		var bounds: Rect2 = Rect2(_fog_start, _fog_end - _fog_start).abs()
@@ -1435,6 +1610,22 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 	_brush_cursor_inside = Rect2(Vector2.ZERO, size).has_point(motion.position)
 	_overlay.queue_redraw()
 	pointer_moved.emit(motion.position)
+	if _canonical_paint and drawing_composition != null:
+		if not Rect2(Vector2.ZERO, size).has_point(motion.position):
+			# Global mouse capture can deliver one final out-of-bounds motion.
+			# Finish using only already accepted in-bounds samples.
+			commit_edit()
+			accept_event()
+			return
+		var point: Vector2 = local_to_document(motion.position)
+		if snap_to_grid:
+			point = AtlasGridSnap.point(map.grid, point)
+		var drawn: DrawingResult = drawing_composition.append_stroke(point)
+		if not drawn.ok:
+			drawing_error.emit(drawn.message)
+			cancel_edit()
+		accept_event()
+		return
 	if _panning:
 		camera_center -= motion.relative / camera_zoom
 		queue_redraw()

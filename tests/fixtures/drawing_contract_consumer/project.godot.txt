@@ -1,0 +1,12 @@
+; T-051 isolated third-party Drawing consumer fixture.
+; This is a template, not a nested Godot project in the Atlas root.
+config_version=5
+
+[application]
+config/name="Drawing Contract Consumer"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.8", "GL Compatibility")
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
