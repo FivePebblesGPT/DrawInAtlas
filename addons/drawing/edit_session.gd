@@ -17,6 +17,10 @@ var _covered: Dictionary[String, bool] = {}
 var _source_tiles: Dictionary[String, Variant] = {}
 ## Detached preview indexed by storage tile + pixel offset; never stored on the document.
 var _preview_tiles: Dictionary[String, Dictionary] = {}
+## Per-storage-tile monotonic content versions. A display tile only needs
+## recomposition when a storage tile touching its source footprint changes.
+var _preview_epoch: int = 0
+var _preview_tile_versions: Dictionary[String, int] = {}
 ## Only touched pixels need rollback. A full triple-dictionary duplicate per motion
 ## event grew quadratically over long strokes.
 var _paint_journal: Dictionary[String, Array] = {}
@@ -47,7 +51,35 @@ func preview_tile(tile_key: String) -> Dictionary:
 	return _preview_tiles.get(tile_key, {})
 
 
+func preview_stamp_for_area(area: Rect2i) -> int:
+	if _closed or _preview_tile_versions.is_empty() or document.revision != expected_revision:
+		return 0
+	var stride: int = document.tile_stride
+	var start_x: int = DrawingDocument.TILES.floor_div(area.position.x, stride)
+	var start_y: int = DrawingDocument.TILES.floor_div(area.position.y, stride)
+	var end_x: int = DrawingDocument.TILES.floor_div(area.end.x - 1, stride)
+	var end_y: int = DrawingDocument.TILES.floor_div(area.end.y - 1, stride)
+	var stamp: int = 0
+	# Tiny storage strides must not turn a 128px display lookup into a
+	# quadratic scan of thousands of absent storage tiles.
+	var span: int = (end_x - start_x + 1) * (end_y - start_y + 1)
+	if _preview_tile_versions.size() < span:
+		for key: String in _preview_tile_versions:
+			var parts: PackedStringArray = key.split(",")
+			var tile_x: int = int(parts[0])
+			var tile_y: int = int(parts[1])
+			if tile_x >= start_x and tile_x <= end_x and tile_y >= start_y and tile_y <= end_y:
+				stamp = maxi(stamp, _preview_tile_versions[key])
+	else:
+		for y: int in range(start_y, end_y + 1):
+			for x: int in range(start_x, end_x + 1):
+				stamp = maxi(stamp, int(_preview_tile_versions.get("%d,%d" % [x, y], 0)))
+	return stamp
+
+
 func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) -> void:
+	_preview_epoch += 1
+	_preview_tile_versions[tile_key] = _preview_epoch
 	var tile_patch: Dictionary = _preview_tiles.get(tile_key, {})
 	if _after.has(pixel_key):
 		tile_patch[local_index] = _after[pixel_key]
@@ -95,6 +127,7 @@ func cancel() -> void:
 	_covered.clear()
 	_source_tiles.clear()
 	_preview_tiles.clear()
+	_preview_tile_versions.clear()
 	_paint_journal.clear()
 	_journaling = false
 	_closed = true
@@ -110,6 +143,7 @@ func commit() -> DrawingResult:
 	_covered.clear()
 	_source_tiles.clear()
 	_preview_tiles.clear()
+	_preview_tile_versions.clear()
 	_paint_journal.clear()
 	return result
 

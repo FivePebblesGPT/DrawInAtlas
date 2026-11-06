@@ -17,6 +17,13 @@ var _nodes: Dictionary[String, DrawingLayerNode] = {}
 var _pending_tiles: Dictionary[String, Dictionary] = {}
 var _known_refs: Dictionary[String, Dictionary] = {}
 var _dirty_tiles: Dictionary[String, bool] = {}
+## Short-lived display invalidations, independent of save/publish dirty tiles.
+## Missing revisions (layer tree, visibility, text, import) force a full redraw.
+const DISPLAY_CHANGE_LIMIT: int = 64
+var _display_changes: Array[Dictionary] = []
+## Lazy source registration can change visible content without a document
+## revision (the caller is attaching a previously published tile).
+var display_source_epoch: int = 0
 ## One local ordered timeline. A selection step carries the current content token.
 ## External Atlas-owned documents use the host timeline instead of this one.
 var external_history: bool = false
@@ -307,6 +314,7 @@ func register_lazy_chunk(layer_id: String, cx: int, cy: int,
 		return DrawingResult.failure("DUPLICATE_TILE", "Chunk already registered")
 	_pending_tiles[layer_id + ":" + key] = {"ref": blob_ref, "sha256": canonical_sha256, "fetch": loader}
 	_known_refs[layer_id + ":" + key] = {"ref": blob_ref, "sha256": canonical_sha256}
+	display_source_epoch += 1
 	_content_committed = true
 	return DrawingResult.success(null, revision)
 
@@ -399,7 +407,36 @@ func _publish_edit(layer_id: String, expected: int,
 			_mark_untracked_change()
 		else:
 			_append_event({"kind": "content", "delta": result.delta}, true)
+	# A frame cache can skip other already-composed display tiles after this
+	# atomic content publication. Keep the journal bounded; consumers falling
+	# behind use a conservative full invalidation instead of stale pixels.
+	_display_changes.append({"revision": revision, "regions": result.regions.duplicate()})
+	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
+		_display_changes.pop_front()
 	return result
+
+
+## Cached views consume monotonic changes without touching persistence state.
+## Any untracked revision (including text, layer structure or visibility)
+## invalidates all cached composites; dirty save tiles are not a change log.
+func display_changes_since(old_revision: int) -> Dictionary:
+	if old_revision == revision:
+		return {"full": false, "regions": []}
+	if old_revision < 0 or old_revision > revision:
+		return {"full": true, "regions": []}
+	var next_revision: int = old_revision + 1
+	var regions: Array[DrawingDirtyRegion] = []
+	for record: Dictionary in _display_changes:
+		var changed_revision: int = int(record["revision"])
+		if changed_revision < next_revision:
+			continue
+		if changed_revision != next_revision:
+			return {"full": true, "regions": []}
+		regions.append_array(record["regions"] as Array[DrawingDirtyRegion])
+		next_revision += 1
+	if next_revision != revision + 1:
+		return {"full": true, "regions": []}
+	return {"full": false, "regions": regions}
 
 
 ## A host must select external ownership *before* it begins committing edits.

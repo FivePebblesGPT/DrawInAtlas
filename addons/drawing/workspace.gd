@@ -1975,7 +1975,7 @@ func _redo() -> void:
 
 
 func _zoom(factor: float) -> void:
-	canvas.zoom = clampf(canvas.zoom * factor, 0.5, 24.0)
+	canvas.zoom = clampf(canvas.zoom * factor, 0.25, 24.0)
 	canvas.queue_redraw()
 	_update_status()
 

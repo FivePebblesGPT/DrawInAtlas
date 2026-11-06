@@ -50,7 +50,23 @@ var last_mouse: Vector2 = Vector2.ZERO
 ## Latest delivered canvas-relative input, including synthetic native test events.
 var last_pointer_position: Vector2 = Vector2.ZERO
 var pointer_known: bool = false
-var _frame_textures: Array[ImageTexture] = []
+## Display tiles are source-space aligned, independent of camera and zoom.
+## The bounded LRU owns every retained texture; a draw call need not create any.
+const DISPLAY_TILE_SIZE: int = 128
+const MAX_DISPLAY_TILES: int = 144
+const MAX_OCCUPANCY_ENTRIES: int = 40000
+var _display_tiles: Dictionary[String, Dictionary] = {}
+## Keep evicted draw-command RIDs alive through the submitted frame. This is
+## transient and separate from the bounded retained LRU (see instrumentation).
+var _frame_references: Array[ImageTexture] = []
+var _cache_document: DrawingDocument
+var _cache_revision: int = -1
+var _cache_source_epoch: int = -1
+var _cache_access: int = 0
+var _occupied_display_tiles: Dictionary[String, bool] = {}
+var _occupancy_unknown: bool = false
+var last_frame_metrics: Dictionary[String, Variant] = {}
+var _last_frame_submit_us: int = 0
 var _reported_render_errors: Dictionary[String, bool] = {}
 ## Motion handlers append raw canvas-source positions only. Bounded pieces are
 ## staged on idle frames, keeping the input path free of long raster sweeps.
@@ -95,6 +111,7 @@ func _restore_input_accumulation() -> void:
 
 
 func _on_frame_post_draw() -> void:
+	last_frame_metrics["post_draw_us"] = Time.get_ticks_usec()
 	if session != null and int(_metrics.get("first_preview_submit_us", 0)) > 0 \
 			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0:
 		_metrics["first_frame_post_draw_us"] = Time.get_ticks_usec()
@@ -121,32 +138,216 @@ func pixel_to_position(pixel: Vector2) -> Vector2:
 	return (pixel - camera) * zoom + size * 0.5
 
 
-func _draw() -> void:
-	_frame_textures.clear()
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
-	if document == null:
+## Source-space occupancy means a sparse document at 25% zoom does not
+## allocate thousands of fully transparent textures. If the occupancy index
+## would exceed its cap, conservatively render instead of omitting content.
+func _mark_occupied(area: Rect2i) -> void:
+	if _occupancy_unknown or not area.has_area():
 		return
+	var start_x: int = DrawingDocument.TILES.floor_div(area.position.x, DISPLAY_TILE_SIZE)
+	var start_y: int = DrawingDocument.TILES.floor_div(area.position.y, DISPLAY_TILE_SIZE)
+	var end_x: int = DrawingDocument.TILES.floor_div(area.end.x - 1, DISPLAY_TILE_SIZE)
+	var end_y: int = DrawingDocument.TILES.floor_div(area.end.y - 1, DISPLAY_TILE_SIZE)
+	if (end_x - start_x + 1) * (end_y - start_y + 1) > MAX_OCCUPANCY_ENTRIES:
+		_occupancy_unknown = true
+		_occupied_display_tiles.clear()
+		return
+	for y: int in range(start_y, end_y + 1):
+		for x: int in range(start_x, end_x + 1):
+			_occupied_display_tiles["%d,%d" % [x, y]] = true
+			if _occupied_display_tiles.size() > MAX_OCCUPANCY_ENTRIES:
+				_occupancy_unknown = true
+				_occupied_display_tiles.clear()
+				return
+
+
+func _rebuild_occupancy() -> void:
+	_occupied_display_tiles.clear()
+	_occupancy_unknown = false
+	var visible: Array[String] = []
+	DrawingRenderer._collect_visible(document, DrawingDocument.ROOT_ID, visible)
+	for node_id: String in visible:
+		var metadata: Dictionary = document.node_metadata(node_id)
+		if metadata["kind"] == DrawingLayerNode.TEXT:
+			var text_node: DrawingLayerNode = document.inspect_node(node_id)
+			if text_node.text_element != null:
+				var measured: DrawingResult = DrawingTextRaster.bounds(text_node.text_element)
+				if not measured.ok:
+					_occupancy_unknown = true
+					_occupied_display_tiles.clear()
+					return
+				_mark_occupied(measured.value as Rect2i)
+		else:
+			for tile_key: String in document.tile_keys(node_id):
+				var coords: PackedStringArray = tile_key.split(",")
+				if coords.size() != 2:
+					_occupancy_unknown = true
+					_occupied_display_tiles.clear()
+					return
+				var stride: int = document.tile_stride
+				var world_x: int = int(coords[0]) * stride
+				var world_y: int = int(coords[1]) * stride
+				if absi(world_x) >= 1073741824 or absi(world_y) >= 1073741824:
+					_occupancy_unknown = true
+					_occupied_display_tiles.clear()
+					return
+				_mark_occupied(Rect2i(world_x, world_y, stride, stride))
+		if _occupancy_unknown:
+			return
+
+
+func _sync_display_cache() -> void:
+	var rebuild_occupancy: bool = false
+	if _cache_document != document:
+		_cache_document = document
+		_cache_revision = -1
+		_cache_source_epoch = -1
+		_display_tiles.clear()
+		_reported_render_errors.clear()
+	if _cache_source_epoch != document.display_source_epoch:
+		_display_tiles.clear()
+		_cache_source_epoch = document.display_source_epoch
+		_cache_revision = -1
+	if _cache_revision == document.revision:
+		return
+	if _cache_revision < 0:
+		rebuild_occupancy = true
+	else:
+		var changed: Dictionary = document.display_changes_since(_cache_revision)
+		if changed["full"]:
+			_display_tiles.clear()
+			rebuild_occupancy = true
+		else:
+			for region: DrawingDirtyRegion in changed["regions"]:
+				# Extending the occupancy index on pixel changes is safe even
+				# for erased tiles. Periodic structural changes rebuild it.
+				if absi(region.x) >= 1073741824 or absi(region.y) >= 1073741824:
+					_occupancy_unknown = true
+					_occupied_display_tiles.clear()
+				else:
+					_mark_occupied(Rect2i(region.x, region.y, region.width, region.height))
+				for key: String in _display_tiles:
+					var tile_area: Rect2i = _display_tiles[key]["area"] as Rect2i
+					if tile_area.position.x < region.x + region.width \
+						and tile_area.end.x > region.x \
+						and tile_area.position.y < region.y + region.height \
+						and tile_area.end.y > region.y:
+						_display_tiles[key]["dirty"] = true
+	_cache_revision = document.revision
+	if rebuild_occupancy:
+		_rebuild_occupancy()
+
+## Retain tiles that remain in the current viewport when it exceeds the
+## persistent limit. Evict off-screen entries first; render overflow entries
+## transiently so the next redraw can still hit the retained in-view tiles.
+## Unconditionally evicting the oldest tile churns *every* tile on each frame
+## whenever a dense viewport needs MAX_DISPLAY_TILES + 1 textures.
+func _reserve_display_slot(visible_tile_range: Rect2i) -> bool:
+	if _display_tiles.size() < MAX_DISPLAY_TILES:
+		return true
+	var oldest_offscreen_key: String = ""
+	var oldest_access: int = 9223372036854775807
+	for key: String in _display_tiles:
+		var tile_area: Rect2i = _display_tiles[key]["area"] as Rect2i
+		var tile_x: int = DrawingDocument.TILES.floor_div(tile_area.position.x, DISPLAY_TILE_SIZE)
+		var tile_y: int = DrawingDocument.TILES.floor_div(tile_area.position.y, DISPLAY_TILE_SIZE)
+		if visible_tile_range.has_point(Vector2i(tile_x, tile_y)):
+			continue
+		var access: int = int(_display_tiles[key]["last_used"])
+		if access < oldest_access:
+			oldest_access = access
+			oldest_offscreen_key = key
+	if oldest_offscreen_key.is_empty():
+		return false
+	_display_tiles.erase(oldest_offscreen_key)
+	return true
+
+
+func _draw() -> void:
+	_frame_references.clear()
+	var draw_start: int = Time.get_ticks_usec()
+	var metrics: Dictionary[String, Variant] = {"zoom": zoom, "tiles_visible": 0,
+		"cache_hits": 0, "tiles_composited": 0, "source_pixels_rendered": 0,
+		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
+		"bytes_uploaded": 0,
+		"compose_cpu_us": 0, "texture_cpu_us": 0, "empty_skipped": 0,
+		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
+	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
+		last_frame_metrics = metrics
+		return
+	_sync_display_cache()
 	var left_top: Vector2i = Vector2i(floori(camera.x - size.x / zoom * 0.5),
 		floori(camera.y - size.y / zoom * 0.5))
 	var dimensions: Vector2i = Vector2i(ceili(size.x / zoom) + 2, ceili(size.y / zoom) + 2)
-	# Bounded viewport reads; never turn a huge zoom-out into a full-canvas allocation.
-	for y: int in range(0, dimensions.y, 192):
-		for x: int in range(0, dimensions.x, 192):
-			var area: Rect2i = Rect2i(left_top + Vector2i(x, y),
-				Vector2i(mini(192, dimensions.x - x), mini(192, dimensions.y - y)))
-			var composite: DrawingResult = DrawingRenderer.render(document, area,
-				0, 0, 1048576, session)
-			if not composite.ok or composite.code == "GLYPH_FALLBACK":
-				if not _reported_render_errors.has(composite.code):
-					_reported_render_errors[composite.code] = true
-					canvas_error.emit(composite.message)
-				if not composite.ok:
-					continue
-			var image: Image = composite.value as Image
-			var texture: ImageTexture = ImageTexture.create_from_image(image)
-			_frame_textures.append(texture)
-			draw_texture_rect(texture, Rect2(pixel_to_position(Vector2(area.position)),
-				Vector2(area.size) * zoom), false)
+	var start_x: int = DrawingDocument.TILES.floor_div(left_top.x, DISPLAY_TILE_SIZE)
+	var start_y: int = DrawingDocument.TILES.floor_div(left_top.y, DISPLAY_TILE_SIZE)
+	var end_x: int = DrawingDocument.TILES.floor_div(left_top.x + dimensions.x - 1, DISPLAY_TILE_SIZE)
+	var end_y: int = DrawingDocument.TILES.floor_div(left_top.y + dimensions.y - 1, DISPLAY_TILE_SIZE)
+	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
+		end_x - start_x + 1, end_y - start_y + 1)
+	for y: int in range(start_y, end_y + 1):
+		for x: int in range(start_x, end_x + 1):
+			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1
+			var key: String = "%d,%d" % [x, y]
+			var area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE, y * DISPLAY_TILE_SIZE,
+				DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
+			var preview_stamp: int = session.preview_stamp_for_area(area) if session != null else 0
+			if not _occupancy_unknown and not _occupied_display_tiles.has(key) and preview_stamp == 0:
+				metrics["empty_skipped"] = int(metrics["empty_skipped"]) + 1
+				continue
+			_cache_access += 1
+			var entry: Dictionary = _display_tiles.get(key, {})
+			var preview_owner: DrawingEditSession = session if preview_stamp > 0 else null
+			if not entry.is_empty() and not bool(entry["dirty"]) \
+					and int(entry["preview_stamp"]) == preview_stamp \
+					and entry["preview_owner"] == preview_owner:
+				metrics["cache_hits"] = int(metrics["cache_hits"]) + 1
+			else:
+				var start_compose: int = Time.get_ticks_usec()
+				var composite: DrawingResult = DrawingRenderer.render(document, area,
+					0, 0, 1048576, session)
+				metrics["compose_cpu_us"] = int(metrics["compose_cpu_us"]) + Time.get_ticks_usec() - start_compose
+				if not composite.ok or composite.code == "GLYPH_FALLBACK":
+					if not _reported_render_errors.has(composite.code):
+						_reported_render_errors[composite.code] = true
+						canvas_error.emit(composite.message)
+					if not composite.ok:
+						continue
+				var image: Image = composite.value as Image
+				var start_texture: int = Time.get_ticks_usec()
+				var retain: bool = true
+				if entry.is_empty():
+					retain = _reserve_display_slot(visible_tiles)
+					entry = {"texture": ImageTexture.create_from_image(image)}
+					metrics["textures_created"] = int(metrics["textures_created"]) + 1
+					if not retain:
+						metrics["textures_transient"] = int(metrics["textures_transient"]) + 1
+				else:
+					(entry["texture"] as ImageTexture).update(image)
+					metrics["textures_updated"] = int(metrics["textures_updated"]) + 1
+				metrics["texture_cpu_us"] = int(metrics["texture_cpu_us"]) + Time.get_ticks_usec() - start_texture
+				metrics["bytes_uploaded"] = int(metrics["bytes_uploaded"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4
+				metrics["source_pixels_rendered"] = int(metrics["source_pixels_rendered"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE
+				metrics["tiles_composited"] = int(metrics["tiles_composited"]) + 1
+				entry["area"] = area
+				entry["preview_stamp"] = preview_stamp
+				entry["preview_owner"] = preview_owner
+				entry["dirty"] = false
+				if retain:
+					_display_tiles[key] = entry
+			entry["last_used"] = _cache_access
+			_frame_references.append(entry["texture"] as ImageTexture)
+			draw_texture_rect(entry["texture"] as ImageTexture,
+				Rect2(pixel_to_position(Vector2(area.position)), Vector2(area.size) * zoom), false)
+	metrics["cache_tiles"] = _display_tiles.size()
+	metrics["cache_bytes_estimate"] = _display_tiles.size() * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4
+	metrics["frame_reference_bytes_upper_bound"] = _frame_references.size() * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4
+	metrics["draw_cpu_us"] = Time.get_ticks_usec() - draw_start
+	metrics["submit_us"] = Time.get_ticks_usec()
+	last_frame_metrics = metrics
+	_last_frame_submit_us = int(metrics["submit_us"])
+
 	if asset_bounds.has_area():
 		draw_rect(Rect2(pixel_to_position(Vector2(asset_bounds.position)),
 			Vector2(asset_bounds.size) * zoom), Color(0.2, 0.8, 0.5, 0.8), false, 1.5)
@@ -174,7 +375,7 @@ func _gui_input(event: InputEvent) -> void:
 		if button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if button.pressed:
 				var before: Vector2 = (button.position - size * 0.5) / zoom + camera
-				zoom = clampf(zoom * (1.25 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 0.8), 0.5, 24.0)
+				zoom = clampf(zoom * (1.25 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 0.8), 0.25, 24.0)
 				camera = before - (button.position - size * 0.5) / zoom
 				queue_redraw()
 				view_changed.emit()

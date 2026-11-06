@@ -28,6 +28,25 @@ T-059, T-065 or T-083. T-094 remains In Progress until remote CI and
 future Linux/Windows owner-witness rows are evidenced; don't change
 review flags merely because this patch's local tests pass.
 
+## T-086 persistent source-space viewport cache
+
+Fast push/PR CI stages/imports the independent Drawing package and runs
+`drawing/tests/viewport_cache_smoke.gd` (27 model checks). Its change-journal,
+revision gaps, signed source seams and draft-stamp tests cannot prove real
+texture reuse. The **manual-only** `.github/workflows/godot-native-t086-viewport.yml`
+runs `drawing/tests/viewport_cache_native.gd` on Xvfb/Mesa after importing
+fonts (68 framebuffer/texture checks), and calls
+`python3 tools/benchmarks/t086_compare_viewport.py` to compare the T-085
+pre-cache canvas against the current package using the **same** 12-trial
+100/50/25% workload. Measurements separate CPU composition, `ImageTexture`
+full uploads, redraw-to-frame submission, RSS/HWM and the retained texture
+payload estimate. These are Linux **software** diagnostics, not physical
+Windows/Linux GPU/DPI/scan-out/owner acceptance. T-086 remains In Progress
+until those hardware and large dense viewport gaps are addressed. The native
+witness also exercises a >144-tile conservative fallback without destroying
+previously cached in-view textures; its transient frame references may exceed
+the fixed retained-cache payload budget.
+
 ## Required CI
 
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.

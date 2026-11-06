@@ -125,6 +125,37 @@ at 100%, 50% and 25% zoom. It is software rendering only and does not replace
 physical Windows/Linux usability validation or T-086's dirty-tile viewport
 cache. See [T-085 evidence](../docs/Tickets/T-085.md).
 
+## Source-aligned viewport cache (T-086)
+
+Viewport redraws reuse persistent 128×128 source-space `ImageTexture` tiles
+(up to 144 retained; approximately 9 MiB of RGBA8 texture payload). Zoom/pan
+rescale native Godot texture quads; small edits/Undo/Redo invalidate only
+intersecting cached display tiles. Rendering still composites the canonical
+RGBA8 source in layer order, including uncommitted detached Brush/Eraser
+pixels; cancellation does not publish history. Empty source tiles are skipped
+through bounded occupancy metadata. A Godot `ImageTexture.update()` refreshes
+one **whole 128px display texture**, not a partial upload. All sizes are
+editor-display/cache quantities and do not alter sparse storage tile stride.
+
+```sh
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/viewport_cache_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd
+python3 tools/benchmarks/t086_compare_viewport.py --godot godot
+```
+
+The native check uses a **software framebuffer**. The benchmark compares the
+pinned pre-cache T-085 code to the current implementation under the same Xvfb
+Mesa process profile, at 100/50/25% zoom. It reports CPU composition, full
+texture bytes uploaded, software frame submission, and process HWM, **not**
+physical input-to-photon or GPU VRAM. The cache keeps a 9MiB retained-texture
+payload bound; when a dense/unknown viewport exceeds 144 tiles, extra textures
+are transient and can exceed that limit for one submitted frame, but in-view
+retained entries avoid full-cache LRU churn. First-time zoom-out population
+may still be slow. See [T-086 measurements](../docs/Tickets/T-086.md).
+
 ## Editable text (T-058)
 
 Choose **Text** then click the canvas to open a text dialog; **Cancel** or an

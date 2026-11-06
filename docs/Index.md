@@ -31,7 +31,20 @@ Software first-frame samples still reach **119.841 ms at 25%** (one trial per
 zoom); the display-tile work remains T-086, and owner Windows/Linux hardware
 and physical input-to-photon evidence are **not claimed**. [Checkpoint](Tickets/T-085.md).
 
-**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 remains Ready for display-cache fixes; T-068 native research remains conditional.
+**T-086 incremental viewport cache checkpoint (2026-11-06; In Progress):**
+Persistent 128px source-space display tiles now reuse textures across
+pan/zoom and update only dirty raster/preview footprints (including Undo/Redo),
+with a 144-texture retained cache limit and sparse occupancy culling. A
+192-tile conservative over-budget view now keeps 144 retained tiles warm and
+uses 48 transient draw-command references rather than thrashing every tile.
+The 27/27 headless journal/stamp and 68/68 Xvfb native RGBA8/alpha/text/seam
+witnesses pass. In a reproducible 12-trial llvmpipe benchmark, warmed 25%
+one-pixel-edit frames improve **253.09ms → 22.96ms median**, and idle frames
+**262.93ms → 1.50ms median**; the **initial 50% zoom transition is slower**
+(144.22ms → 165.52ms, one sample). No real Linux/Windows physical latency or
+large dense reference-window acceptance is claimed. [Ticket and evidence](Tickets/T-086.md).
+
+**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 is In Progress with source-space cache software witnesses; T-068 native research remains conditional.
 
 ## Kanban summary
 
@@ -152,7 +165,7 @@ output buffers. Source-pinned GCC/Clang `-O0/-O2/-O3` builds matched all
 **576/576 Godot oracle masks** across two passes per profile and rejected
 **42/42 invalid ABI calls** without output modification. Both unsafe
 compiler configurations failed at build time. Fresh Godot GDExtension runs
-preserve **55/55 scope** and **153/153 publication** checks per run, twice.
+preserve **62/62 scope** and **153/153 publication** checks per run, twice.
 This is **not** Windows/hardware performance or production backend approval;
 T-068 remains In Progress.
 [Ticket](Tickets/T-068.md) ·
@@ -164,7 +177,7 @@ The detached scope kernel now follows the pinned Godot 4.8b2 float32
 strict double-precision ray crossings. The **48 seeded 32² transformed
 selection cases now match all 48/48 Godot masks**, twice, with **zero missed
 or extra pixels**; the original 15/15 exact-edge 64² fixture still matches.
-Two real isolated GDExtension runs confirm **55/55 native mask checks** and
+Two real isolated GDExtension runs confirm **62/62 native mask checks** and
 **153/153 selection-to-`DrawingDocument` publication checks per run**,
 including source-byte validation and Undo/Redo. The previous **16 cases / 247
 omissions** are preserved in the
@@ -289,7 +302,7 @@ claim is made. [T-068](Tickets/T-068.md) ·
 A detached C++17 hard-brush kernel now emits only changed canonical RGBA8
 pixels as ordered, checked 12-byte before/after records plus a 4-byte count,
 using the existing isolated bridge wire format. Across two independent passes
-all **56/56 small/large Godot-oracle-derived comparisons** reconstruct exact
+all **62/62 small/large Godot-oracle-derived comparisons** reconstruct exact
 final RGBA8; no-op paint emits four bytes. A 2048² 4px stroke produces 5,524
 wire bytes versus 16 MiB full-tile output, **not a measured marshaling or GPU
 speedup**. Bounded capacity and malformed/aliased buffers fail atomically.
@@ -300,7 +313,7 @@ The prototype is not linked into Godot, and hardware/release gates remain open.
 **T-068 scalar native hard-brush canonical RGBA8 checkpoint (2026-11-04; In Progress):**
 The detached C++17 hard-brush comparator now returns both the full 0/255
 gesture coverage bitmap and detached **straight-RGBA8 pixels**. Two passes
-over 28 pinned Godot geometry cases show **56/56 exact coverage and RGBA8
+over 28 pinned Godot geometry cases show **62/62 exact coverage and RGBA8
 comparisons**, including source-over, erasure, transparent hidden RGB,
 selection masks, crossing and 512/1024/2048-scale strokes. The 16 small cases
 match **actual Godot output hashes**; the 12 large Godot oracles supply
@@ -314,7 +327,7 @@ hardware-performance or release acceptance is claimed. [T-068](Tickets/T-068.md)
 A detached scalar C++17 pixel-center / swept-segment comparator now returns
 exact binary once-per-gesture coverage with checked input buffers and local
 selection masks. Compared against the real Godot 4.8b2 brush oracles, two
-independent runs produce **56/56 identical masks** across sixteen 32²
+independent runs produce **62/62 identical masks** across sixteen 32²
 brush/selection/transform cases and twelve 512²/1024²/2048² workloads.
 This closes the *tested scalar geometry screen*, not the application path:
 canonical small-case RGBA8 is independently reconstructed, while large cases
@@ -633,7 +646,7 @@ parent-owned, version-checked registry publications, share the existing
 child-local Undo/Redo with structure/transforms/visibility, and preserve
 unrelated metadata. The **54/54** headless witness covers failed/stale edits,
 no-ops, duplicates, history, saved registry reload, portable Objects-component
-copy and live inspector controls. Its **55/55** targeted native Xvfb/Mesa
+copy and live inspector controls. Its **62/62** targeted native Xvfb/Mesa
 witness captures a 420px inspector. The ticket remains **In Progress**:
 nested single-source Save As/export graph-copy policy and owner physical UX
 validation remain pending. See [T-064](Tickets/T-064.md).
@@ -998,7 +1011,7 @@ third-party native backend or hardware gate was satisfied. See
 
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Ready | — | [T-053](Tickets/T-053.md) |
