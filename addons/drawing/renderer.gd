@@ -3,9 +3,22 @@ extends RefCounted
 ## Bounded, render-on-demand source compositing; never allocates a whole canvas.
 
 
+## A synchronous display frame may render hundreds of source-aligned tiles.
+## Snapshot the visible layer order once, rather than walking the document tree
+## for every tile. Plans are deliberately ephemeral and revision/epoch pinned:
+## neither edits nor lazy-source registrations may reuse an older plan.
+static func prepare_visible_layers(document: DrawingDocument) -> Dictionary:
+	if document == null:
+		return {}
+	var layers: Array[String] = []
+	_collect_visible(document, DrawingDocument.ROOT_ID, layers)
+	return {"document": document, "revision": document.revision,
+		"source_epoch": document.display_source_epoch, "layers": layers}
+
+
 static func render(document: DrawingDocument, view: Rect2i,
 		origin_x: int = 0, origin_y: int = 0, max_pixels: int = 1048576,
-		preview: DrawingEditSession = null) -> DrawingResult:
+		preview: DrawingEditSession = null, visible_plan: Dictionary = {}) -> DrawingResult:
 	if document == null or view.size.x <= 0 or view.size.y <= 0 or view.size.x > max_pixels or view.size.y > max_pixels / view.size.x:
 		return DrawingResult.failure("RENDER_LIMIT", "Viewport must be bounded")
 	# Never mix a stale or unrelated edit with committed document pixels.
@@ -13,7 +26,16 @@ static func render(document: DrawingDocument, view: Rect2i,
 			preview.expected_revision != document.revision):
 		return DrawingResult.failure("PREVIEW_REVISION", "Preview source revision is stale")
 	var leaf_layers: Array[String] = []
-	_collect_visible(document, DrawingDocument.ROOT_ID, leaf_layers)
+	if visible_plan.is_empty():
+		_collect_visible(document, DrawingDocument.ROOT_ID, leaf_layers)
+	else:
+		if visible_plan.get("document") != document \
+				or visible_plan.get("revision") != document.revision \
+				or visible_plan.get("source_epoch") != document.display_source_epoch:
+			return DrawingResult.failure("RENDER_PLAN_STALE", "Visible layer plan no longer matches source")
+		if not (visible_plan.get("layers") is Array):
+			return DrawingResult.failure("RENDER_PLAN_INVALID", "Visible layer plan is malformed")
+		leaf_layers = visible_plan["layers"] as Array[String]
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(view.size.x * view.size.y * 4)
 	# Keep 64-bit camera anchors out of Vector2i, which truncates at 32 bits.

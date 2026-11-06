@@ -128,6 +128,15 @@ paired runs show opaque CPU medians 54.94→25.86ms and 57.19→26.89ms, with
 exact output hashes. This does **not** close cold GPU zoom, dense reference
 hardware or physical input-latency gates. [T-086](Tickets/T-086.md).
 
+**T-086 frame-local visible-layer preparation (2026-11-06; In Progress):**
+A cold display draw now walks the ordered visible layer tree once on its
+first cache miss, not once per display tile; cache-hit redraws do not walk it.
+Source revision/epoch checks reject stale preparations, and the new 82/82
+headless oracle plus 69/69 native Xvfb/Mesa framebuffer checks pass. The
+nine-sample repeated small CPU tile workload measures 7.56→6.58ms median,
+**not** a full cold zoom or physical input-to-photon result. Large dense
+hardware acceptance remains open. [T-086](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.

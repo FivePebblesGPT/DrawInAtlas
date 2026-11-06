@@ -356,6 +356,7 @@ func _draw() -> void:
 	var draw_start: int = Time.get_ticks_usec()
 	var metrics: Dictionary[String, Variant] = {"zoom": zoom, "tiles_visible": 0,
 		"cache_hits": 0, "tiles_composited": 0, "source_pixels_rendered": 0,
+		"visible_layer_plan_builds": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0, "empty_skipped": 0,
@@ -375,13 +376,16 @@ func _draw() -> void:
 	var end_y: int = DrawingDocument.TILES.floor_div(left_top.y + dimensions.y - 1, DISPLAY_TILE_SIZE)
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
+	# Resolve visible layers lazily: an idle redraw consisting entirely of
+	# cached texture hits must not traverse the document tree at all.
+	var visible_plan: Dictionary = {}
+	var preview_session: DrawingEditSession = session if session != null else _move_preview
 	for y: int in range(start_y, end_y + 1):
 		for x: int in range(start_x, end_x + 1):
 			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1
 			var key: String = "%d,%d" % [x, y]
 			var area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE, y * DISPLAY_TILE_SIZE,
 				DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
-			var preview_session: DrawingEditSession = session if session != null else _move_preview
 			var preview_stamp: int = preview_session.preview_stamp_for_area(area) if preview_session != null else 0
 			if not _occupancy_unknown and not _occupied_display_tiles.has(key) and preview_stamp == 0:
 				metrics["empty_skipped"] = int(metrics["empty_skipped"]) + 1
@@ -394,9 +398,12 @@ func _draw() -> void:
 					and entry["preview_owner"] == preview_owner:
 				metrics["cache_hits"] = int(metrics["cache_hits"]) + 1
 			else:
+				if visible_plan.is_empty():
+					visible_plan = DrawingRenderer.prepare_visible_layers(document)
+					metrics["visible_layer_plan_builds"] = int(metrics["visible_layer_plan_builds"]) + 1
 				var start_compose: int = Time.get_ticks_usec()
 				var composite: DrawingResult = DrawingRenderer.render(document, area,
-					0, 0, 1048576, preview_session)
+					0, 0, 1048576, preview_session, visible_plan)
 				metrics["compose_cpu_us"] = int(metrics["compose_cpu_us"]) + Time.get_ticks_usec() - start_compose
 				if not composite.ok or composite.code == "GLYPH_FALLBACK":
 					if not _reported_render_errors.has(composite.code):

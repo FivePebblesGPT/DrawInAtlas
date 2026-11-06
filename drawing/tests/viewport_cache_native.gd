@@ -90,6 +90,8 @@ func run() -> void:
 		"first paint allocates source-aligned tiles: %s" % first)
 	check(canvas._display_tiles.size() <= canvas.MAX_DISPLAY_TILES,
 		"initial cache respects hard texture count")
+	check(int(first.get("visible_layer_plan_builds", -1)) <= 1,
+		"cold frame compiles no more than one visible-layer plan")
 	var red: Color = sample(canvas, Vector2(-3.5, -3.5))
 	var blue: Color = sample(canvas, Vector2(4.5, 4.5))
 	check(red.r > 0.8 and red.g < 0.35 and blue.b > 0.75,
@@ -99,7 +101,8 @@ func run() -> void:
 	await frames()
 	var cached: Dictionary = canvas.last_frame_metrics.duplicate()
 	check(int(cached["tiles_composited"]) == 0 and int(cached["textures_created"]) == 0
-		and int(cached["textures_updated"]) == 0 and int(cached["cache_hits"]) > 0,
+		and int(cached["textures_updated"]) == 0 and int(cached["cache_hits"]) > 0
+		and int(cached["visible_layer_plan_builds"]) == 0,
 		"cursor/selection-only redraw makes no CPU composite or GPU uploads: %s" % cached)
 
 	canvas.camera = Vector2(4, 6)
@@ -150,7 +153,8 @@ func run() -> void:
 	await frames()
 	var edited: Dictionary = canvas.last_frame_metrics.duplicate()
 	check(int(edited["tiles_composited"]) == 1 and int(edited["textures_updated"]) == 1
-		and int(edited["textures_created"]) == 0 and int(edited["bytes_uploaded"]) == 65536,
+		and int(edited["textures_created"]) == 0 and int(edited["bytes_uploaded"]) == 65536
+		and int(edited["visible_layer_plan_builds"]) == 1,
 		"one-pixel edit updates one complete 128px display texture: %s" % edited)
 	check(sample(canvas, Vector2(-2.5, -2.5)).g > red.g,
 		"native framebuffer includes edited green pixel")

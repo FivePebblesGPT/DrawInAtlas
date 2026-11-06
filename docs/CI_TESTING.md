@@ -39,6 +39,23 @@ runs both CPU comparisons and retains separate before/after logs. The new
 four-dense-layer model tests confirm exact source-over/preview parity, but CPU
 medians do not imply full cold-zoom frame speed or GPU scan-out performance.
 
+## T-086 frame-local visible-layer preparation — 2026-11-06
+
+The **same** `ci_t086_viewport_cache_model` check runs
+`drawing/tests/renderer_visible_plan_smoke.gd` after the cold compositor
+oracle. The test validates byte-exact render equivalence for sixteen source
+rectangles, unchanged ordered layer traversal (one per prepared frame rather
+than one per display tile), detached preview, document revision/visibility
+and lazy-source epoch rejection, and invalid plan diagnostics. The paired
+nine-sample CPU-only timing is diagnostic and does **not** enforce a latency
+threshold. The native T-086 framebuffer witness also checks that cache-hit
+redraws prepare **zero** plans and a dirty redraw prepares **one**.
+
+Preparation remains frame-local, never serialized or reused after a source
+revision/epoch change. This is not a physical-GPU performance witness and does
+not close T-086's large dense zoom/hardware gates. The required 46-check fast
+CI inventory is unchanged.
+
 ## T-094 strict-native and owner evidence checkpoint — 2026-11-06
 
 The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)
