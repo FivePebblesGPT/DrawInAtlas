@@ -1,0 +1,146 @@
+name: Godot GDScript checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke-and-web-export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Godot cannot import LFS pointer text as textures.
+          lfs: true
+      - name: Install Godot 4.8-beta1 (standard, non-.NET)
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta1
+          use-dotnet: false
+          include-templates: true
+      - name: Verify the exact beta engine
+        shell: bash
+        run: godot --version | grep -E '^4\.8\.beta1\.official\.'
+      - name: Import resources and parse scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Run domain smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/smoke.gd 2>&1 | tee /tmp/godot-test.log
+          grep -q 'ATLAS_TESTS_PASSED' /tmp/godot-test.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-test.log; then exit 1; fi
+      - name: Run artwork and history tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/artwork_smoke.gd 2>&1 | tee /tmp/godot-artwork.log
+          grep -q 'ATLAS_ARTWORK_PASSED' /tmp/godot-artwork.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-artwork.log; then exit 1; fi
+      - name: Run board and grid tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/board_grid_smoke.gd 2>&1 | tee /tmp/godot-board-grid.log
+          grep -q 'ATLAS_BOARD_GRID_PASSED' /tmp/godot-board-grid.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-board-grid.log; then exit 1; fi
+      - name: Run layer and recovery tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in layers_smoke storage_smoke layer_ui_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_LAYERS_PASSED' /tmp/godot-layers_smoke.log
+          grep -q 'ATLAS_STORAGE_PASSED' /tmp/godot-storage_smoke.log
+          grep -q 'ATLAS_LAYER_UI_PASSED' /tmp/godot-layer_ui_smoke.log
+      - name: Run editing tool and clipboard tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in fill_scope_smoke clipboard_smoke selection_smoke tools_ui_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_FILL_SCOPE_PASSED' /tmp/godot-fill_scope_smoke.log
+          grep -q 'ATLAS_CLIPBOARD_PASSED' /tmp/godot-clipboard_smoke.log
+          grep -q 'ATLAS_SELECTION_PASSED' /tmp/godot-selection_smoke.log
+          grep -q 'ATLAS_TOOLS_UI_PASSED' /tmp/godot-tools_ui_smoke.log
+      - name: Run workspace composition and organization tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in editor_modules_smoke organization_ui_smoke floors_view_smoke overview_smoke preview_cache_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_EDITOR_MODULES_PASSED' /tmp/godot-editor_modules_smoke.log
+          grep -q 'ATLAS_ORGANIZATION_UI_PASSED' /tmp/godot-organization_ui_smoke.log
+          grep -q 'ATLAS_FLOORS_VIEW_PASSED' /tmp/godot-floors_view_smoke.log
+          grep -q 'ATLAS_OVERVIEW_PASSED' /tmp/godot-overview_smoke.log
+          grep -q 'ATLAS_PREVIEW_CACHE_PASSED' /tmp/godot-preview_cache_smoke.log
+      # Linked-map commands/UI run headlessly as well as through native input.
+      - name: Run linked-map workflow tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for suite in links_smoke linked_maps_ui_smoke; do
+            godot --headless --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_LINKS_PASSED' /tmp/godot-links_smoke.log
+          grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
+      - name: Install native framebuffer test dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
+      - name: Run native framebuffer acceptance
+        timeout-minutes: 5
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          for suite in visual_smoke preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
+            xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
+          done
+          grep -q 'ATLAS_VISUAL_PASSED' /tmp/godot-visual_smoke.log
+          grep -q 'ATLAS_PREVIEW_UI_PASSED' /tmp/godot-preview_ui_smoke.log
+          grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
+          grep -q 'ATLAS_REFERENCES_UI_PASSED' /tmp/godot-references_ui_smoke.log
+      - name: Launch main scene headlessly
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --quit-after 5 2>&1 | tee /tmp/godot-launch.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-launch.log; then exit 1; fi
+      - name: Export Web (single-thread, Compatibility)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/web
+          godot --headless --path . --export-release "Web" build/web/index.html 2>&1 | tee /tmp/godot-export.log
+          test -s build/web/index.html
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-export.log; then exit 1; fi
+      - name: Verify fresh-process saves across exported script remaps
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/storage_smoke.gd -- write-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-source-write.log
+          godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- read-portable /tmp/atlas-source.scn 2>&1 | tee /tmp/atlas-pack-read.log
+          godot --headless --main-pack build/web/index.pck --script "$GITHUB_WORKSPACE/tests/storage_smoke.gd" -- write-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-pack-write.log
+          godot --headless --path . --script res://tests/storage_smoke.gd -- read-portable /tmp/atlas-packed.scn 2>&1 | tee /tmp/atlas-source-read.log
+          for log in /tmp/atlas-source-write.log /tmp/atlas-pack-read.log /tmp/atlas-pack-write.log /tmp/atlas-source-read.log; do
+            grep -q 'ATLAS_PORTABILITY_PASSED' "$log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "$log"; then exit 1; fi
+          done
+      - name: Upload Web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: drawinatlas-web
+          path: build/web/
