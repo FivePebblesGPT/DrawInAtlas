@@ -82,6 +82,32 @@ The regression contracts run in the existing T-073 fast CI step:
 `tests/test_t094_ci_replay.py`. **T-094 remains In Progress** until patched
 GitHub CI itself is green and real Linux/Windows owner evidence is reviewed.
 
+## T-094 complete replay evidence audit
+
+The completed local replay of clean commit `c18e69b` passed **46/46** checked-in
+fast workflow steps under `4.8.beta2.official.cafc17a19`. It took 295.2 s of
+step runtimes and retained **56 recognized Godot 4.8 beta2 exit-leak lines in
+13 logs**. This still requires remote GitHub Actions verification, and the
+leak lines must not be described as a clean teardown. The SHA-256 of that
+run's `report.json` was
+`a99f7a2c4ce42d0593574d1e5351438a4092adb1d299987f4b08f4ca8e99930d`.
+
+Audit a copied, retained replay directory before citing the local result:
+
+```sh
+python3 tools/verify_godot_ci_replay.py /tmp/drawing-ci-replay \
+  --expected-commit "$(git rev-parse HEAD)"
+```
+
+The auditor verifies **all** 46 expected checks, script bytes against the
+workflow, per-script/per-log digests, outcome and exit codes, log-path safety,
+step order and the regenerated summary. A missing result, failed test,
+changed workflow, altered script/log, symlink or incomplete replay is rejected.
+A matching digest can detect accidental/tampered local bytes; it **does not**
+independently attest who ran them. The `--expected-commit` must refer to the
+candidate used for that replay (use its full SHA for historical runs). The
+contract regressions in `tests/test_t094_ci_replay.py` also exercise tampering.
+
 ## T-094 strict Godot model-log classification and repeatable export
 
 A complete fast-workflow local replay of the pre-fix checkpoint

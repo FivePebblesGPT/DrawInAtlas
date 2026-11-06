@@ -61,6 +61,16 @@ directory. All 11 affected steps have passed targeted reruns; **patched
 remote CI and physical Linux/Windows owner signoff remain NOT RUN**.
 [T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
 
+**T-094 completed local fast-CI replay (2026-11-06; In Progress):**
+Committed checkpoint `c18e69b` completed **46/46** required Linux local
+fast-workflow steps with Godot 4.8-beta2; the raw logs retain 56 recognized
+post-exit resource-leak diagnostics across 13 steps. A separate replay
+artifact auditor now checks the committed scripts, complete step order,
+result metadata, summary and per-log SHA-256 against tampering; its regression
+suite is part of the existing fast CI contract group. **This is not a hosted
+GitHub Actions green run**, physical Windows/Linux review or owner approval.
+[T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples

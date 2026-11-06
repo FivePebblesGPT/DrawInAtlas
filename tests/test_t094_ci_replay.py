@@ -130,5 +130,94 @@ class LocalReplayTests(unittest.TestCase):
             self.assertFalse((root / "should-not-exist").exists())
 
 
+class VerifiedReplayArtifactTests(unittest.TestCase):
+    """The audit consumes only recorded bytes, never regenerates success."""
+
+    @staticmethod
+    def create_sample(root: Path) -> tuple[Path, str, str]:
+        from verify_godot_ci_replay import PREFIX
+        from report_godot_ci import summarize
+        workflow = fixture("printf 'ok\\n'")
+        checks = extract_checks(workflow)
+        directory = root / "result"
+        report = run_checks(checks, directory, timeout_seconds=5, cwd=root)
+        commit = "a" * 40
+        report.update({
+            "schema_version": 1, "runner": "local-fast-CI-replay-not-GitHub",
+            "candidate_commit": commit, "base_head_sha": commit,
+            "working_tree_clean": True,
+            "godot_version": "4.8.beta2.official.cafc17a19",
+            "workflow_sha256": hashlib.sha256(workflow.encode()).hexdigest(),
+        })
+        (directory / "report.json").write_text(json.dumps(report), encoding="utf-8")
+        expected, success = summarize({"ci_example": {"outcome": "success"}}, ["ci_example"])
+        assert success
+        (directory / "summary.md").write_text(PREFIX + expected, encoding="utf-8")
+        return directory, workflow, commit
+
+    def test_full_record_is_checked_against_original_scripts_and_hashes(self) -> None:
+        from verify_godot_ci_replay import verify_replay
+        with tempfile.TemporaryDirectory() as temporary:
+            directory, workflow, commit = self.create_sample(Path(temporary))
+            self.assertEqual(verify_replay(directory, extract_checks(workflow), workflow,
+                                           expected_commit=commit), [])
+            self.assertTrue(any("expected candidate" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow,
+                expected_commit="b" * 40)))
+
+    def test_missing_tampered_or_symlinked_log_is_not_accepted(self) -> None:
+        from verify_godot_ci_replay import verify_replay
+        with tempfile.TemporaryDirectory() as temporary:
+            directory, workflow, commit = self.create_sample(Path(temporary))
+            log = directory / "logs/ci_example.log"
+            original = log.read_bytes()
+            log.write_bytes(original + b"extra")
+            self.assertTrue(any("SHA-256 mismatch" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow, expected_commit=commit)))
+            log.unlink()
+            log.symlink_to(directory / "scripts/ci_example.sh")
+            self.assertTrue(any("Unsafe" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow, expected_commit=commit)))
+            log.unlink()
+            (directory / "logs").rename(directory / "saved-logs")
+            (directory / "logs").symlink_to(directory / "saved-logs", target_is_directory=True)
+            self.assertTrue(any("Unsafe" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow, expected_commit=commit)))
+
+    def test_modified_script_or_forged_status_is_rejected(self) -> None:
+        from verify_godot_ci_replay import verify_replay
+        with tempfile.TemporaryDirectory() as temporary:
+            directory, workflow, commit = self.create_sample(Path(temporary))
+            script = directory / "scripts/ci_example.sh"
+            original = script.read_bytes()
+            script.write_bytes(b"true\n")
+            self.assertTrue(any("script differs" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow, expected_commit=commit)))
+            script.write_bytes(original)
+            path = directory / "report.json"
+            report = json.loads(path.read_text())
+            report["checks"][0]["outcome"] = "failure"
+            path.write_text(json.dumps(report))
+            problems = verify_replay(directory, extract_checks(workflow), workflow,
+                                     expected_commit=commit)
+            self.assertTrue(any("did not exit" in p for p in problems))
+            self.assertTrue(any("Fail-late verdict" in p for p in problems))
+
+    def test_partial_or_changed_summary_cannot_be_reported_green(self) -> None:
+        from verify_godot_ci_replay import verify_replay
+        with tempfile.TemporaryDirectory() as temporary:
+            directory, workflow, commit = self.create_sample(Path(temporary))
+            summary = directory / "summary.md"
+            summary.write_text("ALL TESTS PASSED")
+            self.assertTrue(any("Stored summary" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow, expected_commit=commit)))
+            report_file = directory / "report.json"
+            report = json.loads(report_file.read_text())
+            report["checks_executed"] = 0
+            report_file.write_text(json.dumps(report))
+            self.assertTrue(any("not a complete" in p for p in verify_replay(
+                directory, extract_checks(workflow), workflow, expected_commit=commit)))
+
+
 if __name__ == "__main__":
     unittest.main()
