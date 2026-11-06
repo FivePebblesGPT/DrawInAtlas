@@ -1,0 +1,37 @@
+extends Node
+## Executed from a clean, isolated Godot project assembled from the package.
+
+const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
+
+var _checks: int = 0
+var _failures: int = 0
+
+
+func _check(ok: bool, description: String) -> void:
+	_checks += 1
+	if not ok:
+		_failures += 1
+		push_error("DRAWING CONTRACT CONSUMER FAILED: " + description)
+
+
+func _ready() -> void:
+	# Test all proposed logical tile-size candidates, not an assumed final size.
+	for stride: int in [256, 512, 1024, 2048]:
+		var points: Array[Vector2i] = [
+			Vector2i.ZERO, Vector2i(-1, -1), Vector2i(stride - 1, stride),
+			Vector2i(-stride, -stride - 1), Vector2i(3 * stride + 7, -4 * stride - 9),
+			Vector2i(1099511627776, -1099511627776),
+		]
+		for pixel: Vector2i in points:
+			var tile: Vector2i = TILES.tile_for_pixel(pixel, stride)
+			var offset: Vector2i = TILES.offset_in_tile(pixel, stride)
+			_check(offset.x >= 0 and offset.x < stride
+				and offset.y >= 0 and offset.y < stride,
+				"tile offsets are bounded for stride %d at %s" % [stride, pixel])
+			_check(tile * stride + offset == pixel,
+				"signed integer pixel roundtrip for stride %d at %s" % [stride, pixel])
+		_check(TILES.tile_for_pixel(Vector2i(-1, -stride - 1), stride)
+			== Vector2i(-1, -2), "floor division across negative seam")
+	print("DRAWING_CONTRACT_CONSUMER_%s checks=%d failures=%d" % [
+		"PASSED" if _failures == 0 else "FAILED", _checks, _failures])
+	get_tree().quit(0 if _failures == 0 else 1)

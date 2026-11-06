@@ -30,6 +30,9 @@ func _run() -> void:
 	editor.create_board("Sketch", grid)
 	var source_id: String = editor.canvas.map.id
 	var canvas: AtlasCanvas = editor.canvas
+	# Legacy Line/Fill raster coverage remains separately tested from the new
+	# canonical Pen/Eraser path (tests/drawing_composition_smoke.gd).
+	canvas.drawing_composition = null
 	editor.edits.mark_saved()
 	_tool(editor, AtlasCanvas.Tool.LINE)
 	var start: Vector2 = canvas.local_to_document(Vector2(50, 80))

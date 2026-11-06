@@ -1,0 +1,378 @@
+extends Node
+## Real extracted package tested in a fresh project without any Atlas source.
+
+const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
+
+var _checks: int = 0
+var _failures: int = 0
+var _blobs: Dictionary[String, PackedByteArray] = {}
+
+
+func _check(condition: bool, description: String) -> void:
+	_checks += 1
+	if not condition:
+		_failures += 1
+		push_error("DRAWING_CORE_TEST_FAILED: " + description)
+
+
+func _read(document: DrawingDocument, layer_id: String, x: int, y: int) -> int:
+	var result: DrawingResult = document.read_pixel(layer_id, x, y)
+	_check(result.ok, "Read exact pixel at %d,%d: %s" % [x, y, result.message])
+	return int(result.value) if result.ok else -1
+
+
+func _fetch_blob(blob_id: String) -> PackedByteArray:
+	return _blobs.get(blob_id, PackedByteArray())
+
+
+func _ready() -> void:
+	_test_sparse_and_layers()
+	_test_edit_and_history()
+	_test_brush_shapes_and_fill()
+	_test_clipboard_selection()
+	_test_metadata_objects_and_snapping()
+	_test_lazy_tiles_and_transfer()
+	_test_far_signed_coordinates()
+	_test_image_import_and_move()
+	_test_manifest_roundtrip()
+	print("DRAWING_CORE_%s checks=%d failures=%d" % [
+		"PASSED" if _failures == 0 else "FAILED", _checks, _failures])
+	get_tree().quit(0 if _failures == 0 else 1)
+
+
+func _test_sparse_and_layers() -> void:
+	var document: DrawingDocument = DrawingDocument.new("test-document", 16, 2, 1)
+	_check(document.layer_count() == 0 and document.snapshot_for_save()["dirty_rgba8"].is_empty(),
+		"Blank document has zero raster allocation")
+	var group: String = String(document.create_layer(DrawingLayerNode.GROUP, "Art").value)
+	var nested: String = String(document.create_layer(DrawingLayerNode.GROUP, "Foreground", group).value)
+	var raster: String = String(document.create_layer(DrawingLayerNode.RASTER, "Paint", nested).value)
+	for index: int in range(30):
+		_check(document.create_layer(DrawingLayerNode.RASTER, "many-%d" % index, group).ok,
+			"Many generic layers in one group")
+	_check(document.layer_count() == 33 and document.list_children(group).size() == 31,
+		"Ordered group supports many children")
+	_check(not document.create_layer(DrawingLayerNode.RASTER, "duplicate", group, raster).ok,
+		"Duplicate stable layer ID rejected")
+	_check(not document.create_layer(DrawingLayerNode.RASTER, "unsafe", group, "invalid:separator").ok,
+		"Unsafe stable IDs rejected before snapshot/dirty-key ownership")
+	_check(document.rename_layer(raster, "Retained ID").ok and document.has_node(raster),
+		"Rename does not replace stable ID")
+	_check(document.reorder(raster, group, 0).ok and document.list_children(group)[0] == raster,
+		"Reparent/order retains ID")
+	_check(not document.reorder(group, nested, 0).ok,
+		"Nested cycle rejected")
+	_check(document.set_visibility(group, false).ok,
+		"Can hide group without deleting content")
+	_check(not document.begin_edit(raster, document.revision).ok,
+		"Hidden ancestor forbids editing")
+	_check(document.set_visibility(group, true).ok and document.set_locked(group, true).ok,
+		"Can toggle group visibility and lock")
+	_check(not document.begin_edit(raster, document.revision).ok,
+		"Locked ancestor forbids editing")
+	_check(document.set_locked(group, false).ok,
+		"Can unlock group")
+	var metadata: DrawingLayerNode = document.inspect_node(group)
+	metadata.name = "malicious alias"
+	metadata.children.clear()
+	_check(document.inspect_node(group).name == "Art" and document.list_children(group).size() == 32,
+		"Inspect node cannot mutate owned metadata")
+	_check(document.set_density(3, 2).ok, "Density can change before content")
+
+
+func _test_edit_and_history() -> void:
+	var document: DrawingDocument = DrawingDocument.new("pixels", 16)
+	var raster: String = String(document.create_layer(DrawingLayerNode.RASTER, "Pixels").value)
+	var started: DrawingResult = document.begin_edit(raster, document.revision)
+	_check(started.ok, "Begin bounded raster edit")
+	var session: DrawingEditSession = started.value as DrawingEditSession
+	var bytes: PackedByteArray = PackedByteArray([17, 34, 51, 0])
+	_check(session.apply_region(Rect2i(-1, -1, 1, 1), bytes).ok, "Accept exact straight RGBA8")
+	_check(document.tile_keys(raster).is_empty() and _read(document, raster, -1, -1) == 0,
+		"Edit staged: no tile allocated before commit")
+	var result: DrawingResult = session.commit()
+	_check(result.ok and result.regions.size() == 1 and result.regions[0].x == -1,
+		"Commit reports a bounded changed rectangle")
+	_check(_read(document, raster, -1, -1) == 0x00332211,
+		"Hidden RGB preserved for transparent stored pixel")
+	_check(document.tile_keys(raster) == ["-1,-1"], "Negative tiles retain stable index")
+	var requested: DrawingResult = document.request_chunk_at(raster, -1, -1)
+	_check(requested.ok and requested.value is DrawingRasterTile,
+		"Lazy chunk API exposes a detached typed snapshot")
+	(requested.value as DrawingRasterTile).set_rgba(15,15,0)
+	_check(_read(document, raster, -1,-1) == 0x00332211,
+		"Public chunk request cannot change owned source")
+	_check(not document.set_density(2, 1).ok, "Density freezes on first content commit")
+	var snapshot: DrawingLayerNode = document.inspect_node(raster)
+	snapshot.tiles["-1,-1"].set_rgba(15, 15, 0)
+	_check(_read(document, raster, -1, -1) == 0x00332211,
+		"Detached tile snapshot cannot alias live pixels")
+	_check(document.undo().ok and _read(document, raster, -1, -1) == 0,
+		"Undo restores implicit blank pixel")
+	_check(document.redo().ok and _read(document, raster, -1, -1) == 0x00332211,
+		"Redo restores exact hidden RGB")
+	var first: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	var second: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(first.fill_rect(Rect2i(0, 0, 1, 1), 0xff221144).ok, "First concurrent gesture staged")
+	_check(second.fill_rect(Rect2i(3, 3, 1, 1), 0xff004488).ok, "Second concurrent gesture staged")
+	_check(first.commit().ok and not second.commit().ok and _read(document, raster, 3, 3) == 0,
+		"Stale revision rejects whole second transaction")
+	var cancelled: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	var revision_before: int = document.revision
+	_check(cancelled.fill_rect(Rect2i(10, 10, 2, 2), 0xffffffff).ok, "Cancelled gesture staged")
+	cancelled.cancel()
+	_check(document.revision == revision_before and document.tile_keys(raster).size() == 2,
+		"Cancellation changes no stored document bytes or revision")
+	_check(not cancelled.commit().ok, "Closed session cannot commit")
+	var snapshot_save: Dictionary = document.snapshot_for_save()
+	_check(snapshot_save["dirty_rgba8"].size() == 2 and snapshot_save["stride"] == 16,
+		"Snapshot owns only modified tile leases and versioned tile stride")
+	_check(not document.mark_published(document.revision).ok and document.is_dirty(),
+		"Savepoint cannot discard dirty data without durable chunk references")
+	var refs: Dictionary[String, String] = {}
+	for combined: String in snapshot_save["dirty_rgba8"]:
+		refs[combined] = "blob-" + combined
+	_check(document.mark_published(document.revision, refs).ok and not document.is_dirty()
+		and document.snapshot_for_save()["dirty_rgba8"].is_empty(),
+		"Published references clear dirty leases only after explicit savepoint")
+
+
+func _test_brush_shapes_and_fill() -> void:
+	var document: DrawingDocument = DrawingDocument.new("brush", 16)
+	var raster: String = String(document.create_layer(DrawingLayerNode.RASTER, "Paint").value)
+	var gesture: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	var path: PackedVector2Array = PackedVector2Array([Vector2(0.5, 0.5), Vector2(1.5, 0.5), Vector2(0.5, 0.5)])
+	_check(gesture.paint_path(path, 0x80ff0000, 1.0).ok, "Hard brush accepts swept path")
+	_check(gesture.paint_path(PackedVector2Array([Vector2(0.5, 0.5)]), 0x80ff0000, 1.0).ok,
+		"Brush can append pointer batches")
+	_check(gesture.commit().ok and _read(document, raster, 0, 0) == 0x80ff0000,
+		"Repeated coverage blends only once per gesture")
+	var erase: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(erase.paint_path(PackedVector2Array([Vector2(0.5, 0.5)]), 0, 1.0, true).ok,
+		"Eraser stroke")
+	_check(erase.commit().ok and _read(document, raster, 0, 0) == 0,
+		"Eraser deletes pixel and preserves other pixels")
+	var polygon: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(polygon.paint_polygon(PackedVector2Array([Vector2(1,1), Vector2(5,1),
+		Vector2(5,5), Vector2(1,5)]), 0xff123456).ok, "Filled polygon as shape")
+	_check(polygon.commit().ok and _read(document, raster, 2, 2) == 0xff123456,
+		"Filled shape uses pixel centers")
+	var fill: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(fill.flood_fill(Vector2i(2, 2), 0xffabcdef, null, 100).ok, "Four-connected flood fill")
+	_check(fill.commit().ok and _read(document, raster, 3, 3) == 0xffabcdef,
+		"Flood fill includes connected pixels")
+	var too_small: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(not too_small.flood_fill(Vector2i(2, 2), 0xffffffff, null, 2).ok,
+		"Oversize flood fill fails explicitly")
+	_check(too_small.change_count() == 0, "Failed flood fill leaves no partial staging")
+	too_small.cancel()
+	var limited: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(not limited.paint_path(PackedVector2Array([Vector2(0.5, 0.5)]), 0xff0000ff,
+		500.0, false, null, 16).ok and limited.change_count() == 0,
+		"Over-budget stationary brush safely fails")
+	limited.cancel()
+
+
+func _test_clipboard_selection() -> void:
+	var document: DrawingDocument = DrawingDocument.new("clipboard", 16)
+	var raster: String = String(document.create_layer(DrawingLayerNode.RASTER, "Pixels").value)
+	var selection: DrawingSelection = DrawingSelection.new(Rect2i(4, 4, 2, 2), true)
+	var mask: Dictionary[Vector2i, bool] = {Vector2i(4, 4): true}
+	selection.set_mask(mask)
+	var edit: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(edit.fill_rect(Rect2i(4, 4, 2, 2), 0xffabcdef, selection).ok,
+		"Selection mask restricts rectangle fill")
+	_check(edit.commit().ok and _read(document, raster, 4, 4) == 0xffabcdef
+		and _read(document, raster, 5, 4) == 0,
+		"Only selected pixel is modified")
+	var capture: DrawingResult = DrawingClipboard.capture(document, raster, Rect2i(4,4,2,2), selection)
+	_check(capture.ok, "Clipboard captures a detached selection")
+	var clipboard: DrawingClipboard = capture.value as DrawingClipboard
+	var paste: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	_check(clipboard.paste(paste, Vector2i(-1,-1)).ok and paste.commit().ok,
+		"Paste detached clipboard across negative seam")
+	_check(_read(document, raster, -1,-1) == 0xffabcdef,
+		"Clipboard transferred exact canonical RGBA8")
+	var render: DrawingResult = DrawingRenderer.render(document, Rect2i(-1,-1,1,1))
+	_check(render.ok and (render.value as Image).get_data() == PackedByteArray([0xef,0xcd,0xab,0xff]),
+		"Bounded renderer returns canonical composited pixel")
+	_check(document.set_visibility(raster, false).ok, "Hide raster before render")
+	var hidden: DrawingResult = DrawingRenderer.render(document, Rect2i(-1,-1,1,1))
+	_check(hidden.ok and (hidden.value as Image).get_data() == PackedByteArray([0,0,0,0]),
+		"Hidden layer excluded from rendering")
+
+
+func _test_metadata_objects_and_snapping() -> void:
+	var document: DrawingDocument = DrawingDocument.new("semantic", 16)
+	var objects: String = String(document.create_layer(DrawingLayerNode.OBJECTS, "Symbols").value)
+	var data: Dictionary = {"position": Vector2(4, 8), "kind": "star", "metadata": {"tag": "hero"}}
+	var result: DrawingResult = document.add_object(objects, data)
+	_check(result.ok, "Generic semantic object can be added without Atlas types")
+	data["metadata"]["tag"] = "mutated"
+	_check(document.inspect_node(objects).objects[String(result.value)]["metadata"]["tag"] == "hero",
+		"Semantic object payload is detached on import")
+	_check(document.move_object(objects, String(result.value), Vector2(7, 9)).ok and
+		 document.inspect_node(objects).objects[String(result.value)]["position"] == Vector2(7, 9),
+		"Object position edits do not require an Atlas floor")
+	var text_id: String = String(document.create_layer(DrawingLayerNode.TEXT, "Label").value)
+	_check(document.set_text(text_id, "Generic text").ok and
+		document.inspect_node(text_id).text_value == "Generic text", "Font-independent text content")
+	_check(DrawingSnap.point(Vector2(9.2, 12.0), Vector2(10, 10), Vector2.ZERO,
+		PackedFloat32Array([9.5]), PackedFloat32Array([12.25]),
+		PackedVector2Array(), 4.0) == Vector2(9.5, 12.25),
+		"Guides refine grid coordinates")
+	_check(DrawingSnap.displacement(Vector2(3.0,3.0), Vector2(13.0,3.0),
+		Vector2(10,10), Vector2.ZERO, 5.0) == Vector2(10,0),
+		"Selection drag uses snapped delta, not absolute object snap")
+
+
+func _test_lazy_tiles_and_transfer() -> void:
+	var source: DrawingDocument = DrawingDocument.new("source", 16)
+	var root_group: String = String(source.create_layer(DrawingLayerNode.GROUP, "Nested").value)
+	var raster: String = String(source.create_layer(DrawingLayerNode.RASTER, "Raster", root_group).value)
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(16 * 16 * 4)
+	bytes[0] = 31
+	bytes[1] = 77
+	bytes[2] = 80
+	bytes[3] = 0
+	_blobs["fixture"] = bytes
+	var hash: String = DrawingRasterTile.digest_rgba8(bytes, 16)
+	_check(source.register_lazy_chunk(raster, -3, -2, "fixture", hash,
+		Callable(self, "_fetch_blob")).ok, "Register lazy external source chunk")
+	_check(source.tile_keys(raster) == ["-3,-2"], "Tile manifest lists unloaded sparse ref")
+	_check(_read(source, raster, -48, -32) == 0x00504d1f,
+		"Lazy chunk loads exact hidden-RGB bytes")
+	var target: DrawingDocument = DrawingDocument.new("target", 16)
+	var source_revision: int = source.revision
+	var target_revision: int = target.revision
+	_check(not DrawingDocument.transfer_subtree(source, target, root_group,
+		DrawingDocument.ROOT_ID, source_revision - 1, target_revision).ok,
+		"Stale source revision rejects copy without mutation")
+	var copy: DrawingResult = DrawingDocument.transfer_subtree(source, target, root_group,
+		DrawingDocument.ROOT_ID, source_revision, target_revision)
+	_check(copy.ok and source.has_node(root_group) and String(copy.value) != root_group,
+		"Copy creates distinct stable group IDs without deleting source")
+	var copied_layer: String = target.list_children(String(copy.value))[0]
+	_check(_read(target, copied_layer, -48, -32) == 0x00504d1f,
+		"Source tile bytes survive detached cross-document copy")
+	var edit: DrawingEditSession = source.begin_edit(raster, source.revision).value as DrawingEditSession
+	_check(edit.clear_rect(Rect2i(-48,-32,1,1)).ok and edit.commit().ok,
+		"Source modified after copy")
+	_check(_read(target, copied_layer, -48, -32) == 0x00504d1f,
+		"Copied source and destination tile objects do not alias")
+	var mover: DrawingDocument = DrawingDocument.new("mover", 16)
+	var move: DrawingResult = DrawingDocument.transfer_subtree(source, mover, root_group,
+		DrawingDocument.ROOT_ID, source.revision, mover.revision, true)
+	_check(move.ok and not source.has_node(root_group) and mover.has_node(root_group),
+		"Cross-document move preserves stable IDs and detaches ownership")
+	var corrupt: DrawingDocument = DrawingDocument.new("corrupt", 16)
+	var bad: String = String(corrupt.create_layer(DrawingLayerNode.RASTER, "Bad").value)
+	_blobs["bad"] = PackedByteArray([1, 2, 3, 4])
+	_check(corrupt.register_lazy_chunk(bad, 0, 0, "bad", hash,
+		Callable(self, "_fetch_blob")).ok, "Register deferred corrupt chunk")
+	var failed: DrawingResult = corrupt.read_pixel(bad, 0, 0)
+	_check(not failed.ok and failed.code == "CORRUPT_TILE",
+		"Malformed lazy tile never silently renders as blank")
+	_check(corrupt.tile_keys(bad) == ["0,0"], "Corrupt tile still retained as unresolved ref")
+	var empty_target: DrawingDocument = DrawingDocument.new("unavailable", 16)
+	var failed_transfer: DrawingResult = DrawingDocument.transfer_subtree(corrupt, empty_target,
+		bad, DrawingDocument.ROOT_ID, corrupt.revision, empty_target.revision)
+	_check(not failed_transfer.ok and empty_target.layer_count() == 0,
+		"Missing/corrupt lazy data blocks detached transfer without loss")
+	var malformed: Dictionary = mover.export_subtree(raster).value
+	var copied_root: DrawingLayerNode = malformed["nodes"][raster]
+	copied_root.children.append("ghost")
+	var target_before: int = target.revision
+	_check(not target.import_subtree(malformed, DrawingDocument.ROOT_ID).ok and
+		target.revision == target_before, "Invalid detached tree fails atomically")
+
+
+func _test_far_signed_coordinates() -> void:
+	for stride: int in [256, 512, 1024, 2048]:
+		var far_x: int = 1099511627776
+		var far_y: int = -1099511627776
+		var key: String = TILES.tile_key64(far_x - 1, far_y + 3, stride)
+		var parts: PackedStringArray = key.split(",")
+		_check(int(parts[0]) * stride + posmod(far_x - 1, stride) == far_x - 1
+			and int(parts[1]) * stride + posmod(far_y + 3, stride) == far_y + 3,
+			"64-bit signed tile arithmetic roundtrips with stride %d" % stride)
+	var document: DrawingDocument = DrawingDocument.new("far", 16)
+	var raster: String = String(document.create_layer(DrawingLayerNode.RASTER, "Far Pixels").value)
+	var session: DrawingEditSession = document.begin_edit(raster, document.revision,
+		Transform2D.IDENTITY, 1099511627776, -1099511627776).value as DrawingEditSession
+	_check(session.fill_rect(Rect2i(-1,-1,2,2), 0xff112233).ok and session.commit().ok,
+		"View-relative bounded edit at far 64-bit integer anchor")
+	_check(_read(document, raster, 1099511627775, -1099511627777) == 0xff112233,
+		"Exact far position stored without lossy world float multiplication")
+
+
+func _test_image_import_and_move() -> void:
+	var document: DrawingDocument = DrawingDocument.new("image-import", 16)
+	var raster: String = String(document.create_layer(DrawingLayerNode.RASTER, "Image").value)
+	var bytes: PackedByteArray = PackedByteArray([10, 20, 30, 0, 40, 50, 60, 255,
+		70, 80, 90, 128, 110, 120, 130, 255, 150, 160, 170, 255, 190, 200, 210, 0])
+	var image: Image = Image.create_from_data(3, 2, false, Image.FORMAT_RGBA8, bytes)
+	var imported: DrawingResult = DrawingRasterImport.import_image(document, raster, image,
+		-1, -1, document.revision, 1024, 2)
+	_check(imported.ok, "Partial source image imported as bounded edit regions")
+	_check(document.tile_keys(raster).size() == 4, "Unaligned negative image import spans four tiles")
+	_check(_read(document, raster, -1, -1) == 0x001e140a and
+		_read(document, raster, 1, 0) == 0x00d2c8be,
+		"RGBA8 hidden RGB and alpha survive image-to-tile import")
+	_check(_read(document, raster, 2, 0) == 0, "Partial right edge does not allocate padding")
+	var mover: DrawingEditSession = document.begin_edit(raster, document.revision).value as DrawingEditSession
+	var moved: DrawingResult = DrawingClipboard.move_selection(mover,
+		Rect2i(-1, -1, 3, 2), Vector2i(4, 1))
+	_check(moved.ok and mover.commit().ok, "Selection move is one transaction")
+	_check(_read(document, raster, -1,-1) == 0 and
+		_read(document, raster, 3,0) == 0x001e140a,
+		"Move clears source, translates exact transparent RGB")
+	_check(document.undo().ok and _read(document, raster, -1,-1) == 0x001e140a and
+		_read(document, raster, 3,0) == 0,
+		"Selection movement undo restores source and destination exactly")
+	var alternative: DrawingDocument = DrawingDocument.new("density-2", 16, 2, 1)
+	_check(alternative.layer_count() == 0 and alternative.tile_keys("absent").is_empty(),
+		"Higher-density independent document stays empty with no implicit underlay")
+
+
+func _test_manifest_roundtrip() -> void:
+	var original: DrawingDocument = DrawingDocument.new("portable-model", 16, 2, 1)
+	var group: String = String(original.create_layer(DrawingLayerNode.GROUP, "Tiles").value)
+	var raster: String = String(original.create_layer(DrawingLayerNode.RASTER, "Pixels", group).value)
+	var edited: DrawingEditSession = original.begin_edit(raster, original.revision).value as DrawingEditSession
+	_check(edited.apply_region(Rect2i(0,0,1,1), PackedByteArray([11,22,33,0])).ok
+		and edited.commit().ok, "Prepare a precise RGBA8 manifest fixture")
+	var manifest_result: DrawingResult = original.export_manifest()
+	_check(manifest_result.ok, "Logical document manifest has typed metadata")
+	var manifest: Dictionary = manifest_result.value
+	var unstaged: DrawingResult = DrawingDocument.open_manifest(manifest, Callable(self, "_fetch_blob"))
+	_check(not unstaged.ok and unstaged.code == "MISSING_TILE",
+		"Unpublished manifest refuses an unstaged chunk")
+	var dirty: Dictionary = original.snapshot_for_save()["dirty_rgba8"]
+	var refs: Dictionary[String, String] = {}
+	for layer: Dictionary in manifest["layers"]:
+		for chunk: Dictionary in layer["chunks"]:
+			var key: String = layer["id"] + ":%d,%d" % [chunk["coord"][0], chunk["coord"][1]]
+			var blob_name: String = "published-" + layer["id"]
+			_blobs[blob_name] = dirty[key]
+			chunk["ref"] = blob_name
+			refs[key] = blob_name
+	var opened: DrawingResult = DrawingDocument.open_manifest(manifest, Callable(self, "_fetch_blob"))
+	_check(opened.ok and (opened.value as DrawingDocument).id == original.id,
+		"Open metadata without eager image allocation")
+	if opened.ok:
+		var other: DrawingDocument = opened.value as DrawingDocument
+		_check(other.revision == original.revision and other.density_numerator == 2
+			and other.list_children(group) == [raster] and other.tile_keys(raster) == ["0,0"],
+			"Manifest retains exact stable IDs, tree, density, stride and tile refs")
+		_check(not other.is_dirty() and _read(other, raster, 0,0) == 0x0021160b,
+			"Lazy reopen preserves hidden RGB without marking document dirty")
+	_check(original.mark_published(original.revision, refs).ok, "Publish verified blob refs")
+	var published: DrawingResult = original.export_manifest()
+	var found_ref: bool = false
+	if published.ok:
+		for layer: Dictionary in published.value["layers"]:
+			if layer["id"] == raster:
+				found_ref = layer["chunks"].size() == 1 and layer["chunks"][0]["ref"] != ""
+	_check(found_ref, "Published unchanged chunks retain durable blob identities")
