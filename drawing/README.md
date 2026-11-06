@@ -116,6 +116,42 @@ The second test captures real X11/Mesa framebuffer pixels and delivers mouse
 input through a Godot viewport. It is a **software-only** witness; physical
 Windows/Linux owner usability still belongs to the separate review gates.
 
+## Selection, clipboard and Move (T-088)
+
+- **Select** drag a marquee; click blank/outside an existing mask to deselect,
+  rather than selecting one pixel. Select → Replace/Add/Subtract/Intersect
+  (or the Select tool's mode option) changes how the next dragged rectangle
+  combines with the independent selection channel. A small irregular mask
+  outlines its actual edges/holes; large masks use bounded guides. Select →
+  Deselect or Ctrl/Cmd+D explicitly clears selection.
+- **Brush, Eraser and bounded core fill/clear** respect the active mask.
+  With no selection, editing is unrestricted. Selection-only operations are
+  clean and optional history recording remains OFF unless enabled in History.
+- **Edit → Copy/Cut/Paste/Delete selected pixels** (Ctrl/Cmd+C/X/V, Delete
+  when canvas has keyboard focus) operate on the active raster layer, **not**
+  the visible merged composite. Copy is read-only; content changes require an
+  editable (visible, unlocked) layer. Paste advances by 8 source pixels in X
+  and Y for each consecutive paste and selects the new pixels. It preserves
+  exact nonzero hidden RGB in alpha-zero pixels while fully zero transparent
+  source pixels do not overwrite target bytes. Paste is not clipped by the
+  old selection. This is an internal clipboard, not the OS PNG clipboard.
+- **Move** drags selected *layer* pixels with an actual detached source-clear
+  and target-paste preview while held; release commits once, Escape cancels.
+  Undo/redo restores changed pixels and the complete mask/mode snapshot.
+  Multi-layer transformations, OS clipboard image exchange, ellipse/lasso/
+  Magic Wand producers and scale/rotate remain future broader inventory UX.
+
+Verify after a clean standalone import:
+
+```sh
+godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/selection_clipboard_native.gd
+```
+
+The native test captures true Xvfb/Mesa framebuffer pixels and viewport
+input, not a physical Windows/Linux owner acceptance run.
+
 ## File format and boundaries
 
 The app's single-file `.drawing` schema `drawing-standalone-v1` wraps the shared

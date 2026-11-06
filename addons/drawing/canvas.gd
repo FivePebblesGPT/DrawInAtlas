@@ -12,18 +12,20 @@ signal text_requested(pixel: Vector2i)
 
 var document: DrawingDocument:
 	set(value):
-		if session != null and value != document:
+		if (session != null or _move_preview != null) and value != document:
 			cancel_gesture()
+		if document != value:
+			set_selection_mask(null, false)
 		document = value
 		queue_redraw()
 var layer_id: String = "":
 	set(value):
-		if session != null and value != layer_id:
+		if (session != null or _move_preview != null) and value != layer_id:
 			cancel_gesture()
 		layer_id = value
 var tool: String = "Brush":
 	set(value):
-		if session != null and value != tool:
+		if (session != null or _move_preview != null) and value != tool:
 			cancel_gesture()
 		tool = value
 var color_rgba: int = 0xff202020
@@ -38,11 +40,26 @@ var grid_origin: Vector2i = Vector2i.ZERO
 var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
-		if session != null and value != zoom:
+		if (session != null or _move_preview != null) and value != zoom:
 			cancel_gesture()
 		zoom = value
 var camera: Vector2 = Vector2.ZERO
-var selected: Rect2i = Rect2i()
+## Legacy rectangular projection for hosts and history. The actual mask may
+## contain islands/holes; assigning selected directly replaces it by a rect.
+var selection_mask: DrawingSelection = DrawingSelection.new()
+var selection_mode: String = "Replace"
+var _updating_selection_bounds: bool = false
+var selected: Rect2i = Rect2i():
+	set(value):
+		selected = value
+		if not _updating_selection_bounds:
+			selection_mask.set_rectangle(value)
+var _marquee: Rect2i = Rect2i()
+var _marquee_dragged: bool = false
+var _marquee_start_screen: Vector2 = Vector2.ZERO
+var _move_preview: DrawingEditSession
+var _move_target: Vector2i = Vector2i.ZERO
+var _move_preview_offset: Vector2i = Vector2i.ZERO
 ## Object Editor authoring guides only. Neither changes raster pixels nor clips
 ## the infinite sparse canvas; the origin and optional bounds are source-local.
 var asset_origin: Vector2i = Vector2i.ZERO
@@ -94,6 +111,21 @@ var _previous_accumulated_input: bool = true
 var _owns_accumulated_input: bool = false
 var _metrics: Dictionary[String, Variant] = {}
 var last_gesture_metrics: Dictionary[String, Variant] = {}
+
+
+## Replace the channel without collapsing its boolean operations into bounds.
+func set_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
+	selection_mask = value.detached_copy() if value != null else DrawingSelection.new()
+	_updating_selection_bounds = true
+	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
+	_updating_selection_bounds = false
+	queue_redraw()
+	if notify:
+		selection_changed.emit(selected)
+
+
+func clear_selection() -> void:
+	set_selection_mask(null)
 
 
 func _ready() -> void:
@@ -349,13 +381,14 @@ func _draw() -> void:
 			var key: String = "%d,%d" % [x, y]
 			var area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE, y * DISPLAY_TILE_SIZE,
 				DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
-			var preview_stamp: int = session.preview_stamp_for_area(area) if session != null else 0
+			var preview_session: DrawingEditSession = session if session != null else _move_preview
+			var preview_stamp: int = preview_session.preview_stamp_for_area(area) if preview_session != null else 0
 			if not _occupancy_unknown and not _occupied_display_tiles.has(key) and preview_stamp == 0:
 				metrics["empty_skipped"] = int(metrics["empty_skipped"]) + 1
 				continue
 			_cache_access += 1
 			var entry: Dictionary = _display_tiles.get(key, {})
-			var preview_owner: DrawingEditSession = session if preview_stamp > 0 else null
+			var preview_owner: DrawingEditSession = preview_session if preview_stamp > 0 else null
 			if not entry.is_empty() and not bool(entry["dirty"]) \
 					and int(entry["preview_stamp"]) == preview_stamp \
 					and entry["preview_owner"] == preview_owner:
@@ -363,7 +396,7 @@ func _draw() -> void:
 			else:
 				var start_compose: int = Time.get_ticks_usec()
 				var composite: DrawingResult = DrawingRenderer.render(document, area,
-					0, 0, 1048576, session)
+					0, 0, 1048576, preview_session)
 				metrics["compose_cpu_us"] = int(metrics["compose_cpu_us"]) + Time.get_ticks_usec() - start_compose
 				if not composite.ok or composite.code == "GLYPH_FALLBACK":
 					if not _reported_render_errors.has(composite.code):
@@ -416,15 +449,61 @@ func _draw() -> void:
 		var anchor: Vector2 = pixel_to_position(Vector2(asset_origin))
 		draw_line(anchor + Vector2(-6, 0), anchor + Vector2(6, 0), Color(1, 0.75, 0.3), 1.0)
 		draw_line(anchor + Vector2(0, -6), anchor + Vector2(0, 6), Color(1, 0.75, 0.3), 1.0)
-	if selected.has_area():
-		draw_rect(Rect2(pixel_to_position(Vector2(selected.position)),
-			Vector2(selected.size) * zoom), Color(0.2, 0.6, 1.0), false, 1.5)
+	_draw_selection_outline()
+	if selecting and _marquee_dragged:
+		draw_rect(Rect2(pixel_to_position(Vector2(_marquee.position)),
+			Vector2(_marquee.size) * zoom), Color(0.95, 0.8, 0.24), false, 2.0)
 	if pointer_known and tool in ["Brush", "Eraser"] and Rect2(Vector2.ZERO, size).has_point(last_pointer_position):
 		var radius: float = maxf(1.0, brush_width * zoom * 0.5)
 		draw_arc(last_pointer_position, radius + 1.0, 0.0, TAU, 40, Color(0.05, 0.05, 0.05), 1.5)
 		draw_arc(last_pointer_position, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.9), 1.0)
 	if session != null and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
+
+
+## Trace the actual mask for small selections, including islands/holes.
+## Large selections use a bounded fallback (outer guide plus operation rects),
+## never O(number of source pixels) work for unbounded sparse documents.
+func _draw_selection_outline() -> void:
+	if not selection_mask.enabled or not selected.has_area():
+		return
+	var highlight: Color = Color(0.2, 0.65, 1.0, 0.95)
+	var count: int = selected.size.x * selected.size.y
+	if count <= 4096 and zoom >= 0.5:
+		var edges: PackedVector2Array = PackedVector2Array()
+		for y: int in range(selected.position.y, selected.end.y):
+			for x: int in range(selected.position.x, selected.end.x):
+				var at: Vector2i = Vector2i(x, y)
+				if not selection_mask.allows(at):
+					continue
+				var top_left: Vector2 = pixel_to_position(Vector2(at))
+				var bottom_right: Vector2 = top_left + Vector2.ONE * zoom
+				if not selection_mask.allows(at + Vector2i.LEFT):
+					edges.append(top_left)
+					edges.append(Vector2(top_left.x, bottom_right.y))
+				if not selection_mask.allows(at + Vector2i.RIGHT):
+					edges.append(Vector2(bottom_right.x, top_left.y))
+					edges.append(bottom_right)
+				if not selection_mask.allows(at + Vector2i.UP):
+					edges.append(top_left)
+					edges.append(Vector2(bottom_right.x, top_left.y))
+				if not selection_mask.allows(at + Vector2i.DOWN):
+					edges.append(Vector2(top_left.x, bottom_right.y))
+					edges.append(bottom_right)
+		if not edges.is_empty():
+			draw_multiline(edges, highlight, 1.5)
+		return
+	draw_rect(Rect2(pixel_to_position(Vector2(selected.position)),
+		Vector2(selected.size) * zoom), highlight, false, 1.5)
+	# Disclose known add/subtract/intersect contours even when the exact
+	# channel is too big to trace this frame. The crop/holes are never
+	# simulated by a filled bounding-box overlay.
+	for op: Dictionary in selection_mask._operations:
+		var region: Rect2i = op["rect"] as Rect2i
+		var accent: Color = Color(1.0, 0.47, 0.4, 0.85) if op["mode"] == "Subtract" \
+			else Color(0.35, 1.0, 0.7, 0.85)
+		draw_rect(Rect2(pixel_to_position(Vector2(region.position)),
+			Vector2(region.size) * zoom), accent, false, 1.0)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -475,7 +554,7 @@ func _gui_input(event: InputEvent) -> void:
 ## Canvas exit is not a paint cancellation: raw viewport events outside the
 ## Control continue a captured stroke, including its eventual button release.
 func _input(event: InputEvent) -> void:
-	if session == null:
+	if session == null and not (dragging and (selecting or moving)):
 		return
 	if event is InputEventKey:
 		var key: InputEventKey = event
@@ -499,12 +578,17 @@ func _process(_delta: float) -> void:
 			cancel_gesture()
 			return
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
+	if moving and _move_target != _move_preview_offset:
+		_stage_move_preview(_move_target)
+	if _move_preview != null and document.revision != _move_preview.expected_revision:
+		cancel_gesture()
 
 
 func start_gesture(position: Vector2) -> void:
 	if document == null or session != null:
 		return
 	gesture_start = position_to_pixel(position)
+	grab_focus()
 	if tool == "Text":
 		text_requested.emit(gesture_start)
 		return
@@ -512,7 +596,13 @@ func start_gesture(position: Vector2) -> void:
 	selecting = tool == "Select"
 	moving = tool == "Move"
 	if selecting or moving:
+		if selecting:
+			_marquee_start_screen = position
+			_marquee = Rect2i()
+			_marquee_dragged = false
 		if moving:
+			_move_target = Vector2i.ZERO
+			_move_preview_offset = Vector2i.ZERO
 			gesture_started.emit()
 		return
 	if tool not in ["Brush", "Eraser"]:
@@ -554,10 +644,14 @@ func update_gesture(position: Vector2) -> void:
 		return
 	var current: Vector2i = position_to_pixel(position)
 	if selecting:
-		selected = Rect2i(Vector2i(mini(gesture_start.x, current.x), mini(gesture_start.y, current.y)),
-			Vector2i(absi(current.x - gesture_start.x) + 1, absi(current.y - gesture_start.y) + 1))
+		if position.distance_to(_marquee_start_screen) >= 4.0:
+			_marquee_dragged = true
+			_marquee = Rect2i(Vector2i(mini(gesture_start.x, current.x), mini(gesture_start.y, current.y)),
+				Vector2i(absi(current.x - gesture_start.x) + 1, absi(current.y - gesture_start.y) + 1))
 		queue_redraw()
-	elif not moving and session != null:
+	elif moving:
+		_move_target = current - gesture_start
+	elif session != null:
 		_enqueue_sample(source_position(position))
 
 
@@ -590,7 +684,8 @@ func _drain_segments(budget: int) -> void:
 		var next: Vector2 = _staged_position.move_toward(_segment_target, MAX_SEGMENT_LENGTH)
 		var start_us: int = Time.get_ticks_usec()
 		var stage: DrawingResult = session.paint_path(PackedVector2Array([next]),
-			_stroke_color, _stroke_width, _stroke_erase)
+			_stroke_color, _stroke_width, _stroke_erase,
+			selection_mask if selection_mask.enabled else null)
 		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + Time.get_ticks_usec() - start_us
 		if not stage.ok:
 			canvas_error.emit(stage.message)
@@ -640,9 +735,15 @@ func cancel_gesture() -> void:
 	if session != null:
 		session.cancel()
 		session = null
+	if _move_preview != null:
+		_move_preview.cancel()
+		_move_preview = null
 	dragging = false
 	selecting = false
 	moving = false
+	_marquee_dragged = false
+	_move_target = Vector2i.ZERO
+	_move_preview_offset = Vector2i.ZERO
 	_finish_requested = false
 	_restore_input_accumulation()
 	_has_segment_target = false
@@ -652,29 +753,61 @@ func cancel_gesture() -> void:
 	queue_redraw()
 
 
+## The document remains immutable until release. The composited renderer reads
+## these detached source-clear/target-paste pixels at the correct layer depth.
+func _stage_move_preview(offset: Vector2i) -> void:
+	if _move_preview != null:
+		_move_preview.cancel()
+		_move_preview = null
+	_move_preview_offset = offset
+	if not selected.has_area() or offset == Vector2i.ZERO or document == null:
+		queue_redraw()
+		return
+	var started: DrawingResult = document.begin_edit(layer_id, document.revision)
+	if not started.ok:
+		canvas_error.emit(started.message)
+		queue_redraw()
+		return
+	var edit: DrawingEditSession = started.value as DrawingEditSession
+	var staged: DrawingResult = DrawingClipboard.move_selection(edit, selected, offset, selection_mask)
+	if not staged.ok:
+		edit.cancel()
+		canvas_error.emit(staged.message)
+	else:
+		_move_preview = edit
+	queue_redraw()
+
+
 func finish_gesture(position: Vector2) -> void:
 	if not dragging:
 		return
 	if selecting:
 		update_gesture(position)
-		selection_changed.emit(selected)
+		if _marquee_dragged:
+			var next: DrawingSelection = selection_mask.detached_copy()
+			if next.combine_rectangle(_marquee, selection_mode):
+				set_selection_mask(next)
+			else:
+				canvas_error.emit("Selection operation limit reached")
+		elif selection_mask.enabled and not selection_mask.allows(gesture_start):
+			clear_selection()
 	elif moving:
-		if selected.has_area():
-			var displacement: Vector2i = position_to_pixel(position) - gesture_start
-			if displacement != Vector2i.ZERO:
-				var started: DrawingResult = document.begin_edit(layer_id, document.revision)
-				if started.ok:
-					var edit: DrawingEditSession = started.value as DrawingEditSession
-					var staged: DrawingResult = DrawingClipboard.move_selection(edit, selected, displacement)
-					if staged.ok and edit.change_count() > 0:
-						var committed: DrawingResult = edit.commit()
-						if committed.ok:
-							selected.position += displacement
-						_publish(committed)
-					else:
-						edit.cancel()
-						if not staged.ok:
-							canvas_error.emit(staged.message)
+		var displacement: Vector2i = position_to_pixel(position) - gesture_start
+		if displacement != _move_preview_offset:
+			_stage_move_preview(displacement)
+		if _move_preview != null and displacement != Vector2i.ZERO:
+			var edit: DrawingEditSession = _move_preview
+			_move_preview = null
+			if edit.change_count() > 0:
+				var committed: DrawingResult = edit.commit()
+				if committed.ok:
+					set_selection_mask(selection_mask.translated(displacement), false)
+				_publish(committed)
+			else:
+				edit.cancel()
+		elif _move_preview != null:
+			_move_preview.cancel()
+			_move_preview = null
 	else:
 		_enqueue_sample(source_position(position))
 		_metrics["release_us"] = Time.get_ticks_usec()
@@ -683,8 +816,12 @@ func finish_gesture(position: Vector2) -> void:
 		# across frames without blocking the input loop.
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
 	dragging = false
+	selecting = false
+	moving = false
+	_marquee_dragged = false
+	_move_target = Vector2i.ZERO
+	_move_preview_offset = Vector2i.ZERO
 	queue_redraw()
-
 
 func _publish(result: DrawingResult) -> void:
 	if result.ok:

@@ -46,6 +46,27 @@ application shell is implemented under T-053; see `drawing/README.md` for the in
   trees, deep-detach tiles and preserve IDs on moves but mint fresh IDs on
   copies. An inaccessible lazy tile blocks transfer instead of being dropped.
 
+## T-088 independent selection and clipboard layer
+
+`DrawingSelection` is a view-relative boolean channel that can be produced by
+rectangles and combined with Replace/Add/Subtract/Intersect, or backed by an
+explicit sparse pixel mask. Its `bounds` is only a conservative enclosing
+rectangle; call `allows()` for every edit. `enabled=false` means unrestricted,
+but `enabled=true` with empty bounds is **deny-all** (used by Atlas's board-cell
+mask). `detached_copy`/`translated` and `DrawingHistoryContext.selection_mask`
+retain mask holes across Move, Undo and Redo. Composition is bounded to 128
+operations, and a large mask is never materialized merely to display it.
+
+`DrawingClipboard.capture` snapshots **one active raster layer**, caching
+immutable source storage tiles once per capture, including hidden RGB beneath
+transparent alpha. `paste` and `move_selection` preserve source mask holes and
+roll back staged changes on rejection. They are internal Drawing clipboard
+operations; OS clipboard formats and merged-layer copying are not implied.
+Standalone `DrawingCanvas` uses a detached `DrawingEditSession` for live Move
+source-clear/target-paste preview, and workspace commands publish at most one
+undo step. Atlas integration continues to use the existing independent
+selection/transaction core; it does not import workspace or clipboard UI.
+
 ## Lifecycle for persistence implementers
 
 `export_manifest()` yields a **logical, not frozen physical**, metadata tree

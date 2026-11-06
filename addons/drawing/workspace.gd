@@ -90,6 +90,10 @@ var record_selection_history: bool = false
 var _before_gesture: DrawingHistoryContext
 var _last_selection_context: DrawingHistoryContext
 var _restoring_context: bool = false
+## Internal clipboard: active raster layer only, independent from OS formats.
+var drawing_clipboard: DrawingClipboard
+var _paste_serial: int = 0
+var selection_mode_control: OptionButton
 var text_dialog: ConfirmationDialog
 var text_edit: TextEdit
 var text_font: OptionButton
@@ -140,9 +144,12 @@ func _build_interface() -> void:
 		Callable(self, "_save"), Callable(self, "_ask_save"),
 		Callable(self, "new_object"), Callable(self, "_ask_open_object")])
 	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
-		"Record selection changes in Undo History"],
+		"Record selection changes in Undo History", "Copy  Ctrl+C", "Cut  Ctrl+X",
+		"Paste  Ctrl+V", "Delete selected pixels  Del"],
 		[Callable(self, "_undo"), Callable(self, "_redo"),
-		Callable(self, "_toggle_selection_history")])
+		Callable(self, "_toggle_selection_history"), Callable(self, "_copy_selection"),
+		Callable(self, "_cut_selection"), Callable(self, "_paste_selection"),
+		Callable(self, "_delete_selection")])
 	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
 		"Show grid", "Grid spacing and origin…"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
@@ -156,9 +163,14 @@ func _build_interface() -> void:
 		"Remove selected", "Toggle visibility"],
 		[Callable(self, "_add_group"), Callable(self, "_add_layer"),
 		Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility")])
-	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels"],
+	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels",
+		"Deselect  Ctrl+D", "Replace", "Add", "Subtract", "Intersect"],
 		[Callable(self, "_change_tool").bind("Select"),
-		Callable(self, "_change_tool").bind("Move")])
+		Callable(self, "_change_tool").bind("Move"), Callable(self, "_deselect"),
+		Callable(self, "_set_selection_mode").bind("Replace"),
+		Callable(self, "_set_selection_mode").bind("Add"),
+		Callable(self, "_set_selection_mode").bind("Subtract"),
+		Callable(self, "_set_selection_mode").bind("Intersect")])
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
 		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W",
@@ -188,6 +200,12 @@ func _build_interface() -> void:
 	snap_toggle.text = "Snap (8 px)"
 	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
 	snap_toggle.toggled.connect(_set_snap_enabled)
+	selection_mode_control = OptionButton.new()
+	selection_mode_control.tooltip_text = "Marquee combine mode; select without changing document pixels"
+	for option: String in ["Replace", "Add", "Subtract", "Intersect"]:
+		selection_mode_control.add_item(option)
+	selection_mode_control.item_selected.connect(func(index: int) -> void:
+		_set_selection_mode(selection_mode_control.get_item_text(index)))
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
 	tabs_line.name = "DocumentTabs"
@@ -1875,7 +1893,125 @@ func _refresh_tool_options() -> void:
 		controls.append(width_spin)
 	if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]:
 		controls.append(snap_toggle)
+	if active_tool == "Select":
+		controls.append(selection_mode_control)
 	top_bar.set_tool_controls(active_tool, controls)
+
+
+func _set_selection_mode(mode: String) -> void:
+	canvas.selection_mode = mode
+	for index: int in range(selection_mode_control.item_count):
+		if selection_mode_control.get_item_text(index) == mode:
+			selection_mode_control.select(index)
+			break
+	_update_status()
+
+
+func _deselect() -> void:
+	if active_tab >= 0:
+		canvas.clear_selection()
+
+
+func _capture_selection_clipboard() -> DrawingResult:
+	if active_tab < 0 or not canvas.selected.has_area():
+		return DrawingResult.failure("SELECTION", "Select an area before copying pixels")
+	var metadata: Dictionary = current_document().node_metadata(current_layer())
+	if metadata.get("kind", "") != DrawingLayerNode.RASTER:
+		return DrawingResult.failure("LAYER", "Clipboard copies the active raster layer only")
+	return DrawingClipboard.capture(current_document(), current_layer(), canvas.selected,
+		canvas.selection_mask)
+
+
+func _copy_selection() -> void:
+	var capture: DrawingResult = _capture_selection_clipboard()
+	if not capture.ok:
+		_show_error(capture.message)
+		return
+	drawing_clipboard = capture.value as DrawingClipboard
+	_paste_serial = 0
+	_update_status()
+
+
+## All content shortcuts use the same one-gesture history/context path.
+func _commit_clipboard_edit(edit: DrawingEditSession,
+		next_selection: DrawingSelection = null) -> void:
+	if edit.change_count() == 0:
+		edit.cancel()
+		_before_gesture = null
+		return
+	var result: DrawingResult = edit.commit()
+	if not result.ok:
+		_before_gesture = null
+		_show_error(result.message)
+		return
+	if next_selection != null:
+		canvas.set_selection_mask(next_selection, false)
+	_canvas_changed(result)
+
+
+func _delete_selection() -> void:
+	if active_tab < 0 or not canvas.selected.has_area():
+		return
+	var started: DrawingResult = current_document().begin_edit(current_layer(), current_document().revision)
+	if not started.ok:
+		_show_error(started.message)
+		return
+	_before_gesture = _capture_context()
+	var edit: DrawingEditSession = started.value as DrawingEditSession
+	var staged: DrawingResult = edit.clear_rect(canvas.selected, canvas.selection_mask)
+	if not staged.ok:
+		edit.cancel()
+		_before_gesture = null
+		_show_error(staged.message)
+		return
+	_commit_clipboard_edit(edit)
+
+
+func _cut_selection() -> void:
+	var captured: DrawingResult = _capture_selection_clipboard()
+	if not captured.ok:
+		_show_error(captured.message)
+		return
+	var started: DrawingResult = current_document().begin_edit(current_layer(), current_document().revision)
+	if not started.ok:
+		_show_error(started.message)
+		return
+	_before_gesture = _capture_context()
+	var edit: DrawingEditSession = started.value as DrawingEditSession
+	var staged: DrawingResult = edit.clear_rect(canvas.selected, canvas.selection_mask)
+	if not staged.ok:
+		edit.cancel()
+		_before_gesture = null
+		_show_error(staged.message)
+		return
+	drawing_clipboard = captured.value as DrawingClipboard
+	_paste_serial = 0
+	_commit_clipboard_edit(edit)
+
+
+func _paste_selection() -> void:
+	if drawing_clipboard == null or active_tab < 0:
+		_show_error("Copy pixels from a selection before pasting")
+		return
+	var started: DrawingResult = current_document().begin_edit(current_layer(), current_document().revision)
+	if not started.ok:
+		_show_error(started.message)
+		return
+	_before_gesture = _capture_context()
+	var edit: DrawingEditSession = started.value as DrawingEditSession
+	var offset: Vector2i = Vector2i(8, 8) * (_paste_serial + 1)
+	var target: Vector2i = drawing_clipboard.source_position + offset
+	var staged: DrawingResult = drawing_clipboard.paste(edit, target)
+	if not staged.ok:
+		edit.cancel()
+		_before_gesture = null
+		_show_error(staged.message)
+		return
+	var pasted_mask: DrawingSelection = drawing_clipboard.source_selection.translated(offset) \
+		if drawing_clipboard.source_selection != null else DrawingSelection.new(
+		Rect2i(target, Vector2i(drawing_clipboard.width, drawing_clipboard.height)), true)
+	_paste_serial += 1
+	_commit_clipboard_edit(edit, pasted_mask)
 
 
 func _toggle_selection_history() -> void:
@@ -1932,6 +2068,7 @@ func _capture_context() -> DrawingHistoryContext:
 		context.selected_layer_ids.append(current_layer())
 	context.editor_mode = active_tool
 	context.selected_rect = canvas.selected
+	context.selection_mask = canvas.selection_mask.detached_copy()
 	return context
 
 
@@ -1970,7 +2107,8 @@ func _restore_context(context: DrawingHistoryContext) -> void:
 	if not context.selected_layer_ids.is_empty() and current_document().has_node(context.selected_layer_ids[0]):
 		tabs[active_tab]["layer"] = context.selected_layer_ids[0]
 		canvas.layer_id = context.selected_layer_ids[0]
-	canvas.selected = context.selected_rect
+	canvas.set_selection_mask(context.selection_mask if context.selection_mask != null else
+		DrawingSelection.new(context.selected_rect, context.selected_rect.has_area()), false)
 	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		_change_tool(context.editor_mode)
 	_last_selection_context = _capture_context()
@@ -2266,7 +2404,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey:
 		return
 	var key: InputEventKey = event
-	if not key.pressed or key.echo or not (key.ctrl_pressed or key.meta_pressed):
+	if not key.pressed or key.echo:
+		return
+	if not key.ctrl_pressed and not key.meta_pressed:
+		if key.keycode == KEY_DELETE and canvas.has_focus():
+			_delete_selection()
+			get_viewport().set_input_as_handled()
 		return
 	match key.keycode:
 		KEY_N: new_drawing()
@@ -2282,6 +2425,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else:
 				_undo()
 		KEY_Y: _redo()
+		KEY_C: _copy_selection()
+		KEY_X: _cut_selection()
+		KEY_V: _paste_selection()
+		KEY_D: _deselect()
 		KEY_TAB: _cycle_tab(-1 if key.shift_pressed else 1)
 		KEY_W: _request_close_current()
 		_: return

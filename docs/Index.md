@@ -1023,7 +1023,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | — | [T-053](Tickets/T-053.md) |
-| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Done | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Ready | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | Ready | — | [T-082](Tickets/T-082.md) |

@@ -57,11 +57,30 @@ workspace dirty/save/open and tab-local grid options). The **on-demand**
 `drawing/tests/image_frame_native.gd` (36 Xvfb/Mesa framebuffer/input checks)
 for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
 pan/grid alignment, native snapped pointer, off-frame editing and undo.
-The 43-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
+The 44-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
 includes the new bounded model step and prevents silent runaway push CI.
 Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
 #02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
+
+## T-088 selection channel, clipboard, and native Move
+
+Fast push/PR CI stages and imports the canonical Drawing package, then runs
+`drawing/tests/selection_clipboard_smoke.gd` (100 model checks) for boolean
+channel composition, the Atlas **enabled-empty deny-all** contract, masked
+brush/fill/flood/clear, exact RGBA8 and hidden RGB, selection-only history,
+atomic Cut/Paste/Move, negative tile seams, stale revision, locked/hidden
+layers and standalone `.drawing` reopen. This is a focused additional
+**44th step** within fail-late CI, never a new full framebuffer run on push.
+
+`.github/workflows/godot-native-t088-selection.yml` is **on demand** and
+runs `drawing/tests/selection_clipboard_native.gd` after clean asset import
+under Xvfb/Mesa. Its 44 real pointer/keyboard/framebuffer checks include
+Select click-empty, drags with Add/Subtract holes, held-button Brush/Move,
+Escape/undo/redo, Ctrl+C/X/V and Delete, 50/100/200/400% pointer/zoom and
+signed-tile seams. A four-sample `frame_post_draw` p50/p95 upper-bound is
+logged; it is **not** a physical input-to-photon measurement. The software
+runner does not close T-056/T-059 or any other manual owner-review gate.
 
 ## Required CI
 

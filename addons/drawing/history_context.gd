@@ -15,6 +15,7 @@ var editor_mode: String = ""
 var focus_bounds: Rect2 = Rect2()
 var has_focus: bool = false
 var selected_rect: Rect2i = Rect2i()
+var selection_mask: DrawingSelection
 
 
 func detached_copy() -> DrawingHistoryContext:
@@ -31,6 +32,7 @@ func detached_copy() -> DrawingHistoryContext:
 	value.focus_bounds = focus_bounds
 	value.has_focus = has_focus
 	value.selected_rect = selected_rect
+	value.selection_mask = selection_mask.detached_copy() if selection_mask != null else null
 	return value
 
 
@@ -39,4 +41,6 @@ func same_selection(other: DrawingHistoryContext) -> bool:
 	return other != null and selected_layer_ids == other.selected_layer_ids \
 		and selected_instance_id == other.selected_instance_id \
 		and selected_instance_generation == other.selected_instance_generation \
-		and selected_rect == other.selected_rect
+		and selected_rect == other.selected_rect \
+		and ((selection_mask == null and other.selection_mask == null) or \
+		(selection_mask != null and selection_mask.same_as(other.selection_mask)))
