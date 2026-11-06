@@ -1,0 +1,264 @@
+{
+  "base_commit": "b0ba8103741d",
+  "date": "2026-11-03",
+  "engine": "Godot 4.8.beta2.official.cafc17a19",
+  "environment": "Linux container; Xvfb/X11; Mesa llvmpipe software OpenGL; 900x720 Godot window; 800x640 canvas at 4x zoom",
+  "limits": "Test adapter, not production Bucket UI. The measured signal is software frame submission, not physical scan-out or actual user input. 5 trials per case per run cannot establish stable p95; memory counters sampled only post-frame, shared with renderer and unrelated imports, not actual maximum process RSS/GPU VRAM. No external CPU backend, native extension, or device performance comparison.",
+  "median_of_run_medians_ms": [
+    {
+      "cpu_dispatch": 13.829,
+      "event_to_frame_post_draw": 36.03,
+      "size": 32
+    },
+    {
+      "cpu_dispatch": 56.795,
+      "event_to_frame_post_draw": 85.029,
+      "size": 64
+    },
+    {
+      "cpu_dispatch": 138.205,
+      "event_to_frame_post_draw": 172.448,
+      "size": 96
+    }
+  ],
+  "method": "5 fresh 32x32, 64x64, 96x96 straight-RGBA8 raster source rectangles per process, 2 processes; synthetic Control GUI left press/release invokes canonical DrawingEditSession.flood_fill through a test adapter; CPU dispatch and RenderingServer.frame_post_draw timestamps; framebuffer probes, source delta and revision checked per gesture",
+  "native_script": "tests/drawing_fill_frame_native.gd",
+  "runs": [
+    {
+      "cases": [
+        {
+          "cpu_dispatch": {
+            "max_ms": 15.877,
+            "median_ms": 12.903,
+            "min_ms": 11.537,
+            "p95_ms": 15.877,
+            "samples_ms": [
+              11.537,
+              12.153,
+              12.903,
+              15.855,
+              15.877
+            ]
+          },
+          "event_to_frame_post_draw": {
+            "max_ms": 37.135,
+            "median_ms": 35.126,
+            "min_ms": 30.167,
+            "p95_ms": 37.135,
+            "samples_ms": [
+              30.167,
+              31.214,
+              35.126,
+              35.489,
+              37.135
+            ]
+          },
+          "pixels": 1024,
+          "size": 32,
+          "trials": 5
+        },
+        {
+          "cpu_dispatch": {
+            "max_ms": 63.911,
+            "median_ms": 57.53,
+            "min_ms": 55.544,
+            "p95_ms": 63.911,
+            "samples_ms": [
+              55.544,
+              57.511,
+              57.53,
+              60.486,
+              63.911
+            ]
+          },
+          "event_to_frame_post_draw": {
+            "max_ms": 88.683,
+            "median_ms": 85.673,
+            "min_ms": 79.22,
+            "p95_ms": 88.683,
+            "samples_ms": [
+              79.22,
+              81.944,
+              85.673,
+              87.997,
+              88.683
+            ]
+          },
+          "pixels": 4096,
+          "size": 64,
+          "trials": 5
+        },
+        {
+          "cpu_dispatch": {
+            "max_ms": 138.211,
+            "median_ms": 134.877,
+            "min_ms": 123.178,
+            "p95_ms": 138.211,
+            "samples_ms": [
+              123.178,
+              123.557,
+              134.877,
+              136.471,
+              138.211
+            ]
+          },
+          "event_to_frame_post_draw": {
+            "max_ms": 171.766,
+            "median_ms": 168.214,
+            "min_ms": 153.4,
+            "p95_ms": 171.766,
+            "samples_ms": [
+              153.4,
+              154.985,
+              168.214,
+              170.52,
+              171.766
+            ]
+          },
+          "pixels": 9216,
+          "size": 96,
+          "trials": 5
+        }
+      ],
+      "checks": 96,
+      "display": "X11",
+      "engine": {
+        "build": "official",
+        "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+        "hex": 264192,
+        "major": 4,
+        "minor": 8,
+        "patch": 0,
+        "status": "beta2",
+        "string": "4.8-beta2 (official)",
+        "timestamp": 0
+      },
+      "failures": 0,
+      "limits": "Synthetic X11 GUI release mapped by a test adapter to canonical DrawingEditSession; not production Bucket UI, physical pointer, scan-out, or GPU VRAM. Memory monitors are sampled/renderer-dependent.",
+      "renderer": "gl_compatibility",
+      "sampled_render_video_memory_peak_bytes": 12861915.0,
+      "sampled_static_memory_peak_bytes": 97375049.0,
+      "sampled_texture_memory_peak_bytes": 6435923,
+      "schema": "t068-bucket-frame-v1"
+    },
+    {
+      "cases": [
+        {
+          "cpu_dispatch": {
+            "max_ms": 15.901,
+            "median_ms": 14.754,
+            "min_ms": 12.21,
+            "p95_ms": 15.901,
+            "samples_ms": [
+              12.21,
+              14.01,
+              14.754,
+              15.36,
+              15.901
+            ]
+          },
+          "event_to_frame_post_draw": {
+            "max_ms": 40.409,
+            "median_ms": 36.934,
+            "min_ms": 32.899,
+            "p95_ms": 40.409,
+            "samples_ms": [
+              32.899,
+              35.993,
+              36.934,
+              39.988,
+              40.409
+            ]
+          },
+          "pixels": 1024,
+          "size": 32,
+          "trials": 5
+        },
+        {
+          "cpu_dispatch": {
+            "max_ms": 69.757,
+            "median_ms": 56.06,
+            "min_ms": 50.21,
+            "p95_ms": 69.757,
+            "samples_ms": [
+              50.21,
+              51.638,
+              56.06,
+              57.032,
+              69.757
+            ]
+          },
+          "event_to_frame_post_draw": {
+            "max_ms": 96.137,
+            "median_ms": 84.385,
+            "min_ms": 75.107,
+            "p95_ms": 96.137,
+            "samples_ms": [
+              75.107,
+              78.462,
+              84.385,
+              87.854,
+              96.137
+            ]
+          },
+          "pixels": 4096,
+          "size": 64,
+          "trials": 5
+        },
+        {
+          "cpu_dispatch": {
+            "max_ms": 149.787,
+            "median_ms": 141.533,
+            "min_ms": 134.743,
+            "p95_ms": 149.787,
+            "samples_ms": [
+              134.743,
+              135.872,
+              141.533,
+              144.193,
+              149.787
+            ]
+          },
+          "event_to_frame_post_draw": {
+            "max_ms": 189.647,
+            "median_ms": 176.683,
+            "min_ms": 168.216,
+            "p95_ms": 189.647,
+            "samples_ms": [
+              168.216,
+              174.264,
+              176.683,
+              182.316,
+              189.647
+            ]
+          },
+          "pixels": 9216,
+          "size": 96,
+          "trials": 5
+        }
+      ],
+      "checks": 95,
+      "display": "X11",
+      "engine": {
+        "build": "official",
+        "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+        "hex": 264192,
+        "major": 4,
+        "minor": 8,
+        "patch": 0,
+        "status": "beta2",
+        "string": "4.8-beta2 (official)",
+        "timestamp": 0
+      },
+      "failures": 0,
+      "limits": "Synthetic X11 GUI release mapped by a test adapter to canonical DrawingEditSession; not production Bucket UI, physical pointer, scan-out, or GPU VRAM. Memory monitors are sampled/renderer-dependent.",
+      "renderer": "gl_compatibility",
+      "sampled_render_video_memory_peak_bytes": 12861915.0,
+      "sampled_static_memory_peak_bytes": 97374725.0,
+      "sampled_texture_memory_peak_bytes": 6435923,
+      "schema": "t068-bucket-frame-v1"
+    }
+  ],
+  "schema": "t068-bucket-frame-evidence-v1",
+  "ticket": "T-068"
+}

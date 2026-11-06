@@ -55,7 +55,7 @@ func commit() -> DrawingResult:
 
 
 func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
-		once: bool = false, blend: bool = false) -> DrawingResult:
+		once: bool = false, blend: bool = false, verified_source: int = -1) -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if rgba < 0 or rgba > 0xffffffff:
@@ -69,16 +69,21 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	var key: String = "%d,%d" % [global_x, global_y]
 	if once and _covered.has(key):
 		return DrawingResult.success()
-	var stride: int = document.tile_stride
-	var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
-	if not _source_tiles.has(tile_key):
-		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
-		if not resolved.ok:
-			return resolved
-		_source_tiles[tile_key] = resolved.value
-	var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
-	var old: int = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
-		if tile != null else 0
+	# Flood fill has already read this exact pixel through the verified source
+	# snapshot. Re-resolving its tile here needlessly allocates a tile key and
+	# repeats the pixel lookup. -1 means all other callers read it normally.
+	var old: int = verified_source
+	if old == -1:
+		var stride: int = document.tile_stride
+		var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+		if not _source_tiles.has(tile_key):
+			var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+			if not resolved.ok:
+				return resolved
+			_source_tiles[tile_key] = resolved.value
+		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		old = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
+			if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
 	if once:
 		_covered[key] = true
@@ -193,8 +198,12 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
 			selection, max_candidates, depth + 1)
-	# A stationary dab has no segment projection. Avoid a native geometry call
-	# per candidate while retaining the same closed-circle coverage threshold.
+	# A stationary dab has no segment projection. Axis-aligned segments can
+	# compute squared distance without a Geometry2D call per candidate. Keep
+	# the original native geometry oracle for all oblique sweeps.
+	if start != finish and (start.x == finish.x or start.y == finish.y):
+		return _paint_axis_segment(start, finish, left, top, right, bottom,
+			radius * radius, rgba, erase, selection)
 	var stationary: bool = start == finish
 	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
@@ -207,6 +216,44 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 				selection, true, not erase)
 			if not result.ok:
 				return result
+	return DrawingResult.success()
+
+
+func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
+		right: int, bottom: int, radius_squared: float, rgba: int, erase: bool,
+		selection: DrawingSelection) -> DrawingResult:
+	if start.y == finish.y:
+		var min_x: float = minf(start.x, finish.x)
+		var max_x: float = maxf(start.x, finish.x)
+		for y: int in range(top, bottom):
+			var dy: float = (y + 0.5) - start.y
+			var dy_squared: float = dy * dy
+			if dy_squared > radius_squared:
+				continue
+			for x: int in range(left, right):
+				var center_x: float = x + 0.5
+				var dx: float = center_x - clampf(center_x, min_x, max_x)
+				if dx * dx + dy_squared > radius_squared:
+					continue
+				var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+					selection, true, not erase)
+				if not result.ok:
+					return result
+	else:
+		var min_y: float = minf(start.y, finish.y)
+		var max_y: float = maxf(start.y, finish.y)
+		for y: int in range(top, bottom):
+			var center_y: float = y + 0.5
+			var dy: float = center_y - clampf(center_y, min_y, max_y)
+			var dy_squared: float = dy * dy
+			for x: int in range(left, right):
+				var dx: float = (x + 0.5) - start.x
+				if dx * dx + dy_squared > radius_squared:
+					continue
+				var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+					selection, true, not erase)
+				if not result.ok:
+					return result
 	return DrawingResult.success()
 
 
@@ -248,56 +295,74 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 	return DrawingResult.success(_after.size())
 
 
+## Read one canonical source pixel from the gesture's immutable tile snapshot.
+## This also materializes verified lazy tiles: has_stored_pixel() only inspects
+## resident tiles, so using it to gate fill would silently reject persisted
+## artwork that has not yet been decoded. A zero RGBA8 pixel is still blank;
+## nonzero hidden RGB (alpha=0) remains a legitimate stored fill source.
+func _fill_source_pixel(point: Vector2i) -> DrawingResult:
+	var global_x: int = anchor_x + point.x
+	var global_y: int = anchor_y + point.y
+	var stride: int = document.tile_stride
+	var key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+	if not _source_tiles.has(key):
+		var loaded: DrawingResult = document._resolve_chunk(layer_id, key)
+		if not loaded.ok:
+			return loaded
+		_source_tiles[key] = loaded.value
+	var tile: DrawingRasterTile = _source_tiles[key] as DrawingRasterTile
+	if tile == null:
+		return DrawingResult.success(0)
+	return DrawingResult.success(tile.get_rgba(posmod(global_x, stride),
+		posmod(global_y, stride)))
+
+
 ## Four-connected fill of existing pixels; never expands into implicit blank space.
 func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		limit: int = 262144) -> DrawingResult:
 	if limit <= 0 or _closed:
 		return DrawingResult.failure("FILL_LIMIT", "Invalid flood fill budget/session")
-	var x: int = anchor_x + seed.x
-	var y: int = anchor_y + seed.y
-	if not document.has_stored_pixel(layer_id, x, y):
-		return DrawingResult.failure("BLANK_SEED", "Fill begins in unallocated transparent space")
-	var original: DrawingResult = document.read_pixel(layer_id, x, y)
+	var original: DrawingResult = _fill_source_pixel(seed)
 	if not original.ok:
 		return original
+	if int(original.value) == 0:
+		return DrawingResult.failure("BLANK_SEED", "Fill begins in unallocated transparent space")
 	if original.value == rgba:
 		return DrawingResult.failure("NO_CHANGE", "Target color is already present")
 	var frontier: Array[Vector2i] = [seed]
-	var visited: Dictionary[Vector2i, bool] = {}
+	# Mark a point when queued, rather than when popped. Dense regions would
+	# otherwise enqueue the same interior and boundary coordinates repeatedly.
+	# The limit still counts unique examined candidates, including boundaries.
+	var queued: Dictionary[Vector2i, bool] = {seed: true}
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	var head: int = 0
 	while head < frontier.size():
-		if visited.size() >= limit:
+		if head >= limit:
 			_before = old_before
 			_after = old_after
 			return DrawingResult.failure("FILL_LIMIT", "Fill was cancelled at the pixel budget")
 		var point: Vector2i = frontier[head]
 		head += 1
-		if visited.has(point):
-			continue
-		visited[point] = true
 		if selection != null and not selection.allows(point):
 			continue
-		var px: int = anchor_x + point.x
-		var py: int = anchor_y + point.y
-		if not document.has_stored_pixel(layer_id, px, py):
-			continue
-		var current: DrawingResult = document.read_pixel(layer_id, px, py)
+		var current: DrawingResult = _fill_source_pixel(point)
 		if not current.ok:
 			_before = old_before
 			_after = old_after
 			return current
-		if current.value != original.value:
+		if int(current.value) == 0 or current.value != original.value:
 			continue
-		var staged: DrawingResult = _stage(point.x, point.y, rgba, selection)
+		var staged: DrawingResult = _stage(point.x, point.y, rgba, selection,
+			false, false, int(current.value))
 		if not staged.ok:
 			_before = old_before
 			_after = old_after
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset
-			if not visited.has(next):
+			if not queued.has(next):
+				queued[next] = true
 				frontier.append(next)
 	return DrawingResult.success(_after.size())
 

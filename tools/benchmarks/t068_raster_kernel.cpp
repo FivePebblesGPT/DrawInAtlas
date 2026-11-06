@@ -154,3 +154,123 @@ DRAW_EXPORT int32_t draw_batch(const uint8_t* source, uint8_t* output,
     if (outcome > 0) std::memcpy(deltas, pending.data(), pending.size() * sizeof(DrawDelta));
     return outcome;
 }
+
+// The opt-in length-checked boundary does not change the original ABI 1
+// entrypoints, which are used by existing benchmarking clients.
+// It can reject short caller-declared buffers before touching any memory, but
+// it cannot prove that a C pointer genuinely owns its declared number of bytes.
+DRAW_EXPORT uint32_t draw_kernel_checked_api_version() { return 1; }
+
+namespace {
+/// Check two caller-declared ranges without performing undefined pointer arithmetic.
+/// Reject address overflow rather than accepting a potentially wrapped range.
+bool valid_range(const void* pointer, uint64_t bytes) {
+    if (bytes == 0) return true;
+    if (pointer == nullptr) return false;
+    return bytes <= uint64_t(UINTPTR_MAX - reinterpret_cast<uintptr_t>(pointer));
+}
+
+bool intersects(const void* left, uint64_t left_bytes,
+                const void* right, uint64_t right_bytes) {
+    if (left_bytes == 0 || right_bytes == 0) return false;
+    const uintptr_t a = reinterpret_cast<uintptr_t>(left);
+    const uintptr_t b = reinterpret_cast<uintptr_t>(right);
+    return a < b + right_bytes && b < a + left_bytes;
+}
+
+struct CheckedRegion {
+    uint64_t source_bytes;
+    uint64_t point_bytes;
+    uint64_t mask_bytes;
+    uint64_t delta_bytes;
+};
+
+/// -1 invalid operation/shape, -5 missing/short buffers, -6 unsafe aliasing.
+int32_t check_buffers(const uint8_t* source, uint64_t source_capacity,
+                      int32_t width, int32_t height,
+                      const int32_t* points, uint64_t points_capacity, int32_t count,
+                      int32_t operation, const uint8_t* mask, uint64_t mask_capacity,
+                      const DrawDelta* deltas, uint64_t delta_capacity_bytes,
+                      int32_t delta_capacity, CheckedRegion& size) {
+    if (width <= 0 || height <= 0 || width > 2048 || height > 2048 ||
+        count < 0 || count > 1048576 || delta_capacity < 0 ||
+        operation < 0 || operation > 2) return -1;
+    const uint64_t pixels = uint64_t(width) * uint64_t(height);
+    size = {pixels * 4U, uint64_t(count) * 2U * sizeof(int32_t),
+            mask == nullptr ? 0U : pixels,
+            uint64_t(delta_capacity) * sizeof(DrawDelta)};
+    if (source == nullptr || source_capacity < size.source_bytes ||
+        (points == nullptr && (count != 0 || points_capacity != 0)) ||
+        points_capacity < size.point_bytes ||
+        (mask == nullptr && mask_capacity != 0) || mask_capacity < size.mask_bytes ||
+        (deltas == nullptr && (delta_capacity != 0 || delta_capacity_bytes != 0)) ||
+        delta_capacity_bytes < size.delta_bytes ||
+        !valid_range(source, size.source_bytes) ||
+        !valid_range(points, size.point_bytes) ||
+        !valid_range(mask, size.mask_bytes) ||
+        !valid_range(deltas, size.delta_bytes)) return -5;
+    if (intersects(deltas, size.delta_bytes, source, size.source_bytes) ||
+        intersects(deltas, size.delta_bytes, points, size.point_bytes) ||
+        intersects(deltas, size.delta_bytes, mask, size.mask_bytes)) return -6;
+    return 0;
+}
+} // namespace
+
+/// Bounded-buffer counterpart of draw_batch_deltas().
+/// @param source_bytes Accessible bytes at source (at least width*height*4).
+/// @param point_bytes Accessible bytes at points (at least count*2*sizeof(int32_t)).
+/// @param mask_bytes Accessible mask bytes; must be zero for a null mask.
+/// @param delta_bytes Accessible bytes at deltas (at least capacity*sizeof(DrawDelta)).
+/// @return >=0 changed pixels; -1 invalid shape, -2 bad coordinate,
+///         -3 delta capacity, -4 internal C++ exception, -5 short/invalid buffer,
+///         -6 alias with caller-owned output. No output is changed on errors.
+/// @warning Declared capacities must reflect real allocations; an arbitrary
+///          foreign C pointer cannot be independently memory-probed.
+DRAW_EXPORT int32_t draw_batch_deltas_checked(
+        const uint8_t* source, uint64_t source_bytes,
+        int32_t width, int32_t height,
+        const int32_t* points, uint64_t point_bytes, int32_t count,
+        uint32_t rgba, int32_t operation,
+        const uint8_t* mask, uint64_t mask_bytes,
+        DrawDelta* deltas, uint64_t delta_bytes, int32_t delta_capacity) {
+    CheckedRegion size{};
+    const int32_t check = check_buffers(source, source_bytes, width, height,
+        points, point_bytes, count, operation, mask, mask_bytes,
+        deltas, delta_bytes, delta_capacity, size);
+    if (check != 0) return check;
+    try {
+        return draw_batch_deltas(source, width, height, points, count,
+                                 rgba, operation, mask, deltas, delta_capacity);
+    } catch (...) {
+        return -4;
+    }
+}
+
+/// Bounded-buffer counterpart of draw_batch(). The output region must be
+/// disjoint from all inputs and deltas, including partial overlaps.
+DRAW_EXPORT int32_t draw_batch_checked(
+        const uint8_t* source, uint64_t source_bytes,
+        uint8_t* output, uint64_t output_bytes,
+        int32_t width, int32_t height,
+        const int32_t* points, uint64_t point_bytes, int32_t count,
+        uint32_t rgba, int32_t operation,
+        const uint8_t* mask, uint64_t mask_bytes,
+        DrawDelta* deltas, uint64_t delta_bytes, int32_t delta_capacity) {
+    CheckedRegion size{};
+    const int32_t check = check_buffers(source, source_bytes, width, height,
+        points, point_bytes, count, operation, mask, mask_bytes,
+        deltas, delta_bytes, delta_capacity, size);
+    if (check != 0) return check;
+    if (output == nullptr || output_bytes < size.source_bytes ||
+        !valid_range(output, size.source_bytes)) return -5;
+    if (intersects(output, size.source_bytes, source, size.source_bytes) ||
+        intersects(output, size.source_bytes, points, size.point_bytes) ||
+        intersects(output, size.source_bytes, mask, size.mask_bytes) ||
+        intersects(output, size.source_bytes, deltas, size.delta_bytes)) return -6;
+    try {
+        return draw_batch(source, output, width, height, points, count,
+                          rgba, operation, mask, deltas, delta_capacity);
+    } catch (...) {
+        return -4;
+    }
+}
