@@ -58,6 +58,15 @@ func set_results(campaign: AtlasCampaign, result: AtlasOverviewResult) -> void:
 		preview.clear_preview()
 
 
+## Old results may be detached from an edited document. After a rejected
+## action, require a new deliberate selection before Open/Focus is enabled.
+func require_fresh_selection() -> void:
+	result_list.deselect_all()
+	_update_actions(null)
+	preview.clear_preview()
+	summary.text += "\nResults changed. Select an updated result."
+
+
 func selected_entry() -> AtlasOverviewEntry:
 	var index: int = _selected_index()
 	return entries[index] if index >= 0 and index < entries.size() else null

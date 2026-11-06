@@ -1,0 +1,25 @@
+# Floor fog / reveal regions (T-042 engineering checkpoint)
+
+**Status:** GM editor authoring and native saving are implemented; fog-filtered raster capture is available through the isolated T-039/T-040 projection proof. **The actual player projector remains disconnected from the production editor**, since publication grants and the policy in T-039 are not approved. T-042 remains open for design/usability/privacy acceptance.
+
+## GM editing
+
+In **Tools → Player visibility (GM only)** choose **Fog reveal/hide (G)**. Drag a rectangle to reveal, or **Shift-drag** to hide it again. Cyan outlines represent revealed rectangles; red outlines represent hidden rectangles. The overlay is visible only with Fog selected and is never placed in an artwork layer or GM/editor capture. **Esc** cancels a pending drag; **Ctrl+Z/Ctrl+Y** undo/redo committed changes. A click without area does nothing. The first committed fog edit turns on fog for the current floor, hiding all areas except those revealed. This is a deliberate opt-in for older campaigns, which otherwise retain fog-disabled behavior.
+
+Coordinates are **continuous board units**, including negative and fractional values. Rectangle operations are ordered and the newest covering operation wins. The fog belongs to the **floor**, not a specific artwork layer or authored D0/D1 group, so changing detail level cannot reveal a concealed location. Editing honors the selected grid-cell edit mask: the **whole** rectangle must fit inside the active scope or the change is rejected atomically. There are at most 256 operations per floor. To undo the first reveal (and turn fog off again), undo that initial history command. A reset/clear-fog UI and arbitrary polygon brushes are not part of this checkpoint.
+
+## Data model and native save
+
+`AtlasFloor` owns `fog_enabled` and ordered `AtlasFogRegion` Resources (`Rect2` plus `reveal: bool`). The regions are independent of layer order and tokens. Native `.scn` saves embed validated resources with finite, bounded board coordinates. The dictionary clone/digest validates the complete sequence; native saving, backups, floor reordering and independent reload retain it. Missing fields in legacy saves default to disabled/empty. Disabled/empty fog fields are omitted from canonical dictionaries, preserving the integrity digest used by older `.scn` files; a campaign written with the T-041 checkpoint was successfully loaded by the T-042 engine. The optional fog fields do not change the campaign schema version. Editing commands bind the original map/floor resource identity and full prior snapshot, rejecting stale or redirected edits.
+
+## Player privacy proof and limits
+
+`AtlasPlayerProjection.build_capture_input` **filters authorized raster chunks before constructing any player-facing campaign**, by mapping each pixel center through the source raster transform into board coordinates. The output contains only revealed pixel bytes; concealed chunks are omitted entirely, with no canonical source image, asset hash, or encoded bytes retained. The same floor mask is enforced at every authored LOD. Invalid fog, malformed grants or a mask-processing budget violation deny the capture. **Fogged Objects grants are currently rejected outright** rather than pretending that arbitrary text, paths and image props can be clipped securely. Token layers remain denied as under T-041. Without fog enabled, the existing explicit whole-layer grants behave as before.
+
+This is a conservative intermediate design: no production permission toggles, public token rendering, semantic-object region clipping, cross-audience preview cache, incremental mask rebuild or browser projector have been approved. T-043 must test native player views and every derivative preview, including the case where fog changes while the player window is frozen or a capture is in flight. **Never publish `AtlasPreviewCache` images based on their `audience` label**; it is not a privacy filter. The isolated native session additionally compares the source floor's identity and fog revision before and after an asynchronous capture, rejecting a stale in-flight result. **This is not an automatic frozen-image revocation controller.** Always blank/invalidate output immediately when fog or permissions change, even while frozen. The native proof does not establish that an end-to-end projector session is safe today.
+
+## Tests
+
+- `tests/fog_smoke.gd`: validation, signed coordinates, ordered overlap, stale/identity guards, edit-mask scope, undo/redo/cancel, GM tool routing, native save/reload, floor rename, and source-data exclusion for D0/D1 capture inputs.
+- `tests/fog_visual.gd`: real native framebuffer samples for revealed and concealed raster areas, including re-hide.
+- Existing `player_projection_contract_smoke`, `player_projection_visual` and `player_output_session_visual` remain regression gates. CI includes both fog tests.

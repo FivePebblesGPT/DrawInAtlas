@@ -25,6 +25,12 @@ var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
 var tool_palette: AtlasToolPalette
 var text_editor: AtlasTextEditorPopup
+## A text dialog retains the exact authorization it opened under, even when
+## another editor action changes the selected cell, grid or underlying layer.
+var _text_scope_at_open: AtlasEditScope
+var _text_map_at_open: AtlasMapDocument
+var _text_floor_at_open: AtlasFloor
+var _text_layer_at_open: AtlasObjectsLayer
 
 @onready var canvas: AtlasCanvas = $Shell/CanvasAndInspector/Canvas
 @onready var inspector: AtlasInspector = $Shell/CanvasAndInspector/InspectorPanel
@@ -47,6 +53,8 @@ var _link_choices: Array[String] = []
 @onready var opacity_slider: HSlider = inspector.opacity_slider
 @onready var grid_settings_popup: AtlasGridSettingsPopup = get_node("../../GridSettingsPopup") as AtlasGridSettingsPopup
 @onready var grid_settings_button: Button = get_node("../../Chrome/Layout/GridSettingsButton") as Button
+@onready var projector_frame_button: Button = get_node("../../Chrome/Layout/ProjectorFrameButton") as Button
+@onready var projector_aspect_picker: OptionButton = get_node("../../Chrome/Layout/ProjectorAspect") as OptionButton
 @onready var grid_controls: AtlasGridControls = get_node("../../GridSettingsPopup/Panel/Margin/Layout/Scroll/GridControls") as AtlasGridControls
 @onready var distance_spinner: SpinBox = grid_controls.distance_spinner
 @onready var unit_picker: OptionButton = grid_controls.unit_picker
@@ -126,8 +134,14 @@ func _ready() -> void:
 	_mount_sidebar_views()
 	text_editor = AtlasTextEditorPopup.new()
 	add_child(text_editor)
-	text_editor.text_confirmed.connect(artwork.edit_text)
+	text_editor.text_confirmed.connect(_confirm_text_edit)
+	text_editor.visibility_changed.connect(_on_text_editor_visibility_changed)
 	_connect_workspace()
+	projector_aspect_picker.add_item("16:9")
+	projector_aspect_picker.add_item("4:3")
+	projector_aspect_picker.add_item("1:1")
+	projector_frame_button.toggled.connect(_toggle_projector_frame)
+	projector_aspect_picker.item_selected.connect(_choose_projector_aspect)
 	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
 	if load_saved_on_startup:
@@ -171,6 +185,8 @@ func _mount_sidebar_views() -> void:
 	layer_panel.layer_selected.connect(select_layer)
 	layer_panel.object_selected.connect(_select_hierarchy_object)
 	layer_panel.link_action_requested.connect(_on_hierarchy_link_action)
+	layer_panel.link_action_rejected.connect(func() -> void:
+		_message("Map link changed. Select its refreshed hierarchy row before continuing."))
 	layer_panel.layers_changed.connect(apply_layers)
 	layer_panel.presented_detail_selected.connect(_on_presented_detail_selected)
 	layer_panel.automatic_detail_toggled.connect(_on_automatic_detail_toggled)
@@ -196,7 +212,13 @@ func _connect_workspace() -> void:
 	raster_importer.image_ready.connect(artwork.import_prop)
 	raster_importer.failed.connect(_message)
 	canvas.stroke_requested.connect(artwork.stroke)
+	canvas.line_rejected.connect(_message)
+	canvas.polygon_rejected.connect(_message)
+	canvas.wall_rejected.connect(_message)
 	canvas.path_edit_requested.connect(artwork.edit_path)
+	canvas.token_edit_requested.connect(_edit_token)
+	canvas.token_rejected.connect(_message)
+	canvas.fog_edit_requested.connect(_edit_fog)
 	canvas.text_requested.connect(_open_text_editor)
 	canvas.transform_requested.connect(artwork.transform_selection)
 	canvas.fill_requested.connect(artwork.commit_preview_fill)
@@ -217,6 +239,8 @@ func _connect_workspace() -> void:
 	canvas.interaction_finished.connect(_queue_lod_refresh)
 	canvas.view_region_changed.connect(_queue_lod_refresh)
 	edits.changed.connect(_rebuild_lod)
+	inspector.token_name_input.text_changed.connect(func(value: String) -> void: canvas.token_label = value)
+	inspector.token_radius_spinner.value_changed.connect(func(value: float) -> void: canvas.token_radius = value)
 	inspector.floor_selected.connect(switch_floor)
 	inspector.floor_created.connect(create_floor)
 	inspector.floor_renamed.connect(rename_floor)
@@ -227,6 +251,7 @@ func _connect_workspace() -> void:
 	grid_settings_button.pressed.connect(open_grid_settings)
 	inspector.scope_toggled.connect(_on_scope_toggled)
 	inspector.wall_restyle_requested.connect(canvas.restyle_selected_wall)
+	inspector.token_restyle_requested.connect(_restyle_selected_token)
 	inspector.polygon_fill_toggled.connect(func(enabled: bool) -> void:
 		canvas.polygon_solid_fill = enabled
 		if canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
@@ -260,6 +285,7 @@ func _connect_workspace() -> void:
 
 
 func _on_view_changed() -> void:
+	projector_frame_button.set_pressed_no_signal(false)
 	link_dialog.hide()
 	link_chooser.hide()
 	map_references.select_source(navigator.active_entrance_id)
@@ -301,10 +327,9 @@ func _refresh_layers(preferred_id: String = "") -> void:
 			canvas.active_layer_id = canvas.floor.layers[-1].id
 	var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
 	var required: String = AtlasArtworkEditor.tool_layer_kind(canvas.tool)
-	if target is AtlasRasterLayer and required == "OBJECTS":
-		canvas.choose_tool(AtlasCanvas.Tool.PEN)
-	elif target is AtlasObjectsLayer and required == "RASTER":
-		canvas.choose_tool(AtlasCanvas.Tool.ART_SELECT)
+	if not required.is_empty() and target != null 			and not AtlasArtworkEditor._eligible_target(target, required, target.detail_level):
+		canvas.choose_tool(AtlasCanvas.Tool.TOKEN if target is AtlasTokenLayer else
+			AtlasCanvas.Tool.ART_SELECT if target is AtlasObjectsLayer else AtlasCanvas.Tool.PEN)
 	if tool_palette != null:
 		tool_palette.sync_tool(canvas.tool)
 	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
@@ -399,6 +424,7 @@ func _on_documents_changed() -> void:
 		browser.refresh(campaign)
 		linked_maps.refresh()
 		layer_panel.set_navigation_context(campaign, canvas.map)
+		canvas._overlay.queue_redraw()
 
 
 func _message(value: String) -> void:
@@ -412,6 +438,8 @@ func _clone_floors() -> Array[AtlasFloor]:
 		copy.id = floor.id
 		copy.display_name = floor.display_name
 		copy.layers = AtlasLayerCodec.clone_all(floor.layers)
+		copy.fog_enabled = floor.fog_enabled
+		copy.fog_regions = AtlasFloor.clone_fog(floor.fog_regions)
 		result.append(copy)
 	return result
 
@@ -623,19 +651,107 @@ func _choose_link(index: int) -> void:
 		navigator.enter_link(campaign.link_by_id(_link_choices[index]))
 
 
+## Presentation setup only. The active output does not exist until T-040;
+## these presets describe intended proportions, not pixels-per-grid-cell.
+func _choose_projector_aspect(index: int) -> void:
+	var sizes: Array[Vector2i] = [Vector2i(1920, 1080), Vector2i(1600, 1200), Vector2i(1000, 1000)]
+	if index >= 0 and index < sizes.size():
+		canvas.configure_projector_output_size(sizes[index])
+
+
+func _toggle_projector_frame(active: bool) -> void:
+	canvas.set_projector_frame_active(active)
+	projector_frame_button.set_pressed_no_signal(canvas.projector_frame_active)
+	if active and canvas.projector_frame_active:
+		_message("GM-only frame: drag inside to pan, yellow corner to resize; Esc cancels drag. No player image is published.")
+
+
 func _choose_tool(tool: AtlasCanvas.Tool) -> void:
 	_on_tool_changed(tool)
 
 
 func _on_tool_changed(index: int) -> void:
+	canvas.set_projector_frame_active(false)
+	projector_frame_button.set_pressed_no_signal(false)
 	artwork.choose_tool(index as AtlasCanvas.Tool)
 	if tool_palette != null:
 		tool_palette.sync_tool(index)
 	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
+	canvas.token_label = inspector.token_name_input.text
+	canvas.token_radius = inspector.token_radius_spinner.value
 	if not locked_to_cell:
 		lock_checkbox.set_pressed_no_signal(false)
 	zoom_gate.reset()
 	_on_selection_changed()
+
+
+func _restyle_selected_token() -> void:
+	if canvas.floor == null or canvas.tool != AtlasCanvas.Tool.TOKEN:
+		return
+	var layer: AtlasTokenLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTokenLayer
+	if layer == null or not layer.is_editable() or not canvas.editing_target_is_presented():
+		return
+	var before: AtlasToken = layer.token_by_id(canvas.selected_token_id)
+	if before == null:
+		_message("Select a GM token before updating it.")
+		return
+	var after: AtlasToken = before.copy()
+	after.label = inspector.token_name_input.text.strip_edges()
+	after.radius = inspector.token_radius_spinner.value
+	after.tint = inspector.brush_color_picker.color
+	if after.is_valid():
+		_edit_token(before.copy(), after)
+	else:
+		_message("Token label, size, or color is invalid.")
+
+
+func _edit_token(before: AtlasToken, after: AtlasToken) -> void:
+	if canvas.map == null or canvas.floor == null or not canvas.editing_target_is_presented():
+		return
+	var layer: AtlasTokenLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTokenLayer
+	if layer == null or not layer.is_editable():
+		return
+	var next: Array[AtlasToken] = AtlasTokenLayer.clone_tokens(layer.tokens)
+	if before == null:
+		if after == null or layer.token_by_id(after.id) != null:
+			return
+		next.append(after.copy())
+	else:
+		var index: int = -1
+		for i: int in range(layer.tokens.size()):
+			if layer.tokens[i].id == before.id:
+				index = i
+				break
+		if index < 0 or layer.tokens[index].to_dict() != before.to_dict():
+			return
+		if after == null:
+			next.remove_at(index)
+		else:
+			if after.id != before.id:
+				return
+			next[index] = after.copy()
+	var command: AtlasTokenEdit = AtlasTokenEdit.new(canvas.map.id, canvas.floor.id, layer.id,
+		layer.tokens, next, artwork.scope())
+	if not edits.execute(command):
+		_message("Token action rejected: locked layer, changed target or stale draft.")
+		return
+	canvas.queue_redraw()
+	_refresh_layers(layer.id)
+
+
+## Fog is floor-owned GM state, not an editable raster/Objects layer.
+## The command records original map/floor identities, scope and exact snapshots.
+func _edit_fog(bounds: Rect2, reveal: bool) -> void:
+	if canvas.map == null or canvas.floor == null:
+		return
+	var region: AtlasFogRegion = AtlasFogRegion.new(bounds, reveal)
+	var command: AtlasFogEdit = AtlasFogEdit.new(canvas.map, canvas.floor, region, artwork.scope())
+	if not edits.execute(command):
+		_message("Fog edit rejected: invalid rectangle, edit mask or stale floor.")
+		return
+	canvas.queue_redraw()
+	canvas._overlay.queue_redraw()
+	_message("Fog %s on this floor (all detail levels). Undo with Ctrl+Z." % ("revealed" if reveal else "hidden"))
 
 
 func _on_selection_changed() -> void:
@@ -745,6 +861,17 @@ func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	return artwork.apply_layers(layers, selected_id)
 
 
+## Release detached modal authorization when dismissed, including on Escape.
+## Otherwise a closed editor can pin an old map/layer in memory indefinitely.
+func _on_text_editor_visibility_changed() -> void:
+	if text_editor.visible:
+		return
+	_text_scope_at_open = null
+	_text_map_at_open = null
+	_text_floor_at_open = null
+	_text_layer_at_open = null
+
+
 func _open_text_editor(anchor: Vector2, index: int) -> void:
 	var original: AtlasStroke
 	var layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
@@ -752,7 +879,30 @@ func _open_text_editor(anchor: Vector2, index: int) -> void:
 		return
 	if index >= 0 and index < layer.strokes.size():
 		original = layer.strokes[index]
-	text_editor.open_editor(anchor, original, index, canvas.brush_color)
+	_text_scope_at_open = artwork.scope()
+	_text_map_at_open = canvas.map
+	_text_floor_at_open = canvas.floor
+	_text_layer_at_open = layer
+	text_editor.open_editor(anchor, original, index, canvas.brush_color,
+		canvas.map.id, canvas.floor.id, canvas.active_layer_id)
+
+
+func _confirm_text_edit(index: int, expected: AtlasStroke, replacement: AtlasStroke,
+		map_id: String, floor_id: String, layer_id: String) -> void:
+	var current_scope: AtlasEditScope = artwork.scope()
+	if _text_scope_at_open == null or canvas.map != _text_map_at_open \
+			or canvas.floor != _text_floor_at_open \
+			or canvas.floor == null or canvas.floor.layer_by_id(layer_id) != _text_layer_at_open \
+			or current_scope.enabled != _text_scope_at_open.enabled \
+			or current_scope.polygon != _text_scope_at_open.polygon:
+		text_editor.show_error("Text was not applied: its target or selected-cell edit mask "
+			+ "changed while the editor was open. Cancel and reopen to use the new scope.")
+		return
+	if artwork.edit_text_in_context(index, expected, replacement, map_id, floor_id, layer_id):
+		text_editor.close_editor()
+	else:
+		text_editor.show_error("Text was not applied. The target, original text, layer protection, "
+			+ "detail level or edit mask changed. Cancel and reopen the editor if needed.")
 
 
 func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
@@ -876,6 +1026,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif event.keycode == KEY_ENTER and canvas.tool == AtlasCanvas.Tool.ART_SELECT:
 		canvas.clear_selection()
 		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ESCAPE and canvas.projector_frame_active:
+		if canvas._frame_drag != AtlasCanvas.FrameDrag.NONE:
+			canvas.cancel_projector_frame_drag()
+		else:
+			canvas.set_projector_frame_active(false)
+			projector_frame_button.set_pressed_no_signal(false)
+		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_ESCAPE:
 		zoom_gate.reset()
 		if canvas.is_editing():
@@ -884,11 +1041,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			canvas.clear_selection()
 		get_viewport().set_input_as_handled()
 	elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
-		delete_selection()
+		if canvas.tool == AtlasCanvas.Tool.TOKEN:
+			canvas.delete_selected_token()
+		else:
+			delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T, KEY_K, KEY_G]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
 			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT}
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT, KEY_K: AtlasCanvas.Tool.TOKEN, KEY_G: AtlasCanvas.Tool.FOG}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

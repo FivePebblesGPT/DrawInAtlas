@@ -269,6 +269,13 @@ jobs:
           godot --headless --path . --script res://tests/snapping_smoke.gd 2>&1 | tee /tmp/godot-snapping.log
           grep -q 'ATLAS_SNAPPING_PASSED' /tmp/godot-snapping.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-snapping.log; then exit 1; fi
+      - name: Reject stale Search navigation results (T-009)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/search_stale_actions_smoke.gd 2>&1 | tee /tmp/godot-search-stale.log
+          grep -q 'ATLAS_SEARCH_STALE_PASSED' /tmp/godot-search-stale.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|SEARCH STALE FAILED:' /tmp/godot-search-stale.log; then exit 1; fi
       - name: Run workspace composition and organization tests
         shell: bash
         run: |
@@ -293,6 +300,83 @@ jobs:
           done
           grep -q 'ATLAS_LINKS_PASSED' /tmp/godot-links_smoke.log
           grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
+      - name: Verify isolated player-output privacy boundary proof (T-039)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/player_projection_contract_smoke.gd 2>&1 | tee /tmp/godot-player-projection.log
+          grep -q 'ATLAS_PLAYER_PROJECTION_CONTRACT_PASSED' /tmp/godot-player-projection.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-player-projection.log; then exit 1; fi
+      - name: Verify player privacy projection acceptance matrix (T-043)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/player_privacy_acceptance_smoke.gd 2>&1 | tee /tmp/godot-player-privacy-acceptance.log
+          grep -q 'ATLAS_PLAYER_PRIVACY_ACCEPTANCE_PASSED' /tmp/godot-player-privacy-acceptance.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|PLAYER PRIVACY FAILED:' /tmp/godot-player-privacy-acceptance.log; then exit 1; fi
+      - name: Verify session-only projector framing geometry (T-013)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/projector_frame_smoke.gd 2>&1 | tee /tmp/godot-projector-frame.log
+          grep -q 'ATLAS_PROJECTOR_FRAME_PASSED' /tmp/godot-projector-frame.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-projector-frame.log; then exit 1; fi
+      - name: Verify GM-only token authoring, history, saving and privacy (T-041)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/token_smoke.gd 2>&1 | tee /tmp/godot-token.log
+          grep -q 'ATLAS_TOKEN_PASSED' /tmp/godot-token.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|TOKEN FAILED:' /tmp/godot-token.log; then exit 1; fi
+      - name: Verify fog operations, guarded history, native saving and projection (T-042)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/fog_smoke.gd 2>&1 | tee /tmp/godot-fog.log
+          grep -q 'ATLAS_FOG_PASSED' /tmp/godot-fog.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FOG FAILED:' /tmp/godot-fog.log; then exit 1; fi
+      - name: Verify isolated native player camera and calibration contract (T-040)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/player_output_session_smoke.gd 2>&1 | tee /tmp/godot-player-output-session.log
+          grep -q 'ATLAS_PLAYER_OUTPUT_SESSION_PASSED' /tmp/godot-player-output-session.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-player-output-session.log; then exit 1; fi
+      - name: Verify single-window player fallback contract (T-044)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/player_web_fallback_smoke.gd 2>&1 | tee /tmp/godot-player-web-fallback.log
+          grep -q 'ATLAS_PLAYER_WEB_FALLBACK_PASSED' /tmp/godot-player-web-fallback.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|WEB FALLBACK FAILED:' /tmp/godot-player-web-fallback.log; then exit 1; fi
+      - name: Verify authoritative GM session and revision proof (T-045)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/authoritative_session_smoke.gd 2>&1 | tee /tmp/godot-authoritative-session.log
+          grep -q 'ATLAS_AUTHORITATIVE_SESSION_PASSED' /tmp/godot-authoritative-session.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|SESSION FAILED:' /tmp/godot-authoritative-session.log; then exit 1; fi
+      - name: Verify host-bound roles and privacy-filtered replication (T-046)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/filtered_replication_smoke.gd 2>&1 | tee /tmp/godot-filtered-replication.log
+          grep -q 'ATLAS_FILTERED_REPLICATION_PASSED' /tmp/godot-filtered-replication.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FILTERED REPLICATION FAILED:' /tmp/godot-filtered-replication.log; then exit 1; fi
+      - name: Verify trusted reconnect and permission-filtered resynchronization (T-047)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/reconnect_resync_smoke.gd 2>&1 | tee /tmp/godot-reconnect-resync.log
+          grep -q 'ATLAS_RECONNECT_RESYNC_PASSED' /tmp/godot-reconnect-resync.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|RECONNECT FAILED:' /tmp/godot-reconnect-resync.log; then exit 1; fi
+      - name: Verify integrated collaboration authorization, wire privacy and reconnect (T-048)
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --script res://tests/collaboration_acceptance_smoke.gd 2>&1 | tee /tmp/godot-collaboration-acceptance.log
+          grep -q 'ATLAS_COLLABORATION_ACCEPTANCE_PASSED' /tmp/godot-collaboration-acceptance.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|COLLABORATION ACCEPTANCE FAILED:' /tmp/godot-collaboration-acceptance.log; then exit 1; fi
       - name: Install native framebuffer test dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
       - name: Verify editable text and screen-space culling (T-027)
@@ -309,7 +393,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke; do
+          for suite in visual_smoke continuous_canvas_visual zoom_lod_contract_visual aligned_detail_previews_visual automatic_artwork_lod_visual tool_palette_visual compact_controls_visual grid_settings_visual brush_visual raster_rendering_visual drawing_performance_visual eraser_visual move_visual bucket_visual line_visual polygon_visual wall_paths_visual text_visual pen_turns_visual pen_width_wheel_visual selection_interactions_visual snapping_visual layer_hierarchy_visual preview_ui_smoke linked_maps_ui_smoke references_ui_smoke player_projection_visual projector_frame_visual player_output_session_visual token_visual fog_visual player_privacy_acceptance_visual player_web_fallback_visual collaboration_acceptance_visual; do
             xvfb-run -a godot --display-driver x11 --audio-driver Dummy --rendering-method gl_compatibility --path . --script "res://tests/$suite.gd" 2>&1 | tee "/tmp/godot-$suite.log"
             if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "/tmp/godot-$suite.log"; then exit 1; fi
           done
@@ -339,6 +423,14 @@ jobs:
           grep -q 'ATLAS_PREVIEW_UI_PASSED' /tmp/godot-preview_ui_smoke.log
           grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-linked_maps_ui_smoke.log
           grep -q 'ATLAS_REFERENCES_UI_PASSED' /tmp/godot-references_ui_smoke.log
+          grep -q 'ATLAS_PLAYER_PROJECTION_VISUAL_PASSED' /tmp/godot-player_projection_visual.log
+          grep -q 'ATLAS_PROJECTOR_FRAME_VISUAL_PASSED' /tmp/godot-projector_frame_visual.log
+          grep -q 'ATLAS_PLAYER_OUTPUT_SESSION_VISUAL_PASSED' /tmp/godot-player_output_session_visual.log
+          grep -q 'ATLAS_TOKEN_VISUAL_PASSED' /tmp/godot-token_visual.log
+          grep -q 'ATLAS_FOG_VISUAL_PASSED' /tmp/godot-fog_visual.log
+          grep -q 'ATLAS_PLAYER_PRIVACY_ACCEPTANCE_VISUAL_PASSED' /tmp/godot-player_privacy_acceptance_visual.log
+          grep -q 'ATLAS_PLAYER_WEB_FALLBACK_VISUAL_PASSED' /tmp/godot-player_web_fallback_visual.log
+          grep -q 'ATLAS_COLLABORATION_ACCEPTANCE_VISUAL_PASSED' /tmp/godot-collaboration_acceptance_visual.log
       - name: Launch main scene headlessly
         shell: bash
         run: |

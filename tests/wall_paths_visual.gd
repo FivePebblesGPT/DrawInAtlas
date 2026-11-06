@@ -61,6 +61,15 @@ func _run() -> void:
 	var before: Image = root.get_texture().get_image()
 	var sample: Vector2i = Vector2i(canvas.global_position) + Vector2i(120, 150)
 	_check(before.get_pixelv(sample).a > 0.5, "draft visible in native framebuffer")
+	# The saved wall and the confirmed draft edges must use the same renderer.
+	# This is a fixed pointer: the style setters alone must invalidate the cache.
+	canvas.brush_color = Color(0.12, 0.85, 0.2, 1.0)
+	canvas.brush_width = 14.0
+	await _frames(5)
+	var styled: Color = root.get_texture().get_image().get_pixelv(sample)
+	var original: Color = before.get_pixelv(sample)
+	_check(styled.g > styled.r and absf(styled.g - original.g) > 0.1,
+		"stationary draft visibly updates to green instead of old gold")
 	var key: InputEventKey = InputEventKey.new()
 	key.keycode = KEY_ENTER
 	key.pressed = true
@@ -70,6 +79,9 @@ func _run() -> void:
 	_check(ink.strokes.size() == 1 and ink.strokes[0].editable_path, "Enter finalizes one editable wall")
 	var after: Image = root.get_texture().get_image()
 	_check(after.get_pixelv(sample).a > 0.5, "committed wall visible in framebuffer")
+	var saved_color: Color = after.get_pixelv(sample)
+	_check(absf(saved_color.r - styled.r) + absf(saved_color.g - styled.g)
+		+ absf(saved_color.b - styled.b) < 0.05, "draft and committed wall match at a filled stroke pixel")
 	await _click(canvas, b, true)
 	_check(canvas._wall_drag_vertex == 1, "native hit finds wall vertex")
 	var moved: InputEventMouseMotion = InputEventMouseMotion.new()
@@ -91,6 +103,45 @@ func _run() -> void:
 	await _frames(8)
 	_check(canvas.size.x >= 200 and editor.inspector._wall_controls.visible, "800x600 shows wall controls and usable canvas")
 	_check(root.get_texture().get_image().save_png("user://validation/wall-paths-800.png") == OK, "screenshot 800")
+
+	# A native pointer draft must disappear when the selected-cell mask changes
+	# before Enter. Verify the framebuffer, not just the transient path array.
+	editor.apply_grid(AtlasGrid.new(AtlasGrid.Kind.SQUARE, 1000.0))
+	canvas.camera_center = Vector2(400, 400)
+	canvas.snap_to_grid = false
+	editor._on_select(Vector2i.ZERO)
+	editor._on_scope_toggled(true)
+	await _frames(5)
+	var draft_y: float = minf(260.0, canvas.size.y - 35.0)
+	var left: Vector2 = canvas.local_to_document(Vector2(80, draft_y))
+	var right: Vector2 = canvas.local_to_document(Vector2(180, draft_y))
+	var old_count: int = ink.strokes.size()
+	var old_history: int = editor.edits._cursor
+	await _click(canvas, left, true)
+	await _click(canvas, left, false)
+	await _click(canvas, right, true)
+	await _click(canvas, right, false)
+	_check(canvas._wall_draft != null and canvas._wall_vertices.size() == 2,
+		"real pointer stages a masked wall draft")
+	editor._on_select(Vector2i(1, 0))
+	await _frames(4)
+	var witness: Vector2i = Vector2i(canvas.global_position) + Vector2i(130, int(draft_y))
+	var stale_pixel: Color = root.get_texture().get_image().get_pixelv(witness)
+	key = InputEventKey.new()
+	key.keycode = KEY_ENTER
+	key.pressed = true
+	editor._unhandled_key_input(key)
+	await _frames(5)
+	var cleared_pixel: Color = root.get_texture().get_image().get_pixelv(witness)
+	_check(ink.strokes.size() == old_count and editor.edits._cursor == old_history,
+		"native stale wall does not add artwork or undo history")
+	_check(canvas._wall_vertices.is_empty() and canvas._wall_draft == null,
+		"native stale wall clears pending draft")
+	_check(absf(stale_pixel.r - cleared_pixel.r) + absf(stale_pixel.g - cleared_pixel.g)
+		+ absf(stale_pixel.b - cleared_pixel.b) > 0.1,
+		"native framebuffer no longer contains the rejected wall preview")
+	editor._on_scope_toggled(false)
+
 	root.remove_child(scene)
 	scene.free()
 	print("ATLAS_WALL_PATHS_VISUAL_%s checks=%d failures=%d" % ["PASSED" if failures == 0 else "FAILED", checks, failures])

@@ -125,13 +125,23 @@ func reset_previews() -> void:
 
 
 func _open_overview_entry(entry: AtlasOverviewEntry) -> void:
-	if entry.broken_reason.is_empty():
+	if entry != null and entry.broken_reason.is_empty() and _validate_overview_action(entry):
 		map_requested.emit(entry.map_id, entry.floor_id)
 
 
 func _focus_overview_source(entry: AtlasOverviewEntry) -> void:
-	if entry.can_focus:
+	if entry != null and entry.can_focus and _validate_overview_action(entry):
 		source_focus_requested.emit(entry)
+
+
+## A stale result must not use old coordinates or a retired destination.
+## Refresh the panel so the user can deliberately act on the new result.
+func _validate_overview_action(entry: AtlasOverviewEntry) -> bool:
+	if AtlasOverview.entry_is_current(_campaign, entry):
+		return true
+	refresh_search(_sidebar.get_search_query())
+	_overview.require_fresh_selection()
+	return false
 
 
 func _preview_map_index(index: int) -> void:

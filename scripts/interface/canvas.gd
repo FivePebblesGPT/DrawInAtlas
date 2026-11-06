@@ -17,6 +17,9 @@ signal pointer_moved(local_position: Vector2)
 signal interaction_started
 signal interaction_finished
 signal stroke_requested(stroke: AtlasStroke, erasing: bool)
+signal line_rejected(reason: String)
+signal polygon_rejected(reason: String)
+signal wall_rejected(reason: String)
 signal path_edit_requested(index: int, expected: AtlasStroke, replacement: AtlasStroke)
 signal text_requested(anchor: Vector2, index: int)
 signal selection_changed
@@ -25,10 +28,15 @@ signal fill_requested
 signal fill_preview_requested(position: Vector2, invert_global: bool)
 signal fill_cancel_requested
 signal view_region_changed
+signal projector_frame_changed
+signal token_edit_requested(before: AtlasToken, after: AtlasToken)
+signal token_rejected(reason: String)
+signal fog_edit_requested(bounds: Rect2, reveal: bool)
 
-enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT }
+enum Tool { PEN, ERASER, SELECT, LINE, RECTANGLE, ELLIPSE, ART_SELECT, FILL, MOVE, POLYGON, WALL_PATH, TEXT, TOKEN, FOG }
 enum Preview { OFF, MARKERS, THUMBNAILS, OVERLAY }
 enum Manipulation { NONE, MARQUEE, MOVE, RESIZE }
+enum FrameDrag { NONE, MOVE, RESIZE }
 
 var campaign: AtlasCampaign
 var map: AtlasMapDocument
@@ -90,10 +98,16 @@ var show_grid: bool:
 		if map != null:
 			map.grid.visible = value
 		queue_redraw()
-var brush_color: Color = Color("#f5b545")
-## Brush/eraser/line diameter in document units; pointer ring converts with
+var brush_color: Color = Color("#f5b545"):
+	set(value):
+		brush_color = value
+		_refresh_shape_style()
+## Brush/eraser/shape diameter in document units; pointer ring converts with
 ## camera_zoom. Never store a screen-pixel width in a stroke.
-var brush_width: float = 8.0
+var brush_width: float = 8.0:
+	set(value):
+		brush_width = value
+		_refresh_shape_style()
 ## Session-only; grid changes never rewrite existing artwork.
 var snap_to_grid: bool = false
 var polygon_solid_fill: bool = false
@@ -101,6 +115,34 @@ var polygon_solid_fill: bool = false
 var fill_tolerance: float = 0.0
 var fill_global: bool = false
 
+## Opt-in GM chrome, never placed in artwork layers or editor captures.
+var projector_frame: AtlasProjectorFrame = AtlasProjectorFrame.new()
+var projector_frame_active: bool = false
+var _frame_drag: FrameDrag = FrameDrag.NONE
+var _frame_drag_start: Vector2 = Vector2.ZERO
+var _frame_original_center: Vector2 = Vector2.ZERO
+var _frame_original_width: float = 0.0
+var _frame_resize_anchor: Vector2 = Vector2.ZERO
+
+## Selected GM token and uncommitted drag. No source resource is changed until release.
+var token_label: String = "Token"
+var token_radius: float = 16.0
+var selected_token_id: String = ""
+var _token_drag_before: AtlasToken
+var _token_drag_preview: AtlasToken
+var _token_drag_start: Vector2 = Vector2.ZERO
+## A token's pointer drag is authorized by its press-time layer instance,
+## source revision and effective cell mask, not whatever is selected at release.
+var _token_scope_at_press: AtlasEditScope
+var _token_map_at_press: AtlasMapDocument
+var _token_floor_at_press: AtlasFloor
+var _token_layer_at_press: AtlasTokenLayer
+var _token_snap_at_press: bool = false
+## GM-only rectangle draft; not a saved artwork layer or captured overlay.
+var _fog_drag_active: bool = false
+var _fog_start: Vector2 = Vector2.ZERO
+var _fog_end: Vector2 = Vector2.ZERO
+var _fog_reveal: bool = true
 var _panning: bool = false
 var _fill_pending: bool = false
 var _pending_wheel_fraction: float = 0.0
@@ -135,16 +177,37 @@ var _gesture_end: Vector2
 ## Frozen at gesture start so a toggle cannot desynchronize draft and commit.
 var _gesture_snap: bool = false
 var _shape_kind: String = ""
+## A Line draft is valid only for its original floor, raster and edit-mask
+## footprint. Release must not silently paint under a different authorization.
+var _line_scope_at_press: AtlasEditScope
+var _line_map_at_press: String = ""
+var _line_floor_at_press: String = ""
+var _line_layer_at_press: String = ""
+## The Polygon is a multi-click gesture; its first vertex freezes the exact
+## editable target and cell mask until a valid close or explicit cancellation.
+var _polygon_scope_at_start: AtlasEditScope
+var _polygon_map_at_start: AtlasMapDocument
+var _polygon_floor_at_start: AtlasFloor
+var _polygon_layer_at_start: AtlasRasterLayer
 var _polygon_vertices: PackedVector2Array = PackedVector2Array()
 var _polygon_pointer: Vector2 = Vector2.ZERO
 ## Session-only vertex editing; resources remain in the ink layer and history.
 var _wall_vertices: PackedVector2Array = PackedVector2Array()
 var _wall_pointer: Vector2 = Vector2.ZERO
+## Completed draft edges use the same vector renderer as saved wall paths.
+var _wall_draft: AtlasStroke
 var _wall_selected_index: int = -1
 var _wall_drag_vertex: int = -1
 var _wall_drag_origin: Vector2 = Vector2.ZERO
 var _wall_before: AtlasStroke
 var _wall_preview: AtlasStroke
+## The first vertex/press fixes both the Objects target and the effective edit
+## mask for the entire path draft or vertex drag. A later mask change cannot
+## silently authorize a different whole-path edit at finish/release.
+var _wall_scope_at_start: AtlasEditScope
+var _wall_map_at_start: AtlasMapDocument
+var _wall_floor_at_start: AtlasFloor
+var _wall_layer_at_start: AtlasObjectsLayer
 ## Detached candidate rendered during editing; history owns the actual commit.
 var _preview_layer: AtlasLayer
 ## Selection transform in board units, not a camera or raster-pixel transform.
@@ -178,6 +241,9 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 	if selected_floor == null:
 		return false
 	cancel_edit()
+	selected_token_id = ""
+	# Frames are not persistent or transferable to a different map/floor.
+	projector_frame_active = false
 	map = value
 	campaign = current_campaign
 	floor = selected_floor
@@ -194,15 +260,23 @@ func set_document(value: AtlasMapDocument, current_campaign: AtlasCampaign, floo
 
 func choose_tool(value: Tool) -> void:
 	cancel_edit()
+	if value != Tool.TOKEN:
+		selected_token_id = ""
 	tool = value
 	_overlay.queue_redraw()
 
 
 func is_editing() -> bool:
-	return not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
+	return _fog_drag_active or _token_drag_before != null or _frame_drag != FrameDrag.NONE \
+		or not _moving_link_id.is_empty() or _draft_stroke != null or _fill_pending \
+		or _manipulation != Manipulation.NONE or not _shape_kind.is_empty() \
+		or not _polygon_vertices.is_empty() or not _wall_vertices.is_empty() or _wall_drag_vertex >= 0
 
 
 func cancel_edit() -> void:
+	_fog_drag_active = false
+	_clear_token_drag_context()
+	cancel_projector_frame_drag()
 	_end_freehand()
 	if _fill_pending:
 		_fill_pending = false
@@ -211,11 +285,15 @@ func cancel_edit() -> void:
 	_panning = false
 	_manipulation = Manipulation.NONE
 	_shape_kind = ""
+	_clear_line_context()
+	_clear_polygon_context()
 	_polygon_vertices.clear()
 	_wall_vertices.clear()
+	_wall_draft = null
 	_wall_drag_vertex = -1
 	_wall_before = null
 	_wall_preview = null
+	_clear_wall_context()
 	_wall_selected_index = -1
 	_gesture_snap = false
 	_preview_layer = null
@@ -228,6 +306,17 @@ func cancel_edit() -> void:
 
 
 func commit_edit() -> void:
+	if _shape_kind == "LINE" and not _line_context_matches():
+		cancel_edit()
+		line_rejected.emit("Line target or edit mask changed since preview; nothing painted.")
+		return
+	if not _polygon_vertices.is_empty() and not _polygon_context_matches():
+		_reject_stale_polygon()
+		return
+	if not _wall_vertices.is_empty() or _wall_drag_vertex >= 0:
+		if not _wall_context_matches():
+			_reject_stale_wall()
+			return
 	if not _wall_vertices.is_empty():
 		_finish_wall_path(false)
 		return
@@ -237,6 +326,7 @@ func commit_edit() -> void:
 	if not _polygon_vertices.is_empty():
 		var shape: AtlasStroke = AtlasShapes.polygon(_polygon_vertices, brush_color, brush_width, polygon_solid_fill)
 		_polygon_vertices.clear()
+		_clear_polygon_context()
 		_draft_stroke = null
 		_preview_layer = null
 		_preview_dirty = false
@@ -270,6 +360,7 @@ func commit_edit() -> void:
 	_end_freehand()
 	_draft_stroke = null
 	_shape_kind = ""
+	_clear_line_context()
 	_preview_layer = null
 	_clear_raster_textures()
 	stroke_requested.emit(stroke, erasing)
@@ -403,14 +494,19 @@ func _sync_layer_renderers() -> void:
 				present_strokes[stroke] = true
 			state.append(layer.strokes.duplicate())
 			if layer.id == active_layer_id:
-				state.append_array([_wall_preview,
+				state.append_array([_wall_preview, _wall_draft,
 					_wall_vertices.duplicate(), _wall_pointer, tool])
+		elif layer is AtlasTokenLayer:
+			state.append((layer as AtlasTokenLayer).tokens.duplicate())
+			if layer.id == active_layer_id:
+				state.append(_token_drag_preview)
+				state.append(_token_drag_preview.position if _token_drag_preview != null else null)
 		elif layer is AtlasRasterLayer:
 			state.append_array([layer.transform, layer.pixels_per_unit, layer.chunks.duplicate()])
 		if _render_states.get(layer.id, []) != state:
 			_render_states[layer.id] = state
 			_layer_drawers[layer.id].queue_redraw()
-	for stroke: AtlasStroke in [_draft_stroke, _wall_preview]:
+	for stroke: AtlasStroke in [_draft_stroke, _wall_preview, _wall_draft]:
 		if stroke != null:
 			present_strokes[stroke] = true
 	for stroke: AtlasStroke in _ink_masks.keys():
@@ -441,11 +537,19 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 			var stroke: AtlasStroke = artwork[index]
 			_draw_stroke(_wall_preview if id == active_layer_id and _wall_preview != null and index == _wall_selected_index else stroke, item)
 		if id == active_layer_id and tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
-			var guide: PackedVector2Array = _wall_vertices.duplicate()
-			if guide[-1].distance_squared_to(_wall_pointer) > 0.0001:
-				guide.append(_wall_pointer)
-			if guide.size() > 1:
-				item.draw_polyline(guide, Color(0.96, 0.72, 0.32, 0.65), brush_width, true)
+			# Completed edges match the actual committed wall rendering, including
+			# round joins and RGBA. Only the uncommitted pointer leg is a guide.
+			if _wall_draft != null:
+				_draw_stroke(_wall_draft, item)
+			var last: Vector2 = _wall_vertices[-1]
+			if last.distance_squared_to(_wall_pointer) > 0.0001:
+				item.draw_line(last, _wall_pointer, Color("#f9cc65"), 1.5 / camera_zoom, true)
+	elif layer is AtlasTokenLayer:
+		for token: AtlasToken in (layer as AtlasTokenLayer).tokens:
+			var shown: AtlasToken = token
+			if id == active_layer_id and _token_drag_preview != null and token.id == _token_drag_preview.id:
+				shown = _token_drag_preview
+			_draw_token(item, shown)
 	elif layer is AtlasRasterLayer:
 		item.draw_set_transform_matrix(layer.transform)
 		var textures: Dictionary[String, ImageTexture] = _preview_textures if layer == _preview_layer else _raster_textures
@@ -460,6 +564,125 @@ func _draw_content_layer(item: Node2D, id: String) -> void:
 			item.draw_texture_rect(textures[asset], Rect2(origin, dimensions), false)
 
 
+func _draw_token(item: Node2D, token: AtlasToken) -> void:
+	item.draw_circle(token.position, token.radius, token.tint)
+	item.draw_arc(token.position, token.radius, 0, TAU, 48, Color(0.95, 0.97, 1.0), 1.5)
+	var font: Font = ThemeDB.fallback_font
+	var font_size: int = 12
+	var caption: String = token.label
+	var caption_width: float = font.get_string_size(caption, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	item.draw_string(font, token.position + Vector2(-caption_width * 0.5, token.radius + font_size + 4),
+		caption, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
+
+
+func delete_selected_token() -> bool:
+	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
+	if layer == null or not editing_target_is_presented() or not layer.is_editable():
+		return false
+	var selected: AtlasToken = layer.token_by_id(selected_token_id)
+	if selected == null or not edit_scope.contains_rect(Rect2(selected.position - Vector2.ONE * selected.radius,
+			Vector2.ONE * selected.radius * 2.0)):
+		return false
+	token_edit_requested.emit(selected.copy(), null)
+	selected_token_id = ""
+	queue_redraw()
+	return true
+
+
+func _clear_token_drag_context() -> void:
+	_token_drag_before = null
+	_token_drag_preview = null
+	_token_scope_at_press = null
+	_token_map_at_press = null
+	_token_floor_at_press = null
+	_token_layer_at_press = null
+	_token_snap_at_press = false
+
+
+func _token_drag_context_matches() -> bool:
+	if _token_scope_at_press == null or _token_drag_before == null or map == null or floor == null:
+		return false
+	if map != _token_map_at_press or floor != _token_floor_at_press \
+			or floor.layer_by_id(active_layer_id) != _token_layer_at_press \
+			or not _token_layer_at_press.is_editable() or not editing_target_is_presented():
+		return false
+	if edit_scope.enabled != _token_scope_at_press.enabled \
+			or edit_scope.polygon != _token_scope_at_press.polygon:
+		return false
+	var current: AtlasToken = _token_layer_at_press.token_by_id(_token_drag_before.id)
+	return current != null and current.to_dict() == _token_drag_before.to_dict()
+
+
+func _reject_stale_token_drag() -> void:
+	_clear_token_drag_context()
+	selected_token_id = ""
+	queue_redraw()
+	interaction_finished.emit()
+	token_rejected.emit("Token target, source or edit mask changed during drag; nothing moved.")
+
+
+func _begin_token_press(position: Vector2) -> void:
+	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
+	if layer == null or not editing_target_is_presented() or not layer.is_editable():
+		return
+	for index: int in range(layer.tokens.size() - 1, -1, -1):
+		var candidate: AtlasToken = layer.tokens[index]
+		if candidate.position.distance_to(position) <= candidate.radius + 5.0 / camera_zoom:
+			if not edit_scope.contains_rect(Rect2(candidate.position - Vector2.ONE * candidate.radius,
+					Vector2.ONE * candidate.radius * 2.0)):
+				return
+			selected_token_id = candidate.id
+			_token_drag_before = candidate.copy()
+			_token_drag_preview = candidate.copy()
+			_token_drag_start = position
+			_token_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+			_token_map_at_press = map
+			_token_floor_at_press = floor
+			_token_layer_at_press = layer
+			_token_snap_at_press = snap_to_grid
+			queue_redraw()
+			return
+	if layer.tokens.size() >= AtlasTokenLayer.MAX_TOKENS or token_label.strip_edges().is_empty():
+		return
+	var center: Vector2 = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
+	var created: AtlasToken = AtlasToken.new("token-" + Crypto.new().generate_random_bytes(16).hex_encode(),
+		center, token_label.strip_edges())
+	created.radius = token_radius
+	created.tint = brush_color
+	if created.is_valid() and edit_scope.contains_rect(Rect2(created.position - Vector2.ONE * created.radius,
+			Vector2.ONE * created.radius * 2.0)):
+		token_edit_requested.emit(null, created)
+		selected_token_id = created.id
+		queue_redraw()
+
+
+func _update_token_drag(position: Vector2) -> void:
+	if _token_drag_before == null:
+		return
+	if not _token_drag_context_matches():
+		_reject_stale_token_drag()
+		return
+	var target: Vector2 = _token_drag_before.position + position - _token_drag_start
+	_token_drag_preview.position = AtlasGridSnap.point(map.grid, target) if _token_snap_at_press else target
+	queue_redraw()
+
+
+func _finish_token_drag(position: Vector2) -> void:
+	if _token_drag_before == null:
+		return
+	_update_token_drag(position)
+	# Updating the preview may have rejected a changed mask or source token.
+	if _token_drag_before == null:
+		return
+	var before: AtlasToken = _token_drag_before
+	var after: AtlasToken = _token_drag_preview
+	_clear_token_drag_context()
+	if before.position != after.position:
+		token_edit_requested.emit(before, after)
+	queue_redraw()
+	interaction_finished.emit()
+
+
 func _draw_overlays(item: Node2D) -> void:
 	if map == null or floor == null:
 		return
@@ -471,6 +694,14 @@ func _draw_overlays(item: Node2D) -> void:
 	if has_selected_cell and map.grid.kind != AtlasGrid.Kind.GRIDLESS:
 		var outline: PackedVector2Array = map.grid.cell_polygon(selected_cell)
 		_stroke_polygon(outline, Color("#f9cc65"), 2.5 / camera_zoom, item)
+	if tool == Tool.FOG:
+		for region: AtlasFogRegion in floor.fog_regions:
+			item.draw_rect(region.bounds, Color(0.2, 0.9, 0.85, 0.16) if region.reveal else Color(1, 0.3, 0.3, 0.2))
+			item.draw_rect(region.bounds, Color("#63d9d1") if region.reveal else Color("#f07474"), false, 1.0 / camera_zoom)
+		if _fog_drag_active:
+			var candidate: Rect2 = Rect2(_fog_start, _fog_end - _fog_start).abs()
+			item.draw_rect(candidate, Color(0.2, 0.9, 0.85, 0.27) if _fog_reveal else Color(1, 0.3, 0.3, 0.27))
+			item.draw_rect(candidate, Color("#63d9d1") if _fog_reveal else Color("#f07474"), false, 2.0 / camera_zoom)
 	if not _moving_link_id.is_empty():
 		var link: AtlasMapLink = campaign.link_by_id(_moving_link_id)
 		if link != null:
@@ -496,6 +727,14 @@ func _draw_overlays(item: Node2D) -> void:
 				color = Color("#f48771")
 		item.draw_rect(bounds, color, false, 1.5 / camera_zoom)
 		item.draw_rect(Rect2(bounds.end - Vector2.ONE * 4.0 / camera_zoom, Vector2.ONE * 8.0 / camera_zoom), color)
+	var token_layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer
+	if tool == Tool.TOKEN and token_layer != null and token_layer.visible \
+			and token_layer.opacity > 0.0 and token_layer.detail_level == presented_detail_level:
+		var selected_token: AtlasToken = _token_drag_preview if _token_drag_preview != null \
+			else token_layer.token_by_id(selected_token_id)
+		if selected_token != null:
+			item.draw_arc(selected_token.position, selected_token.radius + 4.0 / camera_zoom,
+				0, TAU, 48, Color("#f9cc65"), 2.0 / camera_zoom)
 	if not _polygon_vertices.is_empty():
 		var guide: PackedVector2Array = _polygon_vertices.duplicate()
 		guide.append(_polygon_pointer)
@@ -513,7 +752,10 @@ func _draw_overlays(item: Node2D) -> void:
 		if not _wall_vertices.is_empty():
 			for vertex: Vector2 in _wall_vertices:
 				item.draw_circle(vertex, 3.5 / camera_zoom, Color("#f9cc65"))
-	_draw_brush_cursor(item)
+	if projector_frame_active:
+		_draw_projector_frame(item)
+	else:
+		_draw_brush_cursor(item)
 
 
 ## A pointer ring shows the active Brush or Eraser diameter at any zoom.
@@ -643,6 +885,92 @@ func _clear_ink_masks() -> void:
 			_render_states.erase(id)
 
 
+## Clear authorization captured for this unfinished Line on commit or cancel.
+func _clear_line_context() -> void:
+	_line_scope_at_press = null
+	_line_map_at_press = ""
+	_line_floor_at_press = ""
+	_line_layer_at_press = ""
+
+
+## Compare the current editable target and effective mask with the press-time
+## copy. An unlocked mask is always an empty polygon, regardless of cell focus.
+func _line_context_matches() -> bool:
+	return _line_scope_at_press != null and map != null and floor != null \
+		and map.id == _line_map_at_press and floor.id == _line_floor_at_press \
+		and active_layer_id == _line_layer_at_press \
+		and edit_scope.enabled == _line_scope_at_press.enabled \
+		and edit_scope.polygon == _line_scope_at_press.polygon
+
+
+## Do not allow a multi-click Polygon to silently change its target or
+## eligibility mask between the first vertex and closure.
+func _clear_polygon_context() -> void:
+	_polygon_scope_at_start = null
+	_polygon_map_at_start = null
+	_polygon_floor_at_start = null
+	_polygon_layer_at_start = null
+
+
+func _polygon_context_matches() -> bool:
+	return _polygon_scope_at_start != null and map != null and floor != null \
+		and map == _polygon_map_at_start and floor == _polygon_floor_at_start \
+		and floor.layer_by_id(active_layer_id) == _polygon_layer_at_start \
+		and _polygon_layer_at_start.is_editable() and editing_target_is_presented() \
+		and edit_scope.enabled == _polygon_scope_at_start.enabled \
+		and edit_scope.polygon == _polygon_scope_at_start.polygon
+
+
+func _reject_stale_polygon() -> void:
+	cancel_edit()
+	polygon_rejected.emit("Polygon target or edit mask changed since first vertex; nothing painted.")
+
+
+func _capture_wall_context(layer: AtlasObjectsLayer) -> void:
+	_wall_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+	_wall_map_at_start = map
+	_wall_floor_at_start = floor
+	_wall_layer_at_start = layer
+
+
+func _clear_wall_context() -> void:
+	_wall_scope_at_start = null
+	_wall_map_at_start = null
+	_wall_floor_at_start = null
+	_wall_layer_at_start = null
+
+
+func _wall_context_matches() -> bool:
+	return _wall_scope_at_start != null and map != null and floor != null \
+		and map == _wall_map_at_start and floor == _wall_floor_at_start \
+		and floor.layer_by_id(active_layer_id) == _wall_layer_at_start \
+		and _wall_layer_at_start.is_editable() and editing_target_is_presented() \
+		and edit_scope.enabled == _wall_scope_at_start.enabled \
+		and edit_scope.polygon == _wall_scope_at_start.polygon
+
+
+func _reject_stale_wall() -> void:
+	cancel_edit()
+	wall_rejected.emit("Wall path target or edit mask changed during editing; nothing changed.")
+
+
+## Shape and wall previews follow live style controls without pointer motion.
+## Freehand Brush/Eraser instead retain the style captured at gesture start.
+func _refresh_shape_style() -> void:
+	if tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
+		_refresh_wall_draft()
+		return
+	if tool == Tool.POLYGON and not _polygon_vertices.is_empty():
+		_update_polygon_preview(_brush_cursor_local)
+		return
+	if _shape_kind != "LINE" or _draft_stroke == null:
+		return
+	_draft_stroke.color = brush_color
+	_draft_stroke.width = brush_width
+	_preview_dirty = true
+	queue_redraw()
+
+
 func _append_stroke_point(local_position: Vector2, shift_pressed: bool = false, alt_pressed: bool = false) -> void:
 	if not Rect2(Vector2.ZERO, size).has_point(local_position):
 		_stroke_left_canvas = true
@@ -745,8 +1073,117 @@ func _stroke_polygon(polygon: PackedVector2Array, color: Color, width: float, it
 	item.draw_polyline(outline, color, width, true)
 
 
+## T-013 framing mode deliberately supersedes artwork hit-testing. The frame
+## is a local GM overlay; no player output is published by these operations.
+func set_projector_frame_active(active: bool) -> void:
+	if active == projector_frame_active:
+		return
+	cancel_edit()
+	projector_frame_active = active and map != null
+	if projector_frame_active:
+		var initial_width: float = clampf(size.x * 0.7 / maxf(camera_zoom, 0.0001),
+			AtlasProjectorFrame.MIN_WIDTH, AtlasProjectorFrame.MAX_WIDTH)
+		projector_frame.set_view(camera_center, initial_width)
+		projector_frame_changed.emit()
+	_overlay.queue_redraw()
+
+
+func configure_projector_output_size(dimensions: Vector2i) -> bool:
+	cancel_projector_frame_drag()
+	if not projector_frame.set_output_size(dimensions):
+		return false
+	_overlay.queue_redraw()
+	projector_frame_changed.emit()
+	return true
+
+
+func cancel_projector_frame_drag() -> void:
+	if _frame_drag == FrameDrag.NONE:
+		return
+	projector_frame.set_view(_frame_original_center, _frame_original_width)
+	_frame_drag = FrameDrag.NONE
+	_overlay.queue_redraw()
+
+
+func _draw_projector_frame(item: Node2D) -> void:
+	var bounds: Rect2 = projector_frame.bounds()
+	var line_width: float = 2.0 / camera_zoom
+	var color: Color = Color("#5ee1ff")
+	item.draw_rect(bounds, Color(0.1, 0.75, 0.95, 0.08), true)
+	item.draw_rect(bounds, Color(0.03, 0.08, 0.12, 0.8), false, 4.0 / camera_zoom)
+	item.draw_rect(bounds, color, false, line_width)
+	var handle_size: float = 10.0 / camera_zoom
+	item.draw_rect(Rect2(bounds.end - Vector2.ONE * handle_size * 0.5,
+		Vector2.ONE * handle_size), Color("#ffd276"))
+	item.draw_line(bounds.get_center() - Vector2(7.0, 0.0) / camera_zoom,
+		bounds.get_center() + Vector2(7.0, 0.0) / camera_zoom, color, line_width)
+	item.draw_line(bounds.get_center() - Vector2(0.0, 7.0) / camera_zoom,
+		bounds.get_center() + Vector2(0.0, 7.0) / camera_zoom, color, line_width)
+	var tag: String = "GM frame · %d:%d" % [projector_frame.output_size.x, projector_frame.output_size.y]
+	item.draw_string(ThemeDB.fallback_font, bounds.position + Vector2(8.0, -6.0) / camera_zoom,
+		tag, HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(10, int(12.0 / camera_zoom)), color)
+
+
+func _handle_projector_frame_input(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		var key: InputEventKey = event as InputEventKey
+		if key.pressed and key.keycode == KEY_ESCAPE and _frame_drag != FrameDrag.NONE:
+			cancel_projector_frame_drag()
+			accept_event()
+			return true
+		return false
+	if event is InputEventMouseButton:
+		var button: InputEventMouseButton = event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_LEFT:
+			if button.pressed:
+				grab_focus()
+				var position: Vector2 = local_to_document(button.position)
+				var bounds: Rect2 = projector_frame.bounds()
+				var handle_radius: float = 11.0 / camera_zoom
+				if position.distance_to(bounds.end) <= handle_radius:
+					_frame_drag = FrameDrag.RESIZE
+					_frame_resize_anchor = bounds.position
+				elif bounds.has_point(position):
+					_frame_drag = FrameDrag.MOVE
+				_frame_drag_start = position
+				_frame_original_center = projector_frame.center
+				_frame_original_width = projector_frame.width
+				if _frame_drag != FrameDrag.NONE:
+					interaction_started.emit()
+			else:
+				if _frame_drag != FrameDrag.NONE:
+					_update_projector_frame_drag(local_to_document(button.position))
+					_frame_drag = FrameDrag.NONE
+					projector_frame_changed.emit()
+					interaction_finished.emit()
+			accept_event()
+			return true
+		if button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
+			cancel_projector_frame_drag()
+			accept_event()
+			return true
+		# Middle drag and wheel retain their ordinary GM navigation behavior.
+		return false
+	if event is InputEventMouseMotion and _frame_drag != FrameDrag.NONE:
+		_update_projector_frame_drag(local_to_document(event.position))
+		accept_event()
+		return true
+	return false
+
+
+func _update_projector_frame_drag(position: Vector2) -> void:
+	if _frame_drag == FrameDrag.MOVE:
+		projector_frame.set_view(_frame_original_center + position - _frame_drag_start,
+			_frame_original_width)
+	elif _frame_drag == FrameDrag.RESIZE:
+		projector_frame.resize_from_top_left(_frame_resize_anchor, position)
+	_overlay.queue_redraw()
+
+
 func _gui_input(event: InputEvent) -> void:
 	if map == null:
+		return
+	if projector_frame_active and _handle_projector_frame_input(event):
 		return
 	if _handle_gesture(event):
 		return
@@ -836,8 +1273,16 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 	if _begin_link_press(mouse, position):
 		return
 	match tool:
+		Tool.FOG:
+			_fog_start = position
+			_fog_end = position
+			_fog_reveal = not mouse.shift_pressed
+			_fog_drag_active = true
+			_overlay.queue_redraw()
 		Tool.TEXT:
 			_begin_text_edit(position)
+		Tool.TOKEN:
+			_begin_token_press(position)
 		Tool.POLYGON:
 			_begin_polygon_vertex(mouse, position)
 		Tool.WALL_PATH:
@@ -864,6 +1309,11 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 			if layer != null and layer.is_editable():
 				_erasing = false
 				_shape_kind = Tool.keys()[tool]
+				if tool == Tool.LINE:
+					_line_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+					_line_map_at_press = map.id
+					_line_floor_at_press = floor.id
+					_line_layer_at_press = active_layer_id
 				_gesture_snap = snap_to_grid
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_brush_cursor_local = mouse.position
@@ -941,7 +1391,18 @@ func _begin_link_press(mouse: InputEventMouseButton, position: Vector2) -> bool:
 
 
 func _finish_left_release(mouse: InputEventMouseButton) -> void:
-	if _fill_pending:
+	if _fog_drag_active:
+		_fog_end = local_to_document(mouse.position)
+		var bounds: Rect2 = Rect2(_fog_start, _fog_end - _fog_start).abs()
+		var reveal: bool = _fog_reveal
+		_fog_drag_active = false
+		_overlay.queue_redraw()
+		if bounds.size.x > 0.001 and bounds.size.y > 0.001:
+			fog_edit_requested.emit(bounds, reveal)
+		interaction_finished.emit()
+	elif _token_drag_before != null:
+		_finish_token_drag(local_to_document(mouse.position))
+	elif _fill_pending:
 		_fill_pending = false
 		fill_requested.emit()
 		_preview_layer = null
@@ -950,7 +1411,9 @@ func _finish_left_release(mouse: InputEventMouseButton) -> void:
 		interaction_finished.emit()
 	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:
 		_update_wall_drag(local_to_document(mouse.position))
-		_finish_wall_drag()
+		# Updating the preview can reject a stale gesture and clear its context.
+		if _wall_drag_vertex >= 0:
+			_finish_wall_drag()
 	elif tool == Tool.WALL_PATH and not _wall_vertices.is_empty():
 		_update_wall_pointer(mouse.position)
 	elif tool == Tool.POLYGON and not _polygon_vertices.is_empty():
@@ -978,6 +1441,11 @@ func _handle_mouse_motion(motion: InputEventMouseMotion) -> void:
 	elif not _moving_link_id.is_empty():
 		_link_move_end = local_to_document(motion.position)
 		queue_redraw()
+	elif _fog_drag_active:
+		_fog_end = local_to_document(motion.position)
+		_overlay.queue_redraw()
+	elif _token_drag_before != null:
+		_update_token_drag(local_to_document(motion.position))
 	elif _manipulation != Manipulation.NONE:
 		_update_manipulation(local_to_document(motion.position))
 	elif tool == Tool.WALL_PATH and _wall_drag_vertex >= 0:
@@ -1037,6 +1505,9 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 	if layer == null or not layer.is_editable():
 		return
 	if not _wall_vertices.is_empty():
+		if not _wall_context_matches():
+			_reject_stale_wall()
+			return
 		var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
 		if mouse.double_click:
 			_finish_wall_path(false)
@@ -1046,6 +1517,7 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 			return
 		if _wall_vertices.size() < AtlasEditablePath.MAX_VERTICES and point.distance_squared_to(_wall_vertices[-1]) > 0.0001:
 			_wall_vertices.append(point)
+			_refresh_wall_draft()
 		_update_wall_pointer(mouse.position)
 		return
 	var radius: float = 8.0 / camera_zoom
@@ -1072,6 +1544,7 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 				path_edit_requested.emit(index, path.copy(), inserted)
 			_wall_before = null
 		elif vertex >= 0:
+			_capture_wall_context(layer)
 			_wall_drag_origin = position
 			_wall_drag_vertex = vertex
 			_wall_preview = path.copy()
@@ -1081,12 +1554,25 @@ func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
 		return
 	_wall_selected_index = -1
 	_wall_before = null
+	_capture_wall_context(layer)
 	_gesture_snap = snap_to_grid
 	_wall_vertices = PackedVector2Array([AtlasGridSnap.point(map.grid, position) if _gesture_snap else position])
+	_refresh_wall_draft()
 	_update_wall_pointer(mouse.position)
 
 
+func _refresh_wall_draft() -> void:
+	if not _wall_vertices.is_empty() and not _wall_context_matches():
+		_reject_stale_wall()
+		return
+	_wall_draft = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width) if _wall_vertices.size() >= 2 else null
+	queue_redraw()
+
+
 func _update_wall_pointer(local_position: Vector2) -> void:
+	if not _wall_vertices.is_empty() and not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	_wall_pointer = local_to_document(local_position)
 	if _gesture_snap:
 		_wall_pointer = AtlasGridSnap.point(map.grid, _wall_pointer)
@@ -1094,9 +1580,14 @@ func _update_wall_pointer(local_position: Vector2) -> void:
 
 
 func _finish_wall_path(closed: bool) -> void:
+	if not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	var path: AtlasStroke = AtlasEditablePath.make(_wall_vertices, brush_color, brush_width, closed)
 	_wall_vertices.clear()
+	_wall_draft = null
 	_wall_before = null
+	_clear_wall_context()
 	_gesture_snap = false
 	if path != null:
 		path_edit_requested.emit(-1, null, path)
@@ -1105,6 +1596,9 @@ func _finish_wall_path(closed: bool) -> void:
 
 
 func _update_wall_drag(position: Vector2) -> void:
+	if _wall_drag_vertex >= 0 and not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	if _wall_before == null:
 		return
 	# A simple click selects a vertex. It must not snap an existing off-grid
@@ -1119,12 +1613,16 @@ func _update_wall_drag(position: Vector2) -> void:
 
 
 func _finish_wall_drag() -> void:
+	if not _wall_context_matches():
+		_reject_stale_wall()
+		return
 	var index: int = _wall_selected_index
 	var before: AtlasStroke = _wall_before
 	var after: AtlasStroke = _wall_preview
 	_wall_drag_vertex = -1
 	_wall_before = null
 	_wall_preview = null
+	_clear_wall_context()
 	if before != null and after != null and before.to_dict() != after.to_dict():
 		path_edit_requested.emit(index, before, after)
 	queue_redraw()
@@ -1133,6 +1631,10 @@ func _finish_wall_drag() -> void:
 
 func _handle_wall_key(event: InputEventKey) -> void:
 	if not event.pressed or event.echo:
+		return
+	if event.keycode != KEY_ESCAPE and not _wall_context_matches():
+		_reject_stale_wall()
+		accept_event()
 		return
 	match event.keycode:
 		KEY_ENTER, KEY_KP_ENTER:
@@ -1143,6 +1645,7 @@ func _handle_wall_key(event: InputEventKey) -> void:
 			if _wall_vertices.is_empty():
 				cancel_edit()
 			else:
+				_refresh_wall_draft()
 				_update_wall_pointer(_brush_cursor_local)
 			accept_event()
 		KEY_ESCAPE:
@@ -1153,6 +1656,9 @@ func _handle_wall_key(event: InputEventKey) -> void:
 ## Each click fixes a vertex. Click near the first point, double-click, Enter,
 ## or right-click to close. Backspace removes the last vertex; Escape cancels.
 func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> void:
+	if not _polygon_vertices.is_empty() and not _polygon_context_matches():
+		_reject_stale_polygon()
+		return
 	if not editing_target_is_presented():
 		return
 	var layer: AtlasRasterLayer = floor.layer_by_id(active_layer_id) as AtlasRasterLayer
@@ -1161,6 +1667,10 @@ func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> v
 	if _polygon_vertices.is_empty():
 		_erasing = false
 		_gesture_snap = snap_to_grid
+		_polygon_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+		_polygon_map_at_start = map
+		_polygon_floor_at_start = floor
+		_polygon_layer_at_start = layer
 	var point: Vector2 = AtlasGridSnap.point(map.grid, position) if _gesture_snap else position
 	if mouse.double_click:
 		if _polygon_vertices.size() >= 3:
@@ -1178,6 +1688,9 @@ func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> v
 
 func _update_polygon_preview(local_position: Vector2) -> void:
 	if _polygon_vertices.is_empty():
+		return
+	if not _polygon_context_matches():
+		_reject_stale_polygon()
 		return
 	_polygon_pointer = local_to_document(local_position)
 	if _gesture_snap:

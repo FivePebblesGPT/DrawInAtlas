@@ -18,7 +18,9 @@ func _init(target_map: String, before: Array[AtlasFloor], after: Array[AtlasFloo
 		return
 	for old: AtlasFloor in before:
 		var retained: AtlasFloor = _find(after, old.id)
-		if retained != null and not AtlasLayerCodec.same_layers(old.layers, retained.layers):
+		if retained != null and (not AtlasLayerCodec.same_layers(old.layers, retained.layers)
+				or old.fog_enabled != retained.fog_enabled
+				or not AtlasFloor.same_fog(old.fog_regions, retained.fog_regions)):
 			_valid = false
 			return
 	_before = _clone(before)
@@ -67,7 +69,7 @@ func _valid_floors(floors: Array[AtlasFloor], default_id: String) -> bool:
 	for floor: AtlasFloor in floors:
 		if floor == null or not AtlasData.text(floor.id) or not AtlasData.text(floor.display_name):
 			return false
-		if ids.has(floor.id) or not AtlasLayerCodec.valid_collection(floor.layers):
+		if ids.has(floor.id) or not floor.valid_fog() or not AtlasLayerCodec.valid_collection(floor.layers):
 			return false
 		ids[floor.id] = true
 	return not floors.is_empty() and ids.has(default_id)
@@ -80,6 +82,8 @@ func _clone(floors: Array[AtlasFloor]) -> Array[AtlasFloor]:
 		copy.id = floor.id
 		copy.display_name = floor.display_name
 		copy.layers = AtlasLayerCodec.clone_all(floor.layers)
+		copy.fog_enabled = floor.fog_enabled
+		copy.fog_regions = AtlasFloor.clone_fog(floor.fog_regions)
 		result.append(copy)
 	return result
 
@@ -96,6 +100,8 @@ func _same(first: Array[AtlasFloor], second: Array[AtlasFloor]) -> bool:
 		return false
 	for index: int in range(first.size()):
 		if (first[index].id != second[index].id or first[index].display_name != second[index].display_name
-				or not AtlasLayerCodec.same_layers(first[index].layers, second[index].layers)):
+				or not AtlasLayerCodec.same_layers(first[index].layers, second[index].layers)
+				or first[index].fog_enabled != second[index].fog_enabled
+				or not AtlasFloor.same_fog(first[index].fog_regions, second[index].fog_regions)):
 			return false
 	return true

@@ -137,6 +137,66 @@ func _run() -> void:
 	_button(canvas, pointer, false, true)
 	_check(canvas.floor.raster_layer().chunks.is_empty(), "Escape cancels draft without history")
 
+	# Changing inspector style while the pointer is stationary must repaint
+	# the detached Line preview, not just the eventual release-to-commit stroke.
+	canvas.brush_width = 8.0
+	canvas.brush_color = Color(0.2, 0.7, 0.2, 0.5)
+	_button(canvas, anchor, true)
+	_motion(canvas, pointer, true, true)
+	await process_frame
+	var before_style: Dictionary = canvas._preview_layer.to_dict() if canvas._preview_layer != null else {}
+	var restyled_color: Color = Color(0.9, 0.25, 0.4, 0.8)
+	var restyled_width: float = 17.5
+	editor.inspector.brush_width_spinner.value = restyled_width
+	editor.inspector.brush_color_picker.color = restyled_color
+	# Programmatic picker assignment does not emit color_changed in Godot;
+	# the real picker gesture dispatches this inspector signal.
+	editor.inspector.brush_color_changed.emit(restyled_color)
+	_check(canvas.brush_width == restyled_width and canvas.brush_color == restyled_color,
+		"inspector forwards live Line color and width")
+	await process_frame
+	var restyled_endpoints: PackedVector2Array = AtlasShapes.line_endpoints(anchor, pointer, true, true)
+	var restyled_preview: AtlasFillResult = AtlasRasterBrush.paint(AtlasRasterLayer.paint_layer(),
+		restyled_endpoints, restyled_color, restyled_width, false)
+	_check(canvas._draft_stroke != null and canvas._draft_stroke.points == restyled_endpoints
+		and canvas._draft_stroke.width == restyled_width and canvas._draft_stroke.color == restyled_color,
+		"stationary draft adopts inspector style without requiring pointer motion")
+	_check(restyled_preview.ok and canvas._preview_layer != null
+		and canvas._preview_layer.to_dict() == restyled_preview.layer.to_dict()
+		and canvas._preview_layer.to_dict() != before_style,
+		"detached raster preview repaints with new color and width before release")
+	_button(canvas, pointer, false, true, true)
+	_check(restyled_preview.ok and canvas.floor.raster_layer().to_dict() == restyled_preview.layer.to_dict(),
+		"committed Line exactly matches its restyled stationary preview")
+	_check(editor.edits.undo(), "restyled line is undoable once")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "restyled line undo restores blank pixels")
+
+	# Raster-first Line creates pixels at the selected authored detail rather
+	# than writing an editable stroke object or modifying a different D-level.
+	_check(canvas.set_presented_detail_level(1), "present D1 for Line")
+	editor._choose_tool(AtlasCanvas.Tool.LINE)
+	var detail_layer: AtlasRasterLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasRasterLayer
+	_check(detail_layer != null and detail_layer.detail_level == 1 and detail_layer.pixels_per_unit == 4.0,
+		"Line routing creates a paint-density D1 raster target")
+	_button(canvas, anchor, true)
+	_motion(canvas, pointer)
+	await process_frame
+	var detail_expected: AtlasFillResult = AtlasRasterBrush.paint(detail_layer, PackedVector2Array([anchor, pointer]),
+		restyled_color, restyled_width, false)
+	_check(detail_expected.ok and canvas._preview_layer != null
+		and canvas._preview_layer.to_dict() == detail_expected.layer.to_dict(),
+		"D1 Line draft paints its isolated raster target")
+	_button(canvas, pointer, false)
+	_check(detail_expected.ok and canvas.floor.layer_by_id(detail_layer.id).to_dict() == detail_expected.layer.to_dict(),
+		"D1 release matches preview in the selected authored detail")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "D1 Line does not modify D0")
+	_check(editor.edits.undo(), "D1 Line is one undo command")
+	_check(canvas.floor.layer_by_id(detail_layer.id).to_dict() == detail_layer.to_dict(),
+		"D1 undo restores that layer's original pixels")
+	_check(canvas.set_presented_detail_level(0), "return to D0 Line")
+	editor._choose_tool(AtlasCanvas.Tool.LINE)
+	_check(canvas.active_layer_id == ink_id, "Line route selects the existing D0 raster")
+
 	var grid: AtlasGrid = canvas.map.grid.copy()
 	grid.rotation = deg_to_rad(32.0)
 	grid.origin = Vector2(9, -22)
@@ -174,11 +234,50 @@ func _run() -> void:
 	_motion(canvas, pointer)
 	_button(canvas, pointer, false)
 	_check(canvas.floor.raster_layer().chunks.is_empty(), "masked outside-area line cannot be committed")
+	# A mid-drag cell change must not reuse pixels previewed under the previous
+	# cell mask. Unlike a valid Line, rejection creates no undo entry.
+	var active_cell: Vector2i = canvas.map.grid.document_to_cell(canvas.camera_center)
+	var masked_center: Vector2 = canvas.map.grid.cell_to_document(active_cell)
+	var masked_start: Vector2 = masked_center - Vector2(4.0, 0.0)
+	var masked_finish: Vector2 = masked_center + Vector2(4.0, 0.0)
+	canvas.selected_cell = active_cell
+	canvas.has_selected_cell = true
+	editor.artwork.refresh_scope()
+	var pixels_before: Dictionary = canvas.floor.raster_layer().to_dict()
+	var undo_before: int = editor.edits._cursor
+	_button(canvas, masked_start, true)
+	_motion(canvas, masked_finish)
+	await process_frame
+	_check(canvas._preview_layer != null and canvas._preview_layer.to_dict() != pixels_before,
+		"masked Line preview draws eligible pixels before release")
+	editor._on_select(active_cell + Vector2i(3, 0))
+	_button(canvas, masked_finish, false)
+	_check(canvas.floor.raster_layer().to_dict() == pixels_before
+		and editor.edits._cursor == undo_before,
+		"changed selected cell rejects stale Line without pixels or history")
+	_check(not canvas.is_editing() and canvas._preview_layer == null
+		and "edit mask changed" in editor.status_label.text,
+		"rejected Line clears its preview and explains the mask conflict")
+
+	# An unchanged authorized mask still paints. A changed selected cell while
+	# masking is OFF must not invalidate a valid freehand Line.
+	editor._on_select(active_cell)
+	_button(canvas, masked_start, true)
+	_motion(canvas, masked_finish)
+	_button(canvas, masked_finish, false)
+	_check(canvas.floor.raster_layer().to_dict() != pixels_before
+		and editor.edits._cursor == undo_before + 1,
+		"fresh Line in restored cell commits exactly once")
+	_check(editor.edits.undo(), "masked Line can be undone")
+	_check(canvas.floor.raster_layer().to_dict() == pixels_before,
+		"masked Line undo restores source pixels")
 	editor._on_scope_toggled(false)
 	_button(canvas, anchor, true)
 	_motion(canvas, pointer)
+	editor._on_select(active_cell + Vector2i(5, 5))
 	_button(canvas, pointer, false)
-	_check(not canvas.floor.raster_layer().chunks.is_empty(), "unmasked valid line commits pixels")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(),
+		"cell selection with masking disabled does not block a Line")
 	var saved: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
 	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
