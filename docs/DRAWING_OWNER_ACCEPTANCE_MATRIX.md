@@ -21,6 +21,7 @@ python3 tools/drawing_owner_evidence.py init --os Linux --output /tmp/drawing-ow
 # Fill environment fields, each finding's observed outcome, and evidence.
 python3 tools/drawing_owner_evidence.py verify /tmp/drawing-owner-linux.json
 python3 tools/drawing_owner_evidence.py verify --require-complete \
+  --expected-commit "$(git rev-parse HEAD)" \
   /path/to/drawing-owner-linux.json /path/to/drawing-owner-windows.json
 ```
 
@@ -35,6 +36,11 @@ Use timing arrays in **milliseconds**, and label the measurement method in
 `observed`; Godot frame callbacks still are not physical input-to-photon proof.
 The strict switch requires 23 physical `PASS` rows on *each* OS. A failed or
 incomplete run is retained as a real `FAIL`/`NOT RUN`, never silently excluded.
+When aggregating observed Linux/Windows results, the tool rejects **different
+commit SHAs or Godot builds**, even if both JSON files individually validate.
+Pass `--expected-commit` with the full tested target SHA to prevent a complete
+report for an older, unintended revision. `NOT RUN` templates can coexist with
+partial observations without impersonating a tested build.
 
 The helper is a **format/integrity check**, not a cryptographic hardware or
 owner-identity attestation; its `physical_display` field is self-reported.

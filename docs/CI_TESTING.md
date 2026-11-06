@@ -40,7 +40,10 @@ Regression contracts: `tests/test_godot_ci_fail_late.py`.
 Owner-run native evidence is documented in the
 [23-finding matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md). The offline
 `tools/drawing_owner_evidence.py` creates per-OS **NOT RUN** manifests and
-verifies hashed artifacts and metadata. Its tests run in the existing T-073
+verifies hashed artifacts and metadata. Combined Linux/Windows reports must
+refer to **one exact source commit and Godot build**, with optional
+`--expected-commit $(git rev-parse HEAD)` pinning; mixed revisions cannot
+produce a complete acceptance record. Its tests run in the existing T-073
 fail-late CI step (`tests/test_t094_owner_evidence.py`), not an extra fast CI
 step. A structurally valid JSON manifest cannot approve the four owner-gated
 tickets, validate a physical pointer or substitute for remote CI success.

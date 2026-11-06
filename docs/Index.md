@@ -31,6 +31,15 @@ Remote patched CI, actual hardware/pointer evidence and explicit owner review
 remain unverified. [T-094](Tickets/T-094.md) ·
 [owner runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-094 cross-build evidence consistency (2026-11-06; In Progress):**
+Physical owner manifests now reject Linux/Windows results collected from
+different commits or Godot engine builds; `--expected-commit` pins the candidate
+under review. Local root Atlas editor reimport clears the stale SVG-loader
+errors seen in an otherwise 89/89-pass composition smoke, but post-shutdown
+Godot RID leaks and missing remote CI/hardware evidence remain reported. This
+does not grant physical or owner signoff.
+[T-094](Tickets/T-094.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples

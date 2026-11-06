@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from drawing_owner_evidence import blank_manifest, findings, validate  # noqa: E402
+from drawing_owner_evidence import blank_manifest, check_cohort, findings, validate  # noqa: E402
 
 
 class OwnerPhysicalEvidenceTests(unittest.TestCase):
@@ -115,6 +115,81 @@ class OwnerPhysicalEvidenceTests(unittest.TestCase):
                     candidate = copy.deepcopy(valid)
                     mutation(candidate["results"])
                     self.assertTrue(validate(candidate, root)[0])
+
+    def test_physical_cohort_must_represent_one_revision_and_godot_build(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            linux = self._observed_report(root)
+            windows = copy.deepcopy(linux)
+            windows["environment"]["os"] = "Windows"
+            manifests = {"Linux": linux, "Windows": windows}
+            self.assertEqual(check_cohort(manifests), [])
+            self.assertEqual(check_cohort(manifests, expected_commit="a" * 40), [])
+            self.assertTrue(check_cohort(manifests, expected_commit="b" * 40))
+            self.assertTrue(check_cohort(manifests, expected_commit="not-a-full-sha"))
+
+            windows["environment"]["commit"] = "b" * 40
+            self.assertTrue(any("Mixed Git commit" in item for item in check_cohort(manifests)))
+            windows["environment"]["commit"] = "a" * 40
+            windows["environment"]["godot_version"] = "4.8.beta2.official.other-build"
+            self.assertTrue(any("Mixed Godot build" in item for item in check_cohort(manifests)))
+
+    def test_partial_cohort_accepts_unrun_os_without_faking_comparability(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            linux = self._observed_report(root)
+            manifests = {"Linux": linux, "Windows": blank_manifest("Windows")}
+            self.assertEqual(check_cohort(manifests, expected_commit="a" * 40), [])
+            self.assertTrue(check_cohort(manifests, expected_commit="b" * 40))
+            self.assertEqual(check_cohort({"Windows": blank_manifest("Windows")}), [])
+
+    def test_complete_cli_rejects_mixed_commits_and_revisions_other_than_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cli = [sys.executable, "tools/drawing_owner_evidence.py", "verify"]
+            paths = []
+            for os_name in ("Linux", "Windows"):
+                os_dir = root / os_name
+                os_dir.mkdir()
+                report = self._observed_report(os_dir)
+                report["environment"]["os"] = os_name
+                # Synthetic data intentionally tests *schema* only, not the
+                # authenticity of actual hardware or owner approval.
+                reference = copy.deepcopy(report["results"][0])
+                for entry in report["results"]:
+                    entry.update({key: copy.deepcopy(value) for key, value in reference.items()
+                                  if key not in ("finding", "tickets")})
+                self.assertEqual(validate(report, os_dir), ([], 23, 0))
+                path = os_dir / "results.json"
+                path.write_text(json.dumps(report), encoding="utf-8")
+                paths.append(path)
+
+            command = cli + [str(p) for p in paths] + ["--require-complete"]
+            accepted = subprocess.run(command + ["--expected-commit", "a" * 40], cwd=ROOT,
+                                      capture_output=True, text=True)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertIn("owner approval is never inferred", accepted.stdout)
+
+            for expected in ("b" * 40, "short-sha"):
+                with self.subTest(expected=expected):
+                    denied = subprocess.run(command + ["--expected-commit", expected],
+                                            cwd=ROOT, capture_output=True, text=True)
+                    self.assertEqual(denied.returncode, 2)
+                    self.assertIn("cohort rejected", denied.stderr)
+
+            windows = json.loads(paths[1].read_text(encoding="utf-8"))
+            windows["environment"]["commit"] = "b" * 40
+            paths[1].write_text(json.dumps(windows), encoding="utf-8")
+            denied = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(denied.returncode, 2)
+            self.assertIn("Mixed Git commit", denied.stderr)
+            self.assertNotIn("PASS 23/23", denied.stdout, "Do not print a passing summary before cohort checks")
+            windows["environment"]["commit"] = "a" * 40
+            windows["environment"]["godot_version"] = "4.8.beta2.official.different"
+            paths[1].write_text(json.dumps(windows), encoding="utf-8")
+            denied = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(denied.returncode, 2)
+            self.assertIn("Mixed Godot build", denied.stderr)
 
     def test_init_never_overwrites_and_incomplete_two_os_is_not_pass(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

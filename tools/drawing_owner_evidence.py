@@ -192,6 +192,48 @@ def validate(manifest: Any, directory: Path) -> tuple[list[str], int, int]:
     return problems, passed, failed
 
 
+def check_cohort(
+    manifests: dict[str, dict[str, Any]], expected_commit: str | None = None,
+) -> list[str]:
+    """Reject mixed-code or mixed-engine physical results in a combined review.
+
+    Unrun templates are allowed in a partial review and have no test identity.
+    This validates recorded metadata only; it cannot attest a physical device.
+
+    Parameters
+    ----------
+    manifests : dict[str, dict[str, Any]]
+        OS-keyed evidence manifests already checked individually.
+    expected_commit : str | None
+        Exact candidate revision, when the reviewer supplies one.
+
+    Returns
+    -------
+    list[str]
+        Cross-report contradictions and target-commit mismatches.
+    """
+    problems: list[str] = []
+    if expected_commit is not None and not COMMIT.fullmatch(expected_commit):
+        return ["--expected-commit must be a full 40-character lowercase Git SHA"]
+
+    observed: dict[str, dict[str, Any]] = {}
+    for os_name, manifest in manifests.items():
+        rows = manifest["results"]
+        if any(row.get("status") in ("PASS", "FAIL") for row in rows):
+            observed[os_name] = manifest["environment"]
+
+    if expected_commit is not None:
+        for os_name, environment in observed.items():
+            if environment.get("commit") != expected_commit:
+                problems.append(f"{os_name}: tested commit differs from --expected-commit")
+
+    for key, label in (("commit", "Git commit"), ("godot_version", "Godot build")):
+        distinct = {str(info.get(key, "")) for info in observed.values()}
+        if len(distinct) > 1:
+            problems.append(f"Mixed {label} across physical OS reports; run both on one build")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="action", required=True)
@@ -202,6 +244,8 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("manifests", nargs="+", type=Path)
     verify.add_argument("--require-complete", action="store_true",
                         help="Fail unless 23 PASS results are evidenced on *both* physical OSes")
+    verify.add_argument("--expected-commit",
+                        help="Require all observed physical results to match this full Git SHA")
     args = parser.parse_args(argv)
     try:
         if args.action == "init":
@@ -212,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         seen: set[str] = set()
         counts: dict[str, tuple[int, int]] = {}
+        manifests: dict[str, dict[str, Any]] = {}
         for path in args.manifests:
             report = json.loads(path.read_text(encoding="utf-8"))
             problems, passed, failed = validate(report, path.resolve().parent)
@@ -220,10 +265,17 @@ def main(argv: list[str] | None = None) -> int:
                 problems.append(f"Duplicate {os_name} manifest")
             seen.add(os_name)
             counts[os_name] = (passed, failed)
+            manifests[os_name] = report
             for problem in problems:
                 print(f"{path}: {problem}", file=sys.stderr)
             if problems:
                 return 2
+        contradictions = check_cohort(manifests, expected_commit=args.expected_commit)
+        if contradictions:
+            for problem in contradictions:
+                print(f"Physical evidence cohort rejected: {problem}", file=sys.stderr)
+            return 2
+        for os_name, (passed, failed) in counts.items():
             print(f"{os_name}: PASS {passed}/23, FAIL {failed}/23, NOT RUN {23-passed-failed}/23")
         if args.require_complete and (set(counts) != {"Linux", "Windows"}
                                       or any(count != (23, 0) for count in counts.values())):
