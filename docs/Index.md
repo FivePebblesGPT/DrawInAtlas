@@ -137,6 +137,15 @@ nine-sample repeated small CPU tile workload measures 7.56→6.58ms median,
 **not** a full cold zoom or physical input-to-photon result. Large dense
 hardware acceptance remains open. [T-086](Tickets/T-086.md).
 
+**T-086 bounded sparse-layer culling (2026-11-06; In Progress):**
+Planned cold renders now skip raster layers with no overlapping resident or
+lazy source chunks after at most 16 signed membership probes. An active
+detached preview, text, wide/unknown regions and corrupt lazy data use the
+conservative resolver. New 74-check headless parity/epoch/cancellation tests
+pass; 24-layer sparse CPU medians improve 1.361→0.308 ms for a 16×16 source
+region. This does **not** close dense cold zoom or hardware latency acceptance.
+[T-086](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.

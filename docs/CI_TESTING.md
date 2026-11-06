@@ -56,6 +56,20 @@ revision/epoch change. This is not a physical-GPU performance witness and does
 not close T-086's large dense zoom/hardware gates. The required 46-check fast
 CI inventory is unchanged.
 
+## T-086 bounded sparse-layer compositor witness — 2026-11-06
+
+The existing `ci_t086_viewport_cache_model` step runs
+`drawing/tests/renderer_sparse_layer_smoke.gd` with the strict success-marker
+log checker. It verifies that only potentially occupied committed/lazy
+raster layers are resolved for a planned cold display tile, while active
+previews, source errors and invalid/oversized footprints conservatively keep
+the original path. Direct renderer callers are unchanged. The check runs
+**inside the existing 46-check inventory**, with a nine-pair *diagnostic*
+headless CPU timing printout but **no flaky timing assertion**. The native
+viewport suite remains separately runnable under Xvfb and requires a clean
+Godot editor import after standalone staging. This does not imply hardware
+input or cold zoom acceptance.
+
 ## T-094 strict-native and owner evidence checkpoint — 2026-11-06
 
 The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)

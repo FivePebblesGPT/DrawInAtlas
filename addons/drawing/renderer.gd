@@ -58,9 +58,18 @@ static func render(document: DrawingDocument, view: Rect2i,
 				if result.code == "GLYPH_FALLBACK" and not font_warnings.has(result.message):
 					font_warnings.append(result.message)
 			continue
+		# The cold canvas passes a revision-pinned frame plan. Before walking
+		# thousands of absent pixels across sparse, separate layers, ask whether
+		# any committed or pending source chunk overlaps this display tile. Keep
+		# the legacy direct-render path, bounded-large-footprint fallback, and
+		# detached preview layer conservative so no newly staged dab disappears.
+		var active_preview: DrawingEditSession = preview if preview != null and preview.layer_id == layer_id else null
+		if not visible_plan.is_empty() and active_preview == null \
+				and not document.raster_may_cover(layer_id, world_x, world_y,
+				view.size.x, view.size.y):
+			continue
 		# Resolve at most one source tile per scanline run, not once per pixel.
 		# The region is still bounded; source tiles stay immutable throughout render.
-		var active_preview: DrawingEditSession = preview if preview != null and preview.layer_id == layer_id else null
 		var raster: DrawingResult = _composite_raster(document, layer_id,
 			world_x, world_y, view.size, bytes, active_preview)
 		if not raster.ok:

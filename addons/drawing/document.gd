@@ -380,6 +380,37 @@ func tile_keys(layer_id: String) -> Array[String]:
 	return keys
 
 
+## Conservative constant-work source-footprint check for display-tile renders.
+## A missing resident/pending chunk cannot contribute a pixel. Large regions,
+## invalid layers and unknown shapes fall back to rendering (never false-cull).
+## This probes metadata only: lazy data and its integrity are still validated
+## by _resolve_chunk() when a stored source overlaps the requested rectangle.
+func raster_may_cover(layer_id: String, left: int, top: int,
+		width: int, height: int) -> bool:
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER \
+			or width <= 0 or height <= 0:
+		return true
+	var first_x: int = TILES.floor_div(left, tile_stride)
+	var first_y: int = TILES.floor_div(top, tile_stride)
+	var last_x: int = TILES.floor_div(left + width - 1, tile_stride)
+	var last_y: int = TILES.floor_div(top + height - 1, tile_stride)
+	const MAX_FOOTPRINT_CHECKS: int = 16
+	var horizontal: int = last_x - first_x + 1
+	var vertical: int = last_y - first_y + 1
+	if horizontal <= 0 or vertical <= 0 or horizontal > MAX_FOOTPRINT_CHECKS \
+			or vertical > MAX_FOOTPRINT_CHECKS \
+			or horizontal * vertical > MAX_FOOTPRINT_CHECKS:
+		return true
+	var resident: Dictionary = _nodes[layer_id].tiles
+	var prefix: String = layer_id + ":"
+	for cy: int in range(first_y, last_y + 1):
+		for cx: int in range(first_x, last_x + 1):
+			var key: String = "%d,%d" % [cx, cy]
+			if resident.has(key) or _pending_tiles.has(prefix + key):
+				return true
+	return false
+
+
 ## Read and compare originals before publication, then detach only touched tiles.
 func _publish_edit(layer_id: String, expected: int,
 		before: Dictionary[String, int], after: Dictionary[String, int],
