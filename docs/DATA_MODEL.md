@@ -1,6 +1,74 @@
-# Campaign Data Model and Storage Proposal
+# Campaign Data Model and Persistence
 
-**Status:** proposed versioned format, not current application serialization. The examples are illustrative and intentionally small. Final schema, migration strategy and language bindings should be tested during the first vertical slice.
+**Status:** current Resource-backed runtime model and native single-file **`.scn`** saves, locally verified on Godot 4.8-beta1. Embedded Resources are not standalone `.res` user files. The JSON examples farther below illustrate relationships and historical formats, not the physical storage layout.
+
+## Current native checkpoint contract (native v1)
+
+Keep native resource/scene serialization behind `AtlasCampaignStore`. Floor,
+overview and editing code operate on typed runtime objects and stable IDs;
+they must not infer identity from a resource filename or a node path. Multiple
+entrances still reference one independent destination map, including its
+explicit floor and arrival camera.
+
+Persist canonical campaign/map/floor/layer/link/placement content. Do not pack
+the running editor workspace into a save: its selected floor/layer, camera,
+Back history, gesture state and private preview renderers belong to the viewer.
+Preview images are derived data, never substitutes for the original artwork.
+The data-only save root owns map-document nodes whose embedded Resources supply
+the map registry. Map IDs, rather than child order, are canonical; floor/layer
+array order remains significant. The binary `.scn` embeds every map and lossless
+WebP chunk and uses whole-scene ResourceSaver compression. Native version **1**,
+domain validation, exact RGBA8 hashes and a deterministic semantic digest gate
+activation. No user artwork sidecars or JSON schema are written inside the file.
+
+`AtlasCampaignStore` stages and verifies candidates, retains the previous
+validated generation beside the campaign as `.bak.scn`, and replaces the head.
+`.pending.scn` and `.bak.pending.scn` are never automatic recovery candidates.
+Only a valid head may rotate into the backup. Failure leaves active work intact;
+backup recovery carries diagnostics and requires a new save to clear dirty state.
+
+All raster payloads reconstruct exact RGBA8 bytes including transparent RGB;
+the decoded Image is a runtime cache. Repeated loads isolate mutable nested
+Resources and Images. Shipped application scripts are permitted external
+dependencies; arbitrary external artwork/campaign dependencies are rejected.
+Old JSON saves remain untouched, with **no legacy user-save importer**.
+
+Whole-file save/load and eager hydration costs, codec selection AD-10 and
+measured fidelity/size/memory trade-offs are in [benchmarks](NATIVE_SAVE_BENCHMARKS.md).
+See [native saves](NATIVE_SAVE_IMPLEMENTATION.md) for transaction details and
+portability evidence. Browser smoke remains deferred; Windows/macOS replacement
+and physical-media power-loss durability are not claimed.
+
+Milestone 6 uses the existing link/placement fields and native format v1 without
+adding a schema. `AtlasLinkEdit` atomically changes one source-owned entrance,
+its footprint and an optional new independent document. Reference sources,
+frozen images, preview crops and traversed-entrance history are viewer state,
+not extra Resources in the campaign file. See [linked maps](LINKED_MAPS.md).
+
+### Historical JSON checkpoint / retained in-memory dictionary schema (v6)
+
+Before native saves, the store wrote a checksummed JSON head, `.bak` and immutable
+`.assets/<pixel-sha256>.webp` chunks. That user-file path has been retired, not
+converted. The following v1–v6 rules still describe the compatibility dictionaries
+used by validation, cloning and tests; they are not the native container schema.
+
+Each floor owns an ordered `layers` array (back to front): `TILES` has sparse terrain plus its own geometry, `INK` has vector strokes, and `RASTER` has bounded RGBA8 chunks and pixels-per-board-unit calibration. Layer IDs are stable within a floor; all kinds share name, visibility, lock and opacity fields. Raster metadata contains chunk coordinates, dimensions and hashes, never inline lossy pixel payloads or arbitrary file paths.
+
+Versions 1–3 migrate their single terrain/ink payloads into typed layers; v4 raster layers default to identity placement. V5 records each raster layer's affine `transform` as six finite numbers (basis X, basis Y, origin) and rejects singular transforms. Moving/scaling/rotating an asset does not rewrite chunk pixels or their hashes. The frozen terrain basis is preserved. Old floor `terrain`/`strokes` properties are compatibility views, not duplicate serialized authorities. Full-precision JSON/checksums preserve numeric settings; raster hashes include normalized RGBA8 bytes and dimensions.
+
+V6 adds map `tags` and a link's `source_floor_id`; `target_floor_id` remains
+explicit. Missing legacy floor fields resolve to each endpoint map's saved
+default. Floor order and `default_floor_id` are persistent metadata, while the
+currently viewed floor/camera/layer are workspace state. Renaming/reordering or
+choosing a default never rebases artwork, tile geometry or native measurement
+units. Missing target map/floor/placement references remain representable for
+overview placeholders and source Focus actions.
+
+Clipboard payloads use a separate `drawinatlas.clipboard` v1 envelope, not campaign IDs or file paths. Ink coordinates are relative to the copied bounds; raster chunks carry self-contained verified lossless WebP bytes; tile cells carry explicit grid metadata and relative coordinates. Paste assigns fresh raster layer IDs and does not harmonize native units. Viewer selections, gesture previews and edit scopes remain transient and are never saved as artwork.
+
+Neither the historical checkpoint nor the native replacement implements a full
+journal or autosave. Native recovery retains one complete previous generation;
+artwork is embedded rather than stored as immutable sidecars.
 
 ## 1. Identity and relationships
 
@@ -28,7 +96,11 @@ MapLayer
 
 A `MapDocument` may have zero or more incoming links. Do not embed documents recursively inside parents: that would duplicate shared maps and break links with multiple entrances. Treat the campaign as a graph. Floors/layers are **within** a map document, not graph edges.
 
-## 2. Proposed on-disk layout
+## 2. Historical illustrative JSON package
+
+This earlier proposal is superseded by the single binary `.scn` contract above.
+Its following examples describe graph relationships rather than prescribe
+the format of new saves.
 
 ```text
 campaign/
@@ -43,7 +115,7 @@ campaign/
       tile_chunks/
         <floor-id>/<layer-id>/<chunk-coordinate>.bin
       raster_chunks/
-        <floor-id>/<layer-id>/<chunk-coordinate>.png
+        <floor-id>/<layer-id>/<chunk-coordinate>.webp
       objects/
         <floor-id>/<layer-id>.json
       previews/
@@ -55,7 +127,9 @@ campaign/
     operations.log
 ```
 
-Metadata JSON should be human-inspectable; large painting payloads should be chunked. The illustration does not lock down chunk serialization or whether a final project is a directory, ZIP-like package or application bundle.
+The earlier layout used JSON metadata and **lossless .webp** raster chunks,
+with optional lossy derived thumbnails. Native scene packaging now embeds
+metadata Resources and lossless WebP bytes without turning thumbnails into artwork.
 
 ## 3. Manifest example
 
@@ -216,7 +290,7 @@ Store deliberate persistent document metadata separately: actual layers, floors,
 ## 10. Unresolved schema details
 
 - Best chunk size (initial trial: 256 or 512 pixels/cells depending on layer type).
-- Format for sparse tiles, vector geometry and large clipboard payloads.
+- Format for sparse tiles, vector geometry and large clipboard payloads (raster chunks are WebP).
 - Whether battlemap reference is live by default or a frozen snapshot.
 - Which authorization metadata belongs to campaign files versus hosted-session policy.
 - How to package/share assets without violating their licenses.

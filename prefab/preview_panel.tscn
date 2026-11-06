@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://bfk20kjo82lu4"]
+
+[ext_resource type="Script" uid="uid://blsj5tmdxeahh" path="res://scripts/interface/preview_panel.gd" id="1"]
+
+[node name="PreviewPanel" type="VBoxContainer" unique_id=257512644]
+script = ExtResource("1")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=816032173]
+custom_minimum_size = Vector2(0, 128)
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Caption" type="Label" parent="." unique_id=909618408]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Select a map to preview"
+autowrap_mode = 3
+text_overrun_behavior = 3
+max_lines_visible = 2
