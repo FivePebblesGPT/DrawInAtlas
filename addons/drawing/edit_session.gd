@@ -77,6 +77,61 @@ func preview_stamp_for_area(area: Rect2i) -> int:
 	return stamp
 
 
+## Snapshot the changed storage-tile generations into the *visible* display
+## tile grid once per draw. Without this, a zoomed-out view asks every display
+## tile to scan every changed storage key (especially with small strides).
+## The index includes superseded/cleared preview versions: those still need to
+## invalidate a texture which previously held a draft. A capped fallback keeps
+## pathologically large strides or change sets from allocating unbounded maps.
+func preview_stamps_for_display_tiles(visible_tiles: Rect2i, display_stride: int,
+		max_entries: int = 40000) -> Dictionary:
+	var index: Dictionary[String, int] = {}
+	if _closed or document.revision != expected_revision or _preview_tile_versions.is_empty():
+		return {"indexed": true, "stamps": index}
+	if display_stride <= 0 or max_entries <= 0 or not visible_tiles.has_area():
+		return {"indexed": false, "stamps": index}
+	var stride: int = document.tile_stride
+	# Coordinates may be signed 64-bit anchors. Do not overflow while deriving
+	# the world-space footprint: the original per-area lookup remains exact.
+	var safe_tile_limit: int = 1152921504606846976 / maxi(stride, 1)
+	var attempted_entries: int = 0
+	for key: String in _preview_tile_versions:
+		var parts: PackedStringArray = key.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+			return {"indexed": false, "stamps": {}}
+		var storage_x: int = int(parts[0])
+		var storage_y: int = int(parts[1])
+		if storage_x < -safe_tile_limit or storage_x > safe_tile_limit \
+				or storage_y < -safe_tile_limit or storage_y > safe_tile_limit:
+			return {"indexed": false, "stamps": {}}
+		var world_x: int = storage_x * stride
+		var world_y: int = storage_y * stride
+		var first_x: int = maxi(visible_tiles.position.x,
+			DrawingDocument.TILES.floor_div(world_x, display_stride))
+		var first_y: int = maxi(visible_tiles.position.y,
+			DrawingDocument.TILES.floor_div(world_y, display_stride))
+		var last_x: int = mini(visible_tiles.end.x - 1,
+			DrawingDocument.TILES.floor_div(world_x + stride - 1, display_stride))
+		var last_y: int = mini(visible_tiles.end.y - 1,
+			DrawingDocument.TILES.floor_div(world_y + stride - 1, display_stride))
+		if last_x < first_x or last_y < first_y:
+			continue
+		# Bound attempted insertions as well as distinct keys; many overlapping
+		# storage footprints must not turn an otherwise small index into a loop.
+		var span_x: int = last_x - first_x + 1
+		var span_y: int = last_y - first_y + 1
+		if span_x > max_entries or span_y > max_entries / span_x \
+				or attempted_entries + span_x * span_y > max_entries:
+			return {"indexed": false, "stamps": {}}
+		attempted_entries += span_x * span_y
+		var version: int = _preview_tile_versions[key]
+		for y: int in range(first_y, last_y + 1):
+			for x: int in range(first_x, last_x + 1):
+				var display_key: String = "%d,%d" % [x, y]
+				index[display_key] = maxi(int(index.get(display_key, 0)), version)
+	return {"indexed": true, "stamps": index}
+
+
 func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) -> void:
 	_preview_epoch += 1
 	_preview_tile_versions[tile_key] = _preview_epoch

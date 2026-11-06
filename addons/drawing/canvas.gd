@@ -357,6 +357,7 @@ func _draw() -> void:
 	var metrics: Dictionary[String, Variant] = {"zoom": zoom, "tiles_visible": 0,
 		"cache_hits": 0, "tiles_composited": 0, "source_pixels_rendered": 0,
 		"visible_layer_plan_builds": 0,
+		"preview_index_built": 0, "preview_index_keys": 0, "preview_index_fallback": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0, "empty_skipped": 0,
@@ -380,13 +381,29 @@ func _draw() -> void:
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
 	var preview_session: DrawingEditSession = session if session != null else _move_preview
+	var preview_index: Dictionary = {}
+	var indexed_stamps: Dictionary = {}
+	var use_preview_index: bool = false
+	if preview_session != null:
+		preview_index = preview_session.preview_stamps_for_display_tiles(visible_tiles,
+			DISPLAY_TILE_SIZE)
+		use_preview_index = bool(preview_index["indexed"])
+		if use_preview_index:
+			indexed_stamps = preview_index["stamps"] as Dictionary
+			metrics["preview_index_built"] = 1
+			metrics["preview_index_keys"] = indexed_stamps.size()
+		else:
+			metrics["preview_index_fallback"] = 1
 	for y: int in range(start_y, end_y + 1):
 		for x: int in range(start_x, end_x + 1):
 			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1
 			var key: String = "%d,%d" % [x, y]
 			var area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE, y * DISPLAY_TILE_SIZE,
 				DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
-			var preview_stamp: int = preview_session.preview_stamp_for_area(area) if preview_session != null else 0
+			var preview_stamp: int = 0
+			if preview_session != null:
+				preview_stamp = int(indexed_stamps.get(key, 0)) if use_preview_index \
+					else preview_session.preview_stamp_for_area(area)
 			if not _occupancy_unknown and not _occupied_display_tiles.has(key) and preview_stamp == 0:
 				metrics["empty_skipped"] = int(metrics["empty_skipped"]) + 1
 				continue

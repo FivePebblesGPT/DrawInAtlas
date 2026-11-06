@@ -91,6 +91,8 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t086-visible-plan.log --marker T086_PLAN_PASSED || ci_fail_marker 'T086 visible-layer plan parity witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_layer_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-layers.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-sparse-layers.log --marker T086_SPARSE_PASSED || ci_fail_marker 'T086 sparse-layer source culling parity witness error'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_preview_index_smoke.gd 2>&1 | tee /tmp/godot-t086-preview-index.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-preview-index.log --marker T086_PREVIEW_INDEX_PASSED || ci_fail_marker 'T086 bounded preview index parity witness error'
           python3 -m unittest discover -s tests -p 'test_t086_benchmark_fixtures.py' -v || ci_fail_marker 'T086 historical fixture integrity contract failure'
           ci_finish
       - name: Verify T-087 standalone image frame, portable metadata and independent grid

@@ -182,6 +182,11 @@ func run() -> void:
 	check(int(held["tiles_composited"]) > 0 and int(held["tiles_composited"]) <= 4
 		and int(held["textures_created"]) == 0,
 		"preview reuses nearby tiles, not a full viewport rebuild: %s" % held)
+	check(int(held.get("preview_index_built", 0)) == 1
+		and int(held.get("preview_index_keys", 0)) > 0
+		and int(held.get("preview_index_keys", 0)) <= 4
+		and int(held.get("preview_index_fallback", 0)) == 0,
+		"held-button frame indexes just affected display tiles: %s" % held)
 	var covered_by_top: Color = sample(canvas, Vector2(30.5, 30.5))
 	check(covered_by_top.b > 0.75 and covered_by_top.r < 0.4,
 		"low-layer preview stays occluded by top raster content")
@@ -194,8 +199,38 @@ func run() -> void:
 	await frames(4)
 	check(doc.revision == before_preview and int(canvas.last_frame_metrics["tiles_composited"]) <= 4,
 		"cancel removes preview and reuses unaffected tiles without revision")
+	check(int(canvas.last_frame_metrics.get("preview_index_built", -1)) == 0,
+		"cancel discards detached preview index from subsequent redraw")
 	check(sample(canvas, Vector2(40.5, 40.5)).r < 0.5,
 		"no ghost brush pixel survives cancel")
+
+	# The live index must also reach newly exposed negative tiles at 25%,
+	# not just the already-cached 100% view used by the earlier dab.
+	canvas.zoom = 0.25
+	canvas.queue_redraw()
+	await frames(3)
+	var prior_quarter: int = doc.revision
+	mouse_button(canvas, Vector2(-120.5, -120.5), true)
+	await frames(4)
+	var quarter_held: Dictionary = canvas.last_frame_metrics.duplicate()
+	check(canvas.session != null and doc.revision == prior_quarter,
+		"25% held stroke remains a detached uncommitted preview")
+	check(int(quarter_held.get("preview_index_built", 0)) == 1
+		and int(quarter_held.get("preview_index_keys", 0)) > 0
+		and int(quarter_held.get("preview_index_fallback", 0)) == 0,
+		"25% signed preview builds bounded display stamp index: %s" % quarter_held)
+	check(sample(canvas, Vector2(-120.5, -120.5)).r > 0.7,
+		"25% negative signed source tile previews in native framebuffer")
+	canvas.cancel_gesture()
+	canvas.pointer_known = false # Cursor outline is UI-only; inspect the actual pixel.
+	canvas.queue_redraw()
+	await frames(3)
+	var canceled_quarter: Color = sample(canvas, Vector2(-120.5, -120.5))
+	check(doc.revision == prior_quarter and canceled_quarter.r < 0.5,
+		"25% canceled preview leaves no ghost pixels or history: %s" % canceled_quarter)
+	canvas.zoom = 1.0
+	canvas.queue_redraw()
+	await frames(3)
 
 	var with_top: Color = sample(canvas, Vector2(25.5, 25.5))
 	check(doc.set_visibility(top, false).ok, "hide top layer")

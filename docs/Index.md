@@ -146,6 +146,18 @@ pass; 24-layer sparse CPU medians improve 1.361→0.308 ms for a 16×16 source
 region. This does **not** close dense cold zoom or hardware latency acceptance.
 [T-086](Tickets/T-086.md).
 
+**T-086 frame-local preview-stamp index (2026-11-06; In Progress):**
+During a held gesture, one bounded viewport-clipped index now maps changed
+storage-tile generations to 128px display tiles, avoiding a repeated scan of
+the full changed-key set for each zoomed-out tile. The implementation keeps
+an exact fallback when its 40,000-entry cap is exceeded and retains cleared
+patch generations for ghost-free previews. New headless parity/fallback tests
+pass 2,146/2,146; the native framebuffer test passes 75/75. A synthetic
+768-display/240-changed-tile lookup-stage median improved 55.725→0.873ms;
+this is **not** complete frame, hardware or cold-zoom evidence. T-086 stays
+In Progress; physical acceptance remains open.
+[T-086](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.

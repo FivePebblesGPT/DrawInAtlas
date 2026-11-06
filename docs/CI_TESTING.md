@@ -6,6 +6,27 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-086 detached preview index parity — 2026-11-06
+
+After staging **and importing** the standalone Drawing package, run:
+
+```sh
+godot --headless --path drawing --script res://tests/viewport_preview_index_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd
+```
+
+The 2,146-check model compares frame-local preview generations with the
+legacy per-display-area lookup across signed seams, different storage strides,
+cancellation, 64-bit overflow fallback and the capped index. The native
+75-check witness verifies actual Xvfb/Mesa held-button pixels and that
+cancellation removes the preview. New per-frame metrics distinguish one
+index build/number of keys from a bounded fallback. Five diagnostic paired
+lookup timings are printed; do not set CI timing thresholds or construe this
+as full viewport or physical input-to-photon latency. The existing
+`ci_t086_viewport_cache_model` step runs this after sparse-layer parity;
+required 46 CI check IDs are unchanged. T-086 remains In Progress.
+
 ## T-086 cold compositor regression and opt-in measurement — 2026-11-06
 
 The existing `ci_t086_viewport_cache_model` fail-late step also runs
