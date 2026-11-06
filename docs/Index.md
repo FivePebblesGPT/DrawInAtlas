@@ -10,6 +10,8 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
+**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085/T-086 remain Ready for GDScript-first fixes; T-068 native research remains conditional.
+
 ## Kanban summary
 
 **T-068 standalone portable-release isolation gate (2026-11-04; In Progress):**
@@ -973,7 +975,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-082 · Cross-container panel and group docking](Tickets/T-082.md) | Done | — | [T-081](Tickets/T-081.md) |
 | [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | In Progress | **Owner** | [T-082](Tickets/T-082.md) |
 
-| [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Ready | — | [T-052](Tickets/T-052.md) |
+| [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Ready | — | [T-053](Tickets/T-053.md) |
