@@ -39,10 +39,13 @@ func set_library(assets: AtlasObjectLibrary) -> void:
 			library.asset_published.disconnect(_on_asset_change)
 		if library.instances_changed.is_connected(_on_instance_change):
 			library.instances_changed.disconnect(_on_instance_change)
+		if library.child_graph_changed.is_connected(_on_child_graph_change):
+			library.child_graph_changed.disconnect(_on_child_graph_change)
 	library = assets
 	if library != null:
 		library.asset_published.connect(_on_asset_change)
 		library.instances_changed.connect(_on_instance_change)
+		library.child_graph_changed.connect(_on_child_graph_change)
 	invalidate()
 
 
@@ -51,6 +54,10 @@ func _on_asset_change(_asset_id: String, _revision: int) -> void:
 
 
 func _on_instance_change(_instance_ids: Array) -> void:
+	invalidate()
+
+
+func _on_child_graph_change(_source_id: String, _dependent_ids: Array[String]) -> void:
 	invalidate()
 
 
@@ -302,7 +309,7 @@ func _cache_key(map_id: String, floor_id: String, level: int,
 
 
 func _asset_bounds(asset_id: String) -> Rect2i:
-	var result: DrawingResult = library.authored_bounds(asset_id)
+	var result: DrawingResult = library.composed_bounds(asset_id)
 	return result.value if result.ok else Rect2i()
 
 

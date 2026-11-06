@@ -5,7 +5,7 @@
 [node name="LinkDialog" type="ConfirmationDialog"]
 title = "Linked maps — source floor"
 initial_position = 2
-size = Vector2i(520, 680)
+size = Vector2i(520, 520)
 min_size = Vector2i(360, 320)
 visible = false
 dialog_hide_on_ok = false
@@ -54,7 +54,7 @@ text = "Enter"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Unlink"
-tooltip_text = "Remove this entrance and its unshared footprint, keeping the destination document."
+tooltip_text = "Remove this entrance; keep the independent destination document."
 
 [node name="TargetLabel" type="Label" parent="Scroll/Form"]
 layout_mode = 2
@@ -62,7 +62,7 @@ text = "Destination document and floor"
 
 [node name="NewLinkHelp" type="Label" parent="Scroll/Form"]
 layout_mode = 2
-text = "New links use markers to existing maps. To create another independent board, use File → New Board. Existing saved footprints remain editable."
+text = "Links are markers to existing independent maps. To create another board, use File → New Board. Legacy footprints are retired."
 custom_minimum_size = Vector2(1, 0)
 autowrap_mode = 3
 
@@ -78,22 +78,9 @@ layout_mode = 2
 fit_to_longest_item = false
 clip_text = true
 
-[node name="ModePicker" type="OptionButton" parent="Scroll/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-fit_to_longest_item = false
-selected = 0
-item_count = 3
-popup/item_0/text = "Spatial footprint (legacy edit only)"
-popup/item_0/id = 0
-popup/item_1/text = "Symbolic footprint (legacy edit only)"
-popup/item_1/id = 1
-popup/item_2/text = "Marker / portal"
-popup/item_2/id = 2
-
 [node name="PositionLabel" type="Label" parent="Scroll/Form"]
 layout_mode = 2
-text = "Source anchor / legacy footprint origin (board units)"
+text = "Source marker position (board units)"
 
 [node name="PositionRow" type="HBoxContainer" parent="Scroll/Form"]
 layout_mode = 2
@@ -116,71 +103,6 @@ max_value = 10000000.0
 step = 0.01
 format = "Y %s"
 
-[node name="FootprintFields" type="GridContainer" parent="Scroll/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-columns = 2
-
-[node name="AngleLabel" type="Label" parent="Scroll/Form/FootprintFields"]
-layout_mode = 2
-text = "Rotation (degrees)"
-
-[node name="Angle" type="SpinBox" parent="Scroll/Form/FootprintFields"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-min_value = -180.0
-max_value = 180.0
-step = 0.01
-
-[node name="ColumnsLabel" type="Label" parent="Scroll/Form/FootprintFields"]
-layout_mode = 2
-text = "Columns"
-
-[node name="Columns" type="SpinBox" parent="Scroll/Form/FootprintFields"]
-unique_name_in_owner = true
-layout_mode = 2
-min_value = 1.0
-max_value = 10000.0
-value = 10.0
-
-[node name="RowsLabel" type="Label" parent="Scroll/Form/FootprintFields"]
-layout_mode = 2
-text = "Rows"
-
-[node name="Rows" type="SpinBox" parent="Scroll/Form/FootprintFields"]
-unique_name_in_owner = true
-layout_mode = 2
-min_value = 1.0
-max_value = 10000.0
-value = 10.0
-
-[node name="ParentPitchLabel" type="Label" parent="Scroll/Form/FootprintFields"]
-layout_mode = 2
-text = "Parent units / cell"
-
-[node name="ParentPitch" type="SpinBox" parent="Scroll/Form/FootprintFields"]
-unique_name_in_owner = true
-layout_mode = 2
-min_value = 0.001
-max_value = 100000.0
-step = 0.001
-value = 24.0
-tooltip_text = "Source board-coordinate units per footprint cell; native mi/ft/etc. labels are never converted."
-
-[node name="ChildPitchLabel" type="Label" parent="Scroll/Form/FootprintFields"]
-layout_mode = 2
-text = "Child units / cell"
-
-[node name="ChildPitch" type="SpinBox" parent="Scroll/Form/FootprintFields"]
-unique_name_in_owner = true
-layout_mode = 2
-min_value = 0.001
-max_value = 100000.0
-step = 0.001
-value = 64.0
-tooltip_text = "Placement calibration only; changing an existing destination never moves its artwork or grid."
-
 [node name="MarkerFields" type="HBoxContainer" parent="Scroll/Form"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -200,12 +122,6 @@ value = 48.0
 [node name="ArrivalLabel" type="Label" parent="Scroll/Form"]
 layout_mode = 2
 text = "Arrival camera in destination board units"
-
-[node name="CenterArrival" type="CheckBox" parent="Scroll/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-button_pressed = true
-text = "Center arrival on footprint"
 
 [node name="ArrivalRow" type="HBoxContainer" parent="Scroll/Form"]
 layout_mode = 2

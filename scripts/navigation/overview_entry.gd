@@ -22,6 +22,5 @@ var target_floor_instance_id: int = 0
 var source_map_instance_id: int = 0
 var source_floor_instance_id: int = 0
 var link_snapshot: Dictionary = {}
-var placement_snapshot: Dictionary = {}
 var source_label_snapshot: String = ""
 var path_snapshots: Array[Dictionary] = []

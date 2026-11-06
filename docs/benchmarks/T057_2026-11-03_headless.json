@@ -1,0 +1,160 @@
+{
+  "camera_vector2_distinguishes_2pow24_plus_one": false,
+  "cases": [
+    {
+      "baseline_uncached_cpu": {
+        "median_ms": 34.258,
+        "p95_ms": 42.277,
+        "worst_ms": 42.277
+      },
+      "bilinear_2x_fidelity": {
+        "alpha_mean_absolute_error": 28.242,
+        "channel_mean_absolute_error": 25.72,
+        "different_channels": 29942,
+        "total_channels": 65536
+      },
+      "cache_hits": 80,
+      "cache_misses": 8,
+      "candidate_exact_cache_cpu": {
+        "median_ms": 0.105,
+        "p95_ms": 30.864,
+        "worst_ms": 30.864
+      },
+      "display_tile": 64,
+      "estimated_cache_bytes": 196608,
+      "frames": 16,
+      "max_cache_entries": 12,
+      "nearest_2x_fidelity": {
+        "alpha_mean_absolute_error": 24.42,
+        "channel_mean_absolute_error": 28.015,
+        "different_channels": 18858,
+        "total_channels": 65536
+      },
+      "screen_view": [
+        128,
+        96
+      ],
+      "storage_stride": 256
+    },
+    {
+      "baseline_uncached_cpu": {
+        "median_ms": 32.33,
+        "p95_ms": 42.205,
+        "worst_ms": 42.205
+      },
+      "bilinear_2x_fidelity": {
+        "alpha_mean_absolute_error": 28.242,
+        "channel_mean_absolute_error": 25.72,
+        "different_channels": 29942,
+        "total_channels": 65536
+      },
+      "cache_hits": 80,
+      "cache_misses": 8,
+      "candidate_exact_cache_cpu": {
+        "median_ms": 0.112,
+        "p95_ms": 26.082,
+        "worst_ms": 26.082
+      },
+      "display_tile": 64,
+      "estimated_cache_bytes": 196608,
+      "frames": 16,
+      "max_cache_entries": 12,
+      "nearest_2x_fidelity": {
+        "alpha_mean_absolute_error": 24.42,
+        "channel_mean_absolute_error": 28.015,
+        "different_channels": 18858,
+        "total_channels": 65536
+      },
+      "screen_view": [
+        128,
+        96
+      ],
+      "storage_stride": 512
+    },
+    {
+      "baseline_uncached_cpu": {
+        "median_ms": 39.538,
+        "p95_ms": 62.445,
+        "worst_ms": 62.445
+      },
+      "bilinear_2x_fidelity": {
+        "alpha_mean_absolute_error": 28.242,
+        "channel_mean_absolute_error": 25.72,
+        "different_channels": 29942,
+        "total_channels": 65536
+      },
+      "cache_hits": 80,
+      "cache_misses": 8,
+      "candidate_exact_cache_cpu": {
+        "median_ms": 0.104,
+        "p95_ms": 31.216,
+        "worst_ms": 31.216
+      },
+      "display_tile": 64,
+      "estimated_cache_bytes": 196608,
+      "frames": 16,
+      "max_cache_entries": 12,
+      "nearest_2x_fidelity": {
+        "alpha_mean_absolute_error": 24.42,
+        "channel_mean_absolute_error": 28.015,
+        "different_channels": 18858,
+        "total_channels": 65536
+      },
+      "screen_view": [
+        128,
+        96
+      ],
+      "storage_stride": 1024
+    },
+    {
+      "baseline_uncached_cpu": {
+        "median_ms": 35.052,
+        "p95_ms": 58.658,
+        "worst_ms": 58.658
+      },
+      "bilinear_2x_fidelity": {
+        "alpha_mean_absolute_error": 28.242,
+        "channel_mean_absolute_error": 25.72,
+        "different_channels": 29942,
+        "total_channels": 65536
+      },
+      "cache_hits": 80,
+      "cache_misses": 8,
+      "candidate_exact_cache_cpu": {
+        "median_ms": 0.154,
+        "p95_ms": 45.085,
+        "worst_ms": 45.085
+      },
+      "display_tile": 64,
+      "estimated_cache_bytes": 196608,
+      "frames": 16,
+      "max_cache_entries": 12,
+      "nearest_2x_fidelity": {
+        "alpha_mean_absolute_error": 24.42,
+        "channel_mean_absolute_error": 28.015,
+        "different_channels": 18858,
+        "total_channels": 65536
+      },
+      "screen_view": [
+        128,
+        96
+      ],
+      "storage_stride": 2048
+    }
+  ],
+  "checks": 249,
+  "engine": {
+    "build": "official",
+    "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+    "hex": 264192,
+    "major": 4,
+    "minor": 8,
+    "patch": 0,
+    "status": "beta2",
+    "string": "4.8-beta2 (official)",
+    "timestamp": 0
+  },
+  "failures": 0,
+  "limitations": "Timed source CPU tiles, not input-to-photons, actual GPU VRAM, or a production cache. Exact-cache candidate reuses sampled views; mip downsampling is lossy. 64-bit DrawingDocument anchors do not imply 64-bit Atlas Vector2 camera precision.",
+  "schema": "t057-lod-headless-v1"
+}

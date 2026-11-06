@@ -2,8 +2,9 @@ class_name AtlasMapLink
 extends Resource
 
 ## A directed navigation link, not the visible footprint of a child map.
-## Marker links use anchor + hit_radius in the SOURCE board's units; links
-## with a placement_id use the placement polygon instead (see AtlasCampaign).
+## Only markers without a legacy placement_id are actionable. The old
+## placement_id field survives serialization for archival inspection, but
+## must never be interpreted as a spatial hit shape or new marker.
 
 @export var id: String = ""
 @export var source_map_id: String = ""
@@ -22,8 +23,8 @@ extends Resource
 @export var placement_id: String = ""
 
 
-## A marker's clickable area is circular in document coordinates. The placement
-## case is evaluated by AtlasCampaign using AtlasPlacement.contains_parent_point().
+## Only call for active marker links; campaign hit testing excludes retired
+## placement links before testing this circular document-space hit radius.
 func contains_marker_point(document_position: Vector2) -> bool:
 	return anchor.distance_to(document_position) <= hit_radius
 

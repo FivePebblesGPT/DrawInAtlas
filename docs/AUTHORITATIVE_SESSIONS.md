@@ -1,5 +1,11 @@
 # T-045 — Authoritative session and command prototype
 
+## Current product/implementation split (T-075, 2026-11-02)
+
+This is a **legacy `AtlasCampaign`/`AtlasTokenLayer` in-process command harness**, not transport or authorization wired into the current Atlas editor. The editor now uses `DrawingDocument` + `AtlasDrawingRegistry` for per-map/floor/detail artwork, linked `AtlasObjectLibrary` instances, and T-066's multi-file generation save ([composition](DRAWING_ATLAS_COMPOSITION.md), [objects](OBJECT_ASSETS_WORKFLOW.md), [storage](DRAWING_STORAGE_CONTRACT.md)). `AtlasHostSession` does **not** accept Drawing transactions, Object Editor Save/Save As, source mutations, generic selection/camera operations or the complete campaign as remote commands. Do not infer that its tested token revision guarantees cover the new source graph.
+
+**Threat boundary:** the test controller owns raw host handles and can select roles/grants. These calls are trustworthy only *in process*. There is **no authenticated socket/TLS transport, external peer identity, secured resume token, cross-process operation journal, live editor session connection or production collaboration UI**. A client allowed to obtain `AtlasHostSession` directly would defeat the intended role boundary. Windows/Linux desktop are the active targets; [T-044 Web](Archive/Web/T-044.md) is Archived, not a collaboration fallback. The owner must approve [T-039](Tickets/T-039.md) publication policy before real viewers are attached; [T-043](Tickets/T-043.md) player privacy and [T-048](Tickets/T-048.md) multiplayer acceptance remain separate independent gates. Keep tests below as narrow engineering evidence, not a security certification.
+
 **Status: engineering proof, not an approved multiplayer product contract.**
 The source-of-truth remains a single GM campaign and its `AtlasEditHistory`.
 `AtlasHostSession` binds one existing map, floor and `AtlasTokenLayer`, and only

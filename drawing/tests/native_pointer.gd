@@ -40,6 +40,7 @@ func run() -> void:
 	root.content_scale_size = root.size
 	root.mode = Window.MODE_WINDOWED
 	var workspace: Control = load("res://main.tscn").instantiate()
+	workspace.layout_persistence_enabled = false
 	root.add_child(workspace)
 	await frames(8)
 	var canvas: Control = workspace.canvas

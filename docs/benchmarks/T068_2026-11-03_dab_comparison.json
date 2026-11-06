@@ -1,0 +1,165 @@
+{
+  "schema": "t068-dab-comparison-v1",
+  "engine": {
+    "build": "official",
+    "hash": "cafc17a192acf67903910a68aeb3c076c0907a4b",
+    "hex": 264192,
+    "major": 4,
+    "minor": 8,
+    "patch": 0,
+    "status": "beta2",
+    "string": "4.8-beta2 (official)",
+    "timestamp": 0
+  },
+  "runs_per_variant": 5,
+  "conditions": "Two sequential single-host Godot headless benchmark runs, reference first; no randomized A/B crossover, no hardware normalization",
+  "fixture_equal": true,
+  "blend_vectors_equal": true,
+  "rows": [
+    {
+      "storage_stride": 512,
+      "workload": "short_4px",
+      "baseline_median_ms": 3.14,
+      "optimized_median_ms": 2.683,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 512,
+      "workload": "round_64px",
+      "baseline_median_ms": 211.206,
+      "optimized_median_ms": 201.767,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 512,
+      "workload": "long_fast",
+      "baseline_median_ms": 80.568,
+      "optimized_median_ms": 67.665,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 512,
+      "workload": "self_cross",
+      "baseline_median_ms": 3.832,
+      "optimized_median_ms": 1.77,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 512,
+      "workload": "eraser",
+      "baseline_median_ms": 3.011,
+      "optimized_median_ms": 2.94,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 512,
+      "workload": "masked",
+      "baseline_median_ms": 9.145,
+      "optimized_median_ms": 9.702,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 1024,
+      "workload": "short_4px",
+      "baseline_median_ms": 2.884,
+      "optimized_median_ms": 3.361,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 1024,
+      "workload": "round_64px",
+      "baseline_median_ms": 208.288,
+      "optimized_median_ms": 199.49,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 1024,
+      "workload": "long_fast",
+      "baseline_median_ms": 70.766,
+      "optimized_median_ms": 65.797,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 1024,
+      "workload": "self_cross",
+      "baseline_median_ms": 2.256,
+      "optimized_median_ms": 2.078,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 1024,
+      "workload": "eraser",
+      "baseline_median_ms": 2.819,
+      "optimized_median_ms": 3.051,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 1024,
+      "workload": "masked",
+      "baseline_median_ms": 7.0,
+      "optimized_median_ms": 7.055,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 2048,
+      "workload": "short_4px",
+      "baseline_median_ms": 2.707,
+      "optimized_median_ms": 2.68,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 2048,
+      "workload": "round_64px",
+      "baseline_median_ms": 211.647,
+      "optimized_median_ms": 211.511,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 2048,
+      "workload": "long_fast",
+      "baseline_median_ms": 72.515,
+      "optimized_median_ms": 69.767,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 2048,
+      "workload": "self_cross",
+      "baseline_median_ms": 2.722,
+      "optimized_median_ms": 3.133,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 2048,
+      "workload": "eraser",
+      "baseline_median_ms": 3.973,
+      "optimized_median_ms": 5.534,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    },
+    {
+      "storage_stride": 2048,
+      "workload": "masked",
+      "baseline_median_ms": 10.345,
+      "optimized_median_ms": 9.055,
+      "same_changed_pixels": true,
+      "same_undo_wire_bytes": true
+    }
+  ],
+  "limitations": "Single pass per variant; small effect and system load variation mean speedups are exploratory, not causal proof"
+}

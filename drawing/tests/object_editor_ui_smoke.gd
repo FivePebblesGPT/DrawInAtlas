@@ -18,6 +18,7 @@ func _check(ok: bool, description: String) -> void:
 
 func _run() -> void:
 	var app: Control = load("res://main.tscn").instantiate()
+	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await process_frame
 	await process_frame

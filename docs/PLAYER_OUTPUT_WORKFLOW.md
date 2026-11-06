@@ -1,5 +1,13 @@
 # T-040 — Native player output and physical calibration (isolated proof)
 
+## Current platform, source and privacy status (T-075, 2026-11-02)
+
+**Windows/Linux native desktop are the current targets; no browser player output is a supported deliverable.** [T-044](Archive/Web/T-044.md) is **Archived**. The `open_embedded` implementation, its headless/native visual tests and the older Web compilation evidence are retained below **only as historical experiments**; do not infer browser runtime testing, a current Web release plan or owner approval from them. The native separate-window X11 probe remains an isolated `AtlasPlayerOutputSession` test, **not a connected main-editor Publish command**, and it has not been accepted on real Windows/Linux projector hardware or multiple displays.
+
+The current editor's visible art comes from `AtlasDrawingRegistry` / `DrawingDocument` plus linked `AtlasObjectLibrary` instances; saved projects use T-066 generations ([world mapping](DRAWING_WORLD_MAPPING.md), [objects](OBJECT_ASSETS_WORKFLOW.md), [storage](DRAWING_STORAGE_CONTRACT.md)). `AtlasPlayerOutputSession.publish` instead calls `AtlasPlayerProjection.build_capture_input` on **legacy `AtlasMapDocument` layers**. This path has not been adapted to sanitize the newly composed Drawing, text, fonts or linked Object Assets. The existence of a native window and detached image does **not** authorize projecting a live GM board, a read-only preview, or a saved campaign.
+
+For production the trusted policy controller must authorize source IDs and geometry, resolve all reachable linked assets and all floors/detail levels, filter or deny secret content *before* creating any output image, invalidate on grant/fog/artwork/token changes (including freeze and in-flight GPU callbacks), and blank on failure. [T-039](Tickets/T-039.md) still requires the owner's publication decisions; [T-043](Tickets/T-043.md) requires an independent privacy review. Native output/calibration usability remains part of [T-040](Tickets/T-040.md). **No approval is supplied by the following X11 proof.**
+
 **Status: partial engineering proof, NOT an approved live projector.** T-039's publication policy, T-043's end-to-end privacy acceptance, and real-table usability review are still open. Nothing here authorizes displaying the live GM board. This native player-output session is **not connected to editor controls**, campaign saving, or network replication.
 
 ## Native proof path
@@ -8,7 +16,7 @@
 
 The output size is render **pixels**; `open_native` rejects more than 3840×2160 pixels to avoid massive allocations. A native resize invalidates the image and requires an explicit matching camera frame and new authorized render. The frame must share the output aspect ratio; mismatches fail closed, never stretch hidden material into view. T-013 framing remains **session-only** and edits no artwork. `update_frame(frame)` copies the approved frame's center and board width when following. Freeze pins the last authorized camera and pixels until explicitly resumed or invalidated; invalidation clears the texture and cancels pending captures regardless of freeze. The native session also checks the full source publication fingerprint (layer state and pixel hashes, floor identity, LOD, grid, grant IDs, and ordered fog operations) at the end of asynchronous capture; any intervening change rejects that image. This does not watch idle/frozen images. Editing fog or revoking permissions **must** call `invalidate()` immediately; future production wiring must track policy/content revisions automatically and reject every stale publication attempt. Resuming follow updates the camera only; it requires another sanitized `publish` to display pixels.
 
-The native test uses `root.gui_embed_subwindows = false` before opening the window; otherwise Godot may embed the subwindow in the GM window. Whether native windows can be created depends on the platform/window manager. This proof is tested using Linux X11 under Xvfb/Mesa and is **not** evidence of Windows, macOS, Wayland, multiple real monitors, hardware brightness, or Web behavior. There is no fallback in this ticket; T-044 owns Web output.
+The native test uses `root.gui_embed_subwindows = false` before opening the window; otherwise Godot may embed the subwindow in the GM window. Whether native windows can be created depends on the platform/window manager. This proof is tested using Linux X11 under Xvfb/Mesa and is **not** evidence of Windows, macOS, Wayland, multiple real monitors, hardware brightness, or Web behavior. There is no active fallback delivery in this ticket; T-044 is now Archived (the old prototype is described below only for historical audit).
 
 ## Physical table calibration remains independent
 
@@ -53,7 +61,7 @@ The tests cover private rooms/labels/tokens, D0/D1, re-hiding, preview cache
 poisoning, freeze/revocation, and mid-capture edits. These checks do **not**
 validate a live production GM-to-player session or a physical projector.
 
-## T-044 — Single-window/Web-compatible fallback (isolated proof)
+## Archived T-044 — Single-window/Web-compatible fallback (historical isolated proof)
 
 `AtlasPlayerOutputSession.open_embedded(host)` is a presentation *surface*,
 not a second OS window. A trusted caller supplies a **visible, empty, dedicated
@@ -91,4 +99,4 @@ framebuffer before, during and after authorized capture/revocation. This proves
 **native X11 Compatibility rendering**, not runtime Web behavior. The Web export
 build is a separate compilation check. Browser-runtime testing was deferred by
 the user and remains unperformed, alongside real player/GM privacy approval,
-production UI integration and owner acceptance. Keep `docs/Index.md` open.
+production UI integration and owner acceptance. Do not reopen T-044 or treat its archived prototype as accepted browser output.

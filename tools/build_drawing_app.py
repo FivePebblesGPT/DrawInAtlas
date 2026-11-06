@@ -52,6 +52,15 @@ def stage(destination: Path, in_place: bool = False) -> Path:
             raise ValueError("Bundled fonts must not be symbolic links")
         if source.is_file() and source.suffix in {".ttf", ".txt"}:
             shutil.copy2(source, staged / "fonts" / source.name)
+    # The icon-only Drawing tool rail must work in staged/exported consumers;
+    # its SVGs are packaged with the canonical engine rather than Atlas assets.
+    icons = PACKAGE / "icons"
+    icon_destination = staged / "icons"
+    icon_destination.mkdir(parents=True, exist_ok=True)
+    for source in sorted(icons.glob("*.svg")):
+        if source.is_symlink():
+            raise ValueError("Drawing icons must not be symbolic links")
+        shutil.copy2(source, icon_destination / source.name)
     return output
 
 

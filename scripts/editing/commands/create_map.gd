@@ -17,7 +17,7 @@ func apply(campaign: AtlasCampaign) -> bool:
 	if new_map_id.strip_edges().is_empty() or str(_document.get("name", "")).strip_edges().is_empty():
 		return false
 	var document: AtlasMapDocument = AtlasMapDocument.from_dict(_document)
-	if document == null:
+	if document == null or document.kind == "BATTLEMAP":
 		return false
 	campaign.add_map(document)
 	return true

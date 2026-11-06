@@ -305,6 +305,10 @@ func _corruption_and_precision() -> void:
 		rewrite.close()
 	_check(AtlasCampaignBundle.load(campaign_file).error == ERR_FILE_CORRUPT,
 		"single-generation corrupted physical blob fails closed before exposing document")
+	_check(DirAccess.remove_absolute(blob_path) == OK,
+		"simulate incomplete copy with missing referenced compressed tile")
+	_check(AtlasCampaignBundle.load(campaign_file).error == ERR_FILE_CORRUPT,
+		"single-generation missing compressed tile fails closed without transparent fallback")
 	# Reject symlink escapes, including a preexisting Drawings directory link.
 	var unsafe_root: String = folder.path_join("symlink-test")
 	_check(DirAccess.make_dir_recursive_absolute(unsafe_root) == OK, "prepare symlink escape fixture")

@@ -1,12 +1,24 @@
 # Dictionary conversion audit — T-029
 
-## Decision and boundaries
+## Current persistence authority — T-071 (2026-11-02)
+
+**Owner-approved architecture:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]] Round 8 requires portable campaign metadata plus sibling `Drawings/`, `Objects/` and redistributable `Fonts/` assets. **Implemented:** [[T-066]] now writes `Campaign.atlas.json` and `Campaign.atlas.bak.json` root pointers (derived from the user-selected logical `Campaign.scn` path), immutable `Drawings/generations/<id>/generation.json` indexes, per-`(map_id, floor_id, detail_id)` `DrawingDocument` manifests and compressed sparse `.zst` RGBA8 tiles. The generation still includes a **legacy `.scn` metadata scene**, but that scene alone is **not** a complete new-format campaign. See [storage contract](DRAWING_STORAGE_CONTRACT.md) and [portable acceptance examples](DRAWING_STORAGE_CONTRACT.md#reproducible-portability-and-failure-acceptance--t-071).
+
+**What the old dictionary adapters still do:** `AtlasCampaign`, `AtlasMapDocument`, `AtlasFloor`, legacy `AtlasLayer` types, `AtlasNativeScene` and `AtlasLayerCodec` continue to validate or snapshot legacy metadata and history/clipboard paths; their `to_dict`/`from_dict` methods were never an obsolete standalone JSON campaign writer. In the **new path**, `AtlasCampaignBundle` (`scripts/persistence/campaign_bundle.gd`) validates/publishes the generation, `AtlasDrawingRegistry` owns Atlas-to-Drawing identities, and `DrawingBundleManifest` (`addons/drawing/bundle_manifest.gd`) serializes generic layer metadata, signed chunk coordinates as decimal strings and typed semantic values. `DrawingChunkStore` owns content-addressed physical compressed tiles; **no Atlas import is added to the Drawing package**. These are separate responsibilities, not a second mutable source of truth.
+
+**Status distinctions:** The one-file native schema-v6 `.scn` format and fixed `AtlasRasterChunk.SIZE = 256` are **historical/compatibility baselines** (the 2026-10-30 audit below), not the current Atlas Save path. Versioned `tile_stride` and rational density are recorded per `DrawingDocument`; [[T-067]] completed the 256/512/1024/2048 and pack-layout benchmark. Its **512 default and immutable segmented-pack layout are recommendations, not shipped changes**: the verified T-066 writer still emits individual `.zst` blobs. Compressed storage tiles, in-memory edit regions and GPU upload tiles are independently tunable. This documentation does **not** authorize deleting legacy validators or migrating historical user saves, and it does not close owner-review tickets.
+
+## Historical T-029 audit (2026-10-30) — native-only baseline
+
+The following statements, including uses of “current” and “only production store,” describe **the earlier T-029 checkout**. They are retained as implementation-history evidence, not a description of today's end-user campaign persistence.
+
+### Decision and boundaries (at T-029)
 
 **2026-10-30: Retain the current single-file native `.scn` Resource format and schema v6.** No legacy JSON campaign writer or loader exists in the production save path. Consequently **no dictionary conversion method can be removed safely as an obsolete JSON save routine** on the evidence reviewed here. The `to_dict` / `from_dict` names predate the native format but their callers still have active, distinct responsibilities. Removing them without replacements would silently weaken integrity or history guarantees; this ticket does not authorize a new persistence schema or a lossy migration.
 
 The only production cleanup in this ticket removes **unnecessary decoded-Image copies during collection *validation***. `AtlasLayerCodec._validated_metadata()` uses the existing `from_dict(layer.to_dict())` validator, checks live raster chunk validity and coordinate-key consistency, then returns metadata without images. `valid_collection()` uses it instead of `clone()`. `clone()` uses the same validator and **still duplicates every decoded `Image`** for independent edits. The dictionary parser remains the **one authority** for layer metadata; the live-image and chunk-key checks are additional invariants that dictionaries alone cannot represent. This also rejects an inconsistent raster chunk key before attempting a clone.
 
-## Inventory: production adapters and callers
+### Inventory: adapters and callers (at T-029)
 
 | Adapter | Current purpose | Representative callers | Disposition |
 | --- | --- | --- | --- |
@@ -22,7 +34,7 @@ The only production cleanup in this ticket removes **unnecessary decoded-Image c
 
 The `to_dict()` comparisons in the UI and `AtlasSelection` are deliberate optimistic-concurrency / stale-edit guards. They are not writing a campaign JSON file. `AtlasLayerCodec.same_layers()` compares snapshots for history/floor actions; `clone_all()` still builds detached layer instances. `AtlasPreviewCache` serializes a **cache key** with `JSON.stringify` to avoid string delimiter collisions. `AtlasClipboard` deliberately uses versioned, strictly validated JSON for interchange. The browser file-picker script uses `JSON.stringify` for safe JavaScript string quoting. `AtlasLegacyMigrationAudit` emits dictionaries only for a read-only report. None are obsolete native-save writers.
 
-## Native save authority and immutable boundaries
+### Native save authority and immutable boundaries (at T-029)
 
 - `AtlasCampaignStore` is the only end-user campaign store. It stages native PackedScenes, checks a candidate before activation, retains the last verified generation, and loads the backup if needed. Old JSON saves are **not** automatically converted.
 - `AtlasNativeScene._snapshot()` calls the full graph validator, then **duplicates raw RGBA8 Images** and encodes lossless WebP into native chunk resources. The snapshot must not share mutable stroke, text, grid, link, or Image objects with the source.
@@ -30,7 +42,7 @@ The `to_dict()` comparisons in the UI and `AtlasSelection` are deliberate optimi
 - Undo/history and selection/clipboard carry snapshots or typed deep copies. Replacing these conversions with Godot's generic `Resource.duplicate(true)` is not equivalent without an explicit study of nested exported arrays, transient pixel caches and resource identity.
 - The current dictionary schema is an internal validation/compatibility contract, **not a second persisted source of truth**. Native `.scn` remains authoritative; no schema version bump, renderer rewrite, or legacy data deletion is warranted for T-029.
 
-## Regressions and follow-ups
+### Regressions and follow-ups (at T-029)
 
 `tests/dictionary_conversion_audit_smoke.gd` covers dictionary validation without side effects; duplicate IDs; malformed raster metadata and stale chunk keys; exact partial-chunk RGBA8 including hidden RGB; independent raster and editable-text clones; native PackedScene graph round-trip; and independent native decoded pixels. CI runs it alongside existing `layers_smoke`, `storage_smoke`, clipboard/selection/history tests, native framebuffer tests and Web/save portability checks.
 

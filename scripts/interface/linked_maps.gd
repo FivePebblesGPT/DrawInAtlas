@@ -1,6 +1,6 @@
 class_name AtlasLinkedMaps
 extends RefCounted
-## Parent-owned entrance/placement actions. The dialog owns draft controls; the
+## Parent-owned marker-only entrance actions. The dialog owns draft controls; the
 ## command owns atomic validation/snapshots; the navigator owns view changes.
 
 signal changed
@@ -42,8 +42,10 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 		return false
 	var before: AtlasMapLink = _canvas.campaign.link_by_id(link.id)
 	var old: AtlasPlacement = _canvas.campaign.placement_by_id(before.placement_id) if before != null else null
-	# Keep editing legacy footprints, but never create new containers through links.
-	if new_map != null or (placement != null and old == null):
+	# No footprint editing or creation is available after T-015. The original
+	# footprint must not be silently flattened into a marker on Apply.
+	if new_map != null or placement != null or old != null \
+			or not link.placement_id.is_empty():
 		_rejected()
 		return false
 	if dialog.visible:
@@ -103,7 +105,10 @@ func focus(id: String) -> void:
 	var placement: AtlasPlacement = _canvas.campaign.placement_by_id(link.placement_id)
 	if not _dialog_action_is_fresh(id, link, placement):
 		return
-	_canvas.camera_center = placement.child_to_parent() * placement.child_bounds().get_center() if placement != null else link.anchor
+	if not link.placement_id.is_empty():
+		_rejected()
+		return
+	_canvas.camera_center = link.anchor
 	_canvas.selected_link_id = link.id
 	_navigator.zoom_gate.reset()
 	_canvas.queue_redraw()
@@ -116,11 +121,9 @@ func move(id: String, offset: Vector2) -> bool:
 		return false
 	var link: AtlasMapLink = AtlasMapLink.from_dict(original.to_dict())
 	link.anchor += offset
-	var old: AtlasPlacement = _canvas.campaign.placement_by_id(link.placement_id)
-	var placement: AtlasPlacement = AtlasPlacement.from_dict(old.to_dict()) if old != null else null
-	if placement != null:
-		placement.origin += offset
-	return submit(link, placement)
+	if not link.placement_id.is_empty():
+		return false
+	return submit(link, null)
 
 
 func _owns(link: AtlasMapLink) -> bool:
@@ -137,6 +140,6 @@ func _dialog_action_is_fresh(id: String, link: AtlasMapLink, placement: AtlasPla
 
 
 func _rejected() -> void:
-	var text: String = "Link unchanged or rejected: invalid/stale data, shared footprint, or outside selected-cell scope."
+	var text: String = "Link unchanged or rejected: invalid/stale data, retired footprint, or outside selected-cell scope."
 	dialog.show_error(text)
 	message.emit(text)

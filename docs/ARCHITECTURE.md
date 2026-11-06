@@ -1,88 +1,42 @@
 # Technical Architecture
 
-> [!important] Reference implementation and earlier design
-> [[Index]] is the active backlog. The user confirmed a continuous chunked board with separately authored artwork LOD and an explicit editing target: see [[E-002]] and [[E-006]]. The battlemat concept is retired; projector framing belongs to [[E-007]]. **Raster is the approved primary ordinary-painting representation; vector remains for editable semantic objects** (see [[T-028]], [[INK_REPRESENTATION_DECISION]]). Palette-cell `AtlasTerrainLayer` artwork was removed in [[T-050]] ([[TERRAIN_LAYER_DECISION]]), without removing the independent grid or region metadata. A future 5-foot PCG tilemap tool is a separate design. The editor-default implementation is still open under [[T-049]]. Earlier independent-document/footprint assumptions below are superseded where they conflict. This document is not current usability acceptance.
+> [!important] Current implementation and decision authority (2026-11-02)
+> The owner-approved architecture is [[DECISIONS_DRAWING_ATLAS_2026-11-01]]; the concrete contracts are [Drawing package](ADR_DRAWING_DOCUMENT_CONTRACT.md), [world registry](DRAWING_WORLD_MAPPING.md), [canvas composition](DRAWING_ATLAS_COMPOSITION.md) and [campaign generation storage](DRAWING_STORAGE_CONTRACT.md). The ticket ledger is [[Index]]. **Windows/Linux desktop is the active target; Web work is archived.** Nothing here grants player/projector publication approval (T-039/T-043) or final UX approval (T-056/T-059).
 
-**Status:** earlier target architecture plus implementation reference. The development baseline is **Godot 4.8-beta2**, standard edition, and all application code **must be GDScript**. Optional GDExtensions cannot become hard dependencies or break Web export. See [archived implementation notes](Archive/2026-10-30/IMPLEMENTATION_NOTES.md) for historical checks.
-
-## What runs today
-
-The first sections below describe the long-term target architecture. The
-**current implementation** (Godot 4.8-beta2) follows this simpler route:
+## What actually runs on `aidev`
 
 ```text
-main.tscn
-└── prefab/ui.tscn              Menu bar, sidebar, workspace and inspector
-    └── scripts/interface/editor.gd          AtlasEditor: composes the workspace/session
-        ├── prefab/inspector.tscn            AtlasInspector: forms emit typed intents
-        ├── prefab/campaign_browser.tscn     AtlasCampaignBrowser: discovery and previews
-        ├── scripts/interface/artwork_editor.gd  Scoped edits, selections and clipboard
-        ├── prefab/link_dialog.tscn             Scene-owned entrance/footprint drafts
-        ├── scripts/interface/linked_maps.gd    Parent-owned graph edit commands
-        ├── scripts/interface/map_references.gd Bounded derived references/previews
-        ├── scripts/interface/map_capture.gd    Shared private artwork renderer
-        ├── scripts/navigation/map_navigator.gd Cameras, floor memory and Back
-        ├── scripts/interface/canvas.gd      AtlasCanvas: draw and emit gestures
-        ├── scripts/editing/                 Scope, tools, selection, clipboard
-        │   ├── commands/                    Reversible operations on the graph
-        │   └── history.gd                   Undo/redo/savepoint state IDs
-        ├── scripts/campaign/                Campaign → map → floor → layers
-        ├── scripts/artwork/                 Stroke and raster data
-        ├── scripts/navigation/              Per-floor view, linked navigation
-        └── scripts/persistence/             Native .scn + embedded lossless WebP
+Monorepo
+  drawing/project.godot           Standalone Godot Drawing editor (T-053)
+        | stages the canonical package; no Atlas imports
+  addons/drawing/                Shared generic DrawingDocument / layers / tools / history
+        | one source implementation, not a duplicated editor engine
+  project.godot                   Atlas Godot application
+        | scripts/campaign/drawing_registry.gd  (map ID, floor ID, D-level) -> document ID
+        | scripts/campaign/world_space.gd       signed coordinates + rational density
+        | scripts/interface/canvas.gd           Atlas navigation/input/overlays
+        | scripts/objects/                      Object Asset source + instance registry
+        | scripts/editing/history.gd            single Atlas-wide chronological history
+        | scripts/persistence/campaign_bundle.gd immutable generations and root pointers
 ```
 
-**Editing flow:** a pointer gesture reaches `AtlasCanvas`, which emits an
-intent such as `stroke_requested`. The workspace wires it directly to
-`AtlasArtworkEditor`, which resolves the active floor/layer and scope and asks
-a typed command or service to validate it. `AtlasEditHistory` applies reversible changes to the in-memory
-`AtlasCampaign` graph. The `changed` signal refreshes panels and the canvas.
-The canvas is a view of document data; its runtime `CanvasGroup` nodes are
-not the model and their count is determined by the current layers.
+Atlas retains `AtlasCampaign`, `AtlasMapDocument` and `AtlasFloor` as **map graph, floor metadata, grid, link and navigation owners**. They are **not** `DrawingDocument` subclasses and floors are not types in Drawing. `AtlasDrawingRegistry` maps one generic `DrawingDocument` to each internally addressable `(map_id, floor_id, detail_id)`; the editor presents **Map → Floor group → Detail group → Layers**, not user-visible independent documents per hex or one file tab per internal detail. **No per-hex drawing document exists.** All authored detail levels share signed map-world coordinates, with separately recorded pixel densities. Missing higher-detail paint is blank, while Atlas grids and entrance overlays still work. [Mapping tests](DRAWING_WORLD_MAPPING.md) demonstrate this.
 
-**Navigation flow:** `AtlasMapLink` is a directed edge. A marker-only link
-uses an anchor and `hit_radius` measured in the SOURCE map's continuous board
-coordinates, not screen pixels. A link with a placement uses the rotated
-`AtlasPlacement` footprint instead. `AtlasMapNavigator` owns `AtlasViewSession`
-and Back history for one workspace. The view session preserves each map/floor's
-camera and selected layer without dirtying persisted artwork.
-`AtlasZoomGate` requires three further wheel steps at the zoom boundary.
-Ambiguous candidates open the scene-owned chooser and do not accumulate steps.
-`AtlasLinkEdit` applies/reverts an entrance, its footprint and an optional new
-document atomically. Stale geometry/endpoints and out-of-scope edits are rejected;
-unlinking preserves independent destinations and shared footprints.
+A canvas paint gesture pins its document/detail and tool scope and commits through Drawing's touched-region edit transactions. Atlas composes Drawing artwork and linked Object instances, arbitrates entrance navigation, and records one global history action with its originating map/floor/detail context. Standalone Drawing instead uses local history. Atlas-specific import types, navigation, floor types and session state **never** belong inside `addons/drawing/`. T-068 has measured GDScript and prototype C++ raster paths, but **no production native backend has been selected**.
 
-**Reference flow:** `AtlasMapReferences` schedules bounded floor/crop images via
-`AtlasMapCapture`, shared with sidebar previews. Only the private artwork canvas
-renders, with references/grid/link overlays and input disabled. Generation tokens,
-content signatures and an LRU protect against stale captures. Spatial crops map
-through the placement transform; symbolic links stay unregistered thumbnails.
-Reference source/floor, opacity, freeze and captures are viewer state. See
-[linked maps](LINKED_MAPS.md) for budgets, registration and current limitations.
+**Reusable sources:** `Objects/<asset-id>/vNNNNNN.drawing` is an independently published **Object Asset** source. An `AtlasObjectInstance` (**Object Instance**) holds its own ID, link, map/detail and transform; edits to a private Object Editor draft do not affect other instances until Save. Save As creates a new asset and rebinds only the captured instance, with undo retaining the new asset. This is not the earlier proposal to reuse an entire child `MapDocument` as the primary art mechanism. Nested assets and the full Asset Browser are separate tickets T-064/T-065.
 
-**Authoring vs saving:** `examples/northern_marches.tres` is an Inspector-
-editable shipped `Resource` fixture containing two map presets, two
-`AtlasGrid` resources and a link resource. `AtlasCampaign.sample()` creates
-independent runtime objects from that immutable asset. User-edited work is
-persisted through `AtlasCampaignStore` as one compressed binary **`.scn`**,
-with embedded Resource-backed domain data and lossless WebP chunks, a semantic
-digest, staged verification and an adjacent verified **`.bak.scn`**. It is not
-written back over the bundled `.tres`. A minimal data-only scene root owns map
-document nodes; their stable IDs reconstruct the runtime registry. No standalone
-`.res` or raster assets are required. Transient workspace controls, camera state
-and preview renderers remain separate from saved data. Legacy JSON user saves
-are neither imported nor deleted. See [native saves](Archive/2026-10-30/NATIVE_SAVE_IMPLEMENTATION.md)
-for validation boundaries and [benchmarks](Archive/2026-10-30/NATIVE_SAVE_BENCHMARKS.md) for the
-measured whole-file save/load costs.
+**Durable campaign saves (T-066):** `AtlasCampaignBundle` publishes `Campaign.atlas.json` plus a verified backup pointer to immutable `Drawings/generations/`, per-document manifests, sparse `.zst` raster chunks, linked `Objects/`, and redistributable `Fonts/`. It may include `campaign.scn` as *generation metadata*, but the old **single authoritative `.scn` containing embedded WebP pixels is a historical compatibility/test codec**, not the current Save destination. Full-directory relocation and interrupted-save recovery have automated evidence; physical power-loss durability has not been validated. Each manifest retains its tile stride; T-067 recommends 512 for future documents but **does not install a new default or physical pack writer**. There is no historical user-save migration requirement.
 
-**Where to begin:** to change a form, edit `prefab/*.tscn` and its
-`scripts/interface/` controller. To change document rules, start with
-`scripts/campaign/` and `scripts/artwork/` and add smoke-test cases. To
-change an edit gesture, follow the canvas signal to `AtlasArtworkEditor` and
-then `scripts/editing/commands/`. See [Code readability](CODE_READIBILITY.md)
-for the concrete module ownership table.
+**Edit versus presentation:** the Grid, entrance hit regions, map/floor navigation and projector policy are Atlas concerns. A view-only preview must not modify Drawing content. The native player privacy/authorization and network delivery gates remain open (T-039/T-043/T-048). Desktop runtime checks do not imply a release approval.
+
+**Where to modify code:** implement generic drawing behavior and generic snapping in `addons/drawing/`; world mapping in `scripts/campaign/drawing_registry.gd` and `world_space.gd`; asset/source linking in `scripts/objects/`; main editor and input in `scripts/interface/`; root publication in `scripts/persistence/campaign_bundle.gd`. Run the relevant standalone, Atlas, and storage tests in [the verification plan](DRAWING_TEST_PLAN.md).
 
 ---
+
+## Historical conceptual architecture (superseded where it conflicts)
+
+The sections numbered 1–10 below are retained from the **pre-separation design proposal**. Names such as `CampaignRepository`, `DocumentSession`, `BattlemapPlacement`, `MapFloor`, `MapLayer` and `EditCommandBus` in its diagrams/command examples are **illustrative pseudotypes**, not claims that these shipped APIs implement the canonical Drawing package. Its Web baseline, tile-painting, per-battlemap child documents, whole-file WebP and save-migration language are historical; use the implemented contracts above instead. Projector privacy/publishing choices still need their own approvals.
 
 ## 1. Architectural goals
 

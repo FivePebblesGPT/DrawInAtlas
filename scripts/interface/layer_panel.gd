@@ -410,8 +410,6 @@ func _rebuild_hierarchy() -> void:
 	for link: AtlasMapLink in links:
 		var target: AtlasMapDocument = _campaign.get_map(link.target_map_id)
 		var target_floor: AtlasFloor = target.floor_by_id(link.target_floor_id) if target != null else null
-		var placement: AtlasPlacement = (
-			_campaign.placement_by_id(link.placement_id) if not link.placement_id.is_empty() else null)
 		var label: String = "%s / %s" % [target.display_name if target != null else "Missing destination",
 			link.target_floor_id]
 		# Tree rows survive until the next refresh, but their destinations may not.
@@ -420,14 +418,16 @@ func _rebuild_hierarchy() -> void:
 		var snapshot: Dictionary = {"kind": "link", "id": link.id,
 			"campaign": _campaign, "map": _map, "floor": _floor,
 			"link_ref": link, "link": link.to_dict().duplicate(true),
-			"placement_ref": placement, "placement": placement.to_dict().duplicate(true) if placement != null else {},
 			"target": target, "target_floor": target_floor,
 			"target_name": target.display_name if target != null else ""}
 		var row: TreeItem = _make_row(heading, label, snapshot,
 			"Independent destination: %s / %s\nEntrance at %s\nLinks navigate documents; they are not detail layers" % [target.display_name if target != null else "Missing map", link.target_floor_id, link.anchor])
-		row.add_button(0, ICON_FOCUS, LINK_FOCUS, false, "Locate on this board")
-		row.add_button(0, ICON_EDIT, LINK_EDIT, false, "Edit link")
-		row.add_button(0, ICON_ENTER, LINK_ENTER, target == null or target.floor_by_id(link.target_floor_id) == null, "Enter destination map")
+		var retired: bool = not link.placement_id.is_empty()
+		row.add_button(0, ICON_FOCUS, LINK_FOCUS, retired, "Locate on this board")
+		row.add_button(0, ICON_EDIT, LINK_EDIT, retired, "Edit link")
+		row.add_button(0, ICON_ENTER, LINK_ENTER,
+			retired or target == null or target.floor_by_id(link.target_floor_id) == null,
+			"Enter destination map")
 	if _layer_rows.has(_selected):
 		(_layer_rows[_selected] as TreeItem).select(0)
 	_building = false
@@ -475,11 +475,6 @@ func _link_row_is_current(data: Dictionary) -> bool:
 	if link == null or link != data.get("link_ref") or link.source_map_id != _map.id \
 			or link.source_floor_id != _floor.id or link.to_dict() != data.get("link"):
 		return false
-	var placement: AtlasPlacement = (
-		_campaign.placement_by_id(link.placement_id) if not link.placement_id.is_empty() else null)
-	if placement != data.get("placement_ref") \
-			or (placement.to_dict() if placement != null else {}) != data.get("placement"):
-		return false
 	var target: AtlasMapDocument = _campaign.get_map(link.target_map_id)
 	if target != data.get("target"):
 		return false
@@ -504,6 +499,10 @@ func _on_hierarchy_button(item: TreeItem, _column: int, id: int, _mouse_button_i
 		link_action_rejected.emit()
 		return
 	var link_id: String = str(data.get("id", ""))
+	var link: AtlasMapLink = _campaign.link_by_id(link_id)
+	if link == null or not link.placement_id.is_empty():
+		link_action_rejected.emit()
+		return
 	match id:
 		LINK_FOCUS:
 			link_action_requested.emit(link_id, &"focus")

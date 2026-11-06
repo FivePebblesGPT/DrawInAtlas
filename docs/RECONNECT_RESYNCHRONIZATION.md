@@ -1,5 +1,11 @@
 # T-047 — Reconnect and resynchronize permitted state
 
+## Current reconnect threat model (T-075, 2026-11-02)
+
+This is trusted **in-process handle replacement**, not an authenticated resume operation over real network sockets. It applies to the older `AtlasHostSession` token and raster-grant harness, **not** to the editor's `DrawingDocument` / `AtlasDrawingRegistry` artwork, linked `AtlasObjectLibrary` sources, Object Editor drafts or T-066 multi-file campaign generations ([composition](DRAWING_ATLAS_COMPOSITION.md), [objects](OBJECT_ASSETS_WORKFLOW.md), [storage](DRAWING_STORAGE_CONTRACT.md)). A test passing reconnect and JSON round-tripping does not prove revision convergence for the current Drawing source graph. There is no actual interrupted transport, credential expiry, remote-cache invalidation, cross-process journal, or duplicate delivery from a real network.
+
+The production threat includes a stolen/forged resume token, stale player grants revealing private D0/D1 art, divergent linked assets, duplicate edits after missed acknowledgements and cached frames surviving revocation. Production recovery must bind identity, authenticated role and current policy to a fresh session epoch, reject stale messages, and deliver only a re-sanitized current snapshot. A previous receiver may retain already exported pixels regardless of in-process purge. [T-039](Tickets/T-039.md) policy approval, [T-043](Tickets/T-043.md) native privacy acceptance and [T-048](Tickets/T-048.md) independent collaboration acceptance are unresolved. Windows/Linux desktop is current; [T-044 Web](Archive/Web/T-044.md) is Archived.
+
 **Status:** Isolated, trusted-controller **in-process proof**. This is not socket
 reconnection, a secure resume credential, an approved network permission model,
 or an integrated production multiplayer feature. T-045/T-046 and T-039 owner

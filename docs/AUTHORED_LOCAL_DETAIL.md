@@ -1,5 +1,19 @@
 # Authored local detail on a continuous board — T-012 (2026-10-30)
 
+## Current authored-detail implementation — T-070 (2026-11-02)
+
+**Authority:** [[DECISIONS_DRAWING_ATLAS_2026-11-01]], [[DRAWING_WORLD_MAPPING]], [[DRAWING_ATLAS_COMPOSITION]] and [[DRAWING_STORAGE_CONTRACT]]. The original T-012 description below explains the **historical native-layer authoring path**; the canonical Drawing core now supplies the artwork instead.
+
+- **Identity:** Atlas projects **Map → Floor group → Detail group → Layers**. One internal generic **DrawingDocument per `(map_id, floor_id, detail_id)`** is lazily materialized; it is not an ordinary tab or a file exposed to Atlas users. A floor is an elevation group, not D1, and **no hex receives its own DrawingDocument**. Independently opened standalone Drawing files are a separate workflow.
+- **Same world position, separate pixels:** D0–D32 have one signed map-world reference (**1024 ticks/world unit**) and individually specified rational pixel densities (`num/den`). The default `2^min(D,10)` is configurable before committed art, not a fixed zoom or distance mapping. Signed raster tiles are sparse and have versioned per-document stride; D1 can exist logically with no image allocation. Changing authored density after content is committed needs a deliberate resample.
+- **No fallback underlay:** when a viewer explicitly shows **empty D1**, it stays transparent, with **no D0 artwork**, even above painted D0. Atlas still draws the **grid, entrance markers, navigation/hit-testing overlays** and the empty-detail indicator. The legacy automatic authored-LOD selector can choose D0 when higher-detail artwork is absent in the viewed area; this is a **presentation choice**, not D0 painted into D1 or a rule for explicit D1 inspection. Read-only previews do not become editable layers.
+- **Editing and history:** a pointer gesture binds the active map/floor/detail, document and layer **at start**; zoom or presentation cannot redirect it. Atlas global history restores the originating context and preserves current zoom; Drawing standalone has a separate history timeline. A selected-cell restrict-edits polygon is an optional mask, never a child map. Atlas Save uses multi-file sparse generations, not the native `.scn` path discussed in the T-012 historical text below.
+- **Legacy floor links:** explicitly following an entrance may navigate to another **independent map/floor**; it does not automatically switch D-levels or own a piece of a hex. Floor-link terminology and hands-on usability remain gated by [[T-017]]; no retired battlemat container is reinstated.
+
+### Historical T-012 native-layer workflow and migration inventory
+
+The remainder of this page describes the earlier T-012 editor and native `.scn` behavior, retained for its workflow history and legacy-data notes. It **does not override** the current canonical Drawing implementation or the owner's decision that **no historical user saves require migration**.
+
 > [!important] Current ownership and authoring contract
 > This design implements the decision in [[E-002]] and [[E-006]]: local detail is **artwork authored at another level on the same board**, not a battlemap document, nested canvas, grid subdivision, or placement object. It takes precedence over the historical battlemap model in [[MAPS_AND_GRIDS]]. Removal of legacy controls and safe conversion of existing saves are **separate tickets** [[T-014]] and [[T-015]].
 
