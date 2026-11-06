@@ -2,7 +2,10 @@ class_name AtlasEditScope
 extends RefCounted
 ## Document-space convex selection boundary. An enabled empty scope denies edits.
 
+## Disabled = unrestricted edits; enabled with an empty polygon = deny all.
 var enabled: bool = false
+## Board-space convex cell footprint copied from the active edit-mask grid.
+## This transient eligibility geometry is independent of artwork content.
 var polygon: PackedVector2Array = PackedVector2Array()
 
 
@@ -45,12 +48,22 @@ func clip_strokes(strokes: Array[AtlasStroke]) -> Array[AtlasStroke]:
 	for stroke: AtlasStroke in strokes:
 		if stroke == null or not stroke.is_valid():
 			continue
+		# Text stays a semantic object: either its whole glyph envelope fits,
+		# or it is excluded. Ordinary line segments are clipped below.
+		if stroke.is_text() or stroke.is_prop() or stroke.editable_path:
+			if contains_rect(AtlasSelectionGeometry.stroke_bounds(stroke)):
+				result.append(stroke.copy())
+			continue
+		# Remove adjacent duplicate vertices before offsetting the convex scope.
+		# The inset reserves half the stroke diameter on *both* sides.
 		var centerline: PackedVector2Array = PackedVector2Array()
 		for point: Vector2 in stroke.points:
 			if centerline.is_empty() or point != centerline[-1]:
 				centerline.append(point)
 		var insets: Array[PackedVector2Array] = Geometry2D.offset_polygon(
 			polygon, -stroke.width * 0.5, Geometry2D.JOIN_MITER)
+		# A dot uses point containment; a polyline may yield several detached
+		# fragments. These new strokes retain the source's color and width.
 		for inset: PackedVector2Array in insets:
 			if centerline.size() == 1:
 				if Geometry2D.is_point_in_polygon(centerline[0], inset):
@@ -74,10 +87,8 @@ func erase(strokes: Array[AtlasStroke], path: PackedVector2Array, width: float) 
 		if not stroke.is_valid() or not _valid_boundary():
 			result.append(stroke.copy())
 			continue
-		var bounds: Rect2 = Rect2(stroke.points[0], Vector2.ZERO)
-		for point: Vector2 in stroke.points:
-			bounds = bounds.expand(point)
-		if contains_rect(bounds.grow(stroke.width * 0.5)):
+		var bounds: Rect2 = AtlasSelectionGeometry.stroke_bounds(stroke)
+		if contains_rect(bounds):
 			var eligible: Array[AtlasStroke] = [stroke]
 			result.append_array(AtlasStrokeEraser.erase(eligible, path, width))
 		else:

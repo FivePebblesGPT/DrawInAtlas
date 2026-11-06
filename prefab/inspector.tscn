@@ -1,11 +1,15 @@
 [gd_scene format=3 uid="uid://ba8os0lsdl52b"]
 
 [ext_resource type="Script" uid="uid://c3jrf6x5ew6qh" path="res://scripts/interface/inspector.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://cfisw8d1wjsa7" path="res://prefab/grid_controls.tscn" id="2"]
+
+[ext_resource type="Texture2D" path="res://img/controls/add.svg" id="3"]
+[ext_resource type="Texture2D" path="res://img/controls/rename.svg" id="4"]
+[ext_resource type="Texture2D" path="res://img/controls/raise.svg" id="5"]
+[ext_resource type="Texture2D" path="res://img/controls/lower.svg" id="6"]
 
 [node name="InspectorPanel" type="PanelContainer" unique_id=1180319672]
-custom_minimum_size = Vector2(252, 0)
-offset_right = 252.0
+custom_minimum_size = Vector2(232, 0)
+offset_right = 232.0
 offset_bottom = 640.0
 script = ExtResource("1")
 
@@ -23,7 +27,7 @@ theme_override_constants/margin_right = 14
 theme_override_constants/margin_bottom = 14
 
 [node name="Sections" type="VBoxContainer" parent="Scroll/Margin" unique_id=1122101354]
-custom_minimum_size = Vector2(204, 0)
+custom_minimum_size = Vector2(184, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 20
@@ -50,35 +54,49 @@ unique_name_in_owner = true
 layout_mode = 2
 placeholder_text = "Floor name"
 
-[node name="Names" type="HBoxContainer" parent="Scroll/Margin/Sections/FloorSection" unique_id=1118679550]
+[node name="FloorActions" type="HBoxContainer" parent="Scroll/Margin/Sections/FloorSection" unique_id=1118679550]
 layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="FloorAdd" type="Button" parent="Scroll/Margin/Sections/FloorSection/Names" unique_id=1710289388]
+[node name="FloorAdd" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=1710289388]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Add"
+tooltip_text = "Add a floor using the name above"
+accessibility_name = "Add floor"
+icon = ExtResource("3")
+icon_alignment = 1
 
-[node name="FloorRename" type="Button" parent="Scroll/Margin/Sections/FloorSection/Names" unique_id=1400989511]
+[node name="FloorRename" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=1400989511]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Rename"
+tooltip_text = "Rename selected floor using the name above"
+accessibility_name = "Rename selected floor"
+icon = ExtResource("4")
+icon_alignment = 1
 
-[node name="Order" type="HBoxContainer" parent="Scroll/Margin/Sections/FloorSection" unique_id=217643372]
-layout_mode = 2
-
-[node name="FloorUp" type="Button" parent="Scroll/Margin/Sections/FloorSection/Order" unique_id=844295673]
+[node name="FloorUp" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=844295673]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Raise"
+tooltip_text = "Raise selected floor"
+accessibility_name = "Raise selected floor"
+icon = ExtResource("5")
+icon_alignment = 1
 
-[node name="FloorDown" type="Button" parent="Scroll/Margin/Sections/FloorSection/Order" unique_id=811350563]
+[node name="FloorDown" type="Button" parent="Scroll/Margin/Sections/FloorSection/FloorActions" unique_id=811350563]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 34)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Lower"
+tooltip_text = "Lower selected floor"
+accessibility_name = "Lower selected floor"
+icon = ExtResource("6")
+icon_alignment = 1
 
 [node name="FloorDefault" type="Button" parent="Scroll/Margin/Sections/FloorSection" unique_id=1533414022]
 unique_name_in_owner = true
@@ -104,31 +122,30 @@ theme_override_font_sizes/font_size = 11
 text = "TOOLS"
 autowrap_mode = 3
 
-[node name="ToolPicker" type="OptionButton" parent="Scroll/Margin/Sections/ToolSection" unique_id=331717275]
+[node name="ActiveToolLabel" type="Label" parent="Scroll/Margin/Sections/ToolSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Pen (B) · Tools in left sidebar"
+autowrap_mode = 3
+
+[node name="SnapSection" type="VBoxContainer" parent="Scroll/Margin/Sections"]
 unique_name_in_owner = true
 layout_mode = 2
-selected = 0
-item_count = 10
-popup/item_0/text = "Pen"
-popup/item_0/id = 0
-popup/item_1/text = "Eraser"
-popup/item_1/id = 1
-popup/item_2/text = "Paint cells"
-popup/item_2/id = 2
-popup/item_3/text = "Select scope cell"
-popup/item_3/id = 3
-popup/item_4/text = "Drag battlemap"
-popup/item_4/id = 4
-popup/item_5/text = "Line"
-popup/item_5/id = 5
-popup/item_6/text = "Rectangle outline"
-popup/item_6/id = 6
-popup/item_7/text = "Ellipse outline"
-popup/item_7/id = 7
-popup/item_8/text = "Select artwork"
-popup/item_8/id = 8
-popup/item_9/text = "Fill raster / terrain"
-popup/item_9/id = 9
+theme_override_constants/separation = 6
+
+[node name="SnapHeading" type="Label" parent="Scroll/Margin/Sections/SnapSection"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 11
+text = "GRID SNAPPING"
+
+[node name="SnapCheckbox" type="CheckBox" parent="Scroll/Margin/Sections/SnapSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Snap to grid"
+tooltip_text = "Opt in: snap line/shape endpoints and selection moves to the board grid. Pen, selection marquee, resize and numeric transforms stay free."
+accessibility_name = "Snap artwork to editing grid"
 
 [node name="InkSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=751123006]
 unique_name_in_owner = true
@@ -140,13 +157,21 @@ custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 11
-text = "INK"
+text = "BRUSH & STROKE"
+autowrap_mode = 3
+
+[node name="EraserHint" type="Label" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+visible = false
+text = "Clears raster pixels to transparency. The raster target is selected automatically. Select and Delete removes Objects. One drag = one undo."
 autowrap_mode = 3
 
 [node name="ColorLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=1830986059]
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
-text = "Color"
+text = "Color / opacity"
 autowrap_mode = 3
 
 [node name="BrushColorPicker" type="ColorPickerButton" parent="Scroll/Margin/Sections/InkSection" unique_id=1078165809]
@@ -154,12 +179,14 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 color = Color(0.9607843, 0.70980394, 0.27058825, 1)
-edit_alpha = false
+edit_alpha = true
+tooltip_text = "Choose brush color and alpha (opacity); edits apply to the next stroke."
 
 [node name="WidthLabel" type="Label" parent="Scroll/Margin/Sections/InkSection" unique_id=2138069015]
 custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 text = "Width (board units)"
+tooltip_text = "Hover over the width field and scroll to adjust by 0.5 units; type for an exact width."
 autowrap_mode = 3
 
 [node name="BrushWidthSpinner" type="SpinBox" parent="Scroll/Margin/Sections/InkSection" unique_id=2047989301]
@@ -169,6 +196,68 @@ min_value = 0.5
 max_value = 256.0
 step = 0.5
 value = 8.0
+tooltip_text = "Wheel: ±0.5 board units per notch (0.5–256); type an exact value."
+
+[node name="LineHint" type="Label" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+visible = false
+text = "Drag start → end. Shift: 15° angles; Alt: draw about center. Esc cancels. Solid line with round ends; width/color above."
+autowrap_mode = 3
+
+[node name="PolygonHint" type="Label" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+visible = false
+text = "Click vertices. Enter, right-click, double-click, or click first vertex to close; Backspace removes last, Esc cancels. One closed shape, not an editable wall path."
+autowrap_mode = 3
+
+[node name="PolygonFill" type="CheckBox" parent="Scroll/Margin/Sections/InkSection"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+text = "Solid fill (no outline)"
+tooltip_text = "Off: solid rounded outline using stroke width. On: solid interior in the chosen color and opacity; width applies to outlines only."
+
+[node name="BucketSection" type="VBoxContainer" parent="Scroll/Margin/Sections"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BucketHeading" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 11
+text = "BUCKET FILL"
+
+[node name="BucketHint" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+text = "Raster: stored pixels on the active layer only. A blank raster has nothing to fill. Press to preview, release to apply; Esc cancels."
+autowrap_mode = 3
+
+[node name="FillToleranceLabel" type="Label" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Raster tolerance (%)"
+
+[node name="FillTolerance" type="SpinBox" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+step = 1.0
+value = 0.0
+tooltip_text = "0 = exact match. Higher tolerance accepts larger premultiplied RGBA differences from the clicked pixel."
+
+[node name="FillGlobal" type="CheckBox" parent="Scroll/Margin/Sections/BucketSection"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Global (all matching pixels)"
+tooltip_text = "Unchecked: four-connected region. Checked: all matching pixels in stored raster chunks. Hold Shift to temporarily invert."
 
 [node name="SelectionSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=1827189808]
 unique_name_in_owner = true
@@ -241,43 +330,6 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Apply transform"
 
-[node name="TerrainSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=1868315659]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Scroll/Margin/Sections/TerrainSection" unique_id=348581874]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 11
-text = "TERRAIN"
-autowrap_mode = 3
-
-[node name="PaletteLabel" type="Label" parent="Scroll/Margin/Sections/TerrainSection" unique_id=2030587706]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-text = "Palette"
-autowrap_mode = 3
-
-[node name="PalettePicker" type="OptionButton" parent="Scroll/Margin/Sections/TerrainSection" unique_id=1063314913]
-unique_name_in_owner = true
-layout_mode = 2
-selected = 2
-item_count = 6
-popup/item_0/text = "Erase"
-popup/item_0/id = 0
-popup/item_1/text = "Grass"
-popup/item_1/id = 1
-popup/item_2/text = "Forest"
-popup/item_2/id = 2
-popup/item_3/text = "Road"
-popup/item_3/id = 3
-popup/item_4/text = "Water"
-popup/item_4/id = 4
-popup/item_5/text = "Stone"
-popup/item_5/id = 5
-
 [node name="MapSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=709914055]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -287,7 +339,7 @@ custom_minimum_size = Vector2(1, 0)
 layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 11
-text = "MAP"
+text = "EDIT MASK"
 autowrap_mode = 3
 
 [node name="LockCheckbox" type="CheckBox" parent="Scroll/Margin/Sections/MapSection" unique_id=668682371]
@@ -296,36 +348,6 @@ layout_mode = 2
 tooltip_text = "Use Select scope cell first. A locked scope with no cell blocks artwork edits."
 disabled = true
 text = "Lock to selected cell"
-
-[node name="GridControls" parent="Scroll/Margin/Sections/MapSection" unique_id=1880573347 instance=ExtResource("2")]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="PlacementSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=361657607]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Scroll/Margin/Sections/PlacementSection" unique_id=1719210073]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 11
-text = "PLACEMENT"
-autowrap_mode = 3
-
-[node name="RotationLabel" type="Label" parent="Scroll/Margin/Sections/PlacementSection" unique_id=1895047211]
-custom_minimum_size = Vector2(1, 0)
-layout_mode = 2
-text = "Rotation (degrees)"
-autowrap_mode = 3
-
-[node name="AngleSpinner" type="SpinBox" parent="Scroll/Margin/Sections/PlacementSection" unique_id=656639003]
-unique_name_in_owner = true
-layout_mode = 2
-min_value = -180.0
-max_value = 180.0
-step = 0.01
 
 [node name="ReferenceSection" type="VBoxContainer" parent="Scroll/Margin/Sections" unique_id=1487948131]
 layout_mode = 2
@@ -348,21 +370,22 @@ autowrap_mode = 3
 [node name="PreviewPicker" type="OptionButton" parent="Scroll/Margin/Sections/ReferenceSection" unique_id=1706946970]
 unique_name_in_owner = true
 layout_mode = 2
-selected = 2
-tooltip_text = "Up to eight visible floor previews are rendered at once; use Search for additional entrances."
+selected = 3
+tooltip_text = "Registered links show transparent board-aligned detail; links without placement stay markers. Up to eight previews at once."
 item_count = 4
 popup/item_0/text = "Off"
 popup/item_0/id = 0
 popup/item_1/text = "Markers"
 popup/item_1/id = 1
-popup/item_2/text = "Thumbnails"
+popup/item_2/text = "Aligned faint"
 popup/item_2/id = 2
-popup/item_3/text = "Spatial overlay / symbolic thumbnails"
+popup/item_3/text = "Aligned overlay"
 popup/item_3/id = 3
 fit_to_longest_item = false
 
 [node name="ManageLinks" type="Button" parent="Scroll/Margin/Sections/ReferenceSection"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 text = "Linked maps…"
 

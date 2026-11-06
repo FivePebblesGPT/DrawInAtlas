@@ -4,11 +4,19 @@ extends Resource
 
 const SIZE: int = 256
 
+## Signed integer CHUNK coordinate, not a pixel position or document point.
+## Its pixel origin is coord * SIZE, including for negative chunk indexes.
 @export_storage var coord: Vector2i
-var image: Image # decoded runtime cache; never serialized
+## Decoded, mutable RGBA8 runtime image, not part of Resource serialization.
+## Clone before editing to keep undo snapshots and imports independently owned.
+var image: Image
+## Native-save encoded payload; separate from the decoded image cache.
 @export_storage var encoded_webp: PackedByteArray = PackedByteArray()
+## Actual stored pixel dimensions (1..SIZE); boundary chunks may be partial.
 @export_storage var width: int = SIZE
 @export_storage var height: int = SIZE
+## Persisted lowercase SHA-256 content address of dimensions + RGBA8 bytes.
+## asset_id's getter derives it from decoded pixels when available.
 @export_storage var stored_asset_id: String = ""
 var asset_id: String:
 	get:

@@ -11,8 +11,7 @@ func _initialize() -> void:
 
 func _run_suite() -> void:
 	_test_scope_geometry()
-	_test_tile_fill()
-	_test_hex_fill()
+
 	_test_raster_fill_boundaries()
 	_test_raster_transform_scope()
 	_test_raster_brush()
@@ -81,7 +80,7 @@ func _pixel_scope(layer: AtlasRasterLayer, rect: Rect2) -> AtlasEditScope:
 
 func _rejected(result: AtlasFillResult, description: String) -> void:
 	_check(not result.ok and not result.message.is_empty()
-		and result.layer == null and result.terrain.is_empty(), description)
+		and result.layer == null, description)
 
 
 func _test_scope_geometry() -> void:
@@ -107,61 +106,6 @@ func _test_scope_geometry() -> void:
 		Vector2.ZERO, Vector2(10.0, 0.0), Vector2(3.0, 3.0), Vector2(0.0, 10.0)
 	]), true)
 	_check(not concave.contains_rect(Rect2(0.5, 0.5, 1.0, 1.0)), "nonconvex boundary fails closed")
-
-
-func _test_tile_fill() -> void:
-	var grid: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 1.0)
-	var terrain: Dictionary = {"0,0": 2, "1,0": 2, "1,1": 2, "2,2": 2, "0,1": 3}
-	var before: Dictionary = terrain.duplicate(true)
-	var result: AtlasFillResult = AtlasFill.tiles(grid, terrain, Vector2i.ZERO, 7)
-	_check(result.ok and result.terrain.get("0,0") == 7 and result.terrain.get("1,1") == 7,
-		"square flood follows four-connected equal palettes")
-	_check(result.terrain.get("2,2") == 2 and result.terrain.get("0,1") == 3,
-		"square flood excludes diagonal and different palettes")
-	_check(terrain == before, "tile fill never mutates source")
-	result.terrain["0,0"] = 99
-	_check(terrain == before, "tile snapshot is independent")
-	result = AtlasFill.tiles(grid, terrain, Vector2i.ZERO, 0)
-	_check(result.ok and not result.terrain.has("0,0") and result.terrain.size() == 2,
-		"tile palette zero removes affected keys")
-	_rejected(AtlasFill.tiles(grid, terrain, Vector2i.ZERO, 2), "same palette is a no-op")
-	_rejected(AtlasFill.tiles(grid, terrain, Vector2i.ZERO, 7, null, 2),
-		"tile overflow rejects the whole transaction")
-	_check(terrain == before, "overflow leaves terrain untouched")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, 1), "unscoped background is unbounded")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, 1, AtlasEditScope.new()),
-		"disabled scope cannot bound background")
-	var scope: AtlasEditScope = _rect_scope(Rect2(0.0, 0.0, 3.0, 2.0))
-	result = AtlasFill.tiles(grid, {}, Vector2i.ZERO, 4, scope, 6)
-	_check(result.ok and result.terrain.size() == 6 and result.terrain.has("2,1"),
-		"scoped background fills exactly the finite square region at the limit")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, 4, scope, 5),
-		"scoped background overflow is atomic")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, 1, _rect_scope(Rect2(0.2, 0.0, 0.8, 1.0))),
-		"cell center inside scope does not allow a crossing cell")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, 1,
-		AtlasEditScope.new(PackedVector2Array(), true)), "empty selection rejects tile flood")
-	_rejected(AtlasFill.tiles(AtlasGrid.new(AtlasGrid.Kind.GRIDLESS), {}, Vector2i.ZERO, 1),
-		"gridless fill rejected")
-	_rejected(AtlasFill.tiles(grid, {"bad": 1}, Vector2i.ZERO, 1), "malformed terrain rejected")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, -1, scope), "negative palette rejected")
-	_rejected(AtlasFill.tiles(grid, {}, Vector2i.ZERO, 1, scope, 0), "invalid tile limit rejected")
-
-
-func _test_hex_fill() -> void:
-	for kind: AtlasGrid.Kind in [AtlasGrid.Kind.HEX_POINTY, AtlasGrid.Kind.HEX_FLAT]:
-		var grid: AtlasGrid = AtlasGrid.new(kind, 5.0)
-		grid.origin = Vector2(12.0, -9.0)
-		grid.rotation = 0.31
-		var terrain: Dictionary = {"0,0": 2, "1,-1": 2, "-1,1": 2, "3,3": 2}
-		var result: AtlasFillResult = AtlasFill.tiles(grid, terrain, Vector2i.ZERO, 6)
-		_check(result.ok and result.terrain.get("1,-1") == 6
-			and result.terrain.get("-1,1") == 6 and result.terrain.get("3,3") == 2,
-			"hex flood uses six axial neighbors for kind %d" % kind)
-		var scope: AtlasEditScope = AtlasEditScope.new(grid.cell_polygon(Vector2i.ZERO), true)
-		result = AtlasFill.tiles(grid, {}, Vector2i.ZERO, 3, scope)
-		_check(result.ok and result.terrain.size() == 1 and result.terrain.get("0,0") == 3,
-			"rotated hex scope bounds background to one complete cell for kind %d" % kind)
 
 
 func _test_raster_fill_boundaries() -> void:

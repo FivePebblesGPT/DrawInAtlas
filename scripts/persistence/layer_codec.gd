@@ -8,14 +8,20 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	var visible: Variant = data.get("visible", true)
 	var locked: Variant = data.get("locked", false)
 	var opacity: Variant = data.get("opacity", 1.0)
+	var detail: Variant = data.get("detail_level", 0)
 	if not visible is bool or not locked is bool or not AtlasData.number(opacity):
+		return null
+	if not AtlasData.integer(detail) or int(detail) < 0 or int(detail) > AtlasLayer.MAX_DETAIL_LEVEL:
 		return null
 	if float(opacity) < 0.0 or float(opacity) > 1.0:
 		return null
 	var layer: AtlasLayer
 	match data.get("kind"):
-		"INK":
-			var ink: AtlasInkLayer = AtlasInkLayer.new(data.id, data.name)
+		"OBJECTS", "INK":
+			if _has_any(data, ["terrain", "grid", "chunks", "pixels_per_unit", "transform"]):
+				return null
+			var ink: AtlasObjectsLayer = (AtlasObjectsLayer.new(data.id, data.name)
+				if data.get("kind") == "OBJECTS" else AtlasInkLayer.new(data.id, data.name))
 			var strokes: Variant = data.get("strokes", [])
 			if not strokes is Array:
 				return null
@@ -27,22 +33,9 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 					return null
 				ink.strokes.append(stroke)
 			layer = ink
-		"TILES":
-			var tiles: AtlasTileLayer = AtlasTileLayer.new(data.id, data.name)
-			var cells: Variant = data.get("terrain", {})
-			var grid: Variant = data.get("grid")
-			if not cells is Dictionary or (grid != null and not grid is Dictionary):
-				return null
-			for key: Variant in cells:
-				if not AtlasData.coordinate_key(key) or not AtlasData.integer(cells[key]) or int(cells[key]) < 0:
-					return null
-				tiles.terrain[key] = int(cells[key])
-			if grid != null:
-				tiles.grid = AtlasGrid.from_dict(grid)
-				if tiles.grid == null:
-					return null
-			layer = tiles
 		"RASTER":
+			if _has_any(data, ["strokes", "terrain", "grid"]):
+				return null
 			var raster: AtlasRasterLayer = AtlasRasterLayer.new(data.id, data.name)
 			var scale: Variant = data.get("pixels_per_unit", 1.0)
 			var chunks: Variant = data.get("chunks", [])
@@ -77,19 +70,41 @@ static func from_dict(data: Dictionary) -> AtlasLayer:
 	layer.visible = visible
 	layer.locked = locked
 	layer.opacity = float(opacity)
+	layer.detail_level = int(detail)
 	return layer
 
 
-static func clone(layer: AtlasLayer) -> AtlasLayer:
-	if layer == null:
+## A discriminator at a dictionary boundary must not reinterpret another
+## concrete layer's shape by silently ignoring its type-specific fields.
+static func _has_any(data: Dictionary, keys: Array[String]) -> bool:
+	for key: String in keys:
+		if data.has(key):
+			return true
+	return false
+
+
+## Validate a live Resource against the existing dictionary codec without copying
+## its decoded raster pixels. The codec remains the single metadata validator.
+## Check the live chunk keys/images too: dictionary reconstruction alone cannot
+## detect a stale in-memory dictionary key or malformed decoded Image.
+static func _validated_metadata(layer: AtlasLayer) -> AtlasLayer:
+	if layer == null or not layer.has_valid_type_marker():
 		return null
-	var copy: AtlasLayer = from_dict(layer.to_dict())
+	if layer is AtlasRasterLayer:
+		for key: String in layer.chunks:
+			var chunk: AtlasRasterChunk = layer.chunks[key]
+			if chunk == null or not chunk.is_valid() or key != "%d,%d" % [chunk.coord.x, chunk.coord.y]:
+				return null
+	var metadata: AtlasLayer = from_dict(layer.to_dict())
+	return metadata
+
+
+static func clone(layer: AtlasLayer) -> AtlasLayer:
+	var copy: AtlasLayer = _validated_metadata(layer)
 	if copy is AtlasRasterLayer and layer is AtlasRasterLayer:
 		for key: String in layer.chunks:
-			if not layer.chunks[key].is_valid():
-				return null
 			if layer.chunks[key].image != null:
-				copy.chunks[key].image = layer.chunks[key].image.duplicate()
+				(copy as AtlasRasterLayer).chunks[key].image = layer.chunks[key].image.duplicate()
 	return copy
 
 
@@ -106,7 +121,7 @@ static func clone_all(layers: Array[AtlasLayer]) -> Array[AtlasLayer]:
 static func valid_collection(layers: Array[AtlasLayer]) -> bool:
 	var ids: Dictionary[String, bool] = {}
 	for layer: AtlasLayer in layers:
-		if layer == null or ids.has(layer.id) or clone(layer) == null:
+		if layer == null or ids.has(layer.id) or _validated_metadata(layer) == null:
 			return false
 		ids[layer.id] = true
 	return true

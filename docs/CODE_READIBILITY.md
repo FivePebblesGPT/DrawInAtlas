@@ -1,8 +1,14 @@
 # Code readability and scene structure
 
+> [!info] Implementation reference
+> The broader findings in [[ManualReview_2026-10-30]] now drive [[Index]]. Explicit typing/skill guidance is [[T-001]]; additional module readability and commented-step work is tracked by [[T-033]], [[T-034]], [[T-035]], [[T-036]] and [[T-037]]. Earlier focused readability checks are historical evidence.
+
 This document tracks readability improvements on `aidev`. Comparing the number
 of `.gd` files to `.tscn` files was misleading: the domain model, application
 services and test scripts do not describe node trees.
+
+For the post-milestone-6 simplification, code-only review findings and prioritized
+manual-review paths, see [archived readability review](Archive/2026-10-30/READABILITY_REVIEW.md).
 
 ## Fixed UI belongs in scenes
 
@@ -93,19 +99,101 @@ Changing a label, section layout or default is now a scene edit, rather than a
 change to that command workflow.
 
 
-## Explain algorithms, not syntax
+## Function steps: explain algorithms, not syntax (T-037)
 
-- Name phases clearly, use guard clauses when helpful and separate meaningful
-  algorithm steps with a blank line. Preserve behavior rather than minimizing
-  line count.
-- Comment why a lifecycle, coordinate, rendering or persistence invariant is
-  needed; do not narrate obvious assignments.
-- Type public API inputs/outputs and follow existing file indentation until
-  formatting is intentionally standardized.
+Use **intent-named, commented phases** in a function that handles several
+responsibilities (especially coordinates, traversal, mutation and result
+construction). A phase is a cohesive block of work with an identifiable
+input/output or safety invariant, not an arbitrary number of lines.
+
+1. **Guard and normalize** inputs before expensive or mutating work.
+2. **Establish the working space and bounds**, naming conversions and units
+   where they could be confused (for example, board units versus raster pixels).
+3. **Traverse or compute**, stating eligibility, scope and termination/limit
+   rules at the block where they matter.
+4. **Stage changes**, keeping partial results separate from canonical source
+   state until all relevant checks can succeed.
+5. **Construct and return** the result at the end of a successful operation.
+
+Not every function needs all five phases or any phase comments: short cohesive
+helpers should stay short. When the phases are present, put a blank line and a
+brief `#` comment **before** each non-obvious block. Name the phase by what it
+ensures or produces (rather than numbering `Step 1`, `Step 2`, etc.). Explain
+*why* an ordering, coordinate conversion, limit, or ownership rule matters;
+do not narrate obvious assignments or individual `if` statements. Keep useful
+local variables adjacent to the code they explain. Extract a named helper when
+its transformation or subalgorithm has a clear contract, can be understood on
+its own, or is reused; avoid fragmentation into trivial one-line wrappers.
+Preserve explicit types on all declarations, including locals, and follow the
+file's existing indentation style.
+
+**Representative paint example:** `AtlasRasterBrush.paint()` in
+`scripts/editing/raster_brush.gd` now uses these boundaries without rewriting
+its algorithm:
+
+- Validate the layer, color and path before any candidate work.
+- Enclose the board-space sweep and transform its bounds into raster pixels,
+  accounting for the layer's transform.
+- Cap candidate work before scanning, even over empty raster chunks.
+- Test pixel centers and edit-mask quads, recording changes against the
+  original layer (not once per path sample).
+- Build a detached snapshot only after the entire scan succeeds.
+
+The source already has meaningful `_touches()`, `_source_over()` and
+`AtlasFill._paint_pixel_colors()` helpers; keep them instead of making the
+main flow a series of one-line calls. The T-037 demonstration added only
+comments and spacing; the later [[T-034]] implementation extracted a cohesive
+pixel-staging scan. The geometry cleanups [[T-035]] and [[T-036]] are now complete;
+future representation decisions remain separate under [[T-028]].
+
+**Raster brush application (T-034):** `AtlasRasterBrush.paint()` now validates and
+maps the board-space sweep to a raster candidate rectangle, checks the
+candidate-work budget, and hands eligible pixels to `_stage_pixel_changes()`.
+That helper keeps sparse-chunk erase gating before coordinate conversion,
+checks coverage at transformed pixel centers, tests whole-quad edit masks,
+and blends each accepted pixel once against its original image. On success,
+the shared writer constructs a detached snapshot; on error, staged colors
+are discarded. Keep these decisions in this order rather than replacing
+them with per-sample writes or eager snapshot allocation.
+
+**Fill application (T-033):** `AtlasFill.tiles()` now makes the terrain-key
+validation, finite background bound, cell eligibility, bounded traversal and
+copy-on-success steps visible. `AtlasFill.raster()` separates document-to-pixel
+seed conversion from two named scans: a four-connected seed-color flood and a
+sorted stored-chunk scan for global mode. Each scan returns at most `limit + 1`
+eligible pixels; the caller rejects overflow before asking the shared snapshot
+writer to clone and edit any image. Masking uses whole transformed pixel quads;
+even transparent pixels must be stored. The shared writer can also grow partial
+chunks for brush edits, while fills never select those unstored areas.
+
+**Selection geometry application (T-035):** `AtlasSelectionGeometry` keeps
+selection identity and index validation in `select_indices()`, picks ink in
+reverse painter order with `_hits_stroke()`, and inverse-maps raster document
+points into local board units. Raster selection uses a transformed AABB of
+sparse chunks; gaps and transparent pixels inside that envelope still count
+as selected. `transformed()` validates a live selection and a finite,
+invertible transform, clones the layer, then delegates to `_transform_ink()`
+or `_transform_raster()` and revalidates the result. Ink requires uniform,
+orthogonal scaling and scales stroke widths; raster composes affine placement
+without resampling pixels. Both paths require complete source and destination
+footprints inside an enabled edit mask. Helpers mutate only the detached
+snapshot, never the live layer; a rejected edit discards it.
+
+**Vector eraser application (T-036):** `AtlasStrokeEraser.erase()` validates
+board-unit gesture coordinates and diameter before modifying any result. It
+checks text, filled polygons and editable wall paths as semantic whole objects
+using `_touches_whole_object()`; only ordinary strokes reach the intersecting
+centerline fast path. `_retained_centerline_parts()` applies round sweep
+capsules sequentially to detached vertices, preserving multi-cut fragment
+ordering. Single-point strokes/gestures and the 32-sided tap cap are explicit;
+fragment constructors retain source RGBA and width while misses clone full
+source metadata. Mask eligibility, editor preview/commit and exact undo/redo
+remain at the existing call sites. No conversion of vector ink to raster was
+performed here; [[T-028]] owns that design decision.
 
 ## Validation
 
-Run the Godot 4.8-beta1 headless import/parse check and the UI smoke tests
+Run the Godot 4.8-beta2 headless import/parse check and the UI smoke tests
 listed in the README, notably `tests/layer_ui_smoke.gd`,
 `tests/organization_ui_smoke.gd`, `tests/tools_ui_smoke.gd` and
 `tests/editor_modules_smoke.gd`. The module suite exercises form signals,

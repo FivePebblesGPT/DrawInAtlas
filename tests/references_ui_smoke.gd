@@ -50,27 +50,26 @@ func _run() -> void:
 
 
 func _fixture() -> AtlasCampaign:
-	var result := AtlasCampaign.new()
+	var result: AtlasCampaign = AtlasCampaign.new()
 	result.root_map_id = "parent"
-	var parent := AtlasMapDocument.new("parent", "City source")
+	var parent: AtlasMapDocument = AtlasMapDocument.new("parent", "City source")
 	parent.grid = AtlasGrid.new(AtlasGrid.Kind.SQUARE, 40.0)
 	parent.grid.visible = false
-	for x: int in range(-3, 4):
-		for y: int in range(-3, 4):
-			parent.floors[0].paint(Vector2i(x, y), 4)
+	# A colored raster swatch replaces obsolete palette-cell floor painting.
+	parent.floors[0].layers.append(_raster(Color.SANDY_BROWN, Vector2.ZERO, Vector2i(40, 40)))
 	parent_raster = _raster(Color.RED, Vector2(-80, -80), Vector2i(79, 160))
 	parent.floors[0].layers.append(parent_raster)
-	var ink := AtlasInkLayer.new("top-ink", "Top ink")
+	var ink: AtlasInkLayer = AtlasInkLayer.new("top-ink", "Top ink")
 	ink.strokes.append(AtlasStroke.new(PackedVector2Array([Vector2(-10, -100), Vector2(-10, 100)]), Color.GREEN, 8.0))
 	parent.floors[0].layers.append(ink)
-	var upper := AtlasFloor.new()
+	var upper: AtlasFloor = AtlasFloor.new()
 	upper.id = "upper"
 	upper.display_name = "Blue upper floor"
 	upper.layers.append(_raster(Color.BLUE, Vector2(-96, -96), Vector2i(192, 192)))
 	parent.floors.append(upper)
-	var child := AtlasMapDocument.new("child", "Encounter")
+	var child: AtlasMapDocument = AtlasMapDocument.new("child", "Encounter")
 	child.grid.visible = false
-	var other := AtlasMapDocument.new("other", "Unregistered source")
+	var other: AtlasMapDocument = AtlasMapDocument.new("other", "Unregistered source")
 	other.grid.visible = false
 	other.floors[0].layers.append(_raster(Color.GREEN, Vector2.ZERO, Vector2i(64, 64)))
 	result.add_map(parent)
@@ -87,7 +86,7 @@ func _fixture() -> AtlasCampaign:
 	placement.parent_units_per_cell = 20.0
 	placement.child_units_per_cell = 64.0
 	result.placements.append(placement)
-	var link := AtlasMapLink.new()
+	var link: AtlasMapLink = AtlasMapLink.new()
 	link.id = "spatial-door"
 	link.source_map_id = parent.id
 	link.target_map_id = child.id
@@ -124,7 +123,7 @@ func _spatial_parent() -> bool:
 	_check(editor.map_references.source_link_id == "spatial-door", "actual entrance disambiguates multiple parents")
 	_check(_color_at(placement.parent_point_to_child(Vector2(-30, -10)), Color.RED), "rotated reference contains parent raster artwork")
 	_check(_color_at(placement.parent_point_to_child(Vector2(-10, 10)), Color.GREEN), "reference contains top ink in canonical layer order")
-	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), AtlasCanvas.TERRAIN_COLORS[4]), "reference contains terrain using source content geometry")
+	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), Color.SANDY_BROWN), "reference contains raster artwork independently of grid")
 	_check(_color_at(Vector2(-20, -10), AtlasCanvas.EMPTY_COLOR), "reference is cropped at the child footprint boundary")
 	var before: Dictionary = campaign.get_map("parent").to_dict()
 	var bytes: PackedByteArray = parent_raster.chunks["0,0"].image.get_data()
@@ -141,7 +140,7 @@ func _spatial_parent() -> bool:
 	editor.inspector.reference_checkbox.button_pressed = true
 	editor.inspector.opacity_slider.value = 0.5
 	await _frames(14)
-	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), AtlasCanvas.EMPTY_COLOR.lerp(AtlasCanvas.TERRAIN_COLORS[4], 0.5)), "reference opacity composites once over board background")
+	_check(_color_at(placement.parent_point_to_child(Vector2(10, 20)), AtlasCanvas.EMPTY_COLOR.lerp(Color.SANDY_BROWN, 0.5)), "reference opacity composites once over board background")
 	editor.inspector.opacity_slider.value = 1.0
 	return true
 
@@ -184,7 +183,7 @@ func _freeze_and_sources() -> bool:
 	await _frames(14)
 	_check(editor.map_references.source_link_id == "symbolic-door", "explicitly choose another parent entrance")
 	_check(_color_at(point, AtlasCanvas.EMPTY_COLOR), "symbolic reference does not claim physical alignment")
-	_check(_screen_color(Vector2(84, 76), Color.GREEN), "symbolic source appears as an unregistered read-only thumbnail")
+	_check(not _screen_color(Vector2(84, 76), Color.GREEN), "symbolic source cannot float an unregistered picture on the editor")
 	_check(campaign.to_dict() == before, "source/floor/opacity preferences do not edit documents")
 	return true
 
@@ -201,10 +200,15 @@ func _child_previews() -> bool:
 	await _frames(18)
 	var source: Vector2 = Vector2(-30, -10)
 	_check(_color_at(source, Color.MAGENTA.lerp(Color.BLUE, 0.7)), "spatial child overlay includes raster art with the exact rotated footprint mapping")
+	var strong_color: Color = root.get_texture().get_image().get_pixelv(
+		Vector2i(canvas.global_position + canvas.document_to_local(source)))
 	editor.preview_picker.select(AtlasCanvas.Preview.THUMBNAILS)
 	editor.preview_picker.item_selected.emit(AtlasCanvas.Preview.THUMBNAILS)
 	await _frames(14)
-	_check(not _color_at(source, Color.MAGENTA.lerp(Color.BLUE, 0.7)), "thumbnail mode does not silently keep an aligned overlay")
+	var faint_color: Color = root.get_texture().get_image().get_pixelv(
+		Vector2i(canvas.global_position + canvas.document_to_local(source)))
+	_check(faint_color.r > strong_color.r + 0.08 and faint_color.b > 0.90,
+		"faint preview remains spatially aligned with reduced opacity")
 	editor.open_map("other")
 	canvas.camera_center = Vector2(3040, 3030)
 	canvas.camera_zoom = 1.0
@@ -214,8 +218,8 @@ func _child_previews() -> bool:
 	_check(_color_at(Vector2(3010, 3010), AtlasCanvas.EMPTY_COLOR.lerp(Color(0.24, 0.70, 0.82), 0.15)),
 		"symbolic footprint shows its marker, not falsely aligned child pixels")
 	var records: Dictionary = editor.map_references.get("_children")
-	_check(records.has("symbolic-door") and not records["symbolic-door"].spatial,
-		"overlay mode falls back to a pinned thumbnail for symbolic links")
+	_check(not records.has("symbolic-door"),
+		"symbolic link is marker-only: no fabricated registration or expensive capture")
 	DirAccess.make_dir_recursive_absolute("user://validation")
 	_check(root.get_texture().get_image().save_png("user://validation/linked-map-references.png") == OK, "save native milestone-6 preview evidence")
 	return true
@@ -242,7 +246,7 @@ func _preview_budget() -> bool:
 	canvas.camera_center = Vector2.ZERO
 	canvas.camera_zoom = 1.0
 	for index: int in range(9):
-		var link := AtlasMapLink.new()
+		var link: AtlasMapLink = AtlasMapLink.new()
 		link.id = "budget-%d" % index
 		link.source_map_id = "parent"
 		link.target_map_id = "child"
@@ -250,8 +254,8 @@ func _preview_budget() -> bool:
 		_check(editor.edits.execute(AtlasLinkEdit.new("parent", null, link)), "visible marker setup %d" % index)
 	await _frames(40)
 	var records: Dictionary = editor.map_references.get("_children")
-	_check(records.size() <= AtlasMapReferences.MAX_CHILD_PREVIEWS and editor.map_references.omitted_count >= 2,
-		"only eight visible children capture; other entrances remain markers")
+	_check(records.size() <= AtlasMapReferences.MAX_CHILD_PREVIEWS and editor.map_references.omitted_count == 0,
+		"unplaced entrances stay markers and consume no preview capture budget")
 	_check(editor.map_references.cache.entry_count() <= 16, "reference image cache stays bounded across crops, floors and links")
 	return true
 

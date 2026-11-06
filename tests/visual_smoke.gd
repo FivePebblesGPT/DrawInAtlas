@@ -50,7 +50,7 @@ func _run_suite() -> void:
 	canvas.show_grid = false
 	await process_frame
 	await RenderingServer.frame_post_draw
-	var terrain_before: Image = root.get_texture().get_image()
+	var artwork_before: Image = root.get_texture().get_image()
 	var overlay: AtlasGrid = canvas.map.grid.copy()
 	overlay.kind = AtlasGrid.Kind.SQUARE
 	overlay.cell_size = 80.0
@@ -59,14 +59,14 @@ func _run_suite() -> void:
 	editor.apply_grid(overlay)
 	await process_frame
 	await RenderingServer.frame_post_draw
-	var terrain_after: Image = root.get_texture().get_image()
-	var terrain_moved: int = 0
+	var artwork_after: Image = root.get_texture().get_image()
+	var artwork_moved: int = 0
 	for y: int in range(int(bounds.position.y), int(bounds.end.y), 4):
 		for x: int in range(int(bounds.position.x), int(bounds.end.x), 4):
-			if not terrain_before.get_pixel(x, y).is_equal_approx(terrain_after.get_pixel(x, y)):
-				terrain_moved += 1
-	passed = passed and terrain_moved == 0
-	passed = passed and terrain_after.save_png(directory.path_join("independent-grid.png")) == OK
+			if not artwork_before.get_pixel(x, y).is_equal_approx(artwork_after.get_pixel(x, y)):
+				artwork_moved += 1
+	passed = passed and artwork_moved == 0
+	passed = passed and artwork_after.save_png(directory.path_join("independent-grid.png")) == OK
 	editor._on_undo()
 	var blank_grid: AtlasGrid = AtlasGrid.new(AtlasGrid.Kind.GRIDLESS, 64.0)
 	blank_grid.distance_per_cell = 1.0
@@ -76,7 +76,6 @@ func _run_suite() -> void:
 	canvas.camera_zoom = 1.0
 	canvas.preview = AtlasCanvas.Preview.OFF
 	canvas.show_reference = false
-	canvas.floor.terrain.clear()
 	var ink: Color = Color("#f5b545")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([
 		Vector2(-140, 0), Vector2(140, 0)
@@ -104,11 +103,11 @@ func _run_suite() -> void:
 	var restored_ink: bool = undo_image.get_pixelv(center).is_equal_approx(ink)
 	passed = passed and restored_ink
 	passed = passed and undo_image.save_png(directory.path_join("undo-erase.png")) == OK
-	editor.select_layer("ink")
+	editor.select_layer("raster")
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-100, -40), Vector2(-100, 40)]), ink, 20.0), false)
 	var translucent: Array[AtlasLayer] = AtlasLayerCodec.clone_all(canvas.floor.layers)
-	(translucent[1] as AtlasInkLayer).opacity = 0.5
-	editor.apply_layers(translucent, "ink")
+	(translucent[0] as AtlasRasterLayer).opacity = 0.5
+	editor.apply_layers(translucent, "raster")
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var alpha_frame: Image = root.get_texture().get_image()
@@ -117,7 +116,7 @@ func _run_suite() -> void:
 	var group_opacity: bool = line_pixel.is_equal_approx(crossing_pixel) and line_pixel.r > 0.2 and line_pixel.r < 0.9
 	passed = passed and group_opacity
 	var blue: Color = Color("#2070ff")
-	var image: Image = Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var image: Image = Image.create(256, 256, false, Image.FORMAT_RGBA8)
 	image.fill(blue)
 	editor.import_raster(image)
 	var raster_id: String = canvas.active_layer_id
@@ -126,6 +125,7 @@ func _run_suite() -> void:
 	var raster_frame: Image = root.get_texture().get_image()
 	var raster_on_top: bool = raster_frame.get_pixelv(center + Vector2i(20, 5)).is_equal_approx(blue)
 	passed = passed and raster_on_top
+	editor.layer_panel._move(-1)
 	editor.layer_panel._move(-1)
 	await process_frame
 	await RenderingServer.frame_post_draw
@@ -148,10 +148,11 @@ func _run_suite() -> void:
 	var raster_opacity: bool = partial.b > AtlasCanvas.EMPTY_COLOR.b and partial.b < blue.b
 	passed = passed and raster_opacity and canvas.floor.layer_by_id(raster_id) != null
 	passed = passed and layered_frame.save_png(directory.path_join("typed-layers.png")) == OK
-	editor.select_layer(raster_id)
+	canvas.floor.layer_by_id(raster_id).visible = false
+	editor.artwork.import_prop(image)
+	editor.layer_panel.opacity_spinner.value = 0.5
 	editor.select_all_artwork()
-	var original_raster: AtlasRasterLayer = canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer
-	var original_asset: String = original_raster.chunks["0,0"].asset_id
+	var original_asset: PackedByteArray = canvas.floor.objects_layer().strokes[-1].prop_webp
 	var moved: bool = editor.transform_selection(canvas.selection, Transform2D(0.0, Vector2(120, -90)))
 	await process_frame
 	await RenderingServer.frame_post_draw
@@ -166,12 +167,12 @@ func _run_suite() -> void:
 	await RenderingServer.frame_post_draw
 	var scaled_frame: Image = root.get_texture().get_image()
 	var asset_scale_pixels: bool = scaled and scaled_frame.get_pixelv(center + Vector2i(175, -90)).b > AtlasCanvas.EMPTY_COLOR.b
-	var unchanged_asset: bool = (canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer).chunks["0,0"].asset_id == original_asset
+	var unchanged_asset: bool = canvas.floor.objects_layer().strokes[-1].prop_webp == original_asset
 	passed = passed and asset_move_pixels and asset_scale_pixels and unchanged_asset
 	passed = passed and scaled_frame.save_png(directory.path_join("selection-transform.png")) == OK
 	editor._on_undo()
 	editor._on_undo()
-	editor.select_layer("ink")
+	editor.select_layer("raster")
 	editor._on_stroke(AtlasShapes.stroke("RECTANGLE", Vector2(-220, -120), Vector2(-160, -60), Color.LIME, 4.0), false)
 	await process_frame
 	await RenderingServer.frame_post_draw
@@ -224,7 +225,7 @@ func _run_suite() -> void:
 	])
 	print("ATLAS_INK_PIXELS gap=%s surviving_ink=%s undo=%s" % [real_gap, surviving_ink, restored_ink])
 	print("ATLAS_COMPACT_LAYOUT %s" % compact_layout)
-	print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [terrain_moved, compact_dialog])
+	print("ATLAS_GRID_INVARIANCE moved_pixels=%d compact_dialog=%s" % [artwork_moved, compact_dialog])
 	print("ATLAS_LAYER_PIXELS grouped_alpha=%s raster_top=%s order=%s hidden=%s raster_alpha=%s" % [
 		group_opacity, raster_on_top, layer_order, hidden_raster, raster_opacity])
 	print("ATLAS_TOOL_PIXELS move=%s scale=%s asset_unchanged=%s shape=%s fill=%s undo_fill=%s" % [

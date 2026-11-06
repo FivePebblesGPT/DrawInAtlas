@@ -10,6 +10,7 @@ const NATIVE_UNITS: Array[String] = ["mi", "km", "ft", "m", "tiles"]
 const BROWSER_SCENE: PackedScene = preload("res://prefab/campaign_browser.tscn")
 const LAYER_PANEL_SCENE: PackedScene = preload("res://prefab/layer_panel.tscn")
 const OVERVIEW_PANEL_SCENE: PackedScene = preload("res://prefab/overview_panel.tscn")
+const TOOL_PALETTE_SCENE: PackedScene = preload("res://prefab/tool_palette.tscn")
 
 @export var sidebar: Sidebar
 @export var load_saved_on_startup: bool = true
@@ -22,6 +23,8 @@ var store_io: AtlasStoreIO
 var browser: AtlasCampaignBrowser
 var layer_panel: AtlasLayerPanel
 var overview_panel: AtlasOverviewPanel
+var tool_palette: AtlasToolPalette
+var text_editor: AtlasTextEditorPopup
 
 @onready var canvas: AtlasCanvas = $Shell/CanvasAndInspector/Canvas
 @onready var inspector: AtlasInspector = $Shell/CanvasAndInspector/InspectorPanel
@@ -38,13 +41,13 @@ var _link_choices: Array[String] = []
 
 # Keep existing menu/test integrations pointing at the scene-owned controls.
 # These references never own another copy of the form or its state.
-@onready var tool_picker: OptionButton = inspector.tool_picker
 @onready var preview_picker: OptionButton = inspector.preview_picker
-@onready var angle_spinner: SpinBox = inspector.angle_spinner
 @onready var lock_checkbox: CheckBox = inspector.lock_checkbox
 @onready var reference_checkbox: CheckBox = inspector.reference_checkbox
 @onready var opacity_slider: HSlider = inspector.opacity_slider
-@onready var grid_controls: AtlasGridControls = inspector.grid_controls
+@onready var grid_settings_popup: AtlasGridSettingsPopup = get_node("../../GridSettingsPopup") as AtlasGridSettingsPopup
+@onready var grid_settings_button: Button = get_node("../../Chrome/Layout/GridSettingsButton") as Button
+@onready var grid_controls: AtlasGridControls = get_node("../../GridSettingsPopup/Panel/Margin/Layout/Scroll/GridControls") as AtlasGridControls
 @onready var distance_spinner: SpinBox = grid_controls.distance_spinner
 @onready var unit_picker: OptionButton = grid_controls.unit_picker
 @onready var brush_color_picker: ColorPickerButton = inspector.brush_color_picker
@@ -101,11 +104,10 @@ var use_system_clipboard: bool = true:
 		use_system_clipboard = value
 		if artwork != null:
 			artwork.use_system_clipboard = value
-var palette_id: int = 2:
-	set(value):
-		palette_id = value
-		if artwork != null:
-			artwork.palette_id = value
+var automatic_artwork_lod: bool = true
+var artwork_lod: AtlasArtworkLOD = AtlasArtworkLOD.new()
+var _lod_refresh_queued: bool = false
+
 var automatic_navigation: bool = false:
 	set(value):
 		automatic_navigation = value
@@ -118,13 +120,15 @@ func _ready() -> void:
 	artwork.locked_to_cell = _startup_scope_locked
 	_startup_clipboard = ""
 	artwork.use_system_clipboard = use_system_clipboard
-	artwork.palette_id = palette_id
 	navigator.automatic_navigation = automatic_navigation
 	map_references.bind(canvas)
 	canvas.references = map_references
 	_mount_sidebar_views()
+	text_editor = AtlasTextEditorPopup.new()
+	add_child(text_editor)
+	text_editor.text_confirmed.connect(artwork.edit_text)
 	_connect_workspace()
-	_on_tool_changed(tool_picker.selected)
+	_on_tool_changed(AtlasCanvas.Tool.PEN)
 	var restored: AtlasStoreResult
 	if load_saved_on_startup:
 		restored = AtlasCampaignStore.load_result(save_path, store_io)
@@ -138,7 +142,7 @@ func _ready() -> void:
 	edits.changed.connect(map_references.refresh)
 	edits.reset(campaign, loaded and (restored == null or not restored.recovered))
 	_show_map(campaign.get_map(campaign.root_map_id))
-	_message("B pen · E eraser · V select · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
+	_message("B brush · E eraser · V select · M move · F fill · L/R/O outlines · Ctrl+Z undo · Middle-drag pan")
 	if restored != null and restored.recovered:
 		_message(restored.message + " Save to establish a fresh checkpoint.")
 	elif restored != null and restored.error != OK and restored.error != ERR_FILE_NOT_FOUND:
@@ -165,8 +169,16 @@ func _mount_sidebar_views() -> void:
 	layer_panel = LAYER_PANEL_SCENE.instantiate() as AtlasLayerPanel
 	layers_view.add_child(layer_panel)
 	layer_panel.layer_selected.connect(select_layer)
+	layer_panel.object_selected.connect(_select_hierarchy_object)
+	layer_panel.link_action_requested.connect(_on_hierarchy_link_action)
 	layer_panel.layers_changed.connect(apply_layers)
+	layer_panel.presented_detail_selected.connect(_on_presented_detail_selected)
+	layer_panel.automatic_detail_toggled.connect(_on_automatic_detail_toggled)
+	layer_panel.show_editing_detail_requested.connect(_show_editing_detail)
 	layer_panel.import_requested.connect(raster_importer.request_import)
+	tool_palette = TOOL_PALETTE_SCENE.instantiate() as AtlasToolPalette
+	sidebar.get_view_content(&"Tools").add_child(tool_palette)
+	tool_palette.tool_selected.connect(_on_tool_changed)
 
 
 func _connect_workspace() -> void:
@@ -181,15 +193,17 @@ func _connect_workspace() -> void:
 	link_chooser.id_pressed.connect(_choose_link)
 	board_dialog.theme = sidebar.theme
 	board_dialog.board_requested.connect(_on_board_requested)
-	raster_importer.image_ready.connect(import_raster)
+	raster_importer.image_ready.connect(artwork.import_prop)
 	raster_importer.failed.connect(_message)
-	canvas.paint_requested.connect(artwork.paint)
 	canvas.stroke_requested.connect(artwork.stroke)
+	canvas.path_edit_requested.connect(artwork.edit_path)
+	canvas.text_requested.connect(_open_text_editor)
 	canvas.transform_requested.connect(artwork.transform_selection)
-	canvas.fill_requested.connect(artwork.fill_at)
+	canvas.fill_requested.connect(artwork.commit_preview_fill)
+	canvas.fill_preview_requested.connect(artwork.preview_fill)
+	canvas.fill_cancel_requested.connect(artwork.cancel_preview_fill)
 	canvas.selection_requested.connect(_on_select)
 	canvas.selection_changed.connect(_on_selection_changed)
-	canvas.battlemap_requested.connect(_on_create_battlemap)
 	canvas.wheel_step.connect(navigator.wheel_step)
 	canvas.enter_requested.connect(navigator.enter_link)
 	canvas.link_candidates_requested.connect(navigator.choose_links)
@@ -200,22 +214,30 @@ func _connect_workspace() -> void:
 	canvas.interaction_started.connect(navigator.zoom_gate.reset)
 	canvas.mouse_exited.connect(navigator.zoom_gate.reset)
 	canvas.interaction_started.connect(artwork.refresh_scope)
-	inspector.tool_selected.connect(_on_tool_changed)
+	canvas.interaction_finished.connect(_queue_lod_refresh)
+	canvas.view_region_changed.connect(_queue_lod_refresh)
+	edits.changed.connect(_rebuild_lod)
 	inspector.floor_selected.connect(switch_floor)
 	inspector.floor_created.connect(create_floor)
 	inspector.floor_renamed.connect(rename_floor)
 	inspector.floor_moved.connect(move_floor)
 	inspector.floor_default_requested.connect(make_floor_default)
 	inspector.floor_removed.connect(remove_floor)
-	inspector.grid_changed.connect(apply_grid)
+	grid_controls.settings_changed.connect(apply_grid)
+	grid_settings_button.pressed.connect(open_grid_settings)
 	inspector.scope_toggled.connect(_on_scope_toggled)
+	inspector.wall_restyle_requested.connect(canvas.restyle_selected_wall)
+	inspector.polygon_fill_toggled.connect(func(enabled: bool) -> void:
+		canvas.polygon_solid_fill = enabled
+		if canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+			canvas._update_polygon_preview(canvas._brush_cursor_local))
+	inspector.grid_snapping_toggled.connect(func(enabled: bool) -> void:
+		canvas.snap_to_grid = enabled)
 	inspector.selection_transform_requested.connect(_transform_from_inspector)
 	inspector.brush_color_changed.connect(func(color: Color) -> void: canvas.brush_color = color)
 	inspector.brush_width_changed.connect(func(width: float) -> void: canvas.brush_width = width)
-	inspector.palette_selected.connect(func(index: int) -> void: palette_id = index)
-	inspector.placement_rotation_changed.connect(func(radians: float) -> void:
-		canvas.battle_rotation = radians
-		canvas.queue_redraw())
+	inspector.fill_tolerance_changed.connect(func(value: float) -> void: canvas.fill_tolerance = value)
+	inspector.fill_global_changed.connect(func(enabled: bool) -> void: canvas.fill_global = enabled)
 	inspector.preview_changed.connect(func(index: int) -> void:
 		canvas.preview = index as AtlasCanvas.Preview
 		map_references.refresh()
@@ -242,8 +264,10 @@ func _on_view_changed() -> void:
 	link_chooser.hide()
 	map_references.select_source(navigator.active_entrance_id)
 	edits.active_map_id = canvas.map.id
+	_rebuild_lod()
 	_refresh_layers()
 	_refresh_grid_controls()
+	_choose_tool(canvas.tool)
 	locked_to_cell = false
 	lock_checkbox.button_pressed = false
 	inspector.refresh_floors(canvas.map, canvas.floor)
@@ -255,6 +279,7 @@ func _on_view_changed() -> void:
 
 func _refresh_after_history() -> void:
 	navigator.reconcile_floors()
+	_rebuild_lod()
 	_refresh_layers()
 	inspector.refresh_floors(canvas.map, canvas.floor)
 	browser.refresh_metadata()
@@ -270,11 +295,82 @@ func _refresh_layers(preferred_id: String = "") -> void:
 	if not preferred_id.is_empty():
 		canvas.active_layer_id = preferred_id
 	if canvas.floor.layer_by_id(canvas.active_layer_id) == null:
-		var ink: AtlasInkLayer = canvas.floor.ink_layer()
-		canvas.active_layer_id = ink.id if ink != null else ""
-		if ink == null and not canvas.floor.layers.is_empty():
+		var raster: AtlasRasterLayer = canvas.floor.raster_layer()
+		canvas.active_layer_id = raster.id if raster != null else ""
+		if raster == null and not canvas.floor.layers.is_empty():
 			canvas.active_layer_id = canvas.floor.layers[-1].id
-	layer_panel.set_floor(canvas.floor, canvas.active_layer_id)
+	var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+	var required: String = AtlasArtworkEditor.tool_layer_kind(canvas.tool)
+	if target is AtlasRasterLayer and required == "OBJECTS":
+		canvas.choose_tool(AtlasCanvas.Tool.PEN)
+	elif target is AtlasObjectsLayer and required == "RASTER":
+		canvas.choose_tool(AtlasCanvas.Tool.ART_SELECT)
+	if tool_palette != null:
+		tool_palette.sync_tool(canvas.tool)
+	layer_panel.set_floor(canvas.floor, canvas.active_layer_id, canvas.presented_detail_level, automatic_artwork_lod)
+	layer_panel.set_navigation_context(campaign, canvas.map)
+	layer_panel.sync_object_selection(canvas.selection)
+	# Fill requires raster pixels; the grid remains independent of artwork.
+	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
+
+
+func _on_presented_detail_selected(level: int) -> void:
+	automatic_artwork_lod = false
+	if canvas.set_presented_detail_level(level):
+		_refresh_layers()
+		if not canvas.editing_target_is_presented():
+			var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+			_message("Viewing detail D%d; editing target stays %s. Select its level before editing." % [
+				level, "%s (D%d)" % [target.display_name, target.detail_level] if target != null else "none"])
+	else:
+		_refresh_layers()
+
+
+func _on_automatic_detail_toggled(enabled: bool) -> void:
+	automatic_artwork_lod = enabled
+	if enabled:
+		_queue_lod_refresh()
+	_refresh_layers()
+
+
+func _show_editing_detail() -> void:
+	var target: AtlasLayer = canvas.floor.layer_by_id(canvas.active_layer_id)
+	if target != null:
+		_on_presented_detail_selected(target.detail_level)
+
+
+func _rebuild_lod() -> void:
+	if canvas.map == null or canvas.floor == null:
+		return
+	artwork_lod.rebuild(canvas.map, canvas.floor)
+	_queue_lod_refresh()
+
+
+func _queue_lod_refresh() -> void:
+	if not automatic_artwork_lod or _lod_refresh_queued or canvas == null:
+		return
+	_lod_refresh_queued = true
+	call_deferred("_refresh_automatic_detail")
+
+
+func _refresh_automatic_detail() -> void:
+	_lod_refresh_queued = false
+	if not automatic_artwork_lod or canvas.map == null or canvas.floor == null:
+		return
+	if canvas.is_editing():
+		return # interaction_finished schedules the deferred evaluation.
+	var next: int = artwork_lod.choose(canvas.map, canvas.camera_center, canvas.camera_zoom,
+		canvas.size, canvas.presented_detail_level)
+	if next != canvas.presented_detail_level and canvas.set_presented_detail_level(next):
+		_refresh_layers()
+
+
+func open_grid_settings() -> void:
+	# The form is merely a view of the current board, never a pending second copy.
+	if canvas.map == null:
+		return
+	_refresh_grid_controls()
+	grid_settings_popup.open_from(grid_settings_button)
 
 
 func _refresh_grid_controls() -> void:
@@ -285,6 +381,7 @@ func _refresh_grid_controls() -> void:
 		canvas.clear_selection()
 	grid_controls.set_grid(canvas.map.grid)
 	lock_checkbox.disabled = canvas.map.grid.kind == AtlasGrid.Kind.GRIDLESS
+	inspector.refresh_tool(canvas.tool, canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	artwork.refresh_scope()
 
 
@@ -301,6 +398,7 @@ func _on_documents_changed() -> void:
 	if campaign.get_map(canvas.map.id) == canvas.map and canvas.map.floor_by_id(canvas.floor.id) != null:
 		browser.refresh(campaign)
 		linked_maps.refresh()
+		layer_panel.set_navigation_context(campaign, canvas.map)
 
 
 func _message(value: String) -> void:
@@ -336,7 +434,6 @@ func create_floor(name: String) -> bool:
 	var floor: AtlasFloor = AtlasFloor.new()
 	floor.id = "floor-" + Crypto.new().generate_random_bytes(16).hex_encode()
 	floor.display_name = name.strip_edges()
-	floor.terrain_layer().grid = canvas.map.grid.copy()
 	var after: Array[AtlasFloor] = _clone_floors()
 	after.append(floor)
 	if not _apply_floors(after, canvas.map.default_floor_id):
@@ -416,7 +513,6 @@ func create_board(board_name: String, grid: AtlasGrid) -> bool:
 	var document: AtlasMapDocument = AtlasMapDocument.new(id, name)
 	document.kind = "BOARD"
 	document.grid = grid.copy()
-	document.terrain_grid = grid.copy()
 	var command: AtlasCreateMap = AtlasCreateMap.new(canvas.map.id, document)
 	if not edits.execute(command):
 		_message("Board creation failed; the campaign was not replaced.")
@@ -503,10 +599,6 @@ func _on_redo() -> void:
 		_message("Redo blocked: the target changed outside this history.")
 
 
-func _on_create_battlemap(start: Vector2, finish: Vector2, radians: float) -> void:
-	linked_maps.create_drag(start, finish, radians)
-
-
 func _refresh_reference_controls() -> void:
 	inspector.refresh_references(campaign, canvas.map, canvas.floor,
 		map_references.source_link_id, map_references.source_floor_id, map_references.frozen, not history.is_empty())
@@ -532,14 +624,13 @@ func _choose_link(index: int) -> void:
 
 
 func _choose_tool(tool: AtlasCanvas.Tool) -> void:
-	tool_picker.select(tool)
 	_on_tool_changed(tool)
 
 
 func _on_tool_changed(index: int) -> void:
 	artwork.choose_tool(index as AtlasCanvas.Tool)
-	if index == AtlasCanvas.Tool.BATTLEMAP and campaign != null and canvas.map != null:
-		linked_maps.prepare_drag()
+	if tool_palette != null:
+		tool_palette.sync_tool(index)
 	inspector.refresh_tool(canvas.tool, canvas.map != null and canvas.map.grid.kind != AtlasGrid.Kind.GRIDLESS)
 	if not locked_to_cell:
 		lock_checkbox.set_pressed_no_signal(false)
@@ -549,6 +640,8 @@ func _on_tool_changed(index: int) -> void:
 
 func _on_selection_changed() -> void:
 	inspector.refresh_selection(canvas.selection, can_modify_selection())
+	if layer_panel != null:
+		layer_panel.sync_object_selection(canvas.selection)
 
 
 func _on_scope_toggled(enabled: bool) -> void:
@@ -617,8 +710,49 @@ func select_layer(id: String) -> void:
 	artwork.select_layer(id)
 
 
+func _select_hierarchy_object(layer_id: String, stroke_index: int) -> void:
+	var layer: AtlasLayer = canvas.floor.layer_by_id(layer_id)
+	if layer == null or not layer.visible:
+		return
+	if canvas.active_layer_id != layer_id:
+		select_layer(layer_id)
+	# Selection is transient, scoped to the active layer and current presentation.
+	if not canvas.editing_target_is_presented():
+		return
+	var indices: Array[int] = []
+	if stroke_index >= 0:
+		indices.append(stroke_index)
+	canvas.selection = AtlasSelectionGeometry.select_indices(layer, indices)
+	canvas.selection_changed.emit()
+	canvas.queue_redraw()
+
+
+func _on_hierarchy_link_action(id: String, action: StringName) -> void:
+	if action == &"edit":
+		canvas.selected_link_id = id
+		linked_maps.open()
+		return
+	var link: AtlasMapLink = campaign.link_by_id(id)
+	if link == null or link.source_map_id != canvas.map.id or link.source_floor_id != canvas.floor.id:
+		return
+	if action == &"focus":
+		linked_maps.focus(id)
+	elif action == &"enter":
+		linked_maps.enter(id)
+
+
 func apply_layers(layers: Array[AtlasLayer], selected_id: String) -> bool:
 	return artwork.apply_layers(layers, selected_id)
+
+
+func _open_text_editor(anchor: Vector2, index: int) -> void:
+	var original: AtlasStroke
+	var layer: AtlasObjectsLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasObjectsLayer
+	if layer == null or not layer.is_editable():
+		return
+	if index >= 0 and index < layer.strokes.size():
+		original = layer.strokes[index]
+	text_editor.open_editor(anchor, original, index, canvas.brush_color)
 
 
 func _on_stroke(stroke: AtlasStroke, erasing: bool) -> void:
@@ -700,6 +834,8 @@ func _on_unit_changed(index: int) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if text_editor != null and text_editor.visible:
+		return
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	if event.is_command_or_control_pressed():
@@ -713,6 +849,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			KEY_S: _on_save()
 			KEY_N: open_board_dialog()
 			KEY_A: select_all_artwork()
+			KEY_D: canvas.clear_selection()
 			KEY_C: copy_selection()
 			KEY_X: cut_selection()
 			KEY_V: paste_selection()
@@ -720,23 +857,38 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_: return
 		get_viewport().set_input_as_handled()
 		return
-	if event.keycode == KEY_ESCAPE:
+	if event.keycode in [KEY_ENTER, KEY_KP_ENTER] and canvas.tool == AtlasCanvas.Tool.WALL_PATH and not canvas._wall_vertices.is_empty():
+		canvas.commit_edit()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_BACKSPACE and canvas.tool == AtlasCanvas.Tool.WALL_PATH and not canvas._wall_vertices.is_empty():
+		canvas._handle_wall_key(event)
+		get_viewport().set_input_as_handled()
+	elif event.keycode in [KEY_ENTER, KEY_KP_ENTER] and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+		canvas.commit_edit()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_BACKSPACE and canvas.tool == AtlasCanvas.Tool.POLYGON and canvas.is_editing():
+		canvas._polygon_vertices.remove_at(canvas._polygon_vertices.size() - 1)
+		if canvas._polygon_vertices.is_empty():
+			canvas.cancel_edit()
+		else:
+			canvas._update_polygon_preview(canvas._brush_cursor_local)
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ENTER and canvas.tool == AtlasCanvas.Tool.ART_SELECT:
+		canvas.clear_selection()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ESCAPE:
 		zoom_gate.reset()
 		if canvas.is_editing():
 			canvas.cancel_edit()
 		else:
 			canvas.clear_selection()
 		get_viewport().set_input_as_handled()
-	elif (event.keycode == KEY_Q or event.keycode == KEY_E) and canvas.tool == AtlasCanvas.Tool.BATTLEMAP:
-		var sign: float = -1.0 if event.keycode == KEY_Q else 1.0
-		angle_spinner.value = wrapf(angle_spinner.value + 15.0 * sign, -180.0, 180.0)
-		get_viewport().set_input_as_handled()
 	elif event.keycode in [KEY_DELETE, KEY_BACKSPACE]:
 		delete_selection()
 		get_viewport().set_input_as_handled()
-	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_F, KEY_L, KEY_R, KEY_O]:
+	elif event.keycode in [KEY_B, KEY_E, KEY_V, KEY_M, KEY_F, KEY_L, KEY_R, KEY_O, KEY_P, KEY_W, KEY_T]:
 		var tools: Dictionary[int, int] = {KEY_B: AtlasCanvas.Tool.PEN, KEY_E: AtlasCanvas.Tool.ERASER,
-			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
-			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE}
+			KEY_V: AtlasCanvas.Tool.ART_SELECT, KEY_M: AtlasCanvas.Tool.MOVE, KEY_F: AtlasCanvas.Tool.FILL, KEY_L: AtlasCanvas.Tool.LINE,
+			KEY_R: AtlasCanvas.Tool.RECTANGLE, KEY_O: AtlasCanvas.Tool.ELLIPSE, KEY_P: AtlasCanvas.Tool.POLYGON, KEY_W: AtlasCanvas.Tool.WALL_PATH, KEY_T: AtlasCanvas.Tool.TEXT}
 		_choose_tool(tools[event.keycode] as AtlasCanvas.Tool)
 		get_viewport().set_input_as_handled()

@@ -4,5 +4,5 @@ extends RefCounted
 
 var ok: bool = false
 var message: String = ""
-var terrain: Dictionary = {}
+## Detached cloned raster layer for a pixel fill; caller commits atomically.
 var layer: AtlasRasterLayer

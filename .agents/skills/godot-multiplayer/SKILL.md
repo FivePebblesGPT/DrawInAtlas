@@ -47,19 +47,19 @@ work (low-level `PacketPeer`); HTTP requests. For save/persistence → `save-sys
 ### 1. Host or join (ENet)
 
 ```gdscript
-const PORT := 7000
-const MAX_PLAYERS := 8
+const PORT: int = 7000
+const MAX_PLAYERS: int = 8
 
 func host() -> void:
-    var peer := ENetMultiplayerPeer.new()
-    var err := peer.create_server(PORT, MAX_PLAYERS)
+    var peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
+    var err: Error = peer.create_server(PORT, MAX_PLAYERS)
     if err != OK:
         push_error("Cannot host: %s" % err); return
     multiplayer.multiplayer_peer = peer
     multiplayer.peer_connected.connect(_on_peer_connected)
 
-func join(ip := "127.0.0.1") -> void:
-    var peer := ENetMultiplayerPeer.new()
+func join(ip: String = "127.0.0.1") -> void:
+    var peer: ENetMultiplayerPeer = ENetMultiplayerPeer.new()
     peer.create_client(ip, PORT)
     multiplayer.multiplayer_peer = peer
     multiplayer.connected_to_server.connect(func(): print("connected"))
@@ -84,7 +84,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func request_fire() -> void:
     if not multiplayer.is_server():     # ignore copies relayed to other clients
         return
-    var sender := multiplayer.get_remote_sender_id()
+    var sender: int = multiplayer.get_remote_sender_id()
     if not _can_fire(sender):           # server-side validation
         return
     spawn_projectile.rpc(sender)        # tell everyone to spawn it

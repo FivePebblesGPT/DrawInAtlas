@@ -42,10 +42,14 @@ func submit(link: AtlasMapLink, placement: AtlasPlacement, new_map: AtlasMapDocu
 		return false
 	var before: AtlasMapLink = _canvas.campaign.link_by_id(link.id)
 	var old: AtlasPlacement = _canvas.campaign.placement_by_id(before.placement_id) if before != null else null
+	# Keep editing legacy footprints, but never create new containers through links.
+	if new_map != null or (placement != null and old == null):
+		_rejected()
+		return false
 	if dialog.visible and dialog.selected_id == link.id and not dialog.is_current(before, old):
 		_rejected()
 		return false
-	var command := AtlasLinkEdit.new(_canvas.map.id, before, link, old, placement, new_map, _canvas.edit_scope)
+	var command: AtlasLinkEdit = AtlasLinkEdit.new(_canvas.map.id, before, link, old, placement, new_map, _canvas.edit_scope)
 	if not _history.execute(command):
 		_rejected()
 		return false
@@ -89,27 +93,6 @@ func focus(id: String) -> void:
 	dialog.hide()
 
 
-func create_drag(start: Vector2, finish: Vector2, radians: float) -> bool:
-	dialog.prepare_new(_canvas.campaign, _canvas.map, _canvas.floor, start)
-	if dialog.mode_picker.selected == 2:
-		message.emit("Choose a spatial or symbolic footprint in Linked maps before dragging.")
-		return false
-	var values: Array[Resource] = dialog.draft("", start, finish, radians)
-	if values.size() != 3:
-		message.emit("Drag at least half a footprint cell; each dimension is quantized to one cell or more.")
-		return false
-	var link: AtlasMapLink = values[0] as AtlasMapLink
-	if not submit(link, values[1] as AtlasPlacement, values[2] as AtlasMapDocument):
-		return false
-	_navigator.enter_link(_canvas.campaign.link_by_id(link.id))
-	return true
-
-
-func prepare_drag() -> void:
-	dialog.prepare_new(_canvas.campaign, _canvas.map, _canvas.floor, _canvas.camera_center)
-	_canvas.battle_pitch = dialog.parent_pitch.value
-
-
 func move(id: String, offset: Vector2) -> bool:
 	var original: AtlasMapLink = _canvas.campaign.link_by_id(id)
 	if not _owns(original) or not offset.is_finite():
@@ -129,5 +112,5 @@ func _owns(link: AtlasMapLink) -> bool:
 
 func _rejected() -> void:
 	var text: String = "Link unchanged or rejected: invalid/stale data, shared footprint, or outside selected-cell scope."
-	dialog.error_label.text = text
+	dialog.show_error(text)
 	message.emit(text)

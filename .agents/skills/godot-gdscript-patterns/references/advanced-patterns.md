@@ -117,8 +117,8 @@ checks, translate JSON into typed `Resource` objects.
 # save_manager.gd (Autoload)
 extends Node
 
-const SAVE_PATH := "user://savegame.save"
-const ENCRYPTION_KEY := "your_secret_key_here"
+const SAVE_PATH: String = "user://savegame.save"
+const ENCRYPTION_KEY: String = "your_secret_key_here"
 
 signal save_completed
 signal load_completed

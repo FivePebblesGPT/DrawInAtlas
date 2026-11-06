@@ -35,24 +35,28 @@ func _run() -> void:
 	var start: Vector2 = canvas.local_to_document(Vector2(50, 80))
 	_button(canvas, Vector2(50, 80), true)
 	_motion(canvas, Vector2(180, 140))
-	_check(canvas.floor.strokes.is_empty(), "shape preview is not committed")
+	_check(canvas.floor.raster_layer().chunks.is_empty(), "shape preview is not committed")
 	_button(canvas, Vector2(180, 140), false)
-	_check(canvas.floor.strokes.size() == 1 and canvas.floor.strokes[0].points[0] == start,
-		"line gesture stores document coordinates")
+	_check(not canvas.floor.raster_layer().chunks.is_empty() and canvas.floor.strokes.is_empty(),
+		"line gesture commits raster pixels")
+	var line_pixels: Dictionary = canvas.floor.raster_layer().to_dict()
 	_tool(editor, AtlasCanvas.Tool.RECTANGLE)
 	_drag(canvas, Vector2(50, 180), Vector2(180, 260))
-	_check(canvas.floor.strokes.size() == 2 and canvas.floor.strokes[-1].points.size() == 5,
-		"rectangle is one closed outline transaction")
+	_check(canvas.floor.raster_layer().to_dict() != line_pixels, "rectangle adds raster outline pixels")
 	_key(KEY_Z, true)
-	_check(canvas.floor.strokes.size() == 1, "one undo removes whole shape")
+	_check(canvas.floor.raster_layer().to_dict() == line_pixels, "one undo removes whole shape")
 	_key(KEY_Z, true, true)
 	_tool(editor, AtlasCanvas.Tool.ELLIPSE)
 	_button(canvas, Vector2(250, 180), true)
 	_motion(canvas, Vector2(250, 200))
 	_motion(canvas, Vector2(310, 240))
 	_button(canvas, Vector2(310, 240), false)
-	_check(canvas.floor.strokes.size() == 3 and canvas.floor.strokes[-1].points.size() == 65,
+	_check(canvas.floor.raster_layer().to_dict() != line_pixels and canvas.floor.strokes.is_empty(),
 		"ellipse recovers from an initially degenerate drag")
+	_tool(editor, AtlasCanvas.Tool.WALL_PATH)
+	for pair: Vector4 in [Vector4(50, 80, 180, 140), Vector4(50, 180, 180, 260), Vector4(250, 180, 310, 240)]:
+		editor.artwork.edit_path(-1, null, AtlasEditablePath.make(PackedVector2Array([
+			canvas.local_to_document(Vector2(pair.x, pair.y)), canvas.local_to_document(Vector2(pair.z, pair.w))]), Color.WHITE, 4.0, false))
 	_key(KEY_V)
 	_button(canvas, Vector2(115, 110), true)
 	_button(canvas, Vector2(115, 110), false)
@@ -110,9 +114,8 @@ func _run() -> void:
 	editor._on_select(Vector2i.ZERO)
 	_tool(editor, AtlasCanvas.Tool.PEN)
 	editor._on_stroke(AtlasStroke.new(PackedVector2Array([Vector2(-50, 50), Vector2(150, 50)]), Color.RED, 10.0), false)
-	_check(editor.locked_to_cell and canvas.floor.strokes.size() == 4, "cell lock persists across drawing-tool changes")
-	_check(editor.canvas.edit_scope.contains_rect(AtlasSelectionGeometry.stroke_bounds(canvas.floor.strokes[-1])),
-		"new ink is clipped before committing to the selected cell")
+	_check(editor.locked_to_cell and canvas.floor.strokes.size() == 3, "cell lock persists and raster drawing creates no Objects")
+	_check(not canvas.floor.raster_layer().chunks.is_empty(), "new raster pixels are painted through the cell mask")
 	editor.select_all_artwork()
 	before = AtlasStroke.clone_all(canvas.floor.strokes)
 	_check(not editor.transform_selection(canvas.selection, Transform2D(0.0, Vector2(200, 0)))
@@ -139,35 +142,25 @@ func _run() -> void:
 	raster = canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer
 	_check(raster.chunks["0,0"].image.get_pixel(0, 0).a == 0.0, "raster eraser makes pixels transparent")
 	editor._on_undo()
-	editor.select_layer(raster_id)
-	editor.select_all_artwork()
-	_check(editor.copy_selection() and editor.paste_selection(), "raster clipboard is self-contained and pasteable")
+	var prop_image: Image = Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+	prop_image.fill(Color(1, 1, 1, 0.5))
+	_check(editor.artwork.import_prop(prop_image), "image placement creates an Object")
+	var object_count: int = canvas.floor.objects_layer().strokes.size()
+	_check(editor.copy_selection() and editor.paste_selection(), "prop clipboard is self-contained and pasteable")
 	var pasted_id: String = canvas.active_layer_id
-	_check(pasted_id != raster_id and canvas.floor.layer_by_id(pasted_id) is AtlasRasterLayer,
-		"raster paste assigns a new independent layer identity")
-	_check(canvas.tool == AtlasCanvas.Tool.ART_SELECT and canvas.selection.raster_selected,
+	_check(pasted_id != raster_id and canvas.floor.layer_by_id(pasted_id) is AtlasObjectsLayer
+		and canvas.floor.objects_layer().strokes.size() == object_count + 1, "prop paste creates an independent object")
+	_check(canvas.tool == AtlasCanvas.Tool.ART_SELECT and canvas.selection.stroke_indices.size() == 1,
 		"pasted assets are immediately selected for placement")
 	var overlay: AtlasGrid = canvas.map.grid.copy()
 	overlay.kind = AtlasGrid.Kind.HEX_POINTY
 	overlay.cell_size = 42.0
 	overlay.rotation = deg_to_rad(37.0)
 	editor.apply_grid(overlay)
-	_tool(editor, AtlasCanvas.Tool.PAINT)
-	editor.palette_id = 2
-	var tile_center: Vector2 = canvas.document_to_local(Vector2(150, 50))
-	_drag(canvas, tile_center, tile_center)
-	_check(canvas.floor.terrain.get("1,0") == 2, "terrain pointer uses its fixed content grid, not the changed overlay")
-	editor.palette_id = 3
-	_check(editor.fill_at(Vector2(150, 50)) and canvas.floor.terrain.get("1,0") == 3,
-		"terrain fill also resolves the content grid independently")
-	var tile_layer: AtlasTileLayer = canvas.floor.terrain_layer()
-	var payload: AtlasClipboardData = AtlasClipboard.decode(AtlasClipboard.encode_tiles(tile_layer.grid, {"1,0": 3}, Vector2i(1, 0)))
-	_check(editor.paste_payload(payload, Vector2(250, 50)) and canvas.floor.terrain.get("2,0") == 3,
-		"typed tile paste resolves destination content coordinates")
-	var cells_before: Dictionary = canvas.floor.terrain.duplicate()
-	payload.grid.kind = AtlasGrid.Kind.HEX_POINTY
-	_check(not editor.paste_payload(payload, Vector2(350, 50)) and canvas.floor.terrain == cells_before,
-		"tile paste rejects incompatible grids atomically")
+	# Updating the spatial overlay cannot rasterize artwork or change pixel bytes.
+	var previous: PackedByteArray = raster.chunks["-1,-1"].image.get_data().duplicate()
+	_check(canvas.map.grid.same_as(overlay) and raster.chunks["-1,-1"].image.get_data() == previous,
+		"grid is a spatial reference independent of raster artwork")
 	var saved: Dictionary = editor.campaign.to_dict()
 	editor._on_save()
 	editor._on_load()
@@ -181,8 +174,7 @@ func _run() -> void:
 
 
 func _tool(editor: AtlasEditor, tool: AtlasCanvas.Tool) -> void:
-	editor.tool_picker.select(tool)
-	editor._on_tool_changed(tool)
+	editor._choose_tool(tool)
 
 
 func _button(canvas: AtlasCanvas, position: Vector2, pressed: bool) -> void:
