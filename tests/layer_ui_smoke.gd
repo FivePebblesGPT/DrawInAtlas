@@ -116,25 +116,32 @@ func _run() -> void:
 	editor.layer_panel._rename("Renamed Objects")
 	editor._on_save()
 	var basename: String = editor.save_path.trim_suffix(".scn")
-	_check(FileAccess.file_exists(basename + ".bak.scn"), "second save retains the previous checkpoint")
-	_corrupt(editor.save_path)
+	var head: String = basename + ".atlas.json"
+	var backup: String = basename + ".atlas.bak.json"
+	_check(FileAccess.file_exists(ProjectSettings.globalize_path(backup)),
+		"second portable generation retains an independently recoverable pointer")
+	_corrupt(head)
 	editor._on_load()
 	_check(editor.campaign.to_dict() == checkpoint and editor.edits.is_dirty(),
-		"Load recovers the complete previous checkpoint and marks it for repair")
-	_check(editor.status_label.text.contains("Recovered backup"), "recovery is reported in the UI")
+		"Load recovers the complete previous generation and marks it for repair")
+	_check(editor.status_label.text.contains("Recovered previous complete generation"),
+		"recovery is reported in the UI")
 	var recovered_raster: AtlasRasterLayer = editor.canvas.floor.layer_by_id(raster_id) as AtlasRasterLayer
 	_check(recovered_raster != null and recovered_raster.chunks["0,0"].image.get_data() == pixels.get_data(),
 		"UI recovery hydrates exact raster pixels")
-	_corrupt(basename + ".bak.scn")
+	# Repair while the verified backup still exists, then test damage to both pointers.
+	editor._on_save()
+	_check(not editor.edits.is_dirty() and editor.status_label.text.contains("Saved generation"),
+		"saving a recovered generation publishes a healthy new root")
+	_corrupt(head)
+	_corrupt(backup)
 	var retained: AtlasCampaign = editor.campaign
 	editor._on_load()
-	_check(editor.campaign == retained and editor.edits.is_dirty(), "failed load never replaces active work or history")
+	_check(editor.campaign == retained and editor.status_label.text.contains("Head:"),
+		"failed load never replaces the active campaign or history")
 	editor._on_save()
-	_check(not editor.edits.is_dirty(), "saving recovered work establishes a valid new head")
-	for suffix: String in [".scn", ".bak.scn", ".pending.scn", ".bak.pending.scn"]:
-		var file_path: String = basename + suffix
-		if FileAccess.file_exists(file_path):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(file_path))
+	_check(editor.status_label.text.contains("Campaign save failed") and FileAccess.get_file_as_string(ProjectSettings.globalize_path(head)) == "invalid checkpoint",
+		"saving cannot overwrite an unrecoverable damaged root")
 	root.remove_child(scene)
 	scene.free()
 	if failures == 0:

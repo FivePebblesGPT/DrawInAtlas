@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE_ROOTS = ("scripts", "prefab", "tests")
+SOURCE_ROOTS = ("scripts", "prefab", "tests", "drawing")
 SKILLS_ROOT = ROOT / ".agents" / "skills"
 
 INFERRED_DECLARATION = re.compile(r"\b(?:var|const)\s+[A-Za-z_]\w*\s*:=")

@@ -62,6 +62,12 @@ func _run() -> void:
 	editor._unhandled_key_input(shortcut)
 	_check(editor.canvas.tool == AtlasCanvas.Tool.PEN and palette.button_for(AtlasCanvas.Tool.PEN).button_pressed,
 		"B shortcut updates palette and canvas")
+	var pan_shortcut: InputEventKey = InputEventKey.new()
+	pan_shortcut.keycode = KEY_H
+	pan_shortcut.pressed = true
+	editor._unhandled_key_input(pan_shortcut)
+	_check(editor.canvas.tool == AtlasCanvas.Tool.PAN and palette.button_for(AtlasCanvas.Tool.PAN).button_pressed,
+		"H selects the new Pan tool in the same toolbar and keyboard flow")
 	editor._choose_tool(AtlasCanvas.Tool.ART_SELECT)
 	_check(editor.canvas.tool == AtlasCanvas.Tool.ART_SELECT and palette.button_for(AtlasCanvas.Tool.ART_SELECT).button_pressed
 		and editor.inspector.get_node("%ActiveToolLabel").text.contains("Select objects (V)"),

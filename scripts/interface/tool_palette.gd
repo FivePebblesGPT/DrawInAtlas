@@ -26,6 +26,9 @@ const CATEGORIES: Array[Dictionary] = [
 	{"title": "PLAYER VISIBILITY (GM ONLY)", "tools": [
 		{"id": AtlasCanvas.Tool.FOG, "name": "Fog reveal/hide", "key": "G", "icon": "fog", "hint": "Drag to reveal a rectangle; Shift-drag to hide it again. First edit enables deny-by-default fog on this floor, across every detail level. Esc cancels; Ctrl+Z undoes. No live player publication."},
 	]},
+	{"title": "NAVIGATION", "tools": [
+		{"id": AtlasCanvas.Tool.PAN, "name": "Pan / enter map", "key": "H", "icon": "hand", "hint": "Drag the view without painting or moving entrances. Double-click the same entrance to navigate"},
+	]},
 	{"title": "GRID", "tools": [
 		{"id": AtlasCanvas.Tool.SELECT, "name": "Select grid cell", "key": "", "icon": "cell", "hint": "Choose the cell used by the edit-scope mask"},
 	]},

@@ -1,0 +1,30 @@
+{
+  "contract_example": 1,
+  "note": "Illustrative registry for ADR_DRAWING_DOCUMENT_CONTRACT; not a storage schema",
+  "map_id": "map-0042",
+  "world_tick_scale": 1024,
+  "floors": [
+    {
+      "id": "floor-a1",
+      "name": "Ground",
+      "details": [
+        {"id": "detail-a0", "name": "D0", "document_id": "doc-001", "density": [1, 1], "authored": true},
+        {"id": "detail-a1", "name": "D1", "document_id": "doc-002", "density": [2, 1], "authored": false}
+      ]
+    },
+    {
+      "id": "floor-b1",
+      "name": "Upper",
+      "details": [
+        {"id": "detail-b0", "name": "D0", "document_id": "doc-003", "density": [1, 1], "authored": true},
+        {"id": "detail-b1", "name": "D1", "document_id": "doc-004", "density": [2, 1], "authored": true}
+      ]
+    }
+  ],
+  "documents": [
+    {"id": "doc-001", "layer_ids": ["layer-01"], "chunks": ["-1,0", "0,0"]},
+    {"id": "doc-002", "layer_ids": [], "chunks": []},
+    {"id": "doc-003", "layer_ids": ["layer-02"], "chunks": ["0,-1"]},
+    {"id": "doc-004", "layer_ids": ["layer-03"], "chunks": ["-2,4"]}
+  ]
+}

@@ -2,6 +2,9 @@ class_name AtlasStoreResult
 extends RefCounted
 
 var campaign: AtlasCampaign = null
+var registry: AtlasDrawingRegistry = null
+var library: AtlasObjectLibrary = null
+var generation: String = ""
 var error: Error = OK
 var message: String = ""
 var recovered: bool = false
