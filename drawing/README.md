@@ -379,3 +379,26 @@ xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
 
 T-089 model 62/62 and software Xvfb/Mesa native 32/32 are engineering evidence;
 physical Windows/Linux pointer/DPI owner approval is still separate in T-059.
+
+### Responsive chrome and tool-width input (T-090)
+
+Standalone `drawing/project.godot` uses `canvas_items` with aspect `expand`,
+minimum 800×600 physical desktop window. One File/Edit/View/Image/Layers/Select/
+Window/Help row retains overflow More; File holds Object source creation/open/
+rename/Save As plus Close tab. Each document tab has its own × and the existing
+unsaved-content guard. Open a new file with **File → New** or **Ctrl+N** (no
+floating + tab button). Hover **Brush px** and wheel up/down for ±1 px; use
+**[**/**]** with Brush or Eraser (except while editing text), or Shift+wheel/
+left-right wheel/chevrons to scroll overflowed tool options. Keyboard widths and
+wheel changes do not modify document pixels or add undo entries.
+
+The six tool rail SVGs are redistributed from the bundled **MIT at-icons**
+control family with `addons/drawing/icons/LICENSE.at-icons.txt` in all staged
+standalone/third-consumer packages. `drawing/tests/responsive_workspace_native.gd`
+provides a 24-check X11/Mesa software witness (29 with `T090_SCREENSHOTS=...`)
+for real tab-close pointers, brush wheel, menu grouping, framebuffer edges at
+800×600/1280×760/1920×1080, and 150%/200% UI scaling. Run after a clean
+`python3 tools/build_drawing_app.py --in-place` and `godot --headless --editor
+--path drawing --import --quit` to import the bundled SVGs/fonts. The native
+on-demand workflow preserves screenshots/logs; neither software tests nor
+historical T-063 Done constitute physical Windows/Linux owner UX approval.

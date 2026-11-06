@@ -57,7 +57,7 @@ workspace dirty/save/open and tab-local grid options). The **on-demand**
 `drawing/tests/image_frame_native.gd` (36 Xvfb/Mesa framebuffer/input checks)
 for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
 pan/grid alignment, native snapped pointer, off-frame editing and undo.
-The 45-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
+The 46-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
 includes the new bounded model step and prevents silent runaway push CI.
 Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
@@ -106,6 +106,25 @@ Editor UI (25/25, selected Tree row tracks new text), the native T-063
 420px/150%-scale compact workspace (layer actions wrap within the dock),
 and T-073 native keyboard routing. Neither these nor remote automation
 establish physical review acceptance.
+
+## T-090 responsive workspace and icon license audit
+
+Fast push/PR CI runs seven deterministic `tests/test_t090_responsive_workspace.py`
+contracts as its **46th** bounded fail-late check. This covers window stretch,
+File/Object/Window menu ownership, per-tab close with a dirty guard, Brush px
+wheel/keyboard semantics, and byte-identical MIT icons + license staging for
+standalone and independent package consumers. The on-demand
+`.github/workflows/godot-native-t090-workspace.yml` performs a fresh standalone
+stage and Godot 4.8-beta2 import, then executes
+`drawing/tests/responsive_workspace_native.gd` under Linux X11/Xvfb/Mesa
+llvmpipe on a 2200×1500 virtual screen. It checks physical viewport edges
+at 800×600, 1280×760, 1920×1080, also 1.5/2.0 content scale; real hover-wheel,
+keyboard and nonactive-tab close/cancel/save pointer events; and emits optional
+five screenshot PNGs (29 checks, vs 24 without PNG capture). The fail-closed
+`tools/check_native_t090_log.py` checks summaries/markers and runtime errors;
+recognized **post-success Godot/Mesa shutdown leaks** are retained and counted,
+not treated as a clean teardown. This is *not* physical Windows/Linux owner
+approval, and no input-to-photon latency measurement is claimed.
 
 ## Required CI
 

@@ -141,13 +141,16 @@ func _build_interface() -> void:
 	add_child(root)
 	top_bar = TOP_BAR_SCRIPT.new() as HBoxContainer
 	root.add_child(top_bar)
-	# Eight application menus; object-source commands remain accessible in File,
-	# Image and Window without a redundant ninth menu or action toolbar.
+	# Object source file commands belong under File, while Window only changes
+	# workspaces and document navigation (no separate command toolbar).
 	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
-		"Save As…  Ctrl+Shift+S", "New Object source", "Open Object source…"],
+		"Save As…  Ctrl+Shift+S", "Close tab  Ctrl+W", "Object › New source",
+		"Object › Open source…", "Object › Rename source…", "Object › Save source As…"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "new_object"), Callable(self, "_ask_open_object")])
+		Callable(self, "_request_close_current"), Callable(self, "new_object"),
+		Callable(self, "_ask_open_object"), Callable(self, "_ask_rename_object"),
+		Callable(self, "_ask_save")])
 	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
 		"Record selection changes in Undo History", "Copy  Ctrl+C", "Cut  Ctrl+X",
 		"Paste  Ctrl+V", "Delete selected pixels  Del"],
@@ -183,13 +186,11 @@ func _build_interface() -> void:
 		Callable(self, "_set_selection_mode").bind("Intersect")])
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
-		"Rename Object…", "Save Object As…", "Close tab  Ctrl+W",
 		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout",
 		"Asset Browser…"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
-		Callable(self, "_cycle_tab").bind(-1), Callable(self, "_ask_rename_object"),
-		Callable(self, "_ask_save"), Callable(self, "_request_close_current"),
+		Callable(self, "_cycle_tab").bind(-1),
 		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts"),
 		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")])
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
@@ -201,7 +202,7 @@ func _build_interface() -> void:
 	width_spin.max_value = 96
 	width_spin.value = 3
 	width_spin.prefix = "Brush px"
-	width_spin.tooltip_text = "Stroke width in Drawing pixels"
+	width_spin.tooltip_text = "Stroke width in Drawing pixels (wheel or [ / ] keys; Shift+wheel scrolls options)"
 	width_spin.custom_minimum_size.x = 170
 	width_spin.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
 	width_spin.gui_input.connect(func(event: InputEvent) -> void:
@@ -223,16 +224,10 @@ func _build_interface() -> void:
 	tab_bar = TabBar.new()
 	tab_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tab_bar.tab_changed.connect(_activate)
+	tab_bar.tab_close_display_policy = TabBar.CLOSE_BUTTON_SHOW_ALWAYS
+	tab_bar.tab_close_pressed.connect(_request_close_tab)
+	tab_bar.clip_tabs = true
 	tabs_line.add_child(tab_bar)
-	var add_tab: Button = Button.new()
-	add_tab.text = "+"
-	add_tab.pressed.connect(new_drawing)
-	tabs_line.add_child(add_tab)
-	var close_tab: Button = Button.new()
-	close_tab.text = "×"
-	close_tab.tooltip_text = "Close current tab (with unsaved-changes prompt)"
-	close_tab.pressed.connect(_request_close_current)
-	tabs_line.add_child(close_tab)
 	dock_split = HSplitContainer.new()
 	dock_split.name = "WorkspaceSplit"
 	dock_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -924,7 +919,33 @@ func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> voi
 		_drag_candidate_position = event.global_position
 
 
+## Godot 4.8 beta's TabBar close icon is drawn by the theme, but forwarded
+## viewport mouse events do not consistently emit tab_close_pressed. Route the
+## close-glyph rectangle explicitly before TabBar processes the click; keep the
+## built-in signal for native OS events and keyboard/accessibility consumers.
+func _tab_close_hit(position: Vector2) -> int:
+	if not show_document_tabs or tab_bar == null or not tab_bar.is_visible_in_tree():
+		return -1
+	var local: Vector2 = tab_bar.get_global_transform_with_canvas().affine_inverse() * position
+	for index: int in range(tab_bar.tab_count):
+		var tab: Rect2 = tab_bar.get_tab_rect(index)
+		if tab.size.x < 32.0:
+			continue
+		var close: Rect2 = Rect2(tab.end.x - 30.0, tab.position.y, 28.0, tab.size.y)
+		if close.has_point(local):
+			return index
+	return -1
+
+
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var click: InputEventMouseButton = event as InputEventMouseButton
+		if click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+			var close_index: int = _tab_close_hit(click.position)
+			if close_index >= 0:
+				_request_close_tab(close_index)
+				get_viewport().set_input_as_handled()
+				return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
@@ -2657,6 +2678,14 @@ func _show_error(message: String) -> void:
 	push_warning("Drawing: " + message)
 
 
+## Keyboard width adjustments share exactly the same SpinBox range and history-free state.
+func _adjust_brush_size(delta: int) -> void:
+	if active_tool not in ["Brush", "Eraser"]:
+		return
+	width_spin.value = clampf(width_spin.value + float(delta), width_spin.min_value,
+		width_spin.max_value)
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey:
 		return
@@ -2664,6 +2693,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not key.pressed or key.echo:
 		return
 	if not key.ctrl_pressed and not key.meta_pressed:
+		if key.keycode in [KEY_BRACKETLEFT, KEY_BRACKETRIGHT] and not key.alt_pressed:
+			var focused: Control = get_viewport().gui_get_focus_owner()
+			if not (focused is LineEdit or focused is TextEdit or focused is SpinBox):
+				_adjust_brush_size(-1 if key.keycode == KEY_BRACKETLEFT else 1)
+				get_viewport().set_input_as_handled()
+				return
 		if key.keycode == KEY_DELETE and canvas.has_focus():
 			_delete_selection()
 			get_viewport().set_input_as_handled()

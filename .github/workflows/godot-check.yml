@@ -125,6 +125,13 @@ jobs:
           grep -q 'T089_MODEL_PASSED' /tmp/godot-t089-layers-model.log || ci_fail_marker 'T089 layer model incomplete'
           if grep -E 'SCRIPT ERROR:|T089_MODEL_FAILED:' /tmp/godot-t089-layers-model.log; then ci_fail_marker 'T089 layer model error'; fi
           ci_finish
+      - name: Verify T-090 responsive workspace, command routing, and licensed tool icon contracts
+        id: ci_t090_responsive_workspace_contracts
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          python3 -m unittest discover -s tests -p 'test_t090_responsive_workspace.py' -v
       - name: Verify T-053 standalone Linux release package
         id: ci_07_verify_t_053_standalone_linux_release_package
         if: ${{ !cancelled() }}

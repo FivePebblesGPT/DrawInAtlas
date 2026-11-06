@@ -234,17 +234,21 @@ func run() -> void:
 	wheel.pressed = true
 	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
 	top.consume_option_wheel(wheel, app.width_spin)
-	check(app.width_spin.value == wheel_value, "scrolling over brush width does not change it")
+	check(app.width_spin.value == wheel_value - 1.0,
+		"ordinary wheel decrements Brush px by one step")
+	wheel_value = app.width_spin.value
 	var wheel_position: Vector2 = app.width_spin.global_position + Vector2(20, 12)
 	wheel.position = wheel_position
 	wheel.global_position = wheel_position
 	root.push_input(wheel, true)
 	await frames(4)
-	check(app.width_spin.value == wheel_value,
-		"native unmodified wheel over brush width cannot alter the setting")
+	check(app.width_spin.value == wheel_value - 1.0,
+		"native unmodified wheel over Brush px adjusts its value")
+	wheel_value = app.width_spin.value
 	await frames(4)
-	check(top.left_cue.visible and top.right_cue.visible,
-		"long brush options have edge cues, rather than wrapping")
+	check(top.left_cue.visible == (top.options_region.size.x > top.options_scroll.size.x + 1.0)
+		and top.right_cue.visible == top.left_cue.visible,
+		"brush options show edge cues only when their contents actually overflow")
 	var before_scroll: int = top.options_scroll.scroll_horizontal
 	var shifted: InputEventMouseButton = InputEventMouseButton.new()
 	shifted.pressed = true
@@ -269,7 +273,7 @@ func run() -> void:
 	await frames()
 	check(app.width_spin.value == wheel_value and
 		top.options_scroll.scroll_horizontal >= native_before,
-		"native wheel over numeric brush control cannot mutate its value")
+		"Shift+wheel over numeric brush control scrolls options without changing its value")
 	app.snap_toggle.grab_focus()
 	await frames(5)
 	var viewport_bounds: Rect2 = Rect2(top.options_scroll.global_position, top.options_scroll.size)

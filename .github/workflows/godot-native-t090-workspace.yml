@@ -1,0 +1,42 @@
+name: Godot T-090 responsive workspace native witness (on demand, software only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  workspace-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install software-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Stage and import canonical standalone Drawing package
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Verify native resize, framebuffer edges, per-tab pointer close and brush wheel
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/t090-screenshots
+          T090_SCREENSHOTS=/tmp/t090-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/responsive_workspace_native.gd 2>&1 | tee /tmp/t090-native.log
+          python3 tools/check_native_t090_log.py /tmp/t090-native.log
+      - name: Upload software-only screenshots and diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t090-xvfb-responsive-workspace
+          path: |
+            /tmp/t090-native.log
+            /tmp/t090-screenshots/
+          if-no-files-found: warn

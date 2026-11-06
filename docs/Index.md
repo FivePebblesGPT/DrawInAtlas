@@ -67,6 +67,21 @@ workspace-keyboard regressions also pass. Atlas callers retain external chronolo
 findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
 [Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-090 responsive chrome, menus, tabs and licensed icons (2026-11-06; engineering Done):**
+Standalone `canvas_items` now expands with aspect instead of fixed-size side
+pillars (tested 800×600/1280×760/1920×1080 and 150–200% UI scale on Xvfb/Mesa).
+Object file actions and Close tab live in File, Window owns workspace settings,
+per-tab × clicks retain nonactive-tab dirty close prompts, Ctrl+N still creates
+new documents, and Brush px hover wheel/`[`/`]` update the brush width while
+Shift+wheel scrolls crowded settings. The six tool SVGs are sourced byte-identically
+from the bundled MIT at-icons/control family, with attribution included in both
+standalone/consumer packages. A **24-check** native framebuffer/pointer run
+(**29** with optional screenshots), seven focused Python contracts, the 75-check
+T-063 compact native regression and eight keyboard checks pass locally.
+Hardware Windows/Linux owner findings **#03/#04/#06/#08/#09 remain PENDING**;
+no manual review was approved. [Ticket](Tickets/T-090.md) ·
+[owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 is In Progress with source-space cache software witnesses; T-068 native research remains conditional.
 
 ## Kanban summary
@@ -1038,7 +1053,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Done | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
-| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Ready | — | [T-063](Tickets/T-063.md) |
+| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | Ready | — | [T-082](Tickets/T-082.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Ready | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
