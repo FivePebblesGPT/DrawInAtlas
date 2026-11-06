@@ -231,6 +231,8 @@ func _build_interface() -> void:
 	dock_split = HSplitContainer.new()
 	dock_split.name = "WorkspaceSplit"
 	dock_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	dock_split.dragged.connect(_on_dock_split_dragged)
+	dock_split.resized.connect(_apply_saved_dock_geometry)
 	root.add_child(dock_split)
 	var edit_region: HBoxContainer = HBoxContainer.new()
 	edit_region.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -837,9 +839,13 @@ func _float_source(kind: String, source_id: String, at: Vector2 = Vector2(-1, -1
 func move_group_to_floating(group_id: String, host_id: String) -> bool:
 	if not floating_hosts.has(host_id):
 		return false
-	var group_count: int = dock_layout.container_info(host_id)["groups"].size()
-	if not dock_drag.begin_group(group_id) or not dock_drag.preview({"kind": DrawingDockDrag.GROUP_SLOT,
-		"container": host_id, "index": group_count}):
+	# One-group host: an explicit transfer into an occupied host merges tabs.
+	var target_groups: Array = dock_layout.container_info(host_id)["groups"]
+	if target_groups.size() != 1:
+		return false
+	var target_group: Dictionary = target_groups[0]
+	if not dock_drag.begin_group(group_id) or not dock_drag.preview({"kind": DrawingDockDrag.MERGE_GROUP,
+		"group": target_group["id"], "index": target_group["panels"].size()}):
 		dock_drag.cancel()
 		return false
 	if not dock_drag.commit():
@@ -1317,8 +1323,9 @@ func _dock_arrange_action(action_id: int, group_id: String) -> void:
 				if host.visible:
 					source_kind = DrawingDockDrag.PANEL if action_id == 9 else DrawingDockDrag.GROUP
 					source_id = panel_id if action_id == 9 else group_id
-					destination = {"kind": DrawingDockDrag.GROUP_SLOT, "container": host_id,
-						"index": dock_layout.container_info(host_id)["groups"].size()}
+					var existing: Dictionary = dock_layout.container_info(host_id)["groups"][0]
+					destination = {"kind": DrawingDockDrag.TAB_SLOT if action_id == 9 else DrawingDockDrag.MERGE_GROUP,
+						"group": existing["id"], "index": existing["panels"].size()}
 					break
 	if not destination.is_empty():
 		_dock_apply(source_kind, source_id, destination, "edge:" + panel_id)
@@ -2303,7 +2310,8 @@ func _cycle_tab(direction: int) -> void:
 func _toggle_dock() -> void:
 	var minimized: bool = bool(dock_layout.container_info("right")["minimized"])
 	if not minimized:
-		_expanded_dock_width = maxi(160, int(inspector.size.x))
+		# Temporary narrow-window clamps must not replace the last width
+		# explicitly chosen by splitter drag or Window > Reset dock width.
 		_expanded_scroll = inspector.scroll_vertical
 	if dock_layout.set_minimized("right", not minimized):
 		_render_dock()
@@ -2313,6 +2321,21 @@ func _toggle_dock() -> void:
 		if minimized:
 			call_deferred("_restore_expanded_scroll")
 		_schedule_layout_save()
+
+
+func _on_dock_split_dragged(_offset: int) -> void:
+	if not _layout_booted or dock_layout.container_info("right")["minimized"]:
+		return
+	# Drag is observed before some Godot layouts finish sizing. The deferred
+	# save reads the realized inspector width after the splitter has settled.
+	call_deferred("_capture_dragged_dock_width")
+
+
+func _capture_dragged_dock_width() -> void:
+	if dock_split == null or dock_layout.container_info("right")["minimized"]:
+		return
+	_expanded_dock_width = clampi(roundi(inspector.size.x), 160, 800)
+	_schedule_layout_save()
 
 
 func _reset_dock_width() -> void:
@@ -2765,7 +2788,9 @@ func _apply_saved_dock_geometry() -> void:
 	if dock_split == null or not is_inside_tree():
 		return
 	var minimized: bool = dock_layout.container_info("right")["minimized"]
-	dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if minimized else _expanded_dock_width))
+	var usable: int = maxi(160, roundi(dock_split.size.x) - 180)
+	var width: int = 48 if minimized else mini(_expanded_dock_width, usable)
+	dock_split.split_offset = maxi(0, int(dock_split.size.x) - width)
 	if not minimized:
 		inspector.scroll_vertical = _expanded_scroll
 
@@ -2788,7 +2813,8 @@ func _save_workspace_layout() -> bool:
 	if not layout_persistence_enabled or dock_layout == null:
 		return false
 	if not dock_layout.container_info("right")["minimized"]:
-		_expanded_dock_width = maxi(160, int(inspector.size.x))
+		# Capture geometry only on actual user drag (or explicit reset), not
+		# during a viewport resize or an unrelated layout save.
 		_expanded_scroll = inspector.scroll_vertical
 	var state: Dictionary = DrawingDockPersistence.capture(dock_layout, floating_hosts,
 		_expanded_dock_width, _expanded_scroll, size)

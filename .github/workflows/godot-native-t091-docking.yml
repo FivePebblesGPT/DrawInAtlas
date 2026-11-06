@@ -1,0 +1,42 @@
+name: Godot T-091 single-group floating docking native witness (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dock-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install X11 software-rendered display
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Stage and import canonical independent Drawing package
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Verify one-group float, all eight resize directions, width persistence and screenshots
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/t091-screenshots
+          T091_SCREENSHOTS=/tmp/t091-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/dock_single_group_native.gd 2>&1 | tee /tmp/t091-native.log
+          python3 tools/check_native_t091_log.py /tmp/t091-native.log
+      - name: Upload software framebuffer evidence and original diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t091-xvfb-floating-docking
+          path: |
+            /tmp/t091-native.log
+            /tmp/t091-screenshots/
+          if-no-files-found: warn

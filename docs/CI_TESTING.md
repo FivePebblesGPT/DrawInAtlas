@@ -57,11 +57,27 @@ workspace dirty/save/open and tab-local grid options). The **on-demand**
 `drawing/tests/image_frame_native.gd` (36 Xvfb/Mesa framebuffer/input checks)
 for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
 pan/grid alignment, native snapped pointer, off-frame editing and undo.
-The 46-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
-includes the new bounded model step and prevents silent runaway push CI.
+The bounded fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
+includes the model steps and prevents silent runaway push CI (currently 47 steps).
 Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
 #02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
+
+## T-091 single floating tab group and splitter-width recovery
+
+Fast push/PR CI executes `drawing/tests/dock_single_group_smoke.gd` (42
+headless assertions) and `tests/test_t091_dock.py` (3 contract/log-verifier
+tests) in one fail-late step; the existing T-078–083 state-model smoke
+steps remain. The step bound is **47**. `.github/workflows/godot-native-t091-docking.yml`
+is on-demand and imports the staged standalone fonts/icons before running
+`drawing/tests/dock_single_group_native.gd` on Xvfb/Mesa. Its **36** native
+baseline assertions (+2 screenshot readbacks when enabled) cover a one-row header, eight edge/corner pointer resize paths,
+hide/recover, cold-relaunch width/host geometry, narrow-window clamps and
+1.5× content scaling; `T091_SCREENSHOTS` exports framebuffer PNGs. The
+fail-closed `check_native_t091_log.py` retains known post-success Godot/Mesa
+leaks but fails on script/runtime/unknown teardown errors, missing markers or
+failed assertions. No physical Windows/Linux pointer/owner acceptance is
+claimed; T-091 and T-083 remain In Progress.
 
 ## T-088 selection channel, clipboard, and native Move
 

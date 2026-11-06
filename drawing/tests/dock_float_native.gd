@@ -46,6 +46,14 @@ func drag_from(control: Control, at: Vector2) -> void:
 	motion(at)
 	await frames(4)
 
+func drag_point(start: Vector2, at: Vector2) -> void:
+	mouse(start, true)
+	await frames(3)
+	motion(start.lerp(at, 0.55))
+	await frames(3)
+	motion(at)
+	await frames(4)
+
 func drag_end(at: Vector2) -> void:
 	mouse(at, false)
 	await frames(7)
@@ -152,9 +160,9 @@ func run() -> void:
 	check(host.position.distance_to(initial_position) > 70.0, "native pointer moves floating host")
 	check(host.get_global_rect().end.x <= app.get_global_rect().end.x and host.position.x >= 0, "moved host stays in client")
 	var initial_size: Vector2 = host.size
-	var corner: Button = host.get_node("FloatingColumn/ResizeBar/ResizeHandle") as Button
-	target = corner.get_global_rect().get_center() + Vector2(78, 56)
-	await drag_from(corner, target)
+	var corner_point: Vector2 = host.get_global_rect().end - Vector2(3, 3)
+	target = corner_point + Vector2(78, 56)
+	await drag_point(corner_point, target)
 	await drag_end(target)
 	check(host.size.x > initial_size.x and host.size.y > initial_size.y, "native pointer resizes floating host")
 	check(host.get_global_rect().end.x <= app.get_global_rect().end.x and host.get_global_rect().end.y <= app.get_global_rect().end.y,
@@ -165,7 +173,7 @@ func run() -> void:
 	var second: DrawingFloatingHost = app.floating_hosts[second_id]
 	check(layout.owner_of("history") == second_id and layout.owner_of("layers") == "right",
 		"other dock icon remains while second host floats")
-	second.set_host_rect(Rect2(host.position + Vector2(host.size.x - 20.0, 35.0), Vector2(250, 210)))
+	second.set_host_rect(Rect2(host.position + Vector2(host.size.x - 4.0, 35.0), Vector2(250, 210)))
 	await frames(6)
 	check(second.get_global_rect().intersects(host.get_global_rect()), "two in-app hosts can overlap canvas and each other")
 	check(second.get_index() > host.get_index(), "new host starts on top")
@@ -174,41 +182,45 @@ func run() -> void:
 	check(host.get_index() > second.get_index(), "pointer focuses and raises first floating host")
 	await click(second.get_node("FloatingColumn/FloatingTitleBar/MoveHandle") as Button)
 	check(second.get_index() > host.get_index(), "pointer focuses and raises other floating host")
-	# Move another group into the first host; independent groups share the same state.
-	check(app.move_group_to_floating("layers", first_id), "programmatic move group into existing float")
+	# Explicit merge into an occupied host keeps one group, without nested title bars.
+	check(app.move_group_to_floating("layers", first_id), "programmatic group merge into occupied float")
 	await frames(6)
-	check(host.group_frames.size() == 2 and layout.owner_of("layers") == first_id and layout.rail_icons("right").is_empty(),
-		"one floating host supports multiple groups without dock icons")
-	check(layout.set_group_collapsed("colors", true), "collapse first floating group")
+	check(host.group_frames.size() == 1 and layout.owner_of("layers") == first_id and layout.rail_icons("right").is_empty(),
+		"one group after merge, all source panel icons removed from dock")
+	check(layout.group_info("layers").is_empty() and layout.group_info("colors")["panels"] == ["gradients", "colors", "swatches", "layers"],
+		"merged tabs preserve stable panel IDs and exact order")
+	check(host.get_node_or_null("FloatingColumn/ResizeBar") == null and
+		host.get_node_or_null("FloatingColumn/FloatingTitleBar/FloatingTitle") == null,
+		"no floating secondary group heading or full-size resize bar")
+	# The active tab can be split only by constructing another independent host.
+	check(layout.select_panel("swatches"), "select floating tab for separate host")
+	app._render_dock()
+	await frames(4)
+	host._arrange(2, "colors")
+	await frames(6)
+	var new_host_id: String = layout.owner_of("swatches")
+	check(new_host_id != first_id and app.floating_hosts.has(new_host_id),
+		"floating tab split creates another host, not another group")
+	check(layout.container_info(first_id)["groups"].size() == 1 and
+		layout.container_info(new_host_id)["groups"].size() == 1,
+		"both floating hosts own one group")
+	check(app.dock_drag.begin_panel("swatches") and
+		app.dock_drag.preview({"kind": DrawingDockDrag.TAB_SLOT, "group": "colors", "index": 2}) and
+		app.dock_drag.commit(), "merge split tab back into original host")
+	app._reap_empty_hosts()
 	app._render_dock()
 	await frames(6)
-	check(layout.group_info("colors")["collapsed"] and not layout.group_info("layers")["collapsed"], "floating group collapse independent")
-	host._arrange(3, "layers")
-	await frames(5)
-	check(layout.container_info(first_id)["groups"][0]["id"] == "layers", "group reorder in floating host uses drag planner")
-	check(layout.group_info("colors")["panels"] == ["gradients", "colors", "swatches"], "group reorder retains tab order")
-	# Use the actual floating Arrange command to split and remerge a tab in-place.
-	host._arrange(2, "colors")
-	await frames(5)
-	var split_id: String = layout.group_of("swatches")
-	check(split_id != "colors" and layout.owner_of("swatches") == first_id,
-		"floating Arrange splits the active tab without leaving its host")
-	check(layout.container_info(first_id)["groups"].size() == 3, "split creates third local group")
-	host._arrange(5, split_id)
-	await frames(5)
-	check(layout.group_of("swatches") == "colors" and layout.group_info(split_id).is_empty(),
-		"floating Arrange merges tab group back without copies")
-	check(layout.group_info("colors")["panels"] == ["gradients", "colors", "swatches"],
-		"remerge preserves order and original stable panel IDs")
+	check(layout.group_info("colors")["panels"] == ["gradients", "colors", "swatches", "layers"],
+		"remerge keeps tab order and source identity")
 	# Keyboard uses the same transaction as pointer drag and the arrange menu.
 	(host.tab_buttons["swatches"] as Button).grab_focus()
 	await frames(4)
 	await press(KEY_LEFT, true, true)
-	check(layout.group_info("colors")["panels"] == ["gradients", "swatches", "colors"],
+	check(layout.group_info("colors")["panels"] == ["gradients", "swatches", "colors", "layers"],
 		"focused floating tab Ctrl+Alt+Left reorders")
 	(host.tab_buttons["swatches"] as Button).grab_focus()
 	await press(KEY_RIGHT, true, true)
-	check(layout.group_info("colors")["panels"] == ["gradients", "colors", "swatches"],
+	check(layout.group_info("colors")["panels"] == ["gradients", "colors", "swatches", "layers"],
 		"focused floating tab Ctrl+Alt+Right restores order")
 	# Closing/hiding cannot reattach or destroy any panel, and Window recovers it.
 	var before_hide: Dictionary = layout.snapshot()
@@ -251,7 +263,7 @@ func run() -> void:
 	check(host.position.x >= 0 and host.get_global_rect().end.x <= app.get_global_rect().end.x + 1,
 		"1.5x content scale preserves host bounds")
 	check((host.get_node("FloatingColumn/FloatingTitleBar/MoveHandle") as Button).focus_mode == Control.FOCUS_ALL and
-		(host.get_node("FloatingColumn/ResizeBar/ResizeHandle") as Button).custom_minimum_size.x >= 40.0,
+		(host.get_node("FloatingColumn/FloatingTitleBar/HideHost") as Button).custom_minimum_size.x >= 30.0,
 		"HiDPI keyboard focus and grab affordances remain usable")
 	check(app.current_document().revision == revision and app.current_document().is_dirty() == dirty,
 		"dock operations never change Drawing revision or dirty state")
