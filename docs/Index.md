@@ -54,6 +54,19 @@ real pointer snap and 25/50/100/200% zoom) pass. Physical Windows/Linux
 owner UX for findings 02/16 remains **PENDING**, separately gated by T-059.
 [Ticket](Tickets/T-087.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-089 layer/group corrective engineering (2026-11-06; Done):**
+Tree row selection is independent from the paint target; groups are
+selectable without painting, and +Layer/+Group insert relative to that row.
+Clickable row eye/lock controls, keyboard reorder/indent/outdent, guarded
+structural history and stable save/reopen identities are implemented in the
+canonical shared package. **62/62** headless model checks and **32/32**
+X11/Xvfb/Mesa software pointer/framebuffer checks pass (1120×800/880×550,
+400% zoom). The 200-row paging/filter path remains bounded; Xvfb
+compact-workspace (420px, 150% scale), Object Editor UI (25/25), and
+workspace-keyboard regressions also pass. Atlas callers retain external chronology. Physical Windows/Linux owner acceptance for
+findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
+[Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 is In Progress with source-space cache software witnesses; T-068 native research remains conditional.
 
 ## Kanban summary
@@ -1024,7 +1037,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Done | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Ready | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | Ready | — | [T-082](Tickets/T-082.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Ready | — | [T-063](Tickets/T-063.md) |

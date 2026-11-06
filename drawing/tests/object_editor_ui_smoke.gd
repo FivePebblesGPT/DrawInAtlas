@@ -70,8 +70,9 @@ func _run() -> void:
 	app._undo()
 	_check(session.document.inspect_node(text_id).kind == DrawingLayerNode.TEXT,
 		"Object draft undo restores text editability")
-	app.tabs[app.active_tab]["layer"] = layer
-	app.canvas.layer_id = layer
+	# T-089 tracks the selected Tree row separately from the paint target.
+	# Switch through the workspace API rather than mutating one private field.
+	app._select_layer_node(layer, false)
 	var source_path: String = ProjectSettings.globalize_path("user://t062-source.drawing")
 	app._save_file(source_path)
 	_check(FileAccess.file_exists(source_path) and not session.is_dirty() and session.source_id != "",

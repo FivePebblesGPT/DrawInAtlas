@@ -63,12 +63,20 @@ its Godot template on the build host.
   pixels), Pan (left drag); middle drag pans in any tool. Scroll zooms around
   the pointer. A 1–96px brush-width field, optional generic 8px snap and color
   picker control the Drawing core's gestures.
-- **Layer** Add group, add raster, toggle visibility, remove selected; tree
-  selection chooses a raster paint target. Undo and redo apply to raster gestures.
-  The History dock's **Record selection changes in Undo History** checkbox (OFF by default)
-  optionally adds completed selections as separate clean, reversible steps;
-  content undo restores layer/selection/tool context regardless of the toggle.
-  Structural layer operations are dirty but are not yet undoable (follow-up layer feature work).
+- **Layers** Select a group row without making it a paint target. +Layer/+Group
+  append inside that group, or insert immediately above a selected sibling row.
+  Click the eye and lock icon on **any** row; group state also applies to its
+  descendants. The Layer menu offers rename, remove and structural operations.
+  When the Layers Tree has focus, use Ctrl+Alt+Up/Down to reorder a sibling,
+  Ctrl+Alt+Right/Left to indent into a preceding group/outdent, Ctrl+Alt+V/L
+  to toggle visibility/lock and Ctrl+Alt+R to rename. Guarded creation,
+  removal, rename, reorder, visibility and lock are each one undoable step
+  in standalone Drawing; the selected row/paint target are restored by Undo.
+  Layer names and text are searchable with 200-row bounded pages. Atlas API
+  callers retain their own external/legacy structural chronology. The History
+  dock's **Record selection changes in Undo History** checkbox (OFF by default)
+  optionally adds separate clean selection steps; content undo always restores
+  layer/selection/tool context.
 - **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock stacks independently collapsible groups and scrolls at short heights. Use **Window → Minimize/expand panel dock** (or the dock's own button) to switch between the expanded groups and a narrow icon rail. Each attached panel has an icon with a tooltip; adjacent icons in a group share one flyout/tab set, while a separator denotes a different group. The flyout overlays the drawing canvas without changing its layout or creating an OS window; click the active icon to close it. Collapse and active tab state survive minimize/restore during the session. **Drag a panel icon** to another tab position, another group, or a between-group insertion marker; **drag the ↕ handle** to reorder or merge its whole group. The in-app hint appears only for valid drops; Esc and leaving the dock cancel without layout changes. The group **⋮ Arrange** menu provides keyboard-accessible move/split/merge actions. On a focused panel icon use `Ctrl+Alt+Left/Right` to reorder, `Ctrl+Alt+Up/Down` to move to an adjacent group and `Ctrl+Alt+S` to split; on a focused ↕ handle, `Ctrl+Alt+Shift+Up/Down` reorders groups. Large tab strips scroll horizontally, and dragging near the top/bottom of the dock scrolls through offscreen group targets. Use **Window → Float selected dock group** after focusing a dock tab/group handle (otherwise the first attached group is chosen) to move all its current tabs into a floating **in-app Control**. Drag the host's ⠿ title grip to move, its ◢ lower-right grip to resize, and its floating tab icons to reorder within the host; each floating group's ⋮ menu also moves, splits and merges local groups. Close × **hides** the host without redocking or discarding its panels; **Window → Show hidden floating panels** recovers every hidden host. Each host can contain multiple ordered groups, independently collapsed. Drag a floating tab or whole group onto the expanded dock, a minimized-rail group gap, or another floating host to transfer the **original** panel(s), preserving relative tab order. Drop on the bare canvas to create an in-app floating host; Esc or an invalid drop leaves both sides unchanged. The dock and floating-host ⋮ menus offer keyboard-accessible cross-container moves; a focused floating tab can use Ctrl+Alt+D, or focused group handle Ctrl+Alt+Shift+D, to redock at the end of the right dock. The original floating container disappears when all its groups have moved away. Dock/group/flyout/floating-host layout is now saved across application relaunches as a **workspace preference** (never inside `.drawing` documents). **Window → Reset workspace layout** restores Colors/Layers/History singleton groups and resets floating hosts without discarding edits. Settings are stored in the Godot user data directory (`user://drawing-workspace-dock-v1.json`); corrupt/unsupported files return to safe defaults, and offscreen hosts are clamped on restart or resize. Hidden floating panels still recover from Window. A host that embeds the shared editor can override `layout_settings_path` to isolate separate workspaces, and can register optional panels by stable ID before restore. The complete Drawing feature inventory and Asset Browser implementation remain separate tickets; **T-083 awaits explicit owner UX review**, and automated tests do not approve it.
 
 ## Standalone image frame, checkerboard and grid (T-087)
@@ -169,8 +177,8 @@ This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,
 retention, backup, migration or recovery from T-066. It is not yet a complete
 production drawing editor: the compact T-063 layout does not implement
-all approved tools/advanced options, and full structural history and
-performance/native acceleration belong to later tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
+all approved tools/advanced options, while physical owner UX acceptance and hardware performance
+remain separately gated. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
 
 ## Verification
 
@@ -353,3 +361,21 @@ python3 tools/build_drawing_app.py --in-place
 godot --headless --editor --path drawing --import --quit
 godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd
 ```
+
+## Layer hierarchy and structural history verification (T-089)
+
+A selected group is a navigable row, never an active raster target; eye/lock
+buttons act on the clicked row without changing the selection. Group lock or
+visibility blocks child editing. Changes to structure are saved in `.drawing`
+and are locally undoable; one step per operation, including restoring removed
+subtree pixels, IDs and lazy references. The action shortcuts above require
+focus in the Layers Tree (not the canvas). Run after staging/import:
+
+```sh
+godot --headless --path drawing --script res://tests/layer_structure_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/layer_structure_native.gd
+```
+
+T-089 model 62/62 and software Xvfb/Mesa native 32/32 are engineering evidence;
+physical Windows/Linux pointer/DPI owner approval is still separate in T-059.

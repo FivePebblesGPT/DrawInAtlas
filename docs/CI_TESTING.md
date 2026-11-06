@@ -57,7 +57,7 @@ workspace dirty/save/open and tab-local grid options). The **on-demand**
 `drawing/tests/image_frame_native.gd` (36 Xvfb/Mesa framebuffer/input checks)
 for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
 pan/grid alignment, native snapped pointer, off-frame editing and undo.
-The 44-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
+The 45-step fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
 includes the new bounded model step and prevents silent runaway push CI.
 Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
@@ -81,6 +81,31 @@ Escape/undo/redo, Ctrl+C/X/V and Delete, 50/100/200/400% pointer/zoom and
 signed-tile seams. A four-sample `frame_post_draw` p50/p95 upper-bound is
 logged; it is **not** a physical input-to-photon measurement. The software
 runner does not close T-056/T-059 or any other manual owner-review gate.
+
+## T-089 structural layers, pointer row controls and undo
+
+Fast push/PR CI stages/imports the one shared Drawing package and runs
+`drawing/tests/layer_structure_smoke.gd` (**62** headless model assertions) as
+its 45th bounded fail-late check. It verifies locally owned structural
+history, tree insertion semantics, stable identity, canonical RGBA8, locked
+subtree guards, editor selection context and filtered/paged navigation.
+The **on-demand** `.github/workflows/godot-native-t089-layers.yml` imports
+fonts/SVG icons first, then runs `drawing/tests/layer_structure_native.gd`
+(**32** X11/Xvfb/Mesa framebuffer and physical-event-dispatch **software**
+checks) at 1120×800 and 880×550, 400% zoom. The native test clicks the actual
+inline eye and lock controls; it does not simulate the Tree signal or stand
+in for physical Linux/Windows owner review. Pinned Godot is 4.8-beta2.
+The optional native job additionally checks runtime errors with a fail-closed
+log verifier (`tools/check_native_t089_log.py`): recognized Godot/Mesa
+renderer-release leak reports after the success marker are retained and
+counted, never silently discarded. Script errors, early runtime errors, and
+unknown post-marker errors still fail; shutdown leak-free operation is not
+claimed. Owner findings #19/#20 remain **PENDING** and no manual review status or
+remote CI success is inferred from local tests. Shared regressions include the T-062 Object
+Editor UI (25/25, selected Tree row tracks new text), the native T-063
+420px/150%-scale compact workspace (layer actions wrap within the dock),
+and T-073 native keyboard routing. Neither these nor remote automation
+establish physical review acceptance.
 
 ## Required CI
 

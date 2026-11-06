@@ -22,10 +22,11 @@ class GodotCIFailLateTests(unittest.TestCase):
         blocks = re.findall(r"(?ms)^      - name: ([^\n]+)\n(.*?)(?=^      - name: |\Z)", workflow)
         self.assertGreaterEqual(len(blocks), 20)
         # Keep push CI bounded while permitting new focused, fast model
-        # witnesses (T-065 paging, T-086 cache, T-087 frame and T-088 selection).
-        self.assertLessEqual(len(blocks), 44)
+        # witnesses (T-065 paging, T-086 cache, T-087 frame, T-088 selection and T-089 layers).
+        self.assertLessEqual(len(blocks), 45)
         self.assertIn("Verify T-086 source-space dirty-display tile invalidation", workflow)
         self.assertIn("Verify T-088 selection channel, clipboard, and transaction history", workflow)
+        self.assertIn("Verify T-089 layer hierarchy, row actions, and structural history", workflow)
         for name, block in blocks:
             if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
                 continue

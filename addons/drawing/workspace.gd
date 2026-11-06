@@ -10,6 +10,8 @@ const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
+const ROW_EYE: int = 1
+const ROW_LOCK: int = 2
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -103,7 +105,10 @@ var text_alignment: OptionButton
 var text_color: ColorPickerButton
 var text_target: String = ""
 var text_position: Vector2i = Vector2i.ZERO
+var layer_icons: Dictionary = {} # Imported SVG textures cached once per workspace.
 var layer_search: LineEdit
+var layer_rename_dialog: ConfirmationDialog
+var layer_rename_field: LineEdit
 var layer_page: int = 0
 var layer_page_label: Label
 var object_open_dialog: FileDialog
@@ -160,9 +165,14 @@ func _build_interface() -> void:
 		[Callable(self, "_rasterize_text"), Callable(self, "_ask_object_frame"),
 		Callable(self, "_ask_image_frame")])
 	top_bar.add_menu_spec("Layers", ["Add group", "Add raster layer",
-		"Remove selected", "Toggle visibility"],
+		"Remove selected", "Toggle visibility", "Toggle lock", "Rename…",
+		"Move up", "Move down", "Indent into previous group", "Outdent from group"],
 		[Callable(self, "_add_group"), Callable(self, "_add_layer"),
-		Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility")])
+		Callable(self, "_remove_layer"), Callable(self, "_toggle_visibility"),
+		Callable(self, "_toggle_layer_lock"), Callable(self, "_ask_layer_rename"),
+		Callable(self, "_move_selected_layer").bind(-1),
+		Callable(self, "_move_selected_layer").bind(1),
+		Callable(self, "_indent_selected_layer"), Callable(self, "_outdent_selected_layer")])
 	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels",
 		"Deselect  Ctrl+D", "Replace", "Add", "Subtract", "Intersect"],
 		[Callable(self, "_change_tool").bind("Select"),
@@ -301,12 +311,21 @@ func _build_interface() -> void:
 		canvas.color_rgba = _pack_color(value))
 	color_pane.add_child(picker)
 	var layer_pane: VBoxContainer = _add_dock_section("Layers")
-	var layer_actions: HBoxContainer = HBoxContainer.new()
+	# Do not let six layer actions force a minimum 300px dock on small
+	# windows; wrap secondary actions within the existing dock width.
+	var layer_actions: HFlowContainer = HFlowContainer.new()
 	layer_pane.add_child(layer_actions)
 	for entry: Dictionary in [{"label": "+ Group", "handler": Callable(self, "_add_group")},
-		{"label": "+ Layer", "handler": Callable(self, "_add_layer")}]:
+		{"label": "+ Layer", "handler": Callable(self, "_add_layer")},
+		{"label": "↑", "handler": Callable(self, "_move_selected_layer").bind(-1)},
+		{"label": "↓", "handler": Callable(self, "_move_selected_layer").bind(1)},
+		{"label": "↳", "handler": Callable(self, "_indent_selected_layer")},
+		{"label": "↰", "handler": Callable(self, "_outdent_selected_layer")}] :
 		var action: Button = Button.new()
 		action.text = entry["label"]
+		action.tooltip_text = {"↑": "Move selected row up", "↓": "Move selected row down",
+			"↳": "Indent into preceding group", "↰": "Outdent beside parent"}.get(
+			entry["label"], entry["label"])
 		action.pressed.connect(entry["handler"])
 		layer_actions.add_child(action)
 	layer_search = LineEdit.new()
@@ -324,13 +343,25 @@ func _build_interface() -> void:
 		pages.add_child(page_button)
 	layer_page_label = Label.new()
 	pages.add_child(layer_page_label)
+	for icon_name: String in ["layer_visible", "layer_hidden", "layer_unlocked", "layer_locked"]:
+		layer_icons[icon_name] = load("res://addons/drawing/icons/%s.svg" % icon_name) as Texture2D
 	layers = Tree.new()
 	layers.hide_root = true
 	# Fixed viewport for the tree: the dock scrolls as a whole, and the tree
 	# keeps its own row scrolling without expanding indefinitely.
 	layers.custom_minimum_size.y = 230
 	layers.item_selected.connect(_layer_selected)
+	# Tree.button_clicked is not emitted reliably for synthetic and some
+	# forwarded GUI pointer sequences; resolve the row/icon on mouse-down.
+	layers.gui_input.connect(_layer_tree_input)
 	layer_pane.add_child(layers)
+	layer_rename_dialog = ConfirmationDialog.new()
+	layer_rename_dialog.title = "Rename layer or group"
+	add_child(layer_rename_dialog)
+	layer_rename_field = LineEdit.new()
+	layer_rename_field.max_length = 128
+	layer_rename_dialog.add_child(layer_rename_field)
+	layer_rename_dialog.confirmed.connect(_commit_layer_rename)
 	var history_pane: VBoxContainer = _add_dock_section("History")
 	history_label = Label.new()
 	history_label.text = "Undo / Redo"
@@ -1355,7 +1386,13 @@ func current_document() -> DrawingDocument:
 
 
 func current_layer() -> String:
+	# Empty for selected groups: their contents remain visible but drawing into
+	# a previously selected raster must never happen silently.
 	return String(tabs[active_tab]["layer"]) if active_tab >= 0 else ""
+
+
+func selected_layer_node() -> String:
+	return String(tabs[active_tab].get("selected_node", current_layer())) if active_tab >= 0 else ""
 
 
 func new_drawing() -> void:
@@ -1365,7 +1402,7 @@ func new_drawing() -> void:
 	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Group 1")
 	var raster: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1", String(group.value))
 	tabs.append({"document": document, "path": "", "title": "Untitled %d" % new_counter,
-		"layer": raster.value, "saved": -1, "frame": IMAGE_FRAME.DEFAULT_BOUNDS,
+		"layer": raster.value, "selected_node": raster.value, "saved": -1, "frame": IMAGE_FRAME.DEFAULT_BOUNDS,
 		"saved_frame": IMAGE_FRAME.DEFAULT_BOUNDS,
 		"frame_dirty": false, "fit_pending": true})
 	tab_bar.add_tab("Untitled %d *" % new_counter)
@@ -1381,7 +1418,7 @@ func attach_object_session(session: DrawingObjectEditorSession) -> DrawingResult
 	var layer: String = _first_editable(session.document, DrawingDocument.ROOT_ID)
 	var tab_name: String = "Object: " + session.name
 	tabs.append({"document": session.document, "object": session,
-		"path": "", "title": tab_name, "layer": layer})
+		"path": "", "title": tab_name, "layer": layer, "selected_node": layer})
 	tab_bar.add_tab(tab_name)
 	_activate(tabs.size() - 1)
 	return DrawingResult.success(active_tab)
@@ -1401,6 +1438,7 @@ func new_object() -> void:
 	attach_object_session(session)
 	tabs[active_tab]["local_object"] = true
 	tabs[active_tab]["layer"] = layer.value
+	tabs[active_tab]["selected_node"] = layer.value
 	canvas.layer_id = String(layer.value)
 	_update_status()
 
@@ -1622,8 +1660,9 @@ func _sync_object_tab() -> void:
 	tabs[active_tab]["document"] = session.document
 	tabs[active_tab]["title"] = "Object: " + session.name
 	var selected: String = current_layer()
-	if not session.document.has_node(selected):
+	if not session.document.has_node(selected) and not session.document.has_node(selected_layer_node()):
 		tabs[active_tab]["layer"] = _first_editable(session.document, DrawingDocument.ROOT_ID)
+		tabs[active_tab]["selected_node"] = current_layer()
 	canvas.document = session.document
 	canvas.layer_id = current_layer()
 	canvas.asset_origin = session.origin
@@ -1640,6 +1679,11 @@ func _activate(index: int) -> void:
 	active_tab = index
 	tab_bar.current_tab = index
 	canvas.document = current_document()
+	var chosen: String = selected_layer_node()
+	if not current_document().has_node(chosen):
+		chosen = _first_editable(current_document(), DrawingDocument.ROOT_ID)
+		tabs[active_tab]["selected_node"] = chosen
+		tabs[active_tab]["layer"] = chosen
 	canvas.layer_id = current_layer()
 	var object_session: DrawingObjectEditorSession = current_object()
 	canvas.asset_origin = object_session.origin if object_session != null else Vector2i.ZERO
@@ -1698,9 +1742,15 @@ func _refresh_layers() -> void:
 		var info: Dictionary = row["info"]
 		var item: TreeItem = layers.create_item(root)
 		var kind_marker: String = "▸ " if info["kind"] == DrawingLayerNode.GROUP else ("T " if info["kind"] == DrawingLayerNode.TEXT else "◉ ")
-		item.set_text(0, "  ".repeat(mini(int(row["depth"]), 12)) + (kind_marker if info["visible"] else "○ ") + info["name"])
+		item.set_text(0, "  ".repeat(mini(int(row["depth"]), 12)) + kind_marker + info["name"])
+		item.set_tooltip_text(0, "%s · %s%s" % [info["name"], info["kind"],
+			" · inherited visibility/lock applies" if int(row["depth"]) > 0 else ""])
 		item.set_metadata(0, row["id"])
-		if row["id"] == current_layer():
+		item.add_button(0, layer_icons["layer_visible"] if info["visible"] else layer_icons["layer_hidden"], ROW_EYE,
+			false, "Hide this row/group" if info["visible"] else "Show this row/group")
+		item.add_button(0, layer_icons["layer_locked"] if info["locked"] else layer_icons["layer_unlocked"], ROW_LOCK,
+			false, "Unlock this row/group" if info["locked"] else "Lock this row/group")
+		if row["id"] == selected_layer_node():
 			item.select(0)
 			layers.scroll_to_item(item)
 
@@ -1710,42 +1760,228 @@ func _change_layer_page(direction: int) -> void:
 	_refresh_layers()
 
 
-func _layer_selected() -> void:
-	var before: DrawingHistoryContext = _capture_context()
-	var selected_item: TreeItem = layers.get_selected()
-	if selected_item == null:
+func _select_layer_node(node_id: String, record_context: bool = true) -> void:
+	if active_tab < 0 or not current_document().has_node(node_id):
 		return
-	var node_id: String = String(selected_item.get_metadata(0))
-	if current_document().node_metadata(node_id).get("kind") in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT]:
-		tabs[active_tab]["layer"] = node_id
-		canvas.layer_id = node_id
-	_record_selection_context(before)
+	var before: DrawingHistoryContext = _capture_context() if record_context else null
+	var kind: String = String(current_document().node_metadata(node_id).get("kind", ""))
+	tabs[active_tab]["selected_node"] = node_id
+	tabs[active_tab]["layer"] = node_id if kind in [DrawingLayerNode.RASTER, DrawingLayerNode.TEXT] else ""
+	canvas.layer_id = current_layer()
+	if record_context:
+		_record_selection_context(before)
 	_update_status()
 
 
-func _add_group() -> void:
+func _layer_selected() -> void:
+	var selected_item: TreeItem = layers.get_selected()
+	if selected_item != null:
+		_select_layer_node(String(selected_item.get_metadata(0)))
+
+
+## Keyboard-accessible row actions operate only when the layer Tree has focus;
+## dock shortcuts and application-wide undo keep their existing ownership.
+func _layer_tree_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mouse: InputEventMouseButton = event as InputEventMouseButton
+		if not mouse.pressed or mouse.button_index != MOUSE_BUTTON_LEFT:
+			return
+		var row: TreeItem = layers.get_item_at_position(mouse.position)
+		var action: int = layers.get_button_id_at_position(mouse.position)
+		if row == null or action not in [ROW_EYE, ROW_LOCK]:
+			return
+		# Defer tree rebuild until the GUI dispatch finishes: never free its
+		# currently hit-tested TreeItem while Godot is processing that event.
+		call_deferred("_apply_row_icon_action", String(row.get_metadata(0)), action)
+		layers.accept_event()
+		return
+	if not event is InputEventKey:
+		return
+	var key: InputEventKey = event as InputEventKey
+	if not key.pressed or key.echo or not (key.ctrl_pressed or key.meta_pressed) or not key.alt_pressed:
+		return
+	match key.keycode:
+		KEY_UP: _move_selected_layer(-1)
+		KEY_DOWN: _move_selected_layer(1)
+		KEY_LEFT: _outdent_selected_layer()
+		KEY_RIGHT: _indent_selected_layer()
+		KEY_L: _toggle_layer_lock()
+		KEY_V: _toggle_visibility()
+		KEY_R: _ask_layer_rename()
+		_: return
+	layers.accept_event()
+
+
+func _apply_row_icon_action(node_id: String, id: int) -> void:
+	if active_tab < 0 or not current_document().has_node(node_id):
+		return
+	if id == ROW_EYE:
+		_set_row_visibility(node_id)
+	elif id == ROW_LOCK:
+		_set_row_lock(node_id)
+
+
+## Group: append inside. Layer/text: insert immediately above that sibling.
+## This policy is the same for +Layer and +Group, including root siblings.
+func _insertion_target() -> Dictionary:
+	var chosen: String = selected_layer_node()
+	var info: Dictionary = current_document().node_metadata(chosen)
+	if info.is_empty():
+		return {"parent": DrawingDocument.ROOT_ID, "index": current_document().list_children().size()}
+	if info["kind"] == DrawingLayerNode.GROUP:
+		return {"parent": chosen, "index": current_document().list_children(chosen).size()}
+	var parent_id: String = info["parent"]
+	return {"parent": parent_id, "index": current_document().list_children(parent_id).find(chosen) + 1}
+
+
+func _create_selected_layer(kind: String) -> void:
 	if active_tab < 0:
 		return
-	var added: DrawingResult = current_document().create_layer(DrawingLayerNode.GROUP, "Group %d" % current_document().layer_count())
-	if added.ok:
-		_after_edit()
-	else:
+	var target: Dictionary = _insertion_target()
+	var before: DrawingHistoryContext = _capture_context()
+	var name: String = ("Group " if kind == DrawingLayerNode.GROUP else "Layer ") + \
+		str(current_document().layer_count() + 1)
+	var added: DrawingResult = current_document().create_layer(kind, name,
+		String(target["parent"]), "", int(target["index"]), true)
+	if not added.ok:
 		_show_error(added.message)
+		return
+	_select_layer_node(String(added.value), false)
+	current_document().annotate_latest_gesture(before, _capture_context())
+	_reveal_selected_layer()
+	_after_edit()
+
+
+func _add_group() -> void:
+	_create_selected_layer(DrawingLayerNode.GROUP)
 
 
 func _add_layer() -> void:
+	_create_selected_layer(DrawingLayerNode.RASTER)
+
+
+func _reveal_selected_layer() -> void:
 	if active_tab < 0:
 		return
-	var existing: DrawingLayerNode = current_document().inspect_node(current_layer())
-	var parent: String = existing.parent_id if existing != null else DrawingDocument.ROOT_ID
-	var added: DrawingResult = current_document().create_layer(DrawingLayerNode.RASTER,
-		"Layer %d" % current_document().layer_count(), parent)
-	if added.ok:
-		tabs[active_tab]["layer"] = added.value
-		canvas.layer_id = String(added.value)
-		_after_edit()
-	else:
-		_show_error(added.message)
+	# A new/moved item must not disappear behind an old filter/page.
+	if not layer_search.text.is_empty():
+		layer_search.text = ""
+	var rows: Array[Dictionary] = []
+	_flatten_layer_ids(DrawingDocument.ROOT_ID, 0, rows)
+	for index: int in range(rows.size()):
+		if rows[index]["id"] == selected_layer_node():
+			layer_page = index / ROW_PAGE
+			break
+
+
+func _apply_structure(result: DrawingResult, before: DrawingHistoryContext,
+		reveal: bool = false) -> void:
+	if not result.ok:
+		_show_error(result.message)
+		return
+	# If a group visibility/lock edit occurs mid-gesture the previously
+	# detached preview is stale; cancel it before refreshing the compositor.
+	canvas.cancel_gesture()
+	current_document().annotate_latest_gesture(before, _capture_context())
+	if reveal:
+		_reveal_selected_layer()
+	_after_edit()
+
+
+func _set_row_visibility(node_id: String) -> void:
+	if active_tab < 0:
+		return
+	var info: Dictionary = current_document().node_metadata(node_id)
+	if info.is_empty():
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	_apply_structure(current_document().set_visibility(node_id, not bool(info["visible"]), true), before)
+
+
+func _set_row_lock(node_id: String) -> void:
+	if active_tab < 0:
+		return
+	var info: Dictionary = current_document().node_metadata(node_id)
+	if info.is_empty():
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	_apply_structure(current_document().set_locked(node_id, not bool(info["locked"]), true), before)
+
+
+func _toggle_layer_lock() -> void:
+	_set_row_lock(selected_layer_node())
+
+
+func _move_selected_layer(direction: int) -> void:
+	if active_tab < 0:
+		return
+	var node_id: String = selected_layer_node()
+	var info: Dictionary = current_document().node_metadata(node_id)
+	if info.is_empty():
+		return
+	var siblings: Array[String] = current_document().list_children(info["parent"])
+	var index: int = siblings.find(node_id)
+	if index + direction < 0 or index + direction >= siblings.size():
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	_apply_structure(current_document().reorder(node_id, info["parent"], index + direction, true), before, true)
+
+
+func _indent_selected_layer() -> void:
+	if active_tab < 0:
+		return
+	var node_id: String = selected_layer_node()
+	var info: Dictionary = current_document().node_metadata(node_id)
+	if info.is_empty():
+		return
+	var siblings: Array[String] = current_document().list_children(info["parent"])
+	var index: int = siblings.find(node_id)
+	if index <= 0 or current_document().node_metadata(siblings[index - 1]).get("kind") != DrawingLayerNode.GROUP:
+		_show_error("Indent requires a preceding sibling group")
+		return
+	var target: String = siblings[index - 1]
+	var before: DrawingHistoryContext = _capture_context()
+	_apply_structure(current_document().reorder(node_id, target,
+		current_document().list_children(target).size(), true), before, true)
+
+
+func _outdent_selected_layer() -> void:
+	if active_tab < 0:
+		return
+	var node_id: String = selected_layer_node()
+	var info: Dictionary = current_document().node_metadata(node_id)
+	if info.is_empty() or info["parent"] == DrawingDocument.ROOT_ID:
+		return
+	var parent_id: String = info["parent"]
+	var grandparent: String = current_document().node_metadata(parent_id)["parent"]
+	var after_parent: int = current_document().list_children(grandparent).find(parent_id) + 1
+	var before: DrawingHistoryContext = _capture_context()
+	_apply_structure(current_document().reorder(node_id, grandparent, after_parent, true), before, true)
+
+
+func _ask_layer_rename() -> void:
+	if active_tab < 0:
+		return
+	var info: Dictionary = current_document().node_metadata(selected_layer_node())
+	if info.is_empty():
+		return
+	layer_rename_field.text = info["name"]
+	layer_rename_dialog.popup_centered(Vector2i(340, 110))
+	layer_rename_field.select_all()
+	layer_rename_field.grab_focus()
+
+
+func _commit_layer_rename() -> void:
+	if active_tab < 0:
+		return
+	var name: String = layer_rename_field.text.strip_edges()
+	if name.is_empty():
+		_show_error("Layer name cannot be empty")
+		return
+	if current_document().node_metadata(selected_layer_node()).get("name") == name:
+		return
+	var before: DrawingHistoryContext = _capture_context()
+	_apply_structure(current_document().rename_layer(selected_layer_node(), name, true), before, true)
 
 
 func _build_text_dialog() -> void:
@@ -1830,9 +2066,12 @@ func _commit_text_dialog() -> void:
 	if not committed.ok:
 		_show_error(committed.message)
 		return
-	tabs[active_tab]["layer"] = committed.value
-	canvas.layer_id = String(committed.value)
+	# Text creation is also a structural row insertion. Keep the selected Tree
+	# row and paint target in sync, including Object Editor tabs; otherwise a
+	# subsequent Tree rebuild can silently retarget the old raster layer.
+	_select_layer_node(String(committed.value), false)
 	document.annotate_latest_gesture(before, _capture_context())
+	_reveal_selected_layer()
 	_after_edit()
 
 
@@ -1851,25 +2090,33 @@ func _rasterize_text() -> void:
 func _remove_layer() -> void:
 	if active_tab < 0:
 		return
-	var removed: DrawingResult = current_document().remove_subtree(current_layer())
-	if removed.ok:
-		var replacement: DrawingResult = current_document().create_layer(DrawingLayerNode.RASTER, "Layer")
-		tabs[active_tab]["layer"] = replacement.value
-		canvas.layer_id = String(replacement.value)
-		_after_edit()
+	var node_id: String = selected_layer_node()
+	var info: Dictionary = current_document().node_metadata(node_id)
+	if info.is_empty():
+		return
+	var siblings: Array[String] = current_document().list_children(info["parent"])
+	var index: int = siblings.find(node_id)
+	var replacement: String = ""
+	if siblings.size() > 1:
+		replacement = siblings[mini(index + 1, siblings.size() - 1)]
+		if replacement == node_id:
+			replacement = siblings[index - 1]
 	else:
-		_show_error(removed.message)
+		replacement = info["parent"] if info["parent"] != DrawingDocument.ROOT_ID else ""
+	var before: DrawingHistoryContext = _capture_context()
+	var removed: DrawingResult = current_document().remove_subtree(node_id, true)
+	if removed.ok:
+		if not replacement.is_empty():
+			_select_layer_node(replacement, false)
+		else:
+			tabs[active_tab]["selected_node"] = ""
+			tabs[active_tab]["layer"] = ""
+			canvas.layer_id = ""
+	_apply_structure(removed, before, true)
 
 
 func _toggle_visibility() -> void:
-	if active_tab < 0:
-		return
-	var info: Dictionary = current_document().node_metadata(current_layer())
-	var changed: DrawingResult = current_document().set_visibility(current_layer(), not info.get("visible", true))
-	if changed.ok:
-		_after_edit()
-	else:
-		_show_error(changed.message)
+	_set_row_visibility(selected_layer_node())
 
 
 func _change_tool(name: String) -> void:
@@ -2066,6 +2313,7 @@ func _capture_context() -> DrawingHistoryContext:
 	context.document_id = current_document().id
 	if not current_layer().is_empty():
 		context.selected_layer_ids.append(current_layer())
+	context.selected_tree_id = selected_layer_node()
 	context.editor_mode = active_tool
 	context.selected_rect = canvas.selected
 	context.selection_mask = canvas.selection_mask.detached_copy()
@@ -2104,14 +2352,23 @@ func _restore_context(context: DrawingHistoryContext) -> void:
 	if context == null or context.document_id != current_document().id:
 		return
 	_restoring_context = true
-	if not context.selected_layer_ids.is_empty() and current_document().has_node(context.selected_layer_ids[0]):
-		tabs[active_tab]["layer"] = context.selected_layer_ids[0]
-		canvas.layer_id = context.selected_layer_ids[0]
+	var row_id: String = context.selected_tree_id
+	if row_id.is_empty() and not context.selected_layer_ids.is_empty():
+		row_id = context.selected_layer_ids[0]
+	if not current_document().has_node(row_id):
+		row_id = _first_editable(current_document(), DrawingDocument.ROOT_ID)
+	if not row_id.is_empty():
+		_select_layer_node(row_id, false)
+	else:
+		tabs[active_tab]["selected_node"] = ""
+		tabs[active_tab]["layer"] = ""
+		canvas.layer_id = ""
 	canvas.set_selection_mask(context.selection_mask if context.selection_mask != null else
 		DrawingSelection.new(context.selected_rect, context.selected_rect.has_area()), false)
 	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		_change_tool(context.editor_mode)
 	_last_selection_context = _capture_context()
+	_reveal_selected_layer()
 	_restoring_context = false
 
 
@@ -2373,11 +2630,11 @@ func _open_file(path: String) -> void:
 	var document: DrawingDocument = content["document"] as DrawingDocument
 	document.record_selection_history = record_selection_history
 	var raster: String = _first_editable(document, DrawingDocument.ROOT_ID)
-	if raster.is_empty():
+	if raster.is_empty() and document.layer_count() == 0:
 		var added: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Layer 1")
 		raster = added.value
 	tabs.append({"document": document, "path": path, "title": path.get_file(), "layer": raster,
-		"frame": content["image_frame"], "saved_frame": content["image_frame"],
+		"selected_node": raster, "frame": content["image_frame"], "saved_frame": content["image_frame"],
 		"frame_dirty": false, "fit_pending": true})
 	tab_bar.add_tab(path.get_file())
 	_activate(tabs.size() - 1)
