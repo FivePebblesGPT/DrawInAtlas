@@ -40,6 +40,16 @@ Godot RID leaks and missing remote CI/hardware evidence remain reported. This
 does not grant physical or owner signoff.
 [T-094](Tickets/T-094.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-094 local fast-CI replay checkpoint (2026-11-06; In Progress):**
+A new [offline runner](../tools/replay_godot_ci.py) replays the 46 checked-in
+fast-CI Bash checks in order, preserving failure/timeout logs and SHA-256
+hashes. It rejects uncommitted source for commit-specific reports, and marks
+partial check selections **incomplete**, never green. Eight new regression
+tests run within the existing CI documentation step. Four selected development
+checks passed locally, but this does **not** replace patched GitHub Actions,
+Windows/Linux physical acceptance or owner approvals.
+[T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples

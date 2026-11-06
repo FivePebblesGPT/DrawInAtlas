@@ -48,6 +48,40 @@ fail-late CI step (`tests/test_t094_owner_evidence.py`), not an extra fast CI
 step. A structurally valid JSON manifest cannot approve the four owner-gated
 tickets, validate a physical pointer or substitute for remote CI success.
 
+## T-094 local fast-CI replay (diagnostic, not remote CI)
+
+`tools/replay_godot_ci.py` can execute the **46 check steps** from the checked-in
+`.github/workflows/godot-check.yml` on a developer Linux environment with the
+**exact** `4.8.beta2.official.*` Godot binary. This is a faithful Bash-command
+rehearsal, not a new CI suite. It does not install Godot, checkout code, run
+GitHub's service container, or produce Windows/physical owner evidence. Run it
+from the repository with `godot` on `PATH`:
+
+```sh
+python3 tools/replay_godot_ci.py --output /tmp/drawing-ci-replay --expected-commit "$(git rev-parse HEAD)"
+# To isolate checks during development (intentionally returns nonzero/incomplete):
+python3 tools/replay_godot_ci.py --output /tmp/drawing-ci-subset \
+  --check ci_t085_live_stroke_preview --check ci_t086_viewport_cache_model
+```
+
+A new output directory is required. Each extracted Bash script runs under
+`-eo pipefail` in its own process group; a per-step watchdog (default 1800 s)
+terminates an entire timed-out process group. Later checks still run after
+failures. The output directory contains `scripts/`, `logs/`, `report.json`,
+and `summary.md`; each executed step records its exit code, runtime, and
+SHA-256 script/log digest. A selected subset always lists other checks as
+**missing** and **never passes the complete-CI gate**. Unrecognized workflow
+shells, expressions, conditions or actions fail closed instead of silently
+replaying a different command.
+
+To avoid falsely attributing an uncommitted test to a Git revision, the normal
+runner rejects dirty worktrees and `--expected-commit` requires clean source.
+`--allow-dirty` is an explicitly **exploratory** mode: its report has no
+`candidate_commit` attestation and cannot become remote-CI/owner evidence.
+The regression contracts run in the existing T-073 fast CI step:
+`tests/test_t094_ci_replay.py`. **T-094 remains In Progress** until patched
+GitHub CI itself is green and real Linux/Windows owner evidence is reviewed.
+
 ## T-086 persistent source-space viewport cache
 
 Fast push/PR CI stages/imports the independent Drawing package and runs
