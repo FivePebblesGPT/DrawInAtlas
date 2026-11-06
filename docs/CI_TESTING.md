@@ -269,6 +269,18 @@ on exit, making repeated local replay safe from stale `/tmp/drawing-dist`
 collisions. Each previously failing step passed its **targeted** replay,
 but those partial runs do not certify all 46 checks or physical owner UX.
 
+## T-086 over-budget cache-focus witness (2026-11-06)
+
+The same fast `ci_t086_viewport_cache_model` workflow step now additionally runs
+`drawing/tests/viewport_cache_focus_smoke.gd`, validating bounded center/pointer
+retention and stable replacement with **15/15** headless assertions; the number
+of required fast steps remains **46**. The on-demand X11/Xvfb
+`viewport_cache_native.gd` suite now passes **80/80**, covering pointer focus
+changes with a 192-tile dense software viewport. Both suites must run after
+`build_drawing_app.py --in-place` and a standalone Godot editor import.
+This does not cap transient GPU references for dense views, certify frame
+latency on real Windows/Linux hardware, or approve owner interaction.
+
 ## T-086 persistent source-space viewport cache
 
 Fast push/PR CI stages/imports the independent Drawing package and runs

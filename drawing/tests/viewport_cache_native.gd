@@ -353,6 +353,27 @@ func run() -> void:
 	check(int(overflow_again["cache_hits"]) >= canvas.MAX_DISPLAY_TILES and
 		int(overflow_again["textures_transient"]) > 0,
 		"overflow does not churn the retained in-view texture set: %s" % overflow_again)
+	check(canvas._display_tiles.has("0,0") and not canvas._display_tiles.has("-8,-6"),
+		"center-focused overflow retains useful middle tiles, not scan-order corners")
+	# Deliver a real viewport event, rather than directly setting the cached
+	# pointer; the native Control event path must determine the focal tile.
+	var focus_motion: InputEventMouseMotion = InputEventMouseMotion.new()
+	focus_motion.position = canvas.global_position + Vector2(1, 1)
+	focus_motion.global_position = focus_motion.position
+	root.push_input(focus_motion, true)
+	canvas.queue_redraw()
+	await frames(5)
+	var refocused: Dictionary = canvas.last_frame_metrics.duplicate()
+	check(canvas.pointer_known and canvas.last_pointer_position.distance_to(Vector2(1, 1)) < 0.01,
+		"native viewport mouse motion determines the cache focal point")
+	check(canvas._display_tiles.has("-8,-6") and not canvas._display_tiles.has("7,5")
+		and int(refocused["cache_tiles"]) == canvas.MAX_DISPLAY_TILES,
+		"pointer-focus shift replaces distant in-view tiles while respecting cache cap")
+	canvas.queue_redraw()
+	await frames(5)
+	check(int(canvas.last_frame_metrics["cache_hits"]) >= canvas.MAX_DISPLAY_TILES,
+		"stable pointer focus reuses retained dense tiles without cache churn")
+	canvas.pointer_known = false
 	check(int(overflow_again["cache_bytes_estimate"]) <= int(overflow_again["cache_limit_bytes"]) and
 		int(overflow_again["frame_reference_bytes_upper_bound"]) >
 		int(overflow_again["cache_bytes_estimate"]),
@@ -401,11 +422,13 @@ func run() -> void:
 		var y: int = i / 12
 		canvas._display_tiles["%d,%d" % [x, y]] = {"area": Rect2i(x * 128, y * 128, 128, 128),
 			"last_used": i}
-	check(not canvas._reserve_display_slot(Rect2i(0, 0, 12, 12)),
-		"dense on-screen cache uses a transient tile instead of evicting a visible tile")
+	check(not canvas._reserve_display_slot(Rect2i(0, 0, 13, 12),
+		Vector2i(12, 11), Vector2(6, 6)),
+		"farther dense overflow remains transient rather than displacing nearer tiles")
 	check(canvas._display_tiles.size() == canvas.MAX_DISPLAY_TILES,
 		"dense-screen overflow leaves retained memory bounded")
-	check(canvas._reserve_display_slot(Rect2i(11, 11, 1, 1))
+	check(canvas._reserve_display_slot(Rect2i(11, 11, 1, 1),
+		Vector2i(11, 11), Vector2(11.5, 11.5))
 		and not canvas._display_tiles.has("0,0"),
 		"pan evicts the oldest off-screen tile before touching in-view tiles")
 

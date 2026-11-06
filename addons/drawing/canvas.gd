@@ -281,30 +281,58 @@ func _sync_display_cache() -> void:
 	if rebuild_occupancy:
 		_rebuild_occupancy()
 
-## Retain tiles that remain in the current viewport when it exceeds the
-## persistent limit. Evict off-screen entries first; render overflow entries
-## transiently so the next redraw can still hit the retained in-view tiles.
-## Unconditionally evicting the oldest tile churns *every* tile on each frame
-## whenever a dense viewport needs MAX_DISPLAY_TILES + 1 textures.
-func _reserve_display_slot(visible_tile_range: Rect2i) -> bool:
+## Prefer the user's visible working area when a dense viewport contains
+## more tiles than the persistent texture budget. Iteration still draws *all*
+## tiles in source order; only which textures survive to the next frame changes.
+## The distance ordering is stable for a fixed focal point and never evicts a
+## nearer visible tile to cache a farther one. Previous frame references keep
+## an evicted texture alive until that frame has been submitted.
+func _display_cache_focus() -> Vector2:
+	var source_focus: Vector2 = camera
+	if pointer_known and zoom > 0.0 and Rect2(Vector2.ZERO, size).has_point(last_pointer_position):
+		source_focus += (last_pointer_position - size * 0.5) / zoom
+	return source_focus / float(DISPLAY_TILE_SIZE)
+
+
+func _tile_focus_distance(tile: Vector2i, focus: Vector2) -> float:
+	var delta: Vector2 = Vector2(tile) + Vector2(0.5, 0.5) - focus
+	return delta.length_squared()
+
+
+## Offscreen textures go first, preserving the old bounded-LRU behavior.
+## For in-view overflow retain the 144 closest tiles to the current focus;
+## transient edge textures are still drawn at full precision for this frame.
+func _reserve_display_slot(visible_tile_range: Rect2i, candidate: Vector2i,
+		focus: Vector2) -> bool:
 	if _display_tiles.size() < MAX_DISPLAY_TILES:
 		return true
 	var oldest_offscreen_key: String = ""
 	var oldest_access: int = 9223372036854775807
+	var farthest_visible_key: String = ""
+	var farthest_distance: float = -1.0
 	for key: String in _display_tiles:
 		var tile_area: Rect2i = _display_tiles[key]["area"] as Rect2i
 		var tile_x: int = DrawingDocument.TILES.floor_div(tile_area.position.x, DISPLAY_TILE_SIZE)
 		var tile_y: int = DrawingDocument.TILES.floor_div(tile_area.position.y, DISPLAY_TILE_SIZE)
-		if visible_tile_range.has_point(Vector2i(tile_x, tile_y)):
+		var existing_tile: Vector2i = Vector2i(tile_x, tile_y)
+		if not visible_tile_range.has_point(existing_tile):
+			var access: int = int(_display_tiles[key]["last_used"])
+			if access < oldest_access:
+				oldest_access = access
+				oldest_offscreen_key = key
 			continue
-		var access: int = int(_display_tiles[key]["last_used"])
-		if access < oldest_access:
-			oldest_access = access
-			oldest_offscreen_key = key
-	if oldest_offscreen_key.is_empty():
-		return false
-	_display_tiles.erase(oldest_offscreen_key)
-	return true
+		var distance: float = _tile_focus_distance(existing_tile, focus)
+		if distance > farthest_distance:
+			farthest_distance = distance
+			farthest_visible_key = key
+	if not oldest_offscreen_key.is_empty():
+		_display_tiles.erase(oldest_offscreen_key)
+		return true
+	if not farthest_visible_key.is_empty() \
+			and _tile_focus_distance(candidate, focus) + 0.0001 < farthest_distance:
+		_display_tiles.erase(farthest_visible_key)
+		return true
+	return false
 
 
 ## Draw the transparency guide in fixed *screen* pixels, not source pixels.
@@ -377,6 +405,7 @@ func _draw() -> void:
 	var end_y: int = DrawingDocument.TILES.floor_div(left_top.y + dimensions.y - 1, DISPLAY_TILE_SIZE)
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
+	var cache_focus: Vector2 = _display_cache_focus()
 	# Resolve visible layers lazily: an idle redraw consisting entirely of
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
@@ -432,7 +461,7 @@ func _draw() -> void:
 				var start_texture: int = Time.get_ticks_usec()
 				var retain: bool = true
 				if entry.is_empty():
-					retain = _reserve_display_slot(visible_tiles)
+					retain = _reserve_display_slot(visible_tiles, Vector2i(x, y), cache_focus)
 					entry = {"texture": ImageTexture.create_from_image(image)}
 					metrics["textures_created"] = int(metrics["textures_created"]) + 1
 					if not retain:

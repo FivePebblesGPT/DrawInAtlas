@@ -168,6 +168,15 @@ passes 76/76 after clean standalone import. This does **not** prove large
 dense cold-zoom or physical Windows/Linux latency, and T-086 remains
 In Progress. [Ticket](Tickets/T-086.md).
 
+**T-086 dense viewport center/pointer-focused retention (2026-11-06; In Progress):**
+When a dense viewport exceeds the 144-texture retained cap, newly visited tiles
+now replace the farthest visible cached tile only when nearer the active
+in-canvas pointer (or viewport center); stable focus and offscreen LRU remain
+bounded. New headless 15/15 and Xvfb/Mesa native 80/80 checks pass; a warmed
+192-tile software view still renders 48 transient edges each redraw.
+**This is not a dense-zoom throughput or physical hardware acceptance pass.**
+[T-086](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.
