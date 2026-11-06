@@ -1,0 +1,107 @@
+{
+  "ticket": "T-068",
+  "date": "2026-11-03",
+  "godot": "4.8.beta2.official.cafc17a19",
+  "scenario": "fresh blank document; 256 tile stride; 16px brush; synthetic paint_path plus commit; 7 sequential samples per case",
+  "limitations": [
+    "separate process runs, not randomized or interleaved",
+    "not input-to-visible latency",
+    "software CPU and no physical hardware",
+    "no confidence intervals"
+  ],
+  "base_commit": "237113518c05",
+  "baseline": [
+    {
+      "coverage": 3604,
+      "median_ms": 33.803,
+      "name": "horizontal",
+      "p95_ms": 37.963,
+      "samples_ms": [
+        32.104,
+        32.491,
+        33.702,
+        33.803,
+        35.039,
+        35.795,
+        37.963
+      ]
+    },
+    {
+      "coverage": 3604,
+      "median_ms": 32.442,
+      "name": "vertical",
+      "p95_ms": 34.253,
+      "samples_ms": [
+        32.103,
+        32.125,
+        32.138,
+        32.442,
+        32.591,
+        33.552,
+        34.253
+      ]
+    },
+    {
+      "coverage": 3432,
+      "median_ms": 31.407,
+      "name": "diagonal_control",
+      "p95_ms": 33.308,
+      "samples_ms": [
+        29.651,
+        30.221,
+        30.223,
+        31.407,
+        32.178,
+        32.466,
+        33.308
+      ]
+    }
+  ],
+  "modified": [
+    {
+      "coverage": 3604,
+      "median_ms": 33.041,
+      "name": "horizontal",
+      "p95_ms": 36.521,
+      "samples_ms": [
+        32.026,
+        32.334,
+        32.349,
+        33.041,
+        34.693,
+        35.325,
+        36.521
+      ]
+    },
+    {
+      "coverage": 3604,
+      "median_ms": 34.126,
+      "name": "vertical",
+      "p95_ms": 35.606,
+      "samples_ms": [
+        33.428,
+        33.94,
+        33.974,
+        34.126,
+        34.151,
+        34.67,
+        35.606
+      ]
+    },
+    {
+      "coverage": 3432,
+      "median_ms": 31.964,
+      "name": "diagonal_control",
+      "p95_ms": 37.551,
+      "samples_ms": [
+        30.873,
+        31.369,
+        31.831,
+        31.964,
+        32.362,
+        33.487,
+        37.551
+      ]
+    }
+  ]
+}

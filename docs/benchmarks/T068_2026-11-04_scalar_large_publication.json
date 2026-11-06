@@ -1,0 +1,681 @@
+{
+  "schema_version": 1,
+  "ticket": "T-068",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "mode": "isolated C++/Godot large-tile headless publication",
+  "scalar_source_sha256": "48e731354c4bec55f046f11324650e41f31c94cc528eebb31fa94e4e5643a7bf",
+  "bridge_source_sha256": "37055ba1a0494a9cc1aeaf9e170f9f71b3b1e27b9a2451dd896d4af5b148f2ab",
+  "profile_sha256": "c49a207c938735bd971ee7ab266fdd6641194f84dd2d8ad181f16cdec58e6bb2",
+  "measurements": [
+    {
+      "checks": 146,
+      "cases": [
+        {
+          "canonical_sha256": "f83ec4e2fbad43374dcf07dc44252bb7a848250356c9b6a7674666d95d23e8cc",
+          "changed": 2538,
+          "gesture": "long_horizontal",
+          "measurements_us": {
+            "godot_commit": {
+              "max_us": 15275,
+              "median_us": 14423,
+              "min_us": 9290,
+              "trials": 4
+            },
+            "godot_stage": {
+              "max_us": 19943,
+              "median_us": 15204,
+              "min_us": 13616,
+              "trials": 4
+            },
+            "godot_total": {
+              "max_us": 35218,
+              "median_us": 29627,
+              "min_us": 22906,
+              "trials": 4
+            },
+            "native_call": {
+              "max_us": 4346,
+              "median_us": 3600,
+              "min_us": 2877,
+              "trials": 4
+            },
+            "native_commit": {
+              "max_us": 10999,
+              "median_us": 10012,
+              "min_us": 8967,
+              "trials": 4
+            },
+            "native_decode": {
+              "max_us": 1904,
+              "median_us": 1779,
+              "min_us": 1613,
+              "trials": 4
+            },
+            "native_stage": {
+              "max_us": 9799,
+              "median_us": 5992,
+              "min_us": 5812,
+              "trials": 4
+            },
+            "native_total": {
+              "max_us": 26177,
+              "median_us": 22118,
+              "min_us": 19843,
+              "trials": 4
+            }
+          },
+          "path_bytes": 32,
+          "samples_us": [
+            {
+              "godot_commit": 9290,
+              "godot_stage": 13616,
+              "godot_total": 22906,
+              "native_call": 4346,
+              "native_commit": 10012,
+              "native_decode": 1904,
+              "native_stage": 5856,
+              "native_total": 22118,
+              "order": "native_first",
+              "trial": 0
+            },
+            {
+              "godot_commit": 9766,
+              "godot_stage": 14016,
+              "godot_total": 23782,
+              "native_call": 3451,
+              "native_commit": 8967,
+              "native_decode": 1613,
+              "native_stage": 5812,
+              "native_total": 19843,
+              "order": "godot_first",
+              "trial": 1
+            },
+            {
+              "godot_commit": 15275,
+              "godot_stage": 19943,
+              "godot_total": 35218,
+              "native_call": 2877,
+              "native_commit": 9330,
+              "native_decode": 1669,
+              "native_stage": 5992,
+              "native_total": 19868,
+              "order": "native_first",
+              "trial": 2
+            },
+            {
+              "godot_commit": 14423,
+              "godot_stage": 15204,
+              "godot_total": 29627,
+              "native_call": 3600,
+              "native_commit": 10999,
+              "native_decode": 1779,
+              "native_stage": 9799,
+              "native_total": 26177,
+              "order": "godot_first",
+              "trial": 3
+            }
+          ],
+          "side": 512,
+          "source_bytes": 1048576,
+          "sparse_bytes": 30460
+        },
+        {
+          "canonical_sha256": "dad538ceb1988c14a8b43373ba6b1ce14b6c3461a26e7d08b145eb2c2309c96a",
+          "changed": 5098,
+          "gesture": "long_horizontal",
+          "measurements_us": {
+            "godot_commit": {
+              "max_us": 24925,
+              "median_us": 23890,
+              "min_us": 20705,
+              "trials": 4
+            },
+            "godot_stage": {
+              "max_us": 40744,
+              "median_us": 32677,
+              "min_us": 26003,
+              "trials": 4
+            },
+            "godot_total": {
+              "max_us": 65669,
+              "median_us": 56567,
+              "min_us": 46708,
+              "trials": 4
+            },
+            "native_call": {
+              "max_us": 18105,
+              "median_us": 14937,
+              "min_us": 12956,
+              "trials": 4
+            },
+            "native_commit": {
+              "max_us": 26888,
+              "median_us": 24722,
+              "min_us": 19317,
+              "trials": 4
+            },
+            "native_decode": {
+              "max_us": 5228,
+              "median_us": 4390,
+              "min_us": 3696,
+              "trials": 4
+            },
+            "native_stage": {
+              "max_us": 16900,
+              "median_us": 16487,
+              "min_us": 12935,
+              "trials": 4
+            },
+            "native_total": {
+              "max_us": 65238,
+              "median_us": 60584,
+              "min_us": 49736,
+              "trials": 4
+            }
+          },
+          "path_bytes": 32,
+          "samples_us": [
+            {
+              "godot_commit": 23890,
+              "godot_stage": 32677,
+              "godot_total": 56567,
+              "native_call": 14937,
+              "native_commit": 23519,
+              "native_decode": 5228,
+              "native_stage": 16900,
+              "native_total": 60584,
+              "order": "native_first",
+              "trial": 0
+            },
+            {
+              "godot_commit": 24925,
+              "godot_stage": 40744,
+              "godot_total": 65669,
+              "native_call": 18105,
+              "native_commit": 26888,
+              "native_decode": 3758,
+              "native_stage": 16487,
+              "native_total": 65238,
+              "order": "godot_first",
+              "trial": 1
+            },
+            {
+              "godot_commit": 20705,
+              "godot_stage": 26003,
+              "godot_total": 46708,
+              "native_call": 12956,
+              "native_commit": 19317,
+              "native_decode": 3696,
+              "native_stage": 13767,
+              "native_total": 49736,
+              "order": "native_first",
+              "trial": 2
+            },
+            {
+              "godot_commit": 20849,
+              "godot_stage": 26236,
+              "godot_total": 47085,
+              "native_call": 14719,
+              "native_commit": 24722,
+              "native_decode": 4390,
+              "native_stage": 12935,
+              "native_total": 56766,
+              "order": "godot_first",
+              "trial": 3
+            }
+          ],
+          "side": 1024,
+          "source_bytes": 4194304,
+          "sparse_bytes": 61180
+        },
+        {
+          "canonical_sha256": "05ab240dcfbcdc5456717c659d976de40288cfb436159234e6ce1c272658cb33",
+          "changed": 10218,
+          "gesture": "long_horizontal",
+          "measurements_us": {
+            "godot_commit": {
+              "max_us": 54064,
+              "median_us": 51890,
+              "min_us": 43923,
+              "trials": 4
+            },
+            "godot_stage": {
+              "max_us": 61283,
+              "median_us": 56698,
+              "min_us": 53164,
+              "trials": 4
+            },
+            "godot_total": {
+              "max_us": 115347,
+              "median_us": 108588,
+              "min_us": 97087,
+              "trials": 4
+            },
+            "native_call": {
+              "max_us": 61264,
+              "median_us": 58228,
+              "min_us": 51410,
+              "trials": 4
+            },
+            "native_commit": {
+              "max_us": 49661,
+              "median_us": 40270,
+              "min_us": 36877,
+              "trials": 4
+            },
+            "native_decode": {
+              "max_us": 9123,
+              "median_us": 8507,
+              "min_us": 7751,
+              "trials": 4
+            },
+            "native_stage": {
+              "max_us": 37375,
+              "median_us": 28699,
+              "min_us": 26775,
+              "trials": 4
+            },
+            "native_total": {
+              "max_us": 146898,
+              "median_us": 135704,
+              "min_us": 132094,
+              "trials": 4
+            }
+          },
+          "path_bytes": 32,
+          "samples_us": [
+            {
+              "godot_commit": 43923,
+              "godot_stage": 53164,
+              "godot_total": 97087,
+              "native_call": 61264,
+              "native_commit": 36877,
+              "native_decode": 7751,
+              "native_stage": 26775,
+              "native_total": 132667,
+              "order": "native_first",
+              "trial": 0
+            },
+            {
+              "godot_commit": 51890,
+              "godot_stage": 56698,
+              "godot_total": 108588,
+              "native_call": 58228,
+              "native_commit": 40270,
+              "native_decode": 8507,
+              "native_stage": 28699,
+              "native_total": 135704,
+              "order": "godot_first",
+              "trial": 1
+            },
+            {
+              "godot_commit": 46676,
+              "godot_stage": 53334,
+              "godot_total": 100010,
+              "native_call": 57284,
+              "native_commit": 38646,
+              "native_decode": 9123,
+              "native_stage": 27041,
+              "native_total": 132094,
+              "order": "native_first",
+              "trial": 2
+            },
+            {
+              "godot_commit": 54064,
+              "godot_stage": 61283,
+              "godot_total": 115347,
+              "native_call": 51410,
+              "native_commit": 49661,
+              "native_decode": 8452,
+              "native_stage": 37375,
+              "native_total": 146898,
+              "order": "godot_first",
+              "trial": 3
+            }
+          ],
+          "side": 2048,
+          "source_bytes": 16777216,
+          "sparse_bytes": 122620
+        }
+      ]
+    },
+    {
+      "checks": 146,
+      "cases": [
+        {
+          "canonical_sha256": "f83ec4e2fbad43374dcf07dc44252bb7a848250356c9b6a7674666d95d23e8cc",
+          "changed": 2538,
+          "gesture": "long_horizontal",
+          "measurements_us": {
+            "godot_commit": {
+              "max_us": 20978,
+              "median_us": 19486,
+              "min_us": 11024,
+              "trials": 4
+            },
+            "godot_stage": {
+              "max_us": 27138,
+              "median_us": 24643,
+              "min_us": 16364,
+              "trials": 4
+            },
+            "godot_total": {
+              "max_us": 48116,
+              "median_us": 44129,
+              "min_us": 27629,
+              "trials": 4
+            },
+            "native_call": {
+              "max_us": 7295,
+              "median_us": 4972,
+              "min_us": 3386,
+              "trials": 4
+            },
+            "native_commit": {
+              "max_us": 18789,
+              "median_us": 17003,
+              "min_us": 12678,
+              "trials": 4
+            },
+            "native_decode": {
+              "max_us": 3733,
+              "median_us": 2449,
+              "min_us": 1649,
+              "trials": 4
+            },
+            "native_stage": {
+              "max_us": 12927,
+              "median_us": 12536,
+              "min_us": 7621,
+              "trials": 4
+            },
+            "native_total": {
+              "max_us": 40567,
+              "median_us": 39137,
+              "min_us": 25971,
+              "trials": 4
+            }
+          },
+          "path_bytes": 32,
+          "samples_us": [
+            {
+              "godot_commit": 11024,
+              "godot_stage": 16605,
+              "godot_total": 27629,
+              "native_call": 4023,
+              "native_commit": 12678,
+              "native_decode": 1649,
+              "native_stage": 7621,
+              "native_total": 25971,
+              "order": "native_first",
+              "trial": 0
+            },
+            {
+              "godot_commit": 13299,
+              "godot_stage": 16364,
+              "godot_total": 29663,
+              "native_call": 3386,
+              "native_commit": 13677,
+              "native_decode": 1854,
+              "native_stage": 8292,
+              "native_total": 27209,
+              "order": "godot_first",
+              "trial": 1
+            },
+            {
+              "godot_commit": 19486,
+              "godot_stage": 24643,
+              "godot_total": 44129,
+              "native_call": 4972,
+              "native_commit": 18789,
+              "native_decode": 2449,
+              "native_stage": 12927,
+              "native_total": 39137,
+              "order": "native_first",
+              "trial": 2
+            },
+            {
+              "godot_commit": 20978,
+              "godot_stage": 27138,
+              "godot_total": 48116,
+              "native_call": 7295,
+              "native_commit": 17003,
+              "native_decode": 3733,
+              "native_stage": 12536,
+              "native_total": 40567,
+              "order": "godot_first",
+              "trial": 3
+            }
+          ],
+          "side": 512,
+          "source_bytes": 1048576,
+          "sparse_bytes": 30460
+        },
+        {
+          "canonical_sha256": "dad538ceb1988c14a8b43373ba6b1ce14b6c3461a26e7d08b145eb2c2309c96a",
+          "changed": 5098,
+          "gesture": "long_horizontal",
+          "measurements_us": {
+            "godot_commit": {
+              "max_us": 27845,
+              "median_us": 26877,
+              "min_us": 23488,
+              "trials": 4
+            },
+            "godot_stage": {
+              "max_us": 33351,
+              "median_us": 30980,
+              "min_us": 29496,
+              "trials": 4
+            },
+            "godot_total": {
+              "max_us": 58627,
+              "median_us": 58509,
+              "min_us": 54468,
+              "trials": 4
+            },
+            "native_call": {
+              "max_us": 17936,
+              "median_us": 15954,
+              "min_us": 14900,
+              "trials": 4
+            },
+            "native_commit": {
+              "max_us": 26728,
+              "median_us": 22205,
+              "min_us": 20124,
+              "trials": 4
+            },
+            "native_decode": {
+              "max_us": 5047,
+              "median_us": 4608,
+              "min_us": 4130,
+              "trials": 4
+            },
+            "native_stage": {
+              "max_us": 18693,
+              "median_us": 14983,
+              "min_us": 14687,
+              "trials": 4
+            },
+            "native_total": {
+              "max_us": 65505,
+              "median_us": 59622,
+              "min_us": 53896,
+              "trials": 4
+            }
+          },
+          "path_bytes": 32,
+          "samples_us": [
+            {
+              "godot_commit": 25276,
+              "godot_stage": 33351,
+              "godot_total": 58627,
+              "native_call": 15263,
+              "native_commit": 20664,
+              "native_decode": 5047,
+              "native_stage": 14983,
+              "native_total": 55957,
+              "order": "native_first",
+              "trial": 0
+            },
+            {
+              "godot_commit": 27845,
+              "godot_stage": 30664,
+              "godot_total": 58509,
+              "native_call": 15954,
+              "native_commit": 26728,
+              "native_decode": 4130,
+              "native_stage": 18693,
+              "native_total": 65505,
+              "order": "godot_first",
+              "trial": 1
+            },
+            {
+              "godot_commit": 23488,
+              "godot_stage": 30980,
+              "godot_total": 54468,
+              "native_call": 14900,
+              "native_commit": 20124,
+              "native_decode": 4185,
+              "native_stage": 14687,
+              "native_total": 53896,
+              "order": "native_first",
+              "trial": 2
+            },
+            {
+              "godot_commit": 26877,
+              "godot_stage": 29496,
+              "godot_total": 56373,
+              "native_call": 17936,
+              "native_commit": 22205,
+              "native_decode": 4608,
+              "native_stage": 14873,
+              "native_total": 59622,
+              "order": "godot_first",
+              "trial": 3
+            }
+          ],
+          "side": 1024,
+          "source_bytes": 4194304,
+          "sparse_bytes": 61180
+        },
+        {
+          "canonical_sha256": "05ab240dcfbcdc5456717c659d976de40288cfb436159234e6ce1c272658cb33",
+          "changed": 10218,
+          "gesture": "long_horizontal",
+          "measurements_us": {
+            "godot_commit": {
+              "max_us": 63814,
+              "median_us": 55027,
+              "min_us": 46301,
+              "trials": 4
+            },
+            "godot_stage": {
+              "max_us": 75034,
+              "median_us": 71645,
+              "min_us": 59517,
+              "trials": 4
+            },
+            "godot_total": {
+              "max_us": 135459,
+              "median_us": 130061,
+              "min_us": 107438,
+              "trials": 4
+            },
+            "native_call": {
+              "max_us": 61291,
+              "median_us": 56773,
+              "min_us": 54836,
+              "trials": 4
+            },
+            "native_commit": {
+              "max_us": 53757,
+              "median_us": 42328,
+              "min_us": 38395,
+              "trials": 4
+            },
+            "native_decode": {
+              "max_us": 10489,
+              "median_us": 8681,
+              "min_us": 8592,
+              "trials": 4
+            },
+            "native_stage": {
+              "max_us": 42089,
+              "median_us": 36802,
+              "min_us": 27317,
+              "trials": 4
+            },
+            "native_total": {
+              "max_us": 156914,
+              "median_us": 154389,
+              "min_us": 131077,
+              "trials": 4
+            }
+          },
+          "path_bytes": 32,
+          "samples_us": [
+            {
+              "godot_commit": 55027,
+              "godot_stage": 75034,
+              "godot_total": 130061,
+              "native_call": 55866,
+              "native_commit": 53757,
+              "native_decode": 10489,
+              "native_stage": 36802,
+              "native_total": 156914,
+              "order": "native_first",
+              "trial": 0
+            },
+            {
+              "godot_commit": 63814,
+              "godot_stage": 71645,
+              "godot_total": 135459,
+              "native_call": 61291,
+              "native_commit": 42328,
+              "native_decode": 8681,
+              "native_stage": 42089,
+              "native_total": 154389,
+              "order": "godot_first",
+              "trial": 1
+            },
+            {
+              "godot_commit": 49782,
+              "godot_stage": 59517,
+              "godot_total": 109299,
+              "native_call": 54836,
+              "native_commit": 42111,
+              "native_decode": 8610,
+              "native_stage": 28797,
+              "native_total": 134354,
+              "order": "native_first",
+              "trial": 2
+            },
+            {
+              "godot_commit": 46301,
+              "godot_stage": 61137,
+              "godot_total": 107438,
+              "native_call": 56773,
+              "native_commit": 38395,
+              "native_decode": 8592,
+              "native_stage": 27317,
+              "native_total": 131077,
+              "order": "godot_first",
+              "trial": 3
+            }
+          ],
+          "side": 2048,
+          "source_bytes": 16777216,
+          "sparse_bytes": 122620
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Synthetic CPU-only headless tile tests, not physical GPU or actual input-to-visible latency",
+    "All trials use a single horizontal 4px path; no p95 or speedup inference from four paired samples",
+    "Tile/source construction, oracle validation, undo and redo happen outside timing",
+    "The GDExtension lives in a temporary Linux project and is not a production or portable release"
+  ]
+}

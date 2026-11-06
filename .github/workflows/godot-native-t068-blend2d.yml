@@ -1,0 +1,138 @@
+name: T-068 optional Blend2D CPU parity screen (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blend2d-cpu-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - name: Build pinned optional Blend2D source and bundled AsmJit
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ca-certificates curl cmake ninja-build g++
+          curl -fsSL --retry 3 https://blend2d.com/download/blend2d-0.21.2.tar.gz -o /tmp/blend2d-0.21.2.tar.gz
+          echo '234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa  /tmp/blend2d-0.21.2.tar.gz' | sha256sum --check
+          tar -xzf /tmp/blend2d-0.21.2.tar.gz -C /tmp
+          cmake -S /tmp/blend2d -B /tmp/blend2d-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBLEND2D_TEST=OFF \
+            -DBLEND2D_DEMOS=OFF -DBLEND2D_NO_INSTALL=ON -DBLEND2D_NO_STDCXX=OFF
+          cmake --build /tmp/blend2d-build --parallel 4
+      - name: Check source and native rendering contracts
+        env:
+          T068_BLEND2D_ARCHIVE: /tmp/blend2d-0.21.2.tar.gz
+          T068_BLEND2D_SOURCE: /tmp/blend2d
+          T068_BLEND2D_BUILD: /tmp/blend2d-build
+        run: |
+          python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py -v
+          python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py -v
+          python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py -v
+          python3 -m unittest discover -s tests -p test_t068_blend2d_quad.py -v
+      - name: Record two complete conversion scopes with checked kernel oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_blend2d_cpu.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --runs 2 --trials 9 --sides 32 64 128 \
+            --output /tmp/t068-blend2d-cpu.json | tee /tmp/t068-blend2d-cpu.log
+          grep -q 'T068_BLEND2D_CPU_PASSED: 72 verified cases across 2 runs;' /tmp/t068-blend2d-cpu.log
+          test -s /tmp/t068-blend2d-cpu.json
+      - name: Compare native A8 stroke and mask to Godot fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_blend2d_brush.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --runs 2 --trials 7 \
+            --output /tmp/t068-blend2d-brush.json | tee /tmp/t068-blend2d-brush.log
+          grep -q 'T068_BLEND2D_BRUSH_PASSED: 64 comparisons across 2 runs;' /tmp/t068-blend2d-brush.log
+          test -s /tmp/t068-blend2d-brush.json
+      - name: Measure pinned native large tiles with independent RGBA8 replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_blend2d_scale.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --runs 2 --trials 3 \
+            --output /tmp/t068-blend2d-scale.json | tee /tmp/t068-blend2d-scale.log
+          grep -q 'T068_BLEND2D_SCALE_PASSED: 24 canonical output comparisons across 2 runs' /tmp/t068-blend2d-scale.log
+          test -s /tmp/t068-blend2d-scale.json
+      - name: Compare fresh 512/1024/2048 native coverage with Godot-generated brush oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py -v
+          python3 tools/benchmarks/t068_blend2d_large_parity.py \
+            --native-evidence /tmp/t068-blend2d-scale.json \
+            --output /tmp/t068-blend2d-large-parity.json | tee /tmp/t068-blend2d-large-parity.log
+          grep -q 'T068_LARGE_PARITY_PASSED: 24 verified Godot/native comparisons;' /tmp/t068-blend2d-large-parity.log
+          test -s /tmp/t068-blend2d-large-parity.json
+      - name: Compare native transformed full-pixel convex scopes to Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t068_blend2d_quad.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --output /tmp/t068-blend2d-quad.json | tee /tmp/t068-blend2d-quad.log
+          grep -q 'T068_QUAD_SCOPE_PASSED: 30 native/Godot mask comparisons; 0 mismatched cases' /tmp/t068-blend2d-quad.log
+          test -s /tmp/t068-blend2d-quad.json
+      - name: Matched scalar/Blend2D brush ABI call and parity screen
+        shell: bash
+        env:
+          T068_BLEND2D_ARCHIVE: /tmp/blend2d-0.21.2.tar.gz
+          T068_BLEND2D_SOURCE: /tmp/blend2d
+          T068_BLEND2D_BUILD: /tmp/blend2d-build
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_matched_brush.py -v
+          python3 tools/benchmarks/t068_matched_brush.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --output /tmp/t068-matched-brush.json | tee /tmp/t068-matched-brush.log
+          grep -q 'T068_MATCHED_NATIVE_PASSED: 20 paired workloads' /tmp/t068-matched-brush.log
+          python3 tools/benchmarks/t068_matched_brush.py \
+            --replay --output /tmp/t068-matched-brush.json
+      - name: Isolated Linux process RSS and native high-water screen
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_native_memory.py -v
+          python3 tools/benchmarks/t068_native_memory.py \
+            --archive /tmp/blend2d-0.21.2.tar.gz \
+            --source /tmp/blend2d --library-dir /tmp/blend2d-build \
+            --output /tmp/t068-native-memory.json | tee /tmp/t068-native-memory.log
+          grep -q 'T068_NATIVE_MEMORY_PASSED: 12 isolated worker calls' /tmp/t068-native-memory.log
+          python3 tools/benchmarks/t068_native_memory.py \
+            --replay --output /tmp/t068-native-memory.json
+      - name: Upload parity and timing diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t068-blend2d-cpu-diagnostics
+          path: |
+            /tmp/t068-blend2d-cpu.json
+            /tmp/t068-blend2d-cpu.log
+            /tmp/t068-blend2d-brush.json
+            /tmp/t068-blend2d-brush.log
+            /tmp/t068-blend2d-scale.json
+            /tmp/t068-blend2d-scale.log
+            /tmp/t068-blend2d-large-parity.json
+            /tmp/t068-blend2d-large-parity.log
+            /tmp/t068-blend2d-quad.json
+            /tmp/t068-blend2d-quad.log
+            /tmp/t068-matched-brush.json
+            /tmp/t068-matched-brush.log
+            /tmp/t068-native-memory.json
+            /tmp/t068-native-memory.log
+          if-no-files-found: warn

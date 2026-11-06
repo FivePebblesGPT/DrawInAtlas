@@ -27,9 +27,12 @@ func _check(ok: bool, label: String) -> void:
 
 
 func _stats(values: Array[float]) -> Dictionary:
-	values.sort()
-	return {"median_ms": snappedf(values[values.size() / 2], 0.001),
-		"p95_ms": snappedf(values[ceili(values.size() * 0.95) - 1], 0.001)}
+	# Preserve trial order so device evidence can check phase pairing and statistics.
+	var ordered: Array[float] = values.duplicate()
+	ordered.sort()
+	return {"samples_ms": values.duplicate(),
+		"median_ms": snappedf(ordered[ordered.size() / 2], 0.001),
+		"p95_ms": snappedf(ordered[ceili(ordered.size() * 0.95) - 1], 0.001)}
 
 
 func _press(canvas: AtlasCanvas, position: Vector2, pressed: bool) -> void:
@@ -144,7 +147,8 @@ func _run() -> void:
 		print("T068_STRESS_CASE ", JSON.stringify(rows[rows.size() - 1]))
 	_check(history.can_undo(), "gestures have Atlas history")
 	var result: Dictionary = {"schema": "t068-native-stress-v1", "renderer": RenderingServer.get_current_rendering_method(),
-		"driver": DisplayServer.get_name(), "rows": rows, "checks": checks, "failures": failures,
+		"driver": DisplayServer.get_name(), "adapter": RenderingServer.get_video_adapter_name(),
+		"engine": Engine.get_version_info(), "rows": rows, "checks": checks, "failures": failures,
 		"limitations": "Synthetic X11 Control events; software GL frame_post_draw, not presentation or hardware input"}
 	if not output_path.is_empty():
 		var file: FileAccess = FileAccess.open(output_path, FileAccess.WRITE)

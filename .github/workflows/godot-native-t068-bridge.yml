@@ -1,0 +1,138 @@
+name: Godot T-068 isolated raster GDExtension (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  native-raster-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install native framebuffer test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb xauth libgl1-mesa-dri
+      - name: Verify host C++ toolchain and isolated-runner contracts
+        run: |
+          g++ --version
+          python3 -m unittest discover -s tests -p test_t068_bridge_runner.py -v
+          python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py -v
+          python3 -m unittest discover -s tests -p test_t068_scalar_atomicity.py -v
+          python3 -m unittest discover -s tests -p test_t068_scalar_transform.py -v
+          python3 -m unittest discover -s tests -p test_t068_quad_gdextension.py -v
+          python3 -m unittest discover -s tests -p test_t068_quad_publication.py -v
+      - name: Compare strict native selection across GCC and Clang optimizations
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v g++
+          command -v clang++
+          python3 -m unittest discover -s tests -p test_t068_quad_compiler_matrix.py -v
+          python3 -m unittest discover -s tests -p test_t068_quad_stress.py -v
+          python3 tools/benchmarks/t068_quad_compiler_matrix.py \
+            --output /tmp/t068-quad-compiler-matrix.json
+          test -s /tmp/t068-quad-compiler-matrix.json
+      - name: Instrument detached native scope and sparse brush with ASan/UBSan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py -v
+          python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py -v
+          python3 tools/benchmarks/t068_native_sanitizer.py \
+            --output /tmp/t068-native-sanitizer.json
+          test -s /tmp/t068-native-sanitizer.json
+      - name: Build and verify isolated native, texture, document, and scalar sparse brush paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 \
+              --output /tmp/t068-gdextension-bridge.json
+          test -s /tmp/t068-gdextension-bridge.json
+      - name: Check native sparse cancellation, stale revision, and source conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 --atomic-only \
+              --output /tmp/t068-gdextension-atomicity.json
+          test -s /tmp/t068-gdextension-atomicity.json
+      - name: Verify native four-corner masks through canonical document publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 --quad-publication-only \
+              --output /tmp/t068-gdextension-quad-publication.json
+          test -s /tmp/t068-gdextension-quad-publication.json
+      - name: Compare 512/1024/2048 CPU publication in a separate isolated build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_scalar_large_publication.py -v
+          timeout --signal=TERM --kill-after=5s 300s \
+            python3 tools/benchmarks/t068_bridge/run_bridge.py \
+              --godot "$(command -v godot)" --runs 2 --large-only \
+              --output /tmp/t068-gdextension-large.json
+          test -s /tmp/t068-gdextension-large.json
+      - name: Capture software-only Godot visual frame and process RSS witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_visual_device.py -v
+          python3 -m unittest discover -s tests -p test_t068_visual_contention.py -v
+          python3 -m unittest discover -s tests -p test_t068_visual_counterbalanced.py -v
+          timeout --signal=TERM --kill-after=5s 180s xvfb-run -a \
+            -s '-screen 0 1400x900x24' env LIBGL_ALWAYS_SOFTWARE=1 \
+            python3 tools/benchmarks/t068_visual_device.py \
+              --godot "$(command -v godot)" --profile software \
+              --output /tmp/t068-visual-software.json
+          python3 tools/benchmarks/t068_visual_device.py \
+            --evidence /tmp/t068-visual-software.json
+      - name: Compare software frame jitter under external CPU activity
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 360s xvfb-run -a \
+            -s '-screen 0 1400x900x24' env LIBGL_ALWAYS_SOFTWARE=1 \
+            python3 tools/benchmarks/t068_visual_contention.py \
+              --godot "$(command -v godot)" \
+              --output /tmp/t068-visual-contention-software.json
+          python3 tools/benchmarks/t068_visual_contention.py \
+            --evidence /tmp/t068-visual-contention-software.json
+      - name: Counterbalance software frame jitter with two independent CPU-load sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 720s xvfb-run -a \
+            -s '-screen 0 1400x900x24' env LIBGL_ALWAYS_SOFTWARE=1 \
+            python3 tools/benchmarks/t068_visual_counterbalanced.py \
+              --godot "$(command -v godot)" \
+              --output /tmp/t068-visual-counterbalanced-software.json
+          python3 tools/benchmarks/t068_visual_counterbalanced.py \
+            --evidence /tmp/t068-visual-counterbalanced-software.json
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t068-gdextension-isolated-evidence
+          path: |
+            /tmp/t068-gdextension-bridge.json
+            /tmp/t068-quad-compiler-matrix.json
+            /tmp/t068-gdextension-atomicity.json
+            /tmp/t068-gdextension-quad-publication.json
+            /tmp/t068-gdextension-large.json
+            /tmp/t068-visual-software.json
+            /tmp/t068-visual-contention-software.json
+            /tmp/t068-visual-counterbalanced-software.json
+          if-no-files-found: warn

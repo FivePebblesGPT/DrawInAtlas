@@ -1,0 +1,110 @@
+{
+  "ticket": "T-068",
+  "mode": "optional, isolated Linux GDExtension (not production)",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "generated_header_sha256": "c312ed1dfe6bba973018f0937b38220069467c000ee2aa3f23c34997b56f299a",
+  "test_method": "Checked native batch, detached texture adapter, and real single/multiple-tile DrawingDocument transactions",
+  "measurements": [
+    {
+      "checks": 443,
+      "sparse_checks": 173,
+      "sparse_benchmark": {
+        "128": {
+          "full_median_us": 50772,
+          "full_output_bytes": 65536,
+          "samples_per_mode": 5,
+          "sparse_median_us": 109,
+          "sparse_output_bytes": 16
+        },
+        "32": {
+          "full_median_us": 3387,
+          "full_output_bytes": 4096,
+          "samples_per_mode": 5,
+          "sparse_median_us": 58,
+          "sparse_output_bytes": 16
+        },
+        "64": {
+          "full_median_us": 13223,
+          "full_output_bytes": 16384,
+          "samples_per_mode": 5,
+          "sparse_median_us": 74,
+          "sparse_output_bytes": 16
+        }
+      },
+      "revision_checks": 370,
+      "document_checks": 219,
+      "batch_checks": 128,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 15,
+          "p95_us": 20,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 10,
+          "p95_us": 11,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 17,
+          "p95_us": 50,
+          "trials": 31
+        }
+      }
+    },
+    {
+      "checks": 443,
+      "sparse_checks": 173,
+      "sparse_benchmark": {
+        "128": {
+          "full_median_us": 48853,
+          "full_output_bytes": 65536,
+          "samples_per_mode": 5,
+          "sparse_median_us": 113,
+          "sparse_output_bytes": 16
+        },
+        "32": {
+          "full_median_us": 3020,
+          "full_output_bytes": 4096,
+          "samples_per_mode": 5,
+          "sparse_median_us": 52,
+          "sparse_output_bytes": 16
+        },
+        "64": {
+          "full_median_us": 12143,
+          "full_output_bytes": 16384,
+          "samples_per_mode": 5,
+          "sparse_median_us": 76,
+          "sparse_output_bytes": 16
+        }
+      },
+      "revision_checks": 370,
+      "document_checks": 219,
+      "batch_checks": 128,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 19,
+          "p95_us": 54,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 10,
+          "p95_us": 10,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 13,
+          "p95_us": 38,
+          "trials": 31
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
+    "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
+    "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
+    "Software runner only; no physical Windows/Linux hardware or GPU timings",
+    "Temporary binary is not bundled in the repository or loaded at normal startup"
+  ]
+}

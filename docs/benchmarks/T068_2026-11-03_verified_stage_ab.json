@@ -1,0 +1,288 @@
+{
+  "baseline_commit": "5addc1825dda7f2cbbdbaa8d0c4ff7f40bd797b3",
+  "cases": [
+    {
+      "area_px": 1024,
+      "median_of_run_medians_ms": {
+        "after": 11.048,
+        "before": 11.922
+      },
+      "paired_runs": [
+        {
+          "after": {
+            "median_ms": 10.948,
+            "pixels": 1024,
+            "samples_ms": [
+              10.5,
+              10.76,
+              10.948,
+              11.022,
+              11.301
+            ],
+            "size": 32
+          },
+          "before": {
+            "median_ms": 11.922,
+            "pixels": 1024,
+            "samples_ms": [
+              11.461,
+              11.79,
+              11.922,
+              12.083,
+              12.114
+            ],
+            "size": 32
+          },
+          "run": 1
+        },
+        {
+          "after": {
+            "median_ms": 11.296,
+            "pixels": 1024,
+            "samples_ms": [
+              9.726,
+              10.795,
+              11.296,
+              11.345,
+              13.519
+            ],
+            "size": 32
+          },
+          "before": {
+            "median_ms": 11.898,
+            "pixels": 1024,
+            "samples_ms": [
+              11.379,
+              11.412,
+              11.898,
+              12.945,
+              12.967
+            ],
+            "size": 32
+          },
+          "run": 2
+        },
+        {
+          "after": {
+            "median_ms": 11.048,
+            "pixels": 1024,
+            "samples_ms": [
+              10.534,
+              10.539,
+              11.048,
+              11.401,
+              11.607
+            ],
+            "size": 32
+          },
+          "before": {
+            "median_ms": 12.538,
+            "pixels": 1024,
+            "samples_ms": [
+              11.862,
+              12.151,
+              12.538,
+              12.816,
+              17.764
+            ],
+            "size": 32
+          },
+          "run": 3
+        }
+      ],
+      "relative_median_change_percent": -7.33,
+      "side_px": 32
+    },
+    {
+      "area_px": 4096,
+      "median_of_run_medians_ms": {
+        "after": 44.961,
+        "before": 50.868
+      },
+      "paired_runs": [
+        {
+          "after": {
+            "median_ms": 45.064,
+            "pixels": 4096,
+            "samples_ms": [
+              43.974,
+              44.72,
+              45.064,
+              45.862,
+              48.365
+            ],
+            "size": 64
+          },
+          "before": {
+            "median_ms": 50.868,
+            "pixels": 4096,
+            "samples_ms": [
+              48.051,
+              49.766,
+              50.868,
+              52.612,
+              55.271
+            ],
+            "size": 64
+          },
+          "run": 1
+        },
+        {
+          "after": {
+            "median_ms": 44.552,
+            "pixels": 4096,
+            "samples_ms": [
+              43.448,
+              44.315,
+              44.552,
+              45.539,
+              49.543
+            ],
+            "size": 64
+          },
+          "before": {
+            "median_ms": 51.099,
+            "pixels": 4096,
+            "samples_ms": [
+              49.225,
+              50.691,
+              51.099,
+              54.407,
+              56.824
+            ],
+            "size": 64
+          },
+          "run": 2
+        },
+        {
+          "after": {
+            "median_ms": 44.961,
+            "pixels": 4096,
+            "samples_ms": [
+              44.272,
+              44.569,
+              44.961,
+              48.011,
+              48.352
+            ],
+            "size": 64
+          },
+          "before": {
+            "median_ms": 48.098,
+            "pixels": 4096,
+            "samples_ms": [
+              46.855,
+              47.827,
+              48.098,
+              48.159,
+              50.926
+            ],
+            "size": 64
+          },
+          "run": 3
+        }
+      ],
+      "relative_median_change_percent": -11.61,
+      "side_px": 64
+    },
+    {
+      "area_px": 9216,
+      "median_of_run_medians_ms": {
+        "after": 115.892,
+        "before": 121.659
+      },
+      "paired_runs": [
+        {
+          "after": {
+            "median_ms": 131.528,
+            "pixels": 9216,
+            "samples_ms": [
+              117.13,
+              125.762,
+              131.528,
+              139.893,
+              142.383
+            ],
+            "size": 96
+          },
+          "before": {
+            "median_ms": 128.253,
+            "pixels": 9216,
+            "samples_ms": [
+              125.218,
+              126.194,
+              128.253,
+              131.023,
+              137.724
+            ],
+            "size": 96
+          },
+          "run": 1
+        },
+        {
+          "after": {
+            "median_ms": 106.246,
+            "pixels": 9216,
+            "samples_ms": [
+              105.549,
+              105.932,
+              106.246,
+              108.806,
+              118.153
+            ],
+            "size": 96
+          },
+          "before": {
+            "median_ms": 118.151,
+            "pixels": 9216,
+            "samples_ms": [
+              114.481,
+              116.713,
+              118.151,
+              124.056,
+              158.002
+            ],
+            "size": 96
+          },
+          "run": 2
+        },
+        {
+          "after": {
+            "median_ms": 115.892,
+            "pixels": 9216,
+            "samples_ms": [
+              103.856,
+              114.063,
+              115.892,
+              117.745,
+              119.833
+            ],
+            "size": 96
+          },
+          "before": {
+            "median_ms": 121.659,
+            "pixels": 9216,
+            "samples_ms": [
+              116.051,
+              120.012,
+              121.659,
+              121.88,
+              127.941
+            ],
+            "size": 96
+          },
+          "run": 3
+        }
+      ],
+      "relative_median_change_percent": -4.74,
+      "side_px": 96
+    }
+  ],
+  "date": "2026-11-03",
+  "engine": "Godot 4.8.beta2.official.cafc17a19",
+  "execution": "Linux x86_64 sandbox, headless, separate processes, ordered baseline/modified runs",
+  "limitations": "Three baseline/modified ordered pairs are small CPU microbenchmarks, not cross-platform or input-to-visible/p95 evidence; later runs may be affected by process warming or scheduler variability.",
+  "script": "tests/drawing_fill_tile_benchmark.gd",
+  "ticket": "T-068",
+  "timed_scope": "flood_fill + commit only; 5 independent trials on fresh source documents per run; stride 128"
+}

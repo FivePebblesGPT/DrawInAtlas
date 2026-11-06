@@ -1,0 +1,59 @@
+{
+  "ticket": "T-068",
+  "mode": "optional, isolated Linux GDExtension (not production)",
+  "godot_version": "4.8.beta2.official.cafc17a19",
+  "generated_header_sha256": "c312ed1dfe6bba973018f0937b38220069467c000ee2aa3f23c34997b56f299a",
+  "test_method": "Godot GDScript calls against checked native batch and revision-guarded publication adapter",
+  "measurements": [
+    {
+      "checks": 443,
+      "revision_checks": 370,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 16,
+          "p95_us": 65,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 8,
+          "p95_us": 9,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 13,
+          "p95_us": 15,
+          "trials": 31
+        }
+      }
+    },
+    {
+      "checks": 443,
+      "revision_checks": 370,
+      "bridge_latency_us": {
+        "128": {
+          "median_us": 16,
+          "p95_us": 32,
+          "trials": 31
+        },
+        "32": {
+          "median_us": 8,
+          "p95_us": 9,
+          "trials": 31
+        },
+        "64": {
+          "median_us": 13,
+          "p95_us": 15,
+          "trials": 31
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Only the isolated GDScript adapter publishes revisions and whole-texture updates; production DrawingDocument and UI are not exercised",
+    "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
+    "Software runner only; no physical Windows/Linux hardware or GPU timings",
+    "Temporary binary is not bundled in the repository or loaded at normal startup",
+    "The optional publication GL witness uses Xvfb/Mesa software rendering and a single-threaded isolated adapter",
+    "Dirty bounds describe modified pixels; ImageTexture.update() reuploads the entire tile"
+  ]
+}

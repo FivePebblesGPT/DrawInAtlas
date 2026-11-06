@@ -1,0 +1,775 @@
+"""Compile and test T-068's isolated Godot-to-C++ raster boundary.
+
+The shared library and .gdextension descriptor exist only in a temporary
+Godot project. Nothing is loaded by the standalone Drawing or Atlas projects.
+"""
+from __future__ import annotations
+
+import argparse
+import base64
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tempfile
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[3]
+BRIDGE = Path(__file__).resolve().parent
+EXPECTED_VERSION = "4.8.beta2.official.cafc17a19"
+PASS_RE = re.compile(r"^T068_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
+TIMING_RE = re.compile(r"^T068_BRIDGE_TIMING: (.+)$", re.MULTILINE)
+REVISION_RE = re.compile(r"^T068_REVISION_PASSED: (\d+) checks$", re.MULTILINE)
+DOCUMENT_RE = re.compile(r"^T068_DOCUMENT_PASSED: (\d+) checks$", re.MULTILINE)
+BATCH_RE = re.compile(r"^T068_BATCH_PASSED: (\d+) checks$", re.MULTILINE)
+SPARSE_RE = re.compile(r"^T068_SPARSE_PASSED: (\d+) checks$", re.MULTILINE)
+SPARSE_TIMING_RE = re.compile(r"^T068_SPARSE_TIMING: (.+)$", re.MULTILINE)
+SCALAR_RE = re.compile(r"^T068_SCALAR_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
+SCALAR_EVIDENCE_RE = re.compile(r"^T068_SCALAR_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
+TRANSFORM_RE = re.compile(r"^T068_SCALAR_TRANSFORM_PASSED: (\d+) checks$", re.MULTILINE)
+QUAD_RE = re.compile(r"^T068_QUAD_BRIDGE_PASSED: (\d+) checks$", re.MULTILINE)
+QUAD_EVIDENCE_RE = re.compile(r"^T068_QUAD_BRIDGE_EVIDENCE: (.+)$", re.MULTILINE)
+QUAD_PUBLICATION_RE = re.compile(r"^T068_QUAD_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
+QUAD_PUBLICATION_EVIDENCE_RE = re.compile(r"^T068_QUAD_PUBLICATION_EVIDENCE: (.+)$", re.MULTILINE)
+TRANSFORM_EVIDENCE_RE = re.compile(r"^T068_SCALAR_TRANSFORM_EVIDENCE: (.+)$", re.MULTILINE)
+MARSHAL_RE = re.compile(r"^T068_MARSHAL_PASSED: (\d+) checks$", re.MULTILINE)
+PUBLICATION_RE = re.compile(r"^T068_SCALAR_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
+PUBLICATION_TIMING_RE = re.compile(r"^T068_SCALAR_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
+ATOMICITY_RE = re.compile(r"^T068_SCALAR_ATOMICITY_PASSED: (\d+) checks$", re.MULTILINE)
+ATOMICITY_EVIDENCE_RE = re.compile(r"^T068_SCALAR_ATOMICITY_EVIDENCE: (.+)$", re.MULTILINE)
+LARGE_PUBLICATION_RE = re.compile(r"^T068_LARGE_PUBLICATION_PASSED: (\d+) checks$", re.MULTILINE)
+LARGE_PUBLICATION_TIMING_RE = re.compile(r"^T068_LARGE_PUBLICATION_TIMING: (.+)$", re.MULTILINE)
+MARSHAL_TIMING_RE = re.compile(r"^T068_MARSHAL_TIMING: (.+)$", re.MULTILINE)
+CANONICAL_SCRIPTS = (
+    "document", "edit_session", "signed_tiles", "layer_node", "raster_tile",
+    "result", "delta", "dirty_region", "selection", "history_context",
+    "text_element", "text_raster",
+)
+
+
+def checked_run(argv: list[str], *, cwd: Path, timeout: int) -> str:
+    """Run one bounded command and reject Godot diagnostics and subprocess errors."""
+    environment = os.environ.copy()
+    environment["GODOT_SILENCE_ROOT_WARNING"] = "1"
+    result = subprocess.run(
+        argv, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=False,
+        env=environment,
+    )
+    combined = f"{result.stdout}\n{result.stderr}"
+    if result.returncode != 0 or re.search(r"(?m)^(?:ERROR:|SCRIPT ERROR:|T068_BRIDGE_FAIL:|T068_REVISION_FAIL:|T068_REVISION_FAILED:|T068_DOCUMENT_FAIL:|T068_DOCUMENT_FAILED:|T068_BATCH_FAIL:|T068_BATCH_FAILED:|T068_SPARSE_FAIL:|T068_SPARSE_FAILED:|T068_MARSHAL_FAIL:|T068_MARSHAL_FAILED:|T068_SCALAR_BRIDGE_FAIL:|T068_SCALAR_BRIDGE_FAILED:|T068_SCALAR_PUBLICATION_FAIL:|T068_SCALAR_PUBLICATION_FAILED:|T068_LARGE_PUBLICATION_FAIL:|T068_LARGE_PUBLICATION_FAILED:|T068_SCALAR_TRANSFORM_FAIL:|T068_SCALAR_TRANSFORM_FAILED:|T068_QUAD_BRIDGE_FAIL:|T068_QUAD_BRIDGE_FAILED:|T068_SCALAR_ATOMICITY_FAIL:|T068_SCALAR_ATOMICITY_FAILED:)", combined):
+        raise RuntimeError(f"Command failed ({result.returncode}): {argv}\n{combined[-6000:]}")
+    return combined
+
+
+
+def validate_quad_bridge(cases: Any) -> None:
+    """Fail closed against the exact, independently Godot-authored quad oracle."""
+    oracle_path = ROOT / "tools/benchmarks/t068_quad_scope_oracle.json"
+    if hashlib.sha256(oracle_path.read_bytes()).hexdigest() != (
+            "17aa26b3440508382a7a3c6a5a0e23c35c2a170a9b29d392c0a6aff6bd1cfa19"):
+        raise ValueError("Godot four-corner oracle checksum differs")
+    oracle = json.loads(oracle_path.read_text(encoding="utf-8"))
+    expected = oracle["cases"]
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        raise ValueError("Missing or extra native quad cases")
+    for actual, reference in zip(cases, expected):
+        if not isinstance(actual, dict) or set(actual) != {
+                "id", "allowed", "mask_sha256", "changed", "sparse_bytes", "pixels_sha256"}:
+            raise ValueError("Malformed native quad record")
+        mask = base64.b64decode(reference["mask_base64"], validate=True)
+        # Independently reconstruct this fixture's fixed 4px local stroke and
+        # RGBA8 output. A plausible-looking hash/changed count is not proof.
+        expected_pixels = bytearray(64 * 64 * 4)
+        hidden = (22 * 64 + 22) * 4
+        expected_pixels[hidden:hidden + 4] = bytes((0x44, 0x33, 0x22, 0))
+        expected_changed = 0
+        for index, eligible in enumerate(mask):
+            x = (index % 64) + 0.5
+            y = (index // 64) + 0.5
+            t = max(0.0, min(1.0, ((x - 8.5) + (y - 8.5)) / 94.0))
+            if eligible and math.hypot(x - (8.5 + 47.0 * t),
+                                       y - (8.5 + 47.0 * t)) <= 2.0:
+                expected_pixels[index * 4:index * 4 + 4] = bytes((204, 170, 68, 128))
+                expected_changed += 1
+        if (type(actual["id"]) is not str or actual["id"] != reference["id"] or
+                type(actual["allowed"]) is not int or actual["allowed"] != reference["allowed"] or
+                actual["mask_sha256"] != hashlib.sha256(mask).hexdigest() or
+                type(actual["changed"]) is not int or
+                actual["changed"] != expected_changed or
+                type(actual["sparse_bytes"]) is not int or
+                actual["sparse_bytes"] != 4 + 12 * actual["changed"] or
+                not isinstance(actual["pixels_sha256"], str) or
+                len(actual["pixels_sha256"]) != 64 or
+                any(c not in "0123456789abcdef" for c in actual["pixels_sha256"]) or
+                actual["pixels_sha256"] != hashlib.sha256(expected_pixels).hexdigest()):
+            raise ValueError("Native quad output differs from pinned Godot mask")
+
+
+def validate_quad_publication(cases: Any) -> None:
+    """Replay canonical brush geometry and atomic document publication proof."""
+    if not isinstance(cases, list) or len(cases) != 15:
+        raise ValueError("Missing native quad publication cases")
+    expected_keys = {"id", "allowed", "mask_sha256", "changed", "sparse_bytes",
+                     "pixels_sha256", "source_sha256", "undo_sha256", "redo_sha256",
+                     "history_delta", "revision_delta", "checks_after"}
+    original = bytearray(64 * 64 * 4)
+    original[(22 * 64 + 22) * 4:(22 * 64 + 22) * 4 + 4] = bytes((0x44, 0x33, 0x22, 0))
+    original_hash = hashlib.sha256(original).hexdigest()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != expected_keys:
+            raise ValueError("Malformed quad publication record")
+    # The independent Godot-authored masks and per-pixel canonical compositing
+    # are checked by the existing fail-closed native quad validator.
+    validate_quad_bridge([{key: row[key] for key in
+        ("id", "allowed", "mask_sha256", "changed", "sparse_bytes", "pixels_sha256")}
+        for row in cases])
+    prior = 3  # load, register and verify the pinned fixture
+    for case in cases:
+        changed = case["changed"]
+        advance = int(changed > 0)
+        # Each Godot scenario performs ten independent assertions, including
+        # two history checks for success or for the NO_CHANGE rejection.
+        expected_checks = prior + 10
+        if (any(type(case[k]) is not str or case[k] != original_hash
+                for k in ("source_sha256", "undo_sha256")) or
+                case["redo_sha256"] != case["pixels_sha256"] or
+                type(case["history_delta"]) is not int or
+                case["history_delta"] != advance or
+                type(case["revision_delta"]) is not int or
+                case["revision_delta"] != advance or
+                type(case["checks_after"]) is not int or
+                case["checks_after"] != expected_checks):
+            raise ValueError("Invalid quad publication history or source evidence")
+        prior = case["checks_after"]
+
+
+def validate_marshal_evidence(cases: Any) -> None:
+    """Reject truncated or inconsistent native transfer evidence."""
+    expected_cases = {(side, density) for side in (32, 128, 256)
+                      for density in ("single", "sparse", "dense")}
+    modes = {"copy", "full_ptrcall", "full_variant", "sparse_ptrcall"}
+    if not isinstance(cases, list) or len(cases) != len(expected_cases):
+        raise ValueError("Marshal results must contain nine complete workloads")
+    observed: set[tuple[int, str]] = set()
+    for case in cases:
+        try:
+            identity = (case["side"], case["density"])
+            if identity not in expected_cases or identity in observed:
+                raise ValueError("Unknown or duplicate marshal workload")
+            observed.add(identity)
+            pixels = case["side"] ** 2
+            changed = case["unique_changed_pixels"]
+            if (not isinstance(changed, int) or changed < 1 or changed > pixels
+                    or case["requested_points"] < changed
+                    or case["input_rgba_bytes"] != pixels * 4
+                    or case["input_mask_bytes"] != pixels
+                    or case["input_points_bytes"] != case["requested_points"] * 8
+                    or case["full_output_bytes"] != pixels * 4
+                    or case["sparse_output_bytes"] != 4 + changed * 12):
+                raise ValueError("Inconsistent marshal byte or delta counts")
+            measurements = case["measurements_us"]
+            if set(measurements) != modes:
+                raise ValueError("Incomplete marshal timing modes")
+            for record in measurements.values():
+                if (record["trials"] != 16 or not
+                        (0 <= record["min_us"] <= record["median_us"]
+                         <= record["p95_us"] <= record["max_us"])):
+                    raise ValueError("Invalid marshal timing distribution")
+        except (KeyError, TypeError) as exc:
+            raise ValueError("Malformed marshal evidence") from exc
+    if observed != expected_cases:
+        raise ValueError("Missing marshal workloads")
+
+
+def validate_scalar_evidence(record: dict[str, int]) -> None:
+    """Require complete, internally consistent native sparse bridge evidence."""
+    keys = {"source_bytes", "path_bytes", "sparse_bytes", "changed",
+            "masked_sparse_bytes", "no_op_bytes", "erase_sparse_bytes", "checks"}
+    if not isinstance(record, dict) or set(record) != keys or any(
+            type(value) is not int for value in record.values()):
+        raise ValueError("Malformed scalar bridge metrics")
+    if (record["source_bytes"] != 16 * 16 * 4 or
+        record["path_bytes"] != 3 * 16 or
+        record["changed"] <= 5 or record["changed"] > 256 or
+        record["sparse_bytes"] != 4 + 12 * record["changed"] or
+        record["masked_sparse_bytes"] != 16 or
+        record["no_op_bytes"] != 4 or record["erase_sparse_bytes"] != 16 or
+        record["checks"] < 31):
+        raise ValueError("Incomplete scalar brush parity evidence")
+
+
+
+def validate_large_publication(cases: Any) -> None:
+    """Reconstruct full RGBA8 oracles and recompute paired CPU timing summaries."""
+    expected_sides = (512, 1024, 2048)
+    phases = ("godot_stage", "godot_commit", "native_call", "native_decode",
+              "native_stage", "native_commit")
+    totals = {"godot_total": phases[:2], "native_total": phases[2:]}
+    if not isinstance(cases, list) or len(cases) != len(expected_sides):
+        raise ValueError("Missing large publication workloads")
+    for side, record in zip(expected_sides, cases):
+        if not isinstance(record, dict) or set(record) != {
+                "side", "gesture", "source_bytes", "path_bytes", "changed",
+                "sparse_bytes", "canonical_sha256", "samples_us", "measurements_us"}:
+            raise ValueError("Malformed large publication workload")
+        if type(record["side"]) is not int or record["side"] != side or (
+                record["gesture"] != "long_horizontal" or
+                type(record["source_bytes"]) is not int or
+                record["source_bytes"] != side * side * 4 or
+                type(record["path_bytes"]) is not int or record["path_bytes"] != 32):
+            raise ValueError("Inconsistent large publication dimensions")
+        # Independent horizontal capsule coverage: only five rows can be hit.
+        # The canonical source contains one out-of-stroke hidden-RGB pixel.
+        oracle = bytearray(side * side * 4)
+        oracle[(side + 1) * 4:(side + 1) * 4 + 4] = b"\x33\x22\x11\x00"
+        changed = 0
+        y_center = side // 2 + 0.5
+        for y in range(side // 2 - 2, side // 2 + 3):
+            for x in range(side):
+                px = x + 0.5
+                nearest = min(max(px, 3.5), side - 3.5)
+                if (px - nearest) ** 2 + (y + 0.5 - y_center) ** 2 <= 4.0:
+                    oracle[(y * side + x) * 4:(y * side + x) * 4 + 4] = b"\xcc\xaa\x44\x80"
+                    changed += 1
+        if (type(record["changed"]) is not int or record["changed"] != changed or
+                type(record["sparse_bytes"]) is not int or
+                record["sparse_bytes"] != 4 + 12 * changed or
+                record["canonical_sha256"] != hashlib.sha256(oracle).hexdigest()):
+            raise ValueError("Large native result differs from independent pixel oracle")
+        samples = record["samples_us"]
+        if not isinstance(samples, list) or len(samples) != 4:
+            raise ValueError("Expected four counterbalanced large-tile pairs")
+        buckets: dict[str, list[int]] = {key: [] for key in (*phases, *totals)}
+        for i, sample in enumerate(samples):
+            if not isinstance(sample, dict) or set(sample) != {
+                    "trial", "order", *phases, *totals}:
+                raise ValueError("Malformed large-tile timing sample")
+            if type(sample["trial"]) is not int or sample["trial"] != i or (
+                    sample["order"] != ("native_first" if i % 2 == 0 else "godot_first")):
+                raise ValueError("Incorrect paired trial order")
+            for key in phases:
+                if type(sample[key]) is not int or sample[key] < 0:
+                    raise ValueError("Negative or noninteger native timing")
+            for key, components in totals.items():
+                if type(sample[key]) is not int or sample[key] != sum(sample[part] for part in components):
+                    raise ValueError("Forged aggregate native timing")
+            for key in buckets:
+                buckets[key].append(sample[key])
+        summary = record["measurements_us"]
+        if not isinstance(summary, dict) or set(summary) != set(buckets):
+            raise ValueError("Missing large-tile phase summary")
+        for key, values in buckets.items():
+            ordered = sorted(values)
+            expected = {"trials": 4, "min_us": ordered[0],
+                        "median_us": ordered[2], "max_us": ordered[-1]}
+            if summary[key] != expected:
+                raise ValueError("Large-tile sample summary does not match raw trials")
+
+
+def validate_scalar_publication(cases: Any) -> None:
+    """Validate raw paired trials and recompute every published timing summary."""
+    expected = {(side, gesture) for side in (32, 128, 256)
+                for gesture in ("short", "crossing")}
+    parts = ("godot_stage", "godot_commit", "native_call", "native_decode",
+             "native_stage", "native_commit")
+    totals = {"godot_total": parts[:2], "native_total": parts[2:]}
+    phases = set(parts) | set(totals)
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        raise ValueError("Expected six matched native/publication workloads")
+    observed: set[tuple[int, str]] = set()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != {
+                "side", "gesture", "source_bytes", "path_bytes", "changed",
+                "sparse_bytes", "samples_us", "measurements_us"}:
+            raise ValueError("Malformed publication workload")
+        # Reject unhashable JSON values before using the workload as a key.
+        # All malformed evidence must fail with ValueError, not an incidental
+        # TypeError from set membership.
+        if type(case["side"]) is not int or type(case["gesture"]) is not str:
+            raise ValueError("Invalid publication workload identity")
+        identity = (case["side"], case["gesture"])
+        if (identity not in expected or identity in observed or
+                type(case["source_bytes"]) is not int or
+                case["source_bytes"] != case["side"] ** 2 * 4 or
+                type(case["path_bytes"]) is not int or
+                case["path_bytes"] != (32 if case["gesture"] == "short" else 64) or
+                type(case["changed"]) is not int or
+                not 0 < case["changed"] <= case["side"] ** 2 or
+                type(case["sparse_bytes"]) is not int or
+                case["sparse_bytes"] != 4 + case["changed"] * 12):
+            raise ValueError("Inconsistent publication workload dimensions")
+        observed.add(identity)
+        samples = case["samples_us"]
+        if not isinstance(samples, list) or len(samples) != 6:
+            raise ValueError("Expected six paired publication samples")
+        for i, sample in enumerate(samples):
+            if (not isinstance(sample, dict) or
+                    set(sample) != phases | {"trial", "order"} or
+                    type(sample["trial"]) is not int or sample["trial"] != i or
+                    sample["order"] != ("godot_first" if i % 2 == 0 else "native_first") or
+                    any(type(sample[part]) is not int or sample[part] < 0
+                        for part in phases)):
+                raise ValueError("Malformed or non-counterbalanced publication pair")
+            for mode, mode_parts in totals.items():
+                if sample[mode] != sum(sample[part] for part in mode_parts):
+                    raise ValueError("Forged paired publication total")
+        timings = case["measurements_us"]
+        if not isinstance(timings, dict) or set(timings) != phases:
+            raise ValueError("Incomplete publication timing stages")
+        for phase in phases:
+            values = sorted(sample[phase] for sample in samples)
+            expected_stats = {"trials": 6, "min_us": values[0],
+                              "median_us": values[3], "max_us": values[-1]}
+            stats = timings[phase]
+            if (not isinstance(stats, dict) or set(stats) != set(expected_stats) or
+                    any(type(value) is not int for value in stats.values()) or
+                    stats != expected_stats):
+                raise ValueError("Forged publication distribution")
+    if observed != expected:
+        raise ValueError("Missing publication workloads")
+
+
+def validate_scalar_transform(cases: Any) -> None:
+    """Reject missing/malformed transformed-path and binary-mask parity records."""
+    expected = {
+        "identity_rect": 32, "rotated_inverted": 32,
+        "shear_sparse_erase": 32, "mirrored_crossing": 64,
+        "nonuniform_inverted_sparse": 64, "zoom_pan_dab": 64,
+    }
+    required = {"name", "side", "changed", "selected", "path_bytes",
+                "source_bytes", "sparse_bytes", "canonical_sha256"}
+    if not isinstance(cases, list) or len(cases) != len(expected):
+        raise ValueError("Transformed native comparison requires six cases")
+    observed: set[str] = set()
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != required:
+            raise ValueError("Malformed transformed native parity case")
+        name, side = case["name"], case["side"]
+        if type(name) is not str or name not in expected or name in observed:
+            raise ValueError("Unknown or duplicate transformed native case")
+        observed.add(name)
+        if (type(side) is not int or side != expected[name] or
+                any(type(case[key]) is not int for key in (
+                    "changed", "selected", "path_bytes", "source_bytes", "sparse_bytes")) or
+                not 0 < case["changed"] <= case["selected"] <= side * side or
+                case["source_bytes"] != side * side * 4 or
+                case["sparse_bytes"] != 4 + 12 * case["changed"] or
+                case["path_bytes"] not in (16, 32, 48, 64)):
+            raise ValueError("Inconsistent transformed native dimensions")
+        digest = case["canonical_sha256"]
+        if (type(digest) is not str or
+                re.fullmatch(r"[0-9a-f]{64}", digest) is None):
+            raise ValueError("Malformed transformed canonical hash")
+    if observed != set(expected):
+        raise ValueError("Missing transformed native cases")
+
+
+def validate_scalar_atomicity(cases: Any) -> None:
+    """Reject incomplete or forged native cancellation/conflict witness records."""
+    expected_names = ("cancel", "stale_before", "stale_during", "forged_before")
+    if not isinstance(cases, list) or len(cases) != len(expected_names):
+        raise ValueError("Expected four native atomicity scenarios")
+    # Independent 16x16 oracle: seed one hidden-RGB pixel, then paint the
+    # hard brush along the self-overlapping 3-point polyline once per pixel.
+    original = bytearray(16 * 16 * 4)
+    original[(3 * 16 + 2) * 4:(3 * 16 + 2) * 4 + 4] = b"\x44\x33\x22\x00"
+    published = original.copy()
+    changed = 0
+    for y in range(16):
+        for x in range(16):
+            dx, dy = x + .5 - 2.5, y + .5 - 3.5
+            t = max(0., min(1., (dx * 10. + dy * 8.) / 164.))
+            if (dx - 10. * t) ** 2 + (dy - 8. * t) ** 2 <= 4.:
+                published[(y * 16 + x) * 4:(y * 16 + x) * 4 + 4] = b"\xcc\xaa\x44\x80"
+                changed += 1
+    source_hash = hashlib.sha256(original).hexdigest()
+    output_hash = hashlib.sha256(published).hexdigest()
+    expected_checks = (11, 21, 30, 37)
+    for name, check_count, case in zip(expected_names, expected_checks, cases):
+        if not isinstance(case, dict) or set(case) != {
+                "name", "changed", "payload_bytes", "source_sha256",
+                "canonical_sha256", "checks_after"}:
+            raise ValueError("Malformed scalar atomicity case")
+        if (type(case["name"]) is not str or case["name"] != name or
+                type(case["changed"]) is not int or case["changed"] != changed or
+                type(case["payload_bytes"]) is not int or
+                case["payload_bytes"] != 4 + 12 * changed or
+                case["source_sha256"] != source_hash or
+                case["canonical_sha256"] != output_hash or
+                type(case["checks_after"]) is not int or
+                case["checks_after"] != check_count):
+            raise ValueError("Invalid native atomicity results or provenance")
+
+
+def execute(godot: str, *, runs: int = 1, large_only: bool = False,
+            atomic_only: bool = False, quad_publication_only: bool = False) -> dict[str, Any]:
+    """Build against Godot's own header and verify actual Godot Variant calls."""
+    version = checked_run([godot, "--version"], cwd=ROOT, timeout=15).strip()
+    if EXPECTED_VERSION not in version:
+        raise RuntimeError(f"Expected pinned Godot {EXPECTED_VERSION}; got {version!r}")
+
+    with tempfile.TemporaryDirectory(prefix="t068-gdextension-") as directory:
+        temporary = Path(directory)
+        header_dir = temporary / "header"
+        header_dir.mkdir()
+        checked_run([godot, "--headless", "--dump-gdextension-interface"], cwd=header_dir, timeout=45)
+        header = header_dir / "gdextension_interface.h"
+        if not header.is_file():
+            raise RuntimeError("Pinned Godot did not generate gdextension_interface.h")
+        header_sha = hashlib.sha256(header.read_bytes()).hexdigest()
+
+        project = temporary / "test-project"
+        native = project / "native"
+        native.mkdir(parents=True)
+        (project / "project.godot").write_text(
+            'config_version=5\n[application]\nconfig/name="T068 Isolated Bridge"\n'
+            '[rendering]\nrenderer/rendering_method="gl_compatibility"\n', encoding="utf-8",
+        )
+        descriptor = native / "t068.gdextension"
+        descriptor_text = (
+            '[configuration]\nentry_symbol="t068_raster_bridge_init"\n'
+            'compatibility_minimum="4.7"\nreloadable=false\n\n'
+            '[libraries]\nlinux.debug.x86_64="res://native/libt068_raster.so"\n'
+            'linux.release.x86_64="res://native/libt068_raster.so"\n'
+        )
+        library = native / "libt068_raster.so"
+        compiler = shutil.which("g++")
+        if compiler is None:
+            raise RuntimeError("This optional Linux benchmark requires g++")
+        checked_run([
+            compiler, "-std=c++17", "-O2", "-fPIC", "-shared", "-Wall", "-Wextra", "-Werror",
+            "-I", str(header_dir), str(BRIDGE / "t068_bridge.cpp"),
+            str(ROOT / "tools/benchmarks/t068_raster_kernel.cpp"),
+            str(ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp"),
+            str(ROOT / "tools/benchmarks/t068_quad_scope_kernel.cpp"),
+            "-o", str(library),
+        ], cwd=ROOT, timeout=90)
+        # Install only the canonical Drawing document/transaction dependency set;
+        # the test exercises real production scripts, not a parallel model.
+        drawing = project / "addons" / "drawing"
+        drawing.mkdir(parents=True)
+        for script in CANONICAL_SCRIPTS:
+            shutil.copyfile(ROOT / "addons" / "drawing" / (script + ".gd"),
+                            drawing / (script + ".gd"))
+        # Bootstrap a fresh Godot project before registering optional classes.
+        # Godot 4.8 beta 2 can abort on the very first editor scan with a
+        # freshly compiled GDExtension; the existing cache avoids that path.
+        checked_run([godot, "--headless", "--editor", "--path", str(project),
+                     "--import"], cwd=project, timeout=120)
+        descriptor.write_text(descriptor_text, encoding="utf-8")
+        # An explicit runtime load avoids an editor startup crash in Godot 4.8b2
+        # when scanning a hand-authored GDExtension descriptor.
+        # Keep the standalone stress script outside the editor initial scan.
+        shutil.copyfile(BRIDGE / "t068_bridge_smoke.gd", project / "test.gd")
+        shutil.copyfile(BRIDGE / "t068_revision_adapter.gd", project / "adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_revision_smoke.gd", project / "revision_test.gd")
+        shutil.copyfile(BRIDGE / "t068_document_adapter.gd", project / "document_adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_document_smoke.gd", project / "document_test.gd")
+        shutil.copyfile(BRIDGE / "t068_document_batch_adapter.gd", project / "batch_adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_document_batch_smoke.gd", project / "batch_test.gd")
+        shutil.copyfile(BRIDGE / "t068_document_sparse_adapter.gd", project / "sparse_adapter.gd")
+        shutil.copyfile(BRIDGE / "t068_document_sparse_smoke.gd", project / "sparse_test.gd")
+        shutil.copyfile(BRIDGE / "t068_marshal_profile.gd", project / "marshal_test.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd", project / "scalar_test.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_atomicity_smoke.gd", project / "scalar_atomicity.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_publication_profile.gd", project / "scalar_publication.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_large_publication.gd", project / "scalar_large.gd")
+        shutil.copyfile(BRIDGE / "t068_scalar_transform_smoke.gd", project / "scalar_transform.gd")
+        shutil.copyfile(BRIDGE / "t068_quad_scope_smoke.gd", project / "quad_scope.gd")
+        shutil.copyfile(BRIDGE / "t068_quad_publication_smoke.gd", project / "quad_publication.gd")
+        shutil.copyfile(ROOT / "tools/benchmarks/t068_quad_scope_oracle.json", project / "quad_oracle.json")
+        if quad_publication_only:
+            observations: list[dict[str, Any]] = []
+            for _ in range(runs):
+                raw = checked_run([godot, "--headless", "--path", str(project),
+                                   "--audio-driver", "Dummy", "--script",
+                                   "res://quad_publication.gd"], cwd=project, timeout=150)
+                passed = QUAD_PUBLICATION_RE.search(raw)
+                evidence = QUAD_PUBLICATION_EVIDENCE_RE.search(raw)
+                if passed is None or evidence is None:
+                    raise RuntimeError(f"Missing quad publication proof:\n{raw[-5000:]}")
+                cases = json.loads(evidence.group(1))
+                validate_quad_publication(cases)
+                if int(passed.group(1)) != cases[-1]["checks_after"]:
+                    raise RuntimeError("Quad publication assertion count differs")
+                observations.append({"checks": int(passed.group(1)), "cases": cases})
+            return {
+                "schema_version": 1, "ticket": "T-068", "godot_version": version,
+                "mode": "isolated native quad mask and brush to DrawingDocument publication",
+                "quad_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_kernel.cpp").read_bytes()).hexdigest(),
+                "scalar_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+                "bridge_source_sha256": hashlib.sha256((BRIDGE / "t068_bridge.cpp").read_bytes()).hexdigest(),
+                "profile_sha256": hashlib.sha256((BRIDGE / "t068_quad_publication_smoke.gd").read_bytes()).hexdigest(),
+                "oracle_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_oracle.json").read_bytes()).hexdigest(),
+                "runs": observations,
+                "limitations": [
+                    "Temporary Linux Godot bridge; not production Atlas or Drawing runtime integration",
+                    "The 64x64 masks are pinned Godot-authored AtlasFill oracles, not a live Atlas UI path",
+                    "No physical GPU input-to-visible measurements or portable Windows release verification",
+                ],
+            }
+        if atomic_only:
+            observations: list[dict[str, Any]] = []
+            for _ in range(runs):
+                raw = checked_run([godot, "--headless", "--path", str(project),
+                                   "--audio-driver", "Dummy", "--script",
+                                   "res://scalar_atomicity.gd"], cwd=project, timeout=120)
+                passed = ATOMICITY_RE.search(raw)
+                evidence = ATOMICITY_EVIDENCE_RE.search(raw)
+                if passed is None or evidence is None:
+                    raise RuntimeError(f"Missing scalar atomicity proof:\n{raw[-5000:]}")
+                cases = json.loads(evidence.group(1))
+                validate_scalar_atomicity(cases)
+                if int(passed.group(1)) != cases[-1]["checks_after"]:
+                    raise RuntimeError("Atomicity assertion count differs from raw evidence")
+                observations.append({"checks": int(passed.group(1)), "cases": cases})
+            return {
+                "ticket": "T-068", "godot_version": version,
+                "bridge_sha256": hashlib.sha256((BRIDGE / "t068_bridge.cpp").read_bytes()).hexdigest(),
+                "atomicity_script_sha256": hashlib.sha256(
+                    (BRIDGE / "t068_scalar_atomicity_smoke.gd").read_bytes()).hexdigest(),
+                "scalar_source_sha256": hashlib.sha256(
+                    (ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+                "runs": observations,
+                "limitations": [
+                    "Isolated 16x16 native sparse publication safety; not a production backend",
+                    "Synthetic single-thread revision races, not concurrent stress or hardware latency",
+                ],
+            }
+        if large_only:
+            # Explicitly opt in: large cases must not lengthen existing CI or
+            # silently mutate its previously pinned publication evidence.
+            measurements: list[dict[str, Any]] = []
+            for _ in range(runs):
+                raw = checked_run([godot, "--headless", "--path", str(project),
+                                   "--audio-driver", "Dummy", "--script",
+                                   "res://scalar_large.gd"], cwd=project, timeout=240)
+                passed = LARGE_PUBLICATION_RE.search(raw)
+                timing = LARGE_PUBLICATION_TIMING_RE.search(raw)
+                if passed is None or timing is None:
+                    raise RuntimeError(f"Missing large publication proof:\n{raw[-5000:]}")
+                cases = json.loads(timing.group(1))
+                validate_large_publication(cases)
+                if int(passed.group(1)) != 2 + 3 * (3 + 9 * 5):
+                    raise RuntimeError("Insufficient large publication assertions")
+                measurements.append({"checks": int(passed.group(1)), "cases": cases})
+            return {
+                "schema_version": 1, "ticket": "T-068", "godot_version": version,
+                "mode": "isolated C++/Godot large-tile headless publication",
+                "scalar_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+                "bridge_source_sha256": hashlib.sha256((BRIDGE / "t068_bridge.cpp").read_bytes()).hexdigest(),
+                "profile_sha256": hashlib.sha256((BRIDGE / "t068_scalar_large_publication.gd").read_bytes()).hexdigest(),
+                "measurements": measurements,
+                "limitations": [
+                    "Synthetic CPU-only headless tile tests, not physical GPU or actual input-to-visible latency",
+                    "All trials use a single horizontal 4px path; no p95 or speedup inference from four paired samples",
+                    "Tile/source construction, oracle validation, undo and redo happen outside timing",
+                    "The GDExtension lives in a temporary Linux project and is not a production or portable release",
+                ],
+            }
+        observations: list[dict[str, Any]] = []
+        for _ in range(runs):
+            output = checked_run([godot, "--headless", "--path", str(project),
+                                  "--script", "res://test.gd"], cwd=project, timeout=90)
+            match = PASS_RE.search(output)
+            timing = TIMING_RE.search(output)
+            if match is None or timing is None:
+                raise RuntimeError(f"Missing Godot correctness/timing marker:\n{output[-4000:]}")
+            count = int(match.group(1))
+            if count < 442:
+                raise RuntimeError(f"Only {count} GDExtension checks ran; expected at least 442")
+            xvfb = shutil.which("xvfb-run")
+            if xvfb is None:
+                raise RuntimeError("Native texture readback witness requires xvfb-run")
+            revision_output = checked_run([xvfb, "-a", "-s", "-screen 0 1280x720x24",
+                                           godot, "--path", str(project), "--audio-driver", "Dummy",
+                                           "--rendering-method", "gl_compatibility",
+                                           "--script", "res://revision_test.gd"],
+                                          cwd=project, timeout=120)
+            revision_match = REVISION_RE.search(revision_output)
+            if revision_match is None or int(revision_match.group(1)) < 300:
+                raise RuntimeError(f"Missing or insufficient revision checks:\n{revision_output[-4000:]}")
+            # Real DrawingDocument transactions need no GL readback. Exercise
+            # them headlessly, keeping the isolated extension explicit.
+            document_output = checked_run([godot, "--headless", "--path", str(project),
+                                           "--audio-driver", "Dummy", "--script",
+                                           "res://document_test.gd"], cwd=project, timeout=120)
+            document_match = DOCUMENT_RE.search(document_output)
+            if document_match is None or int(document_match.group(1)) < 140:
+                raise RuntimeError(f"Missing or insufficient canonical document checks:\n{document_output[-4000:]}")
+            batch_output = checked_run([godot, "--headless", "--path", str(project),
+                                        "--audio-driver", "Dummy", "--script",
+                                        "res://batch_test.gd"], cwd=project, timeout=120)
+            batch_match = BATCH_RE.search(batch_output)
+            if batch_match is None or int(batch_match.group(1)) != 128:
+                raise RuntimeError(f"Missing or insufficient multi-tile checks:\n{batch_output[-4000:]}")
+            sparse_output = checked_run([godot, "--headless", "--path", str(project),
+                                         "--audio-driver", "Dummy", "--script",
+                                         "res://sparse_test.gd"], cwd=project, timeout=120)
+            sparse_match = SPARSE_RE.search(sparse_output)
+            sparse_timing = SPARSE_TIMING_RE.search(sparse_output)
+            if sparse_match is None or int(sparse_match.group(1)) < 173 or sparse_timing is None:
+                raise RuntimeError(f"Missing or insufficient sparse checks/timing:\n{sparse_output[-4000:]}")
+            sparse_benchmark = json.loads(sparse_timing.group(1))
+            if any(str(side) not in sparse_benchmark for side in (32, 64, 128)):
+                raise RuntimeError("Sparse benchmark omitted a test size")
+            marshal_output = checked_run([godot, "--headless", "--path", str(project),
+                                          "--audio-driver", "Dummy", "--script",
+                                          "res://marshal_test.gd"], cwd=project, timeout=120)
+            marshal_match = MARSHAL_RE.search(marshal_output)
+            marshal_timing = MARSHAL_TIMING_RE.search(marshal_output)
+            if marshal_match is None or int(marshal_match.group(1)) < 700 or marshal_timing is None:
+                raise RuntimeError(f"Missing or insufficient marshal proof/timing:\n{marshal_output[-4000:]}")
+            marshal_cases = json.loads(marshal_timing.group(1))
+            try:
+                validate_marshal_evidence(marshal_cases)
+            except ValueError as exc:
+                raise RuntimeError("Marshal evidence rejected") from exc
+            scalar_output = checked_run([godot, "--headless", "--path", str(project),
+                                         "--audio-driver", "Dummy", "--script",
+                                         "res://scalar_test.gd"], cwd=project, timeout=120)
+            scalar_match = SCALAR_RE.search(scalar_output)
+            scalar_evidence = SCALAR_EVIDENCE_RE.search(scalar_output)
+            if scalar_match is None or scalar_evidence is None:
+                raise RuntimeError(f"Missing scalar brush proof:\n{scalar_output[-4000:]}")
+            try:
+                scalar_record = json.loads(scalar_evidence.group(1))
+                validate_scalar_evidence(scalar_record)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected malformed scalar brush proof") from exc
+            if int(scalar_match.group(1)) != scalar_record["checks"]:
+                raise RuntimeError("Scalar bridge assertion count mismatch")
+            publication_output = checked_run([godot, "--headless", "--path", str(project),
+                                              "--audio-driver", "Dummy", "--script",
+                                              "res://scalar_publication.gd"],
+                                             cwd=project, timeout=180)
+            publication_match = PUBLICATION_RE.search(publication_output)
+            publication_timing = PUBLICATION_TIMING_RE.search(publication_output)
+            if publication_match is None or publication_timing is None:
+                raise RuntimeError(f"Missing matched scalar publication proof:\n{publication_output[-4000:]}")
+            try:
+                publication_cases = json.loads(publication_timing.group(1))
+                validate_scalar_publication(publication_cases)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected scalar publication evidence") from exc
+            if int(publication_match.group(1)) != 536:
+                raise RuntimeError("Insufficient scalar publication correctness checks")
+            transform_output = checked_run([godot, "--headless", "--path", str(project),
+                                            "--audio-driver", "Dummy", "--script",
+                                            "res://scalar_transform.gd"],
+                                           cwd=project, timeout=120)
+            transform_match = TRANSFORM_RE.search(transform_output)
+            transform_evidence = TRANSFORM_EVIDENCE_RE.search(transform_output)
+            if transform_match is None or transform_evidence is None:
+                raise RuntimeError(f"Missing transformed scalar parity proof:\n{transform_output[-4000:]}")
+            try:
+                transform_cases = json.loads(transform_evidence.group(1))
+                validate_scalar_transform(transform_cases)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected transformed scalar parity evidence") from exc
+            if int(transform_match.group(1)) != 110:
+                raise RuntimeError("Insufficient transformed scalar parity checks")
+            quad_output = checked_run([godot, "--headless", "--path", str(project),
+                                       "--audio-driver", "Dummy", "--script", "res://quad_scope.gd"],
+                                      cwd=project, timeout=120)
+            quad_match = QUAD_RE.search(quad_output)
+            quad_evidence = QUAD_EVIDENCE_RE.search(quad_output)
+            if quad_match is None or quad_evidence is None:
+                raise RuntimeError(f"Missing native four-corner parity proof:\n{quad_output[-4000:]}")
+            try:
+                quad_cases = json.loads(quad_evidence.group(1))
+                validate_quad_bridge(quad_cases)
+            except (ValueError, TypeError) as exc:
+                raise RuntimeError("Rejected native four-corner evidence") from exc
+            if int(quad_match.group(1)) != 55:
+                raise RuntimeError("Insufficient native four-corner correctness checks")
+            observations.append({"quad_checks": int(quad_match.group(1)), "quad_cases": quad_cases, "scalar_checks": int(scalar_match.group(1)),
+                                 "scalar_evidence": scalar_record, "scalar_transform_checks": int(transform_match.group(1)),
+                                 "scalar_transform_cases": transform_cases, "scalar_publication_checks": int(publication_match.group(1)),
+                                 "scalar_publication_cases": publication_cases,
+                                 "checks": count, "marshal_checks": int(marshal_match.group(1)),
+                                 "marshal_cases": marshal_cases, "sparse_checks": int(sparse_match.group(1)),
+                                 "sparse_benchmark": sparse_benchmark, "revision_checks": int(revision_match.group(1)),
+                                 "document_checks": int(document_match.group(1)),
+                                 "batch_checks": int(batch_match.group(1)),
+                                 "bridge_latency_us": json.loads(timing.group(1))})
+        return {
+            "ticket": "T-068", "mode": "optional, isolated Linux GDExtension (not production)",
+            "godot_version": version, "generated_header_sha256": header_sha,
+            "quad_source_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_kernel.cpp").read_bytes()).hexdigest(),
+            "quad_fixture_sha256": hashlib.sha256((ROOT / "tools/benchmarks/t068_quad_scope_oracle.json").read_bytes()).hexdigest(),
+            "scalar_source_sha256": hashlib.sha256(
+                (ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp").read_bytes()).hexdigest(),
+            "test_method": "Checked native batch and scalar brush deltas, detached texture adapter, and real revision-checked DrawingDocument transactions",
+            "measurements": observations,
+            "limitations": [
+                "Canonical DrawingDocument and DrawingEditSession are exercised in a temporary test project; production Drawing UI/Atlas history do not load this backend",
+                "Whole-tile and sparse-delta paths both commit through DrawingEditSession; neither is production enabled or proven faster",
+                "Scalar brush native call accepts local packed float64 path samples and a binary mask; completeness is verified against the Godot canonical stroke before publication, not by the native output alone",
+                "The transformed DrawingSelection screen still constructs its pixel-local binary mask in Godot; a separate native four-corner Atlas scope benchmark now matches the pinned Godot oracle",
+                "Marshal screen benchmarks precomputed coordinate arrays and a detached checked kernel, not brush geometry or canonical Document publication",
+                "Matched scalar publication timings are headless CPU diagnostics, with six alternating-order raw paired samples; source seeding, correctness checks, undo and redo are excluded",
+                "Timings include Godot PackedByteArray copies and are not input-to-visible latency",
+                "Software runner only; no physical Windows/Linux hardware or GPU timings",
+                "Temporary binary is not bundled in the repository or loaded at normal startup",
+            ],
+        }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--godot", required=True, help="Godot 4.8 beta 2 executable")
+    parser.add_argument("--runs", type=int, default=1, choices=[1, 2, 3])
+    parser.add_argument("--output", type=Path, help="Write raw JSON evidence outside repository")
+    parser.add_argument("--quad-publication-only", action="store_true",
+                        help="Run native four-corner masks through a canonical document commit")
+    parser.add_argument("--atomic-only", action="store_true",
+                        help="Run only native brush cancellation and conflict guards")
+    parser.add_argument("--large-only", action="store_true",
+                        help="Run only the opt-in 512/1024/2048 publication comparison")
+    args = parser.parse_args()
+    executable = shutil.which(args.godot)
+    if executable is None:
+        parser.error(f"Godot executable not found: {args.godot}")
+    if sum((args.atomic_only, args.large_only, args.quad_publication_only)) > 1:
+        parser.error("Choose at most one isolated benchmark mode")
+    evidence = execute(executable, runs=args.runs, large_only=args.large_only,
+                       atomic_only=args.atomic_only,
+                       quad_publication_only=args.quad_publication_only)
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+    if args.quad_publication_only:
+        counts = ", ".join(str(item["checks"]) for item in evidence["runs"])
+        print(f"T068_QUAD_PUBLICATION_INTEGRATION_PASSED: {counts} checks per run")
+        print("Temporary native Atlas scope publication only; no application backend enabled.")
+        return
+    if args.atomic_only:
+        counts = ", ".join(str(item["checks"]) for item in evidence["runs"])
+        print(f"T068_SCALAR_ATOMICITY_INTEGRATION_PASSED: {counts} checks per run")
+        print("Isolated revision/cancellation safety only; no runtime backend enabled.")
+        return
+    counts = ", ".join(str(item["checks"]) for item in evidence["measurements"])
+    if args.large_only:
+        print(f"T068_LARGE_GDEXTENSION_PASSED: {counts} checks per run")
+        print("Large full-tile RGBA8 publication is CPU-only and research-only.")
+        return
+    print(f"T068_GDEXTENSION_INTEGRATION_PASSED: {counts} native parity checks per run")
+    print("Revision-guarded publication adapter:", ", ".join(str(item["revision_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Canonical DrawingDocument transactions:", ", ".join(str(item["document_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Atomic multi-tile transactions:", ", ".join(str(item["batch_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Sparse delta transaction parity:", ", ".join(str(item["sparse_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Scalar native brush publication screen:", ", ".join(str(item["scalar_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Native Atlas four-corner mask screens:", ", ".join(str(item["quad_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Transformed scalar selection screens:", ", ".join(str(item["scalar_transform_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Matched scalar publication screens:", ", ".join(str(item["scalar_publication_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Godot native marshal screens:", ", ".join(str(item["marshal_checks"]) for item in evidence["measurements"]), "checks per run")
+    print("Timings are diagnostic only; no production backend enabled.")
+
+
+if __name__ == "__main__":
+    main()

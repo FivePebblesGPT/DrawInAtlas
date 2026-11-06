@@ -1,0 +1,1131 @@
+{
+  "ticket": "T-068",
+  "runs": [
+    {
+      "ticket": "T-068",
+      "date": "2026-11-04",
+      "upstream_version": "0.21.2",
+      "source_sha256": "234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa",
+      "comparison": "optional JIT Blend2D CPU vs checked C++ and exact RGBA8 oracle",
+      "method": "square hard-edge half-tile rectangle, single-thread sync; full-tile or edit-region PRGB32 roundtrip",
+      "checked_cpp_kernel": "tools/benchmarks/t068_raster_kernel.cpp (-O2)",
+      "timing_notes": [
+        "Blend2D context measures begin, set_comp_op, set_fill_style, fill_rect and synchronous end, excluding conversions",
+        "Blend2D total includes Python conversion, ctypes dispatch and reconstruction, not native-only end-to-end cost",
+        "Checked kernel timing includes ctypes call and already allocated points/buffers; it excludes Python point preparation",
+        "Each operation is independently verified; different boundaries and language overhead prohibit speedup claims"
+      ],
+      "limitations": [
+        "Blend2D PRGB32 loses transparent hidden RGB on direct full-tile conversion",
+        "Region-scoped conversion preserves untouched RGBA8 exactly but may still disagree on touched alpha rounding",
+        "No masks, brush coverage, path antialiasing, multi-layer Godot publication, production app, or physical GPU timing",
+        "No Blend2D or bridge binary/source added as a Drawing/Atlas runtime dependency"
+      ],
+      "measurements": [
+        {
+          "side": 32,
+          "operation": "opaque_replace",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 4.828,
+          "blend2d_context_median_us": 2.113,
+          "blend2d_total_median_us": 1004.676,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_replace",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 4.828,
+          "blend2d_context_median_us": 0.53,
+          "blend2d_total_median_us": 216.256,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_over",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.346,
+          "blend2d_context_median_us": 1.913,
+          "blend2d_total_median_us": 908.381,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_over",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.346,
+          "blend2d_context_median_us": 0.481,
+          "blend2d_total_median_us": 241.785,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "transparent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 165,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 4.426,
+          "blend2d_context_median_us": 1.542,
+          "blend2d_total_median_us": 850.984,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "transparent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 165,
+            "untouched": 0,
+            "lost_hidden_rgb": 40
+          },
+          "kernel_median_us": 4.426,
+          "blend2d_context_median_us": 0.581,
+          "blend2d_total_median_us": 212.881,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 185,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 9.975,
+          "blend2d_context_median_us": 1.632,
+          "blend2d_total_median_us": 869.782,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 185,
+            "untouched": 0,
+            "lost_hidden_rgb": 40
+          },
+          "kernel_median_us": 9.975,
+          "blend2d_context_median_us": 0.762,
+          "blend2d_total_median_us": 217.188,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_replace",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 256,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 4.687,
+          "blend2d_context_median_us": 1.261,
+          "blend2d_total_median_us": 849.771,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_replace",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 256,
+            "untouched": 0,
+            "lost_hidden_rgb": 40
+          },
+          "kernel_median_us": 4.687,
+          "blend2d_context_median_us": 0.982,
+          "blend2d_total_median_us": 300.474,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "erase",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 510,
+            "lost_hidden_rgb": 136
+          },
+          "kernel_median_us": 4.957,
+          "blend2d_context_median_us": 1.683,
+          "blend2d_total_median_us": 824.404,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "erase",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 4.957,
+          "blend2d_context_median_us": 0.43,
+          "blend2d_total_median_us": 149.896,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_replace",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.546,
+          "blend2d_context_median_us": 3.615,
+          "blend2d_total_median_us": 3739.061,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_replace",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.546,
+          "blend2d_context_median_us": 1.602,
+          "blend2d_total_median_us": 865.916,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_over",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 31.127,
+          "blend2d_context_median_us": 1.993,
+          "blend2d_total_median_us": 3335.061,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_over",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 31.127,
+          "blend2d_context_median_us": 1.713,
+          "blend2d_total_median_us": 986.308,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "transparent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 654,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 8.202,
+          "blend2d_context_median_us": 2.794,
+          "blend2d_total_median_us": 3253.437,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "transparent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 654,
+            "untouched": 0,
+            "lost_hidden_rgb": 160
+          },
+          "kernel_median_us": 8.202,
+          "blend2d_context_median_us": 1.632,
+          "blend2d_total_median_us": 833.497,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 727,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 32.428,
+          "blend2d_context_median_us": 2.884,
+          "blend2d_total_median_us": 3356.824,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 727,
+            "untouched": 0,
+            "lost_hidden_rgb": 160
+          },
+          "kernel_median_us": 32.428,
+          "blend2d_context_median_us": 1.762,
+          "blend2d_total_median_us": 863.803,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_replace",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 1024,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 9.695,
+          "blend2d_context_median_us": 2.264,
+          "blend2d_total_median_us": 3281.74,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_replace",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 1024,
+            "untouched": 0,
+            "lost_hidden_rgb": 160
+          },
+          "kernel_median_us": 9.695,
+          "blend2d_context_median_us": 1.312,
+          "blend2d_total_median_us": 859.387,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "erase",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 2025,
+            "lost_hidden_rgb": 544
+          },
+          "kernel_median_us": 10.606,
+          "blend2d_context_median_us": 2.934,
+          "blend2d_total_median_us": 3088.519,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "erase",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.606,
+          "blend2d_context_median_us": 1.493,
+          "blend2d_total_median_us": 605.113,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_replace",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 35.183,
+          "blend2d_context_median_us": 6.92,
+          "blend2d_total_median_us": 13661.398,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_replace",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 35.183,
+          "blend2d_context_median_us": 4.246,
+          "blend2d_total_median_us": 3563.715,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_over",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 128.353,
+          "blend2d_context_median_us": 9.174,
+          "blend2d_total_median_us": 13758.965,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_over",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 128.353,
+          "blend2d_context_median_us": 3.465,
+          "blend2d_total_median_us": 3386.098,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "transparent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2640,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 25.118,
+          "blend2d_context_median_us": 8.593,
+          "blend2d_total_median_us": 12968.583,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "transparent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2640,
+            "untouched": 0,
+            "lost_hidden_rgb": 672
+          },
+          "kernel_median_us": 25.118,
+          "blend2d_context_median_us": 3.976,
+          "blend2d_total_median_us": 3163.883,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2900,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 124.157,
+          "blend2d_context_median_us": 7.772,
+          "blend2d_total_median_us": 13221.224,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2900,
+            "untouched": 0,
+            "lost_hidden_rgb": 672
+          },
+          "kernel_median_us": 124.157,
+          "blend2d_context_median_us": 3.425,
+          "blend2d_total_median_us": 3455.242,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_replace",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 4096,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 27.872,
+          "blend2d_context_median_us": 9.334,
+          "blend2d_total_median_us": 12999.68,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_replace",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 4096,
+            "untouched": 0,
+            "lost_hidden_rgb": 672
+          },
+          "kernel_median_us": 27.872,
+          "blend2d_context_median_us": 3.675,
+          "blend2d_total_median_us": 3426.569,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "erase",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2080
+          },
+          "kernel_median_us": 27.502,
+          "blend2d_context_median_us": 11.006,
+          "blend2d_total_median_us": 12545.775,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "erase",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 27.502,
+          "blend2d_context_median_us": 3.515,
+          "blend2d_total_median_us": 4328.37,
+          "trials": 9
+        }
+      ]
+    },
+    {
+      "ticket": "T-068",
+      "date": "2026-11-04",
+      "upstream_version": "0.21.2",
+      "source_sha256": "234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa",
+      "comparison": "optional JIT Blend2D CPU vs checked C++ and exact RGBA8 oracle",
+      "method": "square hard-edge half-tile rectangle, single-thread sync; full-tile or edit-region PRGB32 roundtrip",
+      "checked_cpp_kernel": "tools/benchmarks/t068_raster_kernel.cpp (-O2)",
+      "timing_notes": [
+        "Blend2D context measures begin, set_comp_op, set_fill_style, fill_rect and synchronous end, excluding conversions",
+        "Blend2D total includes Python conversion, ctypes dispatch and reconstruction, not native-only end-to-end cost",
+        "Checked kernel timing includes ctypes call and already allocated points/buffers; it excludes Python point preparation",
+        "Each operation is independently verified; different boundaries and language overhead prohibit speedup claims"
+      ],
+      "limitations": [
+        "Blend2D PRGB32 loses transparent hidden RGB on direct full-tile conversion",
+        "Region-scoped conversion preserves untouched RGBA8 exactly but may still disagree on touched alpha rounding",
+        "No masks, brush coverage, path antialiasing, multi-layer Godot publication, production app, or physical GPU timing",
+        "No Blend2D or bridge binary/source added as a Drawing/Atlas runtime dependency"
+      ],
+      "measurements": [
+        {
+          "side": 32,
+          "operation": "opaque_replace",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 4.887,
+          "blend2d_context_median_us": 1.452,
+          "blend2d_total_median_us": 914.109,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_replace",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 4.887,
+          "blend2d_context_median_us": 0.5,
+          "blend2d_total_median_us": 229.075,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_over",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.366,
+          "blend2d_context_median_us": 3.065,
+          "blend2d_total_median_us": 1277.948,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_over",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 10.366,
+          "blend2d_context_median_us": 0.691,
+          "blend2d_total_median_us": 222.446,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "transparent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 165,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 4.487,
+          "blend2d_context_median_us": 1.993,
+          "blend2d_total_median_us": 874.149,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "transparent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 165,
+            "untouched": 0,
+            "lost_hidden_rgb": 40
+          },
+          "kernel_median_us": 4.487,
+          "blend2d_context_median_us": 1.211,
+          "blend2d_total_median_us": 244.409,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 185,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 10.536,
+          "blend2d_context_median_us": 0.922,
+          "blend2d_total_median_us": 793.557,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 185,
+            "untouched": 0,
+            "lost_hidden_rgb": 40
+          },
+          "kernel_median_us": 10.536,
+          "blend2d_context_median_us": 1.022,
+          "blend2d_total_median_us": 230.819,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_replace",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 256,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 4.788,
+          "blend2d_context_median_us": 1.402,
+          "blend2d_total_median_us": 841.019,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_replace",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 256,
+            "untouched": 0,
+            "lost_hidden_rgb": 40
+          },
+          "kernel_median_us": 4.788,
+          "blend2d_context_median_us": 1.322,
+          "blend2d_total_median_us": 229.065,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "erase",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 510,
+            "lost_hidden_rgb": 136
+          },
+          "kernel_median_us": 4.537,
+          "blend2d_context_median_us": 1.763,
+          "blend2d_total_median_us": 795.12,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "erase",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 4.537,
+          "blend2d_context_median_us": 0.571,
+          "blend2d_total_median_us": 154.313,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_replace",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 9.725,
+          "blend2d_context_median_us": 5.118,
+          "blend2d_total_median_us": 3567.822,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_replace",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 9.725,
+          "blend2d_context_median_us": 2.654,
+          "blend2d_total_median_us": 903.604,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_over",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 32.86,
+          "blend2d_context_median_us": 3.756,
+          "blend2d_total_median_us": 3772.38,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_over",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 32.86,
+          "blend2d_context_median_us": 2.104,
+          "blend2d_total_median_us": 1067.3,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "transparent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 654,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 8.092,
+          "blend2d_context_median_us": 3.025,
+          "blend2d_total_median_us": 3553.019,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "transparent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 654,
+            "untouched": 0,
+            "lost_hidden_rgb": 160
+          },
+          "kernel_median_us": 8.092,
+          "blend2d_context_median_us": 1.693,
+          "blend2d_total_median_us": 863.813,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 727,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 31.218,
+          "blend2d_context_median_us": 2.914,
+          "blend2d_total_median_us": 3382.933,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 727,
+            "untouched": 0,
+            "lost_hidden_rgb": 160
+          },
+          "kernel_median_us": 31.218,
+          "blend2d_context_median_us": 1.483,
+          "blend2d_total_median_us": 904.585,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_replace",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 1024,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 9.034,
+          "blend2d_context_median_us": 2.944,
+          "blend2d_total_median_us": 3279.968,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_replace",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 1024,
+            "untouched": 0,
+            "lost_hidden_rgb": 160
+          },
+          "kernel_median_us": 9.034,
+          "blend2d_context_median_us": 0.811,
+          "blend2d_total_median_us": 839.796,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "erase",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 2025,
+            "lost_hidden_rgb": 544
+          },
+          "kernel_median_us": 9.845,
+          "blend2d_context_median_us": 3.976,
+          "blend2d_total_median_us": 3060.036,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "erase",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 9.845,
+          "blend2d_context_median_us": 3.426,
+          "blend2d_total_median_us": 659.765,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_replace",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 31.397,
+          "blend2d_context_median_us": 13.671,
+          "blend2d_total_median_us": 16269.632,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_replace",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 31.397,
+          "blend2d_context_median_us": 5.738,
+          "blend2d_total_median_us": 3426.78,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_over",
+          "scope": "full_tile",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 113.941,
+          "blend2d_context_median_us": 8.162,
+          "blend2d_total_median_us": 13128.164,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_over",
+          "scope": "region_only",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 113.941,
+          "blend2d_context_median_us": 3.846,
+          "blend2d_total_median_us": 3276.052,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "transparent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2640,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 24.477,
+          "blend2d_context_median_us": 13.25,
+          "blend2d_total_median_us": 12657.714,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "transparent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2640,
+            "untouched": 0,
+            "lost_hidden_rgb": 672
+          },
+          "kernel_median_us": 24.477,
+          "blend2d_context_median_us": 4.236,
+          "blend2d_total_median_us": 3186.226,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_over",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2900,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 115.544,
+          "blend2d_context_median_us": 8.323,
+          "blend2d_total_median_us": 12414.327,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_over",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2900,
+            "untouched": 0,
+            "lost_hidden_rgb": 672
+          },
+          "kernel_median_us": 115.544,
+          "blend2d_context_median_us": 3.605,
+          "blend2d_total_median_us": 3287.239,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_replace",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 4096,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 34.933,
+          "blend2d_context_median_us": 10.465,
+          "blend2d_total_median_us": 13219.091,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_replace",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 4096,
+            "untouched": 0,
+            "lost_hidden_rgb": 672
+          },
+          "kernel_median_us": 34.933,
+          "blend2d_context_median_us": 4.096,
+          "blend2d_total_median_us": 3327.8,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "erase",
+          "scope": "full_tile",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2080
+          },
+          "kernel_median_us": 29.775,
+          "blend2d_context_median_us": 8.963,
+          "blend2d_total_median_us": 11692.027,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "erase",
+          "scope": "region_only",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 29.775,
+          "blend2d_context_median_us": 2.394,
+          "blend2d_total_median_us": 2275.733,
+          "trials": 9
+        }
+      ]
+    }
+  ]
+}

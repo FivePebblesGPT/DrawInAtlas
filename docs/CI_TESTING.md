@@ -7,7 +7,203 @@
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
 - T-051–053 isolated Drawing contract, core, standalone consumer and Linux desktop release package.
 - Main project import before GDScript tests: T-015 marker-only authoring and archived-data boundary (13/23), link/history and link form (29/55), overview (67), stale-result (27), hierarchy (44), Organization UI (84) and reference controls (17), all on the modern marker model; T-054 Drawing/Atlas history, T-058 headless text and licensed fonts, T-060 Object Assets, T-062 Object Editor, T-061 world mapping, T-055 Drawing composition, T-066 atomic campaign saves.
+- T-068 targeted *non-push* canonical Bucket fill-to-software-frame witness:
+  `tests/drawing_fill_frame_native.gd` verifies the real Drawing fill and
+  renderer behind a **test-only** GUI release adapter, with signed RGBA8
+  delta/revision checks, framebuffer pixel changes, and rollback on small
+  budgets. Two Xvfb/Mesa runs passed 96 and 95 checks; the optional screenshot
+  and JSON diagnostics are reproduced through manual
+  `.github/workflows/godot-native-t068-fill.yml`. This witness is deliberately
+  **excluded** from fast push/PR CI. It does not measure the production Bucket
+  UI, hardware input, real display scan-out or true peak RSS/VRAM.
+- T-068 optional Cairo CPU format comparator:
+  `tests/test_t068_cairo_cpu.py` (**10** Python tests) exercises an independent
+  straight-RGBA8 oracle, exact opaque-pixel parity, loss of premultiplied
+  transparent hidden RGB, mismatch accounting, and the installed Cairo
+  runtime when available; the runtime tests skip if libcairo is absent from
+  fast CI. The separate **manual-only**
+  `.github/workflows/godot-native-t068-cairo.yml` installs Cairo and runs the
+  complete two-run 32/64/128² comparison, with a machine-readable JSON
+  artifact. It never installs a native dependency in Drawing/Atlas or
+  promotes opaque-only parity to a chosen backend.
+- T-068 optional pinned Blend2D CPU compositor comparator:
+  `tests/test_t068_blend2d_cpu.py` (**12** Python checks, including **7**
+  optional live tests) verifies exact source digest, bounded caller lengths,
+  untouched hidden-RGB preservation for region-only conversion, opaque/clear
+  byte-parity and premultiplied-alpha non-parity. The no-dependency contracts
+  join the existing T-068 fast-CI step; live tests skip without externally
+  supplied Blend2D 0.21.2 build paths. The manual-only
+  `.github/workflows/godot-native-t068-blend2d.yml` downloads the
+  SHA-256-pinned source, builds Blend2D with its bundled AsmJit, and records
+  two 9-trial runs plus raw JSON diagnostics. No library is shipped or loaded
+  into Drawing, and timing boundaries are not considered equivalent.
+- T-068 matched native scalar/Blend2D hard-brush ABI calls:
+  `tests/test_t068_matched_brush.py` replays two source-pinned runs of six 32²
+  and four 512² Godot-authored brush cases without requiring any native
+  dependency on push CI. Exact pixel/mask hashes, missing/extra coverage,
+  backend call orders, trial counts and medians are checked; tampering fails.
+  The manual-only Blend2D workflow builds the pinned source and scalar C++
+  kernel and reruns both against the same buffers in alternating order.
+  This is an isolated Python→C++ call timing, **not** publication, real
+  hardware, Windows or production backend acceptance.
+- T-068 Linux native process-memory screen:
+  `tests/test_t068_native_memory.py` verifies source-pinned, two-run `/proc`
+  `VmRSS`/`VmHWM` evidence for 12 fresh scalar/Blend2D native workers,
+  including complete pinned Godot hard-brush coverage/pixel parity, worker
+  ordering and sample consistency. The offline replay is push-CI safe and
+  requires no native library. The manual-only Blend2D workflow runs the
+  actual Linux process-memory sampling after building both native ABIs.
+  This **does not** measure production editor RAM, device VRAM, Windows,
+  physical latency or a backend speedup.
+- T-068 detached transformed four-corner convex selection comparison:
+  `tests/test_t068_blend2d_quad.py` replays 15 Godot-authored 64² masks
+  for transformed polygonal scope checks and validates the two-run native
+  evidence without a required native dependency. The workflow-dispatch
+  Blend2D job compiles the isolated `t068_blend2d_quad_selection` ABI and
+  checks failure atomicity, mask-to-brush handoff and 30 exact parity comparisons.
+  Exact polygon-edge and vertex ties are covered; near-boundary floating-point tolerance and hardware/release gates remain open.
+- T-068 strict CPU selection kernel compiler matrix:
+  `tests/test_t068_quad_compiler_matrix.py` checks a source-pinned, two-run
+  Godot 48-case oracle under **GCC and Clang `-O0/-O2/-O3`** (576 exact masks)
+  and 42 malformed-input atomic rejection checks. GCC `-Ofast` and Clang
+  `-O3 -ffast-math` builds must fail specifically on the native compile guard:
+  fast-math can elide `std::isfinite` checks, violating failure atomicity.
+  The fast push/PR T-068 contracts and the manual-only bridge workflow both
+  exercise this matrix. This is Linux C++ ABI safety, not native deployment,
+  Windows support, a measured speedup, or physical GPU evidence.
+- T-068 scalar strict-FP build safety: `tests/test_t068_scalar_strict_fp.py`
+  ensures GCC `-Ofast` and Clang `-O3 -ffast-math` **fail compilation**, then
+  verifies six strict GCC/Clang builds reject NaN/Inf widths and pointer
+  samples without changing coverage, RGBA8 or sparse outputs. A documented
+  GCC `-Ofast` failure of the old code motivates the source-local guard.
+  No experimental extension is installed or selected. The scalar and native
+  bridge records were freshly regenerated for the changed source checksum.
+- T-068 detached C++ ASan/UBSan safety screen:
+  `tests/test_t068_native_sanitizer.py` builds two instrumented
+  standalone executables (GCC and Clang `-O1`), each run twice,
+  exercising the four-corner mask and scalar brush coverage,
+  canonical RGBA8 and sparse-delta ABIs. The 1,024 total seeded
+  cases match independently checked mask geometry and exact
+  full/sparse reconstruction; 68 malformed calls reject atomically
+  without redzone corruption. The source-pinned evidence must match
+  all counters/digests, and ASan/UBSan must exit cleanly. It runs
+  in the usual (non-gating legacy) T-068 step and the opt-in native
+  bridge workflow. This does not establish Windows, arbitrary ABI
+  safety, production threading or physical latency.
+- T-068 additional convex polygon scope stress:
+  `tests/test_t068_quad_stress.py` checks a SHA-pinned Godot 4.8b2
+  96-case convex scope oracle against the detached C++ selection ABI under
+  GCC `-O2` and Clang `-O3`. Both profiles run twice (**384 masks**),
+  and evidence tampering or invalid native output fails the normal push-CI
+  job. `T068_QUAD_GODOT=godot` regenerates the independent fixture byte-for-byte.
+  The experiment is not loaded by either app and does not imply Windows,
+  GPU, or release acceptance.
+- T-068 native Atlas four-corner scope through the *temporary* Godot bridge:
+  `tests/test_t068_quad_gdextension.py` pins two 55-check Godot 4.8b2
+  runs against 15 real `AtlasFill._allows_pixel` full masks, tests the
+  checked C++ scope ABI and rejects tampered mask, sparse and RGBA8 evidence.
+  The standard CI uses the no-Godot contract and native C++ unit checks; the
+  full `build_quad_selection()` + `apply_scalar_brush_sparse()` integration
+  remains manual-only in `godot-native-t068-bridge.yml`. It neither loads
+  the extension at application startup nor establishes native backend,
+  physical GPU, Windows or release acceptance.
+- T-068 native Atlas four-corner **document publication**:
+  `tests/test_t068_quad_publication.py` checks pinned two-run,
+  **153-assertion-per-run** Godot evidence for 15 exact native selection masks,
+  ordered sparse records, before pixels, canonical straight-RGBA8,
+  revision/history increments, Undo/Redo and `NO_CHANGE` without publication.
+  The Python replay reconstructs every expected final pixel from the
+  independent Godot-authored mask fixture and rejects malformed source,
+  output, history, revisions and evidence counts. Fast CI checks evidence
+  without a native extension; the explicit `--quad-publication-only --runs 2`
+  bridge mode runs in the manual-only native CI job. The temporary extension
+  does not prove deployed Atlas UI behavior or physical GPU performance.
+- T-068 counterbalanced **software-only** frame-load witness:
+  `tests/test_t068_visual_counterbalanced.py` replays the source-pinned
+  four-session ABBA `idle/loaded/loaded/idle` experiment. It checks raw
+  timing/median/p95 pairs, two loaded-minus-idle contrasts per workload,
+  activity of both CPU workers, identical software GPU identity and
+  whole-Godot-process RSS/HWM. The Xvfb run is opt-in through
+  `godot-native-t068-bridge.yml`; fast CI only replays evidence. Four fresh
+  Godot processes pass 324 checks. Run order is counterbalanced but not
+  randomized; no physical input-to-photon, Windows or VRAM gate is satisfied.
+- T-068 opt-in **software-only** frame-jitter/CPU-load diagnostic:
+  `tests/test_t068_visual_contention.py` replays two source-pinned 25-gesture
+  Godot 4.8b2 X11 sessions (idle and with a separate CPU-busy subprocess),
+  checks the recorded `/proc` worker CPU ticks, raw frame/dispatch statistics,
+  llvmpipe adapter, canonical framebuffer checks and process RSS/HWM.
+  Replay is fast-CI safe; the real two-process Xvfb run is only in the
+  workflow-dispatch bridge job. Sequential nonrandomized phases and five
+  samples per case do **not** establish load causation, stable p95, physical
+  input-to-photon, GPU VRAM, or Windows/production backend acceptance.
+- T-068 visual/X11 process-memory diagnostic:
+  `tests/test_t068_visual_device.py` replays a **source-pinned Xvfb/llvmpipe**
+  25-trial Godot input-to-`frame_post_draw` witness and independently validates
+  raw timing medians/p95, process RSS/HWM samples, Godot 4.8 beta2 identity,
+  and rejection of false hardware/VRAM claims. Fast CI never starts an X11
+  window for this test; an opt-in `godot-native-t068-bridge.yml` step starts a
+  separate software-GL Godot process and publishes fresh JSON diagnostics.
+  Physical hardware runs require `--profile hardware` and a non-software
+  `glxinfo`/Godot adapter. Synthetic input does not measure OS-to-photon latency.
+- T-068 native scalar sparse publication **cancellation/conflict**:
+  `tests/test_t068_scalar_atomicity.py` checks source-pinned two-run
+  37-assertion Godot evidence and independently reconstructs canonical
+  RGBA8 for four cancel/stale-before/stale-during/forged-original cases.
+  Tampered raw evidence fails closed in fast CI without loading a native
+  extension. The real 4-case `--atomic-only --runs 2` GDExtension test is
+  opt-in under `godot-native-t068-bridge.yml`. This proves deterministic
+  `DrawingDocument` publication rejection in a test project, not thread
+  safety of the production app or a performance result.
+- T-068 temporary Godot↔native transformed sparse brush comparison:
+  `tests/test_t068_scalar_transform.py` verifies source-pinned, two-run
+  110-check native GDExtension evidence for transformed view-space strokes,
+  sparse/inverted binary selections, erasure, RGBA8, and revision-checked
+  Undo/Redo. Its fast-CI tests require no extension. Real Godot native calls
+  run only through `godot-native-t068-bridge.yml` (`workflow_dispatch`),
+  not push/PR CI. This is client-inverted geometry and a caller-generated
+  mask, **not** Atlas four-corner scope or physical GPU testing.
+- T-068 detached scalar C++17 hard-brush compositing:
+  `tests/test_t068_scalar_hard_brush.py` and `tests/test_t068_scalar_rgba8.py`
+  compile the dependency-free, non-shipping scalar research ABI. The latter
+  replays two runs of 28 pinned cases with exact coverage and straight-RGBA8
+  parity, verifies small-case real Godot output and large-case independent
+  patterned-source compositing, and tests fail-closed buffer aliases,
+  malformed inputs and error atomicity. It is included in the existing T-068
+  fast CI step without introducing any native runtime dependency or claiming
+  physical performance or publication acceptance.
+- T-068 verified cached flood-fill sources:
+  `tests/drawing_fill_tile_cache_smoke.gd` (**30** fast-CI assertions) checks
+  four-connected fills on verified lazy Object tiles as well as resident
+  chunks, exact alpha-zero hidden RGB, missing/corrupt provider retry,
+  selected pixels, budget rollback and far signed coordinates. The source
+  cache is gesture-local; no tile is published before revision validation.
+  Before/after fill CPU samples are diagnostic only and not CI gating;
+  Windows/Linux hardware performance and native backend comparisons remain
+  open under T-068.
+- T-068 verified-source fill staging:
+  `tests/drawing_fill_verified_stage_smoke.gd` (**29** headless assertions)
+  verifies that fill reuses already validated immutable source RGBA8 when
+  staging, without rereading each matched source pixel, while ordinary edits,
+  rollback, exact hidden RGB, far signed tile seams, Undo/Redo and stale
+  publication preserve prior behavior. The witness runs in the existing
+  T-068 fast-CI step; software framebuffer stress remains targeted only.
+- T-068 bounded flood-fill frontier:
+  `tests/drawing_fill_frontier_smoke.gd` (**56** fast-CI assertions) checks
+  unique-candidate work budgets, atomic rollback/retry, transparent hidden-RGB
+  undo, masks, negative coordinates, and deterministic independent four-neighbor
+  grid-oracle parity. It is added to the existing T-068 job step; its 32²–96²
+  five-sample CPU timing pairs are diagnostic, **not** a gating performance
+  target or physical end-to-end benchmark.
 - T-068 safe stationary round-dab CPU shortcut: `tests/drawing_dab_geometry_smoke.gd` compares its pixels against the **original** Godot `Geometry2D` segment oracle at fractional/negative positions, tile seams and 64-bit signed anchors, including undo/redo, no-op alpha and hidden RGB (125 assertions). The large raster benchmark and 25-gesture native stress run are **targeted**, not push-gating.
+- T-068 bounded axis-aligned swept hard-brush shortcut:
+  `tests/drawing_axis_sweep_smoke.gd` (**239** assertions) compares precise
+  touched-pixel dictionaries, RGBA8 values, masks, once-per-gesture coverage,
+  undo/redo and 320 seeded axis geometry cases against independent Godot
+  `Geometry2D` closest-segment results. It runs in the existing T-068 fast-CI
+  step, not a new native test or CI job. The seven-sample headless
+  `drawing_axis_sweep_benchmark.gd` is **diagnostic only**, not a push gate or
+  physical input-to-visible timing claim.
+
 - T-073 feature inventory and T-063 workspace documentation assertions.
 - T-065 partial portable Object source discovery, identity/path/hash safety, search and real dock/Object Editor tab coupling (`drawing/tests/asset_browser_smoke.gd`, 37 checks). Bounded source thumbnails (`drawing/tests/asset_browser_thumbnails_smoke.gd`, 62 checks) are generated from canonical Drawing pixels, requested only for visible rows, and cached in a 24-image digest-keyed LRU. Changed/source-replaced files invalidate previews after successful publication or explicit Refresh; stale bytes fail closed. Explicit standalone portable `*.drawing` Import/Export file copies
   (`drawing/tests/asset_browser_transfer_smoke.gd`, 29 checks) reject stable-ID
@@ -240,3 +436,219 @@ python3 tools/validate_ticket_store.py
 ```
 
 This is **reduced-scope CI**, not a full release sign-off. In particular, do not infer T-014/019/022/024/025/026 or native UI acceptance from a green run.
+
+
+## T-068 extended native Bucket-adapter profiling (on demand, 2026-11-03)
+
+The manual-only `.github/workflows/godot-native-t068-fill.yml` executes
+`tools/benchmarks/t068_fill_process_profile.py` in two isolated 21-trial
+Godot 4.8 beta 2 Xvfb/Mesa processes. It requires successful source/pixel/
+framebuffer/cancellation checks and writes per-run JSON, PNG, logs and an
+aggregate Linux `/proc/PID/status` RSS/VmHWM report. It checks the executable
+path to avoid sampling the `xvfb-run` shell. The five deterministic Python
+unit tests in `tests/test_t068_fill_process_profile.py` run in the existing
+fast-CI T-068 step; **the native runner itself is not push/PR-gating**. This
+is a synthetic `DrawingEditSession` input adapter, not the real Bucket GUI,
+physical display latency, per-gesture memory or GPU VRAM.
+
+
+### T-068 isolated native thread-safety witness (2026-11-03)
+
+The existing fast T-068 step runs
+`python3 -m unittest discover -s tests -p test_t068_native_thread_jitter.py`
+(two tests). The compiler-backed contract checks 1/2/4 worker output parity
+across both native prototype APIs. The full 101-call contention benchmark is
+**not** a push/PR gate; run
+`python3 tools/benchmarks/t068_native_thread_jitter.py --trials 101`
+when diagnostic evidence is needed. This is standalone host CPU C++ and does
+not run Godot framebuffer or a GDExtension. See T-068 and its raw evidence.
+
+
+### T-068 opt-in checked native buffer contract (2026-11-03)
+
+The existing fast T-068 CI step now also runs
+`python3 -m unittest discover -s tests -p test_t068_checked_abi.py`.
+Six tests compile the **isolated**, not-shipped native CPU kernel and compare
+new length-checked calls against ABI-1 output for 160 deterministic RGBA8
+cases. They also check short/null buffers, partial alias rejection, sentinel
+canaries and atomic failures. This requires only a host C++17 compiler; it
+adds **no** Godot native framebuffer check to fast push CI and does not
+endorse the prototype as the Drawing runtime.
+
+
+### T-068 temporary GDExtension integration boundary (2026-11-03)
+
+The on-demand `godot-native-t068-bridge.yml` additionally executes the
+**128-check atomic multi-tile DrawingDocument witness**, after the checked
+native, GL publication and single-tile document checks. The adapter limits
+work to 16 unique tiles and 1,048,576 staged pixels; the test exercises
+second-tile failures, a concurrent revision change, 64-bit signed bounds and
+one-step undo/redo. This is a temporary test project and is **not** an
+additional push/PR framebuffer step. The fast runner contracts reject a
+missing/failed multi-tile success marker. See T-068 and its raw JSON.
+
+
+`tests/test_t068_bridge_runner.py` runs **11 fast, non-native** harness
+contracts in the existing T-068 push/PR step. It checks fail-closed subprocess
+handling, evidence markers, source locations and the absence of a checked-in
+`.gdextension` descriptor. It does **not** load a native Godot extension.
+
+The **workflow-dispatch-only** `.github/workflows/godot-native-t068-bridge.yml`
+compiles the extension from source with g++ and the `gdextension_interface.h`
+generated by Godot **4.8 beta 2**. Its two temporary-project Godot runtime
+runs each require **443 passing pixel/argument checks**, then an Xvfb/Mesa
+software-GL run requires **370 revision/publication/texture checks**, and a
+separate headless run requires **219 canonical DrawingDocument transaction/
+history checks**, and a final headless run requires **128 multi-tile
+atomic-publication checks**. The independent texture adapter verifies reentrant source
+conflicts, exact dirty rectangles and full `ImageTexture.update()` readback.
+The new adapter copies only the canonical Drawing core scripts into the
+temporary project, stages the native result via `DrawingEditSession.apply_region()`
+and commits through the real `DrawingDocument` transaction; this is not
+production backend adoption or a partial GPU upload. The workflow explicitly installs Xvfb/Mesa and
+produces JSON benchmark evidence. It deliberately does not run in push/PR CI, does not
+install a native binary in either app, and does not imply editor-load or
+physical-device acceptance. See [T-068](Tickets/T-068.md).
+
+
+### T-068 isolated sparse-delta GDExtension witness (2026-11-04)
+
+The workflow-dispatch-only `godot-native-t068-bridge.yml` also runs a checked
+sparse-native-output / atomic canonical-document witness after the existing
+whole-tile integration checks. It compares exact RGBA8, dirty regions and
+Undo/Redo, rejects malformed/forged native pixel records and invalid masks,
+and records **five alternate-order full-vs-sparse synthetic staging samples**
+for each 32/64/128 tile size. `tests/test_t068_bridge_runner.py` adds
+non-native contract checks to the **existing** push-CI T-068 step; the native
+binary, framebuffer tests and benchmark stay outside fast push/PR CI. No
+`.gdextension` is installed in the shipping projects. A returned dirty
+rectangle does not imply GPU subrectangle upload, and these samples are
+not physical or production UI latency measurements. T-068 remains In Progress.
+
+
+### T-068 complete sparse-output validation (2026-11-04)
+
+The existing **non-native** fast-CI runner contract asserts that the isolated
+sparse adapter computes the full expected change set from verified source
+bytes and fails if a native response omits any required pixel. A valid no-op
+remains representable by a four-byte zero count. The existing **on-demand**
+`godot-native-t068-bridge.yml` requires at least **173 sparse test checks** per
+run, including forged empty/partial payloads and an incomplete second tile.
+The optional extension is not loaded in the main application or fast push CI;
+this does not imply third-party native backend adoption or hardware acceptance.
+
+
+### T-068 detached scalar hard-brush parity (2026-11-04)
+
+The existing fast-CI T-068 step compiles the **self-contained C++17 scalar
+coverage comparator** and executes `tests/test_t068_scalar_hard_brush.py`.
+Five tests validate 56 exact coverage comparisons across two independent
+runs against pinned real Godot oracles, plus randomized distance cases,
+invalid-buffer failure atomicity, and evidence replay. This work introduces
+no external library download or new workflow job. It is a research-only
+geometry witness, not a shipped Godot module or native UI/GPU acceptance.
+
+
+### T-068 checked scalar sparse hard-brush wire (2026-11-04)
+
+The existing fast-CI T-068 step additionally compiles the detached C++17
+scalar brush and runs `tests/test_t068_scalar_deltas.py` (six tests). It
+compares 56 changed-pixel wire streams against 16 genuine Godot pixel and
+12 Godot-coverage/independent-pixel fixtures; validates sorted unique records,
+source-before bytes and full RGBA8 reconstruction, buffer-capacity/alias
+atomicity, malicious wire rejection and two-run evidence regeneration.
+The native result is **not** wired into the application: no Godot publication,
+texture update, physical-device latency or memory result is claimed.
+[Raw evidence](benchmarks/T068_2026-11-04_scalar_deltas.json).
+
+
+### T-068 optional scalar brush GDExtension integration (2026-11-04)
+
+The existing **on-demand** `godot-native-t068-bridge.yml` additionally links
+`tools/benchmarks/t068_scalar_hard_brush.cpp` into its temporary native
+library and executes `t068_scalar_sparse_smoke.gd`. Each real Godot 4.8
+beta 2 run requires **31 passing scalar checks** and a fail-closed JSON
+witness (63 changed records on a canonical 16² test stroke). The suite checks
+Godot `DrawingEditSession.paint_path()` output before publishing sparse
+records in a revision-checked document edit, then checks exact Undo/Redo,
+hidden RGB, mask, erase, no-op and malformed capacity rejection. A missing,
+truncated or contradictory marker fails the runner. Two-run source-pinned
+[evidence](benchmarks/T068_2026-11-04_scalar_gdextension.json) is committed.
+
+The existing fast push/PR CI step runs
+`python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py`
+without loading a `.gdextension`. This boundary **is not enabled in either
+app**, has no physical-device GPU proof and does not certify portable native
+shipping or a measured speedup. T-068 stays In Progress.
+
+
+### T-068 counterbalanced native sparse brush/document publication (2026-11-04)
+
+The on-demand `godot-native-t068-bridge.yml` runs the isolated
+`t068_scalar_publication_profile.gd` under Godot 4.8b2, with six matched
+32²/128²/256² 4px short/crossing workloads, two fresh-document warmups and
+**six timed pairs in alternating execution order** (three per order), in
+each of two independent runs. Complete canonical and native pixels, native
+wire originals, one revision and Undo/Redo must match outside the measured
+phases. One complete trusted Godot oracle is precomputed per workload, and
+verified native bytes may only be staged after matching it. Full runs require **536 publication checks**; missing Godot markers
+or error diagnostics fail the command.
+
+Fast push CI runs `tests/test_t068_scalar_publication.py` without a native
+binary. It validates source/profile digests, the pinned schema-v2 evidence,
+all six raw paired samples per workload, counterbalanced order, exact paired
+totals, and independently recomputed min/median/max. Tampered measurements,
+missing trials and fake distributions fail closed. This is CPU-only
+research; the test cannot establish physical input-to-present latency or
+portable native release eligibility. No extension is loaded in the apps.
+
+
+### T-068 isolated 512/1024/2048 native brush publication (2026-11-04)
+
+A distinct `--large-only` `t068_bridge/run_bridge.py` mode builds a temporary
+Godot 4.8b2/Linux GDExtension and runs
+`t068_scalar_large_publication.gd`: one horizontal 4px stroke per full-size
+storage tile, four alternating-order timed pairs plus a warmup, and exact
+canonical whole-tile source, native wire, published pixels and Undo/Redo.
+The two independent pinned runs each pass **146 checks**; oversized
+`max_changes > 65536` and insufficient-capacity native requests must reject.
+Fast push CI runs `test_t068_scalar_large_publication.py` without building or
+loading the extension; the manual `godot-native-t068-bridge.yml` additionally
+runs the two-run live check in a **separate opt-in build** and uploads JSON.
+It remains a headless CPU-only comparison, not Windows/Linux physical
+input-to-visible p95, hardware RAM/VRAM, application backend acceptance, or
+a deployable native export. The 1024²/2048² matched native timings are slower
+than canonical Godot in both pinned runs.
+
+
+### T-068 native/Godot near-edge quad differential (2026-11-04)
+
+Fast push CI runs `T068_QUAD_GODOT=godot python3 -m unittest discover -s
+ tests -p test_t068_quad_differential.py`. This first regenerates the
+independent Godot-authoritative 48-case four-corner scope oracle (exact
+serialized mask bytes must match), then compiles the detached C++17 native
+mask source with the host compiler. It validates **two reproducible runs with exact 48/48 mask parity** and
+rejects evidence corruption, source changes, malformed buffers and lost
+counterexample provenance. The original strict-double kernel's **247 omitted
+pixels across 16 cases** remain in a separately hashed historical record.
+The Godot 4.8b2-compatible native float32 segment/approximate-edge policy
+is a constrained research result, not proof across precision modes,
+compilers, large coordinates or arbitrary convex boundaries. The application
+remains on canonical Godot masking; no extension is loaded or accepted.
+Physical input-to-visible, memory and release gates remain open.
+
+### T-068 portable Drawing release isolation gate (2026-11-04)
+
+Fast CI's existing T-053 standalone Linux export now additionally invokes
+`python3 tools/benchmarks/t068_release_gate.py --stage /tmp/drawing-dist/project
+--linux /tmp/drawing-dist --launch-linux --output /tmp/t068-standalone-linux-release.json`.
+The validator checks the separately exported x86_64 ELF and `Drawing.pck`,
+forbids unapproved native extension/shipped-library sidecars, and launches the
+binary from a fresh working directory with isolated HOME/XDG paths. It rejects
+missing PCK, wrong executable architecture, nonzero exit, and Godot script
+errors; separate four-test offline contracts run in the T-068 fast step.
+Release templates are required for CI's actual export. On a host without them,
+only the offline tests/stage checks can run: no release acceptance may be
+inferred. Windows artifacts may be structurally checked with `--windows`, but
+must also be launched on Windows; physical GPU and release acceptance remain
+open under T-068.
