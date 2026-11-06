@@ -1,0 +1,553 @@
+{
+  "ticket": "T-068",
+  "runs": [
+    {
+      "ticket": "T-068",
+      "date": "2026-11-04",
+      "comparison": "optional Cairo CPU image-surface screening against checked C++ kernel and canonical RGBA8",
+      "cairo_version": "1.18.4",
+      "cairo_library": "libcairo.so.2",
+      "checked_cpp_kernel": "tools/benchmarks/t068_raster_kernel.cpp (built locally with -O2)",
+      "platform": {
+        "byteorder": "little",
+        "os": "linux"
+      },
+      "method": "hard-edged half-tile rectangle, fully detached output; source to premultiplied ARGB32 and back for Cairo",
+      "limitations": [
+        "Cairo is an optional comparator, not the required Blend2D or Skia backend",
+        "Cairo ARGB32 is premultiplied and cannot preserve arbitrary hidden RGB through round-trip conversion",
+        "The checked C++ call excludes coordinate/input setup; Cairo draw-only excludes pixel conversions; total timings include Cairo conversion and Python loops",
+        "No claim of equivalent native input semantics, multi-layer composition, GPU upload, production latency, or hardware performance",
+        "No third-party source or binary is bundled, downloaded, or installed in Drawing/Atlas"
+      ],
+      "measurements": [
+        {
+          "side": 32,
+          "operation": "opaque_replace",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 9.114,
+          "cairo_draw_median_us": 4.647,
+          "cairo_total_median_us": 1241.454,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_over",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 14.041,
+          "cairo_draw_median_us": 4.867,
+          "cairo_total_median_us": 1309.055,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "transparent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 165,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 7.972,
+          "cairo_draw_median_us": 2.805,
+          "cairo_total_median_us": 1044.977,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 240,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 13.991,
+          "cairo_draw_median_us": 6.009,
+          "cairo_total_median_us": 1042.854,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_replace",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 256,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 8.263,
+          "cairo_draw_median_us": 4.918,
+          "cairo_total_median_us": 1106.991,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "erase",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 510,
+            "lost_hidden_rgb": 136
+          },
+          "kernel_median_us": 8.663,
+          "cairo_draw_median_us": 4.767,
+          "cairo_total_median_us": 1160.832,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_replace",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 17.316,
+          "cairo_draw_median_us": 6.91,
+          "cairo_total_median_us": 4392.51,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_over",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 37.787,
+          "cairo_draw_median_us": 6.119,
+          "cairo_total_median_us": 4369.895,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "transparent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 654,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 12.98,
+          "cairo_draw_median_us": 3.235,
+          "cairo_total_median_us": 3608.807,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 970,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 40.972,
+          "cairo_draw_median_us": 11.507,
+          "cairo_total_median_us": 3974.929,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_replace",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 1024,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 15.974,
+          "cairo_draw_median_us": 6.86,
+          "cairo_total_median_us": 3567.855,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "erase",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 2025,
+            "lost_hidden_rgb": 544
+          },
+          "kernel_median_us": 15.303,
+          "cairo_draw_median_us": 6.48,
+          "cairo_total_median_us": 3077.965,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_replace",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 41.362,
+          "cairo_draw_median_us": 10.426,
+          "cairo_total_median_us": 13729.841,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_over",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 127.062,
+          "cairo_draw_median_us": 12.518,
+          "cairo_total_median_us": 14134.321,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "transparent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2640,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 41.052,
+          "cairo_draw_median_us": 7.121,
+          "cairo_total_median_us": 17339.909,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 3864,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 149.766,
+          "cairo_draw_median_us": 20.752,
+          "cairo_total_median_us": 18761.544,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_replace",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 4096,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 42.334,
+          "cairo_draw_median_us": 14.341,
+          "cairo_total_median_us": 15869.649,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "erase",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2080
+          },
+          "kernel_median_us": 36.294,
+          "cairo_draw_median_us": 10.286,
+          "cairo_total_median_us": 12184.789,
+          "trials": 9
+        }
+      ]
+    },
+    {
+      "ticket": "T-068",
+      "date": "2026-11-04",
+      "comparison": "optional Cairo CPU image-surface screening against checked C++ kernel and canonical RGBA8",
+      "cairo_version": "1.18.4",
+      "cairo_library": "libcairo.so.2",
+      "checked_cpp_kernel": "tools/benchmarks/t068_raster_kernel.cpp (built locally with -O2)",
+      "platform": {
+        "byteorder": "little",
+        "os": "linux"
+      },
+      "method": "hard-edged half-tile rectangle, fully detached output; source to premultiplied ARGB32 and back for Cairo",
+      "limitations": [
+        "Cairo is an optional comparator, not the required Blend2D or Skia backend",
+        "Cairo ARGB32 is premultiplied and cannot preserve arbitrary hidden RGB through round-trip conversion",
+        "The checked C++ call excludes coordinate/input setup; Cairo draw-only excludes pixel conversions; total timings include Cairo conversion and Python loops",
+        "No claim of equivalent native input semantics, multi-layer composition, GPU upload, production latency, or hardware performance",
+        "No third-party source or binary is bundled, downloaded, or installed in Drawing/Atlas"
+      ],
+      "measurements": [
+        {
+          "side": 32,
+          "operation": "opaque_replace",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 6.73,
+          "cairo_draw_median_us": 4.507,
+          "cairo_total_median_us": 991.497,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "opaque_over",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 12.879,
+          "cairo_draw_median_us": 3.866,
+          "cairo_total_median_us": 940.569,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "transparent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 165,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 6.64,
+          "cairo_draw_median_us": 2.704,
+          "cairo_total_median_us": 930.113,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 240,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 12.448,
+          "cairo_draw_median_us": 4.888,
+          "cairo_total_median_us": 893.198,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "translucent_replace",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 256,
+            "untouched": 510,
+            "lost_hidden_rgb": 176
+          },
+          "kernel_median_us": 6.861,
+          "cairo_draw_median_us": 4.006,
+          "cairo_total_median_us": 848.14,
+          "trials": 9
+        },
+        {
+          "side": 32,
+          "operation": "erase",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 510,
+            "lost_hidden_rgb": 136
+          },
+          "kernel_median_us": 6.53,
+          "cairo_draw_median_us": 3.516,
+          "cairo_total_median_us": 868.711,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_replace",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 12.72,
+          "cairo_draw_median_us": 5.158,
+          "cairo_total_median_us": 3565.962,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "opaque_over",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 34.993,
+          "cairo_draw_median_us": 5.138,
+          "cairo_total_median_us": 3557.178,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "transparent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 654,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 12.368,
+          "cairo_draw_median_us": 2.945,
+          "cairo_total_median_us": 3499.141,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 970,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 35.664,
+          "cairo_draw_median_us": 6.82,
+          "cairo_total_median_us": 3486.291,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "translucent_replace",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 1024,
+            "untouched": 2025,
+            "lost_hidden_rgb": 704
+          },
+          "kernel_median_us": 13.16,
+          "cairo_draw_median_us": 5.458,
+          "cairo_total_median_us": 3362.965,
+          "trials": 9
+        },
+        {
+          "side": 64,
+          "operation": "erase",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 2025,
+            "lost_hidden_rgb": 544
+          },
+          "kernel_median_us": 14.732,
+          "cairo_draw_median_us": 5.028,
+          "cairo_total_median_us": 3436.386,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_replace",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 38.498,
+          "cairo_draw_median_us": 11.307,
+          "cairo_total_median_us": 15072.697,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "opaque_over",
+          "source_is_opaque": true,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 0,
+            "lost_hidden_rgb": 0
+          },
+          "kernel_median_us": 129.235,
+          "cairo_draw_median_us": 14.351,
+          "cairo_total_median_us": 14823.061,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "transparent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 2640,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 35.584,
+          "cairo_draw_median_us": 5.788,
+          "cairo_total_median_us": 13935.6,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_over",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 3864,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 127.443,
+          "cairo_draw_median_us": 16.925,
+          "cairo_total_median_us": 14120.931,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "translucent_replace",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 4096,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2752
+          },
+          "kernel_median_us": 40.321,
+          "cairo_draw_median_us": 12.589,
+          "cairo_total_median_us": 14422.365,
+          "trials": 9
+        },
+        {
+          "side": 128,
+          "operation": "erase",
+          "source_is_opaque": false,
+          "pixel_mismatches": {
+            "touched": 0,
+            "untouched": 8009,
+            "lost_hidden_rgb": 2080
+          },
+          "kernel_median_us": 37.146,
+          "cairo_draw_median_us": 8.753,
+          "cairo_total_median_us": 13233.623,
+          "trials": 9
+        }
+      ]
+    }
+  ]
+}

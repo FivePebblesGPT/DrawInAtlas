@@ -1,0 +1,169 @@
+{
+  "ticket": "T-068",
+  "date": "2026-11-03",
+  "engine": "4.8.beta2.official.cafc17a19",
+  "base_commit": "f88734a4c0379111c80bf48e6d9853ffa05e460a",
+  "workload": "single-session 4-connected fill and synchronous commit, after identical initial region publication",
+  "methodology": "two ordered runs per variant; five samples per size and run; source/seed allocation excluded; no GPU, hardware presentation, warmup normalization, or confidence intervals",
+  "baseline": [
+    [
+      {
+        "median_ms": 12.766,
+        "pixels": 1024,
+        "samples_ms": [
+          12.686,
+          12.743,
+          12.766,
+          13.566,
+          13.984
+        ],
+        "size": 32
+      },
+      {
+        "median_ms": 53.491,
+        "pixels": 4096,
+        "samples_ms": [
+          50.968,
+          52.606,
+          53.491,
+          60.044,
+          61.731
+        ],
+        "size": 64
+      },
+      {
+        "median_ms": 140.005,
+        "pixels": 9216,
+        "samples_ms": [
+          137.836,
+          139.052,
+          140.005,
+          145.859,
+          198.339
+        ],
+        "size": 96
+      }
+    ],
+    [
+      {
+        "median_ms": 13.601,
+        "pixels": 1024,
+        "samples_ms": [
+          13.2,
+          13.268,
+          13.601,
+          13.98,
+          15.632
+        ],
+        "size": 32
+      },
+      {
+        "median_ms": 57.204,
+        "pixels": 4096,
+        "samples_ms": [
+          53.768,
+          56.368,
+          57.204,
+          63.485,
+          79.481
+        ],
+        "size": 64
+      },
+      {
+        "median_ms": 142.046,
+        "pixels": 9216,
+        "samples_ms": [
+          135.576,
+          140.847,
+          142.046,
+          147.532,
+          153.775
+        ],
+        "size": 96
+      }
+    ]
+  ],
+  "unique_frontier": [
+    [
+      {
+        "median_ms": 13.225,
+        "pixels": 1024,
+        "samples_ms": [
+          12.324,
+          12.987,
+          13.225,
+          14.366,
+          14.707
+        ],
+        "size": 32
+      },
+      {
+        "median_ms": 56.587,
+        "pixels": 4096,
+        "samples_ms": [
+          52.414,
+          56.14,
+          56.587,
+          61.849,
+          69.227
+        ],
+        "size": 64
+      },
+      {
+        "median_ms": 134.218,
+        "pixels": 9216,
+        "samples_ms": [
+          124.189,
+          127.417,
+          134.218,
+          136.637,
+          153.844
+        ],
+        "size": 96
+      }
+    ],
+    [
+      {
+        "median_ms": 19.539,
+        "pixels": 1024,
+        "samples_ms": [
+          18.866,
+          19.43,
+          19.539,
+          20.074,
+          21.962
+        ],
+        "size": 32
+      },
+      {
+        "median_ms": 55.861,
+        "pixels": 4096,
+        "samples_ms": [
+          53.248,
+          55.638,
+          55.861,
+          56.504,
+          56.728
+        ],
+        "size": 64
+      },
+      {
+        "median_ms": 130.686,
+        "pixels": 9216,
+        "samples_ms": [
+          125.476,
+          130.152,
+          130.686,
+          159.258,
+          188.989
+        ],
+        "size": 96
+      }
+    ]
+  ],
+  "caveats": [
+    "non-randomized order",
+    "software headless CPU only",
+    "medians mixed: no proven stable speedup"
+  ]
+}

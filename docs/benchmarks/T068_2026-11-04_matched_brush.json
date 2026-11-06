@@ -1,0 +1,1315 @@
+{
+  "blend2d_archive_sha256": "234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa",
+  "cases": [
+    "small/stationary_dab",
+    "small/horizontal_fractional",
+    "small/diagonal",
+    "small/self_crossing",
+    "small/erase_hidden_rgb",
+    "small/zero_alpha_noop",
+    "large/hard4_long",
+    "large/round256",
+    "large/cross64_sparse_erase",
+    "large/transparent_noop"
+  ],
+  "limitations": [
+    "Headless Linux CPU-call timing; no Godot document or GPU presentation",
+    "Small sample; no p95, confidence interval, Windows, or hardware claims",
+    "Blend2D uses 50%-A8 threshold and can disagree with Godot hard geometry",
+    "Both ABIs receive prepared identical data, but internal allocation differs"
+  ],
+  "runs": [
+    [
+      {
+        "call_ns": {
+          "blend2d": [
+            22994,
+            10386,
+            11728,
+            10336,
+            11988
+          ],
+          "scalar": [
+            25208,
+            13280,
+            10265,
+            13290,
+            10055
+          ]
+        },
+        "godot_coverage": 16,
+        "godot_pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed",
+        "id": "small/stationary_dab",
+        "median_ns": {
+          "blend2d": 11728,
+          "scalar": 13280
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "58e3b928e0f2e7ba353d79bf946e9c5ee3dd6c8d4c9b7da47e9420055994ee8e",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed"
+          },
+          "scalar": {
+            "coverage_sha256": "58e3b928e0f2e7ba353d79bf946e9c5ee3dd6c8d4c9b7da47e9420055994ee8e",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            13430,
+            9995,
+            13991,
+            17556,
+            12700
+          ],
+          "scalar": [
+            19019,
+            18588,
+            17456,
+            19439,
+            17376
+          ]
+        },
+        "godot_coverage": 131,
+        "godot_pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646",
+        "id": "small/horizontal_fractional",
+        "median_ns": {
+          "blend2d": 13430,
+          "scalar": 18588
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "31fd68144229033593ebda45a2c56c5956914e10a52ecc2ffef81c55ba751a05",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646"
+          },
+          "scalar": {
+            "coverage_sha256": "31fd68144229033593ebda45a2c56c5956914e10a52ecc2ffef81c55ba751a05",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            13781,
+            11488,
+            16435,
+            13190,
+            11978
+          ],
+          "scalar": [
+            20691,
+            23305,
+            18858,
+            19099,
+            18619
+          ]
+        },
+        "godot_coverage": 134,
+        "godot_pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624",
+        "id": "small/diagonal",
+        "median_ns": {
+          "blend2d": 13190,
+          "scalar": 19099
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624"
+          },
+          "scalar": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            34612,
+            21623,
+            34953,
+            30416,
+            29905
+          ],
+          "scalar": [
+            38028,
+            43656,
+            36816,
+            39700,
+            58308
+          ]
+        },
+        "godot_coverage": 301,
+        "godot_pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4",
+        "id": "small/self_crossing",
+        "median_ns": {
+          "blend2d": 30416,
+          "scalar": 39700
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4"
+          },
+          "scalar": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            16785,
+            14842,
+            13320,
+            9914,
+            8533
+          ],
+          "scalar": [
+            20371,
+            18858,
+            16184,
+            16686,
+            15613
+          ]
+        },
+        "godot_coverage": 134,
+        "godot_pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df",
+        "id": "small/erase_hidden_rgb",
+        "median_ns": {
+          "blend2d": 13320,
+          "scalar": 16686
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df"
+          },
+          "scalar": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            15694,
+            14352,
+            10826,
+            9785,
+            13030
+          ],
+          "scalar": [
+            28774,
+            26790,
+            25098,
+            26099,
+            27110
+          ]
+        },
+        "godot_coverage": 301,
+        "godot_pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790",
+        "id": "small/zero_alpha_noop",
+        "median_ns": {
+          "blend2d": 13030,
+          "scalar": 26790
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790"
+          },
+          "scalar": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            568277,
+            607116,
+            600086,
+            690772,
+            798044
+          ],
+          "scalar": [
+            778484,
+            976373,
+            782641,
+            781809,
+            948051
+          ]
+        },
+        "godot_coverage": 460,
+        "godot_pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7",
+        "id": "large/hard4_long",
+        "median_ns": {
+          "blend2d": 607116,
+          "scalar": 782641
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "c2df8098ab1a82e79d939ca17136aadc6084d8d7bc18a880b58d880d7052af93",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7"
+          },
+          "scalar": {
+            "coverage_sha256": "c2df8098ab1a82e79d939ca17136aadc6084d8d7bc18a880b58d880d7052af93",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7"
+          }
+        },
+        "side": 512
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            1778002,
+            1895819,
+            2139547,
+            1812895,
+            2060789
+          ],
+          "scalar": [
+            2355253,
+            2246929,
+            2384646,
+            2365448,
+            3401872
+          ]
+        },
+        "godot_coverage": 51468,
+        "godot_pixels_sha256": "ca474d005897b175d67d896c4979e2d9e7396103ef5e2a6995f543968bb0d079",
+        "id": "large/round256",
+        "median_ns": {
+          "blend2d": 1895819,
+          "scalar": 2365448
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "fa0bfd3368a5695533e08cae0881e811b0b8747c462a470e49a409639c621c52",
+            "extra": 0,
+            "missing": 36,
+            "pixel_mismatch": 36,
+            "pixels_sha256": "16bc91b8cd2f91e0c924bc32109f1313871523341ef47dee6e45c054fa4db27e"
+          },
+          "scalar": {
+            "coverage_sha256": "79306ed64a111ca21c440e1281a37f54d53c9777536e21aa27e8532baecb797b",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "ca474d005897b175d67d896c4979e2d9e7396103ef5e2a6995f543968bb0d079"
+          }
+        },
+        "side": 512
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            814689,
+            635014,
+            631809,
+            915456,
+            698839
+          ],
+          "scalar": [
+            1399681,
+            1364009,
+            2474217,
+            1629498,
+            1423329
+          ]
+        },
+        "godot_coverage": 27258,
+        "godot_pixels_sha256": "b3bcd8a2f071be3493a0420d125826bf6781ef1b578a9f5568fa6693d650f140",
+        "id": "large/cross64_sparse_erase",
+        "median_ns": {
+          "blend2d": 698839,
+          "scalar": 1423329
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "22b7c6b624037fb44694e2d1c6d3f79ef9abdd709684e14b7c0f8e729a2ba05f",
+            "extra": 0,
+            "missing": 15,
+            "pixel_mismatch": 15,
+            "pixels_sha256": "72ab60850dd661e5f0a2db5045769a282387396d3839dac8b285ea3029469543"
+          },
+          "scalar": {
+            "coverage_sha256": "f9f6e25af2e838ef2fb599c1a41c2c9c01e41e6df0461dc8d26ac07313498a5e",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "b3bcd8a2f071be3493a0420d125826bf6781ef1b578a9f5568fa6693d650f140"
+          }
+        },
+        "side": 512
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            600462,
+            613883,
+            679671,
+            586341,
+            623847
+          ],
+          "scalar": [
+            776066,
+            748785,
+            1053092,
+            888244,
+            796577
+          ]
+        },
+        "godot_coverage": 7068,
+        "godot_pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc",
+        "id": "large/transparent_noop",
+        "median_ns": {
+          "blend2d": 613883,
+          "scalar": 796577
+        },
+        "order": [
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "e6f646b019862ab645c3428c33e575776cfae7aec2cbae6be1e48f9fd4bd1fa7",
+            "extra": 0,
+            "missing": 22,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc"
+          },
+          "scalar": {
+            "coverage_sha256": "0b3de956e485dfd9eca1c7b308be504514efca8220697cfa8980a3e3aa4226fa",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc"
+          }
+        },
+        "side": 512
+      }
+    ],
+    [
+      {
+        "call_ns": {
+          "blend2d": [
+            10756,
+            19579,
+            16364,
+            14542,
+            8172
+          ],
+          "scalar": [
+            14652,
+            10666,
+            11677,
+            10055,
+            10956
+          ]
+        },
+        "godot_coverage": 16,
+        "godot_pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed",
+        "id": "small/stationary_dab",
+        "median_ns": {
+          "blend2d": 14542,
+          "scalar": 10956
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "58e3b928e0f2e7ba353d79bf946e9c5ee3dd6c8d4c9b7da47e9420055994ee8e",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed"
+          },
+          "scalar": {
+            "coverage_sha256": "58e3b928e0f2e7ba353d79bf946e9c5ee3dd6c8d4c9b7da47e9420055994ee8e",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            17747,
+            14872,
+            16856,
+            13080,
+            22193
+          ],
+          "scalar": [
+            19279,
+            19740,
+            19469,
+            18057,
+            18788
+          ]
+        },
+        "godot_coverage": 131,
+        "godot_pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646",
+        "id": "small/horizontal_fractional",
+        "median_ns": {
+          "blend2d": 16856,
+          "scalar": 19279
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "31fd68144229033593ebda45a2c56c5956914e10a52ecc2ffef81c55ba751a05",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646"
+          },
+          "scalar": {
+            "coverage_sha256": "31fd68144229033593ebda45a2c56c5956914e10a52ecc2ffef81c55ba751a05",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            12468,
+            17816,
+            14201,
+            15363,
+            14792
+          ],
+          "scalar": [
+            19840,
+            19859,
+            21762,
+            38568,
+            20281
+          ]
+        },
+        "godot_coverage": 134,
+        "godot_pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624",
+        "id": "small/diagonal",
+        "median_ns": {
+          "blend2d": 14792,
+          "scalar": 20281
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624"
+          },
+          "scalar": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            28282,
+            29064,
+            19019,
+            24347,
+            18628
+          ],
+          "scalar": [
+            72539,
+            35563,
+            37546,
+            35954,
+            34422
+          ]
+        },
+        "godot_coverage": 301,
+        "godot_pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4",
+        "id": "small/self_crossing",
+        "median_ns": {
+          "blend2d": 24347,
+          "scalar": 35954
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4"
+          },
+          "scalar": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            10646,
+            11837,
+            7892,
+            10355,
+            12519
+          ],
+          "scalar": [
+            17796,
+            43756,
+            15654,
+            15944,
+            16545
+          ]
+        },
+        "godot_coverage": 134,
+        "godot_pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df",
+        "id": "small/erase_hidden_rgb",
+        "median_ns": {
+          "blend2d": 10646,
+          "scalar": 16545
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df"
+          },
+          "scalar": {
+            "coverage_sha256": "36addd61353a0254ededdabe6c1ffd265f9a8dcb822d76770282036546f43b4d",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            10766,
+            11317,
+            8923,
+            11247,
+            9304
+          ],
+          "scalar": [
+            26891,
+            25248,
+            26570,
+            25298,
+            25679
+          ]
+        },
+        "godot_coverage": 301,
+        "godot_pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790",
+        "id": "small/zero_alpha_noop",
+        "median_ns": {
+          "blend2d": 10766,
+          "scalar": 25679
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790"
+          },
+          "scalar": {
+            "coverage_sha256": "326a278fd8da68e0345fcd581c22ca06f79cfb035a7c552bb2a4766892a594fc",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790"
+          }
+        },
+        "side": 32
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            580793,
+            612711,
+            705090,
+            735485,
+            566902
+          ],
+          "scalar": [
+            815526,
+            748114,
+            779120,
+            802656,
+            786131
+          ]
+        },
+        "godot_coverage": 460,
+        "godot_pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7",
+        "id": "large/hard4_long",
+        "median_ns": {
+          "blend2d": 612711,
+          "scalar": 786131
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "c2df8098ab1a82e79d939ca17136aadc6084d8d7bc18a880b58d880d7052af93",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7"
+          },
+          "scalar": {
+            "coverage_sha256": "c2df8098ab1a82e79d939ca17136aadc6084d8d7bc18a880b58d880d7052af93",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7"
+          }
+        },
+        "side": 512
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            2527317,
+            2357481,
+            1865512,
+            1990491,
+            3562462
+          ],
+          "scalar": [
+            2282529,
+            2374227,
+            2420957,
+            2313075,
+            7864435
+          ]
+        },
+        "godot_coverage": 51468,
+        "godot_pixels_sha256": "ca474d005897b175d67d896c4979e2d9e7396103ef5e2a6995f543968bb0d079",
+        "id": "large/round256",
+        "median_ns": {
+          "blend2d": 2357481,
+          "scalar": 2374227
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "fa0bfd3368a5695533e08cae0881e811b0b8747c462a470e49a409639c621c52",
+            "extra": 0,
+            "missing": 36,
+            "pixel_mismatch": 36,
+            "pixels_sha256": "16bc91b8cd2f91e0c924bc32109f1313871523341ef47dee6e45c054fa4db27e"
+          },
+          "scalar": {
+            "coverage_sha256": "79306ed64a111ca21c440e1281a37f54d53c9777536e21aa27e8532baecb797b",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "ca474d005897b175d67d896c4979e2d9e7396103ef5e2a6995f543968bb0d079"
+          }
+        },
+        "side": 512
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            687763,
+            741554,
+            738961,
+            1070819,
+            1215686
+          ],
+          "scalar": [
+            1465842,
+            1363819,
+            3435721,
+            1974155,
+            1891702
+          ]
+        },
+        "godot_coverage": 27258,
+        "godot_pixels_sha256": "b3bcd8a2f071be3493a0420d125826bf6781ef1b578a9f5568fa6693d650f140",
+        "id": "large/cross64_sparse_erase",
+        "median_ns": {
+          "blend2d": 741554,
+          "scalar": 1891702
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "22b7c6b624037fb44694e2d1c6d3f79ef9abdd709684e14b7c0f8e729a2ba05f",
+            "extra": 0,
+            "missing": 15,
+            "pixel_mismatch": 15,
+            "pixels_sha256": "72ab60850dd661e5f0a2db5045769a282387396d3839dac8b285ea3029469543"
+          },
+          "scalar": {
+            "coverage_sha256": "f9f6e25af2e838ef2fb599c1a41c2c9c01e41e6df0461dc8d26ac07313498a5e",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "b3bcd8a2f071be3493a0420d125826bf6781ef1b578a9f5568fa6693d650f140"
+          }
+        },
+        "side": 512
+      },
+      {
+        "call_ns": {
+          "blend2d": [
+            624147,
+            592931,
+            574644,
+            591511,
+            603729
+          ],
+          "scalar": [
+            768755,
+            753302,
+            772313,
+            735858,
+            811843
+          ]
+        },
+        "godot_coverage": 7068,
+        "godot_pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc",
+        "id": "large/transparent_noop",
+        "median_ns": {
+          "blend2d": 592931,
+          "scalar": 768755
+        },
+        "order": [
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ],
+          [
+            "scalar",
+            "blend2d"
+          ],
+          [
+            "blend2d",
+            "scalar"
+          ]
+        ],
+        "parity": {
+          "blend2d": {
+            "coverage_sha256": "e6f646b019862ab645c3428c33e575776cfae7aec2cbae6be1e48f9fd4bd1fa7",
+            "extra": 0,
+            "missing": 22,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc"
+          },
+          "scalar": {
+            "coverage_sha256": "0b3de956e485dfd9eca1c7b308be504514efca8220697cfa8980a3e3aa4226fa",
+            "extra": 0,
+            "missing": 0,
+            "pixel_mismatch": 0,
+            "pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc"
+          }
+        },
+        "side": 512
+      }
+    ]
+  ],
+  "schema": 1,
+  "sources": {
+    "tools/benchmarks/t068_blend2d_brush_bridge.cpp": "9ab7f243d6d7357cc786c90b02184d1b8f1de2ca55eb8a85728dde9e2253aa81",
+    "tools/benchmarks/t068_blend2d_large_oracle.json": "a7d0a30589cbb559e9bafcb6639acd1a9a8c8d3cfbd31bf7b2602785f9dbb9b2",
+    "tools/benchmarks/t068_scalar_hard_brush.cpp": "48e731354c4bec55f046f11324650e41f31c94cc528eebb31fa94e4e5643a7bf",
+    "tools/benchmarks/t068_skia_brush_oracle.json": "b023d44c022e947effe0e688f7a4d0c2da3f51b3bd621dd7a9de02fd5b4d8784"
+  },
+  "trials": 5
+}

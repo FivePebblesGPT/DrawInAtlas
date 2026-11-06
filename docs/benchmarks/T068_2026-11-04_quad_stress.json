@@ -1,0 +1,2345 @@
+{
+  "schema": 1,
+  "ticket": "T-068",
+  "godot_oracle_sha256": "b93c8f80165d628ce9de53948ea4f3e2de24b032d9eab5a9caa370719e69e064",
+  "native_source_sha256": "95094bfb518dc1b7289e53e9ef767bbf6705166a444a734b861dbe527ce64466",
+  "summary": {
+    "profiles": 2,
+    "runs_per_profile": 2,
+    "cases_per_run": 96,
+    "comparisons": 384,
+    "nonparity_profile_cases": 0,
+    "missing_pixels": 0,
+    "extra_pixels": 0
+  },
+  "profiles": [
+    {
+      "compiler": "g++",
+      "optimization": "-O2",
+      "runs": [
+        [
+          {
+            "id": "stress_000",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_001",
+            "native_sha256": "56d203de9497b67933d25007b43e08bf0561d89755429e0192f56fb3a21b0c64",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_002",
+            "native_sha256": "e2b4ae04020e8cb4f07cdf3f9b07595af2f7db66f604da2f322525cbb25f3f38",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_003",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_004",
+            "native_sha256": "c775d3a55c2cc21c23bd3dea938e38ca8802ee72f8542da4b7bb64d883cc1804",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_005",
+            "native_sha256": "839562d00e45a3353c894f531e3735eb0226da024db6298050066747ad968873",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_006",
+            "native_sha256": "8cd0db32cb1167331d546f71b564983e6f9005ec7d8eaae1fbcd44f3ca8b0297",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_007",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_008",
+            "native_sha256": "21169e9fa61d6f0f04a15ba18a234f5480d638a6918986cffb3f64e1b2cd8d9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_009",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_010",
+            "native_sha256": "2ef5296bd7bfb9861d4b4885d6da301a8ebdf843aaeb267fb98b67cc349196fc",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_011",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_012",
+            "native_sha256": "4aef411d2554478907104f13122c89d207b0f9dcc7129cab8b5edb6dff6d094f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_013",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_014",
+            "native_sha256": "a0a2ad8d56caaa9f29edf21a94946a6dc916fc1676f54c62a34e856961fa66fb",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_015",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_016",
+            "native_sha256": "b56ec1a08e0dc02aecb9644c5dcab21c56e590205617a0064df8c80d3ee1954e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_017",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_018",
+            "native_sha256": "bd033b757707d6348e9b9f0d38c1dab3c38725a0eb2490d30d635679c6736a51",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_019",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_020",
+            "native_sha256": "e01620625c3004cc1f6d576e657cff6df05bd35ada5085417adbad6866e1c771",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_021",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_022",
+            "native_sha256": "5bb75438098b9b297b5b1550fe3b02f0ef2d75a8658bbd7387f959ee27d2f8f0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_023",
+            "native_sha256": "67af9d834e892f5d5b4aaf8b6f7de99d709b50769eff7c737f4ebbf1d21268fe",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_024",
+            "native_sha256": "b49ecb475ff20e5a04c7b56637d414e3600043239e053694d6a889d69ce3a174",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_025",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_026",
+            "native_sha256": "8fd90753c9e865014d1634c098278a038a9d95c6b7185bdc22641cc46d514e70",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_027",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_028",
+            "native_sha256": "8463cb4053a3c98a5654f8a43635dd4d21b9f04bdd4487533dec8cc94caca09e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_029",
+            "native_sha256": "1675d48f89e8ab845e9bdadeac55059691915be162e08f104a4a8ff82ad52a28",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_030",
+            "native_sha256": "930c8098a518ec3bb0f5049a79bc8b6dcbd2af638918601fb03e00967d16cfaf",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_031",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_032",
+            "native_sha256": "5f56017e5614551f51266b12c20f3d62eead0965a2ed327ef524423e567023e0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_033",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_034",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_035",
+            "native_sha256": "95a4e7b6a6e6ad0c64031840139122e8e299b93936028a292d5343d88669a458",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_036",
+            "native_sha256": "f3d96078da00e5c36d9fd68c7e89e131c1ab82191c9a8e1ccf8f2d6b83efe585",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_037",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_038",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_039",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_040",
+            "native_sha256": "153a076e2b84efaa29cafa1c04d8c92c60043218ba8b9df8cc7c03847abca156",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_041",
+            "native_sha256": "b37e0604e0e6c0b224e6b8a8dcc332b91e54c9ebb92ff248fe3e3fa68e3d3f5f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_042",
+            "native_sha256": "6449e655b95b3f6b0375046a5b25f25608fd81bae678e003f22605281d22cf22",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_043",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_044",
+            "native_sha256": "0a53224ec499d503962f0c938ee74dfac1e71cbae0c8e7ad7e4867035432c9a1",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_045",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_046",
+            "native_sha256": "0edc666f62abc7808cc8cfb59732f7539a9ea18dfc3a33cb1d2177189a5a9e32",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_047",
+            "native_sha256": "5f05e3435773ac9ccef2f24368159fcde0ffb160992c3eb1b7d136e009729001",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_048",
+            "native_sha256": "7c00cc59d657ef4ed3f63a142487a566baf0e78f44ef0e7f6af6ebd61e06f6df",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_049",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_050",
+            "native_sha256": "b4623c2a29c35e501db2f8f6217a1b5ed2059eac320684db8aa00318f7023c37",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_051",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_052",
+            "native_sha256": "ed08a8425c35dc7d3ff6415945f298cd0dc1ac809a977c1963a71f11c4a96e9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_053",
+            "native_sha256": "c26fe9194fd09650a208f6dd5b0f5d39d02e59182bdb514a5d03ec43793de8a0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_054",
+            "native_sha256": "6e4b166e68d4cd11859b090bde9160dd8f3c6e095e968d844791faf6d531a519",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_055",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_056",
+            "native_sha256": "683c65c6aefd4a6daa52ccff3b13de031b463e3eaff0643f6047865199b41c21",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_057",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_058",
+            "native_sha256": "06ec2873216be1c280f322adf59fdbaa3f72bed84079b382fe8ccb7ac2891e73",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_059",
+            "native_sha256": "3c9fb3a38480558c990e65774a8fb1ec0d4d34c51cb88a21ad6818e91b69fef4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_060",
+            "native_sha256": "c801058faf73e5f9104c6bcdfd636dc4b71e1a7a5eb0d548fdbab992962a274a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_061",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_062",
+            "native_sha256": "2ed0a00f6c29bc4aebdfb7a34834efb0a2545ddfbff54c00c6e926e6c60e358b",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_063",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_064",
+            "native_sha256": "05b0198681564c4ff425b59b07c8d631093bcaf8881cfda7d366df18f4fc5be4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_065",
+            "native_sha256": "9cf0dfeff8d75302256d478f4e9a1d01bd2b85cedf0d2980bf89a61416905a6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_066",
+            "native_sha256": "40867d7aaef8c0b7cd4e9fc9e094073d761402348bb5439bfd32daee47dd6b8f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_067",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_068",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_069",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_070",
+            "native_sha256": "1ec3209f81e66aece132c8e9e12dfabf2973fa1aea12dcb5b4336343e3e2ecd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_071",
+            "native_sha256": "2f2ec08b469b4dff7525b131f9be39b3d49aa6bb4da648668731930ccc0dff49",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_072",
+            "native_sha256": "32d7d32f46065c6a1ccf7d74450e0668760477e2e99a0bae54355abc5f63f0cd",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_073",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_074",
+            "native_sha256": "0ce890eda13618f30cd7b87aece1448a5a7970cff2ede1b25f333e79ea95db6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_075",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_076",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_077",
+            "native_sha256": "6f4c7616b504819d038d14f98b4dbd0cfad5c412184d5b65a0dcd2254663b477",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_078",
+            "native_sha256": "ac0fb69e7d314add3e61af9c7d1f7adbe84f15c9c935087f904b7b95c1d08a15",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_079",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_080",
+            "native_sha256": "69b1584666ac533d15af1463db93b545f4df6c2651a3b1e44d537917ddbeddd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_081",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_082",
+            "native_sha256": "8ba33e4c5c8aa876c6eb7c3cd970d5092e0e3af5d7f545b9b25cd691372320f5",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_083",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_084",
+            "native_sha256": "a5694958a7c40cc63c3ec7372b2eca2a610d6dedb6c8db1b637d8ac77754a168",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_085",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_086",
+            "native_sha256": "733abc76767044d0b8399f66643e3c72d41df9b5bde606ebd519cc4cbc187390",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_087",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_088",
+            "native_sha256": "649f93686da4e9d250f5e686c8720c746bc9bd2ea7ab80f0a85bcc8876d3c903",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_089",
+            "native_sha256": "bdc451f7b713e06c7fdd40c71c0db80ef9c66948ebfd7723ac87fe8383eb0727",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_090",
+            "native_sha256": "b26cd71786f9451e434297070e03be6184f677df4f32df1e8d5490d165f1261f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_091",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_092",
+            "native_sha256": "6ac320cf149da395cc190d050600956169bd881f84158f0b9b6d69388fe7be7d",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_093",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_094",
+            "native_sha256": "21fd3425f3554c742723ce80fb813e1c5d7aa3878ae357109a2187a0c5014054",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_095",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          }
+        ],
+        [
+          {
+            "id": "stress_000",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_001",
+            "native_sha256": "56d203de9497b67933d25007b43e08bf0561d89755429e0192f56fb3a21b0c64",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_002",
+            "native_sha256": "e2b4ae04020e8cb4f07cdf3f9b07595af2f7db66f604da2f322525cbb25f3f38",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_003",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_004",
+            "native_sha256": "c775d3a55c2cc21c23bd3dea938e38ca8802ee72f8542da4b7bb64d883cc1804",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_005",
+            "native_sha256": "839562d00e45a3353c894f531e3735eb0226da024db6298050066747ad968873",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_006",
+            "native_sha256": "8cd0db32cb1167331d546f71b564983e6f9005ec7d8eaae1fbcd44f3ca8b0297",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_007",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_008",
+            "native_sha256": "21169e9fa61d6f0f04a15ba18a234f5480d638a6918986cffb3f64e1b2cd8d9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_009",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_010",
+            "native_sha256": "2ef5296bd7bfb9861d4b4885d6da301a8ebdf843aaeb267fb98b67cc349196fc",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_011",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_012",
+            "native_sha256": "4aef411d2554478907104f13122c89d207b0f9dcc7129cab8b5edb6dff6d094f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_013",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_014",
+            "native_sha256": "a0a2ad8d56caaa9f29edf21a94946a6dc916fc1676f54c62a34e856961fa66fb",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_015",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_016",
+            "native_sha256": "b56ec1a08e0dc02aecb9644c5dcab21c56e590205617a0064df8c80d3ee1954e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_017",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_018",
+            "native_sha256": "bd033b757707d6348e9b9f0d38c1dab3c38725a0eb2490d30d635679c6736a51",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_019",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_020",
+            "native_sha256": "e01620625c3004cc1f6d576e657cff6df05bd35ada5085417adbad6866e1c771",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_021",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_022",
+            "native_sha256": "5bb75438098b9b297b5b1550fe3b02f0ef2d75a8658bbd7387f959ee27d2f8f0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_023",
+            "native_sha256": "67af9d834e892f5d5b4aaf8b6f7de99d709b50769eff7c737f4ebbf1d21268fe",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_024",
+            "native_sha256": "b49ecb475ff20e5a04c7b56637d414e3600043239e053694d6a889d69ce3a174",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_025",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_026",
+            "native_sha256": "8fd90753c9e865014d1634c098278a038a9d95c6b7185bdc22641cc46d514e70",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_027",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_028",
+            "native_sha256": "8463cb4053a3c98a5654f8a43635dd4d21b9f04bdd4487533dec8cc94caca09e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_029",
+            "native_sha256": "1675d48f89e8ab845e9bdadeac55059691915be162e08f104a4a8ff82ad52a28",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_030",
+            "native_sha256": "930c8098a518ec3bb0f5049a79bc8b6dcbd2af638918601fb03e00967d16cfaf",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_031",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_032",
+            "native_sha256": "5f56017e5614551f51266b12c20f3d62eead0965a2ed327ef524423e567023e0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_033",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_034",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_035",
+            "native_sha256": "95a4e7b6a6e6ad0c64031840139122e8e299b93936028a292d5343d88669a458",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_036",
+            "native_sha256": "f3d96078da00e5c36d9fd68c7e89e131c1ab82191c9a8e1ccf8f2d6b83efe585",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_037",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_038",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_039",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_040",
+            "native_sha256": "153a076e2b84efaa29cafa1c04d8c92c60043218ba8b9df8cc7c03847abca156",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_041",
+            "native_sha256": "b37e0604e0e6c0b224e6b8a8dcc332b91e54c9ebb92ff248fe3e3fa68e3d3f5f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_042",
+            "native_sha256": "6449e655b95b3f6b0375046a5b25f25608fd81bae678e003f22605281d22cf22",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_043",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_044",
+            "native_sha256": "0a53224ec499d503962f0c938ee74dfac1e71cbae0c8e7ad7e4867035432c9a1",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_045",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_046",
+            "native_sha256": "0edc666f62abc7808cc8cfb59732f7539a9ea18dfc3a33cb1d2177189a5a9e32",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_047",
+            "native_sha256": "5f05e3435773ac9ccef2f24368159fcde0ffb160992c3eb1b7d136e009729001",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_048",
+            "native_sha256": "7c00cc59d657ef4ed3f63a142487a566baf0e78f44ef0e7f6af6ebd61e06f6df",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_049",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_050",
+            "native_sha256": "b4623c2a29c35e501db2f8f6217a1b5ed2059eac320684db8aa00318f7023c37",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_051",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_052",
+            "native_sha256": "ed08a8425c35dc7d3ff6415945f298cd0dc1ac809a977c1963a71f11c4a96e9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_053",
+            "native_sha256": "c26fe9194fd09650a208f6dd5b0f5d39d02e59182bdb514a5d03ec43793de8a0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_054",
+            "native_sha256": "6e4b166e68d4cd11859b090bde9160dd8f3c6e095e968d844791faf6d531a519",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_055",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_056",
+            "native_sha256": "683c65c6aefd4a6daa52ccff3b13de031b463e3eaff0643f6047865199b41c21",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_057",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_058",
+            "native_sha256": "06ec2873216be1c280f322adf59fdbaa3f72bed84079b382fe8ccb7ac2891e73",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_059",
+            "native_sha256": "3c9fb3a38480558c990e65774a8fb1ec0d4d34c51cb88a21ad6818e91b69fef4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_060",
+            "native_sha256": "c801058faf73e5f9104c6bcdfd636dc4b71e1a7a5eb0d548fdbab992962a274a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_061",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_062",
+            "native_sha256": "2ed0a00f6c29bc4aebdfb7a34834efb0a2545ddfbff54c00c6e926e6c60e358b",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_063",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_064",
+            "native_sha256": "05b0198681564c4ff425b59b07c8d631093bcaf8881cfda7d366df18f4fc5be4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_065",
+            "native_sha256": "9cf0dfeff8d75302256d478f4e9a1d01bd2b85cedf0d2980bf89a61416905a6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_066",
+            "native_sha256": "40867d7aaef8c0b7cd4e9fc9e094073d761402348bb5439bfd32daee47dd6b8f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_067",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_068",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_069",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_070",
+            "native_sha256": "1ec3209f81e66aece132c8e9e12dfabf2973fa1aea12dcb5b4336343e3e2ecd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_071",
+            "native_sha256": "2f2ec08b469b4dff7525b131f9be39b3d49aa6bb4da648668731930ccc0dff49",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_072",
+            "native_sha256": "32d7d32f46065c6a1ccf7d74450e0668760477e2e99a0bae54355abc5f63f0cd",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_073",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_074",
+            "native_sha256": "0ce890eda13618f30cd7b87aece1448a5a7970cff2ede1b25f333e79ea95db6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_075",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_076",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_077",
+            "native_sha256": "6f4c7616b504819d038d14f98b4dbd0cfad5c412184d5b65a0dcd2254663b477",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_078",
+            "native_sha256": "ac0fb69e7d314add3e61af9c7d1f7adbe84f15c9c935087f904b7b95c1d08a15",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_079",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_080",
+            "native_sha256": "69b1584666ac533d15af1463db93b545f4df6c2651a3b1e44d537917ddbeddd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_081",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_082",
+            "native_sha256": "8ba33e4c5c8aa876c6eb7c3cd970d5092e0e3af5d7f545b9b25cd691372320f5",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_083",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_084",
+            "native_sha256": "a5694958a7c40cc63c3ec7372b2eca2a610d6dedb6c8db1b637d8ac77754a168",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_085",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_086",
+            "native_sha256": "733abc76767044d0b8399f66643e3c72d41df9b5bde606ebd519cc4cbc187390",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_087",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_088",
+            "native_sha256": "649f93686da4e9d250f5e686c8720c746bc9bd2ea7ab80f0a85bcc8876d3c903",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_089",
+            "native_sha256": "bdc451f7b713e06c7fdd40c71c0db80ef9c66948ebfd7723ac87fe8383eb0727",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_090",
+            "native_sha256": "b26cd71786f9451e434297070e03be6184f677df4f32df1e8d5490d165f1261f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_091",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_092",
+            "native_sha256": "6ac320cf149da395cc190d050600956169bd881f84158f0b9b6d69388fe7be7d",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_093",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_094",
+            "native_sha256": "21fd3425f3554c742723ce80fb813e1c5d7aa3878ae357109a2187a0c5014054",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_095",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          }
+        ]
+      ]
+    },
+    {
+      "compiler": "clang++",
+      "optimization": "-O3",
+      "runs": [
+        [
+          {
+            "id": "stress_000",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_001",
+            "native_sha256": "56d203de9497b67933d25007b43e08bf0561d89755429e0192f56fb3a21b0c64",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_002",
+            "native_sha256": "e2b4ae04020e8cb4f07cdf3f9b07595af2f7db66f604da2f322525cbb25f3f38",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_003",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_004",
+            "native_sha256": "c775d3a55c2cc21c23bd3dea938e38ca8802ee72f8542da4b7bb64d883cc1804",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_005",
+            "native_sha256": "839562d00e45a3353c894f531e3735eb0226da024db6298050066747ad968873",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_006",
+            "native_sha256": "8cd0db32cb1167331d546f71b564983e6f9005ec7d8eaae1fbcd44f3ca8b0297",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_007",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_008",
+            "native_sha256": "21169e9fa61d6f0f04a15ba18a234f5480d638a6918986cffb3f64e1b2cd8d9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_009",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_010",
+            "native_sha256": "2ef5296bd7bfb9861d4b4885d6da301a8ebdf843aaeb267fb98b67cc349196fc",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_011",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_012",
+            "native_sha256": "4aef411d2554478907104f13122c89d207b0f9dcc7129cab8b5edb6dff6d094f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_013",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_014",
+            "native_sha256": "a0a2ad8d56caaa9f29edf21a94946a6dc916fc1676f54c62a34e856961fa66fb",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_015",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_016",
+            "native_sha256": "b56ec1a08e0dc02aecb9644c5dcab21c56e590205617a0064df8c80d3ee1954e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_017",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_018",
+            "native_sha256": "bd033b757707d6348e9b9f0d38c1dab3c38725a0eb2490d30d635679c6736a51",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_019",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_020",
+            "native_sha256": "e01620625c3004cc1f6d576e657cff6df05bd35ada5085417adbad6866e1c771",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_021",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_022",
+            "native_sha256": "5bb75438098b9b297b5b1550fe3b02f0ef2d75a8658bbd7387f959ee27d2f8f0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_023",
+            "native_sha256": "67af9d834e892f5d5b4aaf8b6f7de99d709b50769eff7c737f4ebbf1d21268fe",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_024",
+            "native_sha256": "b49ecb475ff20e5a04c7b56637d414e3600043239e053694d6a889d69ce3a174",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_025",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_026",
+            "native_sha256": "8fd90753c9e865014d1634c098278a038a9d95c6b7185bdc22641cc46d514e70",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_027",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_028",
+            "native_sha256": "8463cb4053a3c98a5654f8a43635dd4d21b9f04bdd4487533dec8cc94caca09e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_029",
+            "native_sha256": "1675d48f89e8ab845e9bdadeac55059691915be162e08f104a4a8ff82ad52a28",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_030",
+            "native_sha256": "930c8098a518ec3bb0f5049a79bc8b6dcbd2af638918601fb03e00967d16cfaf",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_031",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_032",
+            "native_sha256": "5f56017e5614551f51266b12c20f3d62eead0965a2ed327ef524423e567023e0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_033",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_034",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_035",
+            "native_sha256": "95a4e7b6a6e6ad0c64031840139122e8e299b93936028a292d5343d88669a458",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_036",
+            "native_sha256": "f3d96078da00e5c36d9fd68c7e89e131c1ab82191c9a8e1ccf8f2d6b83efe585",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_037",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_038",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_039",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_040",
+            "native_sha256": "153a076e2b84efaa29cafa1c04d8c92c60043218ba8b9df8cc7c03847abca156",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_041",
+            "native_sha256": "b37e0604e0e6c0b224e6b8a8dcc332b91e54c9ebb92ff248fe3e3fa68e3d3f5f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_042",
+            "native_sha256": "6449e655b95b3f6b0375046a5b25f25608fd81bae678e003f22605281d22cf22",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_043",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_044",
+            "native_sha256": "0a53224ec499d503962f0c938ee74dfac1e71cbae0c8e7ad7e4867035432c9a1",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_045",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_046",
+            "native_sha256": "0edc666f62abc7808cc8cfb59732f7539a9ea18dfc3a33cb1d2177189a5a9e32",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_047",
+            "native_sha256": "5f05e3435773ac9ccef2f24368159fcde0ffb160992c3eb1b7d136e009729001",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_048",
+            "native_sha256": "7c00cc59d657ef4ed3f63a142487a566baf0e78f44ef0e7f6af6ebd61e06f6df",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_049",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_050",
+            "native_sha256": "b4623c2a29c35e501db2f8f6217a1b5ed2059eac320684db8aa00318f7023c37",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_051",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_052",
+            "native_sha256": "ed08a8425c35dc7d3ff6415945f298cd0dc1ac809a977c1963a71f11c4a96e9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_053",
+            "native_sha256": "c26fe9194fd09650a208f6dd5b0f5d39d02e59182bdb514a5d03ec43793de8a0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_054",
+            "native_sha256": "6e4b166e68d4cd11859b090bde9160dd8f3c6e095e968d844791faf6d531a519",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_055",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_056",
+            "native_sha256": "683c65c6aefd4a6daa52ccff3b13de031b463e3eaff0643f6047865199b41c21",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_057",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_058",
+            "native_sha256": "06ec2873216be1c280f322adf59fdbaa3f72bed84079b382fe8ccb7ac2891e73",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_059",
+            "native_sha256": "3c9fb3a38480558c990e65774a8fb1ec0d4d34c51cb88a21ad6818e91b69fef4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_060",
+            "native_sha256": "c801058faf73e5f9104c6bcdfd636dc4b71e1a7a5eb0d548fdbab992962a274a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_061",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_062",
+            "native_sha256": "2ed0a00f6c29bc4aebdfb7a34834efb0a2545ddfbff54c00c6e926e6c60e358b",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_063",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_064",
+            "native_sha256": "05b0198681564c4ff425b59b07c8d631093bcaf8881cfda7d366df18f4fc5be4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_065",
+            "native_sha256": "9cf0dfeff8d75302256d478f4e9a1d01bd2b85cedf0d2980bf89a61416905a6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_066",
+            "native_sha256": "40867d7aaef8c0b7cd4e9fc9e094073d761402348bb5439bfd32daee47dd6b8f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_067",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_068",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_069",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_070",
+            "native_sha256": "1ec3209f81e66aece132c8e9e12dfabf2973fa1aea12dcb5b4336343e3e2ecd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_071",
+            "native_sha256": "2f2ec08b469b4dff7525b131f9be39b3d49aa6bb4da648668731930ccc0dff49",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_072",
+            "native_sha256": "32d7d32f46065c6a1ccf7d74450e0668760477e2e99a0bae54355abc5f63f0cd",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_073",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_074",
+            "native_sha256": "0ce890eda13618f30cd7b87aece1448a5a7970cff2ede1b25f333e79ea95db6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_075",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_076",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_077",
+            "native_sha256": "6f4c7616b504819d038d14f98b4dbd0cfad5c412184d5b65a0dcd2254663b477",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_078",
+            "native_sha256": "ac0fb69e7d314add3e61af9c7d1f7adbe84f15c9c935087f904b7b95c1d08a15",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_079",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_080",
+            "native_sha256": "69b1584666ac533d15af1463db93b545f4df6c2651a3b1e44d537917ddbeddd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_081",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_082",
+            "native_sha256": "8ba33e4c5c8aa876c6eb7c3cd970d5092e0e3af5d7f545b9b25cd691372320f5",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_083",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_084",
+            "native_sha256": "a5694958a7c40cc63c3ec7372b2eca2a610d6dedb6c8db1b637d8ac77754a168",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_085",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_086",
+            "native_sha256": "733abc76767044d0b8399f66643e3c72d41df9b5bde606ebd519cc4cbc187390",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_087",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_088",
+            "native_sha256": "649f93686da4e9d250f5e686c8720c746bc9bd2ea7ab80f0a85bcc8876d3c903",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_089",
+            "native_sha256": "bdc451f7b713e06c7fdd40c71c0db80ef9c66948ebfd7723ac87fe8383eb0727",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_090",
+            "native_sha256": "b26cd71786f9451e434297070e03be6184f677df4f32df1e8d5490d165f1261f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_091",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_092",
+            "native_sha256": "6ac320cf149da395cc190d050600956169bd881f84158f0b9b6d69388fe7be7d",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_093",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_094",
+            "native_sha256": "21fd3425f3554c742723ce80fb813e1c5d7aa3878ae357109a2187a0c5014054",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_095",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          }
+        ],
+        [
+          {
+            "id": "stress_000",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_001",
+            "native_sha256": "56d203de9497b67933d25007b43e08bf0561d89755429e0192f56fb3a21b0c64",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_002",
+            "native_sha256": "e2b4ae04020e8cb4f07cdf3f9b07595af2f7db66f604da2f322525cbb25f3f38",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_003",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_004",
+            "native_sha256": "c775d3a55c2cc21c23bd3dea938e38ca8802ee72f8542da4b7bb64d883cc1804",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_005",
+            "native_sha256": "839562d00e45a3353c894f531e3735eb0226da024db6298050066747ad968873",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_006",
+            "native_sha256": "8cd0db32cb1167331d546f71b564983e6f9005ec7d8eaae1fbcd44f3ca8b0297",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_007",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_008",
+            "native_sha256": "21169e9fa61d6f0f04a15ba18a234f5480d638a6918986cffb3f64e1b2cd8d9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_009",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_010",
+            "native_sha256": "2ef5296bd7bfb9861d4b4885d6da301a8ebdf843aaeb267fb98b67cc349196fc",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_011",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_012",
+            "native_sha256": "4aef411d2554478907104f13122c89d207b0f9dcc7129cab8b5edb6dff6d094f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_013",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_014",
+            "native_sha256": "a0a2ad8d56caaa9f29edf21a94946a6dc916fc1676f54c62a34e856961fa66fb",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_015",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_016",
+            "native_sha256": "b56ec1a08e0dc02aecb9644c5dcab21c56e590205617a0064df8c80d3ee1954e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_017",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_018",
+            "native_sha256": "bd033b757707d6348e9b9f0d38c1dab3c38725a0eb2490d30d635679c6736a51",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_019",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_020",
+            "native_sha256": "e01620625c3004cc1f6d576e657cff6df05bd35ada5085417adbad6866e1c771",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_021",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_022",
+            "native_sha256": "5bb75438098b9b297b5b1550fe3b02f0ef2d75a8658bbd7387f959ee27d2f8f0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_023",
+            "native_sha256": "67af9d834e892f5d5b4aaf8b6f7de99d709b50769eff7c737f4ebbf1d21268fe",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_024",
+            "native_sha256": "b49ecb475ff20e5a04c7b56637d414e3600043239e053694d6a889d69ce3a174",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_025",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_026",
+            "native_sha256": "8fd90753c9e865014d1634c098278a038a9d95c6b7185bdc22641cc46d514e70",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_027",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_028",
+            "native_sha256": "8463cb4053a3c98a5654f8a43635dd4d21b9f04bdd4487533dec8cc94caca09e",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_029",
+            "native_sha256": "1675d48f89e8ab845e9bdadeac55059691915be162e08f104a4a8ff82ad52a28",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_030",
+            "native_sha256": "930c8098a518ec3bb0f5049a79bc8b6dcbd2af638918601fb03e00967d16cfaf",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_031",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_032",
+            "native_sha256": "5f56017e5614551f51266b12c20f3d62eead0965a2ed327ef524423e567023e0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_033",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_034",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_035",
+            "native_sha256": "95a4e7b6a6e6ad0c64031840139122e8e299b93936028a292d5343d88669a458",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_036",
+            "native_sha256": "f3d96078da00e5c36d9fd68c7e89e131c1ab82191c9a8e1ccf8f2d6b83efe585",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_037",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_038",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_039",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_040",
+            "native_sha256": "153a076e2b84efaa29cafa1c04d8c92c60043218ba8b9df8cc7c03847abca156",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_041",
+            "native_sha256": "b37e0604e0e6c0b224e6b8a8dcc332b91e54c9ebb92ff248fe3e3fa68e3d3f5f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_042",
+            "native_sha256": "6449e655b95b3f6b0375046a5b25f25608fd81bae678e003f22605281d22cf22",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_043",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_044",
+            "native_sha256": "0a53224ec499d503962f0c938ee74dfac1e71cbae0c8e7ad7e4867035432c9a1",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_045",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_046",
+            "native_sha256": "0edc666f62abc7808cc8cfb59732f7539a9ea18dfc3a33cb1d2177189a5a9e32",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_047",
+            "native_sha256": "5f05e3435773ac9ccef2f24368159fcde0ffb160992c3eb1b7d136e009729001",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_048",
+            "native_sha256": "7c00cc59d657ef4ed3f63a142487a566baf0e78f44ef0e7f6af6ebd61e06f6df",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_049",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_050",
+            "native_sha256": "b4623c2a29c35e501db2f8f6217a1b5ed2059eac320684db8aa00318f7023c37",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_051",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_052",
+            "native_sha256": "ed08a8425c35dc7d3ff6415945f298cd0dc1ac809a977c1963a71f11c4a96e9a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_053",
+            "native_sha256": "c26fe9194fd09650a208f6dd5b0f5d39d02e59182bdb514a5d03ec43793de8a0",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_054",
+            "native_sha256": "6e4b166e68d4cd11859b090bde9160dd8f3c6e095e968d844791faf6d531a519",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_055",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_056",
+            "native_sha256": "683c65c6aefd4a6daa52ccff3b13de031b463e3eaff0643f6047865199b41c21",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_057",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_058",
+            "native_sha256": "06ec2873216be1c280f322adf59fdbaa3f72bed84079b382fe8ccb7ac2891e73",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_059",
+            "native_sha256": "3c9fb3a38480558c990e65774a8fb1ec0d4d34c51cb88a21ad6818e91b69fef4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_060",
+            "native_sha256": "c801058faf73e5f9104c6bcdfd636dc4b71e1a7a5eb0d548fdbab992962a274a",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_061",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_062",
+            "native_sha256": "2ed0a00f6c29bc4aebdfb7a34834efb0a2545ddfbff54c00c6e926e6c60e358b",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_063",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_064",
+            "native_sha256": "05b0198681564c4ff425b59b07c8d631093bcaf8881cfda7d366df18f4fc5be4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_065",
+            "native_sha256": "9cf0dfeff8d75302256d478f4e9a1d01bd2b85cedf0d2980bf89a61416905a6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_066",
+            "native_sha256": "40867d7aaef8c0b7cd4e9fc9e094073d761402348bb5439bfd32daee47dd6b8f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_067",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_068",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_069",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_070",
+            "native_sha256": "1ec3209f81e66aece132c8e9e12dfabf2973fa1aea12dcb5b4336343e3e2ecd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_071",
+            "native_sha256": "2f2ec08b469b4dff7525b131f9be39b3d49aa6bb4da648668731930ccc0dff49",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_072",
+            "native_sha256": "32d7d32f46065c6a1ccf7d74450e0668760477e2e99a0bae54355abc5f63f0cd",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_073",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_074",
+            "native_sha256": "0ce890eda13618f30cd7b87aece1448a5a7970cff2ede1b25f333e79ea95db6f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_075",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_076",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_077",
+            "native_sha256": "6f4c7616b504819d038d14f98b4dbd0cfad5c412184d5b65a0dcd2254663b477",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_078",
+            "native_sha256": "ac0fb69e7d314add3e61af9c7d1f7adbe84f15c9c935087f904b7b95c1d08a15",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_079",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_080",
+            "native_sha256": "69b1584666ac533d15af1463db93b545f4df6c2651a3b1e44d537917ddbeddd4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_081",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_082",
+            "native_sha256": "8ba33e4c5c8aa876c6eb7c3cd970d5092e0e3af5d7f545b9b25cd691372320f5",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_083",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_084",
+            "native_sha256": "a5694958a7c40cc63c3ec7372b2eca2a610d6dedb6c8db1b637d8ac77754a168",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_085",
+            "native_sha256": "6c6897240943a4e1218c0016a09d07f5ce5f57fe99c390cad571e4c2adb30015",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_086",
+            "native_sha256": "733abc76767044d0b8399f66643e3c72d41df9b5bde606ebd519cc4cbc187390",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_087",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_088",
+            "native_sha256": "649f93686da4e9d250f5e686c8720c746bc9bd2ea7ab80f0a85bcc8876d3c903",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_089",
+            "native_sha256": "bdc451f7b713e06c7fdd40c71c0db80ef9c66948ebfd7723ac87fe8383eb0727",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_090",
+            "native_sha256": "b26cd71786f9451e434297070e03be6184f677df4f32df1e8d5490d165f1261f",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_091",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_092",
+            "native_sha256": "6ac320cf149da395cc190d050600956169bd881f84158f0b9b6d69388fe7be7d",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_093",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_094",
+            "native_sha256": "21fd3425f3554c742723ce80fb813e1c5d7aa3878ae357109a2187a0c5014054",
+            "missing_indices": [],
+            "extra_indices": []
+          },
+          {
+            "id": "stress_095",
+            "native_sha256": "1a0295f4bf5986c5f74eca9153a6a4cb10b073a01a76ba4a457fd862c78966a4",
+            "missing_indices": [],
+            "extra_indices": []
+          }
+        ]
+      ]
+    }
+  ],
+  "limitations": [
+    "Seeded finite convex scopes only; not arbitrary transforms, Windows, or native backend acceptance",
+    "Godot AtlasFill generated masks; detached C++ ABI, no GPU or app integration"
+  ]
+}
