@@ -510,6 +510,48 @@ func history_length() -> int:
 	return _events.size()
 
 
+## Public, bounded, read-only history description for the shared editor shell.
+## Never return event dictionaries: these hold mutable tile deltas and snapshots.
+func history_position() -> int:
+	return _cursor
+
+
+func history_summaries(start: int = 0, count: int = 128) -> Array[String]:
+	var summaries: Array[String] = []
+	for index: int in range(clampi(start, 0, _events.size()),
+		mini(_events.size(), maxi(0, start) + clampi(count, 0, 256))):
+		var event: Dictionary = _events[index]
+		var kind: String = String(event.get("kind", ""))
+		var label: String = "Edit"
+		if kind == "selection":
+			label = "Selection"
+		elif kind == "content":
+			label = "Raster edit · " + _history_node_name((event["delta"] as DrawingDelta).layer_id)
+		elif kind == "text_tree":
+			label = "Text edit · " + _history_node_name(String(event["layer"]))
+		elif kind == "structure":
+			var op: String = String(event.get("op", ""))
+			var node_name: String = _history_node_name(String(event.get("id", "")))
+			if op == "create":
+				node_name = (event["node"] as DrawingLayerNode).name
+			elif op == "remove":
+				node_name = (event["nodes"][event["id"]] as DrawingLayerNode).name
+			if op == "property":
+				var field: String = String(event.get("field", ""))
+				label = ("Rename" if field == "name" else "Visibility" if field == "visible"
+					else "Lock" if field == "locked" else "Change") + " · " + node_name
+			else:
+				label = {"create": "Add", "remove": "Remove", "reorder": "Move"}.get(op, "Change") + " · " + node_name
+		summaries.append(label)
+	return summaries
+
+
+func _history_node_name(node_id: String) -> String:
+	if _nodes.has(node_id):
+		return (_nodes[node_id] as DrawingLayerNode).name
+	return node_id.left(24) if not node_id.is_empty() else "layer"
+
+
 ## Structural operations are opt-in for local editor history. Legacy/Atlas API
 ## callers keep their original untracked/external ownership semantics.
 func _finish_structure(record_history: bool, event: Dictionary) -> void:

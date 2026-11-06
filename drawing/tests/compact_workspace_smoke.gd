@@ -72,6 +72,7 @@ func run() -> void:
 	root.size = Vector2i(1280, 800)
 	var app: Control = load("res://main.tscn").instantiate()
 	app.layout_persistence_enabled = false
+	app.preferences_persistence_enabled = false
 	root.add_child(app)
 	await frames(12)
 	var top: HBoxContainer = app.top_bar
@@ -102,8 +103,9 @@ func run() -> void:
 	await snapshot("drawing-1280")
 	check(top.options_region.get_child_count() == 2 and top.active_options == "Brush",
 		"brush options show width and generic snap")
-	check(not app.record_selection_history and app.selection_history_toggle.get_parent().name == "History",
-		"selection-history preference OFF in History dock, not tool options")
+	check(not app.record_selection_history and app.selection_history_toggle.get_parent() != app.dock_views["history"]
+		and top._menus[1].get_popup().get_item_text(2).contains("Preferences"),
+		"selection-history preference OFF and moved from History to Edit > Preferences")
 	check(app.dock_split != null and app.inspector.get_parent() == app.dock_split,
 		"right dock is a resizable split sibling")
 	check(app.inspector is ScrollContainer and
@@ -113,8 +115,8 @@ func run() -> void:
 	for pane: Control in app.dock_panels.get_children():
 		panel_names.append(pane.name)
 	check(panel_names == ["MinimizeDock", "Group_colors", "Group_layers", "Group_history"] and
-		app.layers.is_visible_in_tree() and app.selection_history_toggle.is_visible_in_tree(),
-		"Colors, Layers and History render as separate stacked group controls")
+		app.layers.is_visible_in_tree() and app.history_list.is_visible_in_tree(),
+		"Colors, Layers and compact History render as separate stacked group controls")
 	check(app.status.text.contains("cursor") and app.status.text.contains("zoom"),
 		"status reports pixel coordinates and zoom")
 	var file_popup: PopupMenu = top._menus[0].get_popup()
@@ -131,10 +133,11 @@ func run() -> void:
 	app._toggle_selection_history()
 	check(app.record_selection_history and app.selection_history_toggle.button_pressed,
 		"Edit menu and History dock share preference")
-	check(edit_popup.is_item_checked(2), "Edit menu reflects checked history preference")
+	check(not edit_popup.is_item_checkable(2) and app.selection_history_toggle.button_pressed,
+		"Edit menu opens Preferences rather than duplicating a history toggle")
 	app._selection_history_preference_changed(false)
-	check(not app.record_selection_history and not edit_popup.is_item_checked(2),
-		"history preference returns to OFF in dock and Edit menu")
+	check(not app.record_selection_history and not app.selection_history_toggle.button_pressed,
+		"history preference returns to OFF in Preferences")
 	app._toggle_dock()
 	check(app.inspector.visible and app.dock_rail.visible and
 		bool(app.dock_layout.container_info("right")["minimized"]),
@@ -188,11 +191,11 @@ func run() -> void:
 	app.tool_buttons["Brush"].grab_focus()
 	app.inspector.scroll_vertical = 0
 	await frames(4)
-	app.selection_history_toggle.grab_focus()
+	app.history_list.grab_focus()
 	await frames(8)
 	check(app.inspector.scroll_vertical > 0 and
-		app.inspector.get_global_rect().intersects(app.selection_history_toggle.get_global_rect()),
-		"keyboard focus brings History into scroll viewport")
+		app.inspector.get_global_rect().intersects(app.history_list.get_global_rect()),
+		"keyboard focus brings History events into scroll viewport")
 	app.inspector.scroll_vertical = int(dock_scrollbar.max_value)
 	await frames(4)
 	check(app.inspector.scroll_vertical > 0 and app.layers.get_parent().name == "Layers",

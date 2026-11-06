@@ -63,6 +63,24 @@ Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
 #02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
 
+## T-092 compact color controls, cursor history and app preferences
+
+Fast push/PR CI runs `drawing/tests/color_history_smoke.gd` (**46** model
+checks) plus `tests/test_t092_color_history.py` (four CI/log/preference
+contracts) as a single fail-late step. The bounded fast workflow now has at
+most **48 steps**. The on-demand
+`.github/workflows/godot-native-t092-color-history.yml` stages/imports
+Godot 4.8-beta2 fonts and SVG resources, runs
+`drawing/tests/color_history_native.gd` (**34** native Xvfb/Mesa framebuffer,
+actual viewport pointer dispatch and workspace relaunch checks, plus optional
+three PNGs), and verifies logs using `tools/check_native_t092_log.py`.
+Native acceptance does **not** assert a click inside the separate Preferences
+modal viewport; the control signal and file persistence are tested, while a
+physical Linux/Windows modal-pointer and owner visual check is **NOT RUN**.
+The verifier retains recognized **post-success** GL/RID leak diagnostics, and
+rejects any missing marker, runtime error or failed check. Owner #11/#23 and
+all manual-review gates remain unapproved.
+
 ## T-091 single floating tab group and splitter-width recovery
 
 Fast push/PR CI executes `drawing/tests/dock_single_group_smoke.gd` (42

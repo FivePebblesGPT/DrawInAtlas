@@ -145,6 +145,20 @@ jobs:
           if grep -E 'SCRIPT ERROR:|^ERROR:|T091_MODEL_FAILED:' /tmp/godot-t091-dock-model.log; then ci_fail_marker 'T091 model error'; fi
           python3 -m unittest discover -s tests -p 'test_t091_dock.py' -v
           ci_finish
+      - name: Verify T-092 compact Colors, history cursor, and isolated app preferences
+        id: ci_t092_compact_color_history_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/color_history_smoke.gd 2>&1 | tee /tmp/godot-t092-model.log
+          grep -q 'T092_MODEL_PASSED' /tmp/godot-t092-model.log || ci_fail_marker 'T092 model incomplete'
+          if grep -E 'SCRIPT ERROR:|T092_MODEL_FAILED:' /tmp/godot-t092-model.log; then ci_fail_marker 'T092 model error'; fi
+          python3 -m unittest discover -s tests -p 'test_t092_color_history.py' -v
+          ci_finish
       - name: Verify T-053 standalone Linux release package
         id: ci_07_verify_t_053_standalone_linux_release_package
         if: ${{ !cancelled() }}

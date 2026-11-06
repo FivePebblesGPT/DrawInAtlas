@@ -9,6 +9,7 @@ const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd"
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
+const WORKSPACE_PREFERENCES: Script = preload("res://addons/drawing/workspace_preferences.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
@@ -28,6 +29,8 @@ var asset_browser: DrawingAssetBrowserPanel
 var asset_browser_directory_dialog: FileDialog
 var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered new ID
 var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
+var preferences_persistence_enabled: bool = true
+var preferences_settings_path: String = "user://drawing-workspace-preferences-v1.json"
 var layout_recovery_status: String = "defaults" # defaults / loaded / repaired / invalid
 var _layout_booted: bool = false
 var _layout_save_pending: bool = false
@@ -84,6 +87,27 @@ var dock_views: Dictionary = {} # Stable panel IDs -> existing Controls, never d
 var dock_split: HSplitContainer
 var selection_history_toggle: CheckButton
 var history_label: Label
+var history_list: ItemList
+var _history_row_positions: Array[int] = []
+var _rendering_history: bool = false
+var history_undo: Button
+var history_redo: Button
+var _history_stamp: String = ""
+var color_hex: LineEdit
+var color_rgb: Array[SpinBox] = []
+var color_swatch_buttons: Array[Button] = []
+var color_advanced: ColorPicker
+var color_advanced_toggle: Button
+var foreground_button: Button
+var background_button: Button
+var previous_foreground_button: Button
+var previous_background_button: Button
+var color_background: Color = Color.WHITE
+var previous_foreground: Color = Color(0.12, 0.20, 0.35)
+var previous_background: Color = Color.WHITE
+var recent_colors: Array[Color] = []
+var _updating_color_widgets: bool = false
+var preferences_dialog: AcceptDialog
 var open_dialog: FileDialog
 var save_dialog: FileDialog
 var new_counter: int = 0
@@ -127,6 +151,7 @@ const ROW_PAGE: int = 200
 
 
 func _ready() -> void:
+	_load_preferences()
 	_build_interface()
 	if not initial_asset_browser_root.is_empty():
 		show_asset_browser(initial_asset_browser_root)
@@ -152,10 +177,10 @@ func _build_interface() -> void:
 		Callable(self, "_ask_open_object"), Callable(self, "_ask_rename_object"),
 		Callable(self, "_ask_save")])
 	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
-		"Record selection changes in Undo History", "Copy  Ctrl+C", "Cut  Ctrl+X",
+		"Preferences…", "Copy  Ctrl+C", "Cut  Ctrl+X",
 		"Paste  Ctrl+V", "Delete selected pixels  Del"],
 		[Callable(self, "_undo"), Callable(self, "_redo"),
-		Callable(self, "_toggle_selection_history"), Callable(self, "_copy_selection"),
+		Callable(self, "_show_preferences"), Callable(self, "_copy_selection"),
 		Callable(self, "_cut_selection"), Callable(self, "_paste_selection"),
 		Callable(self, "_delete_selection")])
 	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
@@ -196,7 +221,6 @@ func _build_interface() -> void:
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
-	top_bar.set_menu_checked("Edit", 2, record_selection_history)
 	width_spin = SpinBox.new()
 	width_spin.min_value = 1
 	width_spin.max_value = 96
@@ -300,13 +324,7 @@ func _build_interface() -> void:
 	inspector.add_child(dock_rail)
 	_make_dock_flyout()
 	var color_pane: VBoxContainer = _add_dock_section("Colors")
-	var picker: ColorPickerButton = ColorPickerButton.new()
-	picker.text = "Brush color"
-	picker.color = active_color
-	picker.color_changed.connect(func(value: Color) -> void:
-		active_color = value
-		canvas.color_rgba = _pack_color(value))
-	color_pane.add_child(picker)
+	_build_color_controls(color_pane)
 	var layer_pane: VBoxContainer = _add_dock_section("Layers")
 	# Do not let six layer actions force a minimum 300px dock on small
 	# windows; wrap secondary actions within the existing dock width.
@@ -360,16 +378,35 @@ func _build_interface() -> void:
 	layer_rename_dialog.add_child(layer_rename_field)
 	layer_rename_dialog.confirmed.connect(_commit_layer_rename)
 	var history_pane: VBoxContainer = _add_dock_section("History")
+	var history_actions: HBoxContainer = HBoxContainer.new()
+	history_pane.add_child(history_actions)
+	history_undo = Button.new()
+	history_undo.text = "↶ Undo"
+	history_undo.pressed.connect(_undo)
+	history_actions.add_child(history_undo)
+	history_redo = Button.new()
+	history_redo.text = "↷ Redo"
+	history_redo.pressed.connect(_redo)
+	history_actions.add_child(history_redo)
 	history_label = Label.new()
-	history_label.text = "Undo / Redo"
-	history_pane.add_child(history_label)
+	history_actions.add_child(history_label)
+	history_list = ItemList.new()
+	history_list.custom_minimum_size.y = 128
+	history_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	history_list.allow_reselect = true
+	history_list.item_selected.connect(_history_item_selected)
+	history_pane.add_child(history_list)
+	preferences_dialog = AcceptDialog.new()
+	preferences_dialog.title = "Drawing preferences"
+	add_child(preferences_dialog)
+	var preferences_content: VBoxContainer = VBoxContainer.new()
+	preferences_dialog.add_child(preferences_content)
 	selection_history_toggle = CheckButton.new()
-	selection_history_toggle.text = "Log selections"
-	selection_history_toggle.clip_text = true
-	selection_history_toggle.tooltip_text = "Record selection changes in Undo History (workspace preference; OFF by default, never marks a document dirty)"
+	selection_history_toggle.text = "Record selection changes in Undo History"
+	selection_history_toggle.tooltip_text = "Application preference (default OFF); never changes artwork or its saved state"
 	selection_history_toggle.button_pressed = record_selection_history
 	selection_history_toggle.toggled.connect(_selection_history_preference_changed)
-	history_pane.add_child(selection_history_toggle)
+	preferences_content.add_child(selection_history_toggle)
 	for panel_id: String in initial_extra_panels:
 		var view: Control = initial_extra_panels[panel_id] as Control
 		if view != null and not dock_views.has(panel_id) and dock_layout.register_panel(panel_id):
@@ -1401,6 +1438,219 @@ func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
 	return dialog
 
 
+## Color controls are native and dock-width-safe; the full ColorPicker is opt-in.
+func _build_color_controls(parent: VBoxContainer) -> void:
+	var swatches: HFlowContainer = HFlowContainer.new()
+	parent.add_child(swatches)
+	for role: String in ["Foreground", "Previous FG", "Background", "Previous BG"]:
+		var button: Button = Button.new()
+		button.custom_minimum_size = Vector2(58, 30)
+		button.tooltip_text = role + " — click to use as brush color"
+		button.pressed.connect(_color_swatch_pressed.bind(role))
+		swatches.add_child(button)
+		color_swatch_buttons.append(button)
+		match role:
+			"Foreground": foreground_button = button
+			"Previous FG": previous_foreground_button = button
+			"Background": background_button = button
+			"Previous BG": previous_background_button = button
+	var swap: Button = Button.new()
+	swap.text = "↔ Swap FG/BG"
+	swap.tooltip_text = "Exchange the foreground brush color with the secondary background color"
+	swap.pressed.connect(_swap_colors)
+	parent.add_child(swap)
+	color_hex = LineEdit.new()
+	color_hex.placeholder_text = "#RRGGBBAA"
+	color_hex.tooltip_text = "Enter #RRGGBB or #RRGGBBAA; Enter to apply"
+	color_hex.text_submitted.connect(func(_text: String) -> void: _commit_hex())
+	color_hex.focus_exited.connect(_commit_hex)
+	parent.add_child(color_hex)
+	var rgb: HFlowContainer = HFlowContainer.new()
+	parent.add_child(rgb)
+	for channel: String in ["R", "G", "B"]:
+		var spin: SpinBox = SpinBox.new()
+		spin.min_value = 0
+		spin.max_value = 255
+		spin.step = 1
+		spin.rounded = true
+		spin.custom_minimum_size.x = 72
+		spin.prefix = channel
+		spin.tooltip_text = "%s channel (0–255)" % channel
+		spin.value_changed.connect(_commit_rgb)
+		rgb.add_child(spin)
+		color_rgb.append(spin)
+	var recent_label: Label = Label.new()
+	recent_label.text = "Recent colors"
+	parent.add_child(recent_label)
+	var recents: HFlowContainer = HFlowContainer.new()
+	parent.add_child(recents)
+	for index: int in range(6):
+		var sample: Button = Button.new()
+		sample.custom_minimum_size = Vector2(28, 26)
+		sample.tooltip_text = "Use recent brush color"
+		sample.pressed.connect(_use_recent_color.bind(index))
+		recents.add_child(sample)
+		color_swatch_buttons.append(sample)
+	color_advanced_toggle = Button.new()
+	color_advanced_toggle.text = "Advanced picker ▸"
+	color_advanced_toggle.pressed.connect(_toggle_advanced_picker)
+	parent.add_child(color_advanced_toggle)
+	color_advanced = ColorPicker.new()
+	color_advanced.visible = false
+	color_advanced.custom_minimum_size.y = 190
+	color_advanced.color_changed.connect(_set_foreground)
+	parent.add_child(color_advanced)
+	_refresh_color_controls()
+
+
+func _style_swatch(button: Button, value: Color, caption: String) -> void:
+	button.text = caption
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = value
+	style.set_border_width_all(1)
+	style.border_color = Color(0.35, 0.35, 0.35)
+	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
+		button.add_theme_stylebox_override(state, style)
+	button.add_theme_color_override("font_color", Color.BLACK if value.get_luminance() > 0.6 else Color.WHITE)
+	button.add_theme_color_override("font_hover_color", Color.BLACK if value.get_luminance() > 0.6 else Color.WHITE)
+
+
+func _refresh_color_controls() -> void:
+	if color_hex == null:
+		return
+	_updating_color_widgets = true
+	color_hex.text = "#" + active_color.to_html(true).to_upper()
+	var channels: Array[int] = [roundi(active_color.r * 255.0),
+		roundi(active_color.g * 255.0), roundi(active_color.b * 255.0)]
+	for index: int in range(color_rgb.size()):
+		color_rgb[index].set_value_no_signal(channels[index])
+	_style_swatch(foreground_button, active_color, "FG")
+	_style_swatch(previous_foreground_button, previous_foreground, "Prev")
+	_style_swatch(background_button, color_background, "BG")
+	_style_swatch(previous_background_button, previous_background, "Prev")
+	for index: int in range(6):
+		var button: Button = color_swatch_buttons[index + 4]
+		button.disabled = index >= recent_colors.size()
+		if not button.disabled:
+			_style_swatch(button, recent_colors[index], "")
+	if color_advanced != null:
+		color_advanced.color = active_color
+	_updating_color_widgets = false
+
+
+func _set_foreground(value: Color) -> void:
+	if _updating_color_widgets or active_color == value:
+		return
+	previous_foreground = active_color
+	if not recent_colors.has(active_color):
+		recent_colors.push_front(active_color)
+	else:
+		recent_colors.erase(active_color)
+		recent_colors.push_front(active_color)
+	if recent_colors.size() > 6:
+		recent_colors.resize(6)
+	active_color = value
+	if canvas != null:
+		canvas.color_rgba = _pack_color(value)
+	_refresh_color_controls()
+
+
+func _swap_colors() -> void:
+	var former: Color = active_color
+	_set_foreground(color_background)
+	previous_background = color_background
+	color_background = former
+	_refresh_color_controls()
+
+
+func _color_swatch_pressed(role: String) -> void:
+	match role:
+		"Previous FG": _set_foreground(previous_foreground)
+		"Background": _swap_colors()
+		"Previous BG": _set_foreground(previous_background)
+		_: pass
+
+
+func _use_recent_color(index: int) -> void:
+	if index >= 0 and index < recent_colors.size():
+		_set_foreground(recent_colors[index])
+
+
+func _commit_hex() -> void:
+	if color_hex == null:
+		return
+	var value: String = color_hex.text.strip_edges()
+	if Color.html_is_valid(value):
+		_set_foreground(Color.html(value))
+	_refresh_color_controls()
+
+
+func _commit_rgb(_value: float) -> void:
+	if _updating_color_widgets or color_rgb.size() != 3:
+		return
+	_set_foreground(Color8(int(color_rgb[0].value), int(color_rgb[1].value),
+		int(color_rgb[2].value), roundi(active_color.a * 255.0)))
+
+
+func _toggle_advanced_picker() -> void:
+	color_advanced.visible = not color_advanced.visible
+	color_advanced_toggle.text = "Advanced picker ▾" if color_advanced.visible else "Advanced picker ▸"
+
+
+func _refresh_history() -> void:
+	if history_list == null or active_tab < 0:
+		return
+	var document: DrawingDocument = current_document()
+	var stamp: String = "%s:%d:%d:%s" % [str(document.get_instance_id()),
+		document.history_position(), document.history_length(), str(document.external_history)]
+	if stamp == _history_stamp:
+		return
+	_history_stamp = stamp
+	_rendering_history = true
+	history_list.clear()
+	_history_row_positions.clear()
+	history_undo.disabled = document.external_history or not document.can_undo()
+	history_redo.disabled = document.external_history or not document.can_redo()
+	history_label.text = "%d / %d" % [document.history_position(), document.history_length()]
+	if document.external_history:
+		history_list.add_item("History owned by host")
+	else:
+		var total: int = document.history_length()
+		var first: int = clampi(document.history_position() - 32, 0, maxi(0, total - 64))
+		if first == 0:
+			history_list.add_item("0 · Initial state")
+			_history_row_positions.append(0)
+		var labels: Array[String] = document.history_summaries(first, 64)
+		for index: int in range(labels.size()):
+			var position: int = first + index + 1
+			history_list.add_item("%d · %s" % [position, labels[index]])
+			_history_row_positions.append(position)
+		var row: int = _history_row_positions.find(document.history_position())
+		if row >= 0:
+			history_list.select(row)
+	_rendering_history = false
+
+
+func _history_item_selected(row: int) -> void:
+	if _rendering_history or active_tab < 0 or row < 0 or row >= _history_row_positions.size():
+		return
+	var target: int = _history_row_positions[row]
+	var document: DrawingDocument = current_document()
+	while document.history_position() > target:
+		var result: DrawingResult = document.undo()
+		if not result.ok:
+			_show_error(result.message)
+			break
+		_restore_context(result.value as DrawingHistoryContext)
+	while document.history_position() < target:
+		var result: DrawingResult = document.redo()
+		if not result.ok:
+			_show_error(result.message)
+			break
+		_restore_context(result.value as DrawingHistoryContext)
+	_after_edit()
+
+
 func _pack_color(value: Color) -> int:
 	return clampi(roundi(value.r * 255.0), 0, 255) | (clampi(roundi(value.g * 255.0), 0, 255) << 8) | (clampi(roundi(value.b * 255.0), 0, 255) << 16) | (clampi(roundi(value.a * 255.0), 0, 255) << 24)
 
@@ -2289,6 +2539,18 @@ func _paste_selection() -> void:
 	_commit_clipboard_edit(edit, pasted_mask)
 
 
+func _show_preferences() -> void:
+	preferences_dialog.popup_centered(Vector2i(420, 110))
+
+
+func _load_preferences() -> void:
+	if not preferences_persistence_enabled:
+		return
+	var saved: Dictionary = WORKSPACE_PREFERENCES.read_file(preferences_settings_path)
+	if not saved.is_empty():
+		record_selection_history = saved["record_selection_history"]
+
+
 func _toggle_selection_history() -> void:
 	_selection_history_preference_changed(not record_selection_history)
 	if selection_history_toggle != null:
@@ -2366,12 +2628,12 @@ func _capture_context() -> DrawingHistoryContext:
 
 func _selection_history_preference_changed(enabled: bool) -> void:
 	record_selection_history = enabled
-	if top_bar != null:
-		top_bar.set_menu_checked("Edit", 2, enabled)
 	for tab: Dictionary in tabs:
 		(tab["document"] as DrawingDocument).record_selection_history = enabled
 	if selection_history_toggle != null and selection_history_toggle.button_pressed != enabled:
 		selection_history_toggle.set_pressed_no_signal(enabled)
+	if preferences_persistence_enabled and _layout_booted:
+		WORKSPACE_PREFERENCES.save_file(preferences_settings_path, enabled)
 
 
 func _gesture_started() -> void:
@@ -2455,11 +2717,12 @@ func _update_status() -> void:
 	var grid_info: String = " | grid %dpx @ %d,%d (%s, snap %s)" % [canvas.grid_spacing,
 		canvas.grid_origin.x, canvas.grid_origin.y,
 		"shown" if canvas.show_grid else "hidden", "on" if canvas.snap_to_grid else "off"]
-	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%%%s%s | revision %d | %s" % [
+	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%%%s%s | history %d/%d | %s" % [
 		tab_identity, source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
-		canvas.zoom * 100.0, guide, grid_info, document.revision,
-		"Unsaved changes" if dirty else "Saved"]
+		canvas.zoom * 100.0, guide, grid_info, document.history_position(),
+		document.history_length(), "Unsaved changes" if dirty else "Saved"]
 	status.tooltip_text = status.text
+	_refresh_history()
 
 
 func _set_snap_enabled(enabled: bool) -> void:
