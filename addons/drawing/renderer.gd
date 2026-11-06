@@ -69,19 +69,46 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 		world_x: int, world_y: int, size: Vector2i, bytes: PackedByteArray,
 		preview: DrawingEditSession = null) -> DrawingResult:
 	var stride: int = document.tile_stride
+	# The source revision is fixed for this bounded render. Reuse each resolved
+	# storage tile (including an absent/null tile) and detached preview patch
+	# across its scanlines instead of repeatedly entering lazy chunk lookup.
+	# Cap the references and reset at each storage-tile row. A 1px stride or
+	# extremely wide view must not accumulate up to max_pixels cache entries.
+	# A failed lazy resolution must still abort rather than cache a blank tile.
+	const MAX_SOURCE_TILE_REFS: int = 256
+	var source_tiles: Dictionary[String, Variant] = {}
+	var preview_patches: Dictionary[String, Dictionary] = {}
+	var cached_row: int = -9223372036854775807
 	for y: int in range(size.y):
-		var local_y: int = posmod(world_y + y, stride)
+		var world_row: int = world_y + y
+		var storage_row: int = DrawingDocument.TILES.floor_div(world_row, stride)
+		if storage_row != cached_row:
+			source_tiles.clear()
+			preview_patches.clear()
+			cached_row = storage_row
+		var local_y: int = posmod(world_row, stride)
 		var x: int = 0
 		while x < size.x:
 			var absolute_x: int = world_x + x
 			var local_x: int = posmod(absolute_x, stride)
 			var run_length: int = mini(size.x - x, stride - local_x)
 			var key: String = DrawingDocument.TILES.tile_key64(absolute_x, world_y + y, stride)
-			var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
-			if not fetched.ok:
-				return fetched
-			var tile: DrawingRasterTile = fetched.value as DrawingRasterTile
-			var patch: Dictionary = preview.preview_tile(key) if preview != null else {}
+			var tile: DrawingRasterTile = null
+			var patch: Dictionary = {}
+			if source_tiles.has(key):
+				tile = source_tiles[key] as DrawingRasterTile
+				patch = preview_patches.get(key, {})
+			else:
+				var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
+				if not fetched.ok:
+					return fetched
+				tile = fetched.value as DrawingRasterTile
+				if preview != null:
+					patch = preview.preview_tile(key)
+				if stride > 1 and source_tiles.size() < MAX_SOURCE_TILE_REFS:
+					source_tiles[key] = tile
+					if preview != null:
+						preview_patches[key] = patch
 			if tile != null or not patch.is_empty():
 				for offset: int in range(run_length):
 					var pixel_index: int = local_y * stride + local_x + offset
@@ -89,9 +116,11 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 					if (source & 0xff000000) == 0:
 						continue
 					var index: int = (y * size.x + x + offset) * 4
-					var destination: int = int(bytes[index]) | (int(bytes[index + 1]) << 8) \
-						| (int(bytes[index + 2]) << 16) | (int(bytes[index + 3]) << 24)
-					var result: int = DrawingEditSession._blend(source, destination)
+					var result: int = source
+					if ((source >> 24) & 255) != 255:
+						var destination: int = int(bytes[index]) | (int(bytes[index + 1]) << 8) \
+							| (int(bytes[index + 2]) << 16) | (int(bytes[index + 3]) << 24)
+						result = DrawingEditSession._blend(source, destination)
 					bytes[index] = result & 255
 					bytes[index + 1] = (result >> 8) & 255
 					bytes[index + 2] = (result >> 16) & 255

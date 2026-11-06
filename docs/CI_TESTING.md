@@ -6,6 +6,24 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-086 cold compositor regression and opt-in measurement — 2026-11-06
+
+The existing `ci_t086_viewport_cache_model` fail-late step also runs
+`drawing/tests/renderer_cold_tile_smoke.gd` (25 exact model assertions),
+so the **46 required check IDs do not change**. Its success marker is
+validated with `tools/check_godot_model_log.py`, which rejects script or
+runtime defects and reports only the known post-success Godot exit leaks.
+
+For reproducible cold **CPU** composition medians/p95 and pixel SHA-256 parity
+against the pinned pre-optimization source, run
+`python3 tools/benchmarks/t086_compare_cold_composite.py --godot godot`.
+The same script runs in the manual-on-demand
+`godot-native-t086-viewport.yml` workflow alongside the native viewport
+framebuffer witness and the older pre-cache full-frame benchmark. It builds
+isolated standalone projects and verifies the archived baseline's hash; it
+never asserts physical display latency, GPU memory bounds or hardware owner
+acceptance. T-086's remaining cold zoom/large dense hardware gates stay open.
+
 ## T-094 strict-native and owner evidence checkpoint — 2026-11-06
 
 The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)

@@ -105,6 +105,18 @@ one-pixel-edit frames improve **253.09ms → 22.96ms median**, and idle frames
 (144.22ms → 165.52ms, one sample). No real Linux/Windows physical latency or
 large dense reference-window acceptance is claimed. [Ticket and evidence](Tickets/T-086.md).
 
+**T-086 cold-source compositor optimization (2026-11-06; In Progress):**
+A bounded per-storage-row tile/preview lookup (maximum 256 references) and
+opaque-RGBA8 overwrite fast path reduce repeated cold raster composition
+while retaining byte-for-byte alpha parity. New 25/25 headless model checks
+and the existing native framebuffer witness pass. Two isolated, checksum-
+matched nine-sample paired runs improve the 256x256 two-layer opaque CPU
+median from 95.95→54.58ms and 88.39→59.79ms; fractional alpha also
+improves, and an all-transparent case is essentially unchanged. This is
+**headless CPU-only**, not evidence that full cold zoom or real GPU/Windows
+latency acceptance is complete; T-086 remains In Progress.
+[Ticket/measurement](Tickets/T-086.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.

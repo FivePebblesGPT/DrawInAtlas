@@ -85,6 +85,8 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-model.log
           grep -q 'T086_MODEL_PASSED' /tmp/godot-t086-cache-model.log || ci_fail_marker 'T086 model witness incomplete'
           if grep -E 'SCRIPT ERROR:|^ERROR:|T086_MODEL_FAILED:' /tmp/godot-t086-cache-model.log; then ci_fail_marker 'T086 model witness error'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-cold-model.log --marker T086_COLD_PASSED || ci_fail_marker 'T086 cold renderer parity witness error'
           ci_finish
       - name: Verify T-087 standalone image frame, portable metadata and independent grid
         id: ci_t087_image_frame_model
