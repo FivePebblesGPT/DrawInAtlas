@@ -1,6 +1,12 @@
 # Drawing workspace panel docking — agreed follow-up scope
 
-**Agreed roadmap (2026-11-02), progress through 2026-11-03:** T-078 (model), T-079 (collapsible/rail/flyout UI), T-080 (tab/group reordering and previews), T-081 (movable floating hosts), and T-082 (transactional cross-container docking) are **engineering Done**. T-083 persistence/recovery engineering is verified and **awaits explicit owner UX review**. The user flows below describe **the whole future feature set**, not all functionality delivered yet. Earlier T-063 and T-059/T-056 owner-review boundaries remain intact. See [the workflow](TICKET_WORKFLOW.md) and [the UI specification](DRAW_MODULE_UI_SPEC.md).
+**Agreed roadmap (2026-11-02), progress through 2026-11-03:** T-078 (model), T-079 (collapsible/rail/flyout UI), T-080 (tab/group reordering and previews), T-081 (movable floating hosts), and T-082 (transactional cross-container docking) are **engineering Done**. T-083 persistence/recovery engineering was verified, but the 2026-11-05 owner review found the UX unacceptable; **rework is In Progress and owner approval remains open**. The user flows below describe **the whole future feature set**, not all functionality delivered yet. Earlier T-063 and T-059/T-056 owner-review boundaries remain intact. See [the workflow](TICKET_WORKFLOW.md) and [the UI specification](DRAW_MODULE_UI_SPEC.md).
+
+## Superseding owner UX correction — 2026-11-05
+
+The November 5 hands-on review rejects the earlier **multi-group-in-one-floating-container** design and the extra host/group title rows. **Current target:** a floating host owns **exactly one tabbed panel group**; the compact header consists of a drag grip, tab strip and ×. The visual bottom-right resize cue may resemble a textarea grip, but users can resize from any edge/corner. Multiple groups require separate floating hosts. Tab redock preserves their current relative order. Standard docked groups, grouped icon rail, in-app overlays and transaction safety remain valid. T-091 implements this correction and T-083 remains unapproved/In Progress. [Owner review](DRAWING_USABILITY_REVIEW_2026-11-05.md).
+
+**Authority rule:** the old multi-group host statements and older acceptance scenarios below are preserved as **historical implementation scope**, and are superseded on this particular floating-host issue by the correction above; do not assert they represent accepted target UX. Update the corresponding native model/visual tests when implementing T-091.
 
 ## Reference behavior and terminology
 
@@ -38,7 +44,7 @@ Statuses below are the **initial planning state on 2026-11-02**, not a substitut
 | [T-080](Tickets/T-080.md) | Tab reordering, group creation/splitting and rail insertion previews | T-079 | Native drag tests; **Blocked** |
 | [T-081](Tickets/T-081.md) | Movable/resizable in-app floating **tabbed group** containers | T-080 | Native window/control tests; **Blocked** |
 | [T-082](Tickets/T-082.md) | Cross-container docking: tabs and whole groups with alignment hints | T-081 | **Done**; native target/cancellation tests |
-| [T-083](Tickets/T-083.md) | Workspace layout persistence/recovery and final owner UX acceptance | T-082 | **Manual Review**; engineering verified; owner decision pending |
+| [T-083](Tickets/T-083.md) | Workspace layout persistence/recovery and final owner UX acceptance | T-082 | **In Progress** after rejected owner UX; must retest T-091 correction |
 
 Only **one implementation ticket per turn**. T-065's future Asset Browser may register as another panel, but this design work does not make T-065 Done or create an unnecessary hard dependency on it. T-059 and T-056 retain their separate full-Drawing UX and Atlas integration manual gates. Owner agreement to this staged scope is **not** manual approval of a future T-083 implementation.
 
@@ -89,3 +95,9 @@ The shared workspace now saves a `DrawingDockLayout` snapshot plus dock width/sc
 All document pixels, object sources, history and dirty flags are separate. Corrupt/unsupported/oversized preferences never partially mutate the live model; offscreen/invalid host placements recover visibly, and **Window → Reset workspace layout** returns to the defaults without touching the document. The standalone and Atlas projects have independent `user://` directories; embedding hosts can provide another `layout_settings_path` for multiple distinct workspaces. Settings are saved on layout changes and clean shutdown; a process killed before a flush may lose its last layout tweak (never document content). Windows native hardware and extreme multi-monitor transition UX require owner/release testing.
 
 Verified with Godot 4.8 beta 2: T-083 model **46/46**, native round-trip **63/63** (**65/65** including two saved before/after screenshots), T-079–T-082 native regression witnesses **40/68/55/56**, T-063 **75**, and native keyboard **8**. These are objective engineering results only. [T-083](Tickets/T-083.md) is **Manual Review** until the owner explicitly approves the rail/flyout/grouping/drag/floating/persistence/recovery experience. T-056 and T-059 approvals remain separate and pending.
+
+## Corrective checkpoint and test changes — 2026-11-05
+
+- [[T-091]]: enforce one group per floating host, compact grip/tabs/close header, edge resize and reliable saved splitter width. Maintain one icon per panel in docked grouped rail, stable panel IDs and cross-container rollback.
+- Replace tests that assert multi-group floating-host acceptance with tests that assert **one** group; keep old engineering results labeled historical. Test migrated settings containing multiple floating groups without dropping tabs.
+- Owner must inspect native UI after correction under [[T-083]]. Earlier scope agreement and passing model tests are not UX signoff. Keep the manual-review gate intact.
