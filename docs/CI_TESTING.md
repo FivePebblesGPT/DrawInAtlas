@@ -108,6 +108,37 @@ independently attest who ran them. The `--expected-commit` must refer to the
 candidate used for that replay (use its full SHA for historical runs). The
 contract regressions in `tests/test_t094_ci_replay.py` also exercise tampering.
 
+## T-094 hosted fast-CI outcome artifact (not owner/hardware approval)
+
+The fast workflow has **46 check IDs** plus two final non-check steps that run
+`always()` after its required fail-late summary. The first exports a small,
+sanitized `ci-evidence/godot-fast-ci.json`; the second uploads it with
+`actions/upload-artifact@v4` (30-day retention), including when a test step
+fails. Only step **outcomes**, not `toJSON(steps)` outputs, logs, expressions,
+or arbitrary CI metadata, enter the uploaded JSON. If Godot setup fails after checkout but before `godot` is available,
+the artifact is marked incomplete, never green. If checkout itself fails, no
+repository exporter is available; the GitHub run status remains authoritative.
+
+The artifact records the checkout SHA (in pull-request workflows, often a
+**synthetic merge SHA**), GitHub run/attempt IDs, OS, Godot 4.8-beta2 version,
+workflow hash and all expected IDs. Download from that particular GitHub
+Actions run; verify its run/attempt provenance independently, then check:
+
+```sh
+python3 tools/export_godot_ci_evidence.py --verify ./godot-fast-ci.json \
+  --expected-commit <exact-checked-out-40-char-sha> \
+  --expected-run-id <github-actions-run-id>
+```
+
+This fails closed on missing/skipped/failed checks with a forged green verdict,
+wrong engine/workflow/revision, altered order and invalid result counts.
+A valid **red** report can still be inspected (it must not claim success).
+The `tests/test_t094_hosted_ci_evidence.py` contracts execute within the
+existing T-073 fast step, keeping the push CI check set fixed at 46.
+This JSON is **not signed**, cannot establish its own GitHub provenance, and
+never substitutes for the separately reviewed physical Windows/Linux owner
+manifest, user acceptance or `manual_review_approved` fields.
+
 ## T-094 strict Godot model-log classification and repeatable export
 
 A complete fast-workflow local replay of the pre-fix checkpoint

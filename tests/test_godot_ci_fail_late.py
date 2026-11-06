@@ -24,7 +24,7 @@ class GodotCIFailLateTests(unittest.TestCase):
         # Keep push CI bounded while permitting new focused, fast model
         # witnesses (T-065 paging, T-086 cache, T-087 frame, T-088 selection,
         # T-089 layers, T-090 workspace, T-091 docking, T-092 Colors/History and T-093 discovery).
-        self.assertLessEqual(len(blocks), 49)
+        self.assertLessEqual(len(blocks), 51)
         self.assertIn("Verify T-086 source-space dirty-display tile invalidation", workflow)
         self.assertIn("Verify T-088 selection channel, clipboard, and transaction history", workflow)
         self.assertIn("Verify T-089 layer hierarchy, row actions, and structural history", workflow)
@@ -33,7 +33,7 @@ class GodotCIFailLateTests(unittest.TestCase):
         self.assertIn("Verify T-092 compact Colors, history cursor, and isolated app preferences", workflow)
         self.assertIn("Verify T-093 Object source discovery, recent-root consent, image import and safe Open", workflow)
         for name, block in blocks:
-            if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
+            if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name in {"Summarize CI failures", "Export sanitized hosted CI evidence", "Upload hosted CI evidence (including red runs)"}:
                 continue
             with self.subTest(name=name):
                 self.assertRegex(block, r"(?m)^        id: ci_[a-z0-9_]+$")

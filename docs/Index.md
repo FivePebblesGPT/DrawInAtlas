@@ -50,6 +50,16 @@ checks passed locally, but this does **not** replace patched GitHub Actions,
 Windows/Linux physical acceptance or owner approvals.
 [T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
 
+**T-094 hosted-CI artifact export (2026-11-06; In Progress):**
+The hosted fast-CI workflow now uploads a sanitized JSON snapshot of all
+46 check outcomes (including failures), exact candidate commit, runner/Godot
+build and workflow digest. The artifact follows the fail-late summary and
+requires independent verification against its actual GitHub run/attempt;
+the export does not turn the previous local replay into hosted CI evidence.
+Nine new contracts check missing/extra/failed checks, hash/order drift and
+secret-output omission. Physical owner acceptance is still outstanding.
+[T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
+
 **T-094 local full-replay diagnostics (2026-11-06; In Progress):**
 The new fast-CI runner found **35/46 passing** in the first complete local
 rehearsal. Eleven model/export steps had successful assertions but were marked
