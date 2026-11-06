@@ -37,6 +37,16 @@ DistanceInCells(cellA, cellB) -> number
 
 Grid configuration should include `shape` (`GRIDLESS`, `SQUARE`, `HEX_POINTY`, `HEX_FLAT`), `cell_size`, `origin`, `rotation`, `distance_per_cell`, `distance_unit`, and visibility/snapping settings. Document units per cell are **not** the same as feet/miles per cell. Rendering at 64 document units for a five-foot square is valid; projector calibration maps display pixels to physical dimensions separately.
 
+### Native units and exploration scale
+
+The DM chooses each map's native unit and distance per cell when creating it. Linked maps retain their own values; no campaign-wide unit harmonization or exact physical conversion is required. For example, a wilderness board can use **3 mi/hex**, another region 1 mi/hex, and an encounter 5 ft/square. These are independently chosen labels, not instructions to subdivide world hexes into battle squares.
+
+The runtime exposes native distance/unit separately from overlay shape, spacing, origin, rotation and visibility. **File → New board** chooses these values for an independent blank document. The inspector changes them afterward through reversible commands; changing distance/unit labels never converts linked maps, and changing overlay geometry never moves freehand ink. Square spacing is cell side length; hex spacing is explicitly labeled as circumradius in board coordinates. The sample world uses 3 mi/cell; existing saves retain their values.
+
+Schema v3 preserves the inherited terrain prototype's original geometry as `terrain_grid`, independently of `grid` (the editing overlay and authoritative native measurement settings). Legacy v1/v2 loads capture their existing grid as this terrain basis. Typed layers will own content-specific geometry later. Prototype cell painting is blocked when the overlay no longer matches that basis; freehand ink remains editable. Very dense overlay grids are temporarily hidden while zoomed out to keep rendering bounded.
+
+Whether a hex distance means a center-to-center travel step, across-flats width, or another campaign convention remains undecided. Do not silently impose that convention. Physical unit conversion, mismatch warnings, rounding policies and content rescaling remain deferred.
+
 ### Square grid
 
 Square cell conversion: subtract grid origin, invert grid rotation, divide by cell pitch, then floor to integer x/y. Reverse mapping uses cell center and forward transform. For spatial hit-testing, use half-open boundaries to prevent selecting two adjacent cells simultaneously.
