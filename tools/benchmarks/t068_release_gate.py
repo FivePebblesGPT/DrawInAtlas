@@ -27,6 +27,10 @@ class ReleaseError(ValueError):
 BINARY = {"linux": "Drawing.x86_64", "windows": "Drawing.exe"}
 REQUIRED_FONT_LICENSE = "addons/drawing/fonts/OFL-1.1.txt"
 BAD_LOG = re.compile(r"(?:^|\n)(?:SCRIPT ERROR:|ERROR:|Parse Error:|Compile Error:)")
+# Standard Godot 4.8-beta2 headless shutdown may emit these named leaks even
+# after a clean, zero-exit isolated launch. Preserve counts, never exempt
+# general runtime errors, missing Godot identification, or nonzero exit codes.
+KNOWN_SHUTDOWN = re.compile(r"ERROR: \d+ RID allocations of type '[^'\n]+' were leaked at exit\.")
 FORBIDDEN_EXTENSIONS = {".so", ".dll", ".dylib", ".gdextension"}
 
 
@@ -108,6 +112,20 @@ def inspect_distribution(directory: Path, platform: str) -> dict[str, Any]:
     }
 
 
+def check_launch_log(log: str, returncode: int) -> int:
+    """Require clean startup; count only precisely recognized exit diagnostics."""
+    if returncode != 0 or "Godot Engine" not in log:
+        raise ReleaseError(f"Isolated Linux export failed ({returncode}): {log[-2000:]}")
+    shutdown_leaks = 0
+    for line in log.splitlines():
+        if BAD_LOG.match(line):
+            if KNOWN_SHUTDOWN.fullmatch(line):
+                shutdown_leaks += 1
+            else:
+                raise ReleaseError(f"Isolated Linux export runtime error: {line}")
+    return shutdown_leaks
+
+
 def launch_linux(directory: Path, *, timeout: int = 45) -> dict[str, Any]:
     """Launch only the exported binary, isolated from both editor files and HOME."""
     with tempfile.TemporaryDirectory(prefix="t068-export-runtime-") as temporary:
@@ -134,12 +152,10 @@ def launch_linux(directory: Path, *, timeout: int = 45) -> dict[str, Any]:
         except (subprocess.TimeoutExpired, OSError) as exc:
             raise ReleaseError(f"Isolated Linux export failed to launch: {exc}") from exc
         log = result.stdout + "\n" + result.stderr
-        if result.returncode != 0 or BAD_LOG.search(log):
-            raise ReleaseError(f"Isolated Linux export failed ({result.returncode}): {log[-2000:]}")
-        if "Godot Engine" not in log:
-            raise ReleaseError("Export did not identify itself as a Godot runtime")
+        leaks = check_launch_log(log, result.returncode)
         return {"status": "passed", "isolated_working_directory": True,
-                "isolated_user_profile": True, "source_project_loaded": False}
+                "isolated_user_profile": True, "source_project_loaded": False,
+                "post_exit_leak_diagnostics": leaks}
 
 
 def inspect_release(stage: Path, linux: Path | None, windows: Path | None,

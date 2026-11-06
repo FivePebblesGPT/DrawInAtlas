@@ -50,6 +50,17 @@ checks passed locally, but this does **not** replace patched GitHub Actions,
 Windows/Linux physical acceptance or owner approvals.
 [T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
 
+**T-094 local full-replay diagnostics (2026-11-06; In Progress):**
+The new fast-CI runner found **35/46 passing** in the first complete local
+rehearsal. Eleven model/export steps had successful assertions but were marked
+failed by named Godot 4.8-beta2 post-exit resource-leak `ERROR:` diagnostics.
+A shared strict, success-marker-aware log validator now rejects any runtime
+fault while separately counting only known shutdown diagnostics. The Linux
+release gate is likewise fail-closed and its stage uses a unique temporary
+directory. All 11 affected steps have passed targeted reruns; **patched
+remote CI and physical Linux/Windows owner signoff remain NOT RUN**.
+[T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples

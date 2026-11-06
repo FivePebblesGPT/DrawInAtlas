@@ -82,6 +82,31 @@ The regression contracts run in the existing T-073 fast CI step:
 `tests/test_t094_ci_replay.py`. **T-094 remains In Progress** until patched
 GitHub CI itself is green and real Linux/Windows owner evidence is reviewed.
 
+## T-094 strict Godot model-log classification and repeatable export
+
+A complete fast-workflow local replay of the pre-fix checkpoint
+`71ab793` executed **46/46** checks and correctly reported **35 pass / 11
+fail**. All 11 failed after their model **success markers** because Godot
+4.8-beta2 headless teardown emitted named `RID allocations ... were leaked
+at exit` errors. Every retained failed-step log was inspected; no additional
+pre-success script, parse, assertion, or runtime errors were found. This
+explains the *local* red result, **not** the previously red upstream run or
+its still-unverified status on patched code.
+
+`tools/check_godot_model_log.py --marker TXXX_MODEL_PASSED /tmp/godot-xxx.log`
+replaces broad post-test `grep '^ERROR:'` handling only in affected fast
+smokes. It requires exactly one marker, rejects all parse/script/model
+failures and unknown runtime errors, and reports only **known,
+post-success** Godot RID/GL teardown leaks explicitly while preserving the
+raw logs. Tests in `tests/test_t094_godot_model_log.py` exercise both
+acceptance and fail-closed cases. The isolated Linux release gate performs
+its own similarly strict exit-code/startup/runtime validation and publishes
+the recognized post-exit leak count; it never treats those logs as clean.
+The CI release step now stages in a fresh `mktemp` directory and cleans it
+on exit, making repeated local replay safe from stale `/tmp/drawing-dist`
+collisions. Each previously failing step passed its **targeted** replay,
+but those partial runs do not certify all 46 checks or physical owner UX.
+
 ## T-086 persistent source-space viewport cache
 
 Fast push/PR CI stages/imports the independent Drawing package and runs

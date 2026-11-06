@@ -96,8 +96,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/image_frame_smoke.gd 2>&1 | tee /tmp/godot-t087-frame-model.log
-          grep -q 'T087_MODEL_PASSED' /tmp/godot-t087-frame-model.log || ci_fail_marker 'T087 model witness incomplete'
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T087_MODEL_FAILED:' /tmp/godot-t087-frame-model.log; then ci_fail_marker 'T087 model witness error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t087-frame-model.log --marker T087_MODEL_PASSED || ci_fail_marker 'T087_MODEL_PASSED log rejected'
           ci_finish
       - name: Verify T-088 selection channel, clipboard, and transaction history
         id: ci_t088_selection_clipboard_model
@@ -109,8 +108,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd 2>&1 | tee /tmp/godot-t088-selection-model.log
-          grep -q 'T088_MODEL_PASSED' /tmp/godot-t088-selection-model.log || ci_fail_marker 'T088 model witness incomplete'
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T088_MODEL_FAILED:' /tmp/godot-t088-selection-model.log; then ci_fail_marker 'T088 model witness error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t088-selection-model.log --marker T088_MODEL_PASSED || ci_fail_marker 'T088_MODEL_PASSED log rejected'
           ci_finish
       - name: Verify T-089 layer hierarchy, row actions, and structural history
         id: ci_t089_layer_structure_model
@@ -180,23 +178,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/drawing-dist
-          python3 tools/build_drawing_app.py --output /tmp/drawing-dist/project
-          godot --headless --editor --path /tmp/drawing-dist/project --import --quit
-          godot --headless --path /tmp/drawing-dist/project --export-release Linux /tmp/drawing-dist/Drawing.x86_64
-          test -s /tmp/drawing-dist/Drawing.x86_64
-          test -s /tmp/drawing-dist/Drawing.pck
-          # Godot keeps font bytes inside imported .fontdata, not raw .ttf paths.
-          # Run a source-side probe against the exported PCK (never the editor tree).
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --path /tmp/drawing-dist --main-pack /tmp/drawing-dist/Drawing.pck \
-            --script /tmp/drawing-dist/project/tests/packaged_fonts_smoke.gd \
+          # A fresh isolated stage is required even on repeated CI replays.
+          release_root="$(mktemp -d "${TMPDIR:-/tmp}/drawing-dist.XXXXXXXX")"
+          trap 'rm -rf "$release_root"' EXIT
+          python3 tools/build_drawing_app.py --output "$release_root/project"
+          godot --headless --editor --path "$release_root/project" --import --quit
+          godot --headless --path "$release_root/project" --export-release Linux "$release_root/Drawing.x86_64"
+          test -s "$release_root/Drawing.x86_64"
+          test -s "$release_root/Drawing.pck"
+          # Font bytes ship as imported .fontdata, not raw .ttf.
+          # Probe the exported PCK rather than editor source files.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root" --main-pack "$release_root/Drawing.pck" \
+            --script "$release_root/project/tests/packaged_fonts_smoke.gd" \
             2>&1 | tee /tmp/godot-export-fonts.log
-          grep -q 'DRAWING_PACK_FONT_PASSED' /tmp/godot-export-fonts.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-export-fonts.log; then exit 1; fi
-          # Validate the shipped ELF/PCK without looking at editor resources.
-          # The binary must launch from a fresh cwd and disposable HOME.
+          python3 tools/check_godot_model_log.py /tmp/godot-export-fonts.log --marker DRAWING_PACK_FONT_PASSED
+          # Inspect the exported ELF/PCK and launch with a disposable HOME/CWD.
           python3 tools/benchmarks/t068_release_gate.py \
-            --stage /tmp/drawing-dist/project --linux /tmp/drawing-dist \
+            --stage "$release_root/project" --linux "$release_root" \
             --launch-linux --output /tmp/t068-standalone-linux-release.json
       # The standalone package import above only registers *its* classes.
       # The main checkout needs its own class cache before any --path . --script smoke.
@@ -264,14 +262,12 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
-          grep -q 'DRAWING_TEXT_PASSED' /tmp/godot-drawing-text.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text.log; then ci_fail_marker 'Forbidden error marker'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-drawing-text.log --marker DRAWING_TEXT_PASSED || ci_fail_marker 'DRAWING_TEXT_PASSED log rejected'
           python3 tools/build_drawing_app.py --in-place
           # Staging refreshes font files: let Godot generate their imported FontFile resources.
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
-          grep -q 'DRAWING_TEXT_UI_PASSED' /tmp/godot-drawing-text-ui.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-text-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-drawing-text-ui.log --marker DRAWING_TEXT_UI_PASSED || ci_fail_marker 'DRAWING_TEXT_UI_PASSED log rejected'
           ci_finish
       - name: Verify T-060 reusable Object Assets and atomic Save As
         id: ci_11_verify_t_060_reusable_object_assets_and_atomic_save_as
@@ -301,17 +297,14 @@ jobs:
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_project_copy_smoke.gd 2>&1 | tee /tmp/godot-t064-project-copy.log
-          grep -q 'T064_PROJECT_COPY_PASSED' /tmp/godot-t064-project-copy.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_PROJECT_COPY_FAILED:' /tmp/godot-t064-project-copy.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t064-project-copy.log --marker T064_PROJECT_COPY_PASSED
           # A saved portable campaign copy includes all retained Drawing/Objects/
           # Fonts generations, verified before one destination directory rename.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_campaign_copy_smoke.gd 2>&1 | tee /tmp/godot-t064-campaign-copy.log
-          grep -q 'T064_CAMPAIGN_COPY_PASSED' /tmp/godot-t064-campaign-copy.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CAMPAIGN_COPY_FAILED:' /tmp/godot-t064-campaign-copy.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t064-campaign-copy.log --marker T064_CAMPAIGN_COPY_PASSED
           # Atlas File > Copy saved campaign routes through the same verified API.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_campaign_copy_ui_smoke.gd 2>&1 | tee /tmp/godot-t064-copy-ui.log
-          grep -q 'T064_COPY_UI_PASSED' /tmp/godot-t064-copy-ui.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_COPY_UI_FAILED:' /tmp/godot-t064-copy-ui.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t064-copy-ui.log --marker T064_COPY_UI_PASSED
       - name: Verify T-064 bounded nested source composition and hit paths
         id: ci_t064_nested_source_render
         if: ${{ !cancelled() }}
@@ -383,14 +376,12 @@ jobs:
         run: |
           source tools/ci_fail_late.sh
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
-          grep -q 'OBJECT_EDITOR_PASSED' /tmp/godot-object-editor.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_EDITOR_FAILED:' /tmp/godot-object-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-object-editor.log --marker OBJECT_EDITOR_PASSED || ci_fail_marker 'OBJECT_EDITOR_PASSED log rejected'
           python3 tools/build_drawing_app.py --in-place
           # Staged licensed fonts must be imported before UI text editing.
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
-          grep -q 'DRAWING_OBJECT_UI_PASSED' /tmp/godot-object-editor-ui.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|DRAWING_OBJECT_UI_FAILED:' /tmp/godot-object-editor-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-object-editor-ui.log --marker DRAWING_OBJECT_UI_PASSED || ci_fail_marker 'DRAWING_OBJECT_UI_PASSED log rejected'
           ci_finish
       - name: Verify T-061 signed floor/detail world mapping and blank D-levels
         id: ci_13_verify_t_061_signed_floor_detail_world_mapping_and_blank_d_leve
@@ -410,8 +401,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
-          grep -q 'T055_COMPOSITION_PASSED' /tmp/godot-t055-composition.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T055_FAILED:' /tmp/godot-t055-composition.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t055-composition.log --marker T055_COMPOSITION_PASSED
       - name: Verify T-068 hard-dab parity and source-tile cache transactions
         id: ci_t068_stationary_dab_parity
         if: ${{ !cancelled() }}
@@ -498,6 +488,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_t094_owner_matrix.py' -v
           python3 -m unittest discover -s tests -p 'test_t094_owner_evidence.py' -v
           python3 -m unittest discover -s tests -p 'test_t094_ci_replay.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_godot_model_log.py' -v
       - name: Verify T-063 compact Drawing workspace and shortcut contract
         id: ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract
         if: ${{ !cancelled() }}
@@ -514,8 +505,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_layout_smoke.gd 2>&1 | tee /tmp/godot-dock-layout.log
-          grep -q 'DRAWING_DOCK_MODEL_PASSED' /tmp/godot-dock-layout.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|DOCK MODEL FAILED:' /tmp/godot-dock-layout.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-dock-layout.log --marker DRAWING_DOCK_MODEL_PASSED
       - name: Verify T-080 transactional dock drag/drop model
         id: ci_dock_drag_model
         if: ${{ !cancelled() }}
@@ -564,8 +554,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_smoke.gd 2>&1 | tee /tmp/godot-t065-browser.log
-          grep -q 'T065_ASSET_BROWSER_PASSED' /tmp/godot-t065-browser.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ASSET_BROWSER_FAILED:' /tmp/godot-t065-browser.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t065-browser.log --marker T065_ASSET_BROWSER_PASSED
       - name: Verify T-065 lazily rendered Object source thumbnails
         id: ci_t065_asset_thumbnail_model
         if: ${{ !cancelled() }}
@@ -574,8 +563,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_thumbnails_smoke.gd 2>&1 | tee /tmp/godot-t065-thumbnails.log
-          grep -q 'T065_THUMBNAILS_PASSED' /tmp/godot-t065-thumbnails.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_THUMB_FAILED:' /tmp/godot-t065-thumbnails.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t065-thumbnails.log --marker T065_THUMBNAILS_PASSED
       - name: Verify T-065 Object metadata listing, full pixel decoding and cache safety
         id: ci_t065_real_source_io
         if: ${{ !cancelled() }}
@@ -634,8 +622,7 @@ jobs:
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/asset_browser_atlas_smoke.gd 2>&1 | tee /tmp/godot-t065-atlas-browser.log
-          grep -q 'T065_ATLAS_BROWSER_PASSED' /tmp/godot-t065-atlas-browser.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ATLAS_BROWSER_FAILED:' /tmp/godot-t065-atlas-browser.log; then exit 1; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t065-atlas-browser.log --marker T065_ATLAS_BROWSER_PASSED
       - name: Verify T-065 large Atlas source catalog paging and global search
         id: ci_t065_atlas_browser_paging
         if: ${{ !cancelled() }}
