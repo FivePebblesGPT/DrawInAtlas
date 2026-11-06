@@ -1,8 +1,14 @@
 # Ticket Kanban Index
 
-**As of 2026-11-04 · `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+**As of 2026-11-05 · owner usability review against `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
+
+## Current priority — owner Drawing review (2026-11-05)
+
+**Standalone Drawing usability is NOT accepted.** The owner reproduced missing live paint feedback, ~1-second strokes, zoom-out lag, insufficient selection and Move, opaque/unclear canvas bounds, ineffective layer hierarchy/visibility, cramped floating docks, responsive layout defects, and poor Object discovery. `.drawing` save/open **worked** in the exercised flow; undo's monotonic internal revision is **not itself a bug**. This assessment supersedes any implication that T-053/T-063/T-078–T-083 engineering checks constitute final interactive UX approval. [Full 23-finding matrix and milestones](DRAWING_USABILITY_REVIEW_2026-11-05.md).
+
+**Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
 ## Kanban summary
 
@@ -965,7 +971,19 @@ third-party native backend or hardware gate was satisfied. See
 | [T-080 · Tab and group reordering](Tickets/T-080.md) | Done | — | [T-079](Tickets/T-079.md) |
 | [T-081 · Floating tabbed panel containers](Tickets/T-081.md) | Done | — | [T-080](Tickets/T-080.md) |
 | [T-082 · Cross-container panel and group docking](Tickets/T-082.md) | Done | — | [T-081](Tickets/T-081.md) |
-| [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | Manual Review | **Owner** | [T-082](Tickets/T-082.md) |
+| [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | In Progress | **Owner** | [T-082](Tickets/T-082.md) |
+
+| [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Ready | — | [T-052](Tickets/T-052.md) |
+| [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Ready | — | [T-063](Tickets/T-063.md) |
+| [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | Ready | — | [T-082](Tickets/T-082.md) |
+| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Ready | — | [T-063](Tickets/T-063.md) |
+| [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | Ready | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
 
 ## Epics
 

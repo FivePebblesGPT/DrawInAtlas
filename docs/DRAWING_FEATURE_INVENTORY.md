@@ -6,6 +6,10 @@
 
 Related: [[T-059]], [[T-051]], [[T-052]], [[T-053]], [[T-058]], [[T-060]], [[T-062]], [[T-063]], [[T-065]], [[DRAW_MODULE_UI_SPEC]], [[DECISIONS_DRAWING_ATLAS_2026-11-01]].
 
+## 2026-11-05 hands-on acceptance gap
+
+The owner-approved Essential/Later/Skip matrix below is **scope**, not implementation or final UX approval. The first owner trial of the independent Drawing app reports missing live stroke preview, lag, insufficient selection/Move/layer behavior and workspace defects; saving/loading `.drawing` works in that trial. See the [owner findings and milestones](DRAWING_USABILITY_REVIEW_2026-11-05.md) and tickets [[T-084]]–[[T-094]]. No Essential label may be presented as working without interactive evidence. T-059 remains owner-review gated.
+
 ## Interpretation and authority
 
 - **Essential:** **approved** for the complete reduced-feature Drawing baseline; **not** automatically a prerequisite for the tiny T-053 end-to-end vertical slice. Items specifically tagged approved were also settled under the prior owner decision/ticket.

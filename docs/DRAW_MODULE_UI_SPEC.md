@@ -3,6 +3,10 @@
 **Status:** Proposed design  
 **Scope:** Revised Draw workspace layout, based on the earlier mockup (section 8), with a compact top bar and `BarDivider` overflow behavior.
 
+## 2026-11-05 native owner correction (supersedes disputed prototype details)
+
+The owner tested the shipped standalone shell and rejected several usability choices despite earlier T-063 engineering tests. [Full review](DRAWING_USABILITY_REVIEW_2026-11-05.md) and [[T-090]]/[[T-091]]/[[T-092]] define corrective work: responsive full-width client without black side bars; brush-size wheel works; coherent icons; logical File/Object vs Window commands; per-tab × without separate +; compact color/history; one floating group per host, grip/×/tabs-only header and edge resizing. Retain the **single menu/tool-options row**, no redundant quick-action toolbar, central canvas and normal layer/dock hierarchy. This does not constitute approval of the final UX; [[T-059]]/[[T-083]] remain unapproved. Historical proposal details below remain documented where not superseded.
+
 ## Authority, delivered subset, and accepted exceptions (T-073; 2026-11-02)
 
 **Proposed, not signed off:** the owner-proposed compact `BarDivider` layout has

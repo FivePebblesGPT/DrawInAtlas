@@ -8,6 +8,20 @@ DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / 
 
 The development engine is **Godot 4.8-beta2**, standard build. Application code is GDScript. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
 
+## Current split architecture and standalone Drawing — 2026-11-05
+
+**Important:** The Atlas-specific walkthrough below describes substantial **older pre-split** workflows and is not a reliable description of current standalone Drawing or the new Atlas multi-file storage contract. The active architecture is one canonical `addons/drawing/` package, an independently runnable `drawing/` Godot project, and the root Atlas Godot project. Current Windows/Linux desktop is first; Web is paused. See [E-009](docs/Epics/E-009.md), [Drawing storage](docs/DRAWING_STORAGE_CONTRACT.md) and the [new owner usability review](docs/DRAWING_USABILITY_REVIEW_2026-11-05.md).
+
+To launch the **standalone Drawing app** from the repository root with Godot 4.8-beta2:
+
+```sh
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --path drawing
+```
+
+`drawing/main.tscn` is the entry scene, not a separate 'Drawing module' scene inside Atlas. For a clean isolated package use `python3 tools/build_drawing_app.py --output /tmp/drawing-project` and launch that project. The app is **not yet owner-accepted as usable**: live strokes, zoom, selection, layer and dock issues remain. `.drawing` Save/Open worked in the owner's reported test; older single-file Atlas `.scn` save descriptions below are historical. [Corrective tickets](docs/Index.md).
+
 ## Confirmed target interaction model
 
 - Hexes overlay one continuous, chunked drawing board, including higher-detail artwork across their borders; no separate canvas/document per hex.
