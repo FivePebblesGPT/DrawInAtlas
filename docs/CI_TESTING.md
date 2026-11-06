@@ -2,6 +2,10 @@
 
 **Policy (2026-11-03):** Required push/PR GDScript CI now verifies the implemented **Drawing package and shared Atlas composition foundation**. The approved complete Drawing Essential baseline remains unfinished under T-059. Windows/Linux desktop are the release-first targets. **Web export, broad native framebuffer sweeps, and historical Atlas pointer/shape tests are intentionally excluded from push CI.** They remain in source and are not claimed green.
 
+## Owner-facing Drawing quality gates — 2026-11-05
+
+[Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
+
 ## Required CI
 
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
