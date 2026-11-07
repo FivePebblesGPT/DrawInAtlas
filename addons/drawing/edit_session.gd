@@ -305,7 +305,7 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 ## Pointer path is in view coordinates; transform freezes the raster-space mapping.
 func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 		erase: bool = false, selection: DrawingSelection = null,
-		max_candidates: int = 1048576) -> DrawingResult:
+		max_candidates: int = 1048576, clip_bounds: Rect2i = Rect2i()) -> DrawingResult:
 	if _closed or path.is_empty() or width <= 0.0 or not is_finite(width) or max_candidates <= 0:
 		return DrawingResult.failure("BRUSH", "Invalid brush session, radius or pointer path")
 	if rgba < 0 or rgba > 0xffffffff:
@@ -321,7 +321,7 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 			return DrawingResult.failure("COORD_RANGE", "Brush point is outside the view-relative range")
 		var start: Vector2 = previous if index > 0 or _has_last else position
 		var touched: DrawingResult = _paint_segment(start, position, width * 0.5, rgba,
-			erase, selection, max_candidates)
+			erase, selection, max_candidates, clip_bounds)
 		if not touched.ok:
 			_rollback_paint()
 			return touched
@@ -335,11 +335,18 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 
 func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 		erase: bool, selection: DrawingSelection, max_candidates: int,
-		depth: int = 0) -> DrawingResult:
+		clip_bounds: Rect2i = Rect2i(), depth: int = 0) -> DrawingResult:
 	var left: int = floori(minf(start.x, finish.x) - radius - 0.5)
 	var top: int = floori(minf(start.y, finish.y) - radius - 0.5)
 	var right: int = ceili(maxf(start.x, finish.x) + radius + 0.5)
 	var bottom: int = ceili(maxf(start.y, finish.y) + radius + 0.5)
+	# Restrict only this stroke's candidate window, never sparse document data.
+	# Clipping before the candidate limit also avoids processing off-frame runs.
+	if clip_bounds.has_area():
+		left = maxi(left, clip_bounds.position.x)
+		top = maxi(top, clip_bounds.position.y)
+		right = mini(right, clip_bounds.end.x)
+		bottom = mini(bottom, clip_bounds.end.y)
 	var columns: int = right - left
 	var rows: int = bottom - top
 	if columns <= 0 or rows <= 0:
@@ -349,11 +356,11 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return DrawingResult.failure("BRUSH_LIMIT", "Brush candidate window exceeds pixel limit")
 		var middle: Vector2 = (start + finish) * 0.5
 		var first: DrawingResult = _paint_segment(start, middle, radius, rgba, erase,
-			selection, max_candidates, depth + 1)
+			selection, max_candidates, clip_bounds, depth + 1)
 		if not first.ok:
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
-			selection, max_candidates, depth + 1)
+			selection, max_candidates, clip_bounds, depth + 1)
 	# A stationary dab has no segment projection. Axis-aligned segments can
 	# compute squared distance without a Geometry2D call per candidate. Keep
 	# the original native geometry oracle for all oblique sweeps.

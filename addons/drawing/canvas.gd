@@ -32,7 +32,16 @@ var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
 ## Workspace presentation, independent of the unbounded document. Atlas hosts
 ## leave image_bounds empty unless they explicitly want an authoring frame.
-var image_bounds: Rect2i = Rect2i()
+var image_bounds: Rect2i = Rect2i():
+	set(value):
+		if value != image_bounds and session != null:
+			cancel_gesture()
+		image_bounds = value
+		queue_redraw()
+## Only the standalone workspace enables this. Atlas can show a bounded guide
+## without changing its intentionally unbounded authoring surface.
+var clip_strokes_to_image_frame: bool = false
+var _stroke_clip: Rect2i = Rect2i()
 var show_grid: bool = false
 var snap_to_grid: bool = false
 var grid_spacing: int = 8
@@ -161,6 +170,9 @@ func _ready() -> void:
 		for x: int in range(32):
 			checker.set_pixel(x, y, Color8(207, 211, 218) if ((x / 16 + y / 16) % 2 == 0) else Color8(164, 170, 180))
 	_checker_texture = ImageTexture.create_from_image(checker)
+	# Screen-coordinate texture regions can wrap the fixed 32px checker; ordinary
+	# source raster tiles still use their one-to-one texture coordinates.
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	RenderingServer.frame_post_draw.connect(_on_frame_post_draw)
 
 
@@ -366,7 +378,11 @@ func _draw_image_backdrop() -> void:
 		Vector2(image_bounds.size) * zoom)
 	var visible: Rect2 = frame.intersection(Rect2(Vector2.ZERO, size))
 	if visible.has_area():
-		draw_texture_rect(_checker_texture, visible, true)
+		# A tiled rect starts its UVs at visible.position, which changes as the
+		# image enters/leaves each edge. Source UVs must instead be anchored to
+		# the viewport's origin (at all pan edges and fractional zoom values).
+		draw_texture_rect_region(_checker_texture, visible,
+			Rect2(visible.position, visible.size), Color.WHITE, false, false)
 
 
 func _draw_grid_overlay() -> void:
@@ -705,6 +721,12 @@ func start_gesture(position: Vector2) -> void:
 	if tool not in ["Brush", "Eraser"]:
 		dragging = false
 		return
+	# The neutral workspace is not a paint target. An in-frame stroke may
+	# cross the edge; its swept footprint is clipped when staging pixels.
+	if clip_strokes_to_image_frame and image_bounds.has_area() \
+			and not image_bounds.has_point(gesture_start):
+		dragging = false
+		return
 	var result: DrawingResult = document.begin_edit(layer_id, document.revision)
 	if not result.ok:
 		canvas_error.emit(result.message)
@@ -719,6 +741,7 @@ func start_gesture(position: Vector2) -> void:
 	_stroke_color = color_rgba
 	_stroke_width = brush_width
 	_stroke_erase = tool == "Eraser"
+	_stroke_clip = image_bounds if clip_strokes_to_image_frame else Rect2i()
 	_samples.clear()
 	_sample_times_us.clear()
 	_sample_index = 0
@@ -803,7 +826,7 @@ func _drain_segments(budget: int) -> void:
 		var start_us: int = Time.get_ticks_usec()
 		var stage: DrawingResult = session.paint_path(batch,
 			_stroke_color, _stroke_width, _stroke_erase,
-			selection_mask if selection_mask.enabled else null)
+			selection_mask if selection_mask.enabled else null, 1048576, _stroke_clip)
 		var staged_at_us: int = Time.get_ticks_usec()
 		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + staged_at_us - start_us
 		if not stage.ok:

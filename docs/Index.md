@@ -219,7 +219,21 @@ remote baseline and is **not** counted green. Windows/Linux physical pointer,
 DPI and owner approval remain pending, with no T-083 manual gate waived.
 [T-091 evidence and limitations](Tickets/T-091.md).
 
-**T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
+**T-087 finite-frame Brush/Eraser and checker correction (2026-11-07; In Progress):**
+PR #13's reported outside-frame painting and panning checker-phase defects
+are corrected in the standalone canvas without cropping signed sparse data or
+limiting Atlas hosts. Brush/Eraser begins only inside the image; the entire
+swept footprint is clipped in detached staging and remains one Undo entry.
+Existing off-frame pixels, hidden RGB and `.drawing` Save/Open survive.
+The repeated checker uses viewport-origin UV phase so top/left/right/bottom
+image edges do not shift its 16px screen cells. New T-087 model **57/57**
+and Xvfb/Mesa native **64/64** checks pass; neighboring T-085/T-086/T-088
+and shared Atlas checks pass after a clean import. T-059 physical owner UX
+finding #02 and #16 remain **PENDING**; the earlier engineering-Done status
+is reopened for corrective review, without approving manual gates.
+[Ticket](Tickets/T-087.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-087 visible standalone image bounds and independent grid (2026-11-06; historical engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.
 Ordinary New/Open fits a visible edge and screen-space 16px checkerboard;
@@ -1236,7 +1250,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | — | [T-053](Tickets/T-053.md) |
+| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | — | [T-063](Tickets/T-063.md) |

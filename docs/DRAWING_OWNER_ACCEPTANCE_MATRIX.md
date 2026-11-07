@@ -79,6 +79,17 @@ In the **State** column, `PENDING` means a target ticket still owes a fresh inte
 | 22 | T-094 | Paint then Save `.drawing`, close/open, check hidden RGB, IDs and undo | Byte-exact RGBA8 including transparent hidden RGB, stable IDs, clean savepoint, corruption rejected; `drawing/tests/standalone_smoke.gd` | Owner reported one successful flow, not every file | OWNER PASS / REGRESSION |
 | 23 | T-092 | Paint, Undo, compare displayed history cursor and internal revision | History cursor moves backward while internal revision remains monotonic; native History dock screenshot | T-092: public history labels and cursor/total replace raw document revision in status; Xvfb 34/34 Undo/Redo readback confirms cursor decrements while internal revision increases; physical/owner re-review NOT RUN | MODEL EXPECTED / UI PENDING |
 
+**T-087 PR #13 corrective evidence (2026-11-07, still owner PENDING):**
+The original #02 frame check now also requires a wide Brush/Eraser stroke
+from the image into the workspace to affect only in-frame pixels, while
+preexisting off-frame sparse artwork still saves and reopens. Checker phase
+must stay fixed at all four image/pan edges and all zooms. Signed model
+**57/57** and Xvfb/Mesa native framebuffer/pointer **64/64** checks pass
+(Godot 4.8 beta 2, 560×460 window, 310×260 canvas, 50/100/200% checker
+pan sweeps; original 25–200% visibility check). This **does not** grant
+physical Windows/Linux owner acceptance, replace T-059/T-056 or imply
+that direct Atlas edits are framed.
+
 ## Gate and result handling
 
 `T-056` (standalone/Atlas hands-on), `T-059` (full inventory UX), `T-065` (Object discovery), and `T-083` (revised docking) remain `manual_review: true` and require distinct **owner** responses; this runbook does not satisfy them. `T-085` through `T-093` own corrective implementations and new native witnesses, rather than T-094 preemptively marking their findings fixed. Every future checked result should append: `(date, ticket, commit, OS, renderer/GPU, viewport/DPI, zoom, action, expected, observed, test/log/screenshot or pixel hash, reviewer decision)`. If any row fails, retain the failure and link an open follow-up ticket; do not silently relabel it as a pass.

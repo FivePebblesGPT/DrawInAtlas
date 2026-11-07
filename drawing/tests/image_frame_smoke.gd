@@ -91,11 +91,58 @@ func run() -> void:
 		"Object Asset portable metadata continues to save independently")
 	check(DrawingFileIO.open(object_path).ok, "legacy document-only open API preserved")
 
+	# Independent session oracle: clipping restricts a *gesture*, not persisted
+	# source storage, selection semantics or render/save/export boundaries.
+	var frame_clip: Rect2i = Rect2i(-3, 5, 6, 4)
+	var clip_doc: DrawingDocument = DrawingDocument.new("t087-clip")
+	var clip_layer: String = String(clip_doc.create_layer(DrawingLayerNode.RASTER, "Pixels").value)
+	var clip_edit: DrawingEditSession = clip_doc.begin_edit(clip_layer, clip_doc.revision).value as DrawingEditSession
+	check(clip_edit.paint_path(PackedVector2Array([Vector2(-10.5, 6.5),
+		Vector2(10.5, 6.5)]), 0xff12ab34, 5.0, false, null, 100000, frame_clip).ok,
+		"clipped wide stroke crosses both signed frame edges")
+	check(clip_edit.change_count() > 0 and clip_doc.read_pixel(clip_layer, -3, 6).value == 0,
+		"clip operates on detached candidate pixels before publication")
+	check(clip_edit.commit().ok and clip_doc.read_pixel(clip_layer, -3, 6).value != 0
+		and clip_doc.read_pixel(clip_layer, 2, 6).value != 0
+		and clip_doc.read_pixel(clip_layer, -4, 6).value == 0
+		and clip_doc.read_pixel(clip_layer, 3, 6).value == 0,
+		"whole brush footprint, not just center, is cropped at signed extent")
+	check(clip_doc.undo().ok and clip_doc.read_pixel(clip_layer, -3, 6).value == 0
+		and clip_doc.redo().ok and clip_doc.read_pixel(clip_layer, 2, 6).value != 0,
+		"clipped stroke remains exactly one Undo/Redo step")
+	var restricted: DrawingSelection = DrawingSelection.new()
+	restricted.set_rectangle(Rect2i(-2, 6, 2, 2))
+	var restricted_edit: DrawingEditSession = clip_doc.begin_edit(clip_layer, clip_doc.revision).value as DrawingEditSession
+	check(restricted_edit.paint_path(PackedVector2Array([Vector2(-10.5, 7.5),
+		Vector2(10.5, 7.5)]), 0xff5500aa, 1.0, false, restricted,
+		100000, frame_clip).ok and restricted_edit.commit().ok,
+		"selection mask and frame both constrain stroke without mutating either")
+	check(clip_doc.read_pixel(clip_layer, -2, 7).value != 0
+		and clip_doc.read_pixel(clip_layer, 2, 7).value == 0xff12ab34
+		and restricted.allows(Vector2i(-2, 7)) and not restricted.allows(Vector2i(2, 7)),
+		"intersection with a signed selection excludes pixels inside frame but outside mask")
+	var atlas_edit: DrawingEditSession = clip_doc.begin_edit(clip_layer, clip_doc.revision).value as DrawingEditSession
+	check(atlas_edit.paint_path(PackedVector2Array([Vector2(12.5, 9.5)]),
+		0xffaa11cc, 1.0).ok and atlas_edit.commit().ok and
+		clip_doc.read_pixel(clip_layer, 12, 9).value != 0,
+		"unclipped shared edit-session API still permits sparse Atlas pixels")
+	var clip_path: String = ProjectSettings.globalize_path("user://t087-clip.drawing")
+	check(DrawingFileIO.save(clip_doc, clip_path,
+		{"image_frame": DrawingImageFrame.encode(frame_clip)}).ok,
+		"saving a framed document does not delete pre-existing outside pixels")
+	var clip_loaded: DrawingResult = DrawingFileIO.open_with_frame(clip_path)
+	check(clip_loaded.ok and
+		int((clip_loaded.value["document"] as DrawingDocument).read_pixel(clip_layer, 12, 9).value) != 0,
+		"outside pixels survive framed save/reopen even though new strokes are clipped")
+	DirAccess.remove_absolute(clip_path)
+
 	var workspace: Control = load("res://main.tscn").instantiate()
 	workspace.layout_persistence_enabled = false
 	root.add_child(workspace)
 	await process_frame
 	await process_frame
+	check(workspace.canvas.clip_strokes_to_image_frame,
+		"standalone workspace opts in to stroke clipping; Atlas default is unbounded")
 	check(workspace.canvas.image_bounds == DrawingImageFrame.DEFAULT_BOUNDS,
 		"new standalone tab has an explicit visible guide")
 	check(not workspace.canvas.snap_to_grid and not workspace.canvas.show_grid,

@@ -288,6 +288,7 @@ func _build_interface() -> void:
 		rail.add_child(button)
 	_refresh_tool_buttons()
 	canvas = CANVAS_SCRIPT.new() as Control
+	canvas.clip_strokes_to_image_frame = true
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.custom_minimum_size = Vector2(125, 190)

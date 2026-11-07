@@ -41,6 +41,23 @@ func local_delta(before: Image, after: Image, canvas: Control, local: Vector2) -
 	return maximum
 
 
+func pointer(canvas: Control, source: Vector2, pressed: bool) -> void:
+	var event: InputEventMouseButton = InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = pressed
+	event.position = canvas.global_position + canvas.pixel_to_position(source)
+	event.global_position = event.position
+	root.push_input(event, true)
+
+
+func stroke_motion(canvas: Control, source: Vector2) -> void:
+	var event: InputEventMouseMotion = InputEventMouseMotion.new()
+	event.position = canvas.global_position + canvas.pixel_to_position(source)
+	event.global_position = event.position
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(event, true)
+
+
 func patch(doc: DrawingDocument, layer: String, point: Vector2i, rgba: PackedByteArray) -> void:
 	var started: DrawingResult = doc.begin_edit(layer, doc.revision)
 	check(started.ok, "start signed off-frame native patch")
@@ -95,6 +112,28 @@ func run() -> void:
 			"checker is an opaque backdrop, not document pixels, at zoom %.2f" % scale)
 		check(int(canvas.last_frame_metrics.get("textures_created", 0)) == 0,
 			"transparent frame does not allocate raster display textures")
+	# Checker phase is viewport-fixed, even when the visible intersection
+	# moves in from the left, top, right or bottom. A checker tiled from the
+	# intersection origin will fail these unchanged-screen-color assertions.
+	canvas.image_bounds = Rect2i(-300, -300, 600, 600)
+	for scale: float in [0.5, 1.0, 2.0]:
+		canvas.zoom = scale
+		canvas.camera = Vector2.ZERO
+		canvas.queue_redraw()
+		await frames()
+		var fixed_point: Vector2 = Vector2(153, 125)
+		var reference: Color = at(canvas, fixed_point)
+		check(distance(reference, at(canvas, fixed_point + Vector2(16, 0))) > 0.08,
+			"checker has fixed 16-screen-pixel parity at zoom %.2f" % scale)
+		var offset: float = 300.0 - 60.0 / scale
+		for pan: Vector2 in [Vector2(-offset, 0), Vector2(offset, 0),
+				Vector2(0, -offset), Vector2(0, offset)]:
+			canvas.camera = pan
+			canvas.queue_redraw()
+			await frames()
+			check(distance(at(canvas, fixed_point), reference) < 0.025,
+				"checker phase stays screen-fixed at %.2f with camera %s" % [scale, pan])
+	canvas.image_bounds = Rect2i(-80, -60, 160, 120)
 	canvas.zoom = 1.0
 	canvas.camera = Vector2(7, -9)
 	canvas.queue_redraw()
@@ -184,6 +223,77 @@ func run() -> void:
 		"native delivered click commits to configured snapped grid intersection")
 	check(doc.undo().ok and int(doc.read_pixel(layer, 9, 5).value) == 0,
 		"snapped pointer paints one normal reversible edit")
+	# Standalone authoring refuses an outside-image mousedown and clips the
+	# complete wide stroke footprint at the signed frame, not only its center.
+	check(not canvas.clip_strokes_to_image_frame,
+		"an embedded/Atlas canvas defaults to unbounded edit semantics")
+	canvas.clip_strokes_to_image_frame = true
+	canvas.image_bounds = Rect2i(-6, -6, 12, 12)
+	canvas.snap_to_grid = false
+	canvas.show_grid = false
+	canvas.camera = Vector2.ZERO
+	canvas.zoom = 2.0
+	canvas.tool = "Brush"
+	canvas.brush_width = 6.0
+	canvas.color_rgba = 0xff55bb22
+	var revision_before_brush: int = doc.revision
+	pointer(canvas, Vector2(9.5, 0.5), true)
+	await frames(2)
+	check(canvas.session == null and not canvas.dragging and doc.revision == revision_before_brush,
+		"outside-frame pointer down cannot start a standalone Brush edit")
+	pointer(canvas, Vector2(9.5, 0.5), false)
+	pointer(canvas, Vector2(0.5, 0.5), true)
+	await frames(3)
+	check(canvas.session != null and canvas.session.change_count() > 0 and
+		doc.read_pixel(layer, 0, 0).value == 0,
+		"inside-frame held stroke has detached preview without source publication")
+	stroke_motion(canvas, Vector2(10.5, 0.5))
+	await frames(3)
+	pointer(canvas, Vector2(10.5, 0.5), false)
+	await frames(12)
+	check(canvas.session == null and doc.revision == revision_before_brush + 1,
+		"cross-frame brush releases one atomic edit without lingering backlog")
+	check(doc.read_pixel(layer, 5, 0).value != 0 and
+		doc.read_pixel(layer, 6, 0).value == 0 and
+		doc.read_pixel(layer, 9, 0).value == 0 and
+		doc.read_pixel(layer, 0, 6).value == 0,
+		"wide brush clips every pixel at right and bottom image edges")
+	check(doc.undo().ok and doc.read_pixel(layer, 5, 0).value == 0 and
+		doc.redo().ok and doc.read_pixel(layer, 5, 0).value != 0,
+		"native clipped Brush is a single reversible history transaction")
+	patch(doc, layer, Vector2i(7, 0), PackedByteArray([255, 30, 20, 255]))
+	var preserved_off_frame: int = int(doc.read_pixel(layer, 7, 0).value)
+	canvas.tool = "Eraser"
+	pointer(canvas, Vector2(5.5, 0.5), true)
+	stroke_motion(canvas, Vector2(9.5, 0.5))
+	pointer(canvas, Vector2(9.5, 0.5), false)
+	await frames(10)
+	check(doc.read_pixel(layer, 5, 0).value == 0 and
+		int(doc.read_pixel(layer, 7, 0).value) == preserved_off_frame,
+		"Eraser clears inside frame but preserves existing off-frame sparse art")
+	check(doc.undo().ok and doc.read_pixel(layer, 5, 0).value != 0 and
+		int(doc.read_pixel(layer, 7, 0).value) == preserved_off_frame,
+		"Eraser Undo restores inside pixels without touching outside artwork")
+	canvas.tool = "Brush"
+	pointer(canvas, Vector2(0.5, 0.5), true)
+	await frames(2)
+	var before_frame_resize: int = doc.revision
+	canvas.image_bounds = Rect2i(-7, -7, 14, 14)
+	check(canvas.session == null and doc.revision == before_frame_resize,
+		"image-frame changes cancel a captured brush before any old-frame commit")
+	pointer(canvas, Vector2(0.5, 0.5), false)
+	canvas.clip_strokes_to_image_frame = false
+	pointer(canvas, Vector2(9.5, 0.5), true)
+	pointer(canvas, Vector2(9.5, 0.5), false)
+	await frames(10)
+	check(doc.read_pixel(layer, 9, 0).value != 0,
+		"embedded/Atlas opt-out can paint outside a visible image guide")
+	check(doc.undo().ok and doc.read_pixel(layer, 9, 0).value == 0,
+		"unbounded host paint can be independently undone")
+	canvas.clip_strokes_to_image_frame = true
+	canvas.image_bounds = Rect2i(-80, -60, 160, 120)
+	canvas.zoom = 1.0
+	canvas.camera = Vector2.ZERO
 	canvas.tool = "Pan"
 	canvas.snap_to_grid = false
 	canvas.show_grid = false
