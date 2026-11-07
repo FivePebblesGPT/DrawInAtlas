@@ -31,6 +31,14 @@ jobs:
             --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
             --script res://tests/dock_single_group_native.gd 2>&1 | tee /tmp/t091-native.log
           python3 tools/check_native_t091_log.py /tmp/t091-native.log
+      - name: Verify same-frame tabs and tall-host normal-grip redock/cancel
+        run: |
+          set -euo pipefail
+          T091_SCREENSHOTS=/tmp/t091-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/dock_grip_redock_native.gd 2>&1 | tee /tmp/t091-grip-native.log
+          python3 tools/check_native_t091_log.py /tmp/t091-grip-native.log --kind grip
       - name: Upload software framebuffer evidence and original diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -38,5 +46,6 @@ jobs:
           name: t091-xvfb-floating-docking
           path: |
             /tmp/t091-native.log
+            /tmp/t091-grip-native.log
             /tmp/t091-screenshots/
           if-no-files-found: warn

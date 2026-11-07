@@ -59,7 +59,7 @@ func _ready() -> void:
 	var grip: Button = Button.new()
 	grip.name = "MoveHandle"
 	grip.text = "⠿"
-	grip.tooltip_text = "Drag to move this floating group; Ctrl+Alt+Shift+D redocks"
+	grip.tooltip_text = "Drag to move; release over the right dock to redock the group (Shift: transfer group)"
 	grip.custom_minimum_size = Vector2(34, 34)
 	grip.focus_mode = Control.FOCUS_ALL
 	grip.gui_input.connect(_handle_press.bind("move"))
@@ -154,11 +154,18 @@ func _frontmost_at(point: Vector2) -> bool:
 func render() -> void:
 	if layout == null or _body == null:
 		return
-	# Stashing is coordinated by DrawingWorkspace; no Control is duplicated.
+	# A dock refresh can be requested several times before the next frame.
+	# queue_free() alone leaves old tab strips and group chrome in layout until
+	# the frame ends. Detach immediately, then delete; never free panel views.
+	for view: Control in views.values():
+		if _body.is_ancestor_of(view) and stash != null:
+			view.reparent(stash)
 	for child: Node in _body.get_children():
+		_body.remove_child(child)
 		child.queue_free()
 	for child: Node in _header.get_children():
 		if child.name.begins_with("TabStripScroll_"):
+			_header.remove_child(child)
 			child.queue_free()
 	group_frames.clear()
 	tab_buttons.clear()
@@ -338,7 +345,13 @@ func _input(event: InputEvent) -> void:
 		if not _gesture.is_empty():
 			var delta: Vector2 = event.global_position - _pointer_start
 			if _gesture == "move":
-				set_host_rect(Rect2(_frame_start.position + delta, _frame_start.size))
+				# Normal grip dragging moves the host over the canvas, but a
+				# valid dock target offers a whole-group redock on release.
+				# Hit-test the underlying dock even when this tall host overlaps it.
+				var redock: bool = coordinator != null and not group_handles.is_empty() and \
+					coordinator._preview_grip_redock(host_id, String(group_handles.keys()[0]), event.global_position)
+				if not redock:
+					set_host_rect(Rect2(_frame_start.position + delta, _frame_start.size))
 			else:
 				_resize_from_pointer(delta)
 			get_viewport().set_input_as_handled()
@@ -362,7 +375,11 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if not _gesture.is_empty():
+			var was_move: bool = _gesture == "move"
 			_gesture = ""
+			if was_move and coordinator != null and coordinator._commit_grip_redock(host_id, event.global_position):
+				get_viewport().set_input_as_handled()
+				return
 			state_changed.emit()
 			get_viewport().set_input_as_handled()
 		elif not _candidate_id.is_empty():

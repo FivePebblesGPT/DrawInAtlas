@@ -21,8 +21,8 @@ class T091DockTests(unittest.TestCase):
     def test_native_workflow_imports_before_x11_and_uploads_evidence(self) -> None:
         workflow = (ROOT / ".github/workflows/godot-native-t091-docking.yml").read_text()
         for required in ("workflow_dispatch", "--import --quit", "xvfb-run",
-                         "dock_single_group_native.gd", "T091_SCREENSHOTS",
-                         "check_native_t091_log.py", "upload-artifact@v4"):
+                         "dock_single_group_native.gd", "dock_grip_redock_native.gd", "T091_SCREENSHOTS",
+                         "check_native_t091_log.py", "--kind grip", "upload-artifact@v4"):
             with self.subTest(required=required):
                 self.assertIn(required, workflow)
 
@@ -41,6 +41,24 @@ class T091DockTests(unittest.TestCase):
             base + "\nT091_NATIVE_PASSED", ""):
             with self.subTest(invalid=invalid):
                 self.assertFalse(verify(invalid)[0])
+
+    def test_grip_witness_log_fails_closed(self) -> None:
+        base = "T091_GRIP_NATIVE: 53 checks; 0 failed\nT091_GRIP_NATIVE_PASSED"
+        self.assertEqual(verify(base, kind="grip"), (True, [], 0))
+        self.assertEqual(verify(base + "\nERROR: Texture with GL ID of 18: leaked 32 bytes.",
+                                kind="grip"), (True, [], 1))
+        for invalid in (
+            "T091_GRIP_NATIVE: 52 checks; 0 failed\nT091_GRIP_NATIVE_PASSED",
+            "T091_GRIP_NATIVE: 53 checks; 1 failed\nT091_GRIP_NATIVE_PASSED",
+            base + "\nT091_GRIP_NATIVE_FAILED: stale tab strip",
+            base + "\nSCRIPT ERROR: invalid owner",
+            "ERROR: Texture with GL ID of 18: leaked 32 bytes.\n" + base,
+            base.replace("T091_GRIP_NATIVE_PASSED", "T091_NATIVE_PASSED"),
+        ):
+            with self.subTest(invalid=invalid):
+                self.assertFalse(verify(invalid, kind="grip")[0])
+        with self.assertRaises(ValueError):
+            verify(base, kind="typo")
 
 
 if __name__ == "__main__":

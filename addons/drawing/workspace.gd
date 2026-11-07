@@ -1050,7 +1050,8 @@ func _process(delta: float) -> void:
 	# This makes offscreen targets reachable without abandoning the transaction.
 	if dock_drag == null or not dock_drag.is_dragging():
 		return
-	var over_host: DrawingFloatingHost = _topmost_host(_drag_pointer_position)
+	var grip_drag: bool = _grip_redock_active()
+	var over_host: DrawingFloatingHost = null if grip_drag else _topmost_host(_drag_pointer_position)
 	var scroll_target: ScrollContainer = inspector if over_host == null else over_host._scroll
 	if not scroll_target.get_global_rect().has_point(_drag_pointer_position):
 		return
@@ -1065,7 +1066,11 @@ func _process(delta: float) -> void:
 	var before: int = scroll_target.scroll_vertical
 	scroll_target.scroll_vertical += roundi(float(direction) * 420.0 * delta)
 	if scroll_target.scroll_vertical != before:
-		_preview_cross_drop(_drag_pointer_position)
+		if grip_drag:
+			var source_host: DrawingFloatingHost = floating_hosts[_cross_source]
+			_preview_grip_redock(_cross_source, String(source_host.group_handles.keys()[0]), _drag_pointer_position)
+		else:
+			_preview_cross_drop(_drag_pointer_position)
 
 
 func _cancel_dock_drag() -> void:
@@ -1090,6 +1095,53 @@ func begin_cross_drag(source_container: String, kind: String, source_id: String)
 	if started:
 		_cross_source = source_container
 	return started
+
+
+## A normal floating grip drag can redock without Shift. Unlike tab dragging,
+## the source host follows the pointer over the canvas, so its tall rectangle
+## must not occlude underlying dock hit tests. Preview never changes ownership.
+func _grip_redock_active() -> bool:
+	if not floating_hosts.has(_cross_source):
+		return false
+	var host: DrawingFloatingHost = floating_hosts[_cross_source]
+	return is_instance_valid(host) and host._gesture == "move" and not host.group_handles.is_empty()
+
+
+func _preview_grip_redock(source_host_id: String, group_id: String, point: Vector2) -> bool:
+	if not floating_hosts.has(source_host_id) or not (inspector.get_global_rect().has_point(point) or \
+		(dock_flyout.visible and dock_flyout.get_global_rect().has_point(point))):
+		if _cross_source == source_host_id and _grip_redock_active():
+			_cancel_cross_drop()
+		return false
+	# _dock_target_at uses drag.source_kind to decide group vs. tab drops.
+	# Begin the transaction before asking it for a target, not afterward.
+	if _cross_source.is_empty() and not begin_cross_drag(source_host_id, DrawingDockDrag.GROUP, group_id):
+		return false
+	if _cross_source != source_host_id or dock_drag.source_kind() != DrawingDockDrag.GROUP:
+		return false
+	var hit: Dictionary = _dock_target_at(point)
+	_clear_drop_hints()
+	if hit.is_empty() or not dock_drag.preview(hit["target"]):
+		return false
+	_drag_pointer_position = point
+	dock_drop_hint.global_position = (hit["rect"] as Rect2).position
+	dock_drop_hint.size = (hit["rect"] as Rect2).size
+	dock_drop_hint.visible = true
+	return true
+
+
+func _commit_grip_redock(source_host_id: String, point: Vector2) -> bool:
+	if _cross_source != source_host_id:
+		return false
+	var host: DrawingFloatingHost = floating_hosts.get(source_host_id) as DrawingFloatingHost
+	var group_id: String = String(host.group_handles.keys()[0]) if host != null and not host.group_handles.is_empty() else ""
+	var valid: bool = not group_id.is_empty() and _preview_grip_redock(source_host_id, group_id, point)
+	var committed: bool = valid and dock_drag.commit()
+	_cancel_cross_drop()
+	if committed:
+		_reap_empty_hosts()
+		_render_dock()
+	return committed
 
 
 func _topmost_host(point: Vector2) -> DrawingFloatingHost:

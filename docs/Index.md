@@ -1,6 +1,6 @@
 # Ticket Kanban Index
 
-**As of 2026-11-06 · merged owner review and T-094 validation checkpoint.** This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+**As of 2026-11-07 · merged owner review and ongoing validation checkpoints.** This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
@@ -190,6 +190,19 @@ bounded. New headless 15/15 and Xvfb/Mesa native 80/80 checks pass; a warmed
 **This is not a dense-zoom throughput or physical hardware acceptance pass.**
 [T-086](Tickets/T-086.md).
 
+**T-091 repeated floating chrome and tall-host redock checkpoint (2026-11-07; In Progress):**
+Queued-for-deletion floating tab strips/frames are now immediately detached on
+redraw; synchronous multi-tab refreshes keep one header and active view, with
+real panel identity preserved. Normal grip dragging retains host movement over
+the canvas but previews a transactional group redock over the right dock even
+when a tall host overlaps it; Escape and invalid drops cancel unchanged.
+The new Xvfb/Mesa 1280×800 native regression passes **53/53** (or **55/55**
+with two screenshots); original T-091/T-081/T-082/T-083 native suites pass.
+T-080's independent native invalid-drop witness also fails on the untouched
+remote baseline and is **not** counted green. Windows/Linux physical pointer,
+DPI and owner approval remain pending, with no T-083 manual gate waived.
+[T-091 evidence and limitations](Tickets/T-091.md).
+
 **T-087 visible standalone image bounds and independent grid (2026-11-06; engineering Done):**
 An optional validated `.drawing` image frame records origin/size without
 clipping canonical signed sparse pixels, Object Assets or Atlas document space.
@@ -370,7 +383,7 @@ T-068 remains In Progress.
 The detached scope kernel now follows the pinned Godot 4.8b2 float32
 `Vector2` / segment-intersection **approximate boundary** behavior instead of
 strict double-precision ray crossings. The **48 seeded 32² transformed
-selection cases now match all 48/48 Godot masks**, twice, with **zero missed
+selection cases now match all 53/53 Godot masks**, twice, with **zero missed
 or extra pixels**; the original 15/15 exact-edge 64² fixture still matches.
 Two real isolated GDExtension runs confirm **62/62 native mask checks** and
 **153/153 selection-to-`DrawingDocument` publication checks per run**,
