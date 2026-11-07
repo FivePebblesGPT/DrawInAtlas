@@ -40,7 +40,14 @@ var image_bounds: Rect2i = Rect2i():
 		queue_redraw()
 ## Only the standalone workspace enables this. Atlas can show a bounded guide
 ## without changing its intentionally unbounded authoring surface.
-var clip_strokes_to_image_frame: bool = false
+var clip_strokes_to_image_frame: bool = false:
+	set(value):
+		# Clipping is an edit-authorization policy, not a visual guide. A
+		# queued Brush/Eraser stroke must not outlive a host policy change.
+		if value != clip_strokes_to_image_frame and session != null:
+			cancel_gesture()
+			canvas_error.emit("Stroke cancelled because image clipping changed")
+		clip_strokes_to_image_frame = value
 var _stroke_clip: Rect2i = Rect2i()
 ## A stroke uses the exact mask present on pointer-down, not a later edit
 ## region that happens to share the same enclosing rectangle.

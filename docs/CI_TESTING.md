@@ -452,6 +452,14 @@ Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
 engineering ticket is physical Windows/Linux owner approval. Owner findings
 #02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
 
+**T-087 follow-up (2026-11-08):** The same required model step now
+runs **70** checks and the on-demand Xvfb-native witness runs **95** checks,
+including held-pointer clipping-policy OFF→ON/ON→OFF cancellation and
+no-op/commit/Undo controls. Six model and eight native checks fail when the fixed
+canvas is replaced with the committed pre-fix version. This changes no
+required check IDs and does not imply physical owner acceptance or hosted
+GitHub Actions verification.
+
 ## T-093 Object source discovery and safe portable open
 
 Fast push/PR CI runs `drawing/tests/object_discovery_smoke.gd` (**56**

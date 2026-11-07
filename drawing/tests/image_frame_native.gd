@@ -361,6 +361,65 @@ func run() -> void:
 	check(canvas.session == null and doc.revision == before_frame_resize,
 		"image-frame changes cancel a captured brush before any old-frame commit")
 	pointer(canvas, Vector2(0.5, 0.5), false)
+	# Changing the host's clip authorization while an actual pointer is held
+	# must discard the whole transaction, including its detached preview.
+	canvas.clip_strokes_to_image_frame = false
+	var policy_revision: int = doc.revision
+	pointer(canvas, Vector2(16.5, 1.5), true)
+	await frames(2)
+	check(canvas.session != null and canvas.dragging and
+		int(doc.read_pixel(layer, 16, 1).value) == 0,
+		"unbounded outside-frame Brush has a detached held-pointer preview")
+	canvas.clip_strokes_to_image_frame = true
+	check(canvas.session == null and not canvas.dragging and
+		canvas._move_capture == null and not canvas._owns_accumulated_input,
+		"enabling clipping cancels the held unbounded stroke and releases input")
+	pointer(canvas, Vector2(16.5, 1.5), false)
+	await frames(3)
+	check(doc.revision == policy_revision and int(doc.read_pixel(layer, 16, 1).value) == 0,
+		"outside-frame old-policy release cannot commit after clipping enabled")
+	pointer(canvas, Vector2(0.5, -5.5), true)
+	await frames(2)
+	check(canvas.session != null and canvas.dragging,
+		"frame-clipped Brush is held before clipping is disabled")
+	canvas.clip_strokes_to_image_frame = false
+	check(canvas.session == null and not canvas.dragging and not canvas._owns_accumulated_input,
+		"disabling clipping cancels the held frame-clipped stroke")
+	pointer(canvas, Vector2(0.5, -5.5), false)
+	await frames(3)
+	check(doc.revision == policy_revision and int(doc.read_pixel(layer, 0, -6).value) == 0,
+		"clipped old-policy release cannot commit after clipping disabled")
+	pointer(canvas, Vector2(16.5, 1.5), true)
+	await frames(2)
+	canvas.clip_strokes_to_image_frame = false
+	check(canvas.session != null and canvas.dragging,
+		"same-value clipping assignment preserves a held stroke")
+	pointer(canvas, Vector2(16.5, 1.5), false)
+	await frames(6)
+	check(doc.revision == policy_revision + 1 and
+		int(doc.read_pixel(layer, 16, 1).value) != 0,
+		"normal unbounded Brush after policy change publishes once")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 16, 1).value) == 0,
+		"normal unbounded Brush after policy change remains undoable")
+	# Eraser uses the same queued edit contract: reauthorizing its clip
+	# cannot silently clear already published pixels on mouse-up.
+	var eraser_original: int = int(doc.read_pixel(layer, 5, 0).value)
+	check(eraser_original != 0, "existing opaque pixel is available for held Eraser")
+	var eraser_revision: int = doc.revision
+	canvas.tool = "Eraser"
+	pointer(canvas, Vector2(5.5, 0.5), true)
+	await frames(2)
+	check(canvas.session != null and canvas.dragging,
+		"Eraser holds a detached clearing preview before clipping changes")
+	canvas.clip_strokes_to_image_frame = true
+	check(canvas.session == null and not canvas.dragging and not canvas._owns_accumulated_input,
+		"enabling clipping cancels a held Eraser and releases input")
+	pointer(canvas, Vector2(5.5, 0.5), false)
+	await frames(3)
+	check(doc.revision == eraser_revision and
+		int(doc.read_pixel(layer, 5, 0).value) == eraser_original,
+		"Eraser stale mouse-up preserves original pixel and history")
+	canvas.tool = "Brush"
 	canvas.clip_strokes_to_image_frame = false
 	pointer(canvas, Vector2(9.5, 0.5), true)
 	pointer(canvas, Vector2(9.5, 0.5), false)

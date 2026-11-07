@@ -235,6 +235,46 @@ func run() -> void:
 	workspace.canvas.grid_spacing = 12
 	workspace.canvas.grid_origin = Vector2i(-3, 5)
 	workspace._set_snap_enabled(false)
+	# A host may turn standalone-style frame clipping on or off while input
+	# is queued. Neither direction may publish a stroke authorized by the
+	# old policy. Identical policy writes must not interrupt the gesture.
+	workspace.canvas.tool = "Brush"
+	workspace.canvas.brush_width = 1.0
+	workspace.canvas.clip_strokes_to_image_frame = false
+	var clip_canvas: Control = workspace.canvas
+	var clip_document: DrawingDocument = workspace.current_document()
+	var clip_revision: int = clip_document.revision
+	var outside_point: Vector2 = clip_canvas.pixel_to_position(Vector2(-60.5, 40.5))
+	clip_canvas.start_gesture(outside_point)
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"unbounded Brush is captured outside the image guide before policy change")
+	clip_canvas.clip_strokes_to_image_frame = true
+	check(clip_canvas.session == null and not clip_canvas.dragging and
+		clip_document.revision == clip_revision and not clip_canvas._owns_accumulated_input,
+		"enabling clipping cancels an unbounded queued Brush and restores input mode")
+	clip_canvas.finish_gesture(outside_point)
+	check(clip_document.revision == clip_revision,
+		"stale release after clipping enabled never publishes the old Brush")
+	var inside_point: Vector2 = clip_canvas.pixel_to_position(Vector2(-20.5, 40.5))
+	clip_canvas.start_gesture(inside_point)
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"frame-clipped Brush begins inside the guide")
+	clip_canvas.clip_strokes_to_image_frame = false
+	check(clip_canvas.session == null and not clip_canvas.dragging and
+		clip_document.revision == clip_revision and not clip_canvas._owns_accumulated_input,
+		"disabling clipping discards old-policy pixels without history")
+	clip_canvas.finish_gesture(inside_point)
+	check(clip_document.revision == clip_revision,
+		"stale release after disabling clipping has no document side effects")
+	clip_canvas.start_gesture(outside_point)
+	clip_canvas.clip_strokes_to_image_frame = false
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"equivalent clipping assignment preserves an active unbounded Brush")
+	clip_canvas.finish_gesture(outside_point)
+	check(clip_canvas.session == null and clip_document.revision == clip_revision + 1,
+		"unchanged clipping policy publishes exactly one normal history edit")
+	check(clip_document.undo().ok and clip_document.revision == clip_revision + 2,
+		"ordinary post-policy-change Brush remains undoable")
 	workspace.queue_free()
 	DirAccess.remove_absolute(path)
 	DirAccess.remove_absolute(legacy_path)

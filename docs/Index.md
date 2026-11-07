@@ -471,6 +471,17 @@ remote baseline and is **not** counted green. Windows/Linux physical pointer,
 DPI and owner approval remain pending, with no T-083 manual gate waived.
 [T-091 evidence and limitations](Tickets/T-091.md).
 
+**T-087 runtime clipping-policy change safety (2026-11-08; In Progress):**
+A host changing `clip_strokes_to_image_frame` while Brush/Eraser input is
+queued now cancels the old authorization transaction before installing the
+new policy. Stale release cannot publish pixels/history; equivalent policy
+writes preserve normal strokes and Undo. The expanded model **70/70** and
+Xvfb real-pointer/native **95/95** checks pass, while the previous source
+fails **6 model + 8 native** new assertions. The default unbounded Atlas
+host and visual-only frame guides are unchanged; physical Windows/Linux,
+hosted CI and T-056/T-059 owner signoff remain open. T-087 stays **In
+Progress**. [Ticket and evidence](Tickets/T-087.md).
+
 **T-087 live snap-mapping safety (2026-11-07; In Progress):**
 Changing effective Snap mode, grid spacing or grid origin during queued
 Brush/Eraser or active selection/Move dragging now cancels the incomplete
