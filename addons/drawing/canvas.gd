@@ -67,11 +67,24 @@ var selected: Rect2i = Rect2i():
 		selected = value
 		if not _updating_selection_bounds:
 			selection_mask.set_rectangle(value)
+			_mask_outline_cache.clear()
+			_mask_outline_window = Rect2i()
 var _marquee: Rect2i = Rect2i()
 var _marquee_dragged: bool = false
 var _marquee_start_screen: Vector2 = Vector2.ZERO
 var _move_preview: DrawingEditSession
+var _move_capture: DrawingClipboard
+var last_move_metrics: Dictionary[String, Variant] = {}
+var move_profile_samples: Array[Dictionary] = []
+## Cached source-coordinate contour tiles only for explicit pixel masks.
+## Expression-only masks are traced using cheap row intervals each frame.
+const MASK_OUTLINE_TILE: int = 64
+const MASK_OUTLINE_TILES_PER_FRAME: int = 4
+const MAX_MASK_OUTLINE_CACHE: int = 4096
+var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
+var _mask_outline_window: Rect2i = Rect2i()
 var _move_target: Vector2i = Vector2i.ZERO
+var _move_target_received_us: int = 0
 var _move_preview_offset: Vector2i = Vector2i.ZERO
 ## A floating selected-pixel Move retains its *original* mask and source
 ## revision across multiple drags. The shifted mask is display context only:
@@ -149,6 +162,8 @@ func set_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
 
 func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
 	selection_mask = value.detached_copy() if value != null else DrawingSelection.new()
+	_mask_outline_cache.clear()
+	_mask_outline_window = Rect2i()
 	_updating_selection_bounds = true
 	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
 	_updating_selection_bounds = false
@@ -688,7 +703,9 @@ func _draw() -> void:
 		var anchor: Vector2 = pixel_to_position(Vector2(asset_origin))
 		draw_line(anchor + Vector2(-6, 0), anchor + Vector2(6, 0), Color(1, 0.75, 0.3), 1.0)
 		draw_line(anchor + Vector2(0, -6), anchor + Vector2(0, 6), Color(1, 0.75, 0.3), 1.0)
+	var outline_started_us: int = Time.get_ticks_usec()
 	_draw_selection_outline()
+	last_frame_metrics["selection_outline_cpu_us"] = Time.get_ticks_usec() - outline_started_us
 	if selecting and _marquee_dragged:
 		draw_rect(Rect2(pixel_to_position(Vector2(_marquee.position)),
 			Vector2(_marquee.size) * zoom), Color(0.95, 0.8, 0.24), false, 2.0)
@@ -700,49 +717,60 @@ func _draw() -> void:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
 
 
-## Trace the actual mask for small selections, including islands/holes.
-## Large selections use a bounded fallback (outer guide plus operation rects),
-## never O(number of source pixels) work for unbounded sparse documents.
+## The persistent selection always traces mask truth, never the conservative
+## enclosing bounds. Only viewport-intersecting rows are evaluated; rectangle
+## boolean expressions have a scanline cost independent of selected area.
 func _draw_selection_outline() -> void:
 	if not selection_mask.enabled or not selected.has_area():
 		return
-	var highlight: Color = Color(0.2, 0.65, 1.0, 0.95)
-	var count: int = selected.size.x * selected.size.y
-	if count <= 4096 and zoom >= 0.5:
-		var edges: PackedVector2Array = PackedVector2Array()
-		for y: int in range(selected.position.y, selected.end.y):
-			for x: int in range(selected.position.x, selected.end.x):
-				var at: Vector2i = Vector2i(x, y)
-				if not selection_mask.allows(at):
-					continue
-				var top_left: Vector2 = pixel_to_position(Vector2(at))
-				var bottom_right: Vector2 = top_left + Vector2.ONE * zoom
-				if not selection_mask.allows(at + Vector2i.LEFT):
-					edges.append(top_left)
-					edges.append(Vector2(top_left.x, bottom_right.y))
-				if not selection_mask.allows(at + Vector2i.RIGHT):
-					edges.append(Vector2(bottom_right.x, top_left.y))
-					edges.append(bottom_right)
-				if not selection_mask.allows(at + Vector2i.UP):
-					edges.append(top_left)
-					edges.append(Vector2(bottom_right.x, top_left.y))
-				if not selection_mask.allows(at + Vector2i.DOWN):
-					edges.append(Vector2(top_left.x, bottom_right.y))
-					edges.append(bottom_right)
-		if not edges.is_empty():
-			draw_multiline(edges, highlight, 1.5)
-		return
-	draw_rect(Rect2(pixel_to_position(Vector2(selected.position)),
-		Vector2(selected.size) * zoom), highlight, false, 1.5)
-	# Disclose known add/subtract/intersect contours even when the exact
-	# channel is too big to trace this frame. The crop/holes are never
-	# simulated by a filled bounding-box overlay.
-	for op: Dictionary in selection_mask._operations:
-		var region: Rect2i = op["rect"] as Rect2i
-		var accent: Color = Color(1.0, 0.47, 0.4, 0.85) if op["mode"] == "Subtract" \
-			else Color(0.35, 1.0, 0.7, 0.85)
-		draw_rect(Rect2(pixel_to_position(Vector2(region.position)),
-			Vector2(region.size) * zoom), accent, false, 1.0)
+	var top_left: Vector2 = (Vector2.ZERO - size * 0.5) / zoom + camera
+	var bottom_right: Vector2 = (size - size * 0.5) / zoom + camera
+	var visible: Rect2i = Rect2i(Vector2i(floori(top_left.x), floori(top_left.y)),
+		Vector2i(ceili(bottom_right.x) - floori(top_left.x),
+			ceili(bottom_right.y) - floori(top_left.y)))
+	var source_edges: PackedVector2Array = PackedVector2Array()
+	if selection_mask._pixel_mask.is_empty():
+		source_edges = selection_mask.contour_segments(visible)
+	else:
+		# Exact irregular masks may require millions of pixel probes at 25%.
+		# Build at most four 64px tiles per frame and keep already traced tiles.
+		var footprint: Rect2i = selected.intersection(visible.grow(1))
+		if not footprint.has_area():
+			return
+		var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+		var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+		var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+		var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+		var tile_window: Rect2i = Rect2i(left, top, right - left + 1, bottom - top + 1)
+		if tile_window != _mask_outline_window:
+			_mask_outline_cache.clear()
+			_mask_outline_window = tile_window
+		var created: int = 0
+		var pending: bool = false
+		for tile_y: int in range(top, bottom + 1):
+			for tile_x: int in range(left, right + 1):
+				var tile: Vector2i = Vector2i(tile_x, tile_y)
+				if not _mask_outline_cache.has(tile):
+					if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
+						# At extreme zoom-out/display sizes, an explicit mask may
+						# exceed the retained cache. Stop progressive redraw rather
+						# than evict/rebuild forever; a changed view starts fresh.
+						continue
+					if created >= MASK_OUTLINE_TILES_PER_FRAME:
+						pending = true
+						continue
+					created += 1
+					_mask_outline_cache[tile] = selection_mask.contour_segments(
+						Rect2i(tile * MASK_OUTLINE_TILE,
+							Vector2i(MASK_OUTLINE_TILE, MASK_OUTLINE_TILE)))
+				source_edges.append_array(_mask_outline_cache[tile])
+		if pending:
+			queue_redraw()
+	var screen_edges: PackedVector2Array = PackedVector2Array()
+	for source_point: Vector2 in source_edges:
+		screen_edges.append(pixel_to_position(source_point))
+	if not screen_edges.is_empty():
+		draw_multiline(screen_edges, Color(0.2, 0.65, 1.0, 0.95), 1.5)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -858,11 +886,24 @@ func start_gesture(position: Vector2) -> void:
 					moving = false
 					dragging = false
 					return
+				var captured_at: int = Time.get_ticks_usec()
+				var captured: DrawingResult = DrawingClipboard.capture(document, layer_id,
+					selection_mask.bounds, selection_mask)
+				if not captured.ok:
+					moving = false
+					dragging = false
+					canvas_error.emit(captured.message)
+					return
+				_move_capture = captured.value as DrawingClipboard
+				last_move_metrics = {"capture_us": Time.get_ticks_usec() - captured_at,
+					"pixels": _move_capture._pixels.size()}
+				move_profile_samples.clear()
 				_floating_source_selection = selection_mask.detached_copy()
 				_floating_source_revision = document.revision
 				gesture_started.emit()
 			_move_drag_base = _floating_offset
 			_move_target = _floating_offset
+			_move_target_received_us = 0
 		return
 	if tool not in ["Brush", "Eraser"]:
 		dragging = false
@@ -921,6 +962,7 @@ func update_gesture(position: Vector2) -> void:
 		queue_redraw()
 	elif moving:
 		_move_target = _move_drag_base + current - gesture_start
+		_move_target_received_us = Time.get_ticks_usec()
 	elif session != null:
 		_enqueue_sample(source_position(position))
 
@@ -1046,6 +1088,7 @@ func cancel_gesture() -> void:
 	if _floating_source_selection != null:
 		_assign_selection_mask(_floating_source_selection, false)
 	_floating_source_selection = null
+	_move_capture = null
 	_floating_source_revision = -1
 	_floating_active = false
 	_floating_offset = Vector2i.ZERO
@@ -1055,6 +1098,7 @@ func cancel_gesture() -> void:
 	moving = false
 	_marquee_dragged = false
 	_move_target = Vector2i.ZERO
+	_move_target_received_us = 0
 	_move_preview_offset = Vector2i.ZERO
 	_finish_requested = false
 	_restore_input_accumulation()
@@ -1074,6 +1118,7 @@ func has_floating_move() -> bool:
 ## document transaction. The owning workspace captured the original context on
 ## the FIRST drag and receives only one gesture_committed at this final drop.
 func confirm_floating_move() -> bool:
+	var drop_started_us: int = Time.get_ticks_usec()
 	if not _floating_active or dragging or document == null:
 		return false
 	if document.revision != _floating_source_revision:
@@ -1083,11 +1128,13 @@ func confirm_floating_move() -> bool:
 	var original_selection: DrawingSelection = _floating_source_selection
 	_move_preview = null
 	_floating_source_selection = null
+	_move_capture = null
 	_floating_source_revision = -1
 	_floating_active = false
 	_floating_offset = Vector2i.ZERO
 	_move_drag_base = Vector2i.ZERO
 	_move_target = Vector2i.ZERO
+	_move_target_received_us = 0
 	_move_preview_offset = Vector2i.ZERO
 	if edit != null and edit.change_count() > 0:
 		var result: DrawingResult = edit.commit()
@@ -1101,6 +1148,7 @@ func confirm_floating_move() -> bool:
 		if edit != null:
 			edit.cancel()
 		selection_changed.emit(selected)
+	last_move_metrics["drop_cpu_us"] = Time.get_ticks_usec() - drop_started_us
 	queue_redraw()
 	return true
 
@@ -1124,13 +1172,15 @@ func _stage_move_preview(offset: Vector2i) -> void:
 		_assign_selection_mask(_floating_source_selection, false)
 		queue_redraw()
 		return
+	var motion_start_us: int = Time.get_ticks_usec()
 	var started: DrawingResult = document.begin_edit(layer_id, _floating_source_revision)
 	if not started.ok:
 		canvas_error.emit(started.message)
 		return
 	var edit: DrawingEditSession = started.value as DrawingEditSession
-	var staged: DrawingResult = DrawingClipboard.move_selection(edit,
-		_floating_source_selection.bounds, offset, _floating_source_selection)
+	var session_us: int = Time.get_ticks_usec() - motion_start_us
+	var staged: DrawingResult = DrawingClipboard.move_captured(edit, _move_capture, offset)
+	var staging_us: int = Time.get_ticks_usec() - motion_start_us - session_us
 	if not staged.ok:
 		edit.cancel()
 		canvas_error.emit(staged.message)
@@ -1142,6 +1192,14 @@ func _stage_move_preview(offset: Vector2i) -> void:
 	_floating_offset = offset
 	_floating_active = true
 	_assign_selection_mask(_floating_source_selection.translated(offset), false)
+	last_move_metrics["session_us"] = session_us
+	last_move_metrics["stage_us"] = staging_us
+	last_move_metrics["selection_us"] = Time.get_ticks_usec() - motion_start_us - session_us - staging_us
+	last_move_metrics["motion_to_preview_submit_us"] = Time.get_ticks_usec() - motion_start_us
+	last_move_metrics["input_to_preview_submit_us"] = (Time.get_ticks_usec() -
+		_move_target_received_us) if _move_target_received_us > 0 else -1
+	if move_profile_samples.size() < 512:
+		move_profile_samples.append(last_move_metrics.duplicate())
 	queue_redraw()
 
 
@@ -1161,12 +1219,14 @@ func finish_gesture(position: Vector2) -> void:
 	elif moving:
 		var target: Vector2i = _move_drag_base + position_to_pixel(position) - gesture_start
 		if target != _move_preview_offset:
+			_move_target_received_us = Time.get_ticks_usec()
 			_stage_move_preview(target)
 		# Mouse-up completes only this drag. The detached source-clear/target-
 		# paste preview and selection remain until Drop (Enter, outside click,
 		# an explicit command) or Cancel (Escape).
 		if not _floating_active:
 			_floating_source_selection = null
+			_move_capture = null
 			_floating_source_revision = -1
 	else:
 		_enqueue_sample(source_position(position))

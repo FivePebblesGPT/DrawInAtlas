@@ -1302,7 +1302,9 @@ third-party native backend or hardware gate was satisfied. See
 
 ## Next-sprint handoff — 2026-11-07
 
-**Owner verified the chunk-edge filtering artifact gone** after PR #14 (the separate physical benchmark/acceptance gates are not implied). Leave the repaired tile sampling and high-zoom pixel grid in the merged baseline; the pixel grid is **enabled by default** above 600% zoom, with an independent View toggle. [T-095](Tickets/T-095.md) now has an implemented, independent-oracle-tested 60px Brush staging optimization and paired Xvfb/Mesa evidence; it is **Manual Review**, not Done, pending owner GPU/pointer input-to-photon and UX acceptance. [T-096](Tickets/T-096.md), covering large selection contours and floating Move latency, remains **Ready** and untouched by this sprint turn.
+**Owner verified the chunk-edge filtering artifact gone** after PR #14 (the separate physical benchmark/acceptance gates are not implied). Leave the repaired tile sampling and high-zoom pixel grid in the merged baseline; the pixel grid is **enabled by default** above 600% zoom, with an independent View toggle. [T-095](Tickets/T-095.md) now has an implemented, independent-oracle-tested 60px Brush staging optimization and paired Xvfb/Mesa evidence; it is **Manual Review**, not Done, pending owner GPU/pointer input-to-photon and UX acceptance. [T-096](Tickets/T-096.md) now implements exact large-mask contours and reusable floating Move capture with independent exact-pixel oracles, multi-zoom native pointer/framebuffer witnesses and a controlled software before/after profile; it is **Manual Review**, not Done, until physical owner UX acceptance.
+
+**T-096 large-mask contours and cached floating Move (2026-11-07; Manual Review):** The previous >4096-cell enclosing-box fallback is replaced by viewport-clipped exact boolean mask boundaries (including disconnected islands and subtract holes), plus a bounded progressive cache for explicit pixel masks. The floating Move keeps one immutable capture and stages only nonzero selected source pixels per pointer offset, preserving hidden RGB, multiple drags and a single drop history step. Eight independent same-offset legacy/new detached-edit comparisons are byte-identical. The pinned Xvfb/Mesa native suite passes **34/34** actual viewport-delivered pointer/framebuffer checks at 25%/400%/786%, with software input receipt-to-preview-submit CPU p95 **12.093ms** and pointer-to-postdraw callback p95 **47.638ms**; nearby T-085/T-086/T-088/T-095 suites pass. These do **not** constitute physical GPU input-to-photon or owner approval. [T-096](Tickets/T-096.md) · [paired evidence](evidence/T-096-2026-11-07-selection.md).
 
 ## Tickets
 
@@ -1404,7 +1406,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
 | [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | Manual Review | Owner physical GPU/pointer recheck | [T-053](Tickets/T-053.md) |
-| [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics
 

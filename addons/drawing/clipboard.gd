@@ -71,8 +71,40 @@ func paste(edit: DrawingEditSession, top_left: Vector2i,
 	return DrawingResult.success(edit.change_count())
 
 
-## Move a bounded selection atomically: capture source, clear it, then paste at
-## displacement. The edit session owns one undo delta, even for overlapping moves.
+## Stage a move against an already captured immutable source. This keeps
+## transparent source cells transparent (they are not cleared or pasted), while
+## preserving nonzero hidden-RGB pixels, overlaps and one undo delta.
+## A sparse payload costs O(nonzero selected pixels), not O(area) per drag.
+static func move_captured(edit: DrawingEditSession, clipboard: DrawingClipboard,
+		displacement: Vector2i) -> DrawingResult:
+	if edit == null or clipboard == null:
+		return DrawingResult.failure("CLIPBOARD", "Missing edit session or captured payload")
+	var before: Dictionary[String, int] = edit._before.duplicate()
+	var after: Dictionary[String, int] = edit._after.duplicate()
+	var failure: DrawingResult
+	for local: Vector2i in clipboard._pixels:
+		var source: Vector2i = clipboard.source_position + local
+		var cleared: DrawingResult = edit._stage(source.x, source.y, 0)
+		if not cleared.ok:
+			failure = cleared
+			break
+	if failure == null:
+		for local: Vector2i in clipboard._pixels:
+			var target: Vector2i = clipboard.source_position + local + displacement
+			var pasted: DrawingResult = edit._stage(target.x, target.y,
+				clipboard._pixels[local])
+			if not pasted.ok:
+				failure = pasted
+				break
+	if failure == null:
+		return DrawingResult.success(edit.change_count())
+	edit._before = before
+	edit._after = after
+	edit._rebuild_preview_tiles()
+	return failure
+
+
+## Public edit API preserves atomicity even if the caller already staged work.
 static func move_selection(edit: DrawingEditSession, source_area: Rect2i,
 		displacement: Vector2i, selection: DrawingSelection = null) -> DrawingResult:
 	if edit == null:
@@ -81,16 +113,20 @@ static func move_selection(edit: DrawingEditSession, source_area: Rect2i,
 		selection, edit.anchor_x, edit.anchor_y)
 	if not captured.ok:
 		return captured
-	var clipboard: DrawingClipboard = captured.value as DrawingClipboard
-	var before: Dictionary[String, int] = edit._before.duplicate()
-	var after: Dictionary[String, int] = edit._after.duplicate()
-	var cleared: DrawingResult = edit.clear_rect(source_area, selection)
-	if cleared.ok:
-		var pasted: DrawingResult = clipboard.paste(edit, source_area.position + displacement)
-		if pasted.ok:
-			return pasted
-		cleared = pasted
-	edit._before = before
-	edit._after = after
-	edit._rebuild_preview_tiles()
-	return cleared
+	if edit.change_count() > 0:
+		# Preserve legacy semantics for a caller which already staged pixels:
+		# even originally transparent selected cells must erase that draft.
+		var before: Dictionary[String, int] = edit._before.duplicate()
+		var after: Dictionary[String, int] = edit._after.duplicate()
+		var cleared: DrawingResult = edit.clear_rect(source_area, selection)
+		if cleared.ok:
+			var pasted: DrawingResult = (captured.value as DrawingClipboard).paste(
+				edit, source_area.position + displacement)
+			if pasted.ok:
+				return pasted
+			cleared = pasted
+		edit._before = before
+		edit._after = after
+		edit._rebuild_preview_tiles()
+		return cleared
+	return move_captured(edit, captured.value as DrawingClipboard, displacement)
