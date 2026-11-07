@@ -6,6 +6,16 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-094 optional physical timing summary — 2026-11-07
+
+The existing T-073/T-094 Python documentation CI step tests
+`drawing_owner_evidence.py verify --timing-summary` with synthetic five-sample,
+outlier, `FAIL`, `NOT RUN`, malformed timing and mixed-commit cases. This
+optional reviewer command reports **only validated** per-zoom p50/p95 using
+R-7 linear interpolation; it does not sample a physical monitor, enforce
+latency thresholds, add a CI step ID or approve the owner UX gate. Raw
+artifacts and physical review remain required.
+
 ## T-086 shared frame source-chunk parity — 2026-11-06
 
 After staging and **importing** the standalone Drawing package:

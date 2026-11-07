@@ -20,6 +20,8 @@ python3 tools/drawing_owner_evidence.py init --os Linux --output /tmp/drawing-ow
 # On Windows, use: --os Windows --output path/to/drawing-owner-windows.json
 # Fill environment fields, each finding's observed outcome, and evidence.
 python3 tools/drawing_owner_evidence.py verify /tmp/drawing-owner-linux.json
+# Optional: calculate the verified, per-zoom timing statistics for #01/#15.
+python3 tools/drawing_owner_evidence.py verify --timing-summary /tmp/drawing-owner-linux.json
 python3 tools/drawing_owner_evidence.py verify --require-complete \
   --expected-commit "$(git rev-parse HEAD)" \
   /path/to/drawing-owner-linux.json /path/to/drawing-owner-windows.json
@@ -53,8 +55,18 @@ following is a **shape illustration only, not observed performance evidence**:
 }
 ```
 
-Record per-zoom **median/p95** and the timing method in `observed`; Godot
-frame callbacks still are not physical input-to-photon proof.
+Use `verify --timing-summary` to report the **sample count**, **p50 (median)**
+and **p95** independently for each phase and each zoom on *validated PASS*
+findings #01/#15. The calculation uses the R-7 linear-interpolation
+percentile (`index = (n - 1) × p/100` on sorted samples); with only five
+samples, p95 is interpolated 80% of the way from the fourth to the fifth,
+not a guarantee about a real-time worst case. A `NOT RUN` or `FAIL` finding
+prints no positive timing result, and an invalid or mixed-build report is
+rejected *before* statistics are printed. This command **does not obtain
+samples itself** or attest physical display latency; run on actual hardware,
+record per-zoom **median/p95** and the timing method in `observed`, and keep
+the original timestamped observations/artifacts for inspection. Godot frame
+callbacks still are not physical input-to-photon proof.
 The strict switch requires 23 physical `PASS` rows on *each* OS. A failed or
 incomplete run is retained as a real `FAIL`/`NOT RUN`, never silently excluded.
 When aggregating observed Linux/Windows results, the tool rejects **different

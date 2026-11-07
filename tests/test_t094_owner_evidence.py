@@ -13,7 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-from drawing_owner_evidence import blank_manifest, check_cohort, findings, validate  # noqa: E402
+from drawing_owner_evidence import (  # noqa: E402
+    blank_manifest, check_cohort, findings, percentile_ms, timing_summary, validate,
+)
 
 
 class OwnerPhysicalEvidenceTests(unittest.TestCase):
@@ -132,6 +134,109 @@ class OwnerPhysicalEvidenceTests(unittest.TestCase):
                     problems, passed, failed = validate(candidate, root)
                     self.assertTrue(problems)
                     self.assertEqual((passed, failed), (1, 0), "Reported PASS is not accepted without a clean validator verdict")
+
+    def test_summary_uses_independent_r7_percentiles_and_stable_zoom_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = self._observed_report(root)
+            samples = [100, 2, 3, 1, 4]  # Deliberately unordered with one outlier.
+            report["results"][0]["zooms_percent"] = [100, 25, 50]
+            report["results"][0]["timings_ms"]["25"]["down_to_preview_ms"] = samples
+            self.assertEqual(validate(report, root), ([], 1, 0))
+            self.assertEqual(percentile_ms(samples, 50), 3.0)
+            self.assertAlmostEqual(percentile_ms(samples, 95), 80.8)
+            lines = timing_summary(report)
+            self.assertEqual(len(lines), 9)
+            self.assertEqual(lines[0],
+                             "Linux #01 25% down_to_preview_ms: n=5 p50=3.000 ms p95=80.800 ms")
+            self.assertTrue(lines[3].startswith("Linux #01 50%"))
+            self.assertTrue(lines[6].startswith("Linux #01 100%"))
+            self.assertEqual(timing_summary(blank_manifest("Linux")), [])
+
+    def test_cli_summary_requires_valid_evidence_and_does_not_forge_results(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cli = [sys.executable, "tools/drawing_owner_evidence.py", "verify", "--timing-summary"]
+            report = self._observed_report(root)
+            path = root / "linux.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            success = subprocess.run(cli + [str(path)], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(success.returncode, 0, success.stderr)
+            self.assertEqual(success.stdout.count(" p50="), 9)
+            self.assertIn("Linux #01 25% down_to_preview_ms:", success.stdout)
+            self.assertIn("owner approval is never inferred", success.stdout)
+            self.assertNotIn("Windows #", success.stdout)
+            # FAIL and NOT RUN rows are real outcomes, not inferred timing PASSes.
+            report["results"][0]["status"] = "FAIL"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            failed_observation = subprocess.run(cli + [str(path)], cwd=ROOT,
+                                                capture_output=True, text=True)
+            self.assertEqual(failed_observation.returncode, 0, failed_observation.stderr)
+            self.assertIn("No validated PASS timing observations", failed_observation.stdout)
+            self.assertNotIn(" p50=", failed_observation.stdout)
+            # An invalid PASS cannot print an apparently trustworthy statistic.
+            report["results"][0]["status"] = "PASS"
+            report["results"][0]["timings_ms"]["25"]["motion_to_preview_ms"] = [5]
+            path.write_text(json.dumps(report), encoding="utf-8")
+            invalid = subprocess.run(cli + [str(path)], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn("five finite nonnegative", invalid.stderr)
+            self.assertNotIn(" p50=", invalid.stdout)
+            # Untested templates print an explicit absence, not made-up timings.
+            path.write_text(json.dumps(blank_manifest("Linux")), encoding="utf-8")
+            unrun = subprocess.run(cli + [str(path)], cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(unrun.returncode, 0, unrun.stderr)
+            self.assertIn("No validated PASS timing observations", unrun.stdout)
+
+    def test_timing_summary_reports_both_findings_and_both_operating_systems(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = []
+            for os_name in ("Linux", "Windows"):
+                os_dir = root / os_name
+                os_dir.mkdir()
+                report = self._observed_report(os_dir)
+                report["environment"]["os"] = os_name
+                source = report["results"][0]
+                fifteenth = report["results"][14]
+                fifteenth.update({key: copy.deepcopy(value) for key, value in source.items()
+                                  if key not in ("finding", "tickets")})
+                path = os_dir / "manifest.json"
+                path.write_text(json.dumps(report), encoding="utf-8")
+                paths.append(str(path))
+            command = [sys.executable, "tools/drawing_owner_evidence.py", "verify",
+                       "--timing-summary", "--expected-commit", "a" * 40, *paths]
+            valid = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertEqual(valid.stdout.count(" p50="), 36)
+            self.assertIn("Windows #15 100% release_to_commit_ms:", valid.stdout)
+            self.assertIn("Linux #01 25% down_to_preview_ms:", valid.stdout)
+            # Complete-status rejection happens *before* performance statistics.
+            incomplete = subprocess.run(command[:4] + ["--require-complete"] + command[4:],
+                                        cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(incomplete.returncode, 1)
+            self.assertIn("Physical evidence incomplete", incomplete.stderr)
+            self.assertNotIn(" p50=", incomplete.stdout)
+
+    def test_mixed_revision_summary_fails_before_printing_statistics(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = []
+            for os_name in ("Linux", "Windows"):
+                os_dir = root / os_name
+                os_dir.mkdir()
+                report = self._observed_report(os_dir)
+                report["environment"]["os"] = os_name
+                report["environment"]["commit"] = "a" * 40 if os_name == "Linux" else "b" * 40
+                path = os_dir / "manifest.json"
+                path.write_text(json.dumps(report), encoding="utf-8")
+                paths.append(str(path))
+            command = [sys.executable, "tools/drawing_owner_evidence.py", "verify",
+                       "--timing-summary", *paths]
+            invalid = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn("Mixed Git commit", invalid.stderr)
+            self.assertNotIn(" p50=", invalid.stdout)
 
     def test_untested_rows_cannot_carry_stale_zoom_claims(self) -> None:
         report = blank_manifest("Linux")

@@ -119,6 +119,16 @@ The [physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md) documents
 the JSON shape; T-094 remains In Progress.
 [T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
 
+**T-094 per-zoom review statistics (2026-11-07; In Progress):**
+A new optional `drawing_owner_evidence.py verify --timing-summary` emits
+R-7-interpolated p50/p95 and sample counts by 25/50/100% zoom and timing phase
+for individually validated #01/#15 physical `PASS` reports. It never prints
+statistics for unrun/failed/invalid or mixed-build evidence. New negative CLI
+and percentile contracts pass; **this is not a hardware measurement, owner
+acceptance, or remote hosted-CI run**. Ticket status and manual gates remain
+unchanged. [T-094](Tickets/T-094.md) ·
+[physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples

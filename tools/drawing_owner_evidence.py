@@ -144,6 +144,57 @@ def _validate_zoom_timings(entry: dict[str, Any], finding: int) -> list[str]:
     return problems
 
 
+def percentile_ms(samples: list[int | float], percentile: float) -> float:
+    """Return a linearly interpolated (R-7) percentile of validated samples.
+
+    A five-sample p95 lies between the fourth and fifth ordered values, rather
+    than silently implying 20 or more independent observations.
+
+    Parameters
+    ----------
+    samples : list[int | float]
+        Five or more finite nonnegative millisecond observations, previously
+        checked by ``_validate_zoom_timings``.
+    percentile : float
+        Requested percentile in the inclusive 0–100 range.
+
+    Returns
+    -------
+    float
+        Sample percentile in milliseconds.
+    """
+    ordered = sorted(samples)
+    rank = (len(ordered) - 1) * percentile / 100.0
+    lower = math.floor(rank)
+    upper = math.ceil(rank)
+    weight = rank - lower
+    return float(ordered[lower] + (ordered[upper] - ordered[lower]) * weight)
+
+
+def timing_summary(manifest: dict[str, Any]) -> list[str]:
+    """Format medians/p95 for validated physical PASS findings #01/#15 only.
+
+    Call only after ``validate`` and the cross-OS cohort check have succeeded.
+    Never derive a timing claim from FAIL or NOT RUN rows, and never confuse
+    recorded frame callbacks with a hardware input-to-photon measurement.
+    """
+    result: list[str] = []
+    os_name: str = manifest["environment"]["os"]
+    for entry in manifest["results"]:
+        if entry["finding"] not in TIMED_FINDINGS or entry["status"] != "PASS":
+            continue
+        for zoom in sorted(entry["zooms_percent"]):
+            phases = entry["timings_ms"][str(zoom)]
+            for phase in TIMING_PHASES:
+                samples = phases[phase]
+                result.append(
+                    f"{os_name} #{entry['finding']:02d} {zoom}% {phase}: "
+                    f"n={len(samples)} p50={percentile_ms(samples, 50):.3f} ms "
+                    f"p95={percentile_ms(samples, 95):.3f} ms"
+                )
+    return result
+
+
 def validate(manifest: Any, directory: Path) -> tuple[list[str], int, int]:
     """Validate evidence honesty/integrity, without equating it to owner signoff.
 
@@ -278,6 +329,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Fail unless 23 PASS results are evidenced on *both* physical OSes")
     verify.add_argument("--expected-commit",
                         help="Require all observed physical results to match this full Git SHA")
+    verify.add_argument("--timing-summary", action="store_true",
+                        help="Print validated per-zoom p50/p95 timing samples (not hardware attestation)")
     args = parser.parse_args(argv)
     try:
         if args.action == "init":
@@ -313,6 +366,14 @@ def main(argv: list[str] | None = None) -> int:
                                       or any(count != (23, 0) for count in counts.values())):
             print("Physical evidence incomplete: require 23 PASS rows on each OS", file=sys.stderr)
             return 1
+        if args.timing_summary:
+            lines = [line for report in manifests.values() for line in timing_summary(report)]
+            if lines:
+                print("Validated reported timing samples (R-7 interpolation; not input-to-photon attestation):")
+                for line in lines:
+                    print(line)
+            else:
+                print("No validated PASS timing observations for findings #01/#15.")
         print("Evidence files are structurally valid; owner approval is never inferred.")
         return 0
     except (OSError, ValueError, KeyError, TypeError) as exc:
