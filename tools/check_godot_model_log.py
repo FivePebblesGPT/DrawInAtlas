@@ -18,6 +18,16 @@ KNOWN_POST_EXIT = (
     re.compile(r"ERROR: Texture with GL ID of \d+: leaked \d+ bytes\."),
 )
 MODEL_FAILURE = re.compile(r"\b[A-Z][A-Z0-9_]*FAILED:|\bFAILED:|\bDOCK MODEL FAILED:")
+# Godot errors can be indented by CI log forwarders or decorated by terminal
+# color codes. Such decoration must not hide a runtime failure behind a valid
+# success marker. Only *literal*, unadorned post-exit leaks are allowlisted.
+ANSI_SGR = re.compile(r"\x1b\[[0-9;]*m")
+PROCESS_FAILURE = re.compile(
+    r"(?:FATAL(?: ERROR)?:|CRASH:|Segmentation fault(?: \(core dumped\))?"
+    r"|Aborted(?: \(core dumped\))?|terminate called after throwing)",
+    re.IGNORECASE,
+)
+
 
 
 def verify_log(content: str, marker: str) -> tuple[list[str], int]:
@@ -55,11 +65,14 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
     marker_line = markers[0] if len(markers) == 1 else len(lines)
     leaks = 0
     for number, line in enumerate(lines, 1):
-        if ("SCRIPT ERROR:" in line or "Parse Error:" in line or "Compile Error:" in line
-                or MODEL_FAILURE.search(line)):
+        diagnostic = ANSI_SGR.sub("", line).lstrip(" \t")
+        if ("SCRIPT ERROR:" in diagnostic or "Parse Error:" in diagnostic
+                or "Compile Error:" in diagnostic or MODEL_FAILURE.search(diagnostic)
+                or PROCESS_FAILURE.match(diagnostic)):
             problems.append(f"Line {number}: {line}")
-        elif line.startswith("ERROR:"):
-            if number - 1 > marker_line and any(p.fullmatch(line) for p in KNOWN_POST_EXIT):
+        elif diagnostic.startswith("ERROR:"):
+            if (diagnostic == line and number - 1 > marker_line
+                    and any(pattern.fullmatch(line) for pattern in KNOWN_POST_EXIT)):
                 leaks += 1
             else:
                 problems.append(f"Line {number}: {line}")

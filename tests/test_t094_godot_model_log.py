@@ -36,6 +36,45 @@ class ModelLogTests(unittest.TestCase):
                 issues, _ = verify_log(f"{MARKER}\n{error}\n", MARKER)
                 self.assertTrue(issues)
 
+    def test_wrapped_diagnostics_and_process_crashes_cannot_claim_success(self) -> None:
+        # Prior verifier only recognized ERROR: at column zero and missed
+        # terminal-color wrappers plus shell crash text printed after PASS.
+        bad_lines = (
+            "  ERROR: invalid script state",
+            "\tERROR: invalid renderer state",
+            "\x1b[31mERROR: invalid renderer state\x1b[0m",
+            "  \x1b[1;31mERROR: failed read\x1b[0m",
+            "FATAL ERROR: invalid native state",
+            "CRASH: renderer backend failed",
+            "Segmentation fault (core dumped)",
+            "Aborted (core dumped)",
+            "terminate called after throwing an instance of RuntimeError",
+        )
+        for line in bad_lines:
+            with self.subTest(line=line):
+                issues, leaks = verify_log(f"{MARKER}\n{line}\n", MARKER)
+                self.assertTrue(issues)
+                self.assertEqual(leaks, 0)
+        # An indented or ANSI-wrapped leak is not byte-identical to a known
+        # shutdown diagnostic; it must not consume the narrow leak exception.
+        for line in (" " + LEAK, "\x1b[31m" + LEAK + "\x1b[0m"):
+            with self.subTest(line=line):
+                issues, leaks = verify_log(f"{MARKER}\n{line}\n", MARKER)
+                self.assertTrue(issues)
+                self.assertEqual(leaks, 0)
+
+    def test_wrapped_diagnostics_fail_through_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "godot.log"
+            log.write_text(f"{MARKER}\n\x1b[31mERROR: runtime fault\x1b[0m\n")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tools/check_godot_model_log.py"),
+                 str(log), "--marker", MARKER],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("GODOT_MODEL_LOG_REJECTED", result.stdout)
+
     def test_missing_or_duplicate_or_ambiguous_marker_fails(self) -> None:
         for output in ("", "OTHER_MODEL_PASSED", f"{MARKER}\n{MARKER}"):
             with self.subTest(output=output):

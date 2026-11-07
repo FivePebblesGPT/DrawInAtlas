@@ -119,6 +119,17 @@ import with strict log validation. This does not verify GitHub-hosted CI,
 Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
 In Progress. [Ticket](Tickets/T-094.md).
 
+**T-094 decorated-error CI fail-closed checkpoint (2026-11-07; In Progress):**
+The required model-log guard no longer accepts a success marker followed by
+indented/ANSI-colored Godot `ERROR:` lines or fatal shell crash banners.
+Exact-marker and literal known post-exit leak rules are unchanged; a
+reproduction returned exit 0 with the prior checker and exit 1 after this
+fix. The 16/16 T-094 Python contracts and the required T-073 step
+pass locally (**1/46 selected, incomplete**); no new check ID, runtime
+behavior, or owner approval is implied. Hosted GitHub CI, Linux/Windows physical evidence and all manual
+review gates remain open. [Ticket](Tickets/T-094.md) ·
+[CI policy](CI_TESTING.md).
+
 **T-094 strict Drawing model-log consistency (2026-11-07; In Progress):**
 Six T-085–T-093 fast-CI Drawing model steps still used success-substring greps
 and inconsistent error handling, allowing unknown `ERROR:` output to be missed

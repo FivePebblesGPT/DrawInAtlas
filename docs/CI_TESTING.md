@@ -1188,3 +1188,20 @@ only the offline tests/stage checks can run: no release acceptance may be
 inferred. Windows artifacts may be structurally checked with `--windows`, but
 must also be launched on Windows; physical GPU and release acceptance remain
 open under T-068.
+
+## T-094 decorated/error-bearing model-log fail-closed check — 2026-11-07
+
+`tools/check_godot_model_log.py` detects Godot `ERROR:` lines even when
+terminal-color SGR escapes or indentation precede the diagnostic. After a
+valid success marker, plain shell crash banners (`Segmentation fault`,
+`Aborted`, `FATAL ERROR`, `CRASH`, and uncaught C++ termination text) still
+fail the step. The known Godot post-exit RID/texture leak exception only
+accepts the **literal** unadorned log line after one exact success marker;
+there is no general relaxation for errors emitted after `*_PASSED`.
+
+The original log content is retained for the reviewer, and the 46 required
+fast-CI check IDs are unchanged. Run `python3 -m unittest
+tests.test_t094_godot_model_log` or the existing T-073 required step to
+exercise both positive logs and deliberate false-green controls. This check
+validates log interpretation only; an actual GitHub-hosted run and physical
+owner acceptance must still be obtained independently.
