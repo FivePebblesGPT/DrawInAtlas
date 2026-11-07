@@ -24,7 +24,7 @@ MODEL_FAILURE = re.compile(r"\b[A-Z][A-Z0-9_]*FAILED:|\bFAILED:|\bDOCK MODEL FAI
 ANSI_SGR = re.compile(r"\x1b\[[0-9;]*m")
 PROCESS_FAILURE = re.compile(
     r"(?:FATAL(?: ERROR)?:|CRASH:|Segmentation fault(?: \(core dumped\))?"
-    r"|Aborted(?: \(core dumped\))?|terminate called after throwing)",
+    r"|Aborted(?: \(core dumped\))?|Killed(?:\s|$)|terminate called after throwing)",
     re.IGNORECASE,
 )
 # Bash wraps a fault with its shell name, source line and child PID. The bare
@@ -32,11 +32,19 @@ PROCESS_FAILURE = re.compile(
 SHELL_CRASH = re.compile(
     r"^(?:bash|sh|dash|zsh|[^\s:]+\.sh):\s*"
     r"(?:(?:line\s+)?\d+:\s*)?(?:\d+\s+)?"
-    r"(?:Segmentation fault|Aborted)(?:\s|$)",
+    r"(?:Segmentation fault|Aborted|Killed)(?:\s|$)",
     re.IGNORECASE,
 )
-PYTHON_TRACEBACK = re.compile(r"^Traceback \(most recent call last\):")
+PYTHON_TRACEBACK = re.compile(
+    r"^(?:Traceback \(most recent call last\):|Exception in thread \S.*:|Fatal Python error:)"
+)
 
+# Glibc malloc/free fatal heap diagnostics are not Godot post-exit RID leaks.
+# Match only allocator-violation prefixes, not explanatory prose mentioning them.
+LIBC_HEAP_FAILURE = re.compile(
+    r"^(?:malloc\(\):|free\(\):|realloc\(\):|munmap_chunk\(\):|double free or corruption(?: \([^\n]*\))?(?:$|:))",
+    re.IGNORECASE,
+)
 
 
 def verify_log(content: str, marker: str) -> tuple[list[str], int]:
@@ -79,7 +87,7 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
                 or "Compile Error:" in diagnostic or MODEL_FAILURE.search(diagnostic)
                 or PROCESS_FAILURE.match(diagnostic)
                 or SHELL_CRASH.match(diagnostic)
-                or PYTHON_TRACEBACK.match(diagnostic)):
+                or PYTHON_TRACEBACK.match(diagnostic) or LIBC_HEAP_FAILURE.match(diagnostic)):
             problems.append(f"Line {number}: {line}")
         elif diagnostic.startswith("ERROR:"):
             if (diagnostic == line and number - 1 > marker_line

@@ -119,6 +119,16 @@ import with strict log validation. This does not verify GitHub-hosted CI,
 Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
 In Progress. [Ticket](Tickets/T-094.md).
 
+**T-094 OOM/allocator-failure log guard (2026-11-07; In Progress):**
+The exact-marker CI log verifier now rejects shell-wrapped `Killed`/OOM
+termination, glibc `malloc`/`free` heap-corruption banners and uncaught Python
+runtime headers after a `*_PASSED` marker; previously these returned a false
+pass from the standalone verifier. The original checker is an independent
+negative control and the **20/20** expanded Python contracts pass, including
+CLI exit and benign prose/known RID leak cases. This is not hosted CI,
+physical owner evidence or manual approval; T-094 remains **In Progress**.
+[T-094 evidence](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
 **T-094 shell-wrapped crash/traceback CI guard (2026-11-07; In Progress):**
 The fast-CI Godot model-log validator now rejects Bash/Dash/Sh child-process
 `Segmentation fault`/`Aborted` lines with shell/PID prefixes and Python traceback

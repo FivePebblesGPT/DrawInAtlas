@@ -90,6 +90,55 @@ class ModelLogTests(unittest.TestCase):
             with self.subTest(note=line):
                 self.assertEqual(verify_log(f"{MARKER}\n{line}\n", MARKER), ([], 0))
 
+    def test_post_success_oom_heap_and_uncaught_python_failures(self) -> None:
+        # These production crash banners were previously ignored when they
+        # followed a valid Godot model PASS marker. Keep the known RID-leak
+        # exception intentionally narrow.
+        failures = (
+            "Killed",  # POSIX signal-9 diagnostic from an enclosing process
+            "bash: line 8: 12345 Killed                  ./godot",
+            "dash: 77: Killed ./godot",
+            "sh: line 2: 98 Killed ./godot",
+            "./ci/model.sh: line 4: 1024 Killed ./godot",
+            "\x1b[31m  bash: line 3: 77 Killed ./godot\x1b[0m",
+            "malloc(): corrupted top size",
+            "malloc(): unsorted double linked list corrupted",
+            "free(): double free detected in tcache 2",
+            "realloc(): invalid pointer",
+            "munmap_chunk(): invalid pointer",
+            "double free or corruption (!prev)",
+            'Exception in thread "MainThread":',
+            "Fatal Python error: Segmentation fault",
+        )
+        for line in failures:
+            with self.subTest(fatal=line):
+                issues, leaks = verify_log(f"{MARKER}\n{line}\n", MARKER)
+                self.assertTrue(issues, line)
+                self.assertEqual(leaks, 0)
+        for benign in (
+            "Note: Killed a stale process during test cleanup",
+            "Model docs mention malloc(): corrupted top size",
+            "Reporter quotes Fatal Python error: as an example",
+            "Traceback format documented in test metadata",
+        ):
+            with self.subTest(note=benign):
+                self.assertEqual(verify_log(f"{MARKER}\n{benign}\n", MARKER), ([], 0))
+        self.assertEqual(verify_log(f"{MARKER}\n{LEAK}\n", MARKER), ([], 1))
+
+    def test_heap_failure_is_rejected_by_real_log_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "model.log"
+            for fatal in ("malloc(): corrupted top size", "bash: line 8: 9 Killed ./godot"):
+                with self.subTest(fatal=fatal):
+                    log.write_text(f"{MARKER}\n{fatal}\n", encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(ROOT / "tools/check_godot_model_log.py"),
+                         str(log), "--marker", MARKER],
+                        text=True, capture_output=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn("GODOT_MODEL_LOG_REJECTED", result.stdout)
+
     def test_shell_crash_and_python_traceback_fail_through_cli(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "godot.log"

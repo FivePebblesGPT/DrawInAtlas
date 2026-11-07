@@ -121,6 +121,20 @@ viewport suite remains separately runnable under Xvfb and requires a clean
 Godot editor import after standalone staging. This does not imply hardware
 input or cold zoom acceptance.
 
+## T-094 OOM and allocator-crash log guard — 2026-11-07
+
+The shared `tools/check_godot_model_log.py` now fails closed on bare or
+shell-prefixed `Killed` (for example a SIGKILL/OOM termination), glibc
+allocator-corruption banners (`malloc():`, `free():`, `realloc():`,
+`munmap_chunk():`, `double free or corruption`), and uncaught Python runtime
+headers even **after** an exact `*_PASSED` marker. ANSI decorations and
+leading whitespace cannot hide these diagnostics. The 20-test Python contract
+suite includes a negative comparison with previously accepted fault lines,
+CLI rejection, harmless explanatory prose, and exact known post-exit Godot
+RID leak allowlisting. This augments the workflow's separate pipefail/command
+exit-code checks; it does not add a workflow step, bless a local test as hosted
+CI, or approve physical-owner findings.
+
 ## T-094 unified Drawing model-log policy — 2026-11-07
 
 The fast-CI Godot-backed T-085/T-086/T-087/T-088/T-089/T-091/T-092/T-093
