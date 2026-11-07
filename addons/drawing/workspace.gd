@@ -1725,11 +1725,22 @@ func _use_recent_color(index: int) -> void:
 		_set_selected_color(recent_colors[index])
 
 
+## Color.html_is_valid also permits bare/abbreviated hex; the Colors editor
+## promises exactly six or eight digit channels with an explicit leading #.
+func _valid_color_hex(value: String) -> bool:
+	if not value.begins_with("#") or value.length() not in [7, 9]:
+		return false
+	for index: int in range(1, value.length()):
+		if "0123456789abcdefABCDEF".find(value.substr(index, 1)) < 0:
+			return false
+	return true
+
+
 func _commit_hex() -> void:
 	if color_hex == null:
 		return
 	var value: String = color_hex.text.strip_edges()
-	if Color.html_is_valid(value):
+	if _valid_color_hex(value):
 		_set_selected_color(Color.html(value))
 	_refresh_color_controls()
 

@@ -460,6 +460,16 @@ The verifier retains recognized **post-success** GL/RID leak diagnostics, and
 rejects any missing marker, runtime error or failed check. Owner #11/#23 and
 all manual-review gates remain unapproved.
 
+**2026-11-07 canonical-hex checkpoint:** The required T-092 model suite
+now runs **67** assertions, rejecting bare/abbreviated hex and accepting only
+`#RRGGBB` or `#RRGGBBAA` with exact RGBA8 preservation. The on-demand native
+suite runs **51** pointer/Enter, framebuffer, preference, and dock assertions;
+`tools/check_native_t092_log.py` rejects fewer than 51, errors, nonzero
+failures, or a missing marker. Reimport the standalone project after every
+`build_drawing_app.py --in-place` staging change, because the icon SVG import
+metadata is generated rather than copied. A software Xvfb pass is not a
+physical Windows/Linux owner approval, or a hosted GitHub Actions result.
+
 ## T-091 single floating tab group and splitter-width recovery
 
 Fast push/PR CI executes `drawing/tests/dock_single_group_smoke.gd` (42

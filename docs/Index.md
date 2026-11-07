@@ -457,6 +457,19 @@ owner findings #19/#20 still await physical Linux/Windows validation under
 T-059; software green does not grant owner acceptance.
 [Details](Tickets/T-089.md).
 
+**T-092 strict hex entry (2026-11-07; In Progress):**
+The Colors hex field now accepts only its documented `#RRGGBB` or
+`#RRGGBBAA` formats; Godot's permissive abbreviated/bare hex parser no
+longer silently changes the selected pigment. The negative control fails
+3 model and 4 native assertions against the prior code. Expanded **67/67**
+headless and **51/51** native Xvfb/Mesa pointer/Enter checks pass
+(**55/55** with four framebuffer captures), including
+zero-alpha hidden RGB, standalone selection/history, and neighboring
+T-063/T-088/T-090/T-091 tests. The native verifier requires all 51 checks;
+reimport of standalone icons is mandatory after staging. T-092 remains
+**In Progress** for owner visual/physical Linux/Windows acceptance (finding
+#11); no manual gate is approved. [Evidence](Tickets/T-092.md).
+
 **T-092 separate FG/BG editing and compact Colors layout (2026-11-07; In Progress):**
 The Colors chips now select *independent* foreground/background edit targets:
 clicking BG no longer silently swaps brush pigment, and Previous BG restores
