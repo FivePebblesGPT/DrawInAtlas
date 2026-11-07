@@ -79,6 +79,16 @@ In the **State** column, `PENDING` means a target ticket still owes a fresh inte
 | 22 | T-094 | Paint then Save `.drawing`, close/open, check hidden RGB, IDs and undo | Byte-exact RGBA8 including transparent hidden RGB, stable IDs, clean savepoint, corruption rejected; `drawing/tests/standalone_smoke.gd` | Owner reported one successful flow, not every file | OWNER PASS / REGRESSION |
 | 23 | T-092 | Paint, Undo, compare displayed history cursor and internal revision | History cursor moves backward while internal revision remains monotonic; native History dock screenshot | T-092: public history labels and cursor/total replace raw document revision in status; Xvfb 34/34 Undo/Redo readback confirms cursor decrements while internal revision increases; physical/owner re-review NOT RUN | MODEL EXPECTED / UI PENDING |
 
+**T-080 post-T-082 docking evidence (2026-11-07, owner still PENDING):**
+The native pointer test (70/70, or 71/71 with one framebuffer PNG) now
+confirms that an invalid off-window drop is a no-op while the canvas remains
+a valid T-082 detach destination, and a long last dock group offers an
+*after-last-group* insertion when scrolled to the clipped bottom. The model
+passes 60/60, with T-082/T-091 and T-083 neighboring regressions passing.
+An unrelated T-081 native width assertion still fails on the unchanged
+baseline. Software Xvfb evidence is not an approved physical Linux/Windows
+T-083 docking UX walkthrough.
+
 **T-087 PR #13 corrective evidence (2026-11-07, still owner PENDING):**
 The original #02 frame check now also requires a wide Brush/Eraser stroke
 from the image into the workspace to affect only in-frame pixels, while

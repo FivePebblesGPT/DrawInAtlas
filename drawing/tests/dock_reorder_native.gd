@@ -126,14 +126,18 @@ func run() -> void:
 	await press_key(KEY_ESCAPE)
 	await drag_end(target)
 	check(not app.dock_drop_hint.visible and layout.snapshot() == before_cancel, "Esc rolls back exact group/order/selection")
-	# Invalid canvas drop does not activate an accidental canvas brush gesture.
+	# Since T-082, dropping onto the canvas deliberately floats a group.
+	# Only space outside all hosts and the viewport is an invalid target.
 	var document_before: Dictionary = layout.snapshot()
+	var floating_before: int = app.floating_hosts.size()
 	tab = app.dock_tab_buttons["patterns"]
-	target = app.canvas.get_global_rect().get_center()
+	target = Vector2(-24.0, -24.0)
 	await drag_begin(tab, target)
-	check(not app.dock_drop_hint.visible, "invalid canvas drop has no fake alignment target")
+	check(not app.dock_drop_hint.visible and not app._detach_preview,
+		"invalid off-window drop has neither dock nor floating target")
 	await drag_end(target)
-	check(layout.snapshot() == document_before, "invalid drop is exact no-op")
+	check(layout.snapshot() == document_before and app.floating_hosts.size() == floating_before,
+		"invalid drop is exact no-op without a floating host")
 	# Split a tab at the top of its source group and merge it back at a precise slot.
 	tab = app.dock_tab_buttons["swatches"]
 	(app.dock_header_buttons["colors"] as Button).grab_focus()
@@ -164,13 +168,21 @@ func run() -> void:
 	target = Vector2(history_frame.get_global_rect().end.x - 24.0,
 		minf(history_frame.get_global_rect().end.y - 2.0, app.inspector.get_global_rect().end.y - 6.0))
 	await drag_begin(group_handle, target)
-	await frames(36) # native auto-scroll toward the last group
-	var bottom_group_rect: Rect2 = (app.dock_group_frames["history"] as Control).get_global_rect()
-	var end_point: Vector2 = Vector2(target.x, minf(bottom_group_rect.end.y - 3.0, app.inspector.get_global_rect().end.y - 4.0))
+	check(app.dock_drag.target().get("kind") == DrawingDockDrag.MERGE_GROUP,
+		"before scrolling to the bottom, the last-group interior is still a merge target")
+	var scrollbar: VScrollBar = app.inspector.get_v_scroll_bar()
+	for step: int in range(90):
+		if app.inspector.scroll_vertical >= roundi(scrollbar.max_value - scrollbar.page) - 2:
+			break
+		await frames()
+	check(app.inspector.scroll_vertical >= roundi(scrollbar.max_value - scrollbar.page) - 2,
+		"group drag auto-scroll reaches the dock's true bottom")
+	var end_point: Vector2 = Vector2(target.x, app.inspector.get_global_rect().end.y - 4.0)
 	motion(end_point)
 	await frames(5)
 	target = end_point
-	check(app.dock_drop_hint.visible, "whole-group insertion hint")
+	check(app.dock_drop_hint.visible and app.dock_drag.target().get("kind") == DrawingDockDrag.GROUP_SLOT,
+		"clipped last group exposes an after-last-group insertion hint")
 	await drag_end(target)
 	var groups: Array = layout.container_info("right")["groups"]
 	check(groups[-1]["id"] == "colors" and layout.group_info("colors")["panels"] == original_color_members, "pointer moves group to bottom with order intact")

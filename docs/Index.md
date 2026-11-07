@@ -206,6 +206,18 @@ standalone, and shared Atlas smokes pass; unrelated T-089 native layer-pointer
 fails nine assertions identically on clean remote `116afa12` in this Xvfb
 setup and is not counted green. [Ticket](Tickets/T-088.md).
 
+**T-080 clipped bottom dock drop regression (2026-11-07; Done, engineering only):**
+The pre-T-082 native witness incorrectly treated a canvas release as invalid,
+although canvas detach is now deliberate. It now checks genuinely invalid
+outside-window drops. A separate real hit-test correction makes the last dock
+**group insertion slot reachable** at the visible bottom once a tall dock is
+fully scrolled, rather than silently merging into its last group. The native
+Xvfb/Mesa pointer/keyboard test passes **70/70** (71/71 with screenshot),
+model **60/60**; an on-demand native workflow and strict log-contract tests
+capture evidence. T-081's independent native canvas-width check still fails
+**1/54** on the unchanged local baseline and is not counted green. This
+neither closes T-083 nor supplies physical owner review. [T-080](Tickets/T-080.md).
+
 **T-091 repeated floating chrome and tall-host redock checkpoint (2026-11-07; In Progress):**
 Queued-for-deletion floating tab strips/frames are now immediately detached on
 redraw; synchronous multi-tab refreshes keep one header and active view, with

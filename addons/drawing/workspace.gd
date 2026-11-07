@@ -1306,6 +1306,13 @@ func _dock_target_at(position: Vector2) -> Dictionary:
 		return {}
 	if not inspector.get_global_rect().has_point(position):
 		return {}
+	# A long final group may extend past the ScrollContainer clip even at
+	# maximum scroll. Reserve the visible bottom edge for an after-last-group
+	# insertion, otherwise a group drag incorrectly merges into that group.
+	var scroll_bar: VScrollBar = inspector.get_v_scroll_bar()
+	var bottom_scroll: float = maxf(0.0, scroll_bar.max_value - scroll_bar.page)
+	if dock_drag.is_dragging() and not groups.is_empty() and bottom_scroll > 0.0 and 		inspector.scroll_vertical >= roundi(bottom_scroll) - 2 and 		position.y >= inspector.get_global_rect().end.y - 16.0:
+		return _dock_group_gap(groups.size(), inspector.get_global_rect().end.y - 4.0)
 	for group_index: int in range(groups.size()):
 		var group_id: String = String(groups[group_index]["id"])
 		var frame: VBoxContainer = dock_group_frames.get(group_id) as VBoxContainer
