@@ -38,6 +38,11 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
         canvas = (ROOT / "addons/drawing/canvas.gd").read_text()
         self.assertIn("texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST", canvas)
         self.assertIn("_draw_pixel_grid_overlay()", canvas)
+        self.assertIn("var show_pixel_grid: bool = false", canvas)
+        self.assertIn("func _raster_screen_rect(area: Rect2i)", canvas)
+        self.assertIn("_raster_screen_rect(area), false", canvas)
+        self.assertIn("Pixel grid at high zoom", self.workspace)
+        self.assertIn("func _toggle_pixel_grid()", self.workspace)
 
     def test_file_and_object_commands_are_outside_window(self) -> None:
         file_section = self.workspace.split('top_bar.add_menu_spec("File"', 1)[1].split(
