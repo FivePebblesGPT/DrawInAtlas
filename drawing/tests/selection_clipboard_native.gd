@@ -224,17 +224,46 @@ func run() -> void:
 	check(delta(color(canvas, src), before_move_source) < 0.05 and
 		delta(color(canvas, dest), before_move_dest) < 0.05,
 		"canceled Move leaves no compositing ghost")
+	# First release ends the pointer drag, NOT the detached floating piece.
+	var intermediate: Vector2 = Vector2(-10.5, 0.5)
 	button(canvas, src, true)
-	motion(canvas, dest)
+	motion(canvas, intermediate)
 	await frames(5)
+	button(canvas, intermediate, false)
+	await frames(5)
+	check(canvas.has_floating_move() and canvas._move_preview != null and
+		doc.revision == move_rev and pixel(doc, layer, -17, 0) != 0 and
+		pixel(doc, layer, -10, 0) == 0,
+		"mouse-up retains detached floating pixels without source publication")
+	check(canvas.selection_mask.allows(Vector2i(-10, 0)) and
+		canvas.selection_mask.allows(Vector2i(9, 0)),
+		"floating selection mask translates with the first drag, including island")
+	check(delta(color(canvas, intermediate), before_move_dest) > 0.08,
+		"floating pixels stay visible in framebuffer after mouse release")
+	# Second drag must accumulate from original source, never recapture the
+	# previously cleared preview or leave an extra copy behind.
+	button(canvas, intermediate, true)
+	motion(canvas, dest)
+	await frames(3)
 	button(canvas, dest, false)
 	await frames(5)
-	check(doc.revision == move_rev + 1 and pixel(doc, layer, -17, 0) == 0 and
-		pixel(doc, layer, -8, 0) != 0,
-		"Move release publishes one signed-source transaction")
+	check(canvas.has_floating_move() and doc.revision == move_rev and
+		canvas._move_preview_offset == Vector2i(9, 0) and
+		pixel(doc, layer, -8, 0) == 0 and pixel(doc, layer, -17, 0) != 0,
+		"second drag accumulates without publishing or resampling the source")
+	check(canvas.selection_mask.allows(Vector2i(-8, 0)) and
+		canvas.selection_mask.allows(Vector2i(11, 0)) and
+		not canvas.selection_mask.allows(Vector2i(-6, 0)),
+		"translated mask preserves subtract hole and distant Add island")
+	key(KEY_ENTER)
+	await frames(5)
+	check(not canvas.has_floating_move() and canvas._move_preview == null and
+		doc.revision == move_rev + 1 and pixel(doc, layer, -17, 0) == 0 and
+		pixel(doc, layer, -8, 0) != 0 and pixel(doc, layer, -10, 0) == 0,
+		"Enter commits one exact source-to-final-target transaction")
 	check(canvas.selected.has_point(Vector2i(-8, 0)) and
 		canvas.selection_mask.allows(Vector2i(11, 0)),
-		"Move translates selection mask including distant Add island")
+		"confirmed Move retains complete translated mask")
 	workspace._undo()
 	check(pixel(doc, layer, -17, 0) != 0 and pixel(doc, layer, -8, 0) == 0 and
 		canvas.selection_mask.allows(Vector2i(-17, 0)),
@@ -243,6 +272,21 @@ func run() -> void:
 	check(pixel(doc, layer, -8, 0) != 0 and
 		canvas.selection_mask.allows(Vector2i(-8, 0)),
 		"Move redo restores pixel destination and selection context")
+
+	# Escape after release cancels the entire next floating transaction.
+	var prior_confirmed_revision: int = doc.revision
+	button(canvas, dest, true)
+	motion(canvas, Vector2(-5.5, 0.5))
+	button(canvas, Vector2(-5.5, 0.5), false)
+	await frames(3)
+	check(canvas.has_floating_move() and doc.revision == prior_confirmed_revision,
+		"third gesture can float existing confirmed selection")
+	key(KEY_ESCAPE)
+	await frames(3)
+	check(not canvas.has_floating_move() and doc.revision == prior_confirmed_revision and
+		pixel(doc, layer, -8, 0) != 0 and pixel(doc, layer, -5, 0) == 0 and
+		canvas.selection_mask.allows(Vector2i(-8, 0)),
+		"Escape after mouse-up restores original pixels and mask without history")
 
 	canvas.grab_focus()
 	key(KEY_C, true)

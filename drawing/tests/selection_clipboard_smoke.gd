@@ -276,6 +276,100 @@ func run() -> void:
 	workspace._undo()
 	check(read(work_doc, work_layer, Vector2i(7, 7)) == 0xff998877,
 		"Delete undo restores exact content")
+
+	# Floating Move is a transient selected-pixel operation, not one commit per
+	# pointer release. Verify source identity across overlapping signed offsets,
+	# a channel hole, nonzero RGB hidden under alpha zero and the history cursor.
+	var float_seed: DrawingEditSession = work_doc.begin_edit(work_layer, work_doc.revision).value as DrawingEditSession
+	check(float_seed._stage(-17, 20, 0xffaabbcc).ok and
+		float_seed._stage(-16, 20, 0x00bb99aa).ok and
+		float_seed._stage(-15, 20, 0xff114477).ok and
+		float_seed._stage(-14, 20, 0xff882211).ok and float_seed.commit().ok,
+		"seed floating-move source across signed seam with alpha-zero RGB")
+	var float_mask: DrawingSelection = DrawingSelection.new(Rect2i(-17, 20, 4, 1), true)
+	float_mask.combine_rectangle(Rect2i(-15, 20, 1, 1), "Subtract")
+	var float_canvas: Control = workspace.canvas
+	float_canvas.set_selection_mask(float_mask)
+	workspace._change_tool("Move")
+	var float_rev: int = work_doc.revision
+	var float_history: int = work_doc.history_length()
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(-16.5, 20.5)))
+	float_canvas.finish_gesture(float_canvas.pixel_to_position(Vector2(-15.5, 20.5)))
+	check(float_canvas.has_floating_move() and float_canvas._move_preview != null and
+		float_canvas._floating_offset == Vector2i(1, 0) and
+		work_doc.revision == float_rev and work_doc.history_length() == float_history,
+		"first floating mouse-up retains source revision and history unchanged")
+	check(read(work_doc, work_layer, Vector2i(-17, 20)) == 0xffaabbcc and
+		read(work_doc, work_layer, Vector2i(-16, 20)) == 0x00bb99aa,
+		"held floating preview has not changed byte-exact source including hidden RGB")
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(-15.5, 20.5)))
+	float_canvas.finish_gesture(float_canvas.pixel_to_position(Vector2(-13.5, 20.5)))
+	check(float_canvas.has_floating_move() and float_canvas._floating_offset == Vector2i(3, 0) and
+		float_canvas.selection_mask.allows(Vector2i(-14, 20)) and
+		not float_canvas.selection_mask.allows(Vector2i(-12, 20)) and
+		work_doc.revision == float_rev,
+		"second drag accumulates offset; mask hole stays at shifted source location")
+	workspace._drop_floating_move()
+	check(not float_canvas.has_floating_move() and work_doc.revision == float_rev + 1 and
+		work_doc.history_length() == float_history + 1,
+		"explicit Drop publishes one undoable edit after two pointer releases")
+	check(read(work_doc, work_layer, Vector2i(-17, 20)) == 0 and
+		read(work_doc, work_layer, Vector2i(-16, 20)) == 0 and
+		read(work_doc, work_layer, Vector2i(-15, 20)) == 0xff114477 and
+		read(work_doc, work_layer, Vector2i(-14, 20)) == 0xffaabbcc and
+		read(work_doc, work_layer, Vector2i(-13, 20)) == 0x00bb99aa and
+		read(work_doc, work_layer, Vector2i(-11, 20)) == 0xff882211,
+		"Move retains exact RGBA8, independent hole and overlapping source/target")
+	workspace._undo()
+	check(read(work_doc, work_layer, Vector2i(-17, 20)) == 0xffaabbcc and
+		read(work_doc, work_layer, Vector2i(-13, 20)) == 0 and
+		float_canvas.selection_mask.allows(Vector2i(-17, 20)),
+		"one Undo restores exact source plus original channel context")
+	workspace._redo()
+	check(read(work_doc, work_layer, Vector2i(-13, 20)) == 0x00bb99aa and
+		float_canvas.selection_mask.allows(Vector2i(-14, 20)),
+		"one Redo reapplies complete move and translated mask")
+	var cancel_rev: int = work_doc.revision
+	var cancel_cursor: int = work_doc.history_position()
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(-13.5, 20.5)))
+	float_canvas.finish_gesture(float_canvas.pixel_to_position(Vector2(-10.5, 20.5)))
+	check(float_canvas.has_floating_move(), "subsequent operation can float committed piece")
+	workspace._undo()
+	check(not float_canvas.has_floating_move() and work_doc.revision == cancel_rev and
+		work_doc.history_position() == cancel_cursor and
+		read(work_doc, work_layer, Vector2i(-13, 20)) == 0x00bb99aa,
+		"Ctrl+Z cancels floating preview rather than undoing an older edit")
+	# Switching to Select drops the floating selection before any new marquee,
+	# as verified in the PhotoCraft command behavior. No second history entry.
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(-13.5, 20.5)))
+	float_canvas.finish_gesture(float_canvas.pixel_to_position(Vector2(-12.5, 20.5)))
+	var implicit_rev: int = work_doc.revision
+	workspace._change_tool("Select")
+	check(workspace.active_tool == "Select" and not float_canvas.has_floating_move() and
+		work_doc.revision == implicit_rev + 1 and
+		read(work_doc, work_layer, Vector2i(-12, 20)) == 0x00bb99aa,
+		"Select command implicitly drops floating pixels once before new operation")
+	workspace._change_tool("Move")
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(-12.5, 20.5)))
+	float_canvas.finish_gesture(float_canvas.pixel_to_position(Vector2(-11.5, 20.5)))
+	var outside_rev: int = work_doc.revision
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(40.5, 40.5)))
+	check(not float_canvas.has_floating_move() and work_doc.revision == outside_rev + 1 and
+		read(work_doc, work_layer, Vector2i(-11, 20)) == 0x00bb99aa,
+		"click outside floating mask drops pixels without starting an extra gesture")
+	# External canonical revision invalidates the entire detached preview and
+	# leaves the source untouched; no stale pixel delta may be published.
+	float_canvas.start_gesture(float_canvas.pixel_to_position(Vector2(-11.5, 20.5)))
+	float_canvas.finish_gesture(float_canvas.pixel_to_position(Vector2(-10.5, 20.5)))
+	check(float_canvas.has_floating_move(), "external revision stale test starts floating")
+	var ext: DrawingEditSession = work_doc.begin_edit(work_layer, work_doc.revision).value as DrawingEditSession
+	check(ext._stage(45, 20, 0xff010203).ok and ext.commit().ok,
+		"concurrent canonical edit advances document revision")
+	float_canvas._process(0.0)
+	check(not float_canvas.has_floating_move() and float_canvas._move_preview == null and
+		read(work_doc, work_layer, Vector2i(-11, 20)) == 0x00bb99aa and
+		read(work_doc, work_layer, Vector2i(-10, 20)) == 0,
+		"stale preview auto-cancels and does not leak pixels or change selection")
 	workspace.queue_free()
 	print("T088_MODEL: %d checks; %d failed" % [checks, failures])
 	if failures == 0:

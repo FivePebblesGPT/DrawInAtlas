@@ -12,7 +12,7 @@ signal text_requested(pixel: Vector2i)
 
 var document: DrawingDocument:
 	set(value):
-		if (session != null or _move_preview != null) and value != document:
+		if (session != null or dragging or _floating_source_selection != null) and value != document:
 			cancel_gesture()
 		if document != value:
 			set_selection_mask(null, false)
@@ -20,12 +20,12 @@ var document: DrawingDocument:
 		queue_redraw()
 var layer_id: String = "":
 	set(value):
-		if (session != null or _move_preview != null) and value != layer_id:
+		if (session != null or dragging or _floating_source_selection != null) and value != layer_id:
 			cancel_gesture()
 		layer_id = value
 var tool: String = "Brush":
 	set(value):
-		if (session != null or _move_preview != null) and value != tool:
+		if (session != null or dragging or _floating_source_selection != null) and value != tool:
 			cancel_gesture()
 		tool = value
 var color_rgba: int = 0xff202020
@@ -40,7 +40,7 @@ var grid_origin: Vector2i = Vector2i.ZERO
 var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
-		if (session != null or _move_preview != null) and value != zoom:
+		if (session != null or dragging or _floating_source_selection != null) and value != zoom:
 			cancel_gesture()
 		zoom = value
 var camera: Vector2 = Vector2.ZERO
@@ -51,6 +51,8 @@ var selection_mode: String = "Replace"
 var _updating_selection_bounds: bool = false
 var selected: Rect2i = Rect2i():
 	set(value):
+		if not _updating_selection_bounds and _floating_source_selection != null:
+			cancel_gesture()
 		selected = value
 		if not _updating_selection_bounds:
 			selection_mask.set_rectangle(value)
@@ -60,6 +62,14 @@ var _marquee_start_screen: Vector2 = Vector2.ZERO
 var _move_preview: DrawingEditSession
 var _move_target: Vector2i = Vector2i.ZERO
 var _move_preview_offset: Vector2i = Vector2i.ZERO
+## A floating selected-pixel Move retains its *original* mask and source
+## revision across multiple drags. The shifted mask is display context only:
+## every preview is rebuilt against the same immutable source until Drop.
+var _floating_source_selection: DrawingSelection
+var _floating_source_revision: int = -1
+var _floating_offset: Vector2i = Vector2i.ZERO
+var _move_drag_base: Vector2i = Vector2i.ZERO
+var _floating_active: bool = false
 ## Object Editor authoring guides only. Neither changes raster pixels nor clips
 ## the infinite sparse canvas; the origin and optional bounds are source-local.
 var asset_origin: Vector2i = Vector2i.ZERO
@@ -121,6 +131,12 @@ var last_gesture_metrics: Dictionary[String, Variant] = {}
 
 ## Replace the channel without collapsing its boolean operations into bounds.
 func set_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
+	if _floating_source_selection != null:
+		cancel_gesture()
+	_assign_selection_mask(value, notify)
+
+
+func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
 	selection_mask = value.detached_copy() if value != null else DrawingSelection.new()
 	_updating_selection_bounds = true
 	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
@@ -615,12 +631,17 @@ func _gui_input(event: InputEvent) -> void:
 ## Canvas exit is not a paint cancellation: raw viewport events outside the
 ## Control continue a captured stroke, including its eventual button release.
 func _input(event: InputEvent) -> void:
-	if session == null and not (dragging and (selecting or moving)):
+	if session == null and not (dragging and (selecting or moving)) and not _floating_active:
 		return
 	if event is InputEventKey:
 		var key: InputEventKey = event
-		if key.pressed and key.keycode == KEY_ESCAPE:
+		if key.pressed and not key.echo and key.keycode == KEY_ESCAPE \
+				and (dragging or session != null or has_focus()):
 			cancel_gesture()
+			get_viewport().set_input_as_handled()
+		elif key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER] \
+				and _floating_active and not dragging and has_focus():
+			confirm_floating_move()
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		var motion: InputEventMouseMotion = event
@@ -641,7 +662,8 @@ func _process(_delta: float) -> void:
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
 	if moving and _move_target != _move_preview_offset:
 		_stage_move_preview(_move_target)
-	if _move_preview != null and document.revision != _move_preview.expected_revision:
+	if _floating_source_revision >= 0 and (document == null \
+			or document.revision != _floating_source_revision):
 		cancel_gesture()
 
 
@@ -662,9 +684,23 @@ func start_gesture(position: Vector2) -> void:
 			_marquee = Rect2i()
 			_marquee_dragged = false
 		if moving:
-			_move_target = Vector2i.ZERO
-			_move_preview_offset = Vector2i.ZERO
-			gesture_started.emit()
+			if _floating_active and not selection_mask.allows(gesture_start):
+				# A click outside the floating piece is an explicit drop.
+				moving = false
+				dragging = false
+				confirm_floating_move()
+				return
+			if not _floating_active:
+				if not selection_mask.enabled or not selected.has_area() \
+						or not selection_mask.allows(gesture_start):
+					moving = false
+					dragging = false
+					return
+				_floating_source_selection = selection_mask.detached_copy()
+				_floating_source_revision = document.revision
+				gesture_started.emit()
+			_move_drag_base = _floating_offset
+			_move_target = _floating_offset
 		return
 	if tool not in ["Brush", "Eraser"]:
 		dragging = false
@@ -712,7 +748,7 @@ func update_gesture(position: Vector2) -> void:
 				Vector2i(absi(current.x - gesture_start.x) + 1, absi(current.y - gesture_start.y) + 1))
 		queue_redraw()
 	elif moving:
-		_move_target = current - gesture_start
+		_move_target = _move_drag_base + current - gesture_start
 	elif session != null:
 		_enqueue_sample(source_position(position))
 
@@ -819,7 +855,8 @@ func _commit_stroke() -> void:
 	queue_redraw()
 
 
-## Explicit abort, including Esc/tool/layer/document/zoom changes. No history.
+## Escape, stale revision and direct host changes discard the entire floating
+## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
 	if session != null:
 		session.cancel()
@@ -827,6 +864,13 @@ func cancel_gesture() -> void:
 	if _move_preview != null:
 		_move_preview.cancel()
 		_move_preview = null
+	if _floating_source_selection != null:
+		_assign_selection_mask(_floating_source_selection, false)
+	_floating_source_selection = null
+	_floating_source_revision = -1
+	_floating_active = false
+	_floating_offset = Vector2i.ZERO
+	_move_drag_base = Vector2i.ZERO
 	dragging = false
 	selecting = false
 	moving = false
@@ -842,28 +886,83 @@ func cancel_gesture() -> void:
 	queue_redraw()
 
 
-## The document remains immutable until release. The composited renderer reads
-## these detached source-clear/target-paste pixels at the correct layer depth.
+func has_floating_move() -> bool:
+	return _floating_active
+
+
+## Drop commits at most one pixel delta, regardless of the number of drags.
+## Even a pixel-identical move may translate the selected mask without a dirty
+## document transaction. The owning workspace captured the original context on
+## the FIRST drag and receives only one gesture_committed at this final drop.
+func confirm_floating_move() -> bool:
+	if not _floating_active or dragging or document == null:
+		return false
+	if document.revision != _floating_source_revision:
+		cancel_gesture()
+		return false
+	var edit: DrawingEditSession = _move_preview
+	var original_selection: DrawingSelection = _floating_source_selection
+	_move_preview = null
+	_floating_source_selection = null
+	_floating_source_revision = -1
+	_floating_active = false
+	_floating_offset = Vector2i.ZERO
+	_move_drag_base = Vector2i.ZERO
+	_move_target = Vector2i.ZERO
+	_move_preview_offset = Vector2i.ZERO
+	if edit != null and edit.change_count() > 0:
+		var result: DrawingResult = edit.commit()
+		if not result.ok:
+			_assign_selection_mask(original_selection, false)
+			_publish(result)
+			queue_redraw()
+			return false
+		_publish(result)
+	else:
+		if edit != null:
+			edit.cancel()
+		selection_changed.emit(selected)
+	queue_redraw()
+	return true
+
+
+## Each stage always moves the original source into the accumulated offset;
+## a subsequent drag must NOT sample the previous preview as its new source.
+## Invalid targets retain the last good preview and mask without ghost pixels.
 func _stage_move_preview(offset: Vector2i) -> void:
-	if _move_preview != null:
-		_move_preview.cancel()
-		_move_preview = null
-	_move_preview_offset = offset
-	if not selected.has_area() or offset == Vector2i.ZERO or document == null:
+	if _floating_source_selection == null or document == null:
+		return
+	if document.revision != _floating_source_revision:
+		cancel_gesture()
+		return
+	if offset == Vector2i.ZERO:
+		if _move_preview != null:
+			_move_preview.cancel()
+			_move_preview = null
+		_move_preview_offset = offset
+		_floating_offset = offset
+		_floating_active = false
+		_assign_selection_mask(_floating_source_selection, false)
 		queue_redraw()
 		return
-	var started: DrawingResult = document.begin_edit(layer_id, document.revision)
+	var started: DrawingResult = document.begin_edit(layer_id, _floating_source_revision)
 	if not started.ok:
 		canvas_error.emit(started.message)
-		queue_redraw()
 		return
 	var edit: DrawingEditSession = started.value as DrawingEditSession
-	var staged: DrawingResult = DrawingClipboard.move_selection(edit, selected, offset, selection_mask)
+	var staged: DrawingResult = DrawingClipboard.move_selection(edit,
+		_floating_source_selection.bounds, offset, _floating_source_selection)
 	if not staged.ok:
 		edit.cancel()
 		canvas_error.emit(staged.message)
-	else:
-		_move_preview = edit
+		return
+	if _move_preview != null:
+		_move_preview.cancel()
+	_move_preview = edit
+	_move_preview_offset = offset
+	_floating_offset = offset
+	_floating_active = true
+	_assign_selection_mask(_floating_source_selection.translated(offset), false)
 	queue_redraw()
 
 
@@ -881,22 +980,15 @@ func finish_gesture(position: Vector2) -> void:
 		elif selection_mask.enabled and not selection_mask.allows(gesture_start):
 			clear_selection()
 	elif moving:
-		var displacement: Vector2i = position_to_pixel(position) - gesture_start
-		if displacement != _move_preview_offset:
-			_stage_move_preview(displacement)
-		if _move_preview != null and displacement != Vector2i.ZERO:
-			var edit: DrawingEditSession = _move_preview
-			_move_preview = null
-			if edit.change_count() > 0:
-				var committed: DrawingResult = edit.commit()
-				if committed.ok:
-					set_selection_mask(selection_mask.translated(displacement), false)
-				_publish(committed)
-			else:
-				edit.cancel()
-		elif _move_preview != null:
-			_move_preview.cancel()
-			_move_preview = null
+		var target: Vector2i = _move_drag_base + position_to_pixel(position) - gesture_start
+		if target != _move_preview_offset:
+			_stage_move_preview(target)
+		# Mouse-up completes only this drag. The detached source-clear/target-
+		# paste preview and selection remain until Drop (Enter, outside click,
+		# an explicit command) or Cancel (Escape).
+		if not _floating_active:
+			_floating_source_selection = null
+			_floating_source_revision = -1
 	else:
 		_enqueue_sample(source_position(position))
 		_metrics["release_us"] = Time.get_ticks_usec()
@@ -909,7 +1001,6 @@ func finish_gesture(position: Vector2) -> void:
 	moving = false
 	_marquee_dragged = false
 	_move_target = Vector2i.ZERO
-	_move_preview_offset = Vector2i.ZERO
 	queue_redraw()
 
 func _publish(result: DrawingResult) -> void:

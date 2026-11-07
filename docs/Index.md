@@ -190,6 +190,22 @@ bounded. New headless 15/15 and Xvfb/Mesa native 80/80 checks pass; a warmed
 **This is not a dense-zoom throughput or physical hardware acceptance pass.**
 [T-086](Tickets/T-086.md).
 
+**T-088 persistent selected-pixel Move correction (2026-11-07; In Progress):**
+Mouse release now retains an uncommitted detached floating mask/pixel preview.
+Repeated drags accumulate signed offsets from the original source; explicit
+Enter/Menu Drop or outside click commits **one** history step, while Escape,
+Ctrl+Z, revision/layer change and direct host cancellation restore source.
+Changing tools/selection mode or choosing clipboard/save resolves the floating
+piece first. New **131/131** headless signed-mask/hidden-RGB/Undo checks,
+**51/51** native Xvfb/Mesa pointer/framebuffer checks and six fail-closed
+log contracts pass. The software zoom probe is 17.159ms p50/19.827ms p95
+(n=4), **not** physical input-to-photon evidence. Owner PhotoCraft UX and
+Linux/Windows hardware remain unaccepted; T-088 is reopened In Progress, with
+T-056/T-059 manual gates untouched. Neighboring native T-085/T-086/T-090,
+standalone, and shared Atlas smokes pass; unrelated T-089 native layer-pointer
+fails nine assertions identically on clean remote `116afa12` in this Xvfb
+setup and is not counted green. [Ticket](Tickets/T-088.md).
+
 **T-091 repeated floating chrome and tall-host redock checkpoint (2026-11-07; In Progress):**
 Queued-for-deletion floating tab strips/frames are now immediately detached on
 redraw; synchronous multi-tab refreshes keep one header and active view, with
@@ -1221,7 +1237,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | — | [T-053](Tickets/T-053.md) |
-| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Done | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | — | [T-082](Tickets/T-082.md) |

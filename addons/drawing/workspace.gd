@@ -209,10 +209,12 @@ func _build_interface() -> void:
 		Callable(self, "_move_selected_layer").bind(1),
 		Callable(self, "_indent_selected_layer"), Callable(self, "_outdent_selected_layer")])
 	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels",
+		"Drop moved pixels  Enter", "Cancel floating Move  Esc",
 		"Deselect  Ctrl+D", "Replace", "Add", "Subtract", "Intersect"],
 		[Callable(self, "_change_tool").bind("Select"),
-		Callable(self, "_change_tool").bind("Move"), Callable(self, "_deselect"),
-		Callable(self, "_set_selection_mode").bind("Replace"),
+		Callable(self, "_change_tool").bind("Move"),
+		Callable(self, "_drop_floating_move"), Callable(self, "_cancel_floating_move"),
+		Callable(self, "_deselect"), Callable(self, "_set_selection_mode").bind("Replace"),
 		Callable(self, "_set_selection_mode").bind("Add"),
 		Callable(self, "_set_selection_mode").bind("Subtract"),
 		Callable(self, "_set_selection_mode").bind("Intersect")])
@@ -1997,6 +1999,8 @@ func _request_close_current() -> void:
 func _request_close_tab(index: int) -> void:
 	if index < 0 or index >= tabs.size():
 		return
+	if index == active_tab and canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	_closing_index = index
 	_close_after_save = false
 	var session: DrawingObjectEditorSession = tabs[index].get("object") as DrawingObjectEditorSession
@@ -2518,6 +2522,8 @@ func _toggle_visibility() -> void:
 
 
 func _change_tool(name: String) -> void:
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	active_tool = name
 	canvas.tool = name
 	_refresh_tool_buttons()
@@ -2544,6 +2550,8 @@ func _refresh_tool_options() -> void:
 
 
 func _set_selection_mode(mode: String) -> void:
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	canvas.selection_mode = mode
 	for index: int in range(selection_mode_control.item_count):
 		if selection_mode_control.get_item_text(index) == mode:
@@ -2552,8 +2560,22 @@ func _set_selection_mode(mode: String) -> void:
 	_update_status()
 
 
+func _drop_floating_move() -> void:
+	if canvas.has_floating_move():
+		canvas.confirm_floating_move()
+
+
+func _cancel_floating_move() -> void:
+	if canvas.has_floating_move():
+		canvas.cancel_gesture()
+		_before_gesture = null
+		_update_status()
+
+
 func _deselect() -> void:
 	if active_tab >= 0:
+		if canvas.has_floating_move() and not canvas.confirm_floating_move():
+			return
 		canvas.clear_selection()
 
 
@@ -2568,6 +2590,8 @@ func _capture_selection_clipboard() -> DrawingResult:
 
 
 func _copy_selection() -> void:
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	var capture: DrawingResult = _capture_selection_clipboard()
 	if not capture.ok:
 		_show_error(capture.message)
@@ -2595,6 +2619,8 @@ func _commit_clipboard_edit(edit: DrawingEditSession,
 
 
 func _delete_selection() -> void:
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	if active_tab < 0 or not canvas.selected.has_area():
 		return
 	var started: DrawingResult = current_document().begin_edit(current_layer(), current_document().revision)
@@ -2613,6 +2639,8 @@ func _delete_selection() -> void:
 
 
 func _cut_selection() -> void:
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	var captured: DrawingResult = _capture_selection_clipboard()
 	if not captured.ok:
 		_show_error(captured.message)
@@ -2635,6 +2663,8 @@ func _cut_selection() -> void:
 
 
 func _paste_selection() -> void:
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	if drawing_clipboard == null or active_tab < 0:
 		_show_error("Copy pixels from a selection before pasting")
 		return
@@ -2841,6 +2871,8 @@ func _update_status() -> void:
 		tab_identity, source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
 		canvas.zoom * 100.0, guide, grid_info, document.history_position(),
 		document.history_length(), "Unsaved changes" if dirty else "Saved"]
+	if canvas.has_floating_move():
+		status.text += " | Floating Move: Enter drop / Esc cancel"
 	status.tooltip_text = status.text
 	_refresh_history()
 
@@ -2934,6 +2966,9 @@ func _fit_image_frame() -> void:
 func _undo() -> void:
 	if active_tab < 0:
 		return
+	if canvas.has_floating_move():
+		_cancel_floating_move()
+		return
 	var result: DrawingResult = current_document().undo()
 	if result.ok:
 		_restore_context(result.value as DrawingHistoryContext)
@@ -2944,6 +2979,9 @@ func _undo() -> void:
 
 func _redo() -> void:
 	if active_tab < 0:
+		return
+	if canvas.has_floating_move():
+		_cancel_floating_move()
 		return
 	var result: DrawingResult = current_document().redo()
 	if result.ok:
@@ -3018,6 +3056,8 @@ func _ask_open() -> void:
 func _ask_save() -> void:
 	if active_tab < 0:
 		return
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
+		return
 	var session: DrawingObjectEditorSession = current_object()
 	if session != null and not session.save_as_publisher.is_valid():
 		_show_error("No Object Asset publisher is connected")
@@ -3032,6 +3072,8 @@ func _ask_save() -> void:
 
 func _save() -> void:
 	if active_tab < 0:
+		return
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	var session: DrawingObjectEditorSession = current_object()
 	if session != null:
@@ -3068,6 +3110,8 @@ func _publish_object(as_variant: bool) -> void:
 
 func _save_file(path: String) -> void:
 	if active_tab < 0:
+		return
+	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	if not path.to_lower().ends_with(".drawing"):
 		path += ".drawing"
