@@ -133,9 +133,70 @@ func seed_preview(preview: DrawingEditSession, points: Array[Vector2i]) -> void:
 			"preview sparse pixel stage %d" % i)
 
 
+
+
+func verify_mid_density(count: int) -> void:
+	# One 256px storage tile spans a 128px visible display tile. Test the
+	# density transition that formerly fell back to scanning every pixel at
+	# 13 source entries, including signed coordinates and alpha-zero RGB.
+	var doc: DrawingDocument = DrawingDocument.new("density-oracle-%d" % count, 256)
+	var bottom: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Bottom").value)
+	var top: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Top").value)
+	var points: Array[Vector2i] = []
+	var colors: Array[int] = []
+	for i: int in range(count):
+		points.append(Vector2i(-128 + (i % 128),
+			-128 + ((i * 11 + int(i / 128) * 37) % 128)))
+		# Nonzero RGB under alpha=0 must remain in canonical source but not
+		# contribute to the composed image. The zero alpha is intentional.
+		var alpha: int = 0 if i % 11 == 0 else (127 if i % 3 == 0 else 255)
+		colors.append((alpha << 24) | ((i * 61 % 256) << 16) |
+			((i * 17 % 256) << 8) | ((i + 1) % 256))
+	seed_source(doc, bottom, points, colors)
+	seed_source(doc, top, [points[1], points[3], Vector2i(-1, -1)],
+		[0x80224466, 0xff712300, 0x00007f11])
+	var layers: Array[String] = [bottom, top]
+	var view: Rect2i = Rect2i(-128, -128, 128, 128)
+	var expected: PackedByteArray = reference(doc, view, layers)
+	var ordinary: DrawingResult = DrawingRenderer.render(doc, view)
+	var planned: DrawingResult = DrawingRenderer.render(doc, view,
+		0, 0, 1048576, null, DrawingRenderer.prepare_visible_layers(doc))
+	check(ordinary.ok and planned.ok and
+		(ordinary.value as Image).get_data() == expected and
+		(planned.value as Image).get_data() == expected,
+		"density=%d exact independent 128px signed/RGBA8 reference" % count)
+	var clipped: Rect2i = Rect2i(-119, -123, 83, 71)
+	var cropped: DrawingResult = DrawingRenderer.render(doc, clipped)
+	check(cropped.ok and (cropped.value as Image).get_data() ==
+		reference(doc, clipped, layers),
+		"density=%d clipped storage run matches independent oracle" % count)
+	var started: DrawingResult = doc.begin_edit(top, doc.revision)
+	check(started.ok, "density=%d preview session" % count)
+	if started.ok:
+		var preview: DrawingEditSession = started.value as DrawingEditSession
+		check(preview.apply_region(Rect2i(points[3], Vector2i.ONE),
+			PackedByteArray([40, 60, 80, 0])).ok,
+			"density=%d detached eraser-equivalent stage" % count)
+		check(preview.apply_region(Rect2i(-117, -127, 1, 1),
+			PackedByteArray([200, 30, 90, 170])).ok,
+			"density=%d detached translucent stage" % count)
+		var preview_render: DrawingResult = DrawingRenderer.render(doc, view,
+			0, 0, 1048576, preview, DrawingRenderer.prepare_visible_layers(doc))
+		check(preview_render.ok and (preview_render.value as Image).get_data() ==
+			reference(doc, view, layers, preview),
+			"density=%d preview must conservatively override sparse source" % count)
+		preview.cancel()
+		var restored: DrawingResult = DrawingRenderer.render(doc, view)
+		check(restored.ok and (restored.value as Image).get_data() == expected,
+			"density=%d cancel restores exact committed image" % count)
+	check(int(doc.read_pixel(bottom, points[0].x, points[0].y).value) == colors[0],
+		"density=%d hidden RGB stays in canonical source" % count)
+
 func run() -> void:
 	for stride: int in [1, 16, 64, 128, 256, 513]:
 		verify_stride(stride)
+	for count: int in [13, 24, 48, 64, 96]:
+		verify_mid_density(count)
 	print("T086_SPARSE_PIXEL: %d checks; %d failed" % [checks, failures])
 	print("T086_SPARSE_PIXEL_PASSED" if failures == 0 else "T086_SPARSE_PIXEL_FAILED")
 	quit(0 if failures == 0 else 1)

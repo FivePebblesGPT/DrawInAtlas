@@ -197,6 +197,18 @@ cold-frame latency speedup. The 140/140 native X11 checks and seven T-086
 headless suites pass. Physical Windows/Linux and owner gates remain unverified.
 [Ticket](Tickets/T-086.md) · [CI evidence policy](CI_TESTING.md).
 
+**T-086 density-aware sparse-source cutoff (2026-11-07; In Progress):**
+The 12-stored-pixel compositor cutoff caused near-empty 256px chunks with
+24–64 pixels to scan each destination run densely. A bounded density-aware
+threshold now keeps those runs sparse while preserving dense/preview fallbacks.
+Three paired 9-sample software CPU runs show 24 entries **2.31–2.34ms →
+0.41–0.44ms**, 48 entries **2.35ms → 0.61–0.67ms**, with identical per-case
+RGBA8 SHA-256 hashes; 96/256-entry controls retain dense behavior. The
+expanded public-readback oracle passes **590/590** and Xvfb native framebuffer
+**153/153**. The required T-086 selected CI step passes **1/46 incomplete**.
+Dense/large viewport, GPU/Windows/Linux and owner acceptance remain **open**;
+T-086 stays In Progress. [Evidence](Tickets/T-086.md).
+
 **T-086 sparse stored-pixel CPU compositor (2026-11-07; In Progress):**
 Cold 128px display-tile composition now iterates intersecting stored RGBA8
 pixels for near-empty canonical source chunks, with a dense/short-run and

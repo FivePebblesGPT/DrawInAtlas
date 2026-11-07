@@ -177,7 +177,12 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				# patches may add or erase pixels not present in the source map.
 				# The short-run/dense fallback avoids O(rows * stored_pixels)
 				# iteration for 1px strides and ordinarily populated art.
-				if preview == null and source_pixels.size() <= 12 and run_length >= 16:
+				# A fixed 12-pixel cutoff made a tile with only 13 or 24
+				# occupied pixels pay for every destination pixel. Permit sparse
+				# iteration while it examines fewer than half the run's pixels,
+				# capped to bound work on wide/large storage tiles.
+				if preview == null and run_length >= 16 \
+						and source_pixels.size() <= mini(64, run_length >> 1):
 					var first_index: int = local_y * stride
 					for pixel_index: int in source_pixels:
 						if pixel_index < first_index + local_x \

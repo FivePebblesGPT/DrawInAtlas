@@ -16,6 +16,21 @@ R-7 linear interpolation; it does not sample a physical monitor, enforce
 latency thresholds, add a CI step ID or approve the owner UX gate. Raw
 artifacts and physical review remain required.
 
+## T-086 density-aware sparse-source compositor — 2026-11-07
+
+The existing required T-086 CI step runs
+`drawing/tests/renderer_sparse_pixel_smoke.gd`, now including public-pixel
+RGBA8 parity for 13/24/48/64/96-entry signed source tiles, clipping,
+layered alpha, detached preview overrides and cancellation (**590 checks**).
+The same strict `T086_SPARSE_PIXEL_PASSED` marker is required; the 46-check
+inventory is unchanged. `drawing/tests/renderer_density_benchmark.gd` is an
+**on-demand, nine-sample CPU-only** density-sweep witness (8–256 seeded
+pixels), printing per-case medians, p95 and output SHA-256. Do not enforce
+wall-clock thresholds in fast CI or mistake this for native GPU/owner evidence.
+The T-086 ticket contains paired before/after software timings. Physical
+Windows/Linux responsiveness, large dense cold zoom and owner acceptance are
+still outstanding.
+
 ## T-086 shared frame source-chunk parity — 2026-11-06
 
 After staging and **importing** the standalone Drawing package:
