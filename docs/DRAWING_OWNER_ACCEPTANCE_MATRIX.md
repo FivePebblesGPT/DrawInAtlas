@@ -85,9 +85,20 @@ confirms that an invalid off-window drop is a no-op while the canvas remains
 a valid T-082 detach destination, and a long last dock group offers an
 *after-last-group* insertion when scrolled to the clipped bottom. The model
 passes 60/60, with T-082/T-091 and T-083 neighboring regressions passing.
-An unrelated T-081 native width assertion still fails on the unchanged
-baseline. Software Xvfb evidence is not an approved physical Linux/Windows
-T-083 docking UX walkthrough.
+The T-081 native width assertion failed on that then-unchanged baseline;
+it was subsequently repaired and reverified in the T-081 checkpoint below.
+Software Xvfb evidence is not an approved physical Linux/Windows T-083
+docking UX walkthrough.
+
+**T-081 floating-host canvas-width corrective evidence (2026-11-07,
+T-083 owner review still PENDING):** The earlier 1/54 native test failure
+was reproducible: floating Colors reduced the right dock minimum from
+184px to 182px and widened the canvas by 2px without user splitter input.
+A stable 192px expanded-dock minimum now prevents this; native real-pointer
+**58/58** (59/59 with one framebuffer PNG), T-081 ownership model **64/64**
+and 5 fail-closed contracts pass on Godot 4.8 beta 2 Xvfb/Mesa. This does
+not replace the separate physical Linux/Windows group-docking, narrow/
+HiDPI and owner walkthrough under T-083, T-056 or T-059.
 
 **T-087 PR #13 corrective evidence (2026-11-07, still owner PENDING):**
 The original #02 frame check now also requires a wide Brush/Eraser stroke

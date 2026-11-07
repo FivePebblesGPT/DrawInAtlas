@@ -114,6 +114,8 @@ func run() -> void:
 	await frames(6)
 	check(layout.rail_icons("right").size() == 5, "initial dock has five panel icons")
 	var original_canvas_width: float = app.canvas.size.x
+	var original_dock_floor: float = app.inspector.get_combined_minimum_size().x
+	check(original_dock_floor >= 190.0, "expanded dock reserves compact panel width")
 	var first_id: String = app.float_group("colors")
 	await frames(9)
 	check(not first_id.is_empty(), "float group programmatically")
@@ -129,6 +131,8 @@ func run() -> void:
 	check(app.dock_views["colors"].get_parent() == host.group_frames["colors"] and app.dock_views["swatches"].get_parent() == app.dock_stash,
 		"only active real view is rendered")
 	check(is_equal_approx(original_canvas_width, app.canvas.size.x), "floating overlay leaves split canvas width unchanged")
+	check(is_equal_approx(original_dock_floor, app.inspector.get_combined_minimum_size().x),
+		"removing Colors cannot shrink expanded dock minimum width")
 	await click(host.tab_buttons["swatches"] as Button)
 	check(layout.group_info("colors")["active"] == "swatches", "native tab click selects alternative panel")
 	check(app.dock_views["swatches"].get_parent() == host.group_frames["colors"] and app.dock_views["colors"].get_parent() == app.dock_stash,
@@ -226,11 +230,15 @@ func run() -> void:
 	var before_hide: Dictionary = layout.snapshot()
 	await click(host.get_node("FloatingColumn/FloatingTitleBar/HideHost") as Button)
 	check(not host.visible and layout.snapshot() == before_hide, "close affordance hides without redocking")
+	check(is_equal_approx(original_canvas_width, app.canvas.size.x),
+		"hiding the floated overlay cannot resize the canvas")
 	check(not (app.dock_views["layers"] as Control).is_visible_in_tree(), "hidden host body not visible")
 	app.show_hidden_floating_hosts()
 	await frames(6)
 	check(host.visible and layout.snapshot() == before_hide and host.tab_buttons.has("swatches"),
 		"Window recovery brings back identical panel tabs")
+	check(is_equal_approx(original_canvas_width, app.canvas.size.x),
+		"showing a hidden floated overlay cannot resize the canvas")
 	app.hide_floating_host(first_id)
 	app.hide_floating_host(first_id)
 	app.show_floating_host(first_id)

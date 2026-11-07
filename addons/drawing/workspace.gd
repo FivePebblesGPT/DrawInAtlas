@@ -14,6 +14,10 @@ const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
+# Largest compact built-in panel (Colors/History plus scrollbar) needs
+# a stable floor. Otherwise floating a group shrinks the dock's intrinsic
+# minimum and silently changes the canvas width without a splitter drag.
+const EXPANDED_DOCK_MIN_WIDTH: int = 192
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -315,7 +319,7 @@ func _build_interface() -> void:
 	canvas.color_rgba = _pack_color(active_color)
 	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
-	inspector.custom_minimum_size.x = 160
+	inspector.custom_minimum_size.x = EXPANDED_DOCK_MIN_WIDTH
 	inspector.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	inspector.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	inspector.follow_focus = true
@@ -845,7 +849,7 @@ func _render_dock(focus_key: String = "") -> void:
 				dock_flyout_tabs.add_child(tab)
 			if dock_views.has(String(group["active"])):
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
-	inspector.custom_minimum_size.x = 48 if minimized else 160
+	inspector.custom_minimum_size.x = 48 if minimized else EXPANDED_DOCK_MIN_WIDTH
 	dock_panels.visible = not minimized
 	dock_rail.visible = minimized
 	dock_flyout.visible = minimized and not flyout_group_id.is_empty()

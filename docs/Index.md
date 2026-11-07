@@ -214,9 +214,24 @@ outside-window drops. A separate real hit-test correction makes the last dock
 fully scrolled, rather than silently merging into its last group. The native
 Xvfb/Mesa pointer/keyboard test passes **70/70** (71/71 with screenshot),
 model **60/60**; an on-demand native workflow and strict log-contract tests
-capture evidence. T-081's independent native canvas-width check still fails
-**1/54** on the unchanged local baseline and is not counted green. This
+capture evidence. T-081's then-failing **1/54** baseline canvas-width check was isolated
+and later corrected in the T-081 checkpoint below; it is not counted as a
+T-080 pass. This
 neither closes T-083 nor supplies physical owner review. [T-080](Tickets/T-080.md).
+
+**T-081 floating overlay canvas-width regression (2026-11-07; Done, engineering only):**
+After compact Colors, a native T-081 witness reproduced a **2px canvas-width
+jump** when floating that group: the right dock's intrinsic minimum changed
+184→182px as the group left the split. A stable 192px expanded dock floor now
+prevents that unrequested resizing (minimized rail remains 48px). The native
+pointer/keyboard/geometry suite passes **58/58** (59/59 with one framebuffer
+PNG), the headless ownership model **64/64**, and five fail-closed evidence
+contracts pass. T-079/T-080/T-082/T-083/T-090/T-091/T-092 neighboring native
+suites and the four shared Atlas smoke suites pass; the native run retains
+only classified post-exit Godot/Mesa resource diagnostics. The new on-demand
+X11 workflow does **not** constitute hosted CI or Windows/Linux physical
+owner approval; T-083, T-056 and T-059 manual gates remain open.
+[Ticket](Tickets/T-081.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
 **T-091 repeated floating chrome and tall-host redock checkpoint (2026-11-07; In Progress):**
 Queued-for-deletion floating tab strips/frames are now immediately detached on
