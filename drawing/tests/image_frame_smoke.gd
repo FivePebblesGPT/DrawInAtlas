@@ -207,6 +207,34 @@ func run() -> void:
 	check(workspace.canvas.image_bounds == Rect2i(-42, 27, 75, 95) and
 		workspace.canvas.grid_spacing == 12 and workspace.canvas.show_grid,
 		"switching tabs preserves per-tab guide/grid preferences")
+	# Unlike Show grid, snap settings alter the meaning of a pending source
+	# position. A selection drag must not combine two coordinate mappings.
+	workspace.canvas.tool = "Select"
+	workspace.canvas.clear_selection()
+	workspace._set_snap_enabled(true)
+	var select_start: Vector2 = workspace.canvas.pixel_to_position(Vector2(-3, 40))
+	var select_end: Vector2 = workspace.canvas.pixel_to_position(Vector2(21, 64))
+	workspace.canvas.start_gesture(select_start)
+	workspace.canvas.update_gesture(select_end)
+	check(workspace.canvas.dragging and workspace.canvas.selecting and
+		workspace.canvas._marquee.has_area(),
+		"grid-snapped marquee is pending before editing snap settings")
+	workspace._toggle_grid()
+	workspace.canvas.grid_spacing = 12
+	workspace.canvas.grid_origin = Vector2i(-3, 5)
+	check(workspace.canvas.dragging and workspace.canvas.selecting,
+		"visual grid toggle and identical source-grid mapping retain marquee")
+	workspace.grid_fields[0].value = 14
+	workspace._apply_grid_settings()
+	check(not workspace.canvas.dragging and not workspace.canvas.selecting and
+		not workspace.canvas.selection_mask.enabled,
+		"effective grid-spacing change cancels the unpublished marquee")
+	workspace.canvas.finish_gesture(select_end)
+	check(not workspace.canvas.selection_mask.enabled,
+		"mouse-up after cancelled marquee cannot create a selection")
+	workspace.canvas.grid_spacing = 12
+	workspace.canvas.grid_origin = Vector2i(-3, 5)
+	workspace._set_snap_enabled(false)
 	workspace.queue_free()
 	DirAccess.remove_absolute(path)
 	DirAccess.remove_absolute(legacy_path)

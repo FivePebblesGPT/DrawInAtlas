@@ -370,6 +370,19 @@ remote baseline and is **not** counted green. Windows/Linux physical pointer,
 DPI and owner approval remain pending, with no T-083 manual gate waived.
 [T-091 evidence and limitations](Tickets/T-091.md).
 
+**T-087 live snap-mapping safety (2026-11-07; In Progress):**
+Changing effective Snap mode, grid spacing or grid origin during queued
+Brush/Eraser or active selection/Move dragging now cancels the incomplete
+gesture before it can publish pixels or history from two coordinate mappings.
+Equivalent values, grid/pixel-grid visibility, and spacing/origin adjustments
+while snapping is disabled are non-destructive. New T-087 model **61/61** and
+actual Xvfb/Mesa pointer/framebuffer **82/82** checks pass; pre-fix canvas
+negative controls fail 2 model and 12 native assertions. T-085/T-086/T-088/
+T-096, signed-boundary and shared Atlas regressions pass after a fresh font
+import; the selected local CI check is **1/46 incomplete**, not hosted green.
+Owner T-059/T-056 hardware and UX gates remain **PENDING** and T-087 stays
+**In Progress**. [Ticket and evidence](Tickets/T-087.md).
+
 **T-087 finite-frame Brush/Eraser and checker correction (2026-11-07; In Progress):**
 PR #13's reported outside-frame painting and panning checker-phase defects
 are corrected in the standalone canvas without cropping signed sparse data or

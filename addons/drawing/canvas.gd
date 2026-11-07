@@ -48,9 +48,23 @@ var _stroke_selection: DrawingSelection
 var show_grid: bool = false
 ## Pixel boundaries appear automatically when individual pixels become large.
 var show_pixel_grid: bool = true
-var snap_to_grid: bool = false
-var grid_spacing: int = 8
-var grid_origin: Vector2i = Vector2i.ZERO
+## A stroke/marquee/move drag must not mix two different input coordinate grids.
+## Guide visibility is presentation-only and never cancels a gesture.
+var snap_to_grid: bool = false:
+	set(value):
+		if value != snap_to_grid:
+			_cancel_on_effective_snap_change()
+		snap_to_grid = value
+var grid_spacing: int = 8:
+	set(value):
+		if value != grid_spacing and snap_to_grid:
+			_cancel_on_effective_snap_change()
+		grid_spacing = value
+var grid_origin: Vector2i = Vector2i.ZERO:
+	set(value):
+		if value != grid_origin and snap_to_grid:
+			_cancel_on_effective_snap_change()
+		grid_origin = value
 var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
@@ -191,6 +205,16 @@ func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> voi
 	queue_redraw()
 	if notify:
 		selection_changed.emit(selected)
+
+
+## Snap settings participate in source-coordinate interpretation. Discard an
+## in-flight transaction rather than stage a stroke or selection with samples
+## from two unrelated grids. A finished floating Move can still be adjusted
+## before the next drag, and changing guide visibility is always harmless.
+func _cancel_on_effective_snap_change() -> void:
+	if session != null or (dragging and (selecting or moving)):
+		cancel_gesture()
+		canvas_error.emit("Gesture cancelled because grid snapping changed")
 
 
 func clear_selection() -> void:

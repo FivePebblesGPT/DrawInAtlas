@@ -223,6 +223,85 @@ func run() -> void:
 		"native delivered click commits to configured snapped grid intersection")
 	check(doc.undo().ok and int(doc.read_pixel(layer, 9, 5).value) == 0,
 		"snapped pointer paints one normal reversible edit")
+
+	# Grid/snap controls may change from toolbar or an embedded host while
+	# a real pointer stream is held. Never commit a mixture of two mappings.
+	canvas.show_grid = false
+	canvas.brush_width = 1.0
+	canvas.color_rgba = 0xff33dd66
+	for setting: String in ["snap_to_grid", "grid_spacing", "grid_origin"]:
+		canvas.snap_to_grid = true
+		canvas.grid_spacing = 12
+		canvas.grid_origin = Vector2i(-3, 5)
+		canvas.queue_redraw()
+		await frames()
+		var probe: Vector2 = Vector2(26.3, 24.1)
+		var snap_pixel: Vector2i = canvas.position_to_pixel(canvas.pixel_to_position(probe))
+		var baseline: Color = at(canvas, canvas.pixel_to_position(Vector2(snap_pixel) + Vector2(0.5, 0.5)))
+		var previous_revision: int = doc.revision
+		var old_accumulation: bool = Input.use_accumulated_input
+		pointer(canvas, probe, true)
+		await frames(3)
+		check(canvas.session != null and canvas.dragging and
+			canvas.session.change_count() > 0 and doc.revision == previous_revision,
+			"held Brush has a detached preview before changing %s" % setting)
+		match setting:
+			"snap_to_grid":
+				canvas.snap_to_grid = false
+			"grid_spacing":
+				canvas.grid_spacing = 16
+			"grid_origin":
+				canvas.grid_origin = Vector2i(4, 5)
+		await frames(3)
+		check(canvas.session == null and not canvas.dragging and
+			doc.revision == previous_revision and Input.use_accumulated_input == old_accumulation,
+			"changing effective %s cancels queued preview and restores input" % setting)
+		check(distance(at(canvas, canvas.pixel_to_position(Vector2(snap_pixel) + Vector2(0.5, 0.5))),
+			baseline) < 0.025 and int(doc.read_pixel(layer, snap_pixel.x, snap_pixel.y).value) == 0,
+			"cancelled %s leaves no ghost pixel in the framebuffer or document" % setting)
+		pointer(canvas, probe, false)
+		await frames(4)
+		check(doc.revision == previous_revision and canvas.session == null,
+			"stale release after %s cannot publish an Undo step" % setting)
+
+	# Changing a purely visual grid guide or reassigning identical snap
+	# settings must not abort a legitimate held stroke.
+	canvas.snap_to_grid = true
+	canvas.grid_spacing = 12
+	canvas.grid_origin = Vector2i(-3, 5)
+	pointer(canvas, Vector2(26.3, 24.1), true)
+	await frames(2)
+	canvas.show_grid = true
+	canvas.snap_to_grid = true
+	canvas.grid_spacing = 12
+	canvas.grid_origin = Vector2i(-3, 5)
+	check(canvas.session != null and canvas.dragging,
+		"guide visibility and equivalent snap settings retain pending Brush")
+	pointer(canvas, Vector2(26.3, 24.1), false)
+	await frames(5)
+	check(canvas.session == null and int(doc.read_pixel(layer, 21, 29).value) != 0,
+		"unchanged grid mapping commits a normal snapped Brush")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 21, 29).value) == 0,
+		"unchanged grid mapping preserves one-step Undo")
+
+	# Spacing/origin and both visual grids are irrelevant to an unsnapped
+	# stroke. Changing these must not interrupt the actual pointer capture.
+	canvas.snap_to_grid = false
+	pointer(canvas, Vector2(40.2, 20.3), true)
+	await frames(2)
+	canvas.grid_spacing = 20
+	canvas.grid_origin = Vector2i(7, -4)
+	canvas.show_grid = false
+	canvas.show_pixel_grid = false
+	check(canvas.session != null and canvas.dragging,
+		"grid guides and inactive snap configuration do not cancel raw Brush")
+	pointer(canvas, Vector2(40.2, 20.3), false)
+	await frames(5)
+	check(canvas.session == null and int(doc.read_pixel(layer, 40, 20).value) != 0,
+		"raw Brush commits unchanged coordinates after inactive grid adjustments")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 40, 20).value) == 0,
+		"unsnapped grid adjustments preserve one-step Undo")
+	canvas.show_pixel_grid = true
 	# Standalone authoring refuses an outside-image mousedown and clips the
 	# complete wide stroke footprint at the signed frame, not only its center.
 	check(not canvas.clip_strokes_to_image_frame,
