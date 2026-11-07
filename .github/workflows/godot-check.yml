@@ -71,6 +71,10 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/live_stroke_smoke.gd 2>&1 | tee /tmp/godot-t085-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t085-model.log --marker T085_MODEL_PASSED || ci_fail_marker 'T085 live-stroke model log rejected'
+          # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
+          # its pointer/framebuffer timing witness stays opt-in and software-only.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t095-oracle.log --marker T095_ORACLE_PASSED || ci_fail_marker 'T095 Brush/Eraser independent pixel oracle rejected'
           ci_finish
       - name: Verify T-086 source-space dirty-display tile invalidation
         id: ci_t086_viewport_cache_model
@@ -120,6 +124,10 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd 2>&1 | tee /tmp/godot-t088-selection-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-selection-model.log --marker T088_MODEL_PASSED || ci_fail_marker 'T088_MODEL_PASSED log rejected'
+          # T-096 exact large-mask contours/Move source oracle is mandatory;
+          # real pointer/display and owner acceptance remain separate.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t096-model.log --marker T096_MODEL_PASSED || ci_fail_marker 'T096 large selection and Move oracle rejected'
           ci_finish
       - name: Verify T-089 layer hierarchy, row actions, and structural history
         id: ci_t089_layer_structure_model

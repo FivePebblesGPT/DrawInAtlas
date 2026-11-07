@@ -25,14 +25,31 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
     if not marker or not re.fullmatch(r"[A-Z][A-Z0-9_]+_PASSED", marker):
         raise ValueError("Expected exact uppercase *_PASSED marker")
     lines = content.splitlines()
-    # Legacy model witnesses may report an assertion count as
-    # `T089_MODEL_PASSED: 62 checks`; accept that exact form, not an
-    # arbitrary colon suffix that could disguise a diagnostic.
-    counted_marker = re.compile(re.escape(marker) + r": [1-9][0-9]* checks\Z")
-    markers = [i for i, line in enumerate(lines)
-               if line == marker or line.startswith(marker + " ")
-               or line.startswith(marker + "(") or counted_marker.fullmatch(line)]
+    # Only formats actually emitted by checked-in model witnesses are valid.
+    # A loose prefix check accepted misleading output such as `PASSED 0/99`
+    # and `PASSED (42 checks; 5 failed)` as success. Fail closed instead.
+    escaped = re.escape(marker)
+    positive = r"[1-9][0-9]*"
+    ratio = re.compile(rf"{escaped} ({positive})/({positive})\Z")
+    counted = re.compile(rf"{escaped}: {positive} checks\Z")
+    checked = re.compile(rf"{escaped} \({positive} checks; 0 failed\)\Z")
+    no_failures = re.compile(rf"{escaped} \(0 failures\)\Z")
+    comma_checked = re.compile(rf"{escaped} \({positive} checks, 0 failures\)\Z")
+    labeled_counts = re.compile(rf"{escaped} checks={positive} failures=0\Z")
+    inline_counts = re.compile(rf"{escaped} {positive} checks, failures=0\Z")
+    markers: list[int] = []
     problems: list[str] = []
+    for index, line in enumerate(lines):
+        if not line.startswith((marker + " ", marker + ":", marker + "(")) and line != marker:
+            continue
+        match = ratio.fullmatch(line)
+        if (line == marker or counted.fullmatch(line) or checked.fullmatch(line)
+                or no_failures.fullmatch(line) or comma_checked.fullmatch(line)
+                or labeled_counts.fullmatch(line) or inline_counts.fullmatch(line) or
+                (match is not None and match.group(1) == match.group(2))):
+            markers.append(index)
+        else:
+            problems.append(f"Line {index + 1}: Invalid or incomplete {marker} success summary: {line}")
     if len(markers) != 1:
         problems.append(f"Expected exactly one {marker} marker, got {len(markers)}")
     marker_line = markers[0] if len(markers) == 1 else len(lines)

@@ -148,11 +148,16 @@ func _witness(spec: Dictionary, source: PackedByteArray) -> Dictionary:
 	if not painted.ok:
 		return {}
 	var coverage: Array[int] = []
-	for key: String in session._covered:
-		var index: int = _index(key)
-		if index < 0:
-			return {}
-		coverage.append(index)
+	# T-095 stores once-per-stroke coverage in integer-keyed global scanlines.
+	# Preserve the T-068 independent fixture's exact coverage-index oracle,
+	# including zero-alpha dabs, without requiring string-key staging.
+	for global_y: int in session._covered_rows:
+		var row: Dictionary = session._covered_rows[global_y]
+		for global_x: int in row:
+			var index: int = _index("%d,%d" % [global_x, global_y])
+			if index < 0:
+				return {}
+			coverage.append(index)
 	coverage.sort()
 	var committed: DrawingResult
 	if session.change_count() == 0:

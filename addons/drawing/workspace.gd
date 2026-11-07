@@ -3137,6 +3137,17 @@ func _ask_open() -> void:
 	open_dialog.popup_centered()
 
 
+func _show_save_dialog() -> void:
+	# Godot headless reports a 0x0 screen: centering the native FileDialog
+	# spawns its window at a negative position and emits a runtime ERROR.
+	# Preserve the real dialog and Save/Close routing in headless CI without
+	# changing normal desktop placement.
+	if DisplayServer.get_name() == "headless":
+		save_dialog.show()
+	else:
+		save_dialog.popup_centered()
+
+
 func _ask_save() -> void:
 	if active_tab < 0:
 		return
@@ -3151,7 +3162,7 @@ func _ask_save() -> void:
 		variant_dialog.popup_centered()
 	else:
 		_local_save_as = session != null
-		save_dialog.popup_centered()
+		_show_save_dialog()
 
 
 func _save() -> void:
@@ -3166,7 +3177,7 @@ func _save() -> void:
 			return
 		if session.source_id.is_empty() and tabs[active_tab]["path"].is_empty():
 			_local_save_as = false
-			save_dialog.popup_centered()
+			_show_save_dialog()
 		else:
 			_publish_object(false)
 		return

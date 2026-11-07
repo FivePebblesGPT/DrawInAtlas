@@ -140,6 +140,58 @@ synthetic shell regressions in `tests/test_t094_godot_model_log.py`; no extra
 hosted job, LFS asset or manual gate was added. Exploratory selected local
 replays cannot attest to a complete GitHub Actions run or physical UX.
 
+## T-094 mandatory T-095/T-096 source oracles and summary grammar — 2026-11-07
+
+Required fast-CI checks `ci_t085_live_stroke_preview` and
+`ci_t088_selection_clipboard_model` now also execute the independent T-095
+Brush/Eraser source/rollback and T-096 large selection/Move mask/byte oracles,
+respectively. Each runs only after canonical standalone staging/import, writes
+a distinct log and uses the same fail-late, exact-marker Godot log verifier.
+The actual pointer/framebuffer/timing tests remain **opt-in Xvfb/Mesa**, and
+physical owner acceptance still needs owner-supplied hardware evidence.
+The 46 required check IDs and the CI report/export schema are unchanged.
+
+`check_godot_model_log.py` accepts only bare `*_PASSED`, exact positive
+`N/N`, `: N checks`, `(N checks; 0 failed)`, `(N checks, 0 failures)`,
+`checks=N failures=0`, `N checks, failures=0`, or the font witness's
+`(0 failures)` syntax. Partial `N/M`, zero assertion counts, nonzero failures,
+extra annotation and duplicate malformed success summaries are failures.
+Existing named *post-success* Godot leak diagnostics are retained and counted,
+never used to suppress other runtime faults. Tests for positive/negative
+formats and mandatory workflow wiring run in the existing T-073 documentation
+step. Partial local replay is always reported incomplete, even when all
+selected steps pass.
+
+## T-094 headless FileDialog and stale standalone assertion guard — 2026-11-07
+
+Godot 4.8 beta 2 reports a runtime `ERROR: Window 0 spawned at invalid
+position` when a native FileDialog is centered against the 0×0 headless
+screen. The Drawing workspace presents the **same save dialog** using `show()`
+only on the headless display driver; desktop X11/Windows retain
+`popup_centered()`. The T-062 Object Editor model still exercises
+Save-and-Close, open dialog visibility and now the pending-close target. The
+strict CI log checker does **not** suppress the invalid-window error. The
+standalone T-053 Python contract requires a strict `0 failed` summary and
+at least the current 42 checks, instead of treating an added assertion as a
+failure merely because an old fixed count of 38 was embedded in the caller.
+The T-096 model uses the permitted 120-second watchdog. These fixes preserve
+the 46-check inventory; none are owner physical-GPU or native-dialog UX approval.
+
+## T-094 complete Linux fast-CI replay and T-068 fixture renewal — 2026-11-07
+
+The checked-in 46-check inventory replayed on pinned Godot 4.8 beta 2 in
+an isolated local profile with matching Linux export templates. A complete
+**45/46** diagnostic run found a stale T-068 pinned-oracle generator which
+accessed the pre-T-095 `DrawingEditSession._covered` string dictionary.
+The generator now obtains the same pixel indices from T-095's integer-keyed
+global `_covered_rows` and proves **exact equality of all 16 pinned
+regenerated fixtures**, including zero-alpha coverage and signed anchors.
+The subsequent complete local replay executed and passed **46/46 checks**;
+full per-step logs and script/log digests are in the local external replay
+directory. The audit is **exploratory** (`--allow-dirty`), not a hosted
+GitHub Actions run, a commit-pinned audit, or native Windows/Linux owner
+approval. The outstanding manual UX gates remain explicitly unapproved.
+
 ## T-094 strict-native and owner evidence checkpoint — 2026-11-06
 
 The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)

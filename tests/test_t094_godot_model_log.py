@@ -60,6 +60,93 @@ class ModelLogTests(unittest.TestCase):
         problems, _ = verify_log(f"{marker}\n{marker}: 62 checks\n", marker)
         self.assertTrue(any("exactly one" in problem for problem in problems))
 
+    def test_known_positive_summary_formats_are_accepted(self) -> None:
+        valid = (
+            "T086_COLD_PASSED 45/45",
+            "T089_MODEL_PASSED: 62 checks",
+            "DRAWING_TEXT_UI_PASSED (91 checks; 0 failed)",
+            "DRAWING_PACK_FONT_PASSED (0 failures)",
+            "T064_COPY_UI_PASSED (39 checks, 0 failures)",
+            "T055_COMPOSITION_PASSED checks=89 failures=0",
+            "T065_ATLAS_BROWSER_PASSED 28 checks, failures=0",
+            "T095_ORACLE_PASSED",
+        )
+        for line in valid:
+            with self.subTest(line=line):
+                marker = line.split()[0].split(":")[0]
+                self.assertEqual(verify_log(line + "\n" + LEAK + "\n", marker), ([], 1))
+
+    def test_partial_or_spoofed_success_summaries_are_fatal(self) -> None:
+        examples = (
+            "T086_COLD_PASSED 44/45",  # A failing fraction was previously accepted.
+            "T086_COLD_PASSED 0/0",
+            "T086_COLD_PASSED -1/3",
+            "T086_COLD_PASSED 045/045",
+            "T089_MODEL_PASSED: 0 checks",
+            "T089_MODEL_PASSED: 62 checks; 3 failed",
+            "DRAWING_TEXT_UI_PASSED (91 checks; 2 failed)",
+            "DRAWING_TEXT_UI_PASSED (0 checks; 0 failed)",
+            "DRAWING_PACK_FONT_PASSED (1 failures)",
+            "T064_COPY_UI_PASSED (39 checks, 1 failures)",
+            "T064_COPY_UI_PASSED (0 checks, 0 failures)",
+            "T055_COMPOSITION_PASSED checks=89 failures=2",
+            "T055_COMPOSITION_PASSED checks=0 failures=0",
+            "T065_ATLAS_BROWSER_PASSED 28 checks, failures=4",
+            "T065_ATLAS_BROWSER_PASSED 0 checks, failures=0",
+            "T095_ORACLE_PASSED but some pixels failed",
+            "T096_MODEL_PASSED (warning: stale selection)",
+            "T095_ORACLE_PASSED 1/1 ignored error",
+        )
+        for line in examples:
+            with self.subTest(line=line):
+                marker = line.split()[0].split(":")[0]
+                self.assertTrue(verify_log(line + "\n", marker)[0])
+        marker = "T086_COLD_PASSED"
+        for extra in (f"{marker} 2/3", f"{marker} with problems"):
+            with self.subTest(extra=extra):
+                self.assertTrue(verify_log(f"{marker}\n{extra}\n", marker)[0])
+
+    def test_new_source_pixel_oracles_are_required_without_new_check_ids(self) -> None:
+        from replay_godot_ci import extract_checks, WORKFLOW
+        from report_godot_ci import expected_check_ids
+
+        workflow = WORKFLOW.read_text()
+        checks = extract_checks(workflow)
+        scripts = {check.identifier: check.script for check in checks}
+        self.assertEqual(len(checks), 46)
+        self.assertEqual([check.identifier for check in checks], expected_check_ids(workflow))
+        for check_id, script_name, log, marker in (
+            ("ci_t085_live_stroke_preview", "brush_coverage_smoke.gd",
+             "/tmp/godot-t095-oracle.log", "T095_ORACLE_PASSED"),
+            ("ci_t088_selection_clipboard_model", "selection_large_smoke.gd",
+             "/tmp/godot-t096-model.log", "T096_MODEL_PASSED"),
+        ):
+            with self.subTest(check_id=check_id):
+                script = scripts[check_id]
+                self.assertIn(f"--script res://tests/{script_name}", script)
+                self.assertIn(f"tee {log}", script)
+                invocation = f"python3 tools/check_godot_model_log.py {log} --marker {marker}"
+                self.assertEqual(script.count(invocation), 1)
+                self.assertIn("|| ci_fail_marker", script.split(invocation, 1)[1].split("\n", 1)[0])
+                self.assertIn("source tools/ci_fail_late.sh", script)
+                self.assertIn("ci_finish", script)
+                self.assertLess(script.index("python3 tools/build_drawing_app.py --in-place"),
+                                script.index(f"--script res://tests/{script_name}"))
+                self.assertLess(script.index("godot --headless --editor --path drawing --import --quit"),
+                                script.index(f"--script res://tests/{script_name}"))
+
+    def test_headless_save_dialog_keeps_real_dialog_and_desktop_centering(self) -> None:
+        workspace = (ROOT / "addons/drawing/workspace.gd").read_text()
+        section = workspace.split("func _show_save_dialog() -> void:\n", 1)[1].split("\n\nfunc ", 1)[0]
+        self.assertIn('if DisplayServer.get_name() == "headless":', section)
+        self.assertIn("save_dialog.show()", section)
+        self.assertIn("save_dialog.popup_centered()", section)
+        self.assertEqual(workspace.count("_show_save_dialog()"), 3)  # definition and two entrypoints
+        witness = (ROOT / "drawing/tests/object_editor_ui_smoke.gd").read_text()
+        self.assertIn("app._save_and_close()", witness)
+        self.assertIn("app._close_after_save and app._closing_index == app.active_tab", witness)
+        self.assertIn("app.save_dialog.visible", witness)
+
     def test_fast_ci_affected_smokes_call_shared_strict_verifier(self) -> None:
         from replay_godot_ci import extract_checks, WORKFLOW
         scripts = {check.identifier: check.script for check in extract_checks(WORKFLOW.read_text())}

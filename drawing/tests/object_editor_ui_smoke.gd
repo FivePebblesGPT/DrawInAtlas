@@ -118,6 +118,8 @@ func _run() -> void:
 	await process_frame
 	_check(app.tabs.size() == count_before, "cancelled close preserves private draft")
 	app._save_and_close()
+	_check(app._close_after_save and app._closing_index == app.active_tab,
+		"Save from close prompt preserves the pending close target")
 	_check(app.save_dialog.visible and app.tabs.size() == count_before,
 		"Save from close prompt waits for a target file without discarding the draft")
 	app.save_dialog.hide()
