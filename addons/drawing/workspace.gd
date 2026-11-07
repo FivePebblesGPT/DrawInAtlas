@@ -99,6 +99,8 @@ var history_redo: Button
 var _history_stamp: String = ""
 var color_hex: LineEdit
 var color_rgb: Array[SpinBox] = []
+var color_role_label: Label
+var color_edit_background: bool = false
 var color_swatch_buttons: Array[Button] = []
 var color_advanced: ColorPicker
 var color_advanced_toggle: Button
@@ -1514,14 +1516,15 @@ func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
 	return dialog
 
 
-## Color controls are native and dock-width-safe; the full ColorPicker is opt-in.
+## Foreground and background are separately editable pigments, never a color-swap shortcut.
+## PhotoCraft's distinct color targets inform the interaction; this remains a native Godot layout.
 func _build_color_controls(parent: VBoxContainer) -> void:
 	var swatches: HFlowContainer = HFlowContainer.new()
 	parent.add_child(swatches)
 	for role: String in ["Foreground", "Previous FG", "Background", "Previous BG"]:
 		var button: Button = Button.new()
-		button.custom_minimum_size = Vector2(58, 30)
-		button.tooltip_text = role + " — click to use as brush color"
+		button.custom_minimum_size = Vector2(46, 30) if role in ["Foreground", "Background"] else Vector2(34, 30)
+		button.tooltip_text = role + (" — select for editing" if role in ["Foreground", "Background"] else " — restore previous color")
 		button.pressed.connect(_color_swatch_pressed.bind(role))
 		swatches.add_child(button)
 		color_swatch_buttons.append(button)
@@ -1530,30 +1533,41 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 			"Previous FG": previous_foreground_button = button
 			"Background": background_button = button
 			"Previous BG": previous_background_button = button
+	var actions: HFlowContainer = HFlowContainer.new()
+	parent.add_child(actions)
 	var swap: Button = Button.new()
-	swap.text = "↔ Swap FG/BG"
-	swap.tooltip_text = "Exchange the foreground brush color with the secondary background color"
+	swap.text = "↔ Swap"
+	swap.tooltip_text = "Exchange the foreground brush and background pigments"
 	swap.pressed.connect(_swap_colors)
-	parent.add_child(swap)
+	actions.add_child(swap)
+	var defaults: Button = Button.new()
+	defaults.text = "◩ Default"
+	defaults.tooltip_text = "Reset to black foreground and white background"
+	defaults.pressed.connect(_reset_colors)
+	actions.add_child(defaults)
+	color_role_label = Label.new()
+	parent.add_child(color_role_label)
 	color_hex = LineEdit.new()
 	color_hex.placeholder_text = "#RRGGBBAA"
-	color_hex.tooltip_text = "Enter #RRGGBB or #RRGGBBAA; Enter to apply"
+	color_hex.tooltip_text = "Edit the selected pigment as #RRGGBB or #RRGGBBAA"
 	color_hex.text_submitted.connect(func(_text: String) -> void: _commit_hex())
 	color_hex.focus_exited.connect(_commit_hex)
 	parent.add_child(color_hex)
-	var rgb: HFlowContainer = HFlowContainer.new()
-	parent.add_child(rgb)
-	for channel: String in ["R", "G", "B"]:
+	var rgba: GridContainer = GridContainer.new()
+	rgba.columns = 2
+	parent.add_child(rgba)
+	for channel: String in ["R", "G", "B", "A"]:
 		var spin: SpinBox = SpinBox.new()
 		spin.min_value = 0
 		spin.max_value = 255
 		spin.step = 1
 		spin.rounded = true
-		spin.custom_minimum_size.x = 72
+		spin.custom_minimum_size.x = 70
+		spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spin.prefix = channel
-		spin.tooltip_text = "%s channel (0–255)" % channel
+		spin.tooltip_text = "%s channel (0–255) for selected pigment" % channel
 		spin.value_changed.connect(_commit_rgb)
-		rgb.add_child(spin)
+		rgba.add_child(spin)
 		color_rgb.append(spin)
 	var recent_label: Label = Label.new()
 	recent_label.text = "Recent colors"
@@ -1563,7 +1577,7 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 	for index: int in range(6):
 		var sample: Button = Button.new()
 		sample.custom_minimum_size = Vector2(28, 26)
-		sample.tooltip_text = "Use recent brush color"
+		sample.tooltip_text = "Use recent color for selected pigment"
 		sample.pressed.connect(_use_recent_color.bind(index))
 		recents.add_child(sample)
 		color_swatch_buttons.append(sample)
@@ -1574,82 +1588,120 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 	color_advanced = ColorPicker.new()
 	color_advanced.visible = false
 	color_advanced.custom_minimum_size.y = 190
-	color_advanced.color_changed.connect(_set_foreground)
+	color_advanced.color_changed.connect(_set_selected_color)
 	parent.add_child(color_advanced)
 	_refresh_color_controls()
 
 
-func _style_swatch(button: Button, value: Color, caption: String) -> void:
+func _style_swatch(button: Button, value: Color, caption: String, selected: bool = false) -> void:
 	button.text = caption
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = value
-	style.set_border_width_all(1)
-	style.border_color = Color(0.35, 0.35, 0.35)
+	style.set_border_width_all(2 if selected else 1)
+	style.border_color = Color(0.27, 0.65, 1.0) if selected else Color(0.35, 0.35, 0.35)
 	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
 		button.add_theme_stylebox_override(state, style)
-	button.add_theme_color_override("font_color", Color.BLACK if value.get_luminance() > 0.6 else Color.WHITE)
-	button.add_theme_color_override("font_hover_color", Color.BLACK if value.get_luminance() > 0.6 else Color.WHITE)
+	var shown: Color = Color(0.23, 0.23, 0.23).lerp(Color(value.r, value.g, value.b, 1.0), value.a)
+	var ink: Color = Color.BLACK if shown.get_luminance() > 0.6 else Color.WHITE
+	button.add_theme_color_override("font_color", ink)
+	button.add_theme_color_override("font_hover_color", ink)
+	button.add_theme_color_override("font_pressed_color", ink)
+
+
+func _edited_color() -> Color:
+	return color_background if color_edit_background else active_color
 
 
 func _refresh_color_controls() -> void:
 	if color_hex == null:
 		return
 	_updating_color_widgets = true
-	color_hex.text = "#" + active_color.to_html(true).to_upper()
-	var channels: Array[int] = [roundi(active_color.r * 255.0),
-		roundi(active_color.g * 255.0), roundi(active_color.b * 255.0)]
+	var selected: Color = _edited_color()
+	color_role_label.text = "Editing BG" if color_edit_background else "Editing FG"
+	color_role_label.tooltip_text = "Background is a secondary UI pigment, not the brush color" if color_edit_background else "Foreground supplies the brush color"
+	color_hex.text = "#" + selected.to_html(true).to_upper()
+	var channels: Array[int] = [roundi(selected.r * 255.0), roundi(selected.g * 255.0),
+		roundi(selected.b * 255.0), roundi(selected.a * 255.0)]
 	for index: int in range(color_rgb.size()):
 		color_rgb[index].set_value_no_signal(channels[index])
-	_style_swatch(foreground_button, active_color, "FG")
-	_style_swatch(previous_foreground_button, previous_foreground, "Prev")
-	_style_swatch(background_button, color_background, "BG")
-	_style_swatch(previous_background_button, previous_background, "Prev")
+	_style_swatch(foreground_button, active_color, "FG", not color_edit_background)
+	_style_swatch(previous_foreground_button, previous_foreground, "↶")
+	_style_swatch(background_button, color_background, "BG", color_edit_background)
+	_style_swatch(previous_background_button, previous_background, "↶")
 	for index: int in range(6):
 		var button: Button = color_swatch_buttons[index + 4]
 		button.disabled = index >= recent_colors.size()
 		if not button.disabled:
 			_style_swatch(button, recent_colors[index], "")
 	if color_advanced != null:
-		color_advanced.color = active_color
+		color_advanced.color = selected
 	_updating_color_widgets = false
+
+
+func _remember_recent(value: Color) -> void:
+	recent_colors.erase(value)
+	recent_colors.push_front(value)
+	if recent_colors.size() > 6:
+		recent_colors.resize(6)
 
 
 func _set_foreground(value: Color) -> void:
 	if _updating_color_widgets or active_color == value:
 		return
 	previous_foreground = active_color
-	if not recent_colors.has(active_color):
-		recent_colors.push_front(active_color)
-	else:
-		recent_colors.erase(active_color)
-		recent_colors.push_front(active_color)
-	if recent_colors.size() > 6:
-		recent_colors.resize(6)
+	_remember_recent(active_color)
 	active_color = value
 	if canvas != null:
 		canvas.color_rgba = _pack_color(value)
 	_refresh_color_controls()
 
 
+func _set_background(value: Color) -> void:
+	if _updating_color_widgets or color_background == value:
+		return
+	previous_background = color_background
+	_remember_recent(color_background)
+	color_background = value
+	# Background is a UI pigment, not a paint target or document operation.
+	_refresh_color_controls()
+
+
+func _set_selected_color(value: Color) -> void:
+	if color_edit_background:
+		_set_background(value)
+	else:
+		_set_foreground(value)
+
+
 func _swap_colors() -> void:
 	var former: Color = active_color
 	_set_foreground(color_background)
-	previous_background = color_background
-	color_background = former
+	_set_background(former)
+	_refresh_color_controls()
+
+
+func _reset_colors() -> void:
+	_set_foreground(Color.BLACK)
+	_set_background(Color.WHITE)
 	_refresh_color_controls()
 
 
 func _color_swatch_pressed(role: String) -> void:
 	match role:
-		"Previous FG": _set_foreground(previous_foreground)
-		"Background": _swap_colors()
-		"Previous BG": _set_foreground(previous_background)
-		_: pass
+		"Foreground": color_edit_background = false
+		"Background": color_edit_background = true
+		"Previous FG":
+			color_edit_background = false
+			_set_foreground(previous_foreground)
+		"Previous BG":
+			color_edit_background = true
+			_set_background(previous_background)
+	_refresh_color_controls()
 
 
 func _use_recent_color(index: int) -> void:
 	if index >= 0 and index < recent_colors.size():
-		_set_foreground(recent_colors[index])
+		_set_selected_color(recent_colors[index])
 
 
 func _commit_hex() -> void:
@@ -1657,15 +1709,15 @@ func _commit_hex() -> void:
 		return
 	var value: String = color_hex.text.strip_edges()
 	if Color.html_is_valid(value):
-		_set_foreground(Color.html(value))
+		_set_selected_color(Color.html(value))
 	_refresh_color_controls()
 
 
 func _commit_rgb(_value: float) -> void:
-	if _updating_color_widgets or color_rgb.size() != 3:
+	if _updating_color_widgets or color_rgb.size() != 4:
 		return
-	_set_foreground(Color8(int(color_rgb[0].value), int(color_rgb[1].value),
-		int(color_rgb[2].value), roundi(active_color.a * 255.0)))
+	_set_selected_color(Color8(int(color_rgb[0].value), int(color_rgb[1].value),
+		int(color_rgb[2].value), int(color_rgb[3].value)))
 
 
 func _toggle_advanced_picker() -> void:

@@ -119,9 +119,47 @@ func run() -> void:
 	app.color_rgb[0].value = 17
 	check(roundi(app.active_color.r * 255) == 17 and roundi(app.active_color.a * 255) == 221,
 		"RGB field changes one channel and retains alpha")
+	check(app.color_rgb.size() == 4 and int(app.color_rgb[3].value) == 221,
+		"RGBA editor exposes existing alpha without a popup")
+	app.color_rgb[3].value = 34
+	var brush_before: Color = app.active_color
+	var brush_rgba: int = app.canvas.color_rgba
+	check(roundi(brush_before.a * 255) == 34 and brush_rgba == app._pack_color(brush_before),
+		"alpha edit changes foreground brush and preserves RGB")
+	app._color_swatch_pressed("Background")
+	check(app.color_edit_background and app.color_hex.text == "#FFFFFFFF" and
+		app.active_color == brush_before and app.canvas.color_rgba == brush_rgba,
+		"background chip selects a distinct target instead of swapping brush pigments")
+	app.color_hex.text = "#33445566"
+	app._commit_hex()
+	check(app.color_background == Color8(51, 68, 85, 102) and
+		app.previous_background == Color.WHITE and app.active_color == brush_before and
+		app.canvas.color_rgba == brush_rgba,
+		"background hex changes only the secondary pigment and preserves its undo swatch")
+	app.color_rgb[3].value = 0
+	check(app.color_background == Color8(51, 68, 85, 0) and
+		app.active_color == brush_before and app.color_hex.text == "#33445500",
+		"background RGBA editing retains hidden RGB at alpha zero")
+	app._color_swatch_pressed("Previous BG")
+	check(app.color_background == Color8(51, 68, 85, 102) and
+		app.active_color == brush_before and app.color_edit_background,
+		"previous background restores background, not foreground")
+	app._color_swatch_pressed("Foreground")
+	check(not app.color_edit_background and app.color_hex.text == "#11BBCC22" and
+		app.active_color == brush_before,
+		"foreground chip returns the RGBA editor to brush pigment")
 	app._swap_colors()
-	check(app.color_background.r > 0 and app.active_color == Color.WHITE,
-		"FG/BG swap uses secondary swatch")
+	check(app.active_color == Color8(51, 68, 85, 102) and app.color_background == brush_before and
+		app.canvas.color_rgba == app._pack_color(app.active_color),
+		"Swap alone exchanges both pigments with exact alpha")
+	app._reset_colors()
+	check(app.active_color == Color.BLACK and app.color_background == Color.WHITE and
+		app.canvas.color_rgba == app._pack_color(Color.BLACK),
+		"Default explicitly restores black foreground and white background")
+	app._color_swatch_pressed("Background")
+	app._set_selected_color(Color8(19, 77, 88, 99))
+	check(app.color_background == Color8(19, 77, 88, 99) and app.active_color == Color.BLACK,
+		"advanced picker target route respects selected background")
 	app._toggle_advanced_picker()
 	check(app.color_advanced.visible, "advanced picker accessible only when expanded")
 	app._toggle_advanced_picker()

@@ -31,7 +31,7 @@ def verify(content: str) -> tuple[bool, list[str], int]:
     if len(summaries) != 1 or len(markers) != 1:
         problems.append("expected exactly one passing summary and success marker")
     elif (summaries[0][0] >= markers[0]
-          or int(summaries[0][1].group(1)) < 32
+          or int(summaries[0][1].group(1)) < 42
           or int(summaries[0][1].group(2)) != 0):
         problems.append("incomplete test count, failed assertions, or invalid marker order")
     marker_at = markers[0] if markers else len(lines)

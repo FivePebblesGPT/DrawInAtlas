@@ -26,17 +26,27 @@ class T092ColorsHistoryTests(unittest.TestCase):
                 self.assertIn(field, workflow)
 
     def test_log_retains_known_shutdown_warnings_only_after_success(self) -> None:
-        base = "T092_NATIVE: 32 checks; 0 failed\nT092_NATIVE_PASSED"
+        base = "T092_NATIVE: 42 checks; 0 failed\nT092_NATIVE_PASSED"
         self.assertEqual(verify(base), (True, [], 0))
         self.assertEqual(verify(base + "\nERROR: Texture with GL ID of 18: leaked 32 bytes."),
                          (True, [], 1))
         for bad in ("", "T092_NATIVE_PASSED", base + "\nT092_NATIVE_PASSED",
-                    "T092_NATIVE: 31 checks; 0 failed\nT092_NATIVE_PASSED",
-                    "T092_NATIVE: 32 checks; 1 failed\nT092_NATIVE_PASSED",
+                    "T092_NATIVE: 41 checks; 0 failed\nT092_NATIVE_PASSED",
+                    "T092_NATIVE: 42 checks; 1 failed\nT092_NATIVE_PASSED",
                     base + "\nSCRIPT ERROR: bad assignment", base + "\nERROR: compositor failed",
                     "ERROR: Texture with GL ID of 18: leaked 32 bytes.\n" + base):
             with self.subTest(bad=bad):
                 self.assertFalse(verify(bad)[0])
+
+    def test_color_targets_are_explicit_and_independent(self) -> None:
+        workspace = (ROOT / "addons/drawing/workspace.gd").read_text()
+        for signature in ("func _set_background(value: Color)",
+                          "func _set_selected_color(value: Color)",
+                          "func _reset_colors()", "color_edit_background = true",
+                          '"Previous BG":', '"R", "G", "B", "A"'):
+            with self.subTest(signature=signature):
+                self.assertIn(signature, workspace)
+        self.assertIn("color_advanced.color_changed.connect(_set_selected_color)", workspace)
 
     def test_app_preference_is_separate_from_document_file(self) -> None:
         prefs = (ROOT / "addons/drawing/workspace_preferences.gd").read_text()

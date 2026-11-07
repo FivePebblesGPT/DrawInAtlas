@@ -256,6 +256,20 @@ workspace-keyboard regressions also pass. Atlas callers retain external chronolo
 findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
 [Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-092 separate FG/BG editing and compact Colors layout (2026-11-07; In Progress):**
+The Colors chips now select *independent* foreground/background edit targets:
+clicking BG no longer silently swaps brush pigment, and Previous BG restores
+background instead of changing foreground. A short active-role label, explicit
+Swap/Default, RGB**A** channels (including transparent hidden RGB), hex and
+advanced/recent inputs route to the selected pigment, without touching
+artwork, revision or Atlas semantics. Pinned PhotoCraft source supports the
+two-target grammar, but actual PhotoCraft screenshot parity is **unverified**.
+New **55/55** model and **47/47** Xvfb/Mesa native checks with four framebuffer
+captures pass; T-063/T-090/T-091/T-088 and 346 Atlas smoke assertions pass.
+Physical Linux/Windows and owner finding #11 remain **PENDING**; T-092 is
+reopened In Progress. [Evidence](Tickets/T-092.md) ·
+[owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-090 compact tool rail and centered icons (2026-11-07; In Progress):**
 The 54px/44×42px tool rail had visible left-shifted SVGs despite the
 original licensed-icon pass. Shared workspace controls now use a 42px rail,
@@ -1266,7 +1280,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | — | [T-082](Tickets/T-082.md) |
-| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Done | — | [T-063](Tickets/T-063.md) |
+| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
 

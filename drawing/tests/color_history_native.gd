@@ -73,13 +73,40 @@ func run() -> void:
 	await click(app.color_swatch_buttons[4])
 	check(app.active_color == Color(0.12, 0.20, 0.35),
 		"native recent swatch click restores previous brush pigment")
+	var active_before_bg: Color = app.active_color
+	var paint_before_bg: int = app.canvas.color_rgba
 	await click(app.background_button)
-	check(app.active_color == Color.WHITE, "native BG swatch swaps into active brush")
+	check(app.color_edit_background and app.active_color == active_before_bg and
+		app.color_hex.text == "#FFFFFFFF" and app.canvas.color_rgba == paint_before_bg,
+		"native BG chip selects independent editor without swapping brush color")
+	check(app.color_role_label.text == "Editing BG", "secondary edit target is visibly labelled")
+	app.color_hex.text = "#3C6496C8"
+	app._commit_hex()
+	check(app.color_background == Color8(60, 100, 150, 200) and
+		app.active_color == active_before_bg and app.canvas.color_rgba == paint_before_bg,
+		"editing background hex does not touch brush or artwork")
+	app.color_rgb[3].value = 0
+	check(app.color_background == Color8(60, 100, 150, 0) and
+		app.color_hex.text == "#3C649600" and app.canvas.color_rgba == paint_before_bg,
+		"alpha control retains hidden background RGB at zero alpha")
+	await click(app.previous_background_button)
+	check(app.color_background == Color8(60, 100, 150, 200) and
+		app.active_color == active_before_bg,
+		"native previous BG chip restores only the secondary pigment")
+	await click(app.foreground_button)
+	check(not app.color_edit_background and app.color_hex.text == "#" + active_before_bg.to_html(true).to_upper(),
+		"native FG chip restores brush controls")
+	check(app.color_role_label.text == "Editing FG", "foreground editing target is visibly labelled")
 	await click(app.previous_foreground_button)
-	check(app.active_color == Color8(25, 66, 208, 255) or
-		app.active_color == Color(0.12, 0.20, 0.35), "previous FG swatch responds to native pointer")
+	check(app.active_color != active_before_bg and not app.color_edit_background,
+		"native previous FG restores only foreground pigment")
+	await click(app.background_button)
 	await click(app.color_advanced_toggle)
-	check(app.color_advanced.visible, "native click reveals advanced picker")
+	check(app.color_advanced.visible and app.color_advanced.color == app.color_background,
+		"native click reveals picker seeded with selected background")
+	app._set_selected_color(Color8(14, 28, 42, 128))
+	check(app.color_background == Color8(14, 28, 42, 128) and app.canvas.color_rgba == app._pack_color(app.active_color),
+		"advanced picker background updates without altering brush")
 	await click(app.color_advanced_toggle)
 	check(not app.color_advanced.visible, "native click restores narrow compact palette")
 	check(app.current_document().revision == initial_revision and
@@ -150,6 +177,11 @@ func run() -> void:
 	check(app.inspector.size.x < 240 and app.color_hex.size.x > 120 and
 		app.color_hex.get_global_rect().end.x <= app.inspector.get_global_rect().end.x + 5,
 		"narrow dock keeps hex field inside its viewport")
+	check(app.color_role_label.size.x <= app.inspector.size.x + 2,
+		"narrow dock keeps active color-role caption within available width")
+	check(app.color_rgb.size() == 4 and app.color_rgb[3].size.x >= 69 and
+		app.color_rgb[3].get_global_rect().end.x <= app.inspector.get_global_rect().end.x + 5,
+		"RGBA alpha is reachable at narrow dock width")
 	app.inspector.scroll_vertical = 0
 	await frames(8)
 	check(app.foreground_button.is_visible_in_tree() and
@@ -161,8 +193,8 @@ func run() -> void:
 	root.content_scale_factor = 1.5
 	await frames(12)
 	check(app.color_hex.is_visible_in_tree() and app.canvas.size.x > 380 and
-		app.inspector.size.x > 140,
-		"150% scale preserves a usable canvas and reachable compact Colors")
+		app.inspector.size.x > 140 and app.color_role_label.is_visible_in_tree(),
+		"150% scale preserves a usable canvas and selected-color indicator")
 	await capture("t092-scaled-narrow")
 	root.content_scale_factor = 1.0
 	root.size = Vector2i(1280, 800)
