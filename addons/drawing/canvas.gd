@@ -94,7 +94,13 @@ var _last_frame_submit_us: int = 0
 var _reported_render_errors: Dictionary[String, bool] = {}
 ## Motion handlers append raw canvas-source positions only. Bounded pieces are
 ## staged on idle frames, keeping the input path free of long raster sweeps.
-const MAX_SEGMENTS_PER_FRAME: int = 12
+## Do not let an arbitrary 12-segment cap leave hundreds of frames of backlog
+## after release. Batch consecutive swept segments in one edit transaction call
+## and stop at a measured CPU budget, including on the release input path.
+const MAX_SEGMENTS_PER_FRAME: int = 256
+const MAX_SEGMENTS_PER_BATCH: int = 16
+const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
+const MAX_DRAIN_CPU_US: int = 6000
 const MAX_SEGMENT_LENGTH: float = 24.0
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
@@ -687,6 +693,7 @@ func start_gesture(position: Vector2) -> void:
 		"first_preview_submit_us": 0, "first_frame_post_draw_us": 0,
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
+		"drain_calls": 0, "max_drain_cpu_us": 0,
 		"sample_to_stage_us": []}
 	gesture_started.emit()
 	_enqueue_sample(_staged_position)
@@ -727,34 +734,61 @@ func _enqueue_sample(position: Vector2) -> void:
 func _drain_segments(budget: int) -> void:
 	if session == null:
 		return
+	var drain_start_us: int = Time.get_ticks_usec()
+	var segments: int = 0
 	var changed: bool = false
-	for index: int in range(budget):
-		if not _has_segment_target:
-			if _sample_index == _samples.size():
-				break
-			_segment_target = _samples[_sample_index]
-			_target_arrival_us = _sample_times_us[_sample_index]
-			_sample_index += 1
-			_has_segment_target = true
-		var next: Vector2 = _staged_position.move_toward(_segment_target, MAX_SEGMENT_LENGTH)
+	# A wide brush can rasterize more candidates in one segment than a
+	# narrow one does in 16. Limit the atomic batch by swept footprint so
+	# the soft deadline is not defeated by one oversized paint_path call.
+	var estimated_segment_pixels: float = maxf(1.0,
+		_stroke_width * (_stroke_width + MAX_SEGMENT_LENGTH))
+	var batch_limit: int = clampi(int(MAX_BATCH_ESTIMATED_PIXELS / estimated_segment_pixels),
+		1, MAX_SEGMENTS_PER_BATCH)
+	while segments < budget:
+		var batch: PackedVector2Array = PackedVector2Array()
+		var completed_arrivals: Array[int] = []
+		var next_position: Vector2 = _staged_position
+		while batch.size() < batch_limit and segments < budget:
+			if not _has_segment_target:
+				if _sample_index == _samples.size():
+					break
+				_segment_target = _samples[_sample_index]
+				_target_arrival_us = _sample_times_us[_sample_index]
+				_sample_index += 1
+				_has_segment_target = true
+			next_position = next_position.move_toward(_segment_target, MAX_SEGMENT_LENGTH)
+			batch.append(next_position)
+			segments += 1
+			if next_position == _segment_target:
+				completed_arrivals.append(_target_arrival_us)
+				_has_segment_target = false
+		if batch.is_empty():
+			break
 		var start_us: int = Time.get_ticks_usec()
-		var stage: DrawingResult = session.paint_path(PackedVector2Array([next]),
+		var stage: DrawingResult = session.paint_path(batch,
 			_stroke_color, _stroke_width, _stroke_erase,
 			selection_mask if selection_mask.enabled else null)
-		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + Time.get_ticks_usec() - start_us
+		var staged_at_us: int = Time.get_ticks_usec()
+		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + staged_at_us - start_us
 		if not stage.ok:
 			canvas_error.emit(stage.message)
 			cancel_gesture()
 			return
 		if int(_metrics["first_stage_us"]) == 0:
-			_metrics["first_stage_us"] = Time.get_ticks_usec()
-		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + 1
-		_staged_position = next
+			_metrics["first_stage_us"] = staged_at_us
+		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
+		_staged_position = next_position
 		changed = true
-		if _staged_position == _segment_target:
-			var arrival_to_stage: Array = _metrics["sample_to_stage_us"] as Array
-			arrival_to_stage.append(maxi(0, Time.get_ticks_usec() - _target_arrival_us))
-			_has_segment_target = false
+		var arrival_to_stage: Array = _metrics["sample_to_stage_us"] as Array
+		for arrival_us: int in completed_arrivals:
+			arrival_to_stage.append(maxi(0, staged_at_us - arrival_us))
+		# The deadline is checked between atomic batches, never during a
+		# partially rasterized segment or while receiving a pointer event.
+		if staged_at_us - drain_start_us >= MAX_DRAIN_CPU_US:
+			break
+	_metrics["drain_calls"] = int(_metrics["drain_calls"]) + 1
+	_metrics["max_drain_cpu_us"] = maxi(int(_metrics["max_drain_cpu_us"]),
+		Time.get_ticks_usec() - drain_start_us)
 	if _sample_index == _samples.size():
 		_samples.clear()
 		_sample_times_us.clear()

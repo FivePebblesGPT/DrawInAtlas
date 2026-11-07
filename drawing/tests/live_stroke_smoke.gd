@@ -134,6 +134,83 @@ func run() -> void:
 	check(not DrawingRenderer.render(wrong, Rect2i(0, 0, 3, 3), 0, 0, 1048576, stale_session).ok,
 		"unrelated document preview rejected")
 	stale_session.cancel()
+
+	# Exercise the actual canvas queue in fast headless CI, not just the edit
+	# session. Each zoom maps source floats through the same view transform
+	# as a delivered motion; a single-call reference is the pixel oracle.
+	var queued_canvas: Control = Control.new()
+	queued_canvas.set_script(load("res://addons/drawing/canvas.gd"))
+	queued_canvas.size = Vector2(270, 230)
+	queued_canvas.brush_width = 2.0
+	queued_canvas.color_rgba = 0x8044d9ff
+	root.add_child(queued_canvas)
+	for zoom_value: float in [1.0, 0.5, 0.25]:
+		queued_canvas.zoom = zoom_value
+		var queued_doc: DrawingDocument = DrawingDocument.new("t085-queue")
+		var queued_layer: String = String(queued_doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
+		queued_canvas.document = queued_doc
+		queued_canvas.layer_id = queued_layer
+		var original_revision: int = queued_doc.revision
+		var first: Vector2 = Vector2(12.5, 12.5)
+		var path: PackedVector2Array = PackedVector2Array()
+		path.append(queued_canvas.source_position(queued_canvas.pixel_to_position(first)))
+		queued_canvas.start_gesture(queued_canvas.pixel_to_position(first))
+		for i: int in range(600):
+			var t: float = float(i) / 599.0
+			var point: Vector2 = Vector2(35.5 + 21.0 * cos(t * TAU * 9.0),
+				27.5 + 12.0 * sin(t * TAU * 13.0))
+			path.append(queued_canvas.source_position(queued_canvas.pixel_to_position(point)))
+			queued_canvas.update_gesture(queued_canvas.pixel_to_position(point))
+		var finish: Vector2 = Vector2(59.5, 23.5)
+		path.append(queued_canvas.source_position(queued_canvas.pixel_to_position(finish)))
+		check(queued_doc.revision == original_revision and queued_canvas.session != null and
+			int(queued_canvas._metrics["samples_received"]) == 601,
+			"zoom %s queue accepts entire 600-point stroke without early publication" % zoom_value)
+		queued_canvas.finish_gesture(queued_canvas.pixel_to_position(finish))
+		for drain: int in range(80):
+			if queued_canvas.session == null:
+				break
+			queued_canvas._drain_segments(queued_canvas.MAX_SEGMENTS_PER_FRAME)
+		var stats: Dictionary = queued_canvas.last_gesture_metrics
+		check(queued_canvas.session == null and queued_doc.revision == original_revision + 1,
+			"zoom %s bounded drains publish exactly once" % zoom_value)
+		check(int(stats.get("samples_received", 0)) == 602 and
+			(stats.get("sample_to_stage_us", []) as Array).size() == 602 and
+			int(stats.get("drain_calls", 100)) < 50,
+			"zoom %s bulk stage retains all arrivals and avoids fixed-cap backlog" % zoom_value)
+		var reference: DrawingDocument = DrawingDocument.new("t085-queue-reference")
+		var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
+		var ref_session: DrawingEditSession = reference.begin_edit(reference_layer, reference.revision).value as DrawingEditSession
+		check(ref_session.paint_path(path, queued_canvas.color_rgba, queued_canvas.brush_width).ok and
+			ref_session.commit().ok, "zoom %s single-path oracle paints" % zoom_value)
+		var region: Rect2i = Rect2i(10, 9, 55, 38)
+		var staged_image: DrawingResult = DrawingRenderer.render(queued_doc, region)
+		var oracle_image: DrawingResult = DrawingRenderer.render(reference, region)
+		check(staged_image.ok and oracle_image.ok and staged_image.value.get_data() == oracle_image.value.get_data(),
+			"zoom %s batched queue exactly matches full source path bytes" % zoom_value)
+		check(queued_doc.undo().ok and queued_doc.read_pixel(queued_layer, 59, 23).value == 0,
+			"zoom %s one Undo reverses completed long queue" % zoom_value)
+	# A queued press interrupted before draining must leave no ghost pixels,
+	# history, or captured process-wide input configuration behind.
+	var abandoned: DrawingDocument = DrawingDocument.new("t085-abandon")
+	var abandoned_layer: String = String(abandoned.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
+	queued_canvas.document = abandoned
+	queued_canvas.layer_id = abandoned_layer
+	var previous_accumulation: bool = Input.use_accumulated_input
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(2.5, 2.5)))
+	for i: int in range(300):
+		queued_canvas.paint_to(Vector2i(i, i % 21))
+	check(queued_canvas.session != null and int(queued_canvas._metrics["samples_received"]) == 301,
+		"pending cancellation witness has a queued path")
+	queued_canvas.cancel_gesture()
+	queued_canvas._process(0.0)
+	check(queued_canvas.session == null and queued_canvas._samples.is_empty() and
+		abandoned.read_pixel(abandoned_layer, 2, 2).value == 0 and abandoned.history_length() == 0,
+		"abandoned queue never paints or publishes after cancellation")
+	check(Input.use_accumulated_input == previous_accumulation,
+		"pending cancellation restores global input accumulation")
+	queued_canvas.queue_free()
+
 	print("T085_MODEL: %d checks; %d failed" % [checks, failures])
 	if failures == 0:
 		print("T085_MODEL_PASSED")

@@ -92,6 +92,19 @@ Software first-frame samples still reach **119.841 ms at 25%** (one trial per
 zoom); the display-tile work remains T-086, and owner Windows/Linux hardware
 and physical input-to-photon evidence are **not claimed**. [Checkpoint](Tickets/T-085.md).
 
+**T-085 bounded long-stroke backlog checkpoint (2026-11-07; In Progress):**
+Consecutive source-space stroke waypoints now stage in limited batches with a
+soft 6 ms per-drain CPU budget and footprint-sensitive wide-brush cap, instead
+of allowing a 12-segment/frame limit to defer release for 70 frames. The
+expanded **61/61** headless queue/oracle/cancellation tests and **118/118**
+native Xvfb/Mesa pointer/framebuffer checks pass. Paired three-trial
+840-motion software strokes measure release-to-commit p50 reductions of
+389→43 ms at 100%, 955→68 ms at 50% and 928→70 ms at 25%; exact RGBA8,
+all delivered points and single-step Undo are verified. Three trials and
+software rendering do **not** satisfy real Linux/Windows hardware or
+physical input-to-photon/owner UX gates; T-085 remains In Progress.
+[Details and limitations](Tickets/T-085.md).
+
 **T-086 incremental viewport cache checkpoint (2026-11-06; In Progress):**
 Persistent 128px source-space display tiles now reuse textures across
 pan/zoom and update only dirty raster/preview footprints (including Undo/Redo),
