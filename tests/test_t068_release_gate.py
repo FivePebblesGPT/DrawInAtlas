@@ -108,6 +108,19 @@ class PortableReleaseGateTests(unittest.TestCase):
         with self.assertRaises(release.ReleaseError):
             release.inspect_stage(self.stage)
 
+    def test_isolated_launch_accepts_only_named_post_exit_rids(self) -> None:
+        version = "Godot Engine v4.8.beta2.official.cafc17a19"
+        leak = "ERROR: 9 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit."
+        self.assertEqual(release.check_launch_log(version + "\n" + leak, 0), 1)
+        self.assertEqual(release.check_launch_log(version, 0), 0)
+        for log, code in ((version + "\nERROR: Native renderer crashed", 0),
+                          (version + "\nSCRIPT ERROR: bad source", 0),
+                          (version + "\nParse Error: invalid code", 0),
+                          (leak, 0), (version + "\n" + leak, 2)):
+            with self.subTest(log=log, code=code):
+                with self.assertRaises(release.ReleaseError):
+                    release.check_launch_log(log, code)
+
     def test_linux_runtime_isolated_and_must_identify_godot(self) -> None:
         class Completed:
             def __init__(self, code: int, text: str):

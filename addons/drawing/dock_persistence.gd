@@ -67,6 +67,11 @@ static func recover(raw: Variant, live: DrawingDockLayout, aliases: Dictionary =
 	var container_seen: Dictionary = {}
 	var group_count: int = 0
 	var saved_containers: Array = source["containers"]
+	var reserved_ids: Dictionary = {}
+	for saved: Variant in saved_containers:
+		if saved is Dictionary and saved.get("id") is String:
+			reserved_ids[saved["id"]] = true
+	var migrated_hosts: Dictionary = {} # Old host ID -> new sibling host IDs.
 	if saved_containers.size() > MAX_HOSTS + 1:
 		return {}
 	for entry: Variant in saved_containers:
@@ -116,8 +121,29 @@ static func recover(raw: Variant, live: DrawingDockLayout, aliases: Dictionary =
 		if kind == DrawingDockLayout.FLOATING and groups.is_empty():
 			changed = true
 			continue
+		# T-091: older layouts allowed stacked groups within one floating host.
+		# Split the extra groups into independent, deterministically named hosts,
+		# retaining the original container/group/panel IDs and first host's position.
+		if kind == DrawingDockLayout.FLOATING and groups.size() > 1:
+			changed = true
+			var siblings: Array[String] = []
+			for group_index: int in range(1, groups.size()):
+				var base_id: String = cid.left(54) + "-group-%d" % group_index
+				var migrated_id: String = base_id
+				var suffix: int = 1
+				while reserved_ids.has(migrated_id):
+					migrated_id = "%s-%d" % [base_id, suffix]
+					suffix += 1
+				reserved_ids[migrated_id] = true
+				siblings.append(migrated_id)
+				containers.append({"id": migrated_id, "kind": kind, "minimized": false,
+					"flyout_group": "", "groups": [groups[group_index]]})
+			migrated_hosts[cid] = siblings
+			groups = [groups[0]]
 		containers.append({"id": cid, "kind": kind, "minimized": entry["minimized"] if kind == DrawingDockLayout.DOCK else false,
 			"flyout_group": flyout if kind == DrawingDockLayout.DOCK else "", "groups": groups})
+	if containers.size() > MAX_HOSTS + 1:
+		return {}
 	if not container_seen.has("right"):
 		return {}
 	var dock: Dictionary = {}
@@ -161,6 +187,21 @@ static func recover(raw: Variant, live: DrawingDockLayout, aliases: Dictionary =
 			changed = true
 			continue
 		hosts.append({"id": cid, "visible": entry["visible"], "rect": entry["rect"], "client": entry["client"]})
+	for parent_id: String in migrated_hosts:
+		var original_frame: Dictionary = {}
+		for frame: Dictionary in hosts:
+			if frame["id"] == parent_id:
+				original_frame = frame
+				break
+		for sibling_index: int in range((migrated_hosts[parent_id] as Array).size()):
+			var sibling_id: String = migrated_hosts[parent_id][sibling_index]
+			if not original_frame.is_empty():
+				var shifted: Array = (original_frame["rect"] as Array).duplicate()
+				shifted[0] = float(shifted[0]) + 28.0 * float(sibling_index + 1)
+				shifted[1] = float(shifted[1]) + 28.0 * float(sibling_index + 1)
+				hosts.append({"id": sibling_id, "visible": original_frame["visible"],
+					"rect": shifted, "client": original_frame["client"]})
+			host_ids[sibling_id] = true
 	for entry: Dictionary in containers:
 		if entry["kind"] == DrawingDockLayout.FLOATING and not host_ids.has(entry["id"]):
 			# Unknown host geometry gets a safe, visible default.

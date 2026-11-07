@@ -94,8 +94,9 @@ class PackageIsolationTests(unittest.TestCase):
                  if p.name.endswith(".gd") or p.name.endswith(".gd.uid")}
                | {f"addons/drawing/fonts/{p.name}" for p in (package / "fonts").iterdir()
                   if p.suffix in {".ttf", ".txt"}}
-               | {f"addons/drawing/icons/{p.name}" for p in icons})
-            for source in [package / "signed_tiles.gd", *icons]:
+               | {f"addons/drawing/icons/{p.name}" for p in icons}
+               | {"addons/drawing/icons/LICENSE.at-icons.txt"})
+            for source in [package / "signed_tiles.gd", *icons, package / "icons" / "LICENSE.at-icons.txt"]:
                 staged = project / "addons" / "drawing" / source.relative_to(package)
                 self.assertEqual(staged.read_bytes(), source.read_bytes())
             godot_project = (project / "project.godot").read_text()

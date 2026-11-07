@@ -1,0 +1,44 @@
+name: Godot T-081 floating host canvas-width and owner-state regression (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  floating-host-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install X11 software renderer
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Verify T-081 evidence contracts
+        run: python3 -m unittest discover -s tests -p 'test_t081_float_native.py' -v
+      - name: Stage canonical standalone Drawing app and import resources
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Exercise real pointer, group ownership and stable canvas width
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/t081-screenshots
+          T081_SCREENSHOTS=/tmp/t081-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/dock_float_native.gd 2>&1 | tee /tmp/t081-native.log
+          python3 tools/check_native_t081_log.py /tmp/t081-native.log
+      - name: Upload framebuffer witnesses and unmodified native diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t081-x11-floating-host
+          path: |
+            /tmp/t081-native.log
+            /tmp/t081-screenshots/
+          if-no-files-found: warn

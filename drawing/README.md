@@ -63,18 +63,108 @@ its Godot template on the build host.
   pixels), Pan (left drag); middle drag pans in any tool. Scroll zooms around
   the pointer. A 1–96px brush-width field, optional generic 8px snap and color
   picker control the Drawing core's gestures.
-- **Layer** Add group, add raster, toggle visibility, remove selected; tree
-  selection chooses a raster paint target. Undo and redo apply to raster gestures.
-  The History dock's **Record selection changes in Undo History** checkbox (OFF by default)
-  optionally adds completed selections as separate clean, reversible steps;
-  content undo restores layer/selection/tool context regardless of the toggle.
-  Structural layer operations are dirty but are not yet undoable (follow-up layer feature work).
-- **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock stacks independently collapsible groups and scrolls at short heights. Use **Window → Minimize/expand panel dock** (or the dock's own button) to switch between the expanded groups and a narrow icon rail. Each attached panel has an icon with a tooltip; adjacent icons in a group share one flyout/tab set, while a separator denotes a different group. The flyout overlays the drawing canvas without changing its layout or creating an OS window; click the active icon to close it. Collapse and active tab state survive minimize/restore during the session. **Drag a panel icon** to another tab position, another group, or a between-group insertion marker; **drag the ↕ handle** to reorder or merge its whole group. The in-app hint appears only for valid drops; Esc and leaving the dock cancel without layout changes. The group **⋮ Arrange** menu provides keyboard-accessible move/split/merge actions. On a focused panel icon use `Ctrl+Alt+Left/Right` to reorder, `Ctrl+Alt+Up/Down` to move to an adjacent group and `Ctrl+Alt+S` to split; on a focused ↕ handle, `Ctrl+Alt+Shift+Up/Down` reorders groups. Large tab strips scroll horizontally, and dragging near the top/bottom of the dock scrolls through offscreen group targets. Use **Window → Float selected dock group** after focusing a dock tab/group handle (otherwise the first attached group is chosen) to move all its current tabs into a floating **in-app Control**. Drag the host's ⠿ title grip to move, its ◢ lower-right grip to resize, and its floating tab icons to reorder within the host; each floating group's ⋮ menu also moves, splits and merges local groups. Close × **hides** the host without redocking or discarding its panels; **Window → Show hidden floating panels** recovers every hidden host. Each host can contain multiple ordered groups, independently collapsed. Drag a floating tab or whole group onto the expanded dock, a minimized-rail group gap, or another floating host to transfer the **original** panel(s), preserving relative tab order. Drop on the bare canvas to create an in-app floating host; Esc or an invalid drop leaves both sides unchanged. The dock and floating-host ⋮ menus offer keyboard-accessible cross-container moves; a focused floating tab can use Ctrl+Alt+D, or focused group handle Ctrl+Alt+Shift+D, to redock at the end of the right dock. The original floating container disappears when all its groups have moved away. Dock/group/flyout/floating-host layout is now saved across application relaunches as a **workspace preference** (never inside `.drawing` documents). **Window → Reset workspace layout** restores Colors/Layers/History singleton groups and resets floating hosts without discarding edits. Settings are stored in the Godot user data directory (`user://drawing-workspace-dock-v1.json`); corrupt/unsupported files return to safe defaults, and offscreen hosts are clamped on restart or resize. Hidden floating panels still recover from Window. A host that embeds the shared editor can override `layout_settings_path` to isolate separate workspaces, and can register optional panels by stable ID before restore. The complete Drawing feature inventory and Asset Browser implementation remain separate tickets; **T-083 awaits explicit owner UX review**, and automated tests do not approve it.
+- **Layers** Select a group row without making it a paint target. +Layer/+Group
+  append inside that group, or insert immediately above a selected sibling row.
+  Click the eye and lock icon on **any** row; group state also applies to its
+  descendants. The Layer menu offers rename, remove and structural operations.
+  When the Layers Tree has focus, use Ctrl+Alt+Up/Down to reorder a sibling,
+  Ctrl+Alt+Right/Left to indent into a preceding group/outdent, Ctrl+Alt+V/L
+  to toggle visibility/lock and Ctrl+Alt+R to rename. Guarded creation,
+  removal, rename, reorder, visibility and lock are each one undoable step
+  in standalone Drawing; the selected row/paint target are restored by Undo.
+  Layer names and text are searchable with 200-row bounded pages. Atlas API
+  callers retain their own external/legacy structural chronology. The **Edit → Preferences… → Record selection changes in Undo History**
+  checkbox (OFF by default)
+  optionally adds separate clean selection steps; content undo always restores
+  layer/selection/tool context.
+- **Keyboard** Ctrl/Cmd+N/O/S, Ctrl/Cmd+Shift+S, Z, Y (Shift+Z alias), W for New/Open/Save/Save As/Undo/Redo/Close. Status reports cursor pixel coordinates, visible canvas dimensions and zoom. The right Colors/Layers/History dock stacks independently collapsible groups and scrolls at short heights. Use **Window → Minimize/expand panel dock** (or the dock's own button) to switch between the expanded groups and a narrow icon rail. Each attached panel has an icon with a tooltip; adjacent icons in a group share one flyout/tab set, while a separator denotes a different group. The flyout overlays the drawing canvas without changing its layout or creating an OS window; click the active icon to close it. Collapse and active tab state survive minimize/restore during the session. **Drag a panel icon** to another tab position, another group, or a between-group insertion marker; **drag the ↕ handle** to reorder or merge its whole group. The in-app hint appears only for valid drops; Esc and leaving the dock cancel without layout changes. The group **⋮ Arrange** menu provides keyboard-accessible move/split/merge actions. On a focused panel icon use `Ctrl+Alt+Left/Right` to reorder, `Ctrl+Alt+Up/Down` to move to an adjacent group and `Ctrl+Alt+S` to split; on a focused ↕ handle, `Ctrl+Alt+Shift+Up/Down` reorders groups. Large tab strips scroll horizontally, and dragging near the top/bottom of the dock scrolls through offscreen group targets. Use **Window → Float selected dock group** after focusing a dock tab/group handle (otherwise the first attached group is chosen) to move all its current tabs into a floating **in-app Control**. Drag the host's ⠿ grip to move (or Shift+drag to transfer its whole group); resize from any edge or corner, with the ◢ diagonal as a hint. Drag individual floating tabs to reorder or transfer panels; splitting a tab creates a separate host. Close × **hides** the host without redocking or discarding its panels; **Window → Show hidden floating panels** recovers every hidden host. Each host contains exactly one tabbed group, never multiple stacked groups; old multi-group saved layouts migrate into separate hosts. Drag a floating tab or whole group onto the expanded dock, a minimized-rail group gap, or another floating host to transfer the **original** panel(s), preserving relative tab order. Drop on the bare canvas to create an in-app floating host; Esc or an invalid drop leaves both sides unchanged. The dock ⋮ menu and keyboard shortcuts offer cross-container moves; a focused floating tab can use Ctrl+Alt+D, or focused group handle Ctrl+Alt+Shift+D, to redock at the end of the right dock. The original floating container disappears when all its groups have moved away. Dock/group/flyout/floating-host layout is now saved across application relaunches as a **workspace preference** (never inside `.drawing` documents). **Window → Reset workspace layout** restores Colors/Layers/History singleton groups and resets floating hosts without discarding edits. Settings are stored in the Godot user data directory (`user://drawing-workspace-dock-v1.json`); corrupt/unsupported files return to safe defaults, and offscreen hosts are clamped on restart or resize. Hidden floating panels still recover from Window. A host that embeds the shared editor can override `layout_settings_path` to isolate separate workspaces, and can register optional panels by stable ID before restore. The complete Drawing feature inventory and Asset Browser implementation remain separate tickets; **T-083 awaits explicit owner UX review**, and automated tests do not approve it.
+
+## Standalone image frame, checkerboard and grid (T-087)
+
+New ordinary Drawing tabs start with a **512×512 image frame at (-256,-256)**,
+fit to the viewport. A thin visible edge separates the intended image extent
+from the darker surrounding workspace. A two-tone transparency checkerboard
+appears **only behind the frame**, with **16-pixel squares in screen space**:
+zooming changes image pixel scale, not checker square size. It is a UI backdrop,
+not a raster layer or exported pixel data. Sparse pixels **outside the frame**
+remain editable, visible and saved; the frame is deliberately **not a crop**.
+
+- **Image → Drawing image frame…** changes the signed image origin and positive
+  width/height (up to 1,000,000 px). This is a metadata-only edit, flagged as
+  unsaved until a successful Save. It does **not** scale, resample, clip, erase,
+  resize source tiles, or change the canonical document revision/history.
+  Actual destructive crop/resize is not implemented; a later dedicated feature
+  must specify how to handle outside pixels and history before offering it.
+- **View → Show grid** toggles source-space lines inside the image frame;
+  **View → Grid spacing and origin…** chooses 2–4096 source pixels and signed
+  X/Y origin. The Brush/Eraser/Select/Move/Text tool option **Snap** is
+  independent of grid visibility. At very small zooms, closely spaced grid
+  lines are visually thinned to whole multiples of the chosen spacing to
+  avoid subpixel clutter; snapping still uses every actual intersection.
+  The status bar reports cursor, image origin/size, grid spacing/origin and
+  snap state. Grid/snap toggles and spacing are per-tab *session* preferences,
+  not `.drawing` raster data; object/world/Atlas grids are not modified.
+- New-format `.drawing` envelopes may include an optional `image_frame` with
+  **signed decimal-string origin** and validated integer size. Old files without
+  it still load: the workspace computes a conservative guide around occupied
+  source tiles/text (minimum 512px); extremely distant sparse content falls
+  back to the default centered guide, **without discarding any pixels**. Object
+  Asset `origin`/`bounds` continue using their own existing semantics, and
+  generic Atlas canvas consumers default to no standalone image frame.
+
+Verification after staging and editor import:
+
+```sh
+godot --headless --path drawing --script res://tests/image_frame_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/image_frame_native.gd
+```
+
+The second test captures real X11/Mesa framebuffer pixels and delivers mouse
+input through a Godot viewport. It is a **software-only** witness; physical
+Windows/Linux owner usability still belongs to the separate review gates.
+
+## Selection, clipboard and Move (T-088)
+
+- **Select** drag a marquee; click blank/outside an existing mask to deselect,
+  rather than selecting one pixel. Select → Replace/Add/Subtract/Intersect
+  (or the Select tool's mode option) changes how the next dragged rectangle
+  combines with the independent selection channel. A small irregular mask
+  outlines its actual edges/holes; large masks use bounded guides. Select →
+  Deselect or Ctrl/Cmd+D explicitly clears selection.
+- **Brush, Eraser and bounded core fill/clear** respect the active mask.
+  With no selection, editing is unrestricted. Selection-only operations are
+  clean and optional history recording remains OFF unless enabled in **Edit → Preferences…**.
+- **Edit → Copy/Cut/Paste/Delete selected pixels** (Ctrl/Cmd+C/X/V, Delete
+  when canvas has keyboard focus) operate on the active raster layer, **not**
+  the visible merged composite. Copy is read-only; content changes require an
+  editable (visible, unlocked) layer. Paste advances by 8 source pixels in X
+  and Y for each consecutive paste and selects the new pixels. It preserves
+  exact nonzero hidden RGB in alpha-zero pixels while fully zero transparent
+  source pixels do not overwrite target bytes. Paste is not clipped by the
+  old selection. This is an internal clipboard, not the OS PNG clipboard.
+- **Move** drags selected *layer* pixels with an actual detached source-clear
+  and target-paste preview while held; release commits once, Escape cancels.
+  Undo/redo restores changed pixels and the complete mask/mode snapshot.
+  Multi-layer transformations, OS clipboard image exchange, ellipse/lasso/
+  Magic Wand producers and scale/rotate remain future broader inventory UX.
+
+Verify after a clean standalone import:
+
+```sh
+godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/selection_clipboard_native.gd
+```
+
+The native test captures true Xvfb/Mesa framebuffer pixels and viewport
+input, not a physical Windows/Linux owner acceptance run.
 
 ## File format and boundaries
 
 The app's single-file `.drawing` schema `drawing-standalone-v1` wraps the shared
-`DrawingDocument.export_manifest()` tree and inline base64 **straight RGBA8**
+`DrawingDocument.export_manifest()` tree, optional non-destructive image
+frame metadata, and inline base64 **straight RGBA8**
 chunks addressed by SHA-256 of dimension + format + original pixel bytes.
 Chunk coordinates are signed decimal strings on disk (no 64-bit truncation
 through JSON floats). Load validates the **whole** tree, every referenced blob,
@@ -87,8 +177,8 @@ This is a **standalone-specific** format, not the planned Atlas campaign
 multi-file sparse manifest/chunk root, generational atomic publication,
 retention, backup, migration or recovery from T-066. It is not yet a complete
 production drawing editor: the compact T-063 layout does not implement
-all approved tools/advanced options, and full structural history and
-performance/native acceleration belong to later tickets. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
+all approved tools/advanced options, while physical owner UX acceptance and hardware performance
+remain separately gated. T-058 now supplies standalone editable text and explicit rasterization. T-059 and T-056 still own hands-on owner UX acceptance.
 
 ## Verification
 
@@ -101,6 +191,60 @@ xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
 
 T-060 notes: `.drawing` semantic objects now preserve non-Object Godot Variant
 values with a checksummed payload; older JSON records remain readable.
+
+## Live paint-preview verification (T-085)
+
+Brush and Eraser show a detached, layer-correct draft while the left button
+is still pressed, including the stationary first dab. Raw canvas-source
+samples are queued and timestamped, then staged in bounded frames. A long
+release may finish its queue over subsequent frames before the single normal
+commit; **Esc cancels**, changing tool/layer/document/zoom cancels, and
+releasing outside the canvas finishes the captured path. No uncommitted bytes
+are written to `.drawing`. Brush footprint is outlined at the pointer.
+
+```sh
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/live_stroke_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/live_stroke_native.gd
+```
+
+The Xvfb framebuffer test samples pixels **while mouse-down remains active**
+at 100%, 50% and 25% zoom. It is software rendering only and does not replace
+physical Windows/Linux usability validation or T-086's dirty-tile viewport
+cache. See [T-085 evidence](../docs/Tickets/T-085.md).
+
+## Source-aligned viewport cache (T-086)
+
+Viewport redraws reuse persistent 128×128 source-space `ImageTexture` tiles
+(up to 144 retained; approximately 9 MiB of RGBA8 texture payload). Zoom/pan
+rescale native Godot texture quads; small edits/Undo/Redo invalidate only
+intersecting cached display tiles. Rendering still composites the canonical
+RGBA8 source in layer order, including uncommitted detached Brush/Eraser
+pixels; cancellation does not publish history. Empty source tiles are skipped
+through bounded occupancy metadata. A Godot `ImageTexture.update()` refreshes
+one **whole 128px display texture**, not a partial upload. All sizes are
+editor-display/cache quantities and do not alter sparse storage tile stride.
+
+```sh
+python3 tools/build_drawing_app.py --in-place
+godot --headless --editor --path drawing --import --quit
+godot --headless --path drawing --script res://tests/viewport_cache_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd
+python3 tools/benchmarks/t086_compare_viewport.py --godot godot
+```
+
+The native check uses a **software framebuffer**. The benchmark compares the
+pinned pre-cache T-085 code to the current implementation under the same Xvfb
+Mesa process profile, at 100/50/25% zoom. It reports CPU composition, full
+texture bytes uploaded, software frame submission, and process HWM, **not**
+physical input-to-photon or GPU VRAM. The cache keeps a 9MiB retained-texture
+payload bound; when a dense/unknown viewport exceeds 144 tiles, extra textures
+are transient and can exceed that limit for one submitted frame, but in-view
+retained entries avoid full-cache LRU churn. First-time zoom-out population
+may still be slow. See [T-086 measurements](../docs/Tickets/T-086.md).
 
 ## Editable text (T-058)
 
@@ -165,9 +309,31 @@ selection through `AtlasObjectEditorBridge`; ordinary source Save refreshes
 all linked placements and instance-launched Save As publishes B and rebinds
 only the origin, with one Atlas history command. Undo retains the saved B.
 
+**Object source discovery (T-093):** Use **File → Open Drawing…** for an ordinary
+`.drawing` file and its independent Save/Save As; **File → Object › Open source…**
+opens a portable source in its dedicated Object Editor tab, while
+**File → Object › New source** creates a new source with a separate identity.
+**File → Import Image as Drawing…** loads a bounded PNG/WebP/JPEG as a new
+ordinary Drawing tab (never a linked Atlas placement); fully transparent
+images still receive an authoring frame. These actions are deliberately distinct
+from browsing saved sources. Choose **File → Object › Browse saved sources…**
+(or **Window → Asset Browser…**) for an empty-state walkthrough with **Choose
+Objects/ folder…** and the current project/Objects root label. Hover or use **Copy root path**
+for the exact absolute path. Opening the browser scrolls the right dock to
+its chooser when attached. Select an *existing*
+project's `Objects/` subdirectory; do **not** select the project root or guess
+from the drawing filename. After one successful explicit choice, **Use last
+folder** offers that path on subsequent launches, but opening the app alone
+never scans or binds the saved root. An invalid or missing folder explains
+how to recover without changing the previous valid listing; corrupt and
+duplicate sources are skipped with warnings. Edit Source opens a source tab,
+while Atlas **Place at view center** links an instance on a map and is not
+offered in standalone. Unreferenced saved sources are not automatically deleted;
+missing/NULL links and source removal/repair require Atlas's explicit manager.
+
 **Asset Browser (T-065 engineering preview):** Choose **Window → Asset Browser…**
-and select an existing absolute `Objects/` directory from a portable project.
-The resulting panel is a normal, movable/collapsible dock peer of Colors,
+to reveal the browser's root selection controls, then select an existing
+absolute `Objects/` directory from a portable project. The resulting panel is a normal, movable/collapsible dock peer of Colors,
 Layers and History. It searches source *names* and stable *IDs*, lists loose
 `Objects/*.drawing` and the newest `Objects/<id>/vNNNNNN.drawing`, and opens
 selected sources in an independent Object Editor tab via **Edit Source**.
@@ -217,3 +383,81 @@ python3 tools/build_drawing_app.py --in-place
 godot --headless --editor --path drawing --import --quit
 godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd
 ```
+
+## Compact Colors, event History and app preferences (T-092)
+
+The Colors dock stays compact: foreground/background and previous swatches,
+FG/BG swap, `#RRGGBBAA` and RGB 0–255 fields, six recent colors and a
+collapsed **Advanced picker**. A clicked recent or background swatch changes the
+active Brush pigment without altering source pixels. The background is a
+secondary UI color, not a document fill operation. The History dock shows
+short event descriptions, applied position and Undo/Redo buttons; click a
+listed step to replay undo/redo up to that cursor. **Internal** Drawing
+revision remains monotonic on content Undo, while the UI reads `history n/m`
+instead of exposing that revision as an apparent undo position.
+
+**Edit → Preferences…** holds the optional selection-history switch (OFF by
+default). It saves to `user://drawing-workspace-preferences-v1.json` with schema
+checks/atomic replacement, separate from both `.drawing` content and the dock
+layout file. All tabs share that setting, including a new/reopened tab. A
+connected host can disable `preferences_persistence_enabled` or use a private
+`preferences_settings_path` before adding the workspace to its scene tree.
+
+Run `godot --headless --path drawing --script res://tests/color_history_smoke.gd`
+after staged import, or the **on-demand** native
+`godot-native-t092-color-history.yml` workflow (Xvfb/Mesa screenshot/log
+witness). Actual owner Windows/Linux UI/scale approval remains outstanding.
+
+## Layer hierarchy and structural history verification (T-089)
+
+A selected group is a navigable row, never an active raster target; eye/lock
+buttons act on the clicked row without changing the selection. Group lock or
+visibility blocks child editing. Changes to structure are saved in `.drawing`
+and are locally undoable; one step per operation, including restoring removed
+subtree pixels, IDs and lazy references. The action shortcuts above require
+focus in the Layers Tree (not the canvas). Run after staging/import:
+
+```sh
+godot --headless --path drawing --script res://tests/layer_structure_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/layer_structure_native.gd
+```
+
+T-089 model 62/62 and software Xvfb/Mesa native 32/32 are engineering evidence;
+physical Windows/Linux pointer/DPI owner approval is still separate in T-059.
+
+### Responsive chrome and tool-width input (T-090)
+
+Standalone `drawing/project.godot` uses `canvas_items` with aspect `expand`,
+minimum 800×600 physical desktop window. One File/Edit/View/Image/Layers/Select/
+Window/Help row retains overflow More; File holds Object source creation/open/
+rename/Save As plus Close tab. Each document tab has its own × and the existing
+unsaved-content guard. Open a new file with **File → New** or **Ctrl+N** (no
+floating + tab button). Hover **Brush px** and wheel up/down for ±1 px; use
+**[**/**]** with Brush or Eraser (except while editing text), or Shift+wheel/
+left-right wheel/chevrons to scroll overflowed tool options. Keyboard widths and
+wheel changes do not modify document pixels or add undo entries.
+
+The six tool rail SVGs are redistributed from the bundled **MIT at-icons**
+control family with `addons/drawing/icons/LICENSE.at-icons.txt` in all staged
+standalone/third-consumer packages. `drawing/tests/responsive_workspace_native.gd`
+provides a 24-check X11/Mesa software witness (29 with `T090_SCREENSHOTS=...`)
+for real tab-close pointers, brush wheel, menu grouping, framebuffer edges at
+800×600/1280×760/1920×1080, and 150%/200% UI scaling. Run after a clean
+`python3 tools/build_drawing_app.py --in-place` and `godot --headless --editor
+--path drawing --import --quit` to import the bundled SVGs/fonts. The native
+on-demand workflow preserves screenshots/logs; neither software tests nor
+historical T-063 Done constitute physical Windows/Linux owner UX approval.
+
+### Floating dock controls (T-091)
+
+Each floating host contains **one tabbed group**. Drag its compact ⠿ grip to
+move the host; **Shift+drag the grip** to transfer the entire group between
+dock/hosts. Drag individual tabs to reorder or merge them into other groups;
+the Window menu can restore a host hidden with ×. All four host edges and
+corners are resizable (the bottom-right diagonal cue is only a hint). A
+floating tab split creates another floating host rather than nested groups.
+The expanded dock width is saved when you drag the splitter and recovered
+on restart, even if a narrow window temporarily clamps its displayed size.
+These controls have Xvfb native input coverage; final physical owner UX review
+remains open under T-083.

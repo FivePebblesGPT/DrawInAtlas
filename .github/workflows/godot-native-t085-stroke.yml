@@ -1,0 +1,37 @@
+name: Godot T-085 held-button framebuffer (on demand, software only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  live-stroke-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install software-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Stage independent Drawing package
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Test 100, 50, 25 percent preview with mouse still pressed
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/live_stroke_native.gd 2>&1 | tee /tmp/t085-native.log
+          grep -q 'T085_NATIVE_PASSED' /tmp/t085-native.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T085_NATIVE_FAILED:' /tmp/t085-native.log; then exit 1; fi
+      - name: Upload native software-only logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t085-native-software-framebuffer
+          path: /tmp/t085-native.log
+          if-no-files-found: warn

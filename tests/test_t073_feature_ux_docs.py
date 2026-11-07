@@ -94,8 +94,13 @@ class ApprovedScopeAndProposedUXTests(unittest.TestCase):
             self.assertIn("T-053", doc)
             self.assertIn("T-059", doc)
         self.assertIn("Do not expand the minimum witness retroactively", INVENTORY)
+        # Check that the follow-up tickets are tracked, not that their Kanban
+        # statuses are frozen at their initial planning values. T-064 has
+        # progressed since this documentation ticket was completed.
         for ticket in ("T-023", "T-024", "T-025", "T-026", "T-027", "T-064"):
-            self.assertIn('status: "Ready"', (DOCS / f"Tickets/{ticket}.md").read_text())
+            content = (DOCS / f"Tickets/{ticket}.md").read_text(encoding="utf-8")
+            self.assertRegex(content, r'(?m)^status: "(?:Ready|In Progress|Blocked|Manual Review|Done)"$')
+            self.assertIn(ticket, INVENTORY)
         self.assertIn("Pending native UX", INVENTORY)
 
     def test_pointer_keyboard_cases_have_observable_results_and_witness_paths(self) -> None:

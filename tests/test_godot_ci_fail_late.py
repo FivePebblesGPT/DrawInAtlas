@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "godot-check.yml"
 sys.path.insert(0, str(ROOT / "tools"))
-from report_godot_ci import summarize  # noqa: E402
+from report_godot_ci import expected_check_ids, summarize  # noqa: E402
 
 
 class GodotCIFailLateTests(unittest.TestCase):
@@ -22,10 +22,18 @@ class GodotCIFailLateTests(unittest.TestCase):
         blocks = re.findall(r"(?ms)^      - name: ([^\n]+)\n(.*?)(?=^      - name: |\Z)", workflow)
         self.assertGreaterEqual(len(blocks), 20)
         # Keep push CI bounded while permitting new focused, fast model
-        # witnesses (e.g. the T-065 large-library paging regression).
-        self.assertLessEqual(len(blocks), 40)
+        # witnesses (T-065 paging, T-086 cache, T-087 frame, T-088 selection,
+        # T-089 layers, T-090 workspace, T-091 docking, T-092 Colors/History and T-093 discovery).
+        self.assertLessEqual(len(blocks), 51)
+        self.assertIn("Verify T-086 source-space dirty-display tile invalidation", workflow)
+        self.assertIn("Verify T-088 selection channel, clipboard, and transaction history", workflow)
+        self.assertIn("Verify T-089 layer hierarchy, row actions, and structural history", workflow)
+        self.assertIn("Verify T-090 responsive workspace, command routing, and licensed tool icon contracts", workflow)
+        self.assertIn("Verify T-091 one-group floating dock and legacy settings migration", workflow)
+        self.assertIn("Verify T-092 compact Colors, history cursor, and isolated app preferences", workflow)
+        self.assertIn("Verify T-093 Object source discovery, recent-root consent, image import and safe Open", workflow)
         for name, block in blocks:
-            if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name == "Summarize CI failures":
+            if name.startswith(("Install Godot ", "Verify the exact beta engine")) or name in {"Summarize CI failures", "Export sanitized hosted CI evidence", "Upload hosted CI evidence (including red runs)"}:
                 continue
             with self.subTest(name=name):
                 self.assertRegex(block, r"(?m)^        id: ci_[a-z0-9_]+$")
@@ -94,6 +102,36 @@ class GodotCIFailLateTests(unittest.TestCase):
         self.assertNotIn("`ci_03_good` |", report)
         self.assertFalse(summarize({})[1])
         self.assertTrue(summarize({"ci_03_good": {"outcome": "success"}})[1])
+
+    def test_summary_fails_closed_when_workflow_step_is_missing_or_unexpected(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        ids = expected_check_ids(workflow)
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertGreaterEqual(len(ids), 40)
+        all_good = {name: {"outcome": "success", "conclusion": "success"} for name in ids}
+        self.assertTrue(summarize(all_good, expected_ids=ids)[1])
+
+        for omitted in (ids[0], ids[-1]):
+            with self.subTest(omitted=omitted):
+                missing = dict(all_good)
+                del missing[omitted]
+                report, passed = summarize(missing, expected_ids=ids)
+                self.assertFalse(passed)
+                self.assertIn(f"`{omitted}` | **missing**", report)
+
+        unexpected = dict(all_good, ci_accidental_extra={"outcome": "success"})
+        report, passed = summarize(unexpected, expected_ids=ids)
+        self.assertFalse(passed)
+        self.assertIn("`ci_accidental_extra` | **unexpected**", report)
+        self.assertFalse(summarize({**all_good, ids[3]: {"outcome": "skipped"}}, ids)[1])
+        self.assertFalse(summarize({**all_good, ids[3]: {"conclusion": "success"}}, ids)[1])
+
+    def test_workflow_id_extraction_rejects_duplicate_or_missing_ids(self) -> None:
+        self.assertEqual(expected_check_ids("        id: ci_a\n        id: ci_b\n"), ["ci_a", "ci_b"])
+        with self.assertRaises(ValueError):
+            expected_check_ids("        id: ci_a\n        id: ci_a\n")
+        with self.assertRaises(ValueError):
+            expected_check_ids("name: no checks\n")
 
     def test_bash_group_continues_after_command_and_marker_failures(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

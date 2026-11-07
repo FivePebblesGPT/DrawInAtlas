@@ -9,12 +9,14 @@ var detail_group_id: String = ""
 var document_id: String = ""
 var asset_id: String = ""
 var selected_layer_ids: Array[String] = []
+var selected_tree_id: String = ""
 var selected_instance_id: String = ""
 var selected_instance_generation: String = ""
 var editor_mode: String = ""
 var focus_bounds: Rect2 = Rect2()
 var has_focus: bool = false
 var selected_rect: Rect2i = Rect2i()
+var selection_mask: DrawingSelection
 
 
 func detached_copy() -> DrawingHistoryContext:
@@ -25,18 +27,23 @@ func detached_copy() -> DrawingHistoryContext:
 	value.document_id = document_id
 	value.asset_id = asset_id
 	value.selected_layer_ids = selected_layer_ids.duplicate()
+	value.selected_tree_id = selected_tree_id
 	value.selected_instance_id = selected_instance_id
 	value.selected_instance_generation = selected_instance_generation
 	value.editor_mode = editor_mode
 	value.focus_bounds = focus_bounds
 	value.has_focus = has_focus
 	value.selected_rect = selected_rect
+	value.selection_mask = selection_mask.detached_copy() if selection_mask != null else null
 	return value
 
 
 func same_selection(other: DrawingHistoryContext) -> bool:
 	# Mode-only, camera-only and navigation-only events are not selections.
 	return other != null and selected_layer_ids == other.selected_layer_ids \
+		and selected_tree_id == other.selected_tree_id \
 		and selected_instance_id == other.selected_instance_id \
 		and selected_instance_generation == other.selected_instance_generation \
-		and selected_rect == other.selected_rect
+		and selected_rect == other.selected_rect \
+		and ((selection_mask == null and other.selection_mask == null) or \
+		(selection_mask != null and selection_mask.same_as(other.selection_mask)))

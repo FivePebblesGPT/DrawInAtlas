@@ -13,12 +13,13 @@ func frames(n: int = 6) -> void:
 	for _i: int in range(n):
 		await process_frame
 
-func mouse(point: Vector2, down: bool) -> void:
+func mouse(point: Vector2, down: bool, shift: bool = false) -> void:
 	var e: InputEventMouseButton = InputEventMouseButton.new()
 	e.button_index = MOUSE_BUTTON_LEFT
 	e.position = point
 	e.global_position = point
 	e.pressed = down
+	e.shift_pressed = shift
 	root.push_input(e, true)
 
 func motion(point: Vector2) -> void:
@@ -29,9 +30,9 @@ func motion(point: Vector2) -> void:
 	e.button_mask = MOUSE_BUTTON_MASK_LEFT
 	root.push_input(e, true)
 
-func drag_from(control: Control, point: Vector2) -> void:
+func drag_from(control: Control, point: Vector2, group_drag: bool = false) -> void:
 	var start: Vector2 = control.get_global_rect().get_center()
-	mouse(start, true)
+	mouse(start, true, group_drag)
 	await frames(3)
 	motion(start.lerp(point, 0.5))
 	await frames(4)
@@ -116,7 +117,7 @@ func run() -> void:
 	var a: Rect2 = (app.dock_rail_buttons["history"] as Control).get_global_rect()
 	var b: Rect2 = (app.dock_rail_buttons["swatches"] as Control).get_global_rect()
 	var insert_point: Vector2 = Vector2(a.get_center().x, (a.end.y + b.position.y) / 2.0)
-	await drag_from(host.group_handles["colors"], insert_point)
+	await drag_from(host.group_handles["colors"], insert_point, true)
 	check(layout.snapshot()["containers"].size() == 2, "redock preview leaves both containers unchanged")
 	check(app.dock_drop_hint.visible and app.dock_drag.target().get("kind") == DrawingDockDrag.GROUP_SLOT,
 		"rail gap offers whole-group insertion instead of merging")
@@ -165,18 +166,18 @@ func run() -> void:
 		"two distinct float hosts have exclusive owners")
 	var last_frame: Rect2 = (third.group_frames["history"] as Control).get_global_rect()
 	var group_drop: Vector2 = Vector2(last_frame.get_center().x, last_frame.end.y - 3)
-	await drag_from(second.group_handles["effects"], group_drop)
-	check(third._hint.visible and app.dock_drag.target().get("kind") == DrawingDockDrag.GROUP_SLOT,
-		"floating-to-floating whole-group target is a separate group slot")
+	await drag_from(second.group_handles["effects"], group_drop, true)
+	check(third._hint.visible and app.dock_drag.target().get("kind") == DrawingDockDrag.MERGE_GROUP,
+		"floating-to-floating whole-group target explicitly merges into existing tabs")
 	await drop(group_drop)
 	check(not app.floating_hosts.has(second_id) and layout.container_info(second_id).is_empty(),
 		"source float removed after entire group leaves")
-	check(layout.container_info(third_id)["groups"].map(func(g: Dictionary) -> String: return g["id"]) == ["history", "effects"],
-		"target floating group order matches release point")
-	check(layout.group_info("effects")["panels"] == ["effects", "colors"],
-		"whole-group cross-host drop preserves tab sequence")
-	check(layout.rail_icons(third_id)[2]["separator_before"] == false,
-		"cross-host joined group has no separator between member icons")
+	check(layout.container_info(third_id)["groups"].size() == 1 and layout.group_info("effects").is_empty(),
+		"one group per floating host after cross-host drop")
+	check(layout.group_info("history")["panels"].has("effects") and layout.group_info("history")["panels"].has("colors"),
+		"whole-group cross-host drop preserves every panel")
+	check(not layout.rail_icons(third_id)[2]["separator_before"],
+		"cross-host merged group has no separator between member icons")
 	# Real pointer merge from float into expanded dock, not an extra group.
 	app._toggle_dock()
 	await frames(9)
@@ -189,7 +190,7 @@ func run() -> void:
 	await drop(merge_point)
 	check(layout.owner_of("colors") == "right" and layout.group_of("colors") == "swatches",
 		"only floating tab merged into existing dock group")
-	check(layout.group_info("effects")["panels"] == ["effects"], "source group retains other tab")
+	check(layout.group_info("history")["panels"].has("effects"), "source floating group retains other tab")
 	check(layout.rail_icons("right").any(func(item: Dictionary) -> bool: return item["panel"] == "colors"),
 		"rail reflects recovered single tab")
 	# Target changed during preview: stale transaction must not replay over new state.
@@ -220,7 +221,8 @@ func run() -> void:
 	# recreate it or overwrite the legitimate concurrent change.
 	await drag_from(third.tab_buttons["effects"], dock_pointer)
 	check(app.dock_drop_hint.visible, "target-destruction setup has visible dock hint")
-	check(layout.move_group("swatches", third_id, 2), "destination group externally transferred during hover")
+	check(layout.merge_groups("swatches", "history", layout.group_info("history")["panels"].size()),
+		"destination externally merged during hover")
 	app._render_dock()
 	await frames(4)
 	var after_destroy: Dictionary = layout.snapshot()
@@ -229,7 +231,8 @@ func run() -> void:
 		"destroyed target rejects stale drop and preserves external mutation")
 	check(not app.dock_drag.is_dragging() and app._cross_source.is_empty(), "destroyed target clears coordinator")
 	# Menu and keyboard alternatives use the same model transaction.
-	third._arrange(7, "effects")
+	check(layout.select_panel("effects"), "focus active floating tab for accessible redock")
+	third._arrange(3, "history")
 	await frames(6)
 	check(layout.owner_of("effects") == "right" and layout.owner_of("history") == third_id,
 		"floating Arrange redocks only its active tab")

@@ -339,7 +339,8 @@ func _valid(containers: Array[Dictionary], panels: Dictionary) -> bool:
 		seen_containers[container["id"]] = true
 		if not [DOCK, FLOATING].has(container.get("kind")) or not container.get("minimized") is bool or not container.get("flyout_group") is String or not container.get("groups") is Array:
 			return false
-		if container["kind"] == FLOATING and container["minimized"]:
+		if container["kind"] == FLOATING and (container["minimized"] or container["groups"].size() > 1):
+			# A floating container owns one tabbed group, never stacked groups.
 			return false
 		var local_groups: Dictionary = {}
 		for group: Variant in container["groups"]:

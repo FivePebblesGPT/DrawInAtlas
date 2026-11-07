@@ -15,6 +15,16 @@ var _covered: Dictionary[String, bool] = {}
 # An edit sees one immutable source revision; avoid re-resolving its tile for
 # each covered pixel. Cache successful absent tiles (null), never failed loads.
 var _source_tiles: Dictionary[String, Variant] = {}
+## Detached preview indexed by storage tile + pixel offset; never stored on the document.
+var _preview_tiles: Dictionary[String, Dictionary] = {}
+## Per-storage-tile monotonic content versions. A display tile only needs
+## recomposition when a storage tile touching its source footprint changes.
+var _preview_epoch: int = 0
+var _preview_tile_versions: Dictionary[String, int] = {}
+## Only touched pixels need rollback. A full triple-dictionary duplicate per motion
+## event grew quadratically over long strokes.
+var _paint_journal: Dictionary[String, Array] = {}
+var _journaling: bool = false
 var _closed: bool = false
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
@@ -34,11 +44,147 @@ func change_count() -> int:
 	return _after.size()
 
 
+## Renderer reads only this session's detached patch; a closed/stale session is blank.
+func preview_tile(tile_key: String) -> Dictionary:
+	if _closed or document.revision != expected_revision:
+		return {}
+	return _preview_tiles.get(tile_key, {})
+
+
+func preview_stamp_for_area(area: Rect2i) -> int:
+	if _closed or _preview_tile_versions.is_empty() or document.revision != expected_revision:
+		return 0
+	var stride: int = document.tile_stride
+	var start_x: int = DrawingDocument.TILES.floor_div(area.position.x, stride)
+	var start_y: int = DrawingDocument.TILES.floor_div(area.position.y, stride)
+	var end_x: int = DrawingDocument.TILES.floor_div(area.end.x - 1, stride)
+	var end_y: int = DrawingDocument.TILES.floor_div(area.end.y - 1, stride)
+	var stamp: int = 0
+	# Tiny storage strides must not turn a 128px display lookup into a
+	# quadratic scan of thousands of absent storage tiles.
+	var span: int = (end_x - start_x + 1) * (end_y - start_y + 1)
+	if _preview_tile_versions.size() < span:
+		for key: String in _preview_tile_versions:
+			var parts: PackedStringArray = key.split(",")
+			var tile_x: int = int(parts[0])
+			var tile_y: int = int(parts[1])
+			if tile_x >= start_x and tile_x <= end_x and tile_y >= start_y and tile_y <= end_y:
+				stamp = maxi(stamp, _preview_tile_versions[key])
+	else:
+		for y: int in range(start_y, end_y + 1):
+			for x: int in range(start_x, end_x + 1):
+				stamp = maxi(stamp, int(_preview_tile_versions.get("%d,%d" % [x, y], 0)))
+	return stamp
+
+
+## Snapshot the changed storage-tile generations into the *visible* display
+## tile grid once per draw. Without this, a zoomed-out view asks every display
+## tile to scan every changed storage key (especially with small strides).
+## The index includes superseded/cleared preview versions: those still need to
+## invalidate a texture which previously held a draft. A capped fallback keeps
+## pathologically large strides or change sets from allocating unbounded maps.
+func preview_stamps_for_display_tiles(visible_tiles: Rect2i, display_stride: int,
+		max_entries: int = 40000) -> Dictionary:
+	var index: Dictionary[String, int] = {}
+	if _closed or document.revision != expected_revision or _preview_tile_versions.is_empty():
+		return {"indexed": true, "stamps": index}
+	if display_stride <= 0 or max_entries <= 0 or not visible_tiles.has_area():
+		return {"indexed": false, "stamps": index}
+	var stride: int = document.tile_stride
+	# Coordinates may be signed 64-bit anchors. Do not overflow while deriving
+	# the world-space footprint: the original per-area lookup remains exact.
+	var safe_tile_limit: int = 1152921504606846976 / maxi(stride, 1)
+	var attempted_entries: int = 0
+	for key: String in _preview_tile_versions:
+		var parts: PackedStringArray = key.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+			return {"indexed": false, "stamps": {}}
+		var storage_x: int = int(parts[0])
+		var storage_y: int = int(parts[1])
+		if storage_x < -safe_tile_limit or storage_x > safe_tile_limit \
+				or storage_y < -safe_tile_limit or storage_y > safe_tile_limit:
+			return {"indexed": false, "stamps": {}}
+		var world_x: int = storage_x * stride
+		var world_y: int = storage_y * stride
+		var first_x: int = maxi(visible_tiles.position.x,
+			DrawingDocument.TILES.floor_div(world_x, display_stride))
+		var first_y: int = maxi(visible_tiles.position.y,
+			DrawingDocument.TILES.floor_div(world_y, display_stride))
+		var last_x: int = mini(visible_tiles.end.x - 1,
+			DrawingDocument.TILES.floor_div(world_x + stride - 1, display_stride))
+		var last_y: int = mini(visible_tiles.end.y - 1,
+			DrawingDocument.TILES.floor_div(world_y + stride - 1, display_stride))
+		if last_x < first_x or last_y < first_y:
+			continue
+		# Bound attempted insertions as well as distinct keys; many overlapping
+		# storage footprints must not turn an otherwise small index into a loop.
+		var span_x: int = last_x - first_x + 1
+		var span_y: int = last_y - first_y + 1
+		if span_x > max_entries or span_y > max_entries / span_x \
+				or attempted_entries + span_x * span_y > max_entries:
+			return {"indexed": false, "stamps": {}}
+		attempted_entries += span_x * span_y
+		var version: int = _preview_tile_versions[key]
+		for y: int in range(first_y, last_y + 1):
+			for x: int in range(first_x, last_x + 1):
+				var display_key: String = "%d,%d" % [x, y]
+				index[display_key] = maxi(int(index.get(display_key, 0)), version)
+	return {"indexed": true, "stamps": index}
+
+
+func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) -> void:
+	_preview_epoch += 1
+	_preview_tile_versions[tile_key] = _preview_epoch
+	var tile_patch: Dictionary = _preview_tiles.get(tile_key, {})
+	if _after.has(pixel_key):
+		tile_patch[local_index] = _after[pixel_key]
+		_preview_tiles[tile_key] = tile_patch
+	else:
+		tile_patch.erase(local_index)
+		if tile_patch.is_empty():
+			_preview_tiles.erase(tile_key)
+
+
+## Rare failure path for the other edit APIs which still use full snapshots.
+## Their preview index must never outlive a rolled-back staging dictionary.
+func _rebuild_preview_tiles() -> void:
+	_preview_tiles.clear()
+	for key: String in _after:
+		var parts: PackedStringArray = key.split(",")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		var stride: int = document.tile_stride
+		_sync_preview_pixel(DrawingDocument.TILES.tile_key64(x, y, stride),
+			posmod(y, stride) * stride + posmod(x, stride), key)
+
+
+func _rollback_paint() -> void:
+	for key: String in _paint_journal:
+		var snapshot: Array = _paint_journal[key]
+		if snapshot[0]:
+			_before[key] = snapshot[1]
+		else:
+			_before.erase(key)
+		if snapshot[2]:
+			_after[key] = snapshot[3]
+		else:
+			_after.erase(key)
+		if not snapshot[4]:
+			_covered.erase(key)
+		_sync_preview_pixel(String(snapshot[5]), int(snapshot[6]), key)
+	_paint_journal.clear()
+	_journaling = false
+
+
 func cancel() -> void:
 	_before.clear()
 	_after.clear()
 	_covered.clear()
 	_source_tiles.clear()
+	_preview_tiles.clear()
+	_preview_tile_versions.clear()
+	_paint_journal.clear()
+	_journaling = false
 	_closed = true
 
 
@@ -51,6 +197,9 @@ func commit() -> DrawingResult:
 	_after.clear()
 	_covered.clear()
 	_source_tiles.clear()
+	_preview_tiles.clear()
+	_preview_tile_versions.clear()
+	_paint_journal.clear()
 	return result
 
 
@@ -85,6 +234,13 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		old = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
 			if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
+	var stride_local: int = document.tile_stride
+	var preview_tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride_local)
+	var local_index: int = posmod(global_y, stride_local) * stride_local + posmod(global_x, stride_local)
+	if _journaling and not _paint_journal.has(key):
+		_paint_journal[key] = [_before.has(key), _before.get(key, 0),
+			_after.has(key), _after.get(key, 0), _covered.has(key),
+			preview_tile_key, local_index]
 	if once:
 		_covered[key] = true
 	if not _before.has(key):
@@ -94,6 +250,7 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		_before.erase(key)
 	else:
 		_after[key] = replacement
+	_sync_preview_pixel(preview_tile_key, local_index, key)
 	return DrawingResult.success()
 
 
@@ -117,6 +274,7 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 			if not result.ok:
 				_before = old_before
 				_after = old_after
+				_rebuild_preview_tiles()
 				return result
 	return DrawingResult.success(_after.size())
 
@@ -133,6 +291,7 @@ func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 			if not result.ok:
 				_before = old_before
 				_after = old_after
+				_rebuild_preview_tiles()
 				return result
 	return DrawingResult.success(_after.size())
 
@@ -146,44 +305,48 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 ## Pointer path is in view coordinates; transform freezes the raster-space mapping.
 func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 		erase: bool = false, selection: DrawingSelection = null,
-		max_candidates: int = 1048576) -> DrawingResult:
+		max_candidates: int = 1048576, clip_bounds: Rect2i = Rect2i()) -> DrawingResult:
 	if _closed or path.is_empty() or width <= 0.0 or not is_finite(width) or max_candidates <= 0:
 		return DrawingResult.failure("BRUSH", "Invalid brush session, radius or pointer path")
 	if rgba < 0 or rgba > 0xffffffff:
 		return DrawingResult.failure("RGBA", "Invalid straight RGBA8 color")
 	var inverse: Transform2D = view_transform.affine_inverse()
-	var old_before: Dictionary[String, int] = _before.duplicate()
-	var old_after: Dictionary[String, int] = _after.duplicate()
-	var old_covered: Dictionary[String, bool] = _covered.duplicate()
+	_journaling = true
+	_paint_journal.clear()
 	var previous: Vector2 = _last
 	for index: int in range(path.size()):
 		var position: Vector2 = inverse * path[index]
 		if not position.is_finite() or absf(position.x) > 1000000000.0 or absf(position.y) > 1000000000.0:
-			_before = old_before
-			_after = old_after
-			_covered = old_covered
+			_rollback_paint()
 			return DrawingResult.failure("COORD_RANGE", "Brush point is outside the view-relative range")
 		var start: Vector2 = previous if index > 0 or _has_last else position
 		var touched: DrawingResult = _paint_segment(start, position, width * 0.5, rgba,
-			erase, selection, max_candidates)
+			erase, selection, max_candidates, clip_bounds)
 		if not touched.ok:
-			_before = old_before
-			_after = old_after
-			_covered = old_covered
+			_rollback_paint()
 			return touched
 		previous = position
 	_has_last = true
 	_last = previous
+	_paint_journal.clear()
+	_journaling = false
 	return DrawingResult.success(_after.size())
 
 
 func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 		erase: bool, selection: DrawingSelection, max_candidates: int,
-		depth: int = 0) -> DrawingResult:
+		clip_bounds: Rect2i = Rect2i(), depth: int = 0) -> DrawingResult:
 	var left: int = floori(minf(start.x, finish.x) - radius - 0.5)
 	var top: int = floori(minf(start.y, finish.y) - radius - 0.5)
 	var right: int = ceili(maxf(start.x, finish.x) + radius + 0.5)
 	var bottom: int = ceili(maxf(start.y, finish.y) + radius + 0.5)
+	# Restrict only this stroke's candidate window, never sparse document data.
+	# Clipping before the candidate limit also avoids processing off-frame runs.
+	if clip_bounds.has_area():
+		left = maxi(left, clip_bounds.position.x)
+		top = maxi(top, clip_bounds.position.y)
+		right = mini(right, clip_bounds.end.x)
+		bottom = mini(bottom, clip_bounds.end.y)
 	var columns: int = right - left
 	var rows: int = bottom - top
 	if columns <= 0 or rows <= 0:
@@ -193,11 +356,11 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return DrawingResult.failure("BRUSH_LIMIT", "Brush candidate window exceeds pixel limit")
 		var middle: Vector2 = (start + finish) * 0.5
 		var first: DrawingResult = _paint_segment(start, middle, radius, rgba, erase,
-			selection, max_candidates, depth + 1)
+			selection, max_candidates, clip_bounds, depth + 1)
 		if not first.ok:
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
-			selection, max_candidates, depth + 1)
+			selection, max_candidates, clip_bounds, depth + 1)
 	# A stationary dab has no segment projection. Axis-aligned segments can
 	# compute squared distance without a Geometry2D call per candidate. Keep
 	# the original native geometry oracle for all oblique sweeps.
@@ -291,6 +454,7 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 			if not result.ok:
 				_before = old_before
 				_after = old_after
+				_rebuild_preview_tiles()
 				return result
 	return DrawingResult.success(_after.size())
 
@@ -341,6 +505,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		if head >= limit:
 			_before = old_before
 			_after = old_after
+			_rebuild_preview_tiles()
 			return DrawingResult.failure("FILL_LIMIT", "Fill was cancelled at the pixel budget")
 		var point: Vector2i = frontier[head]
 		head += 1
@@ -350,6 +515,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		if not current.ok:
 			_before = old_before
 			_after = old_after
+			_rebuild_preview_tiles()
 			return current
 		if int(current.value) == 0 or current.value != original.value:
 			continue
@@ -358,6 +524,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		if not staged.ok:
 			_before = old_before
 			_after = old_after
+			_rebuild_preview_tiles()
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset
