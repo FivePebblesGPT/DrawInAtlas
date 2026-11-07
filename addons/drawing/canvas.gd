@@ -274,8 +274,81 @@ func _rebuild_occupancy() -> void:
 			return
 
 
+## A content-only erasure may retire an entire sparse storage chunk. The
+## monotonic occupancy hint would otherwise keep composing its now-empty
+## display tiles and uploading transparent textures on every visit. Probe
+## *metadata*, not raster pixels: visible text uses measured bounds, raster
+## probes conservatively include pending lazy source chunks. If the scan is
+## too large or uncertain, keep the old over-approximation instead.
+func _prune_erased_display_tiles(regions: Array) -> void:
+	const MAX_PRUNE_CANDIDATES: int = 256
+	if _occupancy_unknown or session != null or _move_preview != null:
+		return
+	var candidates: Dictionary[String, Vector2i] = {}
+	for region: DrawingDirtyRegion in regions:
+		if region.width <= 0 or region.height <= 0:
+			continue
+		var start_x: int = DrawingDocument.TILES.floor_div(region.x, DISPLAY_TILE_SIZE)
+		var start_y: int = DrawingDocument.TILES.floor_div(region.y, DISPLAY_TILE_SIZE)
+		var end_x: int = DrawingDocument.TILES.floor_div(region.x + region.width - 1, DISPLAY_TILE_SIZE)
+		var end_y: int = DrawingDocument.TILES.floor_div(region.y + region.height - 1, DISPLAY_TILE_SIZE)
+		if (end_x - start_x + 1) * (end_y - start_y + 1) > MAX_PRUNE_CANDIDATES:
+			return
+		for y: int in range(start_y, end_y + 1):
+			for x: int in range(start_x, end_x + 1):
+				var key: String = "%d,%d" % [x, y]
+				if _occupied_display_tiles.has(key):
+					# Most paint edits leave their own source chunk present;
+					# avoid walking the entire visible layer tree for these.
+					var tile_area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE,
+						y * DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
+					if document.raster_may_cover(region.layer_id, tile_area.position.x,
+							tile_area.position.y, tile_area.size.x, tile_area.size.y):
+						continue
+					candidates[key] = Vector2i(x, y)
+					if candidates.size() > MAX_PRUNE_CANDIDATES:
+						return
+	if candidates.is_empty():
+		return
+	var leaves: Array[String] = []
+	DrawingRenderer._collect_visible(document, DrawingDocument.ROOT_ID, leaves)
+	var raster_layers: Array[String] = []
+	var text_areas: Array[Rect2i] = []
+	for layer: String in leaves:
+		var metadata: Dictionary = document.node_metadata(layer)
+		if metadata.get("kind") == DrawingLayerNode.TEXT:
+			var element: DrawingTextElement = document.inspect_node(layer).text_element
+			if element != null:
+				var measured: DrawingResult = DrawingTextRaster.bounds(element)
+				if not measured.ok:
+					return
+				text_areas.append(measured.value as Rect2i)
+		else:
+			raster_layers.append(layer)
+	for key: String in candidates:
+		var tile: Vector2i = candidates[key]
+		var area: Rect2i = Rect2i(tile * DISPLAY_TILE_SIZE,
+			Vector2i(DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE))
+		var may_contain_content: bool = false
+		for text_area: Rect2i in text_areas:
+			if area.intersects(text_area):
+				may_contain_content = true
+				break
+		if may_contain_content:
+			continue
+		for layer: String in raster_layers:
+			if document.raster_may_cover(layer, area.position.x, area.position.y,
+					area.size.x, area.size.y):
+				may_contain_content = true
+				break
+		if not may_contain_content:
+			_occupied_display_tiles.erase(key)
+			_display_tiles.erase(key)
+
+
 func _sync_display_cache() -> void:
 	var rebuild_occupancy: bool = false
+	var changed_regions: Array = []
 	if _cache_document != document:
 		_cache_document = document
 		_cache_revision = -1
@@ -292,6 +365,7 @@ func _sync_display_cache() -> void:
 		rebuild_occupancy = true
 	else:
 		var changed: Dictionary = document.display_changes_since(_cache_revision)
+		changed_regions = changed["regions"] as Array
 		if changed["full"]:
 			_display_tiles.clear()
 			rebuild_occupancy = true
@@ -311,6 +385,10 @@ func _sync_display_cache() -> void:
 						and tile_area.position.y < region.y + region.height \
 						and tile_area.end.y > region.y:
 						_display_tiles[key]["dirty"] = true
+	if not rebuild_occupancy:
+		# A stale source-occupancy hint is safe but causes needless texture
+		# churn after an erasure. Recheck only the bounded changed footprints.
+		_prune_erased_display_tiles(changed_regions)
 	_cache_revision = document.revision
 	if rebuild_occupancy:
 		_rebuild_occupancy()

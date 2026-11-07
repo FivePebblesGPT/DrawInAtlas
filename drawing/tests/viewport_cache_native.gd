@@ -414,6 +414,111 @@ func run() -> void:
 	check(blank_lazy.r < 0.5 and loaded_lazy.r > 0.8 and loaded_lazy.g > 0.65,
 		"registered source appears without stale blank cache or document revision: %s -> %s" % [blank_lazy, loaded_lazy])
 
+	# A fully erased sparse source tile must not keep its old display tiles
+	# occupying the index or uploading transparent textures. Check offscreen
+	# erasure too: a later pan must not rediscover a ghost cache entry.
+	var erased_doc: DrawingDocument = DrawingDocument.new("t086-pruned-erasure", 256)
+	var erased_layer: String = String(erased_doc.create_layer(DrawingLayerNode.RASTER, "Ink").value)
+	patch(erased_doc, erased_layer, Rect2i(1, 1, 1, 1),
+		PackedByteArray([235, 40, 10, 255]))
+	patch(erased_doc, erased_layer, Rect2i(520, 1, 1, 1),
+		PackedByteArray([50, 190, 20, 255]))
+	canvas.document = erased_doc
+	canvas.layer_id = erased_layer
+	canvas.camera = Vector2.ZERO
+	canvas.zoom = 1.0
+	canvas.queue_redraw()
+	await frames(4)
+	check(canvas._occupied_display_tiles.has("0,0")
+		and canvas._occupied_display_tiles.has("4,0"),
+		"visible and offscreen sparse source tiles start occupied")
+	check(sample(canvas, Vector2(1.5, 1.5)).r > 0.8,
+		"seeded sparse pixel reaches native framebuffer")
+	patch(erased_doc, erased_layer, Rect2i(1, 1, 1, 1),
+		PackedByteArray([0, 0, 0, 0]))
+	patch(erased_doc, erased_layer, Rect2i(520, 1, 1, 1),
+		PackedByteArray([0, 0, 0, 0]))
+	check(erased_doc.tile_keys(erased_layer).is_empty(),
+		"full erasure removes both canonical storage chunks")
+	canvas.queue_redraw()
+	await frames(4)
+	var pruned: Dictionary = canvas.last_frame_metrics.duplicate()
+	check(not canvas._occupied_display_tiles.has("0,0")
+		and not canvas._occupied_display_tiles.has("4,0"),
+		"erased visible/offscreen chunks are removed from display occupancy")
+	check(not canvas._display_tiles.has("0,0") and int(pruned["textures_updated"]) == 0
+		and int(pruned["textures_created"]) == 0,
+		"erasure skips dead display textures instead of uploading transparent images: %s" % pruned)
+	print("T086_ERASE_PRUNE_METRICS %s" % pruned)
+	check(sample(canvas, Vector2(1.5, 1.5)).r < 0.4,
+		"native framebuffer clears the deleted sparse pixel")
+	canvas.camera = Vector2(520, 1)
+	canvas.queue_redraw()
+	await frames(4)
+	var offscreen_erased: Dictionary = canvas.last_frame_metrics.duplicate()
+	check(int(offscreen_erased["tiles_composited"]) == 0
+		and int(offscreen_erased["textures_created"]) == 0
+		and sample(canvas, Vector2(520.5, 1.5)).g < 0.4,
+		"pan to erased offscreen storage chunk skips all transparent uploads")
+	canvas.camera = Vector2.ZERO
+	canvas.queue_redraw()
+	await frames(4)
+	check(erased_doc.undo().ok and erased_doc.undo().ok,
+		"two independent erasures undo to original pixels")
+	canvas.queue_redraw()
+	await frames(4)
+	check(sample(canvas, Vector2(1.5, 1.5)).r > 0.8
+		and canvas._occupied_display_tiles.has("0,0"),
+		"undo republishes erased pixel and restores occupancy")
+	check(erased_doc.redo().ok and erased_doc.redo().ok,
+		"two erasures redo without new source contents")
+	canvas.queue_redraw()
+	await frames(4)
+	check(not canvas._occupied_display_tiles.has("0,0"),
+		"redo prunes the erased display tile again")
+	var preview_started: DrawingResult = erased_doc.begin_edit(erased_layer, erased_doc.revision)
+	check(preview_started.ok, "start detached preview in pruned tile")
+	if preview_started.ok:
+		var erased_preview: DrawingEditSession = preview_started.value as DrawingEditSession
+		check(erased_preview.apply_region(Rect2i(1, 1, 1, 1),
+			PackedByteArray([35, 210, 60, 255])).ok,
+			"stage detached preview without publishing")
+		canvas.session = erased_preview
+		canvas.queue_redraw()
+		await frames(4)
+		check(sample(canvas, Vector2(1.5, 1.5)).g > 0.7,
+			"draft preview bypasses pruned committed occupancy")
+		canvas.cancel_gesture()
+		canvas.queue_redraw()
+		await frames(4)
+		check(sample(canvas, Vector2(1.5, 1.5)).g < 0.4
+			and erased_doc.tile_keys(erased_layer).is_empty(),
+			"cancellation does not resurrect source pixels")
+
+	# Do not prune a shared display tile when another visible layer still
+	# supplies artwork, even if the edited layer's last storage chunk vanished.
+	var shared_doc: DrawingDocument = DrawingDocument.new("t086-shared-erasure", 256)
+	var shared_low: String = String(shared_doc.create_layer(DrawingLayerNode.RASTER, "Low").value)
+	var shared_top: String = String(shared_doc.create_layer(DrawingLayerNode.RASTER, "Top").value)
+	patch(shared_doc, shared_low, Rect2i(1, 1, 1, 1),
+		PackedByteArray([240, 40, 10, 255]))
+	patch(shared_doc, shared_top, Rect2i(5, 5, 1, 1),
+		PackedByteArray([35, 45, 245, 255]))
+	canvas.document = shared_doc
+	canvas.layer_id = shared_low
+	canvas.queue_redraw()
+	await frames(4)
+	patch(shared_doc, shared_low, Rect2i(1, 1, 1, 1),
+		PackedByteArray([0, 0, 0, 0]))
+	canvas.queue_redraw()
+	await frames(4)
+	check(canvas._occupied_display_tiles.has("0,0")
+		and canvas._display_tiles.has("0,0"),
+		"remaining top layer prevents false occupied-tile pruning")
+	check(sample(canvas, Vector2(5.5, 5.5)).b > 0.8
+		and sample(canvas, Vector2(1.5, 1.5)).r < 0.4,
+		"surviving layer remains visible while deleted lower pixel clears")
+
 	# A dense viewport larger than the retained budget must not evict all
 	# currently visible entries every frame (the overflow is transient).
 	canvas._display_tiles.clear()

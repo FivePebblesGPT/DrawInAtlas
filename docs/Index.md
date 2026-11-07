@@ -129,6 +129,20 @@ acceptance, or remote hosted-CI run**. Ticket status and manual gates remain
 unchanged. [T-094](Tickets/T-094.md) ·
 [physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-086 fully erased sparse-tile cache pruning (2026-11-07; In Progress):**
+A source chunk's complete erasure used to leave monotonic display occupancy
+markers, causing blank 128px textures to be recomposited and uploaded again.
+T-086 now probes only up to 256 touched display tiles on selective published
+edits and removes the occupancy and texture entry if no visible raster/lazy
+source or text bounds can cover it. Active detached previews and uncertain
+coverage remain conservative. A native Xvfb/Mesa reproduction changed from
+one **65,536-byte transparent texture upload** to **zero**, with Undo/Redo,
+offscreen pan, preview cancellation and layer-overlap framebuffer checks.
+The clean-stage native witness passes **111/111**, seven T-086 model suites
+**2,420/2,420** and shared Atlas smoke **346/346**. This does **not** close
+large dense cold-zoom, physical Linux/Windows latency or owner gates;
+T-086 stays In Progress. [Ticket](Tickets/T-086.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples
