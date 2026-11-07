@@ -1332,6 +1332,19 @@ partial index on the same fixture. This is a correctness/work-bound test, not
 a full real-campaign performance acceptance test. Atlas registry guards,
 manual review and the 46 required CI check IDs are unchanged.
 
+### T-065 failure-atomic 512-source index — 2026-11-08
+
+The existing required `ci_t065_asset_browser_model` step now runs **79**
+real-file model assertions. The portable index accepts exactly 512 distinct
+saved Object sources, examines later candidates for duplicate IDs rather than
+publishing a truncated list, and rejects a 513th unique source with
+`ASSET_LIMIT` without replacing the last authorized snapshot. Both loose
+`.drawing` sources and versioned `vNNNNNN.drawing` directories are exercised;
+the real browser must display the limit error and preserve its previous root.
+Negative controls against the original implementation fail four assertions.
+This adds no required CI check ID and does not replace hosted CI, physical
+keyboard/pointer testing or T-065 owner approval.
+
 ### T-094 compact Godot engine diagnostic log guard — 2026-11-08
 
 `tools/check_godot_model_log.py` rejects the compact Godot timestamped `E`

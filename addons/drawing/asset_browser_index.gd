@@ -72,9 +72,6 @@ func scan(objects_path: String) -> DrawingResult:
 	child_names.sort()
 	standalone_files.sort()
 	for child_name: String in child_names:
-		if next.size() >= MAX_ASSETS:
-			issues.append("Asset index limit reached")
-			break
 		if not DrawingDocument.valid_identifier(child_name) or directory.is_link(child_name):
 			issues.append("Skipped unsafe asset directory")
 			continue
@@ -116,14 +113,17 @@ func scan(objects_path: String) -> DrawingResult:
 		if chosen.is_empty():
 			continue
 		_read_source(base.path_join(child_name).path_join(chosen), seen, next, issues, child_name)
+		if next.size() > MAX_ASSETS:
+			return DrawingResult.failure("ASSET_LIMIT", "Objects/ exceeds source index limit")
 	# Standalone Drawing can publish individual Objects/*.drawing files, while
 	# Atlas's immutable revisions live in Objects/<id>/vNNNNNN.drawing.
 	for filename: String in standalone_files:
-		if next.size() >= MAX_ASSETS:
-			issues.append("Asset index limit reached")
-			break
 		if filename.ends_with(".drawing") and not directory.is_link(filename):
 			_read_source(base.path_join(filename), seen, next, issues)
+			if next.size() > MAX_ASSETS:
+				# Publishing a partial prefix would hide valid/duplicate identities
+				# from the same root. Keep the previously authorized snapshot intact.
+				return DrawingResult.failure("ASSET_LIMIT", "Objects/ exceeds source index limit")
 	next.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return String(a["name"]).nocasecmp_to(String(b["name"])) < 0 if a["name"] != b["name"] else String(a["id"]) < String(b["id"]))
 	root_path = base

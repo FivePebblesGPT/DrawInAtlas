@@ -10,6 +10,18 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
+**T-065 complete portable source-count authorization (2026-11-08; In Progress):**
+At the 512-source limit the portable index previously returned a successful
+partial listing, hiding later unique assets or duplicate stable IDs. It now
+examines all root candidates within the existing 2,048-entry budget, detects
+late duplicates, and rejects the 513th unique source with `ASSET_LIMIT` while
+preserving the last authorized snapshot. The **79/79** headless model covers
+real loose/versioned source files, exact limit, late duplicates, atomic failure,
+visible browser error and recovery; the original source fails four added
+assertions. Hardware owner review, hosted CI and cross-process filesystem
+atomicity are not verified. T-065 remains **In Progress**, with `manual_review:
+true` and no approval granted. [Ticket](Tickets/T-065.md).
+
 **T-065 snapshot-authorized source access and bounded version enumeration (2026-11-07; In Progress):**
 The shared Object index now requires a matching listed ID/revision/path/SHA
 before Open, thumbnail, drag or Export, preventing unreviewed same-root

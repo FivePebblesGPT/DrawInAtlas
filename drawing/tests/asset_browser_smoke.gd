@@ -235,6 +235,87 @@ func _run() -> void:
 	check(DirAccess.remove_absolute(beyond) == OK and budget_index.scan(root_budget).ok and
 		budget_index.entries.size() == 1 and budget_index.safe_to_open(budget_index.entries[0]),
 		"removing the excess entry allows a new complete authorized scan")
+	# MAX_ASSETS is a source-identity limit, not permission to show only the
+	# first 512 files. A late duplicate must still be discovered and suppressed,
+	# and a 513th distinct source must fail without replacing the last index.
+	var source_limit_root: String = moved_root.path_join("SourceLimit/Objects")
+	check(DirAccess.make_dir_recursive_absolute(source_limit_root) == OK,
+		"create independent source-count Objects folder")
+	var saved_all: bool = true
+	for i: int in range(DrawingAssetBrowserIndex.MAX_ASSETS):
+		var id: String = "bulk-%04d" % i
+		if not write_source(id, "Bulk %04d" % i,
+				source_limit_root.path_join(id + ".drawing")):
+			saved_all = false
+			break
+	check(saved_all, "publish exactly the maximum number of independent source IDs")
+	var source_cap_index: DrawingAssetBrowserIndex = INDEX.new() as DrawingAssetBrowserIndex
+	check(source_cap_index.scan(source_limit_root).ok and
+		source_cap_index.entries.size() == DrawingAssetBrowserIndex.MAX_ASSETS and
+		source_cap_index.warnings.is_empty(),
+		"exactly 512 valid source identities form a complete authorized index")
+	var authorized_snapshot: Array[Dictionary] = source_cap_index.entries.duplicate(true)
+	var duplicate_after_limit: String = source_limit_root.path_join("zz-late-duplicate.drawing")
+	check(write_source("bulk-0000", "Duplicate", duplicate_after_limit),
+		"add a late duplicate beyond the old source-count cutoff")
+	check(source_cap_index.scan(source_limit_root).ok and
+		source_cap_index.entries.size() == DrawingAssetBrowserIndex.MAX_ASSETS - 1 and
+		source_cap_index.filtered("bulk-0000").is_empty() and
+		not source_cap_index.warnings.is_empty(),
+		"late duplicate is examined and suppressed instead of hiding behind first 512")
+	check(DirAccess.remove_absolute(duplicate_after_limit) == OK and
+		source_cap_index.scan(source_limit_root).ok and
+		source_cap_index.entries == authorized_snapshot,
+		"removing duplicate restores the exact original authorized snapshot")
+	var over_source: String = source_limit_root.path_join("zz-new-source.drawing")
+	check(write_source("bulk-extra", "Extra", over_source),
+		"create 513th distinct valid published source")
+	var over_source_scan: DrawingResult = source_cap_index.scan(source_limit_root)
+	check(not over_source_scan.ok and over_source_scan.code == "ASSET_LIMIT" and
+		source_cap_index.root_path == source_limit_root and
+		source_cap_index.entries == authorized_snapshot and
+		source_cap_index.warnings.is_empty() and
+		source_cap_index.safe_to_open(source_cap_index.entries[0]),
+		"source limit fails atomically and retains last authorized index without warnings drift")
+	var panel_source_root_before: String = panel.index.root_path
+	check(not panel.set_objects_root(source_limit_root).ok and
+		panel.index.root_path == panel_source_root_before and
+		panel.message.text.contains("source index limit"),
+		"visible browser reports over-limit source count without switching its root")
+	check(DirAccess.remove_absolute(over_source) == OK and
+		source_cap_index.scan(source_limit_root).ok and
+		source_cap_index.entries.size() == DrawingAssetBrowserIndex.MAX_ASSETS,
+		"removing 513th source allows a complete 512-source rescan")
+	# The versioned-source traversal occurs before loose files. Verify its own
+	# limit guard, without generating an unrelated second 512-source payload.
+	var all_versioned: bool = true
+	for i: int in range(DrawingAssetBrowserIndex.MAX_ASSETS):
+		var id: String = "bulk-%04d" % i
+		var versioned_folder: String = source_limit_root.path_join(id)
+		if DirAccess.make_dir_absolute(versioned_folder) != OK or \
+				DirAccess.rename_absolute(source_limit_root.path_join(id + ".drawing"),
+				versioned_folder.path_join("v000001.drawing")) != OK:
+			all_versioned = false
+			break
+	check(all_versioned, "relocate 512 published sources to canonical versioned directories")
+	var versioned_index: DrawingAssetBrowserIndex = INDEX.new() as DrawingAssetBrowserIndex
+	check(versioned_index.scan(source_limit_root).ok and
+		versioned_index.entries.size() == DrawingAssetBrowserIndex.MAX_ASSETS and
+		versioned_index.warnings.is_empty(),
+		"versioned source traversal also accepts the exact limit")
+	var versioned_snapshot: Array[Dictionary] = versioned_index.entries.duplicate(true)
+	var versioned_extra: String = source_limit_root.path_join("bulk-versioned/v000001.drawing")
+	check(write_source("bulk-versioned", "Versioned overflow", versioned_extra),
+		"publish a 513th versioned source")
+	var versioned_overflow: DrawingResult = versioned_index.scan(source_limit_root)
+	check(not versioned_overflow.ok and versioned_overflow.code == "ASSET_LIMIT" and
+		versioned_index.entries == versioned_snapshot and
+		versioned_index.warnings.is_empty(),
+		"versioned source overflow rejects partial publication atomically")
+	check(DirAccess.remove_absolute(versioned_extra) == OK and
+		versioned_index.scan(source_limit_root).ok and
+		versioned_index.entries.size() == DrawingAssetBrowserIndex.MAX_ASSETS,
+		"versioned overflow can recover after removing the extra source")
 	app.queue_free()
 	print("T065_ASSET_BROWSER: %d passed; %d failed" % [passed, failed])
 	if failed == 0:
