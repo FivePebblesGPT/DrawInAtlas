@@ -6,6 +6,19 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-087 host camera/pointer mapping guard — 2026-11-08
+
+The required T-087 fast-CI step continues to run
+`drawing/tests/image_frame_smoke.gd`, now including cancellation when an
+embedded host pans the camera during queued Brush or selection input
+(**78 checks**). The existing on-demand
+`godot-native-t087-image-frame.yml` requires **104 native Xvfb/Mesa**
+assertions, including visible held preview, no ghost commit after pan,
+restored input state, marquee cancellation and no-op camera assignments.
+Neither the 46 required check IDs nor the hardware/manual approval gates
+change. A successful native software-renderer run is not physical owner
+acceptance.
+
 ## T-094 optional physical timing summary — 2026-11-07
 
 The existing T-073/T-094 Python documentation CI step tests

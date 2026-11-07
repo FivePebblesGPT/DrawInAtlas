@@ -275,6 +275,53 @@ func run() -> void:
 		"unchanged clipping policy publishes exactly one normal history edit")
 	check(clip_document.undo().ok and clip_document.revision == clip_revision + 2,
 		"ordinary post-policy-change Brush remains undoable")
+	# An embedded host may reposition the source camera between captured
+	# events. It must not reinterpret the remainder of one pending edit or
+	# selection under a different source transform.
+	clip_canvas.clip_strokes_to_image_frame = false
+	clip_canvas.tool = "Brush"
+	clip_canvas.brush_width = 1.0
+	clip_canvas.snap_to_grid = false
+	clip_canvas.camera = Vector2.ZERO
+	var camera_revision: int = clip_document.revision
+	var camera_probe: Vector2 = clip_canvas.pixel_to_position(Vector2(35.5, 41.5))
+	clip_canvas.start_gesture(camera_probe)
+	check(clip_canvas.session != null and clip_canvas.dragging and
+		clip_document.read_pixel(clip_canvas.layer_id, 35, 41).value == 0,
+		"camera-change Brush starts with detached, unpublished pixels")
+	clip_canvas.camera = Vector2(9, -7)
+	check(clip_canvas.session == null and not clip_canvas.dragging and
+		not clip_canvas._owns_accumulated_input and clip_document.revision == camera_revision,
+		"host camera pan cancels queued Brush and restores input mode")
+	clip_canvas.finish_gesture(camera_probe)
+	check(clip_document.revision == camera_revision and
+		clip_document.read_pixel(clip_canvas.layer_id, 35, 41).value == 0,
+		"stale pointer release after camera pan cannot publish old Brush")
+	var same_camera_probe: Vector2 = clip_canvas.pixel_to_position(Vector2(36.5, 42.5))
+	clip_canvas.start_gesture(same_camera_probe)
+	clip_canvas.camera = Vector2(9, -7)
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"equivalent camera assignment preserves a queued stroke")
+	clip_canvas.finish_gesture(same_camera_probe)
+	check(clip_document.revision == camera_revision + 1 and
+		clip_document.read_pixel(clip_canvas.layer_id, 36, 42).value != 0,
+		"unchanged camera commits a Brush at the original source coordinate")
+	check(clip_document.undo().ok and
+		clip_document.read_pixel(clip_canvas.layer_id, 36, 42).value == 0,
+		"unchanged camera retains one-step Undo")
+	clip_canvas.tool = "Select"
+	clip_canvas.clear_selection()
+	var marquee_start: Vector2 = clip_canvas.pixel_to_position(Vector2(20, 20))
+	var marquee_end: Vector2 = clip_canvas.pixel_to_position(Vector2(30, 30))
+	clip_canvas.start_gesture(marquee_start)
+	clip_canvas.update_gesture(marquee_end)
+	check(clip_canvas.dragging and clip_canvas.selecting and clip_canvas._marquee.has_area(),
+		"source marquee is pending before programmatic camera pan")
+	clip_canvas.camera = Vector2(-3, 12)
+	clip_canvas.finish_gesture(marquee_end)
+	check(not clip_canvas.dragging and not clip_canvas.selecting and
+		not clip_canvas.selection_mask.enabled and clip_document.revision == camera_revision + 2,
+		"camera change aborts unpublished marquee without selection/history")
 	workspace.queue_free()
 	DirAccess.remove_absolute(path)
 	DirAccess.remove_absolute(legacy_path)

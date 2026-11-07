@@ -428,6 +428,66 @@ func run() -> void:
 		"embedded/Atlas opt-out can paint outside a visible image guide")
 	check(doc.undo().ok and doc.read_pixel(layer, 9, 0).value == 0,
 		"unbounded host paint can be independently undone")
+	# A host can reposition the source camera while the actual mouse button is
+	# still held. Pending geometry was calculated with the old mapping: never
+	# splice later samples into that transaction or retain its old preview.
+	canvas.tool = "Brush"
+	canvas.brush_width = 2.0
+	canvas.snap_to_grid = false
+	canvas.show_grid = false
+	canvas.camera = Vector2.ZERO
+	canvas.zoom = 2.0
+	canvas.queue_redraw()
+	await frames(3)
+	var pan_probe: Vector2 = Vector2(25.5, 17.5)
+	var old_frame: Color = at(canvas, canvas.pixel_to_position(pan_probe))
+	var pan_revision: int = doc.revision
+	var prior_accumulation: bool = Input.use_accumulated_input
+	pointer(canvas, pan_probe, true)
+	await frames(3)
+	check(canvas.session != null and canvas.dragging and
+		int(doc.read_pixel(layer, 25, 17).value) == 0,
+		"real held Brush stages preview without committed source changes")
+	check(distance(at(canvas, canvas.pixel_to_position(pan_probe)), old_frame) > 0.04,
+		"real held Brush has a visible framebuffer preview before camera pan")
+	canvas.camera = Vector2(12, -8)
+	await frames(3)
+	check(canvas.session == null and not canvas.dragging and
+		Input.use_accumulated_input == prior_accumulation,
+		"host camera change cancels held Brush and restores input state")
+	stroke_motion(canvas, Vector2(27.5, 20.5))
+	pointer(canvas, Vector2(27.5, 20.5), false)
+	await frames(5)
+	check(doc.revision == pan_revision and
+		int(doc.read_pixel(layer, 25, 17).value) == 0 and
+		int(doc.read_pixel(layer, 27, 20).value) == 0,
+		"stale mouse motion/release cannot publish original or panned stroke")
+	var same_probe: Vector2 = Vector2(31.5, 23.5)
+	pointer(canvas, same_probe, true)
+	await frames(2)
+	canvas.camera = Vector2(12, -8)
+	check(canvas.session != null and canvas.dragging,
+		"equivalent camera write preserves native held stroke")
+	pointer(canvas, same_probe, false)
+	await frames(5)
+	check(doc.revision == pan_revision + 1 and
+		int(doc.read_pixel(layer, 31, 23).value) != 0,
+		"normal Brush after pan commits one history edit")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 31, 23).value) == 0,
+		"normal post-pan Brush remains undoable")
+	canvas.tool = "Select"
+	canvas.clear_selection()
+	pointer(canvas, Vector2(18, 18), true)
+	stroke_motion(canvas, Vector2(26, 26))
+	await frames(2)
+	check(canvas.dragging and canvas.selecting and canvas._marquee.has_area(),
+		"native marquee is pending before a host camera pan")
+	canvas.camera = Vector2(0, 0)
+	pointer(canvas, Vector2(26, 26), false)
+	await frames(3)
+	check(not canvas.dragging and not canvas.selecting and
+		not canvas.selection_mask.enabled and doc.revision == pan_revision + 2,
+		"camera pan cancels marquee with no selection publication")
 	canvas.clip_strokes_to_image_frame = true
 	canvas.image_bounds = Rect2i(-80, -60, 160, 120)
 	canvas.zoom = 1.0

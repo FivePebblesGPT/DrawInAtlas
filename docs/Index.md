@@ -48,6 +48,18 @@ browser/manager witnesses pass. This is point-in-time filesystem checking,
 T-065 stays **In Progress** with `manual_review: true`; no owner review
 has been granted. [T-065 evidence](Tickets/T-065.md).
 
+**T-087 host-camera-change gesture cancellation (2026-11-08; In Progress):**
+A programmatic camera pan during held Brush/Eraser or Select/Move input
+previously mixed source-coordinate mappings in one unpublished transaction.
+The camera setter now cancels only on an effective changed value, discarding
+queued pixels/marquee and restoring input state; same-value and idle camera
+updates retain their previous behavior. New **78/78 model** and **104/104
+Xvfb native** checks pass, including a real framebuffer preview and stale
+release oracle; original-source negative controls fail **4 + 4** checks.
+Physical owner UX/latency, Windows/Linux devices and hosted CI remain
+unverified; T-087 stays **In Progress**, with T-056/T-059 manual gates open.
+[Ticket and repro](Tickets/T-087.md).
+
 **T-085 immutable live-stroke selection boundary (2026-11-07; In Progress):**
 Brush/Eraser pointer-down now freezes the complete boolean edit mask,
 including holes and enabled-empty deny-all. A changed selection during

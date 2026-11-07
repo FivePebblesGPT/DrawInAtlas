@@ -78,7 +78,15 @@ var zoom: float = 4.0:
 		if (session != null or dragging or _floating_source_selection != null) and value != zoom:
 			cancel_gesture()
 		zoom = value
-var camera: Vector2 = Vector2.ZERO
+## Source coordinates depend on camera. Programmatic host pans during a held
+## Brush/Eraser or marquee/Move drag must not splice two viewport mappings
+## into one gesture. Idle panning and equivalent assignments remain harmless.
+var camera: Vector2 = Vector2.ZERO:
+	set(value):
+		if value != camera and (session != null or (dragging and (selecting or moving))):
+			cancel_gesture()
+			canvas_error.emit("Gesture cancelled because the camera moved")
+		camera = value
 ## Legacy rectangular projection for hosts and history. The actual mask may
 ## contain islands/holes; assigning selected directly replaces it by a rect.
 var selection_mask: DrawingSelection = DrawingSelection.new()
