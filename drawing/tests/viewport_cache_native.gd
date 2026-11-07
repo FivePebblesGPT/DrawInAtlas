@@ -519,6 +519,134 @@ func run() -> void:
 		and sample(canvas, Vector2(1.5, 1.5)).r < 0.4,
 		"surviving layer remains visible while deleted lower pixel clears")
 
+	# A 256px storage chunk containing one visible pixel marks four 128px
+	# display tiles as potentially occupied. Only the tile containing an
+	# actual visible composite should consume a texture upload. Hidden RGB
+	# at alpha zero remains present in the canonical source, not the display.
+	var sparse_doc: DrawingDocument = DrawingDocument.new("t086-subchunk-overhang", 256)
+	var sparse_layer: String = String(sparse_doc.create_layer(DrawingLayerNode.RASTER, "Sparse").value)
+	patch(sparse_doc, sparse_layer, Rect2i(2, 3, 1, 1),
+		PackedByteArray([240, 50, 20, 255]))
+	patch(sparse_doc, sparse_layer, Rect2i(165, 20, 1, 1),
+		PackedByteArray([70, 210, 40, 0]))
+	canvas.document = sparse_doc
+	canvas.layer_id = sparse_layer
+	canvas.size = Vector2(400, 300)
+	canvas.camera = Vector2(128, 128)
+	canvas.zoom = 1.0
+	canvas.queue_redraw()
+	await frames(5)
+	var overhang: Dictionary = canvas.last_frame_metrics.duplicate()
+	check(sparse_doc.tile_keys(sparse_layer).size() == 1
+		and sparse_doc.has_stored_pixel(sparse_layer, 165, 20),
+		"hidden RGB remains a canonical stored pixel within one source chunk")
+	check(int(overhang["textures_created"]) == 1
+		and int(overhang["bytes_uploaded"]) == 65536
+		and int(overhang["tiles_composited"]) >= 4,
+		"cold sparse source composes conservative overhang but uploads one visible tile: %s" % overhang)
+	check(canvas._occupied_display_tiles.has("0,0")
+		and not canvas._occupied_display_tiles.has("1,0")
+		and not canvas._occupied_display_tiles.has("0,1")
+		and not canvas._occupied_display_tiles.has("1,1"),
+		"transparent source-chunk overhang drops three unnecessary occupancy hints")
+	check(canvas._display_tiles.has("0,0") and not canvas._display_tiles.has("1,0")
+		and not canvas._display_tiles.has("0,1") and not canvas._display_tiles.has("1,1"),
+		"transparent overhang allocates no blank retained textures")
+	check(sample(canvas, Vector2(2.5, 3.5)).r > 0.8
+		and sample(canvas, Vector2(165.5, 20.5)).g < 0.5,
+		"visible source remains drawn and zero-alpha hidden RGB remains invisible")
+	canvas.queue_redraw()
+	await frames(3)
+	check(int(canvas.last_frame_metrics["tiles_composited"]) == 0
+		and int(canvas.last_frame_metrics["bytes_uploaded"]) == 0,
+		"subchunk transparency remains skipped on a warm redraw")
+	patch(sparse_doc, sparse_layer, Rect2i(165, 20, 1, 1),
+		PackedByteArray([70, 210, 40, 255]))
+	canvas.queue_redraw()
+	await frames(4)
+	check(canvas._occupied_display_tiles.has("1,0") and canvas._display_tiles.has("1,0")
+		and int(canvas.last_frame_metrics["textures_created"]) == 1,
+		"new edit in previously culled tile republishes exactly one texture")
+	check(sample(canvas, Vector2(165.5, 20.5)).g > 0.7,
+		"reoccupied source tile appears in native framebuffer")
+	check(sparse_doc.undo().ok, "undo edit in previously culled tile")
+	canvas.queue_redraw()
+	await frames(4)
+	check(not canvas._occupied_display_tiles.has("1,0")
+		and not canvas._display_tiles.has("1,0")
+		and int(canvas.last_frame_metrics["bytes_uploaded"]) == 0,
+		"undo returns to zero-alpha tile without uploading transparent texture")
+	check(int(sparse_doc.read_pixel(sparse_layer, 165, 20).value) == 0x0028d246,
+		"undo retains exact hidden RGBA8 channels")
+	check(sparse_doc.redo().ok, "redo previously culled source tile")
+	canvas.queue_redraw()
+	await frames(4)
+	check(canvas._occupied_display_tiles.has("1,0")
+		and sample(canvas, Vector2(165.5, 20.5)).g > 0.7,
+		"redo makes previously empty display tile visible again")
+	var overhang_edit: DrawingResult = sparse_doc.begin_edit(sparse_layer, sparse_doc.revision)
+	check(overhang_edit.ok, "open detached preview in culled overhang tile")
+	if overhang_edit.ok:
+		var overhang_session: DrawingEditSession = overhang_edit.value as DrawingEditSession
+		check(overhang_session.apply_region(Rect2i(180, 180, 1, 1),
+			PackedByteArray([225, 45, 30, 255])).ok,
+			"stage detached pixel in previously culled overhang")
+		canvas.session = overhang_session
+		canvas.queue_redraw()
+		await frames(4)
+		check(sample(canvas, Vector2(180.5, 180.5)).r > 0.8,
+			"detached preview bypasses transparent occupancy culling")
+		canvas.cancel_gesture()
+		canvas.pointer_known = false
+		canvas.queue_redraw()
+		await frames(4)
+		check(sample(canvas, Vector2(180.5, 180.5)).r < 0.5
+			and not sparse_doc.has_stored_pixel(sparse_layer, 180, 180),
+			"preview cancellation clears overhang without publishing source pixels")
+	# In unknown-occupancy mode a blank rendered source must not prune the
+	# conservative fallback: an uncertain source can be republished later.
+	canvas._occupancy_unknown = true
+	canvas._display_tiles.clear()
+	canvas.queue_redraw()
+	await frames(4)
+	check(canvas._occupancy_unknown
+		and int(canvas.last_frame_metrics["transparent_tiles_culled"]) == 0,
+		"unknown occupancy never treats an empty composite as proof of no source")
+	# Lazy source registration changes the display source epoch without a
+	# document revision: a previously culled tile must become visible.
+	var epoch_doc: DrawingDocument = DrawingDocument.new("t086-lazy-after-empty", 256)
+	var epoch_low: String = String(epoch_doc.create_layer(DrawingLayerNode.RASTER, "Hidden").value)
+	var epoch_top: String = String(epoch_doc.create_layer(DrawingLayerNode.RASTER, "Lazy").value)
+	patch(epoch_doc, epoch_low, Rect2i(3, 4, 1, 1),
+		PackedByteArray([180, 70, 90, 0]))
+	canvas.document = epoch_doc
+	canvas.layer_id = epoch_low
+	canvas.queue_redraw()
+	await frames(4)
+	check(not canvas._occupied_display_tiles.has("0,0"),
+		"fully transparent committed source has no display occupancy")
+	var lazy_chunk: PackedByteArray = PackedByteArray()
+	lazy_chunk.resize(256 * 256 * 4)
+	lazy_chunk[4 * (4 * 256 + 3)] = 25
+	lazy_chunk[4 * (4 * 256 + 3) + 1] = 220
+	lazy_chunk[4 * (4 * 256 + 3) + 2] = 80
+	lazy_chunk[4 * (4 * 256 + 3) + 3] = 255
+	var epoch_before: int = epoch_doc.revision
+	var lazy_chunk_fetch: Callable = func(_key: String) -> PackedByteArray: return lazy_chunk
+	check(epoch_doc.register_lazy_chunk(epoch_top, 0, 0, "later",
+		DrawingRasterTile.digest_rgba8(lazy_chunk, 256), lazy_chunk_fetch).ok
+		and epoch_doc.revision == epoch_before,
+		"lazy source registration changes display epoch, not document history")
+	canvas.queue_redraw()
+	await frames(4)
+	check(canvas._occupied_display_tiles.has("0,0")
+		and sample(canvas, Vector2(3.5, 4.5)).g > 0.7,
+		"new lazy source invalidates transparent cull and renders native pixels")
+	print("T086_SUBCHUNK_OVERHANG_METRICS %s" % overhang)
+	canvas.size = Vector2(212, 164)
+	canvas.camera = Vector2.ZERO
+	canvas.zoom = 1.0
+
 	# A dense viewport larger than the retained budget must not evict all
 	# currently visible entries every frame (the overflow is transient).
 	canvas._display_tiles.clear()

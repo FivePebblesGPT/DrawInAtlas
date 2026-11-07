@@ -505,6 +505,7 @@ func _draw() -> void:
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0, "empty_skipped": 0,
+		"transparent_tiles_culled": 0,
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
@@ -574,6 +575,21 @@ func _draw() -> void:
 					if not composite.ok:
 						continue
 				var image: Image = composite.value as Image
+				metrics["tiles_composited"] = int(metrics["tiles_composited"]) + 1
+				metrics["source_pixels_rendered"] = int(metrics["source_pixels_rendered"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE
+				# Sparse source chunks cover more than one display tile. A completed,
+				# fully transparent composite (including hidden RGB at alpha zero)
+				# needs no texture. Retire its conservative occupancy hint only when
+				# all committed sources were actually rendered without a preview;
+				# future edits republish their dirty footprint, while structure or
+				# lazy-source changes rebuild the index. Unknown occupancy remains
+				# conservative so that failed/oversized index builds never cull art.
+				if not _occupancy_unknown and preview_stamp == 0 \
+						and composite.code != "GLYPH_FALLBACK" and not image.get_used_rect().has_area():
+					_occupied_display_tiles.erase(key)
+					_display_tiles.erase(key)
+					metrics["transparent_tiles_culled"] = int(metrics["transparent_tiles_culled"]) + 1
+					continue
 				var start_texture: int = Time.get_ticks_usec()
 				var retain: bool = true
 				if entry.is_empty():
@@ -587,8 +603,6 @@ func _draw() -> void:
 					metrics["textures_updated"] = int(metrics["textures_updated"]) + 1
 				metrics["texture_cpu_us"] = int(metrics["texture_cpu_us"]) + Time.get_ticks_usec() - start_texture
 				metrics["bytes_uploaded"] = int(metrics["bytes_uploaded"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4
-				metrics["source_pixels_rendered"] = int(metrics["source_pixels_rendered"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE
-				metrics["tiles_composited"] = int(metrics["tiles_composited"]) + 1
 				entry["area"] = area
 				entry["preview_stamp"] = preview_stamp
 				entry["preview_owner"] = preview_owner

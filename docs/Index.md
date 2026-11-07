@@ -129,6 +129,20 @@ acceptance, or remote hosted-CI run**. Ticket status and manual gates remain
 unchanged. [T-094](Tickets/T-094.md) ·
 [physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-086 transparent subchunk display culling (2026-11-07; In Progress):**
+Source-chunk occupancy was correct but overly broad: one visible pixel plus
+hidden-RGB/zero-alpha content in a 256px source chunk triggered four 128px
+texture uploads on a cold software viewport. A successfully rendered empty
+RGBA8 composite now retires its display occupancy/texture before upload,
+while unknown occupancy, glyph fallback and detached previews stay
+conservative. Re-edit, Undo/Redo and lazy-source epoch updates restore content
+without losing canonical hidden RGB. The measured isolated software witness
+submits **262,144 → 65,536 texture bytes** (four → one textures), while still
+performing four initial CPU tile composites; this is **not** proof of a
+cold-frame latency speedup. The 140/140 native X11 checks and seven T-086
+headless suites pass. Physical Windows/Linux and owner gates remain unverified.
+[Ticket](Tickets/T-086.md) · [CI evidence policy](CI_TESTING.md).
+
 **T-086 fully erased sparse-tile cache pruning (2026-11-07; In Progress):**
 A source chunk's complete erasure used to leave monotonic display occupancy
 markers, causing blank 128px textures to be recomposited and uploaded again.

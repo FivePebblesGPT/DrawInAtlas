@@ -29,9 +29,8 @@ jobs:
           timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
             --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd \
             2>&1 | tee /tmp/t086-native.log
-          grep -q 'T086_NATIVE_PASSED' /tmp/t086-native.log
-          grep -Fxq 'T086_NATIVE: 111 checks; 0 failed' /tmp/t086-native.log
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T086_NATIVE_FAILED:' /tmp/t086-native.log; then exit 1; fi
+          grep -Fxq 'T086_NATIVE: 140 checks; 0 failed' /tmp/t086-native.log
+          python3 tools/check_godot_model_log.py /tmp/t086-native.log --marker T086_NATIVE_PASSED
       - name: Compare pre-cache and cached software frame timings
         run: |
           set -euo pipefail

@@ -323,6 +323,18 @@ changes with a 192-tile dense software viewport. Both suites must run after
 This does not cap transient GPU references for dense views, certify frame
 latency on real Windows/Linux hardware, or approve owner interaction.
 
+## T-086 transparent subchunk texture regression (2026-11-07)
+
+The on-demand `godot-native-t086-viewport.yml` now requires an exact
+**140-check** native test result and runs `check_godot_model_log.py` rather
+than broadly grepping for all `ERROR:` lines (which would misclassify
+recognized post-success Godot RID teardown diagnostics). The new real
+X11 framebuffer tests cover sparse 256px source / 128px display overhang,
+zero-alpha hidden RGB, edited/undone and lazy-loaded reoccupation, preview
+cancellation and unknown-occupancy fallback. A 640×460 llvmpipe software
+witness at 100% zoom uploads 65,536 instead of 262,144 RGBA8 texture bytes
+on first display; full cold-frame and physical GPU latency remain unverified.
+
 ## T-086 persistent source-space viewport cache
 
 Fast push/PR CI stages/imports the independent Drawing package and runs
