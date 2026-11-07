@@ -10,6 +10,18 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
+**T-094 POSIX native-signal crash log guard (2026-11-08; In Progress):**
+The required model-log checker previously accepted `*_PASSED` followed by
+`Bus error`, `Illegal instruction` or `Floating point exception`, including
+shell-wrapped PID/line-number variants. The new fail-closed guard rejects
+these after whitespace/ANSI normalization without rejecting benign
+crash-related prose or accepting anything beyond exact known post-exit
+Godot leak lines. Six original-checker negative controls demonstrate the
+false-green, while 37 Python log/replay contracts pass. Hosted CI, physical
+Windows/Linux testing and explicit owner gates remain open; T-094 stays
+**In Progress**. [T-094 evidence](Tickets/T-094.md) ·
+[CI policy](CI_TESTING.md).
+
 **T-065 complete portable source-count authorization (2026-11-08; In Progress):**
 At the 512-source limit the portable index previously returned a successful
 partial listing, hiding later unique assets or duplicate stable IDs. It now

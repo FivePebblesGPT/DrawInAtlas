@@ -90,6 +90,52 @@ class ModelLogTests(unittest.TestCase):
             with self.subTest(note=line):
                 self.assertEqual(verify_log(f"{MARKER}\n{line}\n", MARKER), ([], 0))
 
+    def test_native_signal_crashes_cannot_follow_a_pass_marker(self) -> None:
+        # Signal 4/7/8 crash messages are emitted by common POSIX shells and
+        # can follow an already printed Godot PASS marker. The old checker
+        # accepted all of these without reporting a problem.
+        failures = (
+            "Bus error (core dumped)",
+            "Illegal instruction (core dumped)",
+            "Floating point exception (core dumped)",
+            "bash: line 8: 12345 Bus error (core dumped) ./godot",
+            "dash: 31: Illegal instruction ./godot",
+            "sh: line 2: 7 Floating point exception ./godot",
+            "./ci/godot.sh: line 40: 48 Bus error ./godot",
+            "\x1b[1;31m  bash: line 9: 81 Illegal instruction (core dumped) ./godot\x1b[0m",
+        )
+        for fatal in failures:
+            with self.subTest(fatal=fatal):
+                self.assertTrue(verify_log(f"{MARKER}\n{fatal}\n", MARKER)[0])
+        # Do not interpret ordinary notes mentioning crash signatures as
+        # fatal diagnostics; exact known post-success leaks are unchanged.
+        for note in (
+            "A reporter describes Bus error (core dumped) in documentation.",
+            "Native crash notes: Illegal instruction on unsupported CPUs.",
+            "README: Floating point exception examples are disallowed.",
+        ):
+            with self.subTest(note=note):
+                self.assertEqual(verify_log(f"{MARKER}\n{note}\n", MARKER), ([], 0))
+        self.assertEqual(verify_log(f"{MARKER}\n{LEAK}\n", MARKER), ([], 1))
+
+    def test_native_signal_crash_rejected_by_real_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "signal.log"
+            for fatal in (
+                "Bus error (core dumped)",
+                "dash: 31: Illegal instruction ./godot",
+                "sh: line 2: 7 Floating point exception ./godot",
+            ):
+                with self.subTest(fatal=fatal):
+                    log.write_text(f"{MARKER}\n{fatal}\n", encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(ROOT / "tools/check_godot_model_log.py"),
+                         str(log), "--marker", MARKER],
+                        text=True, capture_output=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn("GODOT_MODEL_LOG_REJECTED", result.stdout)
+
     def test_post_success_oom_heap_and_uncaught_python_failures(self) -> None:
         # These production crash banners were previously ignored when they
         # followed a valid Godot model PASS marker. Keep the known RID-leak

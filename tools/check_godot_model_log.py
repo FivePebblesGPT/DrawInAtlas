@@ -22,8 +22,11 @@ MODEL_FAILURE = re.compile(r"\b[A-Z][A-Z0-9_]*FAILED:|\bFAILED:|\bDOCK MODEL FAI
 # color codes. Such decoration must not hide a runtime failure behind a valid
 # success marker. Only *literal*, unadorned post-exit leaks are allowlisted.
 ANSI_SGR = re.compile(r"\x1b\[[0-9;]*m")
+# Native failures may be reported as bare POSIX signal names or by a shell
+# after its line number and child PID. A PASS marker must never hide them.
+NATIVE_SIGNAL = r"(?:Segmentation fault|Bus error|Illegal instruction|Floating point exception)"
 PROCESS_FAILURE = re.compile(
-    r"(?:FATAL(?: ERROR)?:|CRASH:|Segmentation fault(?: \(core dumped\))?"
+    rf"(?:FATAL(?: ERROR)?:|CRASH:|{NATIVE_SIGNAL}(?: \(core dumped\))?"
     r"|Aborted(?: \(core dumped\))?|Killed(?:\s|$)|terminate called after throwing)",
     re.IGNORECASE,
 )
@@ -32,7 +35,7 @@ PROCESS_FAILURE = re.compile(
 SHELL_CRASH = re.compile(
     r"^(?:bash|sh|dash|zsh|[^\s:]+\.sh):\s*"
     r"(?:(?:line\s+)?\d+:\s*)?(?:\d+\s+)?"
-    r"(?:Segmentation fault|Aborted|Killed)(?:\s|$)",
+    rf"(?:{NATIVE_SIGNAL}|Aborted|Killed)(?:\s|$)",
     re.IGNORECASE,
 )
 # Godot's concise timestamped diagnostics (E <h>:<mm>:<ss>[:<ms>])
