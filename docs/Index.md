@@ -381,6 +381,17 @@ X11 workflow does **not** constitute hosted CI or Windows/Linux physical
 owner approval; T-083, T-056 and T-059 manual gates remain open.
 [Ticket](Tickets/T-081.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-091 client-boundary resize anchoring (2026-11-07; In Progress):**
+Dragging a floating host's left/top/right/bottom edge past the viewport
+previously moved its opposite fixed edge because whole-frame clamping was
+used for an edge resize. Each moving edge is now independently clamped at
+the client margin and the opposite edge remains anchored. Six new model
+boundary cases pass **54/54** total; four native real-pointer Xvfb/Mesa
+overdrags pass **44/44** total. The old code fails 6 model / 4 native anchor
+assertions. The required T-091 model CI and on-demand native witness retain
+strict pass requirements; physical Windows/Linux and T-083 owner gates stay
+**PENDING**. [T-091 evidence](Tickets/T-091.md).
+
 **T-091 repeated floating chrome and tall-host redock checkpoint (2026-11-07; In Progress):**
 Queued-for-deletion floating tab strips/frames are now immediately detached on
 redraw; synchronous multi-tab refreshes keep one header and active view, with

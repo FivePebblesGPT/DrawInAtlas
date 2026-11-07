@@ -472,15 +472,15 @@ physical Windows/Linux owner approval, or a hosted GitHub Actions result.
 
 ## T-091 single floating tab group and splitter-width recovery
 
-Fast push/PR CI executes `drawing/tests/dock_single_group_smoke.gd` (42
-headless assertions) and `tests/test_t091_dock.py` (3 contract/log-verifier
+Fast push/PR CI executes `drawing/tests/dock_single_group_smoke.gd` (54
+headless assertions) and `tests/test_t091_dock.py` (4 contract/log-verifier
 tests) in one fail-late step; the existing T-078–083 state-model smoke
 steps remain. The step bound is **47**. `.github/workflows/godot-native-t091-docking.yml`
 is on-demand and imports the staged standalone fonts/icons before running
-`drawing/tests/dock_single_group_native.gd` on Xvfb/Mesa. Its **36** native
+`drawing/tests/dock_single_group_native.gd` on Xvfb/Mesa. Its **44** native
 baseline assertions (+2 screenshot readbacks when enabled) cover a one-row header, eight edge/corner pointer resize paths,
 hide/recover, cold-relaunch width/host geometry, narrow-window clamps and
-1.5× content scaling; `T091_SCREENSHOTS` exports framebuffer PNGs. The
+1.5× content scaling, and four edge overdrags that must preserve the opposite anchor at the client boundary; `T091_SCREENSHOTS` exports framebuffer PNGs. The
 fail-closed `check_native_t091_log.py` retains known post-success Godot/Mesa
 leaks but fails on script/runtime/unknown teardown errors, missing markers or
 failed assertions. No physical Windows/Linux pointer/owner acceptance is
