@@ -259,7 +259,6 @@ func _build_interface() -> void:
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
 	tabs_line.name = "DocumentTabs"
-	root.add_child(tabs_line)
 	tab_bar = TabBar.new()
 	tab_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tab_bar.tab_changed.connect(_activate)
@@ -296,6 +295,14 @@ func _build_interface() -> void:
 		button.pressed.connect(_change_tool.bind(name))
 		tool_buttons[name] = button
 		rail.add_child(button)
+	# Document tabs consume only the editing viewport, not the full tool rail
+	# or the independent right-side panel dock.
+	var editor_column: VBoxContainer = VBoxContainer.new()
+	editor_column.name = "EditorContent"
+	editor_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	editor_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	edit_region.add_child(editor_column)
+	editor_column.add_child(tabs_line)
 	_refresh_tool_buttons()
 	canvas = CANVAS_SCRIPT.new() as Control
 	canvas.clip_strokes_to_image_frame = true
@@ -315,7 +322,7 @@ func _build_interface() -> void:
 	canvas.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseMotion:
 			_update_status())
-	edit_region.add_child(canvas)
+	editor_column.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
 	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
