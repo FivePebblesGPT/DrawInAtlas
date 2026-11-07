@@ -28,7 +28,7 @@ def verify(content: str) -> tuple[bool, list[str], int]:
     elif (summaries[0][0] >= markers[0][0]
           or summaries[0][1].group(1) != markers[0][1].group(1)
           or summaries[0][1].group(2) != "0"
-          or int(markers[0][1].group(1)) < 21):
+          or int(markers[0][1].group(1)) < 72):
         errors.append("summary and pass marker disagree, report failures, or omit checks")
     marker_line = markers[0][0] if markers else len(lines)
     shutdown_leaks = 0

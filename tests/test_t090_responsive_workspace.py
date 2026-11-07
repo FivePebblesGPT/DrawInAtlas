@@ -82,6 +82,15 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
             self.assertIn('license_file = icons / "LICENSE.at-icons.txt"', staged)
             self.assertIn('shutil.copy2(license_file', staged)
 
+    def test_compact_rail_and_centered_tool_glyphs(self) -> None:
+        self.assertIn('rail.custom_minimum_size.x = 42', self.workspace)
+        self.assertIn('button.custom_minimum_size = Vector2(34, 34)', self.workspace)
+        self.assertIn('button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER', self.workspace)
+        native = (ROOT / "drawing/tests/responsive_workspace_native.gd").read_text()
+        self.assertIn('func check_tool_glyph_centers', native)
+        self.assertIn('image.get_pixel(x, y)', native)
+        self.assertIn('await click_at(button.get_global_rect().get_center())', native)
+
     def test_native_witness_covers_pointer_framebuffer_and_scaling(self) -> None:
         source = (ROOT / "drawing/tests/responsive_workspace_native.gd").read_text()
         for term in ("T090_NATIVE_PASSED", "root.push_input", "get_texture().get_image()",
@@ -90,16 +99,16 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
             self.assertIn(term, source)
 
     def test_native_log_verifier_fails_closed(self) -> None:
-        good = "T090_NATIVE: 24 checks; 0 failed\nT090_NATIVE_PASSED: 24 checks\n"
+        good = "T090_NATIVE: 72 checks; 0 failed\nT090_NATIVE_PASSED: 72 checks\n"
         self.assertTrue(verify(good)[0])
         self.assertTrue(verify(good + "ERROR: Texture with GL ID of 24: leaked 1364 bytes.\n")[0])
         for bad in (
-            good.replace("24 checks", "23 checks", 1),
+            good.replace("72 checks", "71 checks"),
             good.replace("0 failed", "1 failed"),
             good + "SCRIPT ERROR: broken\n",
             "ERROR: runtime fail\n" + good,
             good + "ERROR: unknown fatal\n",
-            "T090_NATIVE_PASSED: 24 checks\n",
+            "T090_NATIVE_PASSED: 72 checks\n",
         ):
             with self.subTest(bad=bad[:40]):
                 self.assertFalse(verify(bad)[0])

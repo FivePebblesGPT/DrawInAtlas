@@ -256,6 +256,17 @@ workspace-keyboard regressions also pass. Atlas callers retain external chronolo
 findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
 [Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-090 compact tool rail and centered icons (2026-11-07; In Progress):**
+The 54px/44×42px tool rail had visible left-shifted SVGs despite the
+original licensed-icon pass. Shared workspace controls now use a 42px rail,
+34×34px targets and explicit icon centering; SVG bytes/license remain unchanged.
+A new native SVG-pixel centroid witness passes **72/72** without screenshots,
+**78/78** with six captures, including 100/150/200% scale and six real tool
+clicks. T-063/T-091/T-092/T-088 and shared Atlas regressions pass in Xvfb,
+not physical Linux/Windows. Owner findings #03/#06 and manual UX gates remain
+**PENDING**; this corrective review reopens T-090 as In Progress.
+[Evidence](Tickets/T-090.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-090 responsive chrome, menus, tabs and licensed icons (2026-11-06; engineering Done):**
 Standalone `canvas_items` now expands with aspect instead of fixed-size side
 pillars (tested 800×600/1280×760/1920×1080 and 150–200% UI scale on Xvfb/Mesa).
@@ -1253,7 +1264,7 @@ third-party native backend or hardware gate was satisfied. See
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
-| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | — | [T-063](Tickets/T-063.md) |
+| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | — | [T-082](Tickets/T-082.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Done | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |

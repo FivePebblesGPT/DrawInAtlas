@@ -272,15 +272,19 @@ func _build_interface() -> void:
 	dock_split.add_child(edit_region)
 	var rail: VBoxContainer = VBoxContainer.new()
 	rail.name = "ToolRail"
-	rail.custom_minimum_size.x = 54
+	# Keep the tool rail compact; the SVGs are 16px and do not need 44px-wide buttons.
+	rail.custom_minimum_size.x = 42
 	edit_region.add_child(rail)
 	for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
 		button.name = name + "Tool"
 		button.icon = load("res://addons/drawing/icons/%s.svg" % name.to_lower()) as Texture2D
 		button.tooltip_text = "Drawing tool: " + name
-		button.custom_minimum_size = Vector2(44, 42)
+		button.custom_minimum_size = Vector2(34, 34)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		# Button defaults to left icon alignment even with no label: the glyph
+		# otherwise sits several pixels left of the visual button center.
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.focus_mode = Control.FOCUS_ALL
 		button.toggle_mode = true
 		button.pressed.connect(_change_tool.bind(name))
