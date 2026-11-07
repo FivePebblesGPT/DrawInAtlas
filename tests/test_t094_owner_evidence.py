@@ -51,8 +51,11 @@ class OwnerPhysicalEvidenceTests(unittest.TestCase):
             "observed": "The first uncommitted brush pixels were visually present.",
             "artifacts": [{"path": artifact.name, "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()}],
             "zooms_percent": [25, 50, 100],
-            "timings_ms": {phase: [10, 12, 13, 15, 19] for phase in (
-                "down_to_preview_ms", "motion_to_preview_ms", "release_to_commit_ms")},
+            "timings_ms": {
+                str(zoom): {phase: [10, 12, 13, 15, 19] for phase in (
+                    "down_to_preview_ms", "motion_to_preview_ms", "release_to_commit_ms")}
+                for zoom in (25, 50, 100)
+            },
         })
         return manifest
 
@@ -98,11 +101,55 @@ class OwnerPhysicalEvidenceTests(unittest.TestCase):
                     candidate["environment"][path] = value
                     self.assertTrue(validate(candidate, root)[0])
             candidate = copy.deepcopy(valid)
-            candidate["results"][0]["timings_ms"]["down_to_preview_ms"] = [1, 2]
+            candidate["results"][0]["timings_ms"]["25"]["down_to_preview_ms"] = [1, 2]
             self.assertTrue(validate(candidate, root)[0])
             candidate = copy.deepcopy(valid)
             candidate["results"][0]["zooms_percent"] = [50, 100]
             self.assertTrue(validate(candidate, root)[0])
+
+    def test_timed_pass_requires_unpooled_samples_at_every_recorded_zoom(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            valid = self._observed_report(root)
+            self.assertEqual(validate(valid, root), ([], 1, 0))
+            for mutation in (
+                # This formerly returned a green report despite only 15 pooled samples.
+                lambda row: row.update(timings_ms={phase: [1, 2, 3, 4, 5] for phase in (
+                    "down_to_preview_ms", "motion_to_preview_ms", "release_to_commit_ms")}),
+                lambda row: row["timings_ms"].pop("25"),
+                lambda row: row["timings_ms"].update({"200": row["timings_ms"]["25"]}),
+                lambda row: row["timings_ms"]["50"].pop("motion_to_preview_ms"),
+                lambda row: row["timings_ms"]["100"]["release_to_commit_ms"].append(float("nan")),
+                lambda row: row["timings_ms"]["100"]["release_to_commit_ms"].append(10**1000),
+                lambda row: row["timings_ms"]["25"]["down_to_preview_ms"].append(True),
+                lambda row: row.update(zooms_percent=[25, 50, 50, 100]),
+                lambda row: row.update(zooms_percent=[25, 50, {"value": 100}]),
+                lambda row: row.update(zooms_percent="25,50,100"),
+            ):
+                with self.subTest(mutation=mutation):
+                    candidate = copy.deepcopy(valid)
+                    mutation(candidate["results"][0])
+                    problems, passed, failed = validate(candidate, root)
+                    self.assertTrue(problems)
+                    self.assertEqual((passed, failed), (1, 0), "Reported PASS is not accepted without a clean validator verdict")
+
+    def test_untested_rows_cannot_carry_stale_zoom_claims(self) -> None:
+        report = blank_manifest("Linux")
+        report["results"][0]["zooms_percent"] = [25, 50, 100]
+        problems, _, _ = validate(report, Path("/tmp"))
+        self.assertTrue(any("NOT RUN cannot contain" in p for p in problems))
+
+    def test_both_timed_findings_require_independent_zoom_timings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            report = self._observed_report(root)
+            first = report["results"][0]
+            fifteenth = report["results"][14]
+            fifteenth.update({key: copy.deepcopy(value) for key, value in first.items()
+                              if key not in ("finding", "tickets")})
+            self.assertEqual(validate(report, root), ([], 2, 0))
+            fifteenth["timings_ms"].pop("100")
+            self.assertTrue(any("#15:" in p for p in validate(report, root)[0]))
 
     def test_never_silently_drops_rows_or_changes_the_runbook_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -263,6 +263,19 @@ This JSON is **not signed**, cannot establish its own GitHub provenance, and
 never substitutes for the separately reviewed physical Windows/Linux owner
 manifest, user acceptance or `manual_review_approved` fields.
 
+## T-094 physical timing evidence granularity
+
+The owner-run physical manifest is a **self-reported format validator**, not
+hardware or reviewer attestation. For findings #01 and #15, a claimed `PASS`
+requires three per-phase millisecond sample arrays at **each** of 25%, 50%,
+and 100% zoom (at least 45 samples across the three zooms and phases). The
+older single pooled `timings_ms` object is no longer accepted as evidence for
+multiple zoom levels. The [physical owner runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+provides the JSON shape; untouched `NOT RUN` templates still validate.
+`tests/test_t094_owner_evidence.py` checks omitted zoom/phase data, malformed
+sample values, and leakage of stale claims into unrun rows. This is part of the
+existing fast documentation contract step, not an added physical CI test.
+
 ## T-094 strict Godot model-log classification and repeatable export
 
 A complete fast-workflow local replay of the pre-fix checkpoint

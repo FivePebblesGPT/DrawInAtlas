@@ -30,10 +30,31 @@ duplicate outcomes, requires a physical display/OS/device/Godot/commit/
 window/scale/refresh/timestamp for any `PASS` or `FAIL`, and SHA-256 checks
 every relative screenshot/log/video artifact against the exact bytes beside
 the JSON. A `NOT RUN` row cannot contain old observations or artifacts.
-Findings #01/#15 additionally need 25/50/100% zoom and five numeric samples
-in each of the down→preview, motion→preview and release→commit phases.
-Use timing arrays in **milliseconds**, and label the measurement method in
-`observed`; Godot frame callbacks still are not physical input-to-photon proof.
+Findings #01/#15 additionally need **separate timing samples at 25%, 50%
+and 100% zoom**—at least five samples **per zoom and phase**, not five pooled
+samples shared between zoom levels. In these two `PASS` rows, set
+`zooms_percent: [25, 50, 100]` and populate `timings_ms` as a map from zoom
+strings (`"25"`, `"50"`, `"100"`) to objects containing three arrays:
+`down_to_preview_ms`, `motion_to_preview_ms`, and `release_to_commit_ms`.
+Each array contains at least five finite nonnegative millisecond values.
+Additional recorded zooms need their own complete measurements; missing or
+unreported zoom keys, old pooled timing arrays, duplicate/malformed zooms,
+and stale zoom claims on a `NOT RUN` row are rejected. For example, the
+following is a **shape illustration only, not observed performance evidence**:
+
+```json
+{
+  "zooms_percent": [25, 50, 100],
+  "timings_ms": {
+    "25": {"down_to_preview_ms": [1, 2, 3, 4, 5], "motion_to_preview_ms": [1, 2, 3, 4, 5], "release_to_commit_ms": [1, 2, 3, 4, 5]},
+    "50": {"down_to_preview_ms": [1, 2, 3, 4, 5], "motion_to_preview_ms": [1, 2, 3, 4, 5], "release_to_commit_ms": [1, 2, 3, 4, 5]},
+    "100": {"down_to_preview_ms": [1, 2, 3, 4, 5], "motion_to_preview_ms": [1, 2, 3, 4, 5], "release_to_commit_ms": [1, 2, 3, 4, 5]}
+  }
+}
+```
+
+Record per-zoom **median/p95** and the timing method in `observed`; Godot
+frame callbacks still are not physical input-to-photon proof.
 The strict switch requires 23 physical `PASS` rows on *each* OS. A failed or
 incomplete run is retained as a real `FAIL`/`NOT RUN`, never silently excluded.
 When aggregating observed Linux/Windows results, the tool rejects **different

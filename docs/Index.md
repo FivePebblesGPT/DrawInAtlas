@@ -107,6 +107,18 @@ replays (five together, T-093 separately); these are **not a complete or hosted
 46-step CI pass**. T-094 and all owner manual gates remain open.
 [T-094 details](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
 
+**T-094 per-zoom physical timing evidence validation (2026-11-07; In Progress):**
+The owner-manifest verifier formerly accepted a physical `PASS` for #01/#15
+with 25/50/100 listed but only one pooled set of five samples per timing
+phase. It now requires **independent five-sample arrays per phase and per
+reported zoom** (at least 45 values for three zooms), rejects malformed,
+missing, extra or pooled zoom data and stale zoom claims on `NOT RUN` rows.
+The 12-test owner-schema suite and 94-ticket Kanban validator pass; **no
+physical run, patched hosted CI result or owner approval is inferred**.
+The [physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md) documents
+the JSON shape; T-094 remains In Progress.
+[T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from datetime import datetime
@@ -106,6 +107,43 @@ def _verify_artifacts(artifacts: Any, base: Path, finding: int) -> list[str]:
     return problems
 
 
+def _validate_zoom_timings(entry: dict[str, Any], finding: int) -> list[str]:
+    """Require independent timing samples for each physical zoom observation.
+
+    `zooms_percent` names the measured zooms; `timings_ms` maps their string
+    forms to three per-phase arrays. Pooled samples cannot establish latency
+    at the slowest zoom and must not validate as a physical PASS.
+    """
+    problems: list[str] = []
+    zooms = entry.get("zooms_percent")
+    if (not isinstance(zooms, list) or any(type(zoom) is not int or not 1 <= zoom <= 800
+                                            for zoom in zooms)
+            or len(set(zooms)) != len(zooms)
+            or not {25, 50, 100}.issubset(zooms)):
+        return [f"#{finding:02d}: PASS needs distinct integer 25/50/100% zoom observations"]
+
+    timings = entry.get("timings_ms")
+    expected_keys = {str(zoom) for zoom in zooms}
+    if not isinstance(timings, dict):
+        return [f"#{finding:02d}: timings_ms must contain separate objects for each zoom"]
+    if set(timings) != expected_keys:
+        problems.append(f"#{finding:02d}: timing zoom keys must match recorded zooms {sorted(expected_keys)}")
+    for key in sorted(expected_keys):
+        phases = timings.get(key)
+        if not isinstance(phases, dict):
+            problems.append(f"#{finding:02d}: zoom {key}% needs a timing object")
+            continue
+        if set(phases) != set(TIMING_PHASES):
+            problems.append(f"#{finding:02d}: zoom {key}% needs exactly {', '.join(TIMING_PHASES)}")
+        for phase in TIMING_PHASES:
+            samples = phases.get(phase)
+            if (not isinstance(samples, list) or len(samples) < 5
+                    or any(type(value) not in (int, float) or not 0 <= value <= 120_000
+                           or not math.isfinite(value) for value in samples)):
+                problems.append(f"#{finding:02d}: zoom {key}% {phase} needs five finite nonnegative samples in ms")
+    return problems
+
+
 def validate(manifest: Any, directory: Path) -> tuple[list[str], int, int]:
     """Validate evidence honesty/integrity, without equating it to owner signoff.
 
@@ -140,7 +178,8 @@ def validate(manifest: Any, directory: Path) -> tuple[list[str], int, int]:
         state = entry.get("status")
         if state == "NOT RUN":
             # Prevent attaching an old positive outcome to a NOT RUN row.
-            if entry.get("observed") or entry.get("artifacts") or entry.get("timings_ms"):
+            if (entry.get("observed") or entry.get("artifacts")
+                    or entry.get("timings_ms") or entry.get("zooms_percent")):
                 problems.append(f"#{number:02d}: NOT RUN cannot contain observed results")
             continue
         if state not in ("PASS", "FAIL"):
@@ -154,14 +193,7 @@ def validate(manifest: Any, directory: Path) -> tuple[list[str], int, int]:
             problems.append(f"#{number:02d}: record a substantive observed result")
         problems.extend(_verify_artifacts(entry.get("artifacts"), directory, number))
         if number in TIMED_FINDINGS and state == "PASS":
-            if not {25, 50, 100}.issubset(set(entry.get("zooms_percent", []))):
-                problems.append(f"#{number:02d}: PASS needs 25/50/100% zoom observations")
-            timings = entry.get("timings_ms")
-            for phase in TIMING_PHASES:
-                samples = timings.get(phase) if isinstance(timings, dict) else None
-                if (not isinstance(samples, list) or len(samples) < 5
-                        or any(type(v) not in (int, float) or not 0 <= v <= 120_000 for v in samples)):
-                    problems.append(f"#{number:02d}: {phase} requires five finite nonnegative samples")
+            problems.extend(_validate_zoom_timings(entry, number))
     missing = set(expected) - found
     if missing:
         problems.append(f"Missing findings: {sorted(missing)}")
