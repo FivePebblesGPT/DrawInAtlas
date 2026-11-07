@@ -44,7 +44,7 @@ var clip_strokes_to_image_frame: bool = false
 var _stroke_clip: Rect2i = Rect2i()
 var show_grid: bool = false
 ## Pixel boundaries appear automatically when individual pixels become large.
-var show_pixel_grid: bool = true
+var show_pixel_grid: bool = false
 var snap_to_grid: bool = false
 var grid_spacing: int = 8
 var grid_origin: Vector2i = Vector2i.ZERO
@@ -526,6 +526,19 @@ func _draw_pixel_grid_overlay() -> void:
 			Vector2(visible.end.x, screen_y), line_color, 1.0)
 
 
+## Raster tiles are separate textures. Compute *both* corners from the same
+## source-space boundary and snap them to integer viewport pixels. Rounding the
+## position but scaling a width independently can leave a 1px gap (or overlap)
+## at 786% / fractional camera positions; a gap exposes the checkerboard and
+## cannot be removed by painting or selecting document pixels.
+func _raster_screen_rect(area: Rect2i) -> Rect2:
+	var begin: Vector2 = pixel_to_position(Vector2(area.position))
+	var end: Vector2 = pixel_to_position(Vector2(area.end))
+	var first: Vector2 = Vector2(roundf(begin.x), roundf(begin.y))
+	var last: Vector2 = Vector2(roundf(end.x), roundf(end.y))
+	return Rect2(first, last - first)
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -643,7 +656,7 @@ func _draw() -> void:
 			entry["last_used"] = _cache_access
 			_frame_references.append(entry["texture"] as ImageTexture)
 			draw_texture_rect(entry["texture"] as ImageTexture,
-				Rect2(pixel_to_position(Vector2(area.position)), Vector2(area.size) * zoom), false)
+				_raster_screen_rect(area), false)
 	if not visible_plan.is_empty():
 		metrics["source_chunks_shared"] = (visible_plan["source_chunks"] as Dictionary).size()
 	metrics["cache_tiles"] = _display_tiles.size()
