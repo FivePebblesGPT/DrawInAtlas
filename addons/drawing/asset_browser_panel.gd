@@ -7,6 +7,8 @@ signal place_requested(source: Dictionary)
 signal refresh_requested
 signal query_changed(query: String)
 signal page_requested(offset: int)
+signal choose_root_requested
+signal recent_root_requested
 
 const INDEX_SCRIPT: Script = preload("res://addons/drawing/asset_browser_index.gd")
 const THUMBNAILS_SCRIPT: Script = preload("res://addons/drawing/asset_browser_thumbnails.gd")
@@ -19,6 +21,11 @@ var assets: DrawingAssetBrowserDragList
 var atlas_host_mode: bool = false
 var place_button: Button
 var message: Label
+var root_display: Label
+var choose_root_button: Button
+var recent_root_button: Button
+var copy_root_button: Button
+var recent_root: String = ""
 var open_button: Button
 var import_dialog: FileDialog
 var export_dialog: FileDialog
@@ -37,8 +44,36 @@ func _ready() -> void:
 	index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
 	thumbnails = THUMBNAILS_SCRIPT.new() as DrawingAssetBrowserThumbnails
 	var heading: Label = Label.new()
-	heading.text = "Object Assets"
+	heading.text = "Object sources — browse and edit"
 	add_child(heading)
+	root_display = Label.new()
+	root_display.name = "ObjectsRoot"
+	root_display.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	root_display.tooltip_text = "This folder is a read-only listing until you explicitly import or edit a source."
+	add_child(root_display)
+	var root_actions: HFlowContainer = HFlowContainer.new()
+	root_actions.name = "ObjectRootActions"
+	add_child(root_actions)
+	choose_root_button = Button.new()
+	choose_root_button.name = "ChooseObjectsRoot"
+	choose_root_button.text = "Choose Objects/ folder…"
+	choose_root_button.tooltip_text = "Select an existing portable project Objects/ directory. No Atlas project is inferred."
+	choose_root_button.pressed.connect(func() -> void: choose_root_requested.emit())
+	root_actions.add_child(choose_root_button)
+	copy_root_button = Button.new()
+	copy_root_button.name = "CopyObjectsRoot"
+	copy_root_button.text = "Copy root path"
+	copy_root_button.tooltip_text = "Copy the exact active Objects/ folder path to clipboard"
+	copy_root_button.pressed.connect(func() -> void:
+		if index != null and not index.root_path.is_empty():
+			DisplayServer.clipboard_set(index.root_path))
+	root_actions.add_child(copy_root_button)
+	recent_root_button = Button.new()
+	recent_root_button.name = "UseRecentObjectsRoot"
+	recent_root_button.text = "Use last folder"
+	recent_root_button.tooltip_text = "Explicitly reopen your last chosen Objects/ folder; never automatic."
+	recent_root_button.pressed.connect(func() -> void: recent_root_requested.emit())
+	root_actions.add_child(recent_root_button)
 	search = LineEdit.new()
 	search.name = "AssetSearch"
 	search.placeholder_text = "Search name or source ID…"
@@ -89,14 +124,14 @@ func _ready() -> void:
 	actions.add_child(refresh)
 	open_button = Button.new()
 	open_button.name = "OpenAsset"
-	open_button.text = "Edit Source"
+	open_button.text = "Open in Object Editor"
 	open_button.tooltip_text = "Open the selected published source in an Object Editor tab"
 	open_button.pressed.connect(open_selected)
 	actions.add_child(open_button)
 	place_button = Button.new()
 	place_button.name = "PlaceAsset"
 	place_button.text = "Place at view center"
-	place_button.tooltip_text = "Place the selected published Object in the current Atlas map"
+	place_button.tooltip_text = "Atlas only: place a linked instance, not edit the source file"
 	place_button.pressed.connect(_request_place)
 	place_button.visible = atlas_host_mode
 	actions.add_child(place_button)
@@ -133,6 +168,12 @@ func _ready() -> void:
 	_refresh_view()
 
 
+func set_recent_root(path: String) -> void:
+	recent_root = path
+	if is_node_ready():
+		_refresh_view()
+
+
 func set_objects_root(path: String) -> DrawingResult:
 	if index == null:
 		index = INDEX_SCRIPT.new() as DrawingAssetBrowserIndex
@@ -144,7 +185,7 @@ func set_objects_root(path: String) -> DrawingResult:
 	if is_node_ready():
 		_refresh_view()
 		if not result.ok:
-			message.text = result.message
+			message.text = "Cannot use Objects/ root: " + result.message + ". Choose an existing, non-symlink Objects/ folder."
 	return result
 
 
@@ -211,7 +252,14 @@ func _refresh_view() -> void:
 		assets.select(selection)
 	_update_open_button()
 	_queue_thumbnails()
-	message.text = "%d sources; %d warnings" % [index.entries.size(), index.warnings.size()]
+	message.text = "%d saved sources (Atlas placement not checked; no bindings changed)." % index.entries.size()
+	if index.entries.is_empty():
+		message.text = "No sources found. Import a portable source, create one with File → Object › New source, or choose another Objects/ folder."
+	elif _visible_entries.is_empty():
+		message.text = "No sources match this search. Clear the query or refresh the Objects/ folder."
+	if not index.warnings.is_empty():
+		message.text += " Skipped %d invalid/duplicate sources: %s. Refresh after fixing the folder." % [
+			index.warnings.size(), index.warnings[0]]
 	if atlas_host_mode:
 		message.text = "%d matching sources · %d shown; %d warnings" % [
 			_matched_count, index.entries.size(), index.warnings.size()]
@@ -221,8 +269,19 @@ func _refresh_view() -> void:
 		previous_page.disabled = _page_number <= 0
 	if next_page != null:
 		next_page.disabled = _page_number + 1 >= _page_count
+	if root_display != null:
+		root_display.text = "Root: " + (index.root_path.get_base_dir().get_file() + "/Objects" \
+			if not index.root_path.is_empty() else "Not selected")
+		root_display.tooltip_text = index.root_path if not index.root_path.is_empty() else 			"No folder selected; browsing is disabled until you choose an Objects/ root."
+	if copy_root_button != null:
+		copy_root_button.disabled = index.root_path.is_empty()
+	if recent_root_button != null:
+		recent_root_button.visible = not atlas_host_mode and not recent_root.is_empty()
+		recent_root_button.tooltip_text = "Use last explicitly chosen root: " + recent_root
 	if index.root_path.is_empty():
-		message.text = "Choose a portable Objects/ folder from Window → Asset Browser…"
+		message.text = "No Objects/ folder selected. Choose an existing project's Objects/ directory. Open Drawing handles ordinary files; this browser edits saved sources, not Atlas placements or missing/NULL links."
+	elif atlas_host_mode and index.entries.is_empty():
+		message.text = "No registered sources on this page. Unreferenced saved sources may still be listed; use Atlas source management for missing/NULL links."
 
 
 func selected_asset_id() -> String:
@@ -250,12 +309,12 @@ func open_selected() -> void:
 	# Revalidate the exact source identity before opening a stale listing.
 	var entry: Dictionary = _visible_entries[selected[0]]
 	if not index.safe_to_open(entry):
-		message.text = "Source moved or changed; refresh the Asset Browser before opening"
+		message.text = "Source missing or changed. Refresh the Objects/ folder; no file or Atlas link was changed."
 		return
 	var fresh: DrawingResult = DrawingObjectEditorFile.open(entry["path"])
 	if not fresh.ok or String(fresh.value["source_id"]) != String(entry.get("embedded_id", entry["id"])) or \
 			int(fresh.value["source_revision"]) != int(entry.get("embedded_revision", entry["revision"])):
-		message.text = "Source changed; refresh the Asset Browser before opening"
+		message.text = "Source is missing, altered or unreferenced from this listing. Refresh the folder and select the exact ID again; no Atlas link was changed."
 		return
 	open_requested.emit(String(entry["path"]))
 

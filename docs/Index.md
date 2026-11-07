@@ -1,6 +1,6 @@
 # Ticket Kanban Index
 
-**As of 2026-11-05 · owner usability review against `aidev`**. This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+**As of 2026-11-07 · merged owner review and ongoing validation checkpoints.** This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
@@ -10,7 +10,420 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
-**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085/T-086 remain Ready for GDScript-first fixes; T-068 native research remains conditional.
+**T-094 CI/acceptance baseline in progress (2026-11-06):** Remote baseline
+`main` CI is red; a strict-FP/FMA-native mask reproducer is fixed in the
+T-068 stress **test build**, stale T-064 documentation status assertions are
+removed, and an [actionable 23-finding Linux/Windows owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+now preserves #22 save/open success and #23 expected monotonic revisions.
+Local strict native tests, Drawing clean staging/roundtrip/Linux export,
+Atlas composition, and Xvfb/Mesa software pointer checks pass. Remote CI
+against this patch, owner hardware UX and pending corrective ticket findings
+are **not yet passed**; T-094 stays In Progress. [Checkpoint](Tickets/T-094.md).
+
+**T-094 fail-closed CI summary/evidence capture checkpoint (2026-11-06; In Progress):**
+The fast-CI reporter now compares all expected check IDs from the committed
+workflow against the GitHub step outcomes, so missing/skipped steps cannot
+look green. A local physical-evidence manifest tool tracks 23 dated finding
+results independently for Linux/Windows with SHA-256 artifact validation and
+strict coverage mode; its generated rows begin **NOT RUN**, never auto-pass.
+Reporter and manifest contracts run inside existing fail-late CI steps.
+Remote patched CI, actual hardware/pointer evidence and explicit owner review
+remain unverified. [T-094](Tickets/T-094.md) ·
+[owner runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-094 cross-build evidence consistency (2026-11-06; In Progress):**
+Physical owner manifests now reject Linux/Windows results collected from
+different commits or Godot engine builds; `--expected-commit` pins the candidate
+under review. Local root Atlas editor reimport clears the stale SVG-loader
+errors seen in an otherwise 89/89-pass composition smoke, but post-shutdown
+Godot RID leaks and missing remote CI/hardware evidence remain reported. This
+does not grant physical or owner signoff.
+[T-094](Tickets/T-094.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-094 local fast-CI replay checkpoint (2026-11-06; In Progress):**
+A new [offline runner](../tools/replay_godot_ci.py) replays the 46 checked-in
+fast-CI Bash checks in order, preserving failure/timeout logs and SHA-256
+hashes. It rejects uncommitted source for commit-specific reports, and marks
+partial check selections **incomplete**, never green. Eight new regression
+tests run within the existing CI documentation step. Four selected development
+checks passed locally, but this does **not** replace patched GitHub Actions,
+Windows/Linux physical acceptance or owner approvals.
+[T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
+**T-094 hosted-CI artifact export (2026-11-06; In Progress):**
+The hosted fast-CI workflow now uploads a sanitized JSON snapshot of all
+46 check outcomes (including failures), exact candidate commit, runner/Godot
+build and workflow digest. The artifact follows the fail-late summary and
+requires independent verification against its actual GitHub run/attempt;
+the export does not turn the previous local replay into hosted CI evidence.
+Nine new contracts check missing/extra/failed checks, hash/order drift and
+secret-output omission. Physical owner acceptance is still outstanding.
+[T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
+
+**T-094 local full-replay diagnostics (2026-11-06; In Progress):**
+The new fast-CI runner found **35/46 passing** in the first complete local
+rehearsal. Eleven model/export steps had successful assertions but were marked
+failed by named Godot 4.8-beta2 post-exit resource-leak `ERROR:` diagnostics.
+A shared strict, success-marker-aware log validator now rejects any runtime
+fault while separately counting only known shutdown diagnostics. The Linux
+release gate is likewise fail-closed and its stage uses a unique temporary
+directory. All 11 affected steps have passed targeted reruns; **patched
+remote CI and physical Linux/Windows owner signoff remain NOT RUN**.
+[T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
+
+**T-094 completed local fast-CI replay (2026-11-06; In Progress):**
+Committed checkpoint `c18e69b` completed **46/46** required Linux local
+fast-workflow steps with Godot 4.8-beta2; the raw logs retain 56 recognized
+post-exit resource-leak diagnostics across 13 steps. A separate replay
+artifact auditor now checks the committed scripts, complete step order,
+result metadata, summary and per-log SHA-256 against tampering; its regression
+suite is part of the existing fast CI contract group. **This is not a hosted
+GitHub Actions green run**, physical Windows/Linux review or owner approval.
+[T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
+
+**T-094 dock-review metadata CI regression (2026-11-07; In Progress):**
+The T-078–T-083 docking-plan documentation test incorrectly treated a literal
+`manual_review_approved: true` *example in ticket prose* as an actual owner
+approval. The test now inspects only canonical ticket YAML frontmatter through
+the same parser used by the 94-ticket dependency validator, rejects missing
+review evidence or approval on non-manual tickets, and allows explanatory
+text without changing the gate. The 10/10 docking documentation contracts
+and 13 T-094 local-replay contracts pass; the 60-test fast documentation
+step passed in a **selected local replay**, correctly reported as **1/46
+incomplete**. Five neighboring Godot dock-model suites pass after standalone
+import with strict log validation. This does not verify GitHub-hosted CI,
+Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
+In Progress. [Ticket](Tickets/T-094.md).
+
+**T-094 strict Drawing model-log consistency (2026-11-07; In Progress):**
+Six T-085–T-093 fast-CI Drawing model steps still used success-substring greps
+and inconsistent error handling, allowing unknown `ERROR:` output to be missed
+in some steps and classifying recognized Godot shutdown RID leaks as failures
+in others. All eight Godot-backed Drawing model steps now use the shared
+fail-closed model-log verifier; T-089's counted `T089_MODEL_PASSED: 62 checks`
+format is recognized only with a positive integer count. Focused strict-log
+and replay contracts pass, and six affected model steps pass in partial local
+replays (five together, T-093 separately); these are **not a complete or hosted
+46-step CI pass**. T-094 and all owner manual gates remain open.
+[T-094 details](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
+**T-094 per-zoom physical timing evidence validation (2026-11-07; In Progress):**
+The owner-manifest verifier formerly accepted a physical `PASS` for #01/#15
+with 25/50/100 listed but only one pooled set of five samples per timing
+phase. It now requires **independent five-sample arrays per phase and per
+reported zoom** (at least 45 values for three zooms), rejects malformed,
+missing, extra or pooled zoom data and stale zoom claims on `NOT RUN` rows.
+The 12-test owner-schema suite and 94-ticket Kanban validator pass; **no
+physical run, patched hosted CI result or owner approval is inferred**.
+The [physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md) documents
+the JSON shape; T-094 remains In Progress.
+[T-094](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
+**T-094 per-zoom review statistics (2026-11-07; In Progress):**
+A new optional `drawing_owner_evidence.py verify --timing-summary` emits
+R-7-interpolated p50/p95 and sample counts by 25/50/100% zoom and timing phase
+for individually validated #01/#15 physical `PASS` reports. It never prints
+statistics for unrun/failed/invalid or mixed-build evidence. New negative CLI
+and percentile contracts pass; **this is not a hardware measurement, owner
+acceptance, or remote hosted-CI run**. Ticket status and manual gates remain
+unchanged. [T-094](Tickets/T-094.md) ·
+[physical review runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-086 transparent subchunk display culling (2026-11-07; In Progress):**
+Source-chunk occupancy was correct but overly broad: one visible pixel plus
+hidden-RGB/zero-alpha content in a 256px source chunk triggered four 128px
+texture uploads on a cold software viewport. A successfully rendered empty
+RGBA8 composite now retires its display occupancy/texture before upload,
+while unknown occupancy, glyph fallback and detached previews stay
+conservative. Re-edit, Undo/Redo and lazy-source epoch updates restore content
+without losing canonical hidden RGB. The measured isolated software witness
+submits **262,144 → 65,536 texture bytes** (four → one textures), while still
+performing four initial CPU tile composites; this is **not** proof of a
+cold-frame latency speedup. The 140/140 native X11 checks and seven T-086
+headless suites pass. Physical Windows/Linux and owner gates remain unverified.
+[Ticket](Tickets/T-086.md) · [CI evidence policy](CI_TESTING.md).
+
+**T-086 fully erased sparse-tile cache pruning (2026-11-07; In Progress):**
+A source chunk's complete erasure used to leave monotonic display occupancy
+markers, causing blank 128px textures to be recomposited and uploaded again.
+T-086 now probes only up to 256 touched display tiles on selective published
+edits and removes the occupancy and texture entry if no visible raster/lazy
+source or text bounds can cover it. Active detached previews and uncertain
+coverage remain conservative. A native Xvfb/Mesa reproduction changed from
+one **65,536-byte transparent texture upload** to **zero**, with Undo/Redo,
+offscreen pan, preview cancellation and layer-overlap framebuffer checks.
+The clean-stage native witness passes **111/111**, seven T-086 model suites
+**2,420/2,420** and shared Atlas smoke **346/346**. This does **not** close
+large dense cold-zoom, physical Linux/Windows latency or owner gates;
+T-086 stays In Progress. [Ticket](Tickets/T-086.md).
+
+**T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
+An immediate stationary dab and layer-correct detached Brush/Eraser preview
+now render **before release**. Ordered, timestamped source-float mouse samples
+are drained in bounded chunks; brush sessions use touched-pixel rollback rather
+than copying three growing dictionaries every event. The new 40/40 headless
+model witness and 55/55 Xvfb/Mesa native held-button framebuffer witness pass,
+including 100/50/25% zoom, cancellation, crossing strokes and one-step Undo.
+Software first-frame samples still reach **119.841 ms at 25%** (one trial per
+zoom); the display-tile work remains T-086, and owner Windows/Linux hardware
+and physical input-to-photon evidence are **not claimed**. [Checkpoint](Tickets/T-085.md).
+
+**T-085 bounded long-stroke backlog checkpoint (2026-11-07; In Progress):**
+Consecutive source-space stroke waypoints now stage in limited batches with a
+soft 6 ms per-drain CPU budget and footprint-sensitive wide-brush cap, instead
+of allowing a 12-segment/frame limit to defer release for 70 frames. The
+expanded **61/61** headless queue/oracle/cancellation tests and **118/118**
+native Xvfb/Mesa pointer/framebuffer checks pass. Paired three-trial
+840-motion software strokes measure release-to-commit p50 reductions of
+389→43 ms at 100%, 955→68 ms at 50% and 928→70 ms at 25%; exact RGBA8,
+all delivered points and single-step Undo are verified. Three trials and
+software rendering do **not** satisfy real Linux/Windows hardware or
+physical input-to-photon/owner UX gates; T-085 remains In Progress.
+[Details and limitations](Tickets/T-085.md).
+
+**T-086 incremental viewport cache checkpoint (2026-11-06; In Progress):**
+Persistent 128px source-space display tiles now reuse textures across
+pan/zoom and update only dirty raster/preview footprints (including Undo/Redo),
+with a 144-texture retained cache limit and sparse occupancy culling. A
+192-tile conservative over-budget view now keeps 144 retained tiles warm and
+uses 48 transient draw-command references rather than thrashing every tile.
+The 27/27 headless journal/stamp and 68/68 Xvfb native RGBA8/alpha/text/seam
+witnesses pass. In a reproducible 12-trial llvmpipe benchmark, warmed 25%
+one-pixel-edit frames improve **253.09ms → 22.96ms median**, and idle frames
+**262.93ms → 1.50ms median**; the **initial 50% zoom transition is slower**
+(144.22ms → 165.52ms, one sample). No real Linux/Windows physical latency or
+large dense reference-window acceptance is claimed. [Ticket and evidence](Tickets/T-086.md).
+
+**T-086 cold-source compositor optimization (2026-11-06; In Progress):**
+A bounded per-storage-row tile/preview lookup (maximum 256 references) and
+opaque-RGBA8 overwrite fast path reduce repeated cold raster composition
+while retaining byte-for-byte alpha parity. New 25/25 headless model checks
+and the existing native framebuffer witness pass. Two isolated, checksum-
+matched nine-sample paired runs improve the 256x256 two-layer opaque CPU
+median from 95.95→54.58ms and 88.39→59.79ms; fractional alpha also
+improves, and an all-transparent case is essentially unchanged. This is
+**headless CPU-only**, not evidence that full cold zoom or real GPU/Windows
+latency acceptance is complete; T-086 remains In Progress.
+[Ticket/measurement](Tickets/T-086.md).
+
+**T-086 direct indexed source-pixel CPU improvement (2026-11-06; In Progress):**
+The canonical raster compositor now reads resolved sparse tile maps by linear
+indices without per-pixel checked GDScript accessors; detached preview patches
+remain separate and alpha/layer semantics unchanged. A new four-dense-layer
+signed-seam oracle raises the T-086 cold model to **45/45** checks; the existing
+68/68 native framebuffer witness passes after a clean standalone import.
+Against the SHA-256-pinned immediate predecessor, two nine-sample headless
+paired runs show opaque CPU medians 54.94→25.86ms and 57.19→26.89ms, with
+exact output hashes. This does **not** close cold GPU zoom, dense reference
+hardware or physical input-latency gates. [T-086](Tickets/T-086.md).
+
+**T-086 frame-local visible-layer preparation (2026-11-06; In Progress):**
+A cold display draw now walks the ordered visible layer tree once on its
+first cache miss, not once per display tile; cache-hit redraws do not walk it.
+Source revision/epoch checks reject stale preparations, and the new 82/82
+headless oracle plus 69/69 native Xvfb/Mesa framebuffer checks pass. The
+nine-sample repeated small CPU tile workload measures 7.56→6.58ms median,
+**not** a full cold zoom or physical input-to-photon result. Large dense
+hardware acceptance remains open. [T-086](Tickets/T-086.md).
+
+**T-086 bounded sparse-layer culling (2026-11-06; In Progress):**
+Planned cold renders now skip raster layers with no overlapping resident or
+lazy source chunks after at most 16 signed membership probes. An active
+detached preview, text, wide/unknown regions and corrupt lazy data use the
+conservative resolver. New 74-check headless parity/epoch/cancellation tests
+pass; 24-layer sparse CPU medians improve 1.361→0.308 ms for a 16×16 source
+region. This does **not** close dense cold zoom or hardware latency acceptance.
+[T-086](Tickets/T-086.md).
+
+**T-086 frame-local preview-stamp index (2026-11-06; In Progress):**
+During a held gesture, one bounded viewport-clipped index now maps changed
+storage-tile generations to 128px display tiles, avoiding a repeated scan of
+the full changed-key set for each zoomed-out tile. The implementation keeps
+an exact fallback when its 40,000-entry cap is exceeded and retains cleared
+patch generations for ghost-free previews. New headless parity/fallback tests
+pass 2,146/2,146; the native framebuffer test passes 75/75. A synthetic
+768-display/240-changed-tile lookup-stage median improved 55.725→0.873ms;
+this is **not** complete frame, hardware or cold-zoom evidence. T-086 stays
+In Progress; physical acceptance remains open.
+[T-086](Tickets/T-086.md).
+
+**T-086 shared cold-frame source-chunk references (2026-11-06; In Progress):**
+Neighboring 128px display-tile renders now reuse up to 256 read-only,
+revision/source-epoch-pinned canonical storage chunk references per cold
+frame; no RGBA8 is duplicated and detached preview changes remain separate.
+A 31/31 headless parity/invalid-source/cap witness reduced source resolves
+8→2 across four adjacent display tiles; the native Xvfb framebuffer suite
+passes 76/76 after clean standalone import. This does **not** prove large
+dense cold-zoom or physical Windows/Linux latency, and T-086 remains
+In Progress. [Ticket](Tickets/T-086.md).
+
+**T-086 dense viewport center/pointer-focused retention (2026-11-06; In Progress):**
+When a dense viewport exceeds the 144-texture retained cap, newly visited tiles
+now replace the farthest visible cached tile only when nearer the active
+in-canvas pointer (or viewport center); stable focus and offscreen LRU remain
+bounded. New headless 15/15 and Xvfb/Mesa native 80/80 checks pass; a warmed
+192-tile software view still renders 48 transient edges each redraw.
+**This is not a dense-zoom throughput or physical hardware acceptance pass.**
+[T-086](Tickets/T-086.md).
+
+**T-088 persistent selected-pixel Move correction (2026-11-07; In Progress):**
+Mouse release now retains an uncommitted detached floating mask/pixel preview.
+Repeated drags accumulate signed offsets from the original source; explicit
+Enter/Menu Drop or outside click commits **one** history step, while Escape,
+Ctrl+Z, revision/layer change and direct host cancellation restore source.
+Changing tools/selection mode or choosing clipboard/save resolves the floating
+piece first. New **131/131** headless signed-mask/hidden-RGB/Undo checks,
+**51/51** native Xvfb/Mesa pointer/framebuffer checks and six fail-closed
+log contracts pass. The software zoom probe is 17.159ms p50/19.827ms p95
+(n=4), **not** physical input-to-photon evidence. Owner PhotoCraft UX and
+Linux/Windows hardware remain unaccepted; T-088 is reopened In Progress, with
+T-056/T-059 manual gates untouched. Neighboring native T-085/T-086/T-090,
+standalone, and shared Atlas smokes pass; unrelated T-089 native layer-pointer
+fails nine assertions identically on clean remote `116afa12` in this Xvfb
+setup and is not counted green. [Ticket](Tickets/T-088.md).
+
+**T-080 clipped bottom dock drop regression (2026-11-07; Done, engineering only):**
+The pre-T-082 native witness incorrectly treated a canvas release as invalid,
+although canvas detach is now deliberate. It now checks genuinely invalid
+outside-window drops. A separate real hit-test correction makes the last dock
+**group insertion slot reachable** at the visible bottom once a tall dock is
+fully scrolled, rather than silently merging into its last group. The native
+Xvfb/Mesa pointer/keyboard test passes **70/70** (71/71 with screenshot),
+model **60/60**; an on-demand native workflow and strict log-contract tests
+capture evidence. T-081's then-failing **1/54** baseline canvas-width check was isolated
+and later corrected in the T-081 checkpoint below; it is not counted as a
+T-080 pass. This
+neither closes T-083 nor supplies physical owner review. [T-080](Tickets/T-080.md).
+
+**T-081 floating overlay canvas-width regression (2026-11-07; Done, engineering only):**
+After compact Colors, a native T-081 witness reproduced a **2px canvas-width
+jump** when floating that group: the right dock's intrinsic minimum changed
+184→182px as the group left the split. A stable 192px expanded dock floor now
+prevents that unrequested resizing (minimized rail remains 48px). The native
+pointer/keyboard/geometry suite passes **58/58** (59/59 with one framebuffer
+PNG), the headless ownership model **64/64**, and five fail-closed evidence
+contracts pass. T-079/T-080/T-082/T-083/T-090/T-091/T-092 neighboring native
+suites and the four shared Atlas smoke suites pass; the native run retains
+only classified post-exit Godot/Mesa resource diagnostics. The new on-demand
+X11 workflow does **not** constitute hosted CI or Windows/Linux physical
+owner approval; T-083, T-056 and T-059 manual gates remain open.
+[Ticket](Tickets/T-081.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-091 repeated floating chrome and tall-host redock checkpoint (2026-11-07; In Progress):**
+Queued-for-deletion floating tab strips/frames are now immediately detached on
+redraw; synchronous multi-tab refreshes keep one header and active view, with
+real panel identity preserved. Normal grip dragging retains host movement over
+the canvas but previews a transactional group redock over the right dock even
+when a tall host overlaps it; Escape and invalid drops cancel unchanged.
+The new Xvfb/Mesa 1280×800 native regression passes **53/53** (or **55/55**
+with two screenshots); original T-091/T-081/T-082/T-083 native suites pass.
+T-080's independent native invalid-drop witness also fails on the untouched
+remote baseline and is **not** counted green. Windows/Linux physical pointer,
+DPI and owner approval remain pending, with no T-083 manual gate waived.
+[T-091 evidence and limitations](Tickets/T-091.md).
+
+**T-087 finite-frame Brush/Eraser and checker correction (2026-11-07; In Progress):**
+PR #13's reported outside-frame painting and panning checker-phase defects
+are corrected in the standalone canvas without cropping signed sparse data or
+limiting Atlas hosts. Brush/Eraser begins only inside the image; the entire
+swept footprint is clipped in detached staging and remains one Undo entry.
+Existing off-frame pixels, hidden RGB and `.drawing` Save/Open survive.
+The repeated checker uses viewport-origin UV phase so top/left/right/bottom
+image edges do not shift its 16px screen cells. New T-087 model **57/57**
+and Xvfb/Mesa native **64/64** checks pass; neighboring T-085/T-086/T-088
+and shared Atlas checks pass after a clean import. T-059 physical owner UX
+finding #02 and #16 remain **PENDING**; the earlier engineering-Done status
+is reopened for corrective review, without approving manual gates.
+[Ticket](Tickets/T-087.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-087 visible standalone image bounds and independent grid (2026-11-06; historical engineering Done):**
+An optional validated `.drawing` image frame records origin/size without
+clipping canonical signed sparse pixels, Object Assets or Atlas document space.
+Ordinary New/Open fits a visible edge and screen-space 16px checkerboard;
+View controls toggle grid independently of snap and configure signed origin
+and spacing. Clean-import model 47/47, native Xvfb/Mesa 36/36 (including
+real pointer snap and 25/50/100/200% zoom) pass. Physical Windows/Linux
+owner UX for findings 02/16 remains **PENDING**, separately gated by T-059.
+[Ticket](Tickets/T-087.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-089 layer/group corrective engineering (2026-11-06; Done):**
+Tree row selection is independent from the paint target; groups are
+selectable without painting, and +Layer/+Group insert relative to that row.
+Clickable row eye/lock controls, keyboard reorder/indent/outdent, guarded
+structural history and stable save/reopen identities are implemented in the
+canonical shared package. **62/62** headless model checks and **32/32**
+X11/Xvfb/Mesa software pointer/framebuffer checks pass (1120×800/880×550,
+400% zoom). The 200-row paging/filter path remains bounded; Xvfb
+compact-workspace (420px, 150% scale), Object Editor UI (25/25), and
+workspace-keyboard regressions also pass. Atlas callers retain external chronology. Physical Windows/Linux owner acceptance for
+findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
+[Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-089 native dock-scroll witness repair (2026-11-07; engineering Done):**
+The original nine native eye/lock/group assertion failures on the unchanged
+remote baseline were caused by attempting clicks on the Layers Tree below the
+visible dock, not by evidence of broken structural editing. A real synthetic
+wheel press/release sequence now scrolls the dock before clicking, with an
+explicit unchanged-document check. Imported Xvfb/Mesa **36/36** native and
+**62/62** headless model checks pass, with strict fail-closed log validation;
+neighboring T-090/T-091/T-092 and Atlas smoke checks pass. The T-089 workflow
+and parser reject the stale 32-check marker. No production code changed and
+owner findings #19/#20 still await physical Linux/Windows validation under
+T-059; software green does not grant owner acceptance.
+[Details](Tickets/T-089.md).
+
+**T-092 separate FG/BG editing and compact Colors layout (2026-11-07; In Progress):**
+The Colors chips now select *independent* foreground/background edit targets:
+clicking BG no longer silently swaps brush pigment, and Previous BG restores
+background instead of changing foreground. A short active-role label, explicit
+Swap/Default, RGB**A** channels (including transparent hidden RGB), hex and
+advanced/recent inputs route to the selected pigment, without touching
+artwork, revision or Atlas semantics. Pinned PhotoCraft source supports the
+two-target grammar, but actual PhotoCraft screenshot parity is **unverified**.
+New **55/55** model and **47/47** Xvfb/Mesa native checks with four framebuffer
+captures pass; T-063/T-090/T-091/T-088 and 346 Atlas smoke assertions pass.
+Physical Linux/Windows and owner finding #11 remain **PENDING**; T-092 is
+reopened In Progress. [Evidence](Tickets/T-092.md) ·
+[owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-090 compact tool rail and centered icons (2026-11-07; In Progress):**
+The 54px/44×42px tool rail had visible left-shifted SVGs despite the
+original licensed-icon pass. Shared workspace controls now use a 42px rail,
+34×34px targets and explicit icon centering; SVG bytes/license remain unchanged.
+A new native SVG-pixel centroid witness passes **72/72** without screenshots,
+**78/78** with six captures, including 100/150/200% scale and six real tool
+clicks. T-063/T-091/T-092/T-088 and shared Atlas regressions pass in Xvfb,
+not physical Linux/Windows. Owner findings #03/#06 and manual UX gates remain
+**PENDING**; this corrective review reopens T-090 as In Progress.
+[Evidence](Tickets/T-090.md) · [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-090 responsive chrome, menus, tabs and licensed icons (2026-11-06; engineering Done):**
+Standalone `canvas_items` now expands with aspect instead of fixed-size side
+pillars (tested 800×600/1280×760/1920×1080 and 150–200% UI scale on Xvfb/Mesa).
+Object file actions and Close tab live in File, Window owns workspace settings,
+per-tab × clicks retain nonactive-tab dirty close prompts, Ctrl+N still creates
+new documents, and Brush px hover wheel/`[`/`]` update the brush width while
+Shift+wheel scrolls crowded settings. The six tool SVGs are sourced byte-identically
+from the bundled MIT at-icons/control family, with attribution included in both
+standalone/consumer packages. A **24-check** native framebuffer/pointer run
+(**29** with optional screenshots), seven focused Python contracts, the 75-check
+T-063 compact native regression and eight keyboard checks pass locally.
+Hardware Windows/Linux owner findings **#03/#04/#06/#08/#09 remain PENDING**;
+no manual review was approved. [Ticket](Tickets/T-090.md) ·
+[owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-093 discoverable standalone Object sources (2026-11-06; engineering Done):**
+File now distinguishes Drawing open, portable Object source open/new, and bitmap
+import; the Asset Browser has a visible exact `Objects/` root, choose-folder
+button, empty/invalid/duplicate source explanations, and opt-in recent root.
+The versioned recent-folder preference is app-only and **never automatically
+binds or scans** an Atlas project at launch. A 56-check headless model plus
+27 native Xvfb/Mesa pointer/framebuffer checks pass locally; old T-065
+portable and Atlas source tests remain separate. T-065 manual review and
+owner finding #21 remain **PENDING**, and no NULL-placement policy is changed.
+[Ticket](Tickets/T-093.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
+**T-084 PhotoCraft source investigation completed (2026-11-06):** [report](PHOTOCRAFT_RENDERING_RESEARCH.md) pins the CPU detached live-preview document, 64x64 brush coverage, 256x256 GPU resident tiles, dirty rendering, motion batching and preview-adopt-on-commit. No runtime benchmarking was conducted in this research; do **not** conflate source architecture with proven hardware latency. T-085 is now In Progress with GDScript live-draft witnesses; T-086 is In Progress with source-space cache software witnesses; T-068 native research remains conditional.
 
 ## Kanban summary
 
@@ -131,7 +544,7 @@ output buffers. Source-pinned GCC/Clang `-O0/-O2/-O3` builds matched all
 **576/576 Godot oracle masks** across two passes per profile and rejected
 **42/42 invalid ABI calls** without output modification. Both unsafe
 compiler configurations failed at build time. Fresh Godot GDExtension runs
-preserve **55/55 scope** and **153/153 publication** checks per run, twice.
+preserve **62/62 scope** and **153/153 publication** checks per run, twice.
 This is **not** Windows/hardware performance or production backend approval;
 T-068 remains In Progress.
 [Ticket](Tickets/T-068.md) ·
@@ -141,9 +554,9 @@ T-068 remains In Progress.
 The detached scope kernel now follows the pinned Godot 4.8b2 float32
 `Vector2` / segment-intersection **approximate boundary** behavior instead of
 strict double-precision ray crossings. The **48 seeded 32² transformed
-selection cases now match all 48/48 Godot masks**, twice, with **zero missed
+selection cases now match all 53/53 Godot masks**, twice, with **zero missed
 or extra pixels**; the original 15/15 exact-edge 64² fixture still matches.
-Two real isolated GDExtension runs confirm **55/55 native mask checks** and
+Two real isolated GDExtension runs confirm **62/62 native mask checks** and
 **153/153 selection-to-`DrawingDocument` publication checks per run**,
 including source-byte validation and Undo/Redo. The previous **16 cases / 247
 omissions** are preserved in the
@@ -268,7 +681,7 @@ claim is made. [T-068](Tickets/T-068.md) ·
 A detached C++17 hard-brush kernel now emits only changed canonical RGBA8
 pixels as ordered, checked 12-byte before/after records plus a 4-byte count,
 using the existing isolated bridge wire format. Across two independent passes
-all **56/56 small/large Godot-oracle-derived comparisons** reconstruct exact
+all **62/62 small/large Godot-oracle-derived comparisons** reconstruct exact
 final RGBA8; no-op paint emits four bytes. A 2048² 4px stroke produces 5,524
 wire bytes versus 16 MiB full-tile output, **not a measured marshaling or GPU
 speedup**. Bounded capacity and malformed/aliased buffers fail atomically.
@@ -279,7 +692,7 @@ The prototype is not linked into Godot, and hardware/release gates remain open.
 **T-068 scalar native hard-brush canonical RGBA8 checkpoint (2026-11-04; In Progress):**
 The detached C++17 hard-brush comparator now returns both the full 0/255
 gesture coverage bitmap and detached **straight-RGBA8 pixels**. Two passes
-over 28 pinned Godot geometry cases show **56/56 exact coverage and RGBA8
+over 28 pinned Godot geometry cases show **62/62 exact coverage and RGBA8
 comparisons**, including source-over, erasure, transparent hidden RGB,
 selection masks, crossing and 512/1024/2048-scale strokes. The 16 small cases
 match **actual Godot output hashes**; the 12 large Godot oracles supply
@@ -293,7 +706,7 @@ hardware-performance or release acceptance is claimed. [T-068](Tickets/T-068.md)
 A detached scalar C++17 pixel-center / swept-segment comparator now returns
 exact binary once-per-gesture coverage with checked input buffers and local
 selection masks. Compared against the real Godot 4.8b2 brush oracles, two
-independent runs produce **56/56 identical masks** across sixteen 32²
+independent runs produce **62/62 identical masks** across sixteen 32²
 brush/selection/transform cases and twelve 512²/1024²/2048² workloads.
 This closes the *tested scalar geometry screen*, not the application path:
 canonical small-case RGBA8 is independently reconstructed, while large cases
@@ -612,7 +1025,7 @@ parent-owned, version-checked registry publications, share the existing
 child-local Undo/Redo with structure/transforms/visibility, and preserve
 unrelated metadata. The **54/54** headless witness covers failed/stale edits,
 no-ops, duplicates, history, saved registry reload, portable Objects-component
-copy and live inspector controls. Its **55/55** targeted native Xvfb/Mesa
+copy and live inspector controls. Its **62/62** targeted native Xvfb/Mesa
 witness captures a 420px inspector. The ticket remains **In Progress**:
 nested single-source Save As/export graph-copy policy and owner physical UX
 validation remain pending. See [T-064](Tickets/T-064.md).
@@ -976,16 +1389,16 @@ third-party native backend or hardware gate was satisfied. See
 | [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | In Progress | **Owner** | [T-082](Tickets/T-082.md) |
 
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
-| [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Ready | — | [T-053](Tickets/T-053.md) |
-| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | Ready | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Ready | — | [T-053](Tickets/T-053.md) |
-| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Ready | — | [T-063](Tickets/T-063.md) |
-| [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | Ready | — | [T-082](Tickets/T-082.md) |
-| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Ready | — | [T-063](Tickets/T-063.md) |
-| [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
-| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | Ready | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
+| [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | In Progress | — | [T-053](Tickets/T-053.md) |
+| [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
+| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | In Progress | — | [T-063](Tickets/T-063.md) |
+| [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | — | [T-082](Tickets/T-082.md) |
+| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
+| [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
 
 ## Epics
 

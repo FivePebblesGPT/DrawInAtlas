@@ -3,6 +3,7 @@ extends RefCounted
 ## Standalone-only .drawing file. Atlas campaign publication is owned by T-066.
 ## Inline canonical RGBA8 blobs preserve hidden RGB and enable portable single files.
 
+const IMAGE_FRAME: Script = preload("res://addons/drawing/image_frame.gd")
 const SCHEMA: String = "drawing-standalone-v1"
 const MAX_FILE_BYTES: int = 134217728
 const MAX_BLOBS: int = 4096
@@ -81,6 +82,12 @@ static func encode(document: DrawingDocument) -> DrawingResult:
 static func decode(payload: Dictionary) -> DrawingResult:
 	if payload.get("standalone_schema") != SCHEMA or payload.get("blob_encoding") != "base64-rgba8":
 		return DrawingResult.failure("SCHEMA", "Unsupported standalone Drawing file")
+	# Optional extent affects only standalone presentation. Reject corruption
+	# before accepting any associated canonical pixel data.
+	if payload.has("image_frame"):
+		var checked_frame: DrawingResult = IMAGE_FRAME.decode(payload["image_frame"])
+		if not checked_frame.ok:
+			return checked_frame
 	var manifest_value: Variant = payload.get("document")
 	var blob_value: Variant = payload.get("blobs")
 	if not manifest_value is Dictionary or not blob_value is Dictionary or blob_value.size() > MAX_BLOBS:
@@ -224,10 +231,16 @@ static func save(document: DrawingDocument, path: String,
 	if not encoded.ok:
 		return encoded
 	if not extra.is_empty():
-		if extra.size() != 1 or not extra.has("object_source") or \
-				not extra["object_source"] is Dictionary:
-			return DrawingResult.failure("METADATA", "Unrecognized standalone document metadata")
-		(encoded.value as Dictionary)["object_source"] = (extra["object_source"] as Dictionary).duplicate(true)
+		for key: Variant in extra:
+			if key == "object_source" and extra[key] is Dictionary:
+				(encoded.value as Dictionary)["object_source"] = (extra[key] as Dictionary).duplicate(true)
+			elif key == "image_frame":
+				var checked: DrawingResult = IMAGE_FRAME.decode(extra[key])
+				if not checked.ok:
+					return checked
+				(encoded.value as Dictionary)["image_frame"] = IMAGE_FRAME.encode(checked.value as Rect2i)
+			else:
+				return DrawingResult.failure("METADATA", "Unrecognized standalone document metadata")
 	var text_data: String = JSON.stringify(encoded.value)
 	if text_data.to_utf8_buffer().size() > MAX_FILE_BYTES:
 		return DrawingResult.failure("FILE_LIMIT", "Drawing file exceeds standalone limit")
@@ -275,7 +288,26 @@ static func read_payload(path: String) -> DrawingResult:
 	return DrawingResult.success(json.data)
 
 
+static func open_with_frame(path: String) -> DrawingResult:
+	var payload: DrawingResult = read_payload(path)
+	if not payload.ok:
+		return payload
+	var opened: DrawingResult = decode(payload.value)
+	if not opened.ok:
+		return opened
+	var document: DrawingDocument = opened.value as DrawingDocument
+	var bounds: Rect2i = IMAGE_FRAME.infer_legacy(document)
+	if (payload.value as Dictionary).has("image_frame"):
+		var decoded: DrawingResult = IMAGE_FRAME.decode(payload.value["image_frame"])
+		if not decoded.ok:
+			return decoded
+		bounds = decoded.value as Rect2i
+	return DrawingResult.success({"document": document, "image_frame": bounds}, document.revision)
+
+
 static func open(path: String) -> DrawingResult:
+	# Keep generic and Object Asset consumers on the original document-only
+	# path: legacy frame inference belongs to the standalone workspace UI.
 	var payload: DrawingResult = read_payload(path)
 	if not payload.ok:
 		return payload

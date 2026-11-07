@@ -6,6 +6,486 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-094 optional physical timing summary — 2026-11-07
+
+The existing T-073/T-094 Python documentation CI step tests
+`drawing_owner_evidence.py verify --timing-summary` with synthetic five-sample,
+outlier, `FAIL`, `NOT RUN`, malformed timing and mixed-commit cases. This
+optional reviewer command reports **only validated** per-zoom p50/p95 using
+R-7 linear interpolation; it does not sample a physical monitor, enforce
+latency thresholds, add a CI step ID or approve the owner UX gate. Raw
+artifacts and physical review remain required.
+
+## T-086 shared frame source-chunk parity — 2026-11-06
+
+After staging and **importing** the standalone Drawing package:
+
+```sh
+godot --headless --path drawing --script res://tests/renderer_shared_chunks_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd
+```
+
+The 31-check model proves byte-exact adjacent display-tile parity, 8→2
+source-chunk resolution calls on a two-layer/four-tile example, a hard
+256-reference frame-plan cap, live detached preview updates and proper
+stale-epoch/corrupt-lazy-source rejection. The native witness passes 76
+framebuffer assertions and records `source_chunks_shared`. The existing
+`ci_t086_viewport_cache_model` step runs the model and validates its success
+marker; no required CI check ID was added. These are **local headless and
+software-GL** tests, not a large dense first-zoom frame timing or physical
+GPU acceptance. T-086 stays In Progress.
+
+## T-086 detached preview index parity — 2026-11-06
+
+After staging **and importing** the standalone Drawing package, run:
+
+```sh
+godot --headless --path drawing --script res://tests/viewport_preview_index_smoke.gd
+xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+  --audio-driver Dummy --path drawing --script res://tests/viewport_cache_native.gd
+```
+
+The 2,146-check model compares frame-local preview generations with the
+legacy per-display-area lookup across signed seams, different storage strides,
+cancellation, 64-bit overflow fallback and the capped index. The native
+75-check witness verifies actual Xvfb/Mesa held-button pixels and that
+cancellation removes the preview. New per-frame metrics distinguish one
+index build/number of keys from a bounded fallback. Five diagnostic paired
+lookup timings are printed; do not set CI timing thresholds or construe this
+as full viewport or physical input-to-photon latency. The existing
+`ci_t086_viewport_cache_model` step runs this after sparse-layer parity;
+required 46 CI check IDs are unchanged. T-086 remains In Progress.
+
+## T-086 cold compositor regression and opt-in measurement — 2026-11-06
+
+The existing `ci_t086_viewport_cache_model` fail-late step also runs
+`drawing/tests/renderer_cold_tile_smoke.gd` (45 exact model assertions),
+so the **46 required check IDs do not change**. Its success marker is
+validated with `tools/check_godot_model_log.py`, which rejects script or
+runtime defects and reports only the known post-success Godot exit leaks.
+
+For reproducible cold **CPU** composition medians/p95 and pixel SHA-256 parity
+against the pinned pre-optimization source, run
+`python3 tools/benchmarks/t086_compare_cold_composite.py --godot godot`.
+The same script runs in the manual-on-demand
+`godot-native-t086-viewport.yml` workflow alongside the native viewport
+framebuffer witness and the older pre-cache full-frame benchmark. It builds
+isolated standalone projects and verifies the archived baseline's hash; it
+never asserts physical display latency, GPU memory bounds or hardware owner
+acceptance. T-086's remaining cold zoom/large dense hardware gates stay open.
+
+The follow-up direct sparse-map read optimization also has a separately
+SHA-256-pinned immediate-predecessor fixture. Compare this narrower CPU change
+without conflating it with the earlier storage-row cache and opaque fast path:
+
+```sh
+python3 tools/benchmarks/t086_compare_cold_composite.py --godot godot \
+  --baseline pre-indexed-read
+```
+
+The fast T-086 step now checks both fixture digests and fails before launching
+Godot if either pinned source is corrupted. The manual-only T-086 workflow
+runs both CPU comparisons and retains separate before/after logs. The new
+four-dense-layer model tests confirm exact source-over/preview parity, but CPU
+medians do not imply full cold-zoom frame speed or GPU scan-out performance.
+
+## T-086 frame-local visible-layer preparation — 2026-11-06
+
+The **same** `ci_t086_viewport_cache_model` check runs
+`drawing/tests/renderer_visible_plan_smoke.gd` after the cold compositor
+oracle. The test validates byte-exact render equivalence for sixteen source
+rectangles, unchanged ordered layer traversal (one per prepared frame rather
+than one per display tile), detached preview, document revision/visibility
+and lazy-source epoch rejection, and invalid plan diagnostics. The paired
+nine-sample CPU-only timing is diagnostic and does **not** enforce a latency
+threshold. The native T-086 framebuffer witness also checks that cache-hit
+redraws prepare **zero** plans and a dirty redraw prepares **one**.
+
+Preparation remains frame-local, never serialized or reused after a source
+revision/epoch change. This is not a physical-GPU performance witness and does
+not close T-086's large dense zoom/hardware gates. The required 46-check fast
+CI inventory is unchanged.
+
+## T-086 bounded sparse-layer compositor witness — 2026-11-06
+
+The existing `ci_t086_viewport_cache_model` step runs
+`drawing/tests/renderer_sparse_layer_smoke.gd` with the strict success-marker
+log checker. It verifies that only potentially occupied committed/lazy
+raster layers are resolved for a planned cold display tile, while active
+previews, source errors and invalid/oversized footprints conservatively keep
+the original path. Direct renderer callers are unchanged. The check runs
+**inside the existing 46-check inventory**, with a nine-pair *diagnostic*
+headless CPU timing printout but **no flaky timing assertion**. The native
+viewport suite remains separately runnable under Xvfb and requires a clean
+Godot editor import after standalone staging. This does not imply hardware
+input or cold zoom acceptance.
+
+## T-094 unified Drawing model-log policy — 2026-11-07
+
+The fast-CI Godot-backed T-085/T-086/T-087/T-088/T-089/T-091/T-092/T-093
+steps all run `tools/check_godot_model_log.py` with a single exact success
+marker, and treat verifier failure as `ci_fail_marker` (without short-circuiting
+subsequent fail-late checks). T-090 is a Python-only contract step. The
+T-089 test's canonical `T089_MODEL_PASSED: 62 checks` counts as one success
+marker; the verifier accepts only a positive integer in that counted syntax.
+Duplicate markers, arbitrary success substrings, unexpected `ERROR:` lines,
+script/parse/compile/model errors and incorrect counted-marker text are fatal.
+Only **named, post-success** Godot 4.8-beta2 RID/texture leak diagnostics are
+retained with a separate count; they are not evidence of clean teardown.
+
+The required CI check-ID inventory remains **46**. The existing required
+T-073 documentation test step executes additional strict workflow and
+synthetic shell regressions in `tests/test_t094_godot_model_log.py`; no extra
+hosted job, LFS asset or manual gate was added. Exploratory selected local
+replays cannot attest to a complete GitHub Actions run or physical UX.
+
+## T-094 strict-native and owner evidence checkpoint — 2026-11-06
+
+The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)
+remains **red**: a detached GCC/Clang strict quad-stress mask and stale T-064
+status assumptions in T-073 are reproducible issues, not legitimate owner UX
+failures. The stress harness now explicitly compiles with
+`-ffp-contract=off` and tests a real `-O3 -mfma` profile on capable Linux
+hosts: contraction changed convex validation outcomes in a local reproducer.
+It retains 96-case exact parity per profile, source pins and atomic rejection
+assertions; detailed case/return diagnostics help triage a future regression.
+T-073/T-074 verify **ticket obligations**, not frozen Kanban stages.
+
+The [23-finding native acceptance runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+is guarded by `tests/test_t094_owner_matrix.py` inside the existing fail-late
+T-073 documentation job. It records real pointer/framebuffer/hardware and
+owner evidence **separately** from fast deterministic checks. The local
+standalone `.drawing` regression, Linux export/isolated run, and Xvfb
+software-pointer sanity checks are not substitute approval for T-056,
+T-059, T-065 or T-083. T-094 remains In Progress until remote CI and
+future Linux/Windows owner-witness rows are evidenced; don't change
+review flags merely because this patch's local tests pass.
+
+## T-094 fail-closed check accounting and physical evidence capture
+
+The fast CI terminal summary now derives **all expected `ci_` step IDs** from
+its checked-in `.github/workflows/godot-check.yml`; an absent, skipped,
+malformed or unexpected check fails the final job rather than being omitted
+from a misleading “all passed” count. Duplicate IDs are rejected. This does
+not remove `continue-on-error` or stop later jobs from collecting their logs.
+Regression contracts: `tests/test_godot_ci_fail_late.py`.
+
+Owner-run native evidence is documented in the
+[23-finding matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md). The offline
+`tools/drawing_owner_evidence.py` creates per-OS **NOT RUN** manifests and
+verifies hashed artifacts and metadata. Combined Linux/Windows reports must
+refer to **one exact source commit and Godot build**, with optional
+`--expected-commit $(git rev-parse HEAD)` pinning; mixed revisions cannot
+produce a complete acceptance record. Its tests run in the existing T-073
+fail-late CI step (`tests/test_t094_owner_evidence.py`), not an extra fast CI
+step. A structurally valid JSON manifest cannot approve the four owner-gated
+tickets, validate a physical pointer or substitute for remote CI success.
+
+## T-094 local fast-CI replay (diagnostic, not remote CI)
+
+`tools/replay_godot_ci.py` can execute the **46 check steps** from the checked-in
+`.github/workflows/godot-check.yml` on a developer Linux environment with the
+**exact** `4.8.beta2.official.*` Godot binary. This is a faithful Bash-command
+rehearsal, not a new CI suite. It does not install Godot, checkout code, run
+GitHub's service container, or produce Windows/physical owner evidence. Run it
+from the repository with `godot` on `PATH`:
+
+```sh
+python3 tools/replay_godot_ci.py --output /tmp/drawing-ci-replay --expected-commit "$(git rev-parse HEAD)"
+# To isolate checks during development (intentionally returns nonzero/incomplete):
+python3 tools/replay_godot_ci.py --output /tmp/drawing-ci-subset \
+  --check ci_t085_live_stroke_preview --check ci_t086_viewport_cache_model
+```
+
+A new output directory is required. Each extracted Bash script runs under
+`-eo pipefail` in its own process group; a per-step watchdog (default 1800 s)
+terminates an entire timed-out process group. Later checks still run after
+failures. The output directory contains `scripts/`, `logs/`, `report.json`,
+and `summary.md`; each executed step records its exit code, runtime, and
+SHA-256 script/log digest. A selected subset always lists other checks as
+**missing** and **never passes the complete-CI gate**. Unrecognized workflow
+shells, expressions, conditions or actions fail closed instead of silently
+replaying a different command.
+
+To avoid falsely attributing an uncommitted test to a Git revision, the normal
+runner rejects dirty worktrees and `--expected-commit` requires clean source.
+`--allow-dirty` is an explicitly **exploratory** mode: its report has no
+`candidate_commit` attestation and cannot become remote-CI/owner evidence.
+The regression contracts run in the existing T-073 fast CI step:
+`tests/test_t094_ci_replay.py`. **T-094 remains In Progress** until patched
+GitHub CI itself is green and real Linux/Windows owner evidence is reviewed.
+
+## T-094 complete replay evidence audit
+
+The completed local replay of clean commit `c18e69b` passed **46/46** checked-in
+fast workflow steps under `4.8.beta2.official.cafc17a19`. It took 295.2 s of
+step runtimes and retained **56 recognized Godot 4.8 beta2 exit-leak lines in
+13 logs**. This still requires remote GitHub Actions verification, and the
+leak lines must not be described as a clean teardown. The SHA-256 of that
+run's `report.json` was
+`a99f7a2c4ce42d0593574d1e5351438a4092adb1d299987f4b08f4ca8e99930d`.
+
+Audit a copied, retained replay directory before citing the local result:
+
+```sh
+python3 tools/verify_godot_ci_replay.py /tmp/drawing-ci-replay \
+  --expected-commit "$(git rev-parse HEAD)"
+```
+
+The auditor verifies **all** 46 expected checks, script bytes against the
+workflow, per-script/per-log digests, outcome and exit codes, log-path safety,
+step order and the regenerated summary. A missing result, failed test,
+changed workflow, altered script/log, symlink or incomplete replay is rejected.
+A matching digest can detect accidental/tampered local bytes; it **does not**
+independently attest who ran them. The `--expected-commit` must refer to the
+candidate used for that replay (use its full SHA for historical runs). The
+contract regressions in `tests/test_t094_ci_replay.py` also exercise tampering.
+
+## T-094 hosted fast-CI outcome artifact (not owner/hardware approval)
+
+The fast workflow has **46 check IDs** plus two final non-check steps that run
+`always()` after its required fail-late summary. The first exports a small,
+sanitized `ci-evidence/godot-fast-ci.json`; the second uploads it with
+`actions/upload-artifact@v4` (30-day retention), including when a test step
+fails. Only step **outcomes**, not `toJSON(steps)` outputs, logs, expressions,
+or arbitrary CI metadata, enter the uploaded JSON. If Godot setup fails after checkout but before `godot` is available,
+the artifact is marked incomplete, never green. If checkout itself fails, no
+repository exporter is available; the GitHub run status remains authoritative.
+
+The artifact records the checkout SHA (in pull-request workflows, often a
+**synthetic merge SHA**), GitHub run/attempt IDs, OS, Godot 4.8-beta2 version,
+workflow hash and all expected IDs. Download from that particular GitHub
+Actions run; verify its run/attempt provenance independently, then check:
+
+```sh
+python3 tools/export_godot_ci_evidence.py --verify ./godot-fast-ci.json \
+  --expected-commit <exact-checked-out-40-char-sha> \
+  --expected-run-id <github-actions-run-id>
+```
+
+This fails closed on missing/skipped/failed checks with a forged green verdict,
+wrong engine/workflow/revision, altered order and invalid result counts.
+A valid **red** report can still be inspected (it must not claim success).
+The `tests/test_t094_hosted_ci_evidence.py` contracts execute within the
+existing T-073 fast step, keeping the push CI check set fixed at 46.
+This JSON is **not signed**, cannot establish its own GitHub provenance, and
+never substitutes for the separately reviewed physical Windows/Linux owner
+manifest, user acceptance or `manual_review_approved` fields.
+
+## T-094 physical timing evidence granularity
+
+The owner-run physical manifest is a **self-reported format validator**, not
+hardware or reviewer attestation. For findings #01 and #15, a claimed `PASS`
+requires three per-phase millisecond sample arrays at **each** of 25%, 50%,
+and 100% zoom (at least 45 samples across the three zooms and phases). The
+older single pooled `timings_ms` object is no longer accepted as evidence for
+multiple zoom levels. The [physical owner runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+provides the JSON shape; untouched `NOT RUN` templates still validate.
+`tests/test_t094_owner_evidence.py` checks omitted zoom/phase data, malformed
+sample values, and leakage of stale claims into unrun rows. This is part of the
+existing fast documentation contract step, not an added physical CI test.
+
+## T-094 strict Godot model-log classification and repeatable export
+
+A complete fast-workflow local replay of the pre-fix checkpoint
+`71ab793` executed **46/46** checks and correctly reported **35 pass / 11
+fail**. All 11 failed after their model **success markers** because Godot
+4.8-beta2 headless teardown emitted named `RID allocations ... were leaked
+at exit` errors. Every retained failed-step log was inspected; no additional
+pre-success script, parse, assertion, or runtime errors were found. This
+explains the *local* red result, **not** the previously red upstream run or
+its still-unverified status on patched code.
+
+`tools/check_godot_model_log.py --marker TXXX_MODEL_PASSED /tmp/godot-xxx.log`
+replaces broad post-test `grep '^ERROR:'` handling only in affected fast
+smokes. It requires exactly one marker, rejects all parse/script/model
+failures and unknown runtime errors, and reports only **known,
+post-success** Godot RID/GL teardown leaks explicitly while preserving the
+raw logs. Tests in `tests/test_t094_godot_model_log.py` exercise both
+acceptance and fail-closed cases. The isolated Linux release gate performs
+its own similarly strict exit-code/startup/runtime validation and publishes
+the recognized post-exit leak count; it never treats those logs as clean.
+The CI release step now stages in a fresh `mktemp` directory and cleans it
+on exit, making repeated local replay safe from stale `/tmp/drawing-dist`
+collisions. Each previously failing step passed its **targeted** replay,
+but those partial runs do not certify all 46 checks or physical owner UX.
+
+## T-086 over-budget cache-focus witness (2026-11-06)
+
+The same fast `ci_t086_viewport_cache_model` workflow step now additionally runs
+`drawing/tests/viewport_cache_focus_smoke.gd`, validating bounded center/pointer
+retention and stable replacement with **15/15** headless assertions; the number
+of required fast steps remains **46**. The on-demand X11/Xvfb
+`viewport_cache_native.gd` suite now passes **80/80**, covering pointer focus
+changes with a 192-tile dense software viewport. Both suites must run after
+`build_drawing_app.py --in-place` and a standalone Godot editor import.
+This does not cap transient GPU references for dense views, certify frame
+latency on real Windows/Linux hardware, or approve owner interaction.
+
+## T-086 transparent subchunk texture regression (2026-11-07)
+
+The on-demand `godot-native-t086-viewport.yml` now requires an exact
+**140-check** native test result and runs `check_godot_model_log.py` rather
+than broadly grepping for all `ERROR:` lines (which would misclassify
+recognized post-success Godot RID teardown diagnostics). The new real
+X11 framebuffer tests cover sparse 256px source / 128px display overhang,
+zero-alpha hidden RGB, edited/undone and lazy-loaded reoccupation, preview
+cancellation and unknown-occupancy fallback. A 640×460 llvmpipe software
+witness at 100% zoom uploads 65,536 instead of 262,144 RGBA8 texture bytes
+on first display; full cold-frame and physical GPU latency remain unverified.
+
+## T-086 persistent source-space viewport cache
+
+Fast push/PR CI stages/imports the independent Drawing package and runs
+`drawing/tests/viewport_cache_smoke.gd` (27 model checks). Its change-journal,
+revision gaps, signed source seams and draft-stamp tests cannot prove real
+texture reuse. The **manual-only** `.github/workflows/godot-native-t086-viewport.yml`
+runs `drawing/tests/viewport_cache_native.gd` on Xvfb/Mesa after importing
+fonts (68 framebuffer/texture checks), and calls
+`python3 tools/benchmarks/t086_compare_viewport.py` to compare the T-085
+pre-cache canvas against the current package using the **same** 12-trial
+100/50/25% workload. Measurements separate CPU composition, `ImageTexture`
+full uploads, redraw-to-frame submission, RSS/HWM and the retained texture
+payload estimate. These are Linux **software** diagnostics, not physical
+Windows/Linux GPU/DPI/scan-out/owner acceptance. T-086 remains In Progress
+until those hardware and large dense viewport gaps are addressed. The native
+witness also exercises a >144-tile conservative fallback without destroying
+previously cached in-view textures; its transient frame references may exceed
+the fixed retained-cache payload budget.
+
+## T-087 standalone image-frame and independent grid
+
+Fast push/PR CI stages/imports the canonical Drawing package and executes
+`drawing/tests/image_frame_smoke.gd` (47 checks: optional signed frame metadata,
+legacy read, byte-exact outside-frame pixels, invalid envelope rejection,
+workspace dirty/save/open and tab-local grid options). The **on-demand**
+`.github/workflows/godot-native-t087-image-frame.yml` adds
+`drawing/tests/image_frame_native.gd` (36 Xvfb/Mesa framebuffer/input checks)
+for constant 16-screen-pixel checker squares, 25/50/100/200% zoom, signed
+pan/grid alignment, native snapped pointer, off-frame editing and undo.
+The bounded fail-late guard in `tests/test_godot_ci_fail_late.py` deliberately
+includes the model steps and prevents silent runaway push CI (currently 49 steps).
+Xvfb/Mesa is **software-only**; neither that workflow nor the new `Done`
+engineering ticket is physical Windows/Linux owner approval. Owner findings
+#02/#16 remain pending in T-059 and the 23-finding acceptance matrix.
+
+## T-093 Object source discovery and safe portable open
+
+Fast push/PR CI runs `drawing/tests/object_discovery_smoke.gd` (**56**
+headless checks, no GUI input acceptance), plus
+`tests/test_t093_object_discovery.py` (CI, root-preference and fail-closed
+native-log contracts) as one new fail-late step. The fast workflow is bounded
+to **49** steps. The on-demand
+`.github/workflows/godot-native-t093-object-sources.yml` first stages/imports
+standalone fonts and SVG resources; `drawing/tests/object_discovery_native.gd`
+then exercises **27 native Xvfb/Mesa pointer/framebuffer checks** with optional
+screenshots, validated by `tools/check_native_t093_log.py`. Directory selection
+inside the separate OS/FileDialog viewport is covered by its callback, *not*
+by a real OS pointer click. The verifier rejects any runtime errors before
+success and retains known post-success GL/RID leak diagnostics. Existing T-065
+portable source and Atlas registry/NULL tests must remain green; T-065 and
+finding #21 require owner hardware review independently. No proof of physical
+Windows/Linux UX, input-to-photon latency or campaign-wide NULL usability
+follows from software rendering.
+
+## T-092 compact color controls, cursor history and app preferences
+
+Fast push/PR CI runs `drawing/tests/color_history_smoke.gd` (**46** model
+checks) plus `tests/test_t092_color_history.py` (four CI/log/preference
+contracts) as a single fail-late step. The bounded fast workflow now has at
+most **48 steps**. The on-demand
+`.github/workflows/godot-native-t092-color-history.yml` stages/imports
+Godot 4.8-beta2 fonts and SVG resources, runs
+`drawing/tests/color_history_native.gd` (**34** native Xvfb/Mesa framebuffer,
+actual viewport pointer dispatch and workspace relaunch checks, plus optional
+three PNGs), and verifies logs using `tools/check_native_t092_log.py`.
+Native acceptance does **not** assert a click inside the separate Preferences
+modal viewport; the control signal and file persistence are tested, while a
+physical Linux/Windows modal-pointer and owner visual check is **NOT RUN**.
+The verifier retains recognized **post-success** GL/RID leak diagnostics, and
+rejects any missing marker, runtime error or failed check. Owner #11/#23 and
+all manual-review gates remain unapproved.
+
+## T-091 single floating tab group and splitter-width recovery
+
+Fast push/PR CI executes `drawing/tests/dock_single_group_smoke.gd` (42
+headless assertions) and `tests/test_t091_dock.py` (3 contract/log-verifier
+tests) in one fail-late step; the existing T-078–083 state-model smoke
+steps remain. The step bound is **47**. `.github/workflows/godot-native-t091-docking.yml`
+is on-demand and imports the staged standalone fonts/icons before running
+`drawing/tests/dock_single_group_native.gd` on Xvfb/Mesa. Its **36** native
+baseline assertions (+2 screenshot readbacks when enabled) cover a one-row header, eight edge/corner pointer resize paths,
+hide/recover, cold-relaunch width/host geometry, narrow-window clamps and
+1.5× content scaling; `T091_SCREENSHOTS` exports framebuffer PNGs. The
+fail-closed `check_native_t091_log.py` retains known post-success Godot/Mesa
+leaks but fails on script/runtime/unknown teardown errors, missing markers or
+failed assertions. No physical Windows/Linux pointer/owner acceptance is
+claimed; T-091 and T-083 remain In Progress.
+
+## T-088 selection channel, clipboard, and native Move
+
+Fast push/PR CI stages and imports the canonical Drawing package, then runs
+`drawing/tests/selection_clipboard_smoke.gd` (100 model checks) for boolean
+channel composition, the Atlas **enabled-empty deny-all** contract, masked
+brush/fill/flood/clear, exact RGBA8 and hidden RGB, selection-only history,
+atomic Cut/Paste/Move, negative tile seams, stale revision, locked/hidden
+layers and standalone `.drawing` reopen. This is a focused additional
+**44th step** within fail-late CI, never a new full framebuffer run on push.
+
+`.github/workflows/godot-native-t088-selection.yml` is **on demand** and
+runs `drawing/tests/selection_clipboard_native.gd` after clean asset import
+under Xvfb/Mesa. Its 44 real pointer/keyboard/framebuffer checks include
+Select click-empty, drags with Add/Subtract holes, held-button Brush/Move,
+Escape/undo/redo, Ctrl+C/X/V and Delete, 50/100/200/400% pointer/zoom and
+signed-tile seams. A four-sample `frame_post_draw` p50/p95 upper-bound is
+logged; it is **not** a physical input-to-photon measurement. The software
+runner does not close T-056/T-059 or any other manual owner-review gate.
+
+## T-089 structural layers, pointer row controls and undo
+
+Fast push/PR CI stages/imports the one shared Drawing package and runs
+`drawing/tests/layer_structure_smoke.gd` (**62** headless model assertions) as
+its 45th bounded fail-late check. It verifies locally owned structural
+history, tree insertion semantics, stable identity, canonical RGBA8, locked
+subtree guards, editor selection context and filtered/paged navigation.
+The **on-demand** `.github/workflows/godot-native-t089-layers.yml` imports
+fonts/SVG icons first, then runs `drawing/tests/layer_structure_native.gd`
+(**32** X11/Xvfb/Mesa framebuffer and physical-event-dispatch **software**
+checks) at 1120×800 and 880×550, 400% zoom. The native test clicks the actual
+inline eye and lock controls; it does not simulate the Tree signal or stand
+in for physical Linux/Windows owner review. Pinned Godot is 4.8-beta2.
+The optional native job additionally checks runtime errors with a fail-closed
+log verifier (`tools/check_native_t089_log.py`): recognized Godot/Mesa
+renderer-release leak reports after the success marker are retained and
+counted, never silently discarded. Script errors, early runtime errors, and
+unknown post-marker errors still fail; shutdown leak-free operation is not
+claimed. Owner findings #19/#20 remain **PENDING** and no manual review status or
+remote CI success is inferred from local tests. Shared regressions include the T-062 Object
+Editor UI (25/25, selected Tree row tracks new text), the native T-063
+420px/150%-scale compact workspace (layer actions wrap within the dock),
+and T-073 native keyboard routing. Neither these nor remote automation
+establish physical review acceptance.
+
+## T-090 responsive workspace and icon license audit
+
+Fast push/PR CI runs seven deterministic `tests/test_t090_responsive_workspace.py`
+contracts as its **46th** bounded fail-late check. This covers window stretch,
+File/Object/Window menu ownership, per-tab close with a dirty guard, Brush px
+wheel/keyboard semantics, and byte-identical MIT icons + license staging for
+standalone and independent package consumers. The on-demand
+`.github/workflows/godot-native-t090-workspace.yml` performs a fresh standalone
+stage and Godot 4.8-beta2 import, then executes
+`drawing/tests/responsive_workspace_native.gd` under Linux X11/Xvfb/Mesa
+llvmpipe on a 2200×1500 virtual screen. It checks physical viewport edges
+at 800×600, 1280×760, 1920×1080, also 1.5/2.0 content scale; real hover-wheel,
+keyboard and nonactive-tab close/cancel/save pointer events; and emits optional
+five screenshot PNGs (29 checks, vs 24 without PNG capture). The fail-closed
+`tools/check_native_t090_log.py` checks summaries/markers and runtime errors;
+recognized **post-success Godot/Mesa shutdown leaks** are retained and counted,
+not treated as a clean teardown. This is *not* physical Windows/Linux owner
+approval, and no input-to-photon latency measurement is claimed.
+
 ## Required CI
 
 - Pinned Godot `4.8.0-beta2`, Git LFS checkout, explicit typing and CI order/aggregation guards.
@@ -388,7 +868,7 @@
 - T-081 floating group ownership, unique panel/container state, stale/invalid rollback and abandoned-empty-container handling (64 fast headless checks). Native host move/resize, focus/z-order, tab/group reorganization and HiDPI are tested separately (55 Godot 4.8 beta 2 Xvfb/Mesa checks).
 - T-082 cross-container pointer dock/detach/redock transaction model and unique panel ownership (62 fast headless checks), with shared T-078–T-081 state/preview contracts. Native `drawing/tests/dock_cross_native.gd` (56 actual pointer/keyboard checks plus optional screenshot) is targeted/non-push.
 - T-083 versioned `user://` dock settings, missing/renamed panel recovery, invalid/corrupt JSON fallback, exact model round-trip, and resolution adaptation (`drawing/tests/dock_persistence_smoke.gd`, **46** headless assertions) are required push CI. The actual app save/relaunch/reset/hidden-host/420px/1.5× UI witness (`drawing/tests/dock_persistence_native.gd`, **63** checks, **65** with optional screenshots via `T083_SCREENSHOTS`) remains targeted/native and **does not imply owner UX approval**.
-- T-079 dock UI renders from the same model; its targeted **native** Xvfb/Mesa witness (`drawing/tests/dock_ui_native.gd`, 40 assertions) remains non-push engineering acceptance, alongside the T-063 native 75-check regression. T-080 native drag `drawing/tests/dock_reorder_native.gd` (68 assertions: press/hover/release, cancellations, hints, overflow, keyboard and viewport) and T-081 native `drawing/tests/dock_float_native.gd` (55 assertions) likewise remain targeted/non-push.
+- T-079 dock UI renders from the same model; its targeted **native** Xvfb/Mesa witness (`drawing/tests/dock_ui_native.gd`, 40 assertions) remains non-push engineering acceptance, alongside the T-063 native 75-check regression. T-080 native drag `drawing/tests/dock_reorder_native.gd` (68 assertions: press/hover/release, cancellations, hints, overflow, keyboard and viewport) and T-081 native `drawing/tests/dock_float_native.gd` (58 assertions, or 59 with a PNG capture) is available in the on-demand `godot-native-t081-floating.yml` workflow with a strict `check_native_t081_log.py` checker; this is software-X11 engineering evidence, not owner/physical acceptance.
 - Each check retains its original GitHub Actions `steps.*.outcome` even with `continue-on-error: true`; the final summary still fails the job if any required check fails. Scripted Godot processes have 120-second watchdogs.
 
 ## Targeted renderer/LOD feasibility evidence (T-057, completed research)

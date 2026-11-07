@@ -68,7 +68,13 @@ func _run() -> void:
 	gesture(canvas, Vector2i(-4, 1), Vector2i(0, 4))
 	check(canvas.selected == Rect2i(-4, 1, 5, 4), "pointer creates rectangular selection")
 	canvas.tool = "Move"
+	var move_revision: int = document.revision
 	gesture(canvas, Vector2i(-3, 2), Vector2i(7, 7))
+	check(canvas.has_floating_move() and document.revision == move_revision and
+		read_pixel(document, layer, -3, 2) == painted and
+		read_pixel(document, layer, 7, 7) == 0,
+		"pointer release leaves Move floating rather than committing document pixels")
+	check(canvas.confirm_floating_move(), "explicit Drop confirms floating Move")
 	check(read_pixel(document, layer, -3, 2) == 0 and read_pixel(document, layer, 7, 7) == painted,
 		"pointer moves selection as one edit")
 	check(document.undo().ok and read_pixel(document, layer, -3, 2) == painted and

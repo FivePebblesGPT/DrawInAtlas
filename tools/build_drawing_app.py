@@ -57,6 +57,11 @@ def stage(destination: Path, in_place: bool = False) -> Path:
     icons = PACKAGE / "icons"
     icon_destination = staged / "icons"
     icon_destination.mkdir(parents=True, exist_ok=True)
+    # License follows the six MIT at-icons SVGs in every isolated consumer.
+    license_file = icons / "LICENSE.at-icons.txt"
+    if license_file.is_symlink() or not license_file.is_file():
+        raise ValueError("Drawing icon attribution is missing or unsafe")
+    shutil.copy2(license_file, icon_destination / license_file.name)
     for source in sorted(icons.glob("*.svg")):
         if source.is_symlink():
             raise ValueError("Drawing icons must not be symbolic links")

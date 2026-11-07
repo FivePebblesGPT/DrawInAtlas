@@ -101,3 +101,25 @@ Verified with Godot 4.8 beta 2: T-083 model **46/46**, native round-trip **63/63
 - [[T-091]]: enforce one group per floating host, compact grip/tabs/close header, edge resize and reliable saved splitter width. Maintain one icon per panel in docked grouped rail, stable panel IDs and cross-container rollback.
 - Replace tests that assert multi-group floating-host acceptance with tests that assert **one** group; keep old engineering results labeled historical. Test migrated settings containing multiple floating groups without dropping tabs.
 - Owner must inspect native UI after correction under [[T-083]]. Earlier scope agreement and passing model tests are not UX signoff. Keep the manual-review gate intact.
+
+## T-091 corrective engineering checkpoint — 2026-11-06
+
+The canonical floating layout now rejects multiple groups per host at the
+model's validation boundary. Single tabs and entire groups merge into the
+one existing host tab strip; splitting a floating tab creates an independent
+host instead of a nested heading. The visible host has only a grip, tabs and
+close in one compact header; all four edges/corners resize and the bottom-right
+corner displays a subtle painted diagonal cue. **Shift+drag grip** initiates a
+whole-group transfer; a normal grip drag moves the host. Mouse tab hits are
+routed by viewport-visible rectangles to remain correct under Godot 4.8-beta2
+synthetic pointer forwarding. Preserve keyboard/tab alternatives, cancellation,
+unique IDs and independently collapsible **docked** groups.
+
+Version-1 settings remain readable: historic stacked floating groups become
+separate sibling hosts with their panel IDs and visibility intact. The dock
+splitter's last explicitly dragged width survives both process restart and
+intermediate viewport narrowing; ordinary saves and minimization do not replace
+it with a temporarily clamped width. The T-091 test pair verifies this on
+Xvfb/Mesa; physical Linux/Windows and owner T-083 review are still unapproved.
+The older T-081/T-082 sections above remain historical engineering context,
+not acceptable descriptions of the current floating host.

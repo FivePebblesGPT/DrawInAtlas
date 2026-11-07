@@ -1,6 +1,7 @@
 """Pinned Godot Atlas polygon/mask stress parity and native ABI contracts."""
 from __future__ import annotations
 
+import base64
 import copy
 import ctypes
 import hashlib
@@ -8,6 +9,7 @@ import importlib.util
 import json
 import math
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
@@ -71,6 +73,25 @@ class QuadStressContracts(unittest.TestCase):
         fresh = stress.screen()
         stress.validate_evidence(fresh)
         self.assertEqual(fresh, json.loads(EVIDENCE.read_text(encoding="utf-8")))
+
+    def test_strict_fp_with_fma_capable_target(self) -> None:
+        """FMA-enabled CPUs still honor the Godot float32 convex oracle.
+
+        Without -ffp-contract=off, a local GCC 14 -O3 -mfma reproducer
+        rejected 70/96 legitimate convex cases as nonconvex (-3). This
+        opt-in compiler target never enables fast-math in the ABI itself.
+        """
+        if (platform.machine() not in ("x86_64", "AMD64")
+                or not Path("/proc/cpuinfo").is_file()
+                or "fma" not in Path("/proc/cpuinfo").read_text().split()):
+            self.skipTest("Host CPU does not report x86_64 FMA support")
+        with tempfile.TemporaryDirectory(prefix="t094-quad-fma-") as directory:
+            library = stress.NativeQuad(stress.build(
+                "g++", "-O3", Path(directory), ("-mfma",)))
+            for case in stress.load_oracle():
+                with self.subTest(case=case["id"]):
+                    expected = base64.b64decode(case["mask_base64"])
+                    self.assertEqual(stress.native_mask(library, case), expected)
 
     def test_abi_rejects_bad_bounds_without_mutating_destination(self) -> None:
         with tempfile.TemporaryDirectory(prefix="t068-stress-abi-") as directory:

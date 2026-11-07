@@ -58,6 +58,9 @@ func _ready() -> void:
 	resized.connect(_refresh_layout)
 	get_viewport().size_changed.connect(_refresh_layout)
 	options_region.resized.connect(_refresh_scroll_state)
+	# The scroll viewport can shrink without changing the option content size;
+	# update overflow cues when its own width changes too.
+	options_scroll.resized.connect(_refresh_scroll_state)
 	call_deferred("_refresh_layout")
 
 
@@ -131,16 +134,24 @@ func scroll_options(amount: int) -> void:
 	call_deferred("_refresh_scroll_state")
 
 
-## Wheel over a numeric field must never change its value while browsing bar.
+## Shift+vertical wheel scrolls crowded options. Ordinary wheel adjusts a numeric field.
 func consume_option_wheel(event: InputEvent, source: Control) -> void:
-	if event is InputEventMouseButton:
-		var mouse: InputEventMouseButton = event as InputEventMouseButton
-		if mouse.pressed and mouse.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN,
-			MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
-			var direction: int = -1 if mouse.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT] else 1
-			# Browse options rather than increment a hovered numeric value.
-			scroll_options(direction * OPTION_STEP)
-			source.accept_event()
+	if not event is InputEventMouseButton:
+		return
+	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if not mouse.pressed or mouse.button_index not in [MOUSE_BUTTON_WHEEL_UP,
+		MOUSE_BUTTON_WHEEL_DOWN, MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+		return
+	var direction: int = -1 if mouse.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_LEFT] else 1
+	if mouse.shift_pressed or mouse.button_index in [MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT]:
+		scroll_options(direction * OPTION_STEP)
+		source.accept_event()
+	elif source is SpinBox:
+		# Explicitly handle the hovered field: relying on the SpinBox focus state
+		# makes the first wheel event inconsistent across Godot/theme versions.
+		var spin: SpinBox = source as SpinBox
+		spin.value = clampf(spin.value - direction * spin.step, spin.min_value, spin.max_value)
+		source.accept_event()
 
 
 func _refresh_layout() -> void:

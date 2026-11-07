@@ -35,7 +35,8 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
         self.assertIn('_ask_save()', WORKSPACE)
         self.assertIn('"Redo  Ctrl+Y"', WORKSPACE)
         self.assertIn('selection_history_toggle.toggled.connect(_selection_history_preference_changed)', WORKSPACE)
-        self.assertIn('top_bar.set_menu_checked("Edit", 2,', WORKSPACE)
+        self.assertIn('"Preferences…"', WORKSPACE)
+        self.assertIn('func _load_preferences()', WORKSPACE)
 
     def test_context_options_and_scrolling(self) -> None:
         for term in ('if active_tool in ["Brush", "Eraser"]',
@@ -71,7 +72,7 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
         self.assertIn('icons = PACKAGE / "icons"',
                       (ROOT / "tools/build_drawing_contract_consumer.py").read_text())
         for witness in ('six tools share the icon rail', 'Ctrl+Shift+Tab cycles backward',
-                        'keyboard focus brings History into scroll viewport',
+                        'keyboard focus brings History events into scroll viewport',
                         'hidden tabs still enforce unsaved document close prompt'):
             self.assertIn(witness, NATIVE)
 

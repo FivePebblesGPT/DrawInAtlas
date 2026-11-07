@@ -17,6 +17,13 @@ var _nodes: Dictionary[String, DrawingLayerNode] = {}
 var _pending_tiles: Dictionary[String, Dictionary] = {}
 var _known_refs: Dictionary[String, Dictionary] = {}
 var _dirty_tiles: Dictionary[String, bool] = {}
+## Short-lived display invalidations, independent of save/publish dirty tiles.
+## Missing revisions (layer tree, visibility, text, import) force a full redraw.
+const DISPLAY_CHANGE_LIMIT: int = 64
+var _display_changes: Array[Dictionary] = []
+## Lazy source registration can change visible content without a document
+## revision (the caller is attaching a previously published tile).
+var display_source_epoch: int = 0
 ## One local ordered timeline. A selection step carries the current content token.
 ## External Atlas-owned documents use the host timeline instead of this one.
 var external_history: bool = false
@@ -88,7 +95,8 @@ func has_node(node_id: String) -> bool:
 
 
 func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
-		requested_id: String = "") -> DrawingResult:
+		requested_id: String = "", insertion_index: int = -1,
+		record_history: bool = false) -> DrawingResult:
 	if kind not in [DrawingLayerNode.GROUP, DrawingLayerNode.RASTER,
 			DrawingLayerNode.TEXT, DrawingLayerNode.OBJECTS]:
 		return DrawingResult.failure("LAYER_KIND", "Unknown generic layer type")
@@ -102,41 +110,51 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 	if new_identifier == ROOT_ID or _nodes.has(new_identifier):
 		return DrawingResult.failure("DUPLICATE_ID", "Layer/group identity already exists")
 	_nodes[new_identifier] = DrawingLayerNode.new(new_identifier, kind, name, parent_id)
-	_nodes[parent_id].children.append(new_identifier)
+	var siblings: Array[String] = _nodes[parent_id].children
+	var index: int = siblings.size() if insertion_index < 0 else clampi(insertion_index, 0, siblings.size())
+	siblings.insert(index, new_identifier)
 	revision += 1
-	_mark_untracked_change()
+	_finish_structure(record_history, {"kind": "structure", "op": "create",
+		"id": new_identifier, "parent": parent_id, "index": index,
+		"node": _nodes[new_identifier].detached_copy()})
 	return DrawingResult.success(new_identifier, revision)
 
 
-func rename_layer(node_id: String, name: String) -> DrawingResult:
+func rename_layer(node_id: String, name: String, record_history: bool = false) -> DrawingResult:
 	if not _nodes.has(node_id) or node_id == ROOT_ID:
 		return DrawingResult.failure("LAYER", "Cannot rename missing/root layer")
 	if not _editable(node_id):
 		return DrawingResult.failure("LOCKED", "Layer or ancestor is hidden or locked")
 	if _nodes[node_id].name != name:
+		var before: String = _nodes[node_id].name
 		_nodes[node_id].name = name
 		revision += 1
-		_mark_untracked_change()
+		_finish_structure(record_history, {"kind": "structure", "op": "property",
+			"id": node_id, "field": "name", "before": before, "after": name})
 	return DrawingResult.success(null, revision)
 
 
-func set_visibility(node_id: String, visible: bool) -> DrawingResult:
+func set_visibility(node_id: String, visible: bool, record_history: bool = false) -> DrawingResult:
 	if not _nodes.has(node_id) or node_id == ROOT_ID:
 		return DrawingResult.failure("LAYER", "Cannot change missing/root layer")
 	if _nodes[node_id].visible != visible:
+		var before: bool = _nodes[node_id].visible
 		_nodes[node_id].visible = visible
 		revision += 1
-		_mark_untracked_change()
+		_finish_structure(record_history, {"kind": "structure", "op": "property",
+			"id": node_id, "field": "visible", "before": before, "after": visible})
 	return DrawingResult.success(null, revision)
 
 
-func set_locked(node_id: String, locked: bool) -> DrawingResult:
+func set_locked(node_id: String, locked: bool, record_history: bool = false) -> DrawingResult:
 	if not _nodes.has(node_id) or node_id == ROOT_ID:
 		return DrawingResult.failure("LAYER", "Cannot change missing/root layer")
 	if _nodes[node_id].locked != locked:
+		var before: bool = _nodes[node_id].locked
 		_nodes[node_id].locked = locked
 		revision += 1
-		_mark_untracked_change()
+		_finish_structure(record_history, {"kind": "structure", "op": "property",
+			"id": node_id, "field": "locked", "before": before, "after": locked})
 	return DrawingResult.success(null, revision)
 
 
@@ -150,7 +168,8 @@ func _editable(node_id: String) -> bool:
 	return true
 
 
-func reorder(node_id: String, new_parent: String, new_index: int) -> DrawingResult:
+func reorder(node_id: String, new_parent: String, new_index: int,
+		record_history: bool = false) -> DrawingResult:
 	if not _nodes.has(node_id) or node_id == ROOT_ID or not _nodes.has(new_parent):
 		return DrawingResult.failure("LAYER", "Missing layer or group")
 	if _nodes[new_parent].kind != DrawingLayerNode.GROUP or not _editable(node_id) or not _editable(new_parent):
@@ -162,12 +181,19 @@ func reorder(node_id: String, new_parent: String, new_index: int) -> DrawingResu
 		ancestor = _nodes[ancestor].parent_id
 	var current_parent: String = _nodes[node_id].parent_id
 	var original: Array[String] = _nodes[current_parent].children
+	var old_index: int = original.find(node_id)
+	var target_index: int = clampi(new_index, 0, _nodes[new_parent].children.size() -
+		(1 if current_parent == new_parent else 0))
+	if current_parent == new_parent and target_index == old_index:
+		return DrawingResult.success(null, revision)
 	original.erase(node_id)
 	var destination: Array[String] = _nodes[new_parent].children
-	destination.insert(clampi(new_index, 0, destination.size()), node_id)
+	destination.insert(target_index, node_id)
 	_nodes[node_id].parent_id = new_parent
 	revision += 1
-	_mark_untracked_change()
+	_finish_structure(record_history, {"kind": "structure", "op": "reorder",
+		"id": node_id, "old_parent": current_parent, "old_index": old_index,
+		"new_parent": new_parent, "new_index": target_index})
 	return DrawingResult.success(null, revision)
 
 
@@ -176,12 +202,43 @@ func can_remove_subtree(node_id: String) -> bool:
 	return node_id != ROOT_ID and _nodes.has(node_id) and _editable(node_id)
 
 
-func remove_subtree(node_id: String) -> DrawingResult:
+func remove_subtree(node_id: String, record_history: bool = false) -> DrawingResult:
 	if not can_remove_subtree(node_id):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
+	# The local editor cannot delete locked/hidden descendants indirectly via
+	# an editable ancestor. Legacy API callers keep their historical semantics.
+	var ids: Array[String] = []
+	if record_history and not external_history:
+		_gather_ids(node_id, ids)
+		for identifier: String in ids:
+			if not _editable(identifier):
+				return DrawingResult.failure("LOCKED", "Subtree contains a locked or hidden row")
+	# Preserve full RGBA8 and unresolved lazy references for structural undo.
+	# Only the removed subtree is copied; other raster layers are never cloned.
+	var before: Dictionary = {}
+	if record_history and not external_history:
+		var snapshots: Dictionary = {}
+		var pending: Dictionary = {}
+		var known: Dictionary = {}
+		var dirty: Dictionary = {}
+		for identifier: String in ids:
+			snapshots[identifier] = _nodes[identifier].detached_copy()
+		for key: String in _pending_tiles:
+			if ids.has(key.get_slice(":", 0)):
+				pending[key] = _pending_tiles[key].duplicate(true)
+		for key: String in _known_refs:
+			if ids.has(key.get_slice(":", 0)):
+				known[key] = _known_refs[key].duplicate(true)
+		for key: String in _dirty_tiles:
+			if ids.has(key.get_slice(":", 0)):
+				dirty[key] = _dirty_tiles[key]
+		var parent_id: String = _nodes[node_id].parent_id
+		before = {"kind": "structure", "op": "remove", "id": node_id,
+			"parent": parent_id, "index": _nodes[parent_id].children.find(node_id),
+			"nodes": snapshots, "pending": pending, "known": known, "dirty": dirty}
 	_erase_subtree(node_id)
 	revision += 1
-	_mark_untracked_change()
+	_finish_structure(record_history, before)
 	return DrawingResult.success(null, revision)
 
 
@@ -307,6 +364,7 @@ func register_lazy_chunk(layer_id: String, cx: int, cy: int,
 		return DrawingResult.failure("DUPLICATE_TILE", "Chunk already registered")
 	_pending_tiles[layer_id + ":" + key] = {"ref": blob_ref, "sha256": canonical_sha256, "fetch": loader}
 	_known_refs[layer_id + ":" + key] = {"ref": blob_ref, "sha256": canonical_sha256}
+	display_source_epoch += 1
 	_content_committed = true
 	return DrawingResult.success(null, revision)
 
@@ -320,6 +378,37 @@ func tile_keys(layer_id: String) -> Array[String]:
 			keys.append(joined.substr(layer_id.length() + 1))
 	keys.sort()
 	return keys
+
+
+## Conservative constant-work source-footprint check for display-tile renders.
+## A missing resident/pending chunk cannot contribute a pixel. Large regions,
+## invalid layers and unknown shapes fall back to rendering (never false-cull).
+## This probes metadata only: lazy data and its integrity are still validated
+## by _resolve_chunk() when a stored source overlaps the requested rectangle.
+func raster_may_cover(layer_id: String, left: int, top: int,
+		width: int, height: int) -> bool:
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER \
+			or width <= 0 or height <= 0:
+		return true
+	var first_x: int = TILES.floor_div(left, tile_stride)
+	var first_y: int = TILES.floor_div(top, tile_stride)
+	var last_x: int = TILES.floor_div(left + width - 1, tile_stride)
+	var last_y: int = TILES.floor_div(top + height - 1, tile_stride)
+	const MAX_FOOTPRINT_CHECKS: int = 16
+	var horizontal: int = last_x - first_x + 1
+	var vertical: int = last_y - first_y + 1
+	if horizontal <= 0 or vertical <= 0 or horizontal > MAX_FOOTPRINT_CHECKS \
+			or vertical > MAX_FOOTPRINT_CHECKS \
+			or horizontal * vertical > MAX_FOOTPRINT_CHECKS:
+		return true
+	var resident: Dictionary = _nodes[layer_id].tiles
+	var prefix: String = layer_id + ":"
+	for cy: int in range(first_y, last_y + 1):
+		for cx: int in range(first_x, last_x + 1):
+			var key: String = "%d,%d" % [cx, cy]
+			if resident.has(key) or _pending_tiles.has(prefix + key):
+				return true
+	return false
 
 
 ## Read and compare originals before publication, then detach only touched tiles.
@@ -399,7 +488,36 @@ func _publish_edit(layer_id: String, expected: int,
 			_mark_untracked_change()
 		else:
 			_append_event({"kind": "content", "delta": result.delta}, true)
+	# A frame cache can skip other already-composed display tiles after this
+	# atomic content publication. Keep the journal bounded; consumers falling
+	# behind use a conservative full invalidation instead of stale pixels.
+	_display_changes.append({"revision": revision, "regions": result.regions.duplicate()})
+	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
+		_display_changes.pop_front()
 	return result
+
+
+## Cached views consume monotonic changes without touching persistence state.
+## Any untracked revision (including text, layer structure or visibility)
+## invalidates all cached composites; dirty save tiles are not a change log.
+func display_changes_since(old_revision: int) -> Dictionary:
+	if old_revision == revision:
+		return {"full": false, "regions": []}
+	if old_revision < 0 or old_revision > revision:
+		return {"full": true, "regions": []}
+	var next_revision: int = old_revision + 1
+	var regions: Array[DrawingDirtyRegion] = []
+	for record: Dictionary in _display_changes:
+		var changed_revision: int = int(record["revision"])
+		if changed_revision < next_revision:
+			continue
+		if changed_revision != next_revision:
+			return {"full": true, "regions": []}
+		regions.append_array(record["regions"] as Array[DrawingDirtyRegion])
+		next_revision += 1
+	if next_revision != revision + 1:
+		return {"full": true, "regions": []}
+	return {"full": false, "regions": regions}
 
 
 ## A host must select external ownership *before* it begins committing edits.
@@ -421,6 +539,113 @@ func can_redo() -> bool:
 
 func history_length() -> int:
 	return _events.size()
+
+
+## Public, bounded, read-only history description for the shared editor shell.
+## Never return event dictionaries: these hold mutable tile deltas and snapshots.
+func history_position() -> int:
+	return _cursor
+
+
+func history_summaries(start: int = 0, count: int = 128) -> Array[String]:
+	var summaries: Array[String] = []
+	for index: int in range(clampi(start, 0, _events.size()),
+		mini(_events.size(), maxi(0, start) + clampi(count, 0, 256))):
+		var event: Dictionary = _events[index]
+		var kind: String = String(event.get("kind", ""))
+		var label: String = "Edit"
+		if kind == "selection":
+			label = "Selection"
+		elif kind == "content":
+			label = "Raster edit · " + _history_node_name((event["delta"] as DrawingDelta).layer_id)
+		elif kind == "text_tree":
+			label = "Text edit · " + _history_node_name(String(event["layer"]))
+		elif kind == "structure":
+			var op: String = String(event.get("op", ""))
+			var node_name: String = _history_node_name(String(event.get("id", "")))
+			if op == "create":
+				node_name = (event["node"] as DrawingLayerNode).name
+			elif op == "remove":
+				node_name = (event["nodes"][event["id"]] as DrawingLayerNode).name
+			if op == "property":
+				var field: String = String(event.get("field", ""))
+				label = ("Rename" if field == "name" else "Visibility" if field == "visible"
+					else "Lock" if field == "locked" else "Change") + " · " + node_name
+			else:
+				label = {"create": "Add", "remove": "Remove", "reorder": "Move"}.get(op, "Change") + " · " + node_name
+		summaries.append(label)
+	return summaries
+
+
+func _history_node_name(node_id: String) -> String:
+	if _nodes.has(node_id):
+		return (_nodes[node_id] as DrawingLayerNode).name
+	return node_id.left(24) if not node_id.is_empty() else "layer"
+
+
+## Structural operations are opt-in for local editor history. Legacy/Atlas API
+## callers keep their original untracked/external ownership semantics.
+func _finish_structure(record_history: bool, event: Dictionary) -> void:
+	if record_history and not external_history:
+		_append_event(event, true)
+	else:
+		_mark_untracked_change()
+
+
+## Structural replay is failure-atomic: all preconditions are checked before
+## modifying the tree. Content events are undone first in chronological order.
+func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
+	var node_id: String = event["id"]
+	var op: String = event["op"]
+	if op == "property":
+		if not _nodes.has(node_id):
+			return DrawingResult.failure("HISTORY_TARGET", "Structural node disappeared")
+		var field: String = event["field"]
+		var expected: Variant = event["after"] if undo_action else event["before"]
+		var target: Variant = event["before"] if undo_action else event["after"]
+		if _nodes[node_id].get(field) != expected:
+			return DrawingResult.failure("HISTORY_TARGET", "Structural property diverged")
+		_nodes[node_id].set(field, target)
+	elif op == "reorder":
+		var source: String = event["new_parent"] if undo_action else event["old_parent"]
+		var dest: String = event["old_parent"] if undo_action else event["new_parent"]
+		var source_index: int = event["new_index"] if undo_action else event["old_index"]
+		var dest_index: int = event["old_index"] if undo_action else event["new_index"]
+		if not _nodes.has(node_id) or not _nodes.has(source) or not _nodes.has(dest) or \
+			_nodes[node_id].parent_id != source or _nodes[source].children.find(node_id) != source_index:
+			return DrawingResult.failure("HISTORY_TARGET", "Structural order diverged")
+		_nodes[source].children.erase(node_id)
+		_nodes[dest].children.insert(dest_index, node_id)
+		_nodes[node_id].parent_id = dest
+	elif op in ["create", "remove"]:
+		var restore: bool = (op == "create") != undo_action
+		var parent_id: String = event["parent"]
+		if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP:
+			return DrawingResult.failure("HISTORY_TARGET", "Structural parent disappeared")
+		if restore:
+			var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
+			for identifier: String in restored:
+				if _nodes.has(identifier):
+					return DrawingResult.failure("HISTORY_TARGET", "Structural ID was reused")
+			for identifier: String in restored:
+				_nodes[identifier] = (restored[identifier] as DrawingLayerNode).detached_copy()
+			_nodes[parent_id].children.insert(mini(int(event["index"]), _nodes[parent_id].children.size()), node_id)
+			if op == "remove":
+				for key: String in event["pending"]:
+					_pending_tiles[key] = event["pending"][key].duplicate(true)
+				for key: String in event["known"]:
+					_known_refs[key] = event["known"][key].duplicate(true)
+				for key: String in event["dirty"]:
+					_dirty_tiles[key] = event["dirty"][key]
+		else:
+			if not _nodes.has(node_id) or _nodes[node_id].parent_id != parent_id or \
+				_nodes[parent_id].children.find(node_id) != int(event["index"]):
+				return DrawingResult.failure("HISTORY_TARGET", "Removed subtree diverged")
+			_erase_subtree(node_id)
+	else:
+		return DrawingResult.failure("HISTORY_KIND", "Unknown structural operation")
+	revision += 1
+	return DrawingResult.success(null, revision)
 
 
 func _mark_untracked_change() -> void:
@@ -448,7 +673,7 @@ func _append_event(event: Dictionary, content_change: bool) -> void:
 ## Attach UI context to exactly the just-committed gesture, never to a sample.
 func annotate_latest_gesture(before: DrawingHistoryContext,
 		after: DrawingHistoryContext) -> bool:
-	if external_history or _cursor != _events.size() or _cursor == 0 			or _events[_cursor - 1]["kind"] not in ["content", "text_tree"] or before == null or after == null:
+	if external_history or _cursor != _events.size() or _cursor == 0 			or _events[_cursor - 1]["kind"] not in ["content", "text_tree", "structure"] or before == null or after == null:
 		return false
 	_events[_cursor - 1]["context_before"] = before.detached_copy()
 	_events[_cursor - 1]["context_after"] = after.detached_copy()
@@ -486,11 +711,13 @@ func undo() -> DrawingResult:
 		result = replay_delta(event["delta"] as DrawingDelta, true)
 	elif event["kind"] == "text_tree":
 		result = _replay_text_tree(event, true)
+	elif event["kind"] == "structure":
+		result = _replay_structure(event, true)
 	else:
 		result = DrawingResult.success((event["before"] as DrawingHistoryContext).detached_copy(), revision)
 	if result.ok:
 		_cursor -= 1
-		if event["kind"] in ["content", "text_tree"] and event.has("context_before"):
+		if event["kind"] in ["content", "text_tree", "structure"] and event.has("context_before"):
 			result.value = (event["context_before"] as DrawingHistoryContext).detached_copy()
 	return result
 
@@ -504,11 +731,13 @@ func redo() -> DrawingResult:
 		result = replay_delta(event["delta"] as DrawingDelta, false)
 	elif event["kind"] == "text_tree":
 		result = _replay_text_tree(event, false)
+	elif event["kind"] == "structure":
+		result = _replay_structure(event, false)
 	else:
 		result = DrawingResult.success((event["after"] as DrawingHistoryContext).detached_copy(), revision)
 	if result.ok:
 		_cursor += 1
-		if event["kind"] in ["content", "text_tree"] and event.has("context_after"):
+		if event["kind"] in ["content", "text_tree", "structure"] and event.has("context_after"):
 			result.value = (event["context_after"] as DrawingHistoryContext).detached_copy()
 	return result
 
