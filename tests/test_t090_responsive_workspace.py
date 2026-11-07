@@ -21,17 +21,23 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
         self.workspace = (ROOT / "addons/drawing/workspace.gd").read_text()
         self.topbar = (ROOT / "addons/drawing/editor_top_bar.gd").read_text()
 
-    def test_aspect_expansion_preserves_full_resized_client(self) -> None:
+    def test_desktop_resize_preserves_logical_ui_pixels(self) -> None:
         project = (ROOT / "drawing/project.godot").read_text()
         for property_ in (
-            'window/stretch/mode="canvas_items"',
-            'window/stretch/aspect="expand"',
+            'window/stretch/mode="disabled"',
             'window/size/min_width=800',
             'window/size/min_height=600',
         ):
             self.assertIn(property_, project)
+        self.assertNotIn('window/stretch/mode="canvas_items"', project)
         self.assertIn("Control.PRESET_FULL_RECT", self.workspace)
         self.assertIn("Control.SIZE_EXPAND_FILL", self.workspace)
+        self.assertIn("editor_column.add_child(tabs_line)", self.workspace)
+        self.assertIn("editor_column.add_child(canvas)", self.workspace)
+        self.assertNotIn("root.add_child(tabs_line)", self.workspace)
+        canvas = (ROOT / "addons/drawing/canvas.gd").read_text()
+        self.assertIn("texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST", canvas)
+        self.assertIn("_draw_pixel_grid_overlay()", canvas)
 
     def test_file_and_object_commands_are_outside_window(self) -> None:
         file_section = self.workspace.split('top_bar.add_menu_spec("File"', 1)[1].split(
