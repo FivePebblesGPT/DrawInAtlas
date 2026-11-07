@@ -63,6 +63,48 @@ class ModelLogTests(unittest.TestCase):
                 self.assertTrue(issues)
                 self.assertEqual(leaks, 0)
 
+    def test_shell_wrapped_crashes_and_tracebacks_cannot_follow_pass(self) -> None:
+        # Shells include line numbers and child PIDs before the crash banner.
+        # The prior prefix-only crash matcher silently accepted these lines.
+        bad_lines = (
+            "bash: line 8: 12345 Segmentation fault (core dumped) ./godot",
+            "bash: line 10: 321 Aborted (core dumped) ./godot",
+            "dash: 77: Segmentation fault ./godot",
+            "sh: line 2: 98 Segmentation fault ./godot",
+            "./scripts/check.sh: line 4: 1024 Aborted ./godot",
+            "\x1b[31m  bash: line 1: 7 Segmentation fault (core dumped) ./godot\x1b[0m",
+            "Traceback (most recent call last):",
+            "  \x1b[1;31mTraceback (most recent call last):\x1b[0m",
+        )
+        for line in bad_lines:
+            with self.subTest(line=line):
+                problems, leaks = verify_log(f"{MARKER}\n{line}\n", MARKER)
+                self.assertTrue(problems, line)
+                self.assertEqual(leaks, 0)
+        # Explanatory lines must not trigger a crash regex mid-sentence.
+        notes = (
+            "Diagnostic note: Segmentation fault (core dumped) text is rejected",
+            "Reporter documents Traceback (most recent call last): output",
+        )
+        for line in notes:
+            with self.subTest(note=line):
+                self.assertEqual(verify_log(f"{MARKER}\n{line}\n", MARKER), ([], 0))
+
+    def test_shell_crash_and_python_traceback_fail_through_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "godot.log"
+            for fatal in ("bash: line 5: 314 Segmentation fault ./godot",
+                          "Traceback (most recent call last):"):
+                with self.subTest(fatal=fatal):
+                    log.write_text(f"{MARKER}\n{fatal}\n", encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(ROOT / "tools/check_godot_model_log.py"),
+                         str(log), "--marker", MARKER],
+                        text=True, capture_output=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn("GODOT_MODEL_LOG_REJECTED", result.stdout)
+
     def test_wrapped_diagnostics_fail_through_cli(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "godot.log"

@@ -1242,3 +1242,14 @@ boundaries and signed 64-bit Atlas anchors, and detects a regression that
 resolves all absent source chunks. This is a deterministic model gate, not
 physical UI, GPU-performance or owner acceptance evidence. The CI inventory
 remains **46 required checks**.
+
+## T-094 shell-wrapped crash and traceback guards — 2026-11-07
+
+The shared `check_godot_model_log.py` verifier treats shell-prefixed child
+`Segmentation fault`/`Aborted` lines (including Bash line/PID prefixes and Dash
+line numbers) and a Python traceback header as fatal even after a valid model
+success marker. Raw and ANSI/indented variations are covered. It still counts
+only the specifically named *literal* post-success Godot shutdown leak lines;
+no other error is excused. The existing required T-073 Python test step carries
+these regressions, without changing the 46 required check IDs. The local test
+result is not hosted CI evidence or owner hardware UX approval.

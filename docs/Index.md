@@ -119,6 +119,15 @@ import with strict log validation. This does not verify GitHub-hosted CI,
 Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
 In Progress. [Ticket](Tickets/T-094.md).
 
+**T-094 shell-wrapped crash/traceback CI guard (2026-11-07; In Progress):**
+The fast-CI Godot model-log validator now rejects Bash/Dash/Sh child-process
+`Segmentation fault`/`Aborted` lines with shell/PID prefixes and Python traceback
+headers after an exact PASS marker. The pre-fix implementation accepted three
+representative fatal logs as clean; focused tests exercise the CLI and retain
+the precise post-exit RID leak allowlist. This is a CI trust checkpoint, not
+hosted GitHub Actions or physical owner acceptance. T-094 remains **In Progress**.
+[Ticket](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
 **T-094 decorated-error CI fail-closed checkpoint (2026-11-07; In Progress):**
 The required model-log guard no longer accepts a success marker followed by
 indented/ANSI-colored Godot `ERROR:` lines or fatal shell crash banners.

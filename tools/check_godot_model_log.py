@@ -27,6 +27,15 @@ PROCESS_FAILURE = re.compile(
     r"|Aborted(?: \(core dumped\))?|terminate called after throwing)",
     re.IGNORECASE,
 )
+# Bash wraps a fault with its shell name, source line and child PID. The bare
+# PROCESS_FAILURE prefix check cannot see these fatal child-process messages.
+SHELL_CRASH = re.compile(
+    r"^(?:bash|sh|dash|zsh|[^\s:]+\.sh):\s*"
+    r"(?:(?:line\s+)?\d+:\s*)?(?:\d+\s+)?"
+    r"(?:Segmentation fault|Aborted)(?:\s|$)",
+    re.IGNORECASE,
+)
+PYTHON_TRACEBACK = re.compile(r"^Traceback \(most recent call last\):")
 
 
 
@@ -68,7 +77,9 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
         diagnostic = ANSI_SGR.sub("", line).lstrip(" \t")
         if ("SCRIPT ERROR:" in diagnostic or "Parse Error:" in diagnostic
                 or "Compile Error:" in diagnostic or MODEL_FAILURE.search(diagnostic)
-                or PROCESS_FAILURE.match(diagnostic)):
+                or PROCESS_FAILURE.match(diagnostic)
+                or SHELL_CRASH.match(diagnostic)
+                or PYTHON_TRACEBACK.match(diagnostic)):
             problems.append(f"Line {number}: {line}")
         elif diagnostic.startswith("ERROR:"):
             if (diagnostic == line and number - 1 > marker_line
