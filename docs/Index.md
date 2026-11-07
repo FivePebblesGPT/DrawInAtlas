@@ -155,6 +155,19 @@ cold-frame latency speedup. The 140/140 native X11 checks and seven T-086
 headless suites pass. Physical Windows/Linux and owner gates remain unverified.
 [Ticket](Tickets/T-086.md) · [CI evidence policy](CI_TESTING.md).
 
+**T-086 sparse stored-pixel CPU compositor (2026-11-07; In Progress):**
+Cold 128px display-tile composition now iterates intersecting stored RGBA8
+pixels for near-empty canonical source chunks, with a dense/short-run and
+all-preview fallback; both paths use native packed-byte writes. A
+256×256 two-layer, eight-pixel software CPU witness improved from
+**17.2–17.6ms to 1.8–1.9ms median** across paired nine-sample runs with
+identical SHA-256 output. The independent model oracle passes **270/270**,
+expanded Xvfb framebuffer suite **153/153**, and required T-086 selected
+fast-CI check passes locally (**1/46 incomplete**, not hosted). Real dense
+cold-zoom, hardware input-to-display, transient GPU memory and owner UX
+gates remain open: T-086 is **In Progress**.
+[T-086 implementation and limitations](Tickets/T-086.md).
+
 **T-086 fully erased sparse-tile cache pruning (2026-11-07; In Progress):**
 A source chunk's complete erasure used to leave monotonic display occupancy
 markers, causing blank 128px textures to be recomposited and uploaded again.
