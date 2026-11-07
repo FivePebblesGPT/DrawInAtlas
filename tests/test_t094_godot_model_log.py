@@ -125,6 +125,43 @@ class ModelLogTests(unittest.TestCase):
                 self.assertEqual(verify_log(f"{MARKER}\n{benign}\n", MARKER), ([], 0))
         self.assertEqual(verify_log(f"{MARKER}\n{LEAK}\n", MARKER), ([], 1))
 
+    def test_compact_godot_timestamped_errors_fail_after_success(self) -> None:
+        # Godot can print a compact E <timestamp> diagnostic instead of the
+        # verbose ERROR: form; the former used to produce false-green CI logs.
+        examples = (
+            "E 0:00:00:542   draw_canvas: Invalid texture RID.",
+            "E 0:01:23:005   load: Failed to parse resource.",
+            "E 0:00:00   renderer: Invalid state.",
+            "\x1b[1;31m  E 0:00:03:127   parse: Broken resource\x1b[0m",
+        )
+        for diagnostic in examples:
+            with self.subTest(diagnostic=diagnostic):
+                errors, leaks = verify_log(f"{MARKER}\n{diagnostic}\n", MARKER)
+                self.assertTrue(errors, diagnostic)
+                self.assertEqual(leaks, 0)
+        # Non-error elapsed-time reports and text documenting the format must
+        # not cause arbitrary prose to fail an otherwise valid run.
+        for benign in (
+            "I 0:00:00:542   Initialized renderer.",
+            "W 0:00:00:543   Shader cache warmup pending.",
+            "Reporter describes E 0:00:00:542 diagnostics in its manual.",
+        ):
+            with self.subTest(benign=benign):
+                self.assertEqual(verify_log(f"{MARKER}\n{benign}\n", MARKER), ([], 0))
+        self.assertEqual(verify_log(f"{MARKER}\n{LEAK}\n", MARKER), ([], 1))
+
+    def test_compact_godot_error_is_rejected_by_cli(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "godot.log"
+            log.write_text(f"{MARKER}\nE 0:00:00:542   render: Invalid RID.\n")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tools/check_godot_model_log.py"),
+                 str(log), "--marker", MARKER],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("GODOT_MODEL_LOG_REJECTED", result.stdout)
+
     def test_heap_failure_is_rejected_by_real_log_cli(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             log = Path(directory) / "model.log"

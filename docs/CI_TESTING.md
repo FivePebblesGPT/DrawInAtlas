@@ -1310,3 +1310,14 @@ entry and refreshing must recover. The pre-fix scanner returns a false-success
 partial index on the same fixture. This is a correctness/work-bound test, not
 a full real-campaign performance acceptance test. Atlas registry guards,
 manual review and the 46 required CI check IDs are unchanged.
+
+### T-094 compact Godot engine diagnostic log guard — 2026-11-08
+
+`tools/check_godot_model_log.py` rejects the compact Godot timestamped `E`
+error format (`E 0:00:00:542 ...`), even when a valid model `*_PASSED`
+marker appeared earlier. ANSI and leading whitespace do not hide those engine
+errors. It still permits `I`/`W` lines, explanatory prose and the **exact**
+known post-exit leak messages following one success marker. This additional
+verifier contract is exercised by `tests.test_t094_godot_model_log` in the
+existing T-073 required workflow step. No required check ID is added; local
+replay is not hosted CI or physical owner approval.

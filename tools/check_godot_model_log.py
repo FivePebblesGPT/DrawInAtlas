@@ -35,6 +35,11 @@ SHELL_CRASH = re.compile(
     r"(?:Segmentation fault|Aborted|Killed)(?:\s|$)",
     re.IGNORECASE,
 )
+# Godot's concise timestamped diagnostics (E <h>:<mm>:<ss>[:<ms>])
+# are real engine errors, even without an explicit `ERROR:` prefix. Keep
+# this anchored to the engine severity and time fields so documentation
+# containing the same text does not trigger a false failure.
+GODOT_COMPACT_ERROR = re.compile(r"^E\s+\d+:\d{2}:\d{2}(?::\d{1,3})?(?:\s|$)")
 PYTHON_TRACEBACK = re.compile(
     r"^(?:Traceback \(most recent call last\):|Exception in thread \S.*:|Fatal Python error:)"
 )
@@ -87,7 +92,8 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
                 or "Compile Error:" in diagnostic or MODEL_FAILURE.search(diagnostic)
                 or PROCESS_FAILURE.match(diagnostic)
                 or SHELL_CRASH.match(diagnostic)
-                or PYTHON_TRACEBACK.match(diagnostic) or LIBC_HEAP_FAILURE.match(diagnostic)):
+                or PYTHON_TRACEBACK.match(diagnostic) or LIBC_HEAP_FAILURE.match(diagnostic)
+                or GODOT_COMPACT_ERROR.match(diagnostic)):
             problems.append(f"Line {number}: {line}")
         elif diagnostic.startswith("ERROR:"):
             if (diagnostic == line and number - 1 > marker_line

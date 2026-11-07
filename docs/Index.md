@@ -145,6 +145,15 @@ import with strict log validation. This does not verify GitHub-hosted CI,
 Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
 In Progress. [Ticket](Tickets/T-094.md).
 
+**T-094 compact Godot error log guard (2026-11-08; In Progress):**
+The required model-log checker now rejects timestamped Godot `E 0:00:00:542`
+engine diagnostics after a valid PASS marker, including ANSI-colored/indented
+lines. Previously this produced false-green log verification. New negative
+and real-CLI contracts preserve informational/warning rows and the precise
+post-success RID/texture leak exception. Hosted CI, physical Windows/Linux
+acceptance and manual owner gates remain outstanding; T-094 stays **In
+Progress**. [Evidence](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
 **T-094 OOM/allocator-failure log guard (2026-11-07; In Progress):**
 The exact-marker CI log verifier now rejects shell-wrapped `Killed`/OOM
 termination, glibc `malloc`/`free` heap-corruption banners and uncaught Python
