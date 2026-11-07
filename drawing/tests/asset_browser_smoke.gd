@@ -193,6 +193,48 @@ func _run() -> void:
 		browser.filtered("crowded").size() == 1 and
 		browser.safe_to_open(browser.filtered("crowded")[0]),
 		"after excess entries are removed, a fresh scan authorizes the full revision")
+	# The root budget applies to files *and* directories together. Previously
+	# both get_files()/get_directories() allocated unbounded arrays and a
+	# truncated listing could still publish the first valid loose source.
+	var root_budget: String = moved_root.path_join("RootBudget/Objects")
+	check(DirAccess.make_dir_recursive_absolute(root_budget) == OK,
+		"create independent root-budget Objects folder")
+	var budget_source: String = root_budget.path_join("a-valid.drawing")
+	check(write_source("budget-source", "Budget", budget_source),
+		"prepare valid first-sorted source for root budget")
+	check(DirAccess.make_dir_absolute(root_budget.path_join("empty-folder")) == OK,
+		"root budget includes directories, not just files")
+	var root_populated: bool = true
+	for i: int in range(DrawingAssetBrowserIndex.MAX_CANDIDATES - 2):
+		var noise: FileAccess = FileAccess.open(root_budget.path_join("noise-%04d.tmp" % i), FileAccess.WRITE)
+		if noise == null:
+			root_populated = false
+			break
+		noise.close()
+	check(root_populated, "create root with exactly the combined entry budget")
+	var budget_index: DrawingAssetBrowserIndex = INDEX.new() as DrawingAssetBrowserIndex
+	check(budget_index.scan(root_budget).ok and budget_index.entries.size() == 1 and
+		budget_index.safe_to_open(budget_index.entries[0]),
+		"root exactly at file-plus-directory budget remains usable")
+	var prior_entry: Dictionary = budget_index.entries[0].duplicate(true)
+	var beyond: String = root_budget.path_join("zzzz-overflow.tmp")
+	var extra: FileAccess = FileAccess.open(beyond, FileAccess.WRITE)
+	check(extra != null, "add one unrelated file beyond the root budget")
+	if extra != null:
+		extra.close()
+	var overflowing: DrawingResult = budget_index.scan(root_budget)
+	check(not overflowing.ok and overflowing.code == "ASSET_LIMIT" and
+		budget_index.root_path == root_budget and budget_index.entries.size() == 1 and
+		budget_index.entries[0] == prior_entry,
+		"over-budget root fails atomically without publishing a partial index")
+	var panel_root_before: String = panel.index.root_path
+	check(not panel.set_objects_root(root_budget).ok and
+		panel.index.root_path == panel_root_before and
+		panel.message.text.contains("candidate limit"),
+		"real browser reports the root budget failure without switching roots")
+	check(DirAccess.remove_absolute(beyond) == OK and budget_index.scan(root_budget).ok and
+		budget_index.entries.size() == 1 and budget_index.safe_to_open(budget_index.entries[0]),
+		"removing the excess entry allows a new complete authorized scan")
 	app.queue_free()
 	print("T065_ASSET_BROWSER: %d passed; %d failed" % [passed, failed])
 	if failed == 0:

@@ -24,6 +24,18 @@ enumeration, cross-process filesystem races, real large-library benchmarks,
 hosted CI and owner Windows/Linux review remain open. T-065 stays **In
 Progress**, `manual_review: true`. [T-065 evidence](Tickets/T-065.md).
 
+**T-065 bounded Objects/ root enumeration (2026-11-07; In Progress):**
+The portable source index now enumerates a **single combined maximum of 2,048
+root files and directories** without materializing unbounded lists. The
+2,049th entry rejects the entire new scan (`ASSET_LIMIT`) instead of
+publishing a truncated source snapshot; the previous authorized index is
+unchanged. The real browser displays the specific error. The expanded
+**64/64** model oracle uses an actual 2,049-entry mixed-root fixture;
+the original index fails its new atomicity assertion, and related Atlas and
+native browser tests pass. Large real-library behavior, hosted CI, physical
+Windows/Linux review and explicit owner approval remain open. T-065 stays
+**In Progress**, `manual_review: true`. [Ticket](Tickets/T-065.md).
+
 **T-065 portable Object path-link hardening (2026-11-07; In Progress):**
 The read-only Objects/ index and standalone import/export now reject
 symlinks at **any ancestor**, not only the indexed filename/Objects leaf.

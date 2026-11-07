@@ -185,7 +185,7 @@ func set_objects_root(path: String) -> DrawingResult:
 	if is_node_ready():
 		_refresh_view()
 		if not result.ok:
-			message.text = "Cannot use Objects/ root: " + result.message + ". Choose an existing, non-symlink Objects/ folder."
+			message.text = "Cannot use Objects/ root: " + result.message
 	return result
 
 

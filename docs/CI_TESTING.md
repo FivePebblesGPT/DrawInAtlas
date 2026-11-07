@@ -1296,3 +1296,17 @@ arbitrary old revision. These checks test bounded **per-revision-directory**
 enumeration, not root-directory scalability or atomic no-follow POSIX file
 operations. The native Atlas and standalone browser witnesses remain
 on-demand, and no required CI step ID was added.
+
+
+### T-065 combined root candidate budget — 2026-11-07
+
+The existing required `ci_t065_asset_browser_model` step additionally covers
+incremental `Objects/` **root** enumeration, not only revision subfolders.
+The 64-check headless oracle constructs 2,048 direct entries (one source, one
+folder and unrelated files), verifies a complete authorized index, then adds
+a 2,049th entry and requires `ASSET_LIMIT` with the previous index unchanged.
+The real browser must report the specific budget failure; removing the extra
+entry and refreshing must recover. The pre-fix scanner returns a false-success
+partial index on the same fixture. This is a correctness/work-bound test, not
+a full real-campaign performance acceptance test. Atlas registry guards,
+manual review and the 46 required CI check IDs are unchanged.

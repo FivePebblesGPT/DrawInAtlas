@@ -44,14 +44,34 @@ func scan(objects_path: String) -> DrawingResult:
 	var next: Array[Dictionary] = []
 	var issues: Array[String] = []
 	var seen: Dictionary = {}
-	var candidates: int = 0
-	var child_names: PackedStringArray = directory.get_directories()
-	child_names.sort()
-	for child_name: String in child_names:
-		candidates += 1
-		if candidates > MAX_CANDIDATES:
-			issues.append("Asset scan candidate limit reached")
+	# Count *all* direct children, regardless of type or filename. get_files()
+	# and get_directories() materialize unbounded arrays, and two separate
+	# loops could return a partial, apparently valid index after truncation.
+	# Refuse the entire over-budget snapshot before reading any source bytes.
+	var child_names: PackedStringArray = []
+	var standalone_files: PackedStringArray = []
+	if directory.list_dir_begin() != OK:
+		return DrawingResult.failure("ASSET_PATH", "Cannot enumerate Objects/ directory")
+	var root_examined: int = 0
+	var root_over_limit: bool = false
+	while true:
+		var name: String = directory.get_next()
+		if name.is_empty():
 			break
+		root_examined += 1
+		if root_examined > MAX_CANDIDATES:
+			root_over_limit = true
+			break
+		if directory.current_is_dir():
+			child_names.append(name)
+		else:
+			standalone_files.append(name)
+	directory.list_dir_end()
+	if root_over_limit:
+		return DrawingResult.failure("ASSET_LIMIT", "Objects/ root exceeds candidate limit")
+	child_names.sort()
+	standalone_files.sort()
+	for child_name: String in child_names:
 		if next.size() >= MAX_ASSETS:
 			issues.append("Asset index limit reached")
 			break
@@ -98,13 +118,7 @@ func scan(objects_path: String) -> DrawingResult:
 		_read_source(base.path_join(child_name).path_join(chosen), seen, next, issues, child_name)
 	# Standalone Drawing can publish individual Objects/*.drawing files, while
 	# Atlas's immutable revisions live in Objects/<id>/vNNNNNN.drawing.
-	var standalone_files: PackedStringArray = directory.get_files()
-	standalone_files.sort()
 	for filename: String in standalone_files:
-		candidates += 1
-		if candidates > MAX_CANDIDATES:
-			issues.append("Asset scan candidate limit reached")
-			break
 		if next.size() >= MAX_ASSETS:
 			issues.append("Asset index limit reached")
 			break
