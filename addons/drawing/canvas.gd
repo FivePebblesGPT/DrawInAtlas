@@ -43,6 +43,8 @@ var image_bounds: Rect2i = Rect2i():
 var clip_strokes_to_image_frame: bool = false
 var _stroke_clip: Rect2i = Rect2i()
 var show_grid: bool = false
+## Pixel boundaries appear automatically when individual pixels become large.
+var show_pixel_grid: bool = true
 var snap_to_grid: bool = false
 var grid_spacing: int = 8
 var grid_origin: Vector2i = Vector2i.ZERO
@@ -162,6 +164,8 @@ func clear_selection() -> void:
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	clip_contents = true
+	# The checker and independently composed RGBA tiles must never interpolate.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	focus_mode = Control.FOCUS_ALL
 	set_process_input(true)
 	set_process(true)
@@ -495,6 +499,46 @@ func _draw_grid_overlay() -> void:
 			origin_color if world == grid_origin.y else line_color, 1.0)
 
 
+## An automatic 1px source grid is independent of the user-configured 8px
+## drawing grid and snap. Limit work to visible image pixels at high zoom.
+func _draw_pixel_grid_overlay() -> void:
+	if not show_pixel_grid or zoom < 6.0 or not image_bounds.has_area():
+		return
+	var frame: Rect2 = Rect2(pixel_to_position(Vector2(image_bounds.position)),
+		Vector2(image_bounds.size) * zoom)
+	var visible: Rect2 = frame.intersection(Rect2(Vector2.ZERO, size))
+	if not visible.has_area():
+		return
+	var source_start: Vector2 = (visible.position - size * 0.5) / zoom + camera
+	var source_end: Vector2 = (visible.end - size * 0.5) / zoom + camera
+	var first_x: int = maxi(image_bounds.position.x, ceili(source_start.x))
+	var last_x: int = mini(image_bounds.end.x, floori(source_end.x))
+	var first_y: int = maxi(image_bounds.position.y, ceili(source_start.y))
+	var last_y: int = mini(image_bounds.end.y, floori(source_end.y))
+	var line_color: Color = Color(0.08, 0.14, 0.20, 0.28)
+	for x: int in range(first_x, last_x + 1):
+		var screen_x: float = pixel_to_position(Vector2(x, 0)).x
+		draw_line(Vector2(screen_x, visible.position.y),
+			Vector2(screen_x, visible.end.y), line_color, 1.0)
+	for y: int in range(first_y, last_y + 1):
+		var screen_y: float = pixel_to_position(Vector2(0, y)).y
+		draw_line(Vector2(visible.position.x, screen_y),
+			Vector2(visible.end.x, screen_y), line_color, 1.0)
+
+
+## Raster tiles are separate textures. Compute *both* corners from the same
+## source-space boundary and snap them to integer viewport pixels. Rounding the
+## position but scaling a width independently can leave a 1px gap (or overlap)
+## at 786% / fractional camera positions; a gap exposes the checkerboard and
+## cannot be removed by painting or selecting document pixels.
+func _raster_screen_rect(area: Rect2i) -> Rect2:
+	var begin: Vector2 = pixel_to_position(Vector2(area.position))
+	var end: Vector2 = pixel_to_position(Vector2(area.end))
+	var first: Vector2 = Vector2(roundf(begin.x), roundf(begin.y))
+	var last: Vector2 = Vector2(roundf(end.x), roundf(end.y))
+	return Rect2(first, last - first)
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -612,7 +656,7 @@ func _draw() -> void:
 			entry["last_used"] = _cache_access
 			_frame_references.append(entry["texture"] as ImageTexture)
 			draw_texture_rect(entry["texture"] as ImageTexture,
-				Rect2(pixel_to_position(Vector2(area.position)), Vector2(area.size) * zoom), false)
+				_raster_screen_rect(area), false)
 	if not visible_plan.is_empty():
 		metrics["source_chunks_shared"] = (visible_plan["source_chunks"] as Dictionary).size()
 	metrics["cache_tiles"] = _display_tiles.size()
@@ -624,6 +668,7 @@ func _draw() -> void:
 	_last_frame_submit_us = int(metrics["submit_us"])
 
 	_draw_grid_overlay()
+	_draw_pixel_grid_overlay()
 	if image_bounds.has_area():
 		draw_rect(Rect2(pixel_to_position(Vector2(image_bounds.position)),
 			Vector2(image_bounds.size) * zoom), Color(0.92, 0.94, 0.96), false, 1.5)

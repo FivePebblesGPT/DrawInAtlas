@@ -147,8 +147,9 @@ func run() -> void:
 			"native centered tool target activates %s" % name)
 	check(app.tab_bar.tab_close_display_policy == TabBar.CLOSE_BUTTON_SHOW_ALWAYS,
 		"close affordance belongs to each document tab")
-	check(app.tabs_line.get_child_count() == 1,
-		"detached global new/close buttons are absent")
+	check(app.tabs_line.get_child_count() == 1 and
+		app.tabs_line.get_parent() == app.canvas.get_parent(),
+		"document tabs share the canvas column, not the tool rail or panel dock")
 	var file_menu: PopupMenu = app.top_bar._menus[0].get_popup()
 	var window_menu: PopupMenu = app.top_bar._menus[6].get_popup()
 	var file_labels: String = ""

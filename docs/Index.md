@@ -1300,6 +1300,10 @@ third-party native backend or hardware gate was satisfied. See
 
 **T-075 completed (2026-11-02):** the nine [player projection and collaboration pages](PLAYER_PROJECTION_CONTRACT.md) now distinguish the currently implemented DrawingDocument/Asset/T-066 source graph from isolated legacy raster-sanitization, X11 player-window and in-process session proofs. Windows/Linux native desktop is the active target; [Web T-044](Archive/Web/T-044.md) is **Archived** without deleting its historic tests. Ten source-backed documentation tests and 375 headless plus 124 native visual checks passed. **T-039 Manual Review, T-043/T-048 blocked independent owner gates remain unchanged**; no real player-authorized projector or authenticated multiplayer is claimed.
 
+## Next-sprint handoff — 2026-11-07
+
+**Owner verified the chunk-edge filtering artifact gone** after PR #14 (the separate physical benchmark/acceptance gates are not implied). Leave the repaired tile sampling and high-zoom pixel grid in the merged baseline; the pixel grid is **enabled by default** above 600% zoom, with an independent View toggle. Carry forward [T-095](Tickets/T-095.md) for the unresolved 60px Brush latency and [T-096](Tickets/T-096.md) for large selection contours and floating Move latency. Both are **Ready**, not completed by the earlier T-085/T-088 model checks.
+
 ## Tickets
 
 | Ticket | Status | Review gate | Hard dependencies |
@@ -1399,6 +1403,8 @@ third-party native backend or hardware gate was satisfied. See
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Ready | — | [T-053](Tickets/T-053.md) |
 
 ## Epics
 
