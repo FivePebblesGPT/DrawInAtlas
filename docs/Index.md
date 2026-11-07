@@ -10,6 +10,18 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
+**T-065 portable Object path-link hardening (2026-11-07; In Progress):**
+The read-only Objects/ index and standalone import/export now reject
+symlinks at **any ancestor**, not only the indexed filename/Objects leaf.
+An already-scanned campaign redirected via a symlink fails revalidation
+before Open, Import or Export; ordinary real-path relocation remains supported.
+The new filesystem negative controls pass **46/46** index and **40/40**
+transfer assertions; nine headless T-065 suites and three Xvfb/Mesa native
+browser/manager witnesses pass. This is point-in-time filesystem checking,
+**not** atomic cross-process path authorization or physical owner acceptance.
+T-065 stays **In Progress** with `manual_review: true`; no owner review
+has been granted. [T-065 evidence](Tickets/T-065.md).
+
 **T-085 immutable live-stroke selection boundary (2026-11-07; In Progress):**
 Brush/Eraser pointer-down now freezes the complete boolean edit mask,
 including holes and enabled-empty deny-all. A changed selection during

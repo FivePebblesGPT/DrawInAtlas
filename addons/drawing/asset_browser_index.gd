@@ -12,9 +12,28 @@ var entries: Array[Dictionary] = []
 var warnings: Array[String] = []
 
 
+## Reject links anywhere in an absolute filesystem path, not only its leaf.
+## A renamed campaign parent can become a symlink after a successful scan;
+## all subsequent Open/Export checks must revalidate that same boundary.
+## This is a point-in-time check, not a cross-process filesystem lease.
+static func path_has_no_links(path: String) -> bool:
+	if not path.is_absolute_path() or path != path.simplify_path():
+		return false
+	var current: String = path
+	for _part: int in range(128):
+		var parent_path: String = current.get_base_dir()
+		if parent_path == current:
+			return true
+		var parent: DirAccess = DirAccess.open(parent_path)
+		if parent == null or parent.is_link(current.get_file()):
+			return false
+		current = parent_path
+	return false
+
+
 func scan(objects_path: String) -> DrawingResult:
 	var base: String = objects_path.simplify_path()
-	if not base.is_absolute_path() or base.get_file() != "Objects":
+	if not path_has_no_links(base) or base.get_file() != "Objects":
 		return DrawingResult.failure("ASSET_PATH", "Choose an absolute Objects/ directory")
 	var parent: DirAccess = DirAccess.open(base.get_base_dir())
 	if parent == null or parent.is_link("Objects"):
@@ -118,10 +137,11 @@ func _read_source(path: String, seen: Dictionary, target: Array[Dictionary],
 
 ## Listings are not authority to open files after filesystem changes.
 func safe_to_open(entry: Dictionary) -> bool:
-	if root_path.is_empty() or not entry.get("path") is String or not entry.get("sha256") is String:
+	if root_path.is_empty() or not entry.get("path") is String or not entry.get("sha256") is String or \
+			not path_has_no_links(root_path):
 		return false
 	var path: String = String(entry["path"])
-	if not path.begins_with(root_path + "/") or path != path.simplify_path():
+	if not path.begins_with(root_path + "/") or not path_has_no_links(path):
 		return false
 	var relative: String = path.substr(root_path.length() + 1)
 	var parts: PackedStringArray = relative.split("/")

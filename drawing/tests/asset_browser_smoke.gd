@@ -50,6 +50,38 @@ func _run() -> void:
 	check(browser.warnings.is_empty(), "clean sources do not produce warnings")
 	check(browser.safe_to_open(browser.entries[0]) and browser.safe_to_open(browser.entries[1]),
 		"indexed versioned and loose sources pass safe revalidation")
+	# The user can select an absolute path *through* a symlinked campaign
+	# ancestor; detecting only Objects/ and its direct children is insufficient.
+	var alias_parent: String = fixture_root + "-alias"
+	var links: DirAccess = DirAccess.open(fixture_root.get_base_dir())
+	check(links.create_link(fixture_root, alias_parent) == OK,
+		"create symlinked parent for Objects index")
+	check(not browser.scan(alias_parent.path_join("Objects")).ok and
+		browser.entries.size() == 2 and browser.root_path == objects,
+		"reject symlinked campaign parent without replacing the valid index")
+	check(DirAccess.remove_absolute(alias_parent) == OK, "remove parent alias")
+	# A previously safe index can become unsafe *after* discovery when a
+	# directory in the path is renamed and replaced with a link.
+	var guarded_parent: String = fixture_root.path_join("Guarded")
+	var guarded_objects: String = guarded_parent.path_join("Objects")
+	check(DirAccess.make_dir_recursive_absolute(guarded_objects) == OK,
+		"create nested independent Objects root")
+	check(write_source("guarded", "Guarded", guarded_objects.path_join("guarded.drawing")),
+		"write source in nested Objects root")
+	var guarded: DrawingAssetBrowserIndex = INDEX.new() as DrawingAssetBrowserIndex
+	check(guarded.scan(guarded_objects).ok and guarded.entries.size() == 1,
+		"scan real nested Objects root")
+	var moved_parent: String = fixture_root.path_join("GuardedMoved")
+	check(DirAccess.rename_absolute(guarded_parent, moved_parent) == OK and
+		links.create_link(moved_parent, guarded_parent) == OK,
+		"replace scanned intermediate parent with symlink")
+	check(not guarded.safe_to_open(guarded.entries[0]) and
+		not guarded.scan(guarded_objects).ok and guarded.entries.size() == 1,
+		"stale index cannot open or rescan through a replaced parent")
+	check(DirAccess.remove_absolute(guarded_parent) == OK and
+		DirAccess.rename_absolute(moved_parent, guarded_parent) == OK and
+		guarded.safe_to_open(guarded.entries[0]),
+		"restored real path permits exact original source again")
 	var app: Control = APP.new() as Control
 	app.layout_persistence_enabled = false
 	root.add_child(app)
