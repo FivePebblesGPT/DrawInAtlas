@@ -44,7 +44,7 @@ var clip_strokes_to_image_frame: bool = false
 var _stroke_clip: Rect2i = Rect2i()
 var show_grid: bool = false
 ## Pixel boundaries appear automatically when individual pixels become large.
-var show_pixel_grid: bool = false
+var show_pixel_grid: bool = true
 var snap_to_grid: bool = false
 var grid_spacing: int = 8
 var grid_origin: Vector2i = Vector2i.ZERO
