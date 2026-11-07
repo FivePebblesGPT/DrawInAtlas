@@ -256,6 +256,19 @@ workspace-keyboard regressions also pass. Atlas callers retain external chronolo
 findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
 [Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-089 native dock-scroll witness repair (2026-11-07; engineering Done):**
+The original nine native eye/lock/group assertion failures on the unchanged
+remote baseline were caused by attempting clicks on the Layers Tree below the
+visible dock, not by evidence of broken structural editing. A real synthetic
+wheel press/release sequence now scrolls the dock before clicking, with an
+explicit unchanged-document check. Imported Xvfb/Mesa **36/36** native and
+**62/62** headless model checks pass, with strict fail-closed log validation;
+neighboring T-090/T-091/T-092 and Atlas smoke checks pass. The T-089 workflow
+and parser reject the stale 32-check marker. No production code changed and
+owner findings #19/#20 still await physical Linux/Windows validation under
+T-059; software green does not grant owner acceptance.
+[Details](Tickets/T-089.md).
+
 **T-092 separate FG/BG editing and compact Colors layout (2026-11-07; In Progress):**
 The Colors chips now select *independent* foreground/background edit targets:
 clicking BG no longer silently swaps brush pigment, and Previous BG restores

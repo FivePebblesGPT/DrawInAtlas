@@ -13,7 +13,7 @@ import argparse
 import re
 from pathlib import Path
 
-SUCCESS = "T089_NATIVE_PASSED: 32 checks"
+SUCCESS = "T089_NATIVE_PASSED: 36 checks"
 SHUTDOWN_LEAKS = (
     re.compile(r"ERROR: Texture with GL ID of \d+: leaked \d+ bytes\."),
     re.compile(r"ERROR: \d+ RID allocations of type '[^']+' were leaked at exit\."),

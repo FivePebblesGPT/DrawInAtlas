@@ -52,6 +52,30 @@ func click_row(workspace: Control, node_id: String, button_index: int = -1) -> b
 	return true
 
 
+## Pair synthetic wheel presses with releases. A lone synthetic press can
+## leave the Godot test viewport's GUI pointer tracking in a pressed state.
+func wheel_reveal_layers(workspace: Control) -> bool:
+	var scroller: ScrollContainer = workspace.inspector
+	var tree: Tree = workspace.layers
+	var start: int = scroller.scroll_vertical
+	# Scroll over the outer dock header, not nested Colors controls.
+	var target: Vector2 = scroller.get_global_rect().position + Vector2(12, 60)
+	for _step: int in range(48):
+		if scroller.get_global_rect().encloses(tree.get_global_rect()):
+			return scroller.scroll_vertical > start
+		var wheel: InputEventMouseButton = InputEventMouseButton.new()
+		wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+		wheel.factor = 1.0
+		wheel.pressed = true
+		wheel.position = target
+		wheel.global_position = target
+		root.push_input(wheel, true)
+		wheel.pressed = false
+		root.push_input(wheel, true)
+		await process_frame
+	return false
+
+
 func render_pixel(workspace: Control, pixel: Vector2) -> Color:
 	var image: Image = root.get_texture().get_image()
 	var location: Vector2i = Vector2i(workspace.canvas.global_position +
@@ -119,6 +143,19 @@ func run() -> void:
 		item = item.get_next()
 	check(top_item != null and top_item.get_button_count(0) == 2,
 		"each row has direct eye and lock buttons")
+	var before_scroll_revision: int = doc.revision
+	# The Colors panel can extend below the dock fold. Bring the actual Layers
+	# Tree into the visible ScrollContainer before sending pointer events.
+	check(workspace.layers.get_global_rect().end.y > workspace.inspector.get_global_rect().end.y,
+		"layers initially below Colors in a normal viewport")
+	check(await wheel_reveal_layers(workspace),
+		"native wheel scrolls dock to the layer controls")
+	await frames(3)
+	check(workspace.inspector.scroll_vertical > 0 and
+		workspace.inspector.get_global_rect().encloses(workspace.layers.get_global_rect()),
+		"dock scroll reveals complete Layers Tree before pointer clicks")
+	check(doc.revision == before_scroll_revision and workspace.selected_layer_node() == top,
+		"wheel navigation does not modify artwork or selected layer")
 	check(await click_row(workspace, top, 0), "locate real eye button rect")
 	await frames(5)
 	check(doc.node_metadata(top)["visible"] == false and

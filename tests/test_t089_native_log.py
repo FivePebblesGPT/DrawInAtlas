@@ -37,6 +37,10 @@ class T089NativeLogTests(unittest.TestCase):
             with self.subTest(message=message):
                 self.assertFalse(verify(message)[0])
 
+    def test_previous_stale_witness_is_not_accepted(self) -> None:
+        self.assertFalse(verify("T089_NATIVE_PASSED: 32 checks")[0])
+        self.assertFalse(verify("T089_NATIVE_PASSED: 35 checks")[0])
+
     def test_missing_and_duplicate_markers_fail(self) -> None:
         self.assertFalse(verify("some other output")[0])
         self.assertFalse(verify(SUCCESS + "\n" + SUCCESS)[0])
