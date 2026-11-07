@@ -23,28 +23,55 @@ static func capture(document: DrawingDocument, layer_id: String,
 	result.height = area.size.y
 	result.source_position = area.position
 	result.source_selection = selection.detached_copy() if selection != null else null
-	# Resolve each immutable storage tile once; per-pixel read_pixel() would
-	# repeatedly run the lazy source/identity lookup for large selections.
-	var tile_cache: Dictionary[String, DrawingRasterTile] = {}
+	# A clipboard stores only nonzero RGBA8 values. Visit the occupied source
+	# chunks and their stored pixels rather than scanning the enclosing marquee
+	# (which can be a million mostly empty cells). Work in global 64-bit tile
+	# coordinates so negative tiles and nonzero Atlas origins are exact.
 	var stride: int = document.tile_stride
-	for y: int in range(area.size.y):
-		for x: int in range(area.size.x):
-			var local: Vector2i = area.position + Vector2i(x, y)
-			if selection != null and not selection.allows(local):
+	var left: int = origin_x + int(area.position.x)
+	var top: int = origin_y + int(area.position.y)
+	var right: int = left + int(area.size.x)
+	var bottom: int = top + int(area.size.y)
+	for cy: int in range(DrawingDocument.TILES.floor_div(top, stride),
+			DrawingDocument.TILES.floor_div(bottom - 1, stride) + 1):
+		for cx: int in range(DrawingDocument.TILES.floor_div(left, stride),
+				DrawingDocument.TILES.floor_div(right - 1, stride) + 1):
+			var chunk_x: int = cx * stride
+			var chunk_y: int = cy * stride
+			if not document.raster_may_cover(layer_id, chunk_x, chunk_y, stride, stride):
 				continue
-			var global_x: int = origin_x + int(local.x)
-			var global_y: int = origin_y + int(local.y)
-			var key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
-			if not tile_cache.has(key):
-				var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
-				if not fetched.ok:
-					return fetched
-				tile_cache[key] = fetched.value as DrawingRasterTile
-			var tile: DrawingRasterTile = tile_cache[key]
-			var rgba: int = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
-				if tile != null else 0
-			if rgba != 0:
-				result._pixels[Vector2i(x, y)] = rgba
+			var key: String = "%d,%d" % [cx, cy]
+			# Preserve the original lazy-source error boundary: an entirely
+			# deselected pending chunk must not be fetched (or fail to load).
+			# Resident chunks need no such area scan: their occupied cells are
+			# tested against the selection below.
+			if selection != null and selection.enabled and \
+					document._pending_tiles.has(layer_id + ":" + key):
+				var allowed: bool = false
+				for gy: int in range(maxi(top, chunk_y), mini(bottom, chunk_y + stride)):
+					for gx: int in range(maxi(left, chunk_x), mini(right, chunk_x + stride)):
+						if selection.allows(Vector2i(gx - origin_x, gy - origin_y)):
+							allowed = true
+							break
+					if allowed:
+						break
+				if not allowed:
+					continue
+			var fetched: DrawingResult = document._resolve_chunk(layer_id, key)
+			if not fetched.ok:
+				return fetched
+			var tile: DrawingRasterTile = fetched.value as DrawingRasterTile
+			if tile == null:
+				continue
+			for index: int in tile._pixels:
+				var global_x: int = chunk_x + index % stride
+				var global_y: int = chunk_y + index / stride
+				if global_x < left or global_x >= right or global_y < top or global_y >= bottom:
+					continue
+				var local: Vector2i = Vector2i(global_x - origin_x, global_y - origin_y)
+				if selection != null and not selection.allows(local):
+					continue
+				result._pixels[local - area.position] = tile._pixels[index]
 	return DrawingResult.success(result, document.revision)
 
 

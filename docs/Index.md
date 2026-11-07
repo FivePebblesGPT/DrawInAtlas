@@ -314,6 +314,17 @@ bounded. New headless 15/15 and Xvfb/Mesa native 80/80 checks pass; a warmed
 **This is not a dense-zoom throughput or physical hardware acceptance pass.**
 [T-086](Tickets/T-086.md).
 
+**T-088 sparse Copy/Move capture (2026-11-07; In Progress):**
+Initial clipboard capture now walks only present signed source chunks and
+stored nonzero RGBA8 cells, with exact boolean selection masks and hidden-RGB
+preservation. Selected lazy chunks still verify their digests; excluded lazy
+corruption is not fetched. The independent dense-readback/negative-control
+model detects the old 289-chunk sweep; a seven-trial 512×512, eight-pixel
+CPU-only median decreased **231,542 → 611 µs** (not input-to-photon).
+The new oracle is part of the existing required T-088 CI step; physical
+Windows/Linux and T-056/T-059 owner gates remain unapproved, so T-088 stays
+**In Progress**. [Ticket](Tickets/T-088.md).
+
 **T-088 sparse transparent Paste staging (2026-11-07; In Progress):**
 The Drawing clipboard now stages nonzero source payload pixels directly for
 sparse transparent pastes instead of rescanning a large empty selection box;

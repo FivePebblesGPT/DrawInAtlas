@@ -1214,3 +1214,14 @@ tests.test_t094_godot_model_log` or the existing T-073 required step to
 exercise both positive logs and deliberate false-green controls. This check
 validates log interpretation only; an actual GitHub-hosted run and physical
 owner acceptance must still be obtained independently.
+
+### T-088 sparse clipboard capture oracle — 2026-11-07
+
+The existing required `ci_t088_selection_clipboard_model` step also runs
+`drawing/tests/selection_sparse_capture_smoke.gd` with strict
+`T088_SPARSE_CAPTURE_PASSED` whole-log validation. It compares the sparse
+capture to an independent pixel-by-pixel oracle, tests lazy integrity/error
+boundaries and signed 64-bit Atlas anchors, and detects a regression that
+resolves all absent source chunks. This is a deterministic model gate, not
+physical UI, GPU-performance or owner acceptance evidence. The CI inventory
+remains **46 required checks**.
