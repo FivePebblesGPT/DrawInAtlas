@@ -70,8 +70,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/live_stroke_smoke.gd 2>&1 | tee /tmp/godot-t085-model.log
-          grep -q 'T085_MODEL_PASSED' /tmp/godot-t085-model.log || ci_fail_marker 'T085 model witness incomplete'
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T085_MODEL_FAILED:' /tmp/godot-t085-model.log; then ci_fail_marker 'T085 model witness error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t085-model.log --marker T085_MODEL_PASSED || ci_fail_marker 'T085 live-stroke model log rejected'
           ci_finish
       - name: Verify T-086 source-space dirty-display tile invalidation
         id: ci_t086_viewport_cache_model
@@ -83,8 +82,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-model.log
-          grep -q 'T086_MODEL_PASSED' /tmp/godot-t086-cache-model.log || ci_fail_marker 'T086 model witness incomplete'
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T086_MODEL_FAILED:' /tmp/godot-t086-cache-model.log; then ci_fail_marker 'T086 model witness error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-model.log --marker T086_MODEL_PASSED || ci_fail_marker 'T086 viewport model log rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_focus_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-focus.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-focus.log --marker T086_FOCUS_PASSED || ci_fail_marker 'T086 dense viewport retention priority witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
@@ -133,8 +131,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/layer_structure_smoke.gd 2>&1 | tee /tmp/godot-t089-layers-model.log
-          grep -q 'T089_MODEL_PASSED' /tmp/godot-t089-layers-model.log || ci_fail_marker 'T089 layer model incomplete'
-          if grep -E 'SCRIPT ERROR:|T089_MODEL_FAILED:' /tmp/godot-t089-layers-model.log; then ci_fail_marker 'T089 layer model error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t089-layers-model.log --marker T089_MODEL_PASSED || ci_fail_marker 'T089 layers model log rejected'
           ci_finish
       - name: Verify T-090 responsive workspace, command routing, and licensed tool icon contracts
         id: ci_t090_responsive_workspace_contracts
@@ -152,8 +149,7 @@ jobs:
           source tools/ci_fail_late.sh
           python3 tools/build_drawing_app.py --in-place
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/dock_single_group_smoke.gd 2>&1 | tee /tmp/godot-t091-dock-model.log
-          grep -q 'T091_MODEL_PASSED' /tmp/godot-t091-dock-model.log || ci_fail_marker 'T091 model incomplete'
-          if grep -E 'SCRIPT ERROR:|^ERROR:|T091_MODEL_FAILED:' /tmp/godot-t091-dock-model.log; then ci_fail_marker 'T091 model error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t091-dock-model.log --marker T091_MODEL_PASSED || ci_fail_marker 'T091 docking model log rejected'
           python3 -m unittest discover -s tests -p 'test_t091_dock.py' -v
           ci_finish
       - name: Verify T-092 compact Colors, history cursor, and isolated app preferences
@@ -166,8 +162,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/color_history_smoke.gd 2>&1 | tee /tmp/godot-t092-model.log
-          grep -q 'T092_MODEL_PASSED' /tmp/godot-t092-model.log || ci_fail_marker 'T092 model incomplete'
-          if grep -E 'SCRIPT ERROR:|T092_MODEL_FAILED:' /tmp/godot-t092-model.log; then ci_fail_marker 'T092 model error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t092-model.log --marker T092_MODEL_PASSED || ci_fail_marker 'T092 Colors/History model log rejected'
           python3 -m unittest discover -s tests -p 'test_t092_color_history.py' -v
           ci_finish
       - name: Verify T-093 Object source discovery, recent-root consent, image import and safe Open
@@ -180,8 +175,7 @@ jobs:
           python3 tools/build_drawing_app.py --in-place
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_discovery_smoke.gd 2>&1 | tee /tmp/godot-t093-discovery-model.log
-          grep -q 'T093_MODEL_PASSED' /tmp/godot-t093-discovery-model.log || ci_fail_marker 'T093 discovery model incomplete'
-          if grep -E 'SCRIPT ERROR:|T093_MODEL_FAILED:' /tmp/godot-t093-discovery-model.log; then ci_fail_marker 'T093 discovery model error'; fi
+          python3 tools/check_godot_model_log.py /tmp/godot-t093-discovery-model.log --marker T093_MODEL_PASSED || ci_fail_marker 'T093 Object discovery model log rejected'
           python3 -m unittest discover -s tests -p 'test_t093_object_discovery.py' -v
           ci_finish
       - name: Verify T-053 standalone Linux release package

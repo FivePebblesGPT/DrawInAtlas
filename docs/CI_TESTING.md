@@ -111,6 +111,25 @@ viewport suite remains separately runnable under Xvfb and requires a clean
 Godot editor import after standalone staging. This does not imply hardware
 input or cold zoom acceptance.
 
+## T-094 unified Drawing model-log policy — 2026-11-07
+
+The fast-CI Godot-backed T-085/T-086/T-087/T-088/T-089/T-091/T-092/T-093
+steps all run `tools/check_godot_model_log.py` with a single exact success
+marker, and treat verifier failure as `ci_fail_marker` (without short-circuiting
+subsequent fail-late checks). T-090 is a Python-only contract step. The
+T-089 test's canonical `T089_MODEL_PASSED: 62 checks` counts as one success
+marker; the verifier accepts only a positive integer in that counted syntax.
+Duplicate markers, arbitrary success substrings, unexpected `ERROR:` lines,
+script/parse/compile/model errors and incorrect counted-marker text are fatal.
+Only **named, post-success** Godot 4.8-beta2 RID/texture leak diagnostics are
+retained with a separate count; they are not evidence of clean teardown.
+
+The required CI check-ID inventory remains **46**. The existing required
+T-073 documentation test step executes additional strict workflow and
+synthetic shell regressions in `tests/test_t094_godot_model_log.py`; no extra
+hosted job, LFS asset or manual gate was added. Exploratory selected local
+replays cannot attest to a complete GitHub Actions run or physical UX.
+
 ## T-094 strict-native and owner evidence checkpoint — 2026-11-06
 
 The merged `main` baseline [CI run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)

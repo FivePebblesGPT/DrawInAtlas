@@ -25,8 +25,13 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
     if not marker or not re.fullmatch(r"[A-Z][A-Z0-9_]+_PASSED", marker):
         raise ValueError("Expected exact uppercase *_PASSED marker")
     lines = content.splitlines()
+    # Legacy model witnesses may report an assertion count as
+    # `T089_MODEL_PASSED: 62 checks`; accept that exact form, not an
+    # arbitrary colon suffix that could disguise a diagnostic.
+    counted_marker = re.compile(re.escape(marker) + r": [1-9][0-9]* checks\Z")
     markers = [i for i, line in enumerate(lines)
-               if line == marker or line.startswith(marker + " ") or line.startswith(marker + "(")]
+               if line == marker or line.startswith(marker + " ")
+               or line.startswith(marker + "(") or counted_marker.fullmatch(line)]
     problems: list[str] = []
     if len(markers) != 1:
         problems.append(f"Expected exactly one {marker} marker, got {len(markers)}")

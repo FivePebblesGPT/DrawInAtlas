@@ -95,6 +95,18 @@ import with strict log validation. This does not verify GitHub-hosted CI,
 Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
 In Progress. [Ticket](Tickets/T-094.md).
 
+**T-094 strict Drawing model-log consistency (2026-11-07; In Progress):**
+Six T-085–T-093 fast-CI Drawing model steps still used success-substring greps
+and inconsistent error handling, allowing unknown `ERROR:` output to be missed
+in some steps and classifying recognized Godot shutdown RID leaks as failures
+in others. All eight Godot-backed Drawing model steps now use the shared
+fail-closed model-log verifier; T-089's counted `T089_MODEL_PASSED: 62 checks`
+format is recognized only with a positive integer count. Focused strict-log
+and replay contracts pass, and six affected model steps pass in partial local
+replays (five together, T-093 separately); these are **not a complete or hosted
+46-step CI pass**. T-094 and all owner manual gates remain open.
+[T-094 details](Tickets/T-094.md) · [CI policy](CI_TESTING.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples
