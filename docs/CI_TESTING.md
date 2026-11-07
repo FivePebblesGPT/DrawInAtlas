@@ -494,6 +494,15 @@ signed-tile seams. A four-sample `frame_post_draw` p50/p95 upper-bound is
 logged; it is **not** a physical input-to-photon measurement. The software
 runner does not close T-056/T-059 or any other manual owner-review gate.
 
+**2026-11-07 T-088 sparse Paste extension:** The existing required T-088
+step additionally runs `drawing/tests/selection_sparse_paste_smoke.gd` with
+`T088_SPARSE_PASTE_PASSED` through the same strict complete-log verifier.
+Its independent dense pixel oracle checks sparse/opaque fallback, mask holes,
+signed coordinates, alpha-zero hidden RGB, failure rollback and Undo/Redo
+(**56 checks**). The seven-trial stage-only CPU numbers are recorded in
+[T-088](Tickets/T-088.md), not a physical latency or hosted CI claim.
+No new check ID or owner signoff is introduced.
+
 ## T-089 structural layers, pointer row controls and undo
 
 Fast push/PR CI stages/imports the one shared Drawing package and runs

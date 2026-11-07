@@ -54,20 +54,48 @@ func paste(edit: DrawingEditSession, top_left: Vector2i,
 		return DrawingResult.failure("CLIPBOARD", "No destination edit session")
 	var before: Dictionary[String, int] = edit._before.duplicate()
 	var after: Dictionary[String, int] = edit._after.duplicate()
-	for y: int in range(height):
-		for x: int in range(width):
-			var point: Vector2i = Vector2i(x, y)
+	var failure: DrawingResult
+	# Capture stores only nonzero RGBA8 pixels. Most large selections contain
+	# far fewer such pixels than their enclosing rectangle; scanning each empty
+	# cell again on every transparent paste causes visible latency. The dense
+	# path remains authoritative for opaque pastes, which must clear holes.
+	if transparent and _pixels.size() * 4 < width * height:
+		for point: Vector2i in _pixels:
+			# Keep row-major paste's bounds and source-mask semantics even if a
+			# caller has constructed a payload instead of using capture().
+			if point.x < 0 or point.y < 0 or point.x >= width or point.y >= height:
+				continue
 			if source_selection != null and not source_selection.allows(source_position + point):
 				continue
-			var rgba: int = _pixels.get(point, 0)
-			if rgba == 0 and transparent:
+			var rgba: int = _pixels[point]
+			if rgba == 0:
 				continue
-			var staged: DrawingResult = edit._stage(top_left.x + x, top_left.y + y, rgba, selection)
+			var staged: DrawingResult = edit._stage(top_left.x + point.x,
+				top_left.y + point.y, rgba, selection)
 			if not staged.ok:
-				edit._before = before
-				edit._after = after
-				edit._rebuild_preview_tiles()
-				return staged
+				failure = staged
+				break
+	else:
+		for y: int in range(height):
+			for x: int in range(width):
+				var point: Vector2i = Vector2i(x, y)
+				if source_selection != null and not source_selection.allows(source_position + point):
+					continue
+				var rgba: int = _pixels.get(point, 0)
+				if rgba == 0 and transparent:
+					continue
+				var staged: DrawingResult = edit._stage(top_left.x + x, top_left.y + y,
+					rgba, selection)
+				if not staged.ok:
+					failure = staged
+					break
+			if failure != null:
+				break
+	if failure != null:
+		edit._before = before
+		edit._after = after
+		edit._rebuild_preview_tiles()
+		return failure
 	return DrawingResult.success(edit.change_count())
 
 

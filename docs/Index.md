@@ -314,6 +314,19 @@ bounded. New headless 15/15 and Xvfb/Mesa native 80/80 checks pass; a warmed
 **This is not a dense-zoom throughput or physical hardware acceptance pass.**
 [T-086](Tickets/T-086.md).
 
+**T-088 sparse transparent Paste staging (2026-11-07; In Progress):**
+The Drawing clipboard now stages nonzero source payload pixels directly for
+sparse transparent pastes instead of rescanning a large empty selection box;
+nontransparent and dense paths retain exact zero-cell clearing semantics.
+A separate dense oracle passes **56/56** headless checks across hidden RGB,
+boolean masks, rollback and Undo/Redo; the pinned T-088/T-096/T-085/T-086
+native regressions remain green. A 512×512, six-pixel CPU staging comparison
+across three paired seven-trial runs decreased from **156–158ms to 42–46µs**
+per-run median, without measuring capture, GPU frames or owner input-to-photon.
+The new source oracle is part of the existing required T-088 fast-CI step.
+No physical/owner acceptance or T-056/T-059 manual approval is claimed;
+T-088 remains **In Progress**. [Ticket](Tickets/T-088.md).
+
 **T-088 persistent selected-pixel Move correction (2026-11-07; In Progress):**
 Mouse release now retains an uncommitted detached floating mask/pixel preview.
 Repeated drags accumulate signed offsets from the original source; explicit
