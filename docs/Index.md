@@ -471,6 +471,17 @@ Physical Linux/Windows and owner finding #11 remain **PENDING**; T-092 is
 reopened In Progress. [Evidence](Tickets/T-092.md) ·
 [owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
 
+**T-090 More-menu checkmark parity (2026-11-07; In Progress):**
+Narrow Drawing windows moved checkable View/Window commands to More without
+copying their on/off indicators. The shared top bar now reflects checked and
+disabled state and synchronizes live toggles without closing/rebuilding the
+popup. A 32/32 independent headless/Xvfb oracle detects 12 failures against
+the original code; expanded real-pointer Xvfb tests pass 77/77. The required
+T-090 step includes the fail-closed oracle inside the unchanged 46-check
+inventory. Hosted CI, physical display/DPI and owner UX review remain open;
+T-090 remains In Progress. [Evidence](Tickets/T-090.md) ·
+[owner matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-090 compact tool rail and centered icons (2026-11-07; In Progress):**
 The 54px/44×42px tool rail had visible left-shifted SVGs despite the
 original licensed-icon pass. Shared workspace controls now use a 42px rail,

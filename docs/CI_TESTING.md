@@ -126,7 +126,8 @@ input or cold zoom acceptance.
 The fast-CI Godot-backed T-085/T-086/T-087/T-088/T-089/T-091/T-092/T-093
 steps all run `tools/check_godot_model_log.py` with a single exact success
 marker, and treat verifier failure as `ci_fail_marker` (without short-circuiting
-subsequent fail-late checks). T-090 is a Python-only contract step. The
+subsequent fail-late checks). T-090 runs both Python contracts and a 32-check
+headless overflow-menu model witness with the same fail-closed checker. The
 T-089 test's canonical `T089_MODEL_PASSED: 62 checks` counts as one success
 marker; the verifier accepts only a positive integer in that counted syntax.
 Duplicate markers, arbitrary success substrings, unexpected `ERROR:` lines,
@@ -530,8 +531,12 @@ establish physical review acceptance.
 
 ## T-090 responsive workspace and icon license audit
 
-Fast push/PR CI runs seven deterministic `tests/test_t090_responsive_workspace.py`
-contracts as its **46th** bounded fail-late check. This covers window stretch,
+Fast push/PR CI runs nine deterministic `tests/test_t090_responsive_workspace.py`
+contracts and a 32-check Godot headless **More-menu state/dispatch oracle**
+inside its unchanged bounded T-090 step (the **46th** check). The model runs
+after a canonical standalone stage/editor import, and its single exact
+`T090_OVERFLOW_PASSED` marker is checked by `check_godot_model_log.py`.
+This covers window stretch, More-menu checkmarks and dispatch,
 File/Object/Window menu ownership, per-tab close with a dirty guard, Brush px
 wheel/keyboard semantics, and byte-identical MIT icons + license staging for
 standalone and independent package consumers. The on-demand
@@ -541,7 +546,9 @@ stage and Godot 4.8-beta2 import, then executes
 llvmpipe on a 2200×1500 virtual screen. It checks physical viewport edges
 at 800×600, 1280×760, 1920×1080, also 1.5/2.0 content scale; real hover-wheel,
 keyboard and nonactive-tab close/cancel/save pointer events; and emits optional
-five screenshot PNGs (29 checks, vs 24 without PNG capture). The fail-closed
+seven screenshot PNGs (84 checks, vs 77 without PNG capture); the
+expanded native run includes a real pointer opening More and verifying its
+Window checkmark as tabs change. The fail-closed
 `tools/check_native_t090_log.py` checks summaries/markers and runtime errors;
 recognized **post-success Godot/Mesa shutdown leaks** are retained and counted,
 not treated as a clean teardown. This is *not* physical Windows/Linux owner
