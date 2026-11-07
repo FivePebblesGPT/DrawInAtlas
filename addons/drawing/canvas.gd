@@ -548,7 +548,8 @@ func _draw() -> void:
 		"preview_index_built": 0, "preview_index_keys": 0, "preview_index_fallback": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
-		"compose_cpu_us": 0, "texture_cpu_us": 0, "empty_skipped": 0,
+		"compose_cpu_us": 0, "texture_cpu_us": 0, "preview_index_cpu_us": 0,
+		"empty_skipped": 0,
 		"transparent_tiles_culled": 0,
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
@@ -575,8 +576,10 @@ func _draw() -> void:
 	var indexed_stamps: Dictionary = {}
 	var use_preview_index: bool = false
 	if preview_session != null:
+		var index_start_us: int = Time.get_ticks_usec()
 		preview_index = preview_session.preview_stamps_for_display_tiles(visible_tiles,
 			DISPLAY_TILE_SIZE)
+		metrics["preview_index_cpu_us"] = Time.get_ticks_usec() - index_start_us
 		use_preview_index = bool(preview_index["indexed"])
 		if use_preview_index:
 			indexed_stamps = preview_index["stamps"] as Dictionary
@@ -666,6 +669,12 @@ func _draw() -> void:
 	metrics["submit_us"] = Time.get_ticks_usec()
 	last_frame_metrics = metrics
 	_last_frame_submit_us = int(metrics["submit_us"])
+	if session != null:
+		# Capture per-gesture compositor/upload work before the next _draw
+		# replaces last_frame_metrics. This is CPU submission, not photon time.
+		_metrics["preview_frames"] = int(_metrics["preview_frames"]) + 1
+		for key: String in ["compose_cpu_us", "texture_cpu_us", "preview_index_cpu_us", "bytes_uploaded"]:
+			_metrics[key] = int(_metrics[key]) + int(metrics[key])
 
 	_draw_grid_overlay()
 	_draw_pixel_grid_overlay()
@@ -890,7 +899,10 @@ func start_gesture(position: Vector2) -> void:
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"drain_calls": 0, "max_drain_cpu_us": 0,
-		"sample_to_stage_us": []}
+		"sample_to_stage_us": [], "stage_batches_us": [],
+		"commit_cpu_us": 0, "preview_frames": 0,
+		"compose_cpu_us": 0, "texture_cpu_us": 0,
+		"preview_index_cpu_us": 0, "bytes_uploaded": 0}
 	gesture_started.emit()
 	_enqueue_sample(_staged_position)
 	# A stationary dab does not wait for the first motion or mouse-up event.
@@ -965,7 +977,12 @@ func _drain_segments(budget: int) -> void:
 			_stroke_color, _stroke_width, _stroke_erase,
 			selection_mask if selection_mask.enabled else null, 1048576, _stroke_clip)
 		var staged_at_us: int = Time.get_ticks_usec()
-		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + staged_at_us - start_us
+		var batch_cpu_us: int = staged_at_us - start_us
+		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + batch_cpu_us
+		# Cap debug samples during unbounded captures; keep aggregate timing exact.
+		var batch_times: Array = _metrics["stage_batches_us"] as Array
+		if batch_times.size() < 4096:
+			batch_times.append(batch_cpu_us)
 		if not stage.ok:
 			canvas_error.emit(stage.message)
 			cancel_gesture()
@@ -1000,10 +1017,12 @@ func _commit_stroke() -> void:
 		return
 	var active: DrawingEditSession = session
 	session = null
+	var commit_start_us: int = Time.get_ticks_usec()
 	if active.change_count() > 0:
 		_publish(active.commit())
 	else:
 		active.cancel()
+	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	last_gesture_metrics = _metrics.duplicate(true)
 	_restore_input_accumulation()

@@ -11,7 +11,11 @@ var anchor_x: int = 0
 var anchor_y: int = 0
 var _before: Dictionary[String, int] = {}
 var _after: Dictionary[String, int] = {}
-var _covered: Dictionary[String, bool] = {}
+# The hard Brush/Eraser blends each pixel only once per gesture. Keep covered
+# coordinates in integer-keyed scanlines so repeated overlapping 60px sweeps
+# can be rejected *before* their costly geometry and pixel-string allocation.
+# Rows are global (anchor-relative edits must never collide).
+var _covered_rows: Dictionary[int, Dictionary] = {}
 # An edit sees one immutable source revision; avoid re-resolving its tile for
 # each covered pixel. Cache successful absent tiles (null), never failed loads.
 var _source_tiles: Dictionary[String, Variant] = {}
@@ -170,7 +174,12 @@ func _rollback_paint() -> void:
 		else:
 			_after.erase(key)
 		if not snapshot[4]:
-			_covered.erase(key)
+			var parts: PackedStringArray = key.split(",")
+			var row_y: int = int(parts[1])
+			var row: Dictionary = _covered_rows.get(row_y, {})
+			row.erase(int(parts[0]))
+			if row.is_empty():
+				_covered_rows.erase(row_y)
 		_sync_preview_pixel(String(snapshot[5]), int(snapshot[6]), key)
 	_paint_journal.clear()
 	_journaling = false
@@ -179,7 +188,7 @@ func _rollback_paint() -> void:
 func cancel() -> void:
 	_before.clear()
 	_after.clear()
-	_covered.clear()
+	_covered_rows.clear()
 	_source_tiles.clear()
 	_preview_tiles.clear()
 	_preview_tile_versions.clear()
@@ -195,7 +204,7 @@ func commit() -> DrawingResult:
 	var result: DrawingResult = document._publish_edit(layer_id, expected_revision, _before, _after)
 	_before.clear()
 	_after.clear()
-	_covered.clear()
+	_covered_rows.clear()
 	_source_tiles.clear()
 	_preview_tiles.clear()
 	_preview_tile_versions.clear()
@@ -215,9 +224,12 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		return DrawingResult.success()
 	var global_x: int = anchor_x + x
 	var global_y: int = anchor_y + y
+	var covered_row: Dictionary = {}
+	if once:
+		covered_row = _covered_rows.get(global_y, {})
+		if covered_row.has(global_x):
+			return DrawingResult.success()
 	var key: String = "%d,%d" % [global_x, global_y]
-	if once and _covered.has(key):
-		return DrawingResult.success()
 	# Flood fill has already read this exact pixel through the verified source
 	# snapshot. Re-resolving its tile here needlessly allocates a tile key and
 	# repeats the pixel lookup. -1 means all other callers read it normally.
@@ -239,10 +251,11 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	var local_index: int = posmod(global_y, stride_local) * stride_local + posmod(global_x, stride_local)
 	if _journaling and not _paint_journal.has(key):
 		_paint_journal[key] = [_before.has(key), _before.get(key, 0),
-			_after.has(key), _after.get(key, 0), _covered.has(key),
+			_after.has(key), _after.get(key, 0), covered_row.has(global_x),
 			preview_tile_key, local_index]
 	if once:
-		_covered[key] = true
+		covered_row[global_x] = true
+		_covered_rows[global_y] = covered_row
 	if not _before.has(key):
 		_before[key] = old
 	if replacement == _before[key]:
@@ -370,7 +383,10 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 	var stationary: bool = start == finish
 	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
+		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 		for x: int in range(left, right):
+			if covered_row.has(anchor_x + x):
+				continue
 			var center: Vector2 = Vector2(x + 0.5, y + 0.5)
 			var nearest: Vector2 = start if stationary else Geometry2D.get_closest_point_to_segment(center, start, finish)
 			if center.distance_squared_to(nearest) > radius_squared:
@@ -393,7 +409,10 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			var dy_squared: float = dy * dy
 			if dy_squared > radius_squared:
 				continue
+			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 			for x: int in range(left, right):
+				if covered_row.has(anchor_x + x):
+					continue
 				var center_x: float = x + 0.5
 				var dx: float = center_x - clampf(center_x, min_x, max_x)
 				if dx * dx + dy_squared > radius_squared:
@@ -409,7 +428,10 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			var center_y: float = y + 0.5
 			var dy: float = center_y - clampf(center_y, min_y, max_y)
 			var dy_squared: float = dy * dy
+			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 			for x: int in range(left, right):
+				if covered_row.has(anchor_x + x):
+					continue
 				var dx: float = (x + 0.5) - start.x
 				if dx * dx + dy_squared > radius_squared:
 					continue

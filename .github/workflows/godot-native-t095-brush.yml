@@ -1,0 +1,47 @@
+name: Godot T-095 60px Brush profile and independent oracle (on demand, software only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  brush-profile-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install software-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Stage and import from canonical Drawing source
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Exact 60px Brush/Eraser source oracle and transaction rollback
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/t095-oracle.log
+          python3 tools/check_godot_model_log.py /tmp/t095-oracle.log --marker T095_ORACLE_PASSED
+      - name: Real mouse routing and held-button software framebuffer profile
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s xvfb-run -a -s '-screen 0 1280x900x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/brush_latency_native.gd \
+            2>&1 | tee /tmp/t095-native.log
+          python3 tools/check_godot_model_log.py /tmp/t095-native.log --marker T095_NATIVE_PASSED
+      - name: Upload timing data (not owner GPU acceptance)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t095-independent-source-and-software-frames
+          path: |
+            /tmp/t095-oracle.log
+            /tmp/t095-native.log
+          if-no-files-found: warn
