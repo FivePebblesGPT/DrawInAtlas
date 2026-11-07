@@ -197,10 +197,10 @@ func _build_interface() -> void:
 		Callable(self, "_cut_selection"), Callable(self, "_paste_selection"),
 		Callable(self, "_delete_selection")])
 	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
-		"Show grid", "Grid spacing and origin…"],
+		"Show grid", "Grid spacing and origin…", "Pixel grid at high zoom"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
 		func() -> void: _reset_view(), Callable(self, "_toggle_grid"),
-		Callable(self, "_ask_grid_settings")])
+		Callable(self, "_ask_grid_settings"), Callable(self, "_toggle_pixel_grid")])
 	top_bar.add_menu_spec("Image", ["Rasterize text layer", "Object frame…",
 		"Drawing image frame…"],
 		[Callable(self, "_rasterize_text"), Callable(self, "_ask_object_frame"),
@@ -259,7 +259,6 @@ func _build_interface() -> void:
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
 	tabs_line.name = "DocumentTabs"
-	root.add_child(tabs_line)
 	tab_bar = TabBar.new()
 	tab_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	tab_bar.tab_changed.connect(_activate)
@@ -296,9 +295,20 @@ func _build_interface() -> void:
 		button.pressed.connect(_change_tool.bind(name))
 		tool_buttons[name] = button
 		rail.add_child(button)
+	# Document tabs consume only the editing viewport, not the full tool rail
+	# or the independent right-side panel dock.
+	var editor_column: VBoxContainer = VBoxContainer.new()
+	editor_column.name = "EditorContent"
+	editor_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	editor_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	edit_region.add_child(editor_column)
+	editor_column.add_child(tabs_line)
 	_refresh_tool_buttons()
 	canvas = CANVAS_SCRIPT.new() as Control
 	canvas.clip_strokes_to_image_frame = true
+	# Explicit opt-in: translucent grid lines alter framebuffer colors and
+	# should not be mistaken for texture filtering or removable paint pixels.
+	top_bar.set_menu_checked("View", 5, canvas.show_pixel_grid)
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.custom_minimum_size = Vector2(125, 190)
@@ -315,7 +325,7 @@ func _build_interface() -> void:
 	canvas.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseMotion:
 			_update_status())
-	edit_region.add_child(canvas)
+	editor_column.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
 	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
@@ -2961,6 +2971,12 @@ func _toggle_grid() -> void:
 	top_bar.set_menu_checked("View", 3, canvas.show_grid)
 	canvas.queue_redraw()
 	_update_status()
+
+
+func _toggle_pixel_grid() -> void:
+	canvas.show_pixel_grid = not canvas.show_pixel_grid
+	top_bar.set_menu_checked("View", 5, canvas.show_pixel_grid)
+	canvas.queue_redraw()
 
 
 func _ask_grid_settings() -> void:
