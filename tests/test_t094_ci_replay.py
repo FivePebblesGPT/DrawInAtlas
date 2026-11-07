@@ -40,6 +40,14 @@ class LocalReplayTests(unittest.TestCase):
         self.assertIn("tools/ci_fail_late.sh", next(
             step.script for step in steps if step.identifier == "ci_t085_live_stroke_preview"))
 
+    def test_docking_review_metadata_contract_is_required_in_fast_ci(self) -> None:
+        steps = extract_checks(WORKFLOW.read_text(encoding="utf-8"))
+        docs_check = next(step for step in steps if step.identifier ==
+                          "ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux")
+        self.assertIn("test_t078_t083_docking_plan.py", docs_check.script)
+        self.assertIn("test_t094_owner_matrix.py", docs_check.script)
+        self.assertIn("test_t094_owner_evidence.py", docs_check.script)
+
     def test_parser_rejects_unreplayable_step_changes(self) -> None:
         valid = fixture("echo first\necho second")
         self.assertEqual(extract_checks(valid)[0].script, "echo first\necho second\n")

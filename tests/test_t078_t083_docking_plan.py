@@ -7,8 +7,11 @@ or of a completed native UX review.
 from __future__ import annotations
 
 import re
+import tempfile
 import unittest
 from pathlib import Path
+
+from tools.validate_ticket_store import parse_ticket
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
@@ -55,16 +58,70 @@ class GroupedPanelDockRoadmapTests(unittest.TestCase):
         self.assertIn("| 83 |", INDEX)
 
     def test_only_final_ticket_has_new_manual_review_gate(self) -> None:
-        for ticket_id, contents in TICKETS.items():
-            expected = "true" if ticket_id == 83 else "false"
-            self.assertIn(f"manual_review: {expected}", frontmatter(contents))
-            self.assertNotIn("manual_review_approved: true", contents)
+        for ticket_id in TICKETS:
+            with self.subTest(ticket=ticket_id):
+                errors: list[str] = []
+                record = parse_ticket(DOCS / f"Tickets/T-{ticket_id:03}.md", errors)
+                self.assertFalse(errors, errors)
+                self.assertIsNotNone(record)
+                self.assertEqual(record.manual_review, ticket_id == 83)
+                if ticket_id == 83 and record.status == "Done":
+                    self.assertTrue(record.approved and record.evidence)
+                if not record.manual_review:
+                    self.assertFalse(record.approved)
         self.assertIn("**Owner**", next(
             line for line in INDEX.splitlines() if line.startswith("| [T-083 ·")
         ))
         for earlier in (56, 59):
-            existing = (DOCS / f"Tickets/T-{earlier:03}.md").read_text()
-            self.assertIn("manual_review: true", frontmatter(existing))
+            errors: list[str] = []
+            record = parse_ticket(DOCS / f"Tickets/T-{earlier:03}.md", errors)
+            self.assertFalse(errors, errors)
+            self.assertIsNotNone(record)
+            self.assertTrue(record.manual_review)
+
+    def test_example_approval_text_in_body_does_not_set_owner_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "T-083.md"
+            path.write_text(
+                '---\nstatus: "In Progress"\nmanual_review: true\nid: T-083\n'
+                'depends_on: []\n---\n'
+                'Owner must set `manual_review_approved: true` with evidence; '
+                'this is an instruction, not approval.\n',
+                encoding="utf-8",
+            )
+            errors: list[str] = []
+            record = parse_ticket(path, errors)
+            self.assertFalse(errors, errors)
+            self.assertIsNotNone(record)
+            self.assertFalse(record.approved)
+            self.assertEqual(record.evidence, "")
+
+    def test_real_approval_metadata_requires_evidence_and_manual_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "T-083.md"
+            for manual_review, evidence, expected_error in (
+                ("true", "", "requires review_evidence"),
+                ("false", "2026-11-07 owner accepted", "only a manual-review ticket"),
+                ("true", "2026-11-07 owner accepted", None),
+            ):
+                with self.subTest(manual_review=manual_review, evidence=evidence):
+                    path.write_text(
+                        '---\nstatus: "Manual Review"\nid: T-083\n'
+                        f'manual_review: {manual_review}\n'
+                        'manual_review_approved: true\n'
+                        f'review_evidence: "{evidence}"\n'
+                        'depends_on: []\n---\n',
+                        encoding="utf-8",
+                    )
+                    errors: list[str] = []
+                    record = parse_ticket(path, errors)
+                    self.assertIsNotNone(record)
+                    self.assertTrue(record.approved)
+                    if expected_error:
+                        self.assertTrue(any(expected_error in error for error in errors), errors)
+                    else:
+                        self.assertFalse(errors, errors)
+                        self.assertEqual(record.evidence, evidence)
 
     def test_icon_rail_has_panel_icons_but_group_boundaries(self) -> None:
         for phrase in (

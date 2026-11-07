@@ -81,6 +81,20 @@ suite is part of the existing fast CI contract group. **This is not a hosted
 GitHub Actions green run**, physical Windows/Linux review or owner approval.
 [T-094](Tickets/T-094.md) · [CI evidence policy](CI_TESTING.md).
 
+**T-094 dock-review metadata CI regression (2026-11-07; In Progress):**
+The T-078–T-083 docking-plan documentation test incorrectly treated a literal
+`manual_review_approved: true` *example in ticket prose* as an actual owner
+approval. The test now inspects only canonical ticket YAML frontmatter through
+the same parser used by the 94-ticket dependency validator, rejects missing
+review evidence or approval on non-manual tickets, and allows explanatory
+text without changing the gate. The 10/10 docking documentation contracts
+and 13 T-094 local-replay contracts pass; the 60-test fast documentation
+step passed in a **selected local replay**, correctly reported as **1/46
+incomplete**. Five neighboring Godot dock-model suites pass after standalone
+import with strict log validation. This does not verify GitHub-hosted CI,
+Windows/Linux physical owner UX, or T-056/T-059/T-083 signoff; T-094 remains
+In Progress. [Ticket](Tickets/T-094.md).
+
 **T-085 live-stroke engineering checkpoint (2026-11-06; In Progress):**
 An immediate stationary dab and layer-correct detached Brush/Eraser preview
 now render **before release**. Ordered, timestamped source-float mouse samples
