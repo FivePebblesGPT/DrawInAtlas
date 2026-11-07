@@ -197,10 +197,10 @@ func _build_interface() -> void:
 		Callable(self, "_cut_selection"), Callable(self, "_paste_selection"),
 		Callable(self, "_delete_selection")])
 	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
-		"Show grid", "Grid spacing and origin…"],
+		"Show grid", "Grid spacing and origin…", "Pixel grid at high zoom"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
 		func() -> void: _reset_view(), Callable(self, "_toggle_grid"),
-		Callable(self, "_ask_grid_settings")])
+		Callable(self, "_ask_grid_settings"), Callable(self, "_toggle_pixel_grid")])
 	top_bar.add_menu_spec("Image", ["Rasterize text layer", "Object frame…",
 		"Drawing image frame…"],
 		[Callable(self, "_rasterize_text"), Callable(self, "_ask_object_frame"),
@@ -306,6 +306,9 @@ func _build_interface() -> void:
 	_refresh_tool_buttons()
 	canvas = CANVAS_SCRIPT.new() as Control
 	canvas.clip_strokes_to_image_frame = true
+	# Explicit opt-in: translucent grid lines alter framebuffer colors and
+	# should not be mistaken for texture filtering or removable paint pixels.
+	top_bar.set_menu_checked("View", 5, canvas.show_pixel_grid)
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas.custom_minimum_size = Vector2(125, 190)
@@ -2968,6 +2971,12 @@ func _toggle_grid() -> void:
 	top_bar.set_menu_checked("View", 3, canvas.show_grid)
 	canvas.queue_redraw()
 	_update_status()
+
+
+func _toggle_pixel_grid() -> void:
+	canvas.show_pixel_grid = not canvas.show_pixel_grid
+	top_bar.set_menu_checked("View", 5, canvas.show_pixel_grid)
+	canvas.queue_redraw()
 
 
 func _ask_grid_settings() -> void:
