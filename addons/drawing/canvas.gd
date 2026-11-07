@@ -42,6 +42,9 @@ var image_bounds: Rect2i = Rect2i():
 ## without changing its intentionally unbounded authoring surface.
 var clip_strokes_to_image_frame: bool = false
 var _stroke_clip: Rect2i = Rect2i()
+## A stroke uses the exact mask present on pointer-down, not a later edit
+## region that happens to share the same enclosing rectangle.
+var _stroke_selection: DrawingSelection
 var show_grid: bool = false
 ## Pixel boundaries appear automatically when individual pixels become large.
 var show_pixel_grid: bool = true
@@ -66,6 +69,11 @@ var selected: Rect2i = Rect2i():
 			cancel_gesture()
 		selected = value
 		if not _updating_selection_bounds:
+			# Direct legacy rectangle writes must respect the same live-stroke
+			# authorization boundary as set_selection_mask().
+			var next_mask: DrawingSelection = DrawingSelection.new()
+			next_mask.set_rectangle(value)
+			_cancel_stroke_if_selection_changed(next_mask)
 			selection_mask.set_rectangle(value)
 			_mask_outline_cache.clear()
 			_mask_outline_window = Rect2i()
@@ -157,7 +165,20 @@ var last_gesture_metrics: Dictionary[String, Variant] = {}
 func set_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
 	if _floating_source_selection != null:
 		cancel_gesture()
+	_cancel_stroke_if_selection_changed(value)
 	_assign_selection_mask(value, notify)
+
+
+## Changing the edit region during a queued stroke must not combine pixels
+## authorized by two different masks in one document transaction. Equivalent
+## copies are harmless (e.g. a UI refresh that republishes the same mask).
+func _cancel_stroke_if_selection_changed(value: DrawingSelection) -> void:
+	if session == null or _stroke_selection == null:
+		return
+	var next_mask: DrawingSelection = value if value != null else DrawingSelection.new()
+	if not _stroke_selection.same_as(next_mask):
+		cancel_gesture()
+		canvas_error.emit("Stroke cancelled because the selection changed")
 
 
 func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
@@ -929,6 +950,7 @@ func start_gesture(position: Vector2) -> void:
 	_stroke_width = brush_width
 	_stroke_erase = tool == "Eraser"
 	_stroke_clip = image_bounds if clip_strokes_to_image_frame else Rect2i()
+	_stroke_selection = selection_mask.detached_copy()
 	_samples.clear()
 	_sample_times_us.clear()
 	_sample_index = 0
@@ -1017,7 +1039,7 @@ func _drain_segments(budget: int) -> void:
 		var start_us: int = Time.get_ticks_usec()
 		var stage: DrawingResult = session.paint_path(batch,
 			_stroke_color, _stroke_width, _stroke_erase,
-			selection_mask if selection_mask.enabled else null, 1048576, _stroke_clip)
+			_stroke_selection if _stroke_selection.enabled else null, 1048576, _stroke_clip)
 		var staged_at_us: int = Time.get_ticks_usec()
 		var batch_cpu_us: int = staged_at_us - start_us
 		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + batch_cpu_us
@@ -1057,8 +1079,16 @@ func _drain_segments(budget: int) -> void:
 func _commit_stroke() -> void:
 	if session == null:
 		return
+	# Most changes use set_selection_mask() and cancel synchronously. This
+	# final comparison also rejects in-place changes to an exposed mask that
+	# bypassed that setter while input samples were queued.
+	if _stroke_selection == null or not _stroke_selection.same_as(selection_mask):
+		cancel_gesture()
+		canvas_error.emit("Stroke cancelled because the selection changed")
+		return
 	var active: DrawingEditSession = session
 	session = null
+	_stroke_selection = null
 	var commit_start_us: int = Time.get_ticks_usec()
 	if active.change_count() > 0:
 		_publish(active.commit())
@@ -1082,6 +1112,7 @@ func cancel_gesture() -> void:
 	if session != null:
 		session.cancel()
 		session = null
+	_stroke_selection = null
 	if _move_preview != null:
 		_move_preview.cancel()
 		_move_preview = null

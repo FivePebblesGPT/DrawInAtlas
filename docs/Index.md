@@ -10,6 +10,18 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
+**T-085 immutable live-stroke selection boundary (2026-11-07; In Progress):**
+Brush/Eraser pointer-down now freezes the complete boolean edit mask,
+including holes and enabled-empty deny-all. A changed selection during
+queued painting cancels the entire uncommitted preview/backlog and restores
+input state; an equivalent mask is harmless, and an in-place mutation is
+rejected at final commit. The new **77/77 headless** and **125/125 Xvfb native**
+witnesses pass; seven new model assertions fail against the pre-fix code.
+Neighboring T-088/T-095/T-096/viewport/signed-boundary regressions pass
+following a fresh standalone reimport. **No physical input-to-photon evidence,
+Windows/Linux owner approval, or remote CI pass is claimed.**
+[T-085](Tickets/T-085.md) · [T-094 hardware matrix](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
+
 **T-094 CI/acceptance baseline in progress (2026-11-06):** Remote baseline
 `main` CI is red; a strict-FP/FMA-native mask reproducer is fixed in the
 T-068 stress **test build**, stale T-064 documentation status assertions are

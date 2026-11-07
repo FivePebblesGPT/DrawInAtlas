@@ -133,8 +133,12 @@ Windows/Linux owner usability still belongs to the separate review gates.
   outlines its actual edges/holes; large masks use bounded guides. Select →
   Deselect or Ctrl/Cmd+D explicitly clears selection.
 - **Brush, Eraser and bounded core fill/clear** respect the active mask.
-  With no selection, editing is unrestricted. Selection-only operations are
-  clean and optional history recording remains OFF unless enabled in **Edit → Preferences…**.
+  With no selection, editing is unrestricted. Brush/Eraser freeze the exact
+  selection (including holes) at pointer-down; changing or clearing it during
+  a held/queued stroke cancels the entire uncommitted stroke instead of
+  applying later samples to a different edit region. Reapplying an identical
+  mask does not interrupt painting. Selection-only operations are clean and
+  optional history recording remains OFF unless enabled in **Edit → Preferences…**.
 - **Edit → Copy/Cut/Paste/Delete selected pixels** (Ctrl/Cmd+C/X/V, Delete
   when canvas has keyboard focus) operate on the active raster layer, **not**
   the visible merged composite. Copy is read-only; content changes require an
