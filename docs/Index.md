@@ -10,6 +10,20 @@
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**
 
+**T-065 snapshot-authorized source access and bounded version enumeration (2026-11-07; In Progress):**
+The shared Object index now requires a matching listed ID/revision/path/SHA
+before Open, thumbnail, drag or Export, preventing unreviewed same-root
+sources from becoming usable merely by supplying their hash. Atlas drag tokens
+retain their projected metadata and require the independent registry check.
+Per-source version folders now stop after **2,048** directory entries and
+skip any over-budget source with a warning rather than selecting an incomplete
+old revision. The expanded **55/55** index and **43/43** transfer checks pass;
+original-code negative controls fail **3 + 1** new assertions. Atlas paging,
+linked placement and native browser/manager regressions pass. Root-level
+enumeration, cross-process filesystem races, real large-library benchmarks,
+hosted CI and owner Windows/Linux review remain open. T-065 stays **In
+Progress**, `manual_review: true`. [T-065 evidence](Tickets/T-065.md).
+
 **T-065 portable Object path-link hardening (2026-11-07; In Progress):**
 The read-only Objects/ index and standalone import/export now reject
 symlinks at **any ancestor**, not only the indexed filename/Objects leaf.

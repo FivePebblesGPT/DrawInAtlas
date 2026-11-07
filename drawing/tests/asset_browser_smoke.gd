@@ -50,6 +50,21 @@ func _run() -> void:
 	check(browser.warnings.is_empty(), "clean sources do not produce warnings")
 	check(browser.safe_to_open(browser.entries[0]) and browser.safe_to_open(browser.entries[1]),
 		"indexed versioned and loose sources pass safe revalidation")
+	check(browser.safe_to_open(browser.filtered("castle")[0]),
+		"deep-copied filtered index record remains authorized")
+	var altered: Dictionary = browser.entries[0].duplicate(true)
+	altered["name"] = "Unreviewed label"
+	check(not browser.safe_to_open(altered),
+		"a modified display record cannot borrow the indexed source authority")
+	var unlisted_path: String = objects.path_join("unlisted.drawing")
+	check(write_source("unlisted", "Unlisted", unlisted_path),
+		"write a real Object source after the index snapshot")
+	var unlisted: Dictionary = {"id": "unlisted", "name": "Unlisted", "revision": 1,
+		"path": unlisted_path, "sha256": FileAccess.get_sha256(unlisted_path)}
+	check(not browser.safe_to_open(unlisted),
+		"a hash-valid source created after scan is not authorized by the snapshot")
+	check(DirAccess.remove_absolute(unlisted_path) == OK,
+		"clean up unlisted source without changing the indexed records")
 	# The user can select an absolute path *through* a symlinked campaign
 	# ancestor; detecting only Objects/ and its direct children is insufficient.
 	var alias_parent: String = fixture_root + "-alias"
@@ -154,6 +169,30 @@ func _run() -> void:
 	check(browser.scan(moved_root.path_join("Objects")).ok and browser.entries.is_empty() and
 		not browser.warnings.is_empty(),
 		"inconsistent revision is rejected, not silently downgraded to prior version")
+	# A large version folder must not silently publish an older version chosen
+	# from an incomplete directory enumeration. Dummy filenames are deliberately
+	# not valid revisions: every directory entry still costs bounded work.
+	var crowded: String = moved_root.path_join("Objects/crowded")
+	check(write_source("crowded", "Crowded", crowded.path_join("v000001.drawing")),
+		"publish a valid revision beneath the candidate budget")
+	var populated: bool = true
+	for i: int in range(DrawingAssetBrowserIndex.MAX_CANDIDATES):
+		var noise: FileAccess = FileAccess.open(crowded.path_join("noise-%04d.tmp" % i), FileAccess.WRITE)
+		if noise == null:
+			populated = false
+			break
+		noise.close()
+	check(populated, "create over-budget revision directory fixture")
+	check(browser.scan(moved_root.path_join("Objects")).ok and
+		browser.filtered("crowded").is_empty() and
+		"Skipped asset revision directory exceeding candidate limit" in browser.warnings,
+		"over-budget revision directory cannot present an incomplete old version")
+	for i: int in range(DrawingAssetBrowserIndex.MAX_CANDIDATES):
+		DirAccess.remove_absolute(crowded.path_join("noise-%04d.tmp" % i))
+	check(browser.scan(moved_root.path_join("Objects")).ok and
+		browser.filtered("crowded").size() == 1 and
+		browser.safe_to_open(browser.filtered("crowded")[0]),
+		"after excess entries are removed, a fresh scan authorizes the full revision")
 	app.queue_free()
 	print("T065_ASSET_BROWSER: %d passed; %d failed" % [passed, failed])
 	if failed == 0:

@@ -1282,3 +1282,17 @@ only the specifically named *literal* post-success Godot shutdown leak lines;
 no other error is excused. The existing required T-073 Python test step carries
 these regressions, without changing the 46 required check IDs. The local test
 result is not hosted CI evidence or owner hardware UX approval.
+
+### T-065 source index membership and revision directory limits — 2026-11-07
+
+The existing required `ci_t065_asset_browser_model` and
+`ci_t065_asset_transfer_model` steps run the expanded exact-source regression
+fixtures. A filesystem-valid `.drawing` file added after listing must not be
+read/exported via a caller-created record until refresh. Indexed records and
+Atlas's subset drag tokens remain supported; the published Atlas registry is
+still an independent placement authority. A directory containing 2,049
+version candidates must be skipped with a warning rather than expose an
+arbitrary old revision. These checks test bounded **per-revision-directory**
+enumeration, not root-directory scalability or atomic no-follow POSIX file
+operations. The native Atlas and standalone browser witnesses remain
+on-demand, and no required CI step ID was added.

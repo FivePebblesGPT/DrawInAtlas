@@ -68,6 +68,19 @@ func run() -> void:
 		"Import is byte-for-byte lossless and leaves external source intact")
 	check(index.scan(objects).ok and index.entries.size() == 1 and
 		index.entries[0]["id"] == "asset-portable", "fresh index sees copied stable source")
+	# A caller may supply a correct filesystem hash for a source created after
+	# the user's index snapshot. Export must not treat that as selected authority.
+	var forged_path: String = objects.path_join("unlisted.drawing")
+	check(write_source(forged_path, "unlisted", "Unreviewed"),
+		"create source after the latest displayed index snapshot")
+	var forged: Dictionary = {"id": "unlisted", "name": "Unreviewed", "revision": 1,
+		"path": forged_path, "sha256": FileAccess.get_sha256(forged_path)}
+	var forged_export: String = output_folder.path_join("forged-export.drawing")
+	check(not TRANSFERS.export_file(index, forged, forged_export).ok and
+		not FileAccess.file_exists(forged_export),
+		"Export rejects a real byte-valid source that was not in the selected index")
+	check(DirAccess.remove_absolute(forged_path) == OK,
+		"clean up unindexed source without changing the authorized export")
 	check(not TRANSFERS.import_file(index, source).ok,
 		"duplicate source ID import is forbidden, even with different filename")
 	check(not TRANSFERS.import_file(index, destination).ok,

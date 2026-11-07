@@ -61,11 +61,26 @@ func scan(objects_path: String) -> DrawingResult:
 		var asset_directory: DirAccess = DirAccess.open(base.path_join(child_name))
 		if asset_directory == null:
 			continue
+		# A revision folder is untrusted input. Enumerate it incrementally;
+		# get_files() materializes an unbounded array before we can apply a cap.
+		# Never publish an arbitrarily old revision from a truncated directory.
+		if asset_directory.list_dir_begin() != OK:
+			issues.append("Skipped unreadable asset revisions")
+			continue
 		var latest: int = 0
 		var chosen: String = ""
-		for filename: String in asset_directory.get_files():
-			if asset_directory.is_link(filename) or not filename.begins_with("v") or \
-					not filename.ends_with(".drawing"):
+		var examined: int = 0
+		var over_limit: bool = false
+		while true:
+			var filename: String = asset_directory.get_next()
+			if filename.is_empty():
+				break
+			examined += 1
+			if examined > MAX_CANDIDATES:
+				over_limit = true
+				break
+			if asset_directory.current_is_dir() or asset_directory.is_link(filename) or \
+					not filename.begins_with("v") or not filename.ends_with(".drawing"):
 				continue
 			var digits: String = filename.substr(1, filename.length() - 9)
 			if digits.length() != 6 or not digits.is_valid_int():
@@ -74,6 +89,10 @@ func scan(objects_path: String) -> DrawingResult:
 			if revision > latest and revision <= 999999:
 				latest = revision
 				chosen = filename
+		asset_directory.list_dir_end()
+		if over_limit:
+			issues.append("Skipped asset revision directory exceeding candidate limit")
+			continue
 		if chosen.is_empty():
 			continue
 		_read_source(base.path_join(child_name).path_join(chosen), seen, next, issues, child_name)
@@ -139,6 +158,27 @@ func _read_source(path: String, seen: Dictionary, target: Array[Dictionary],
 func safe_to_open(entry: Dictionary) -> bool:
 	if root_path.is_empty() or not entry.get("path") is String or not entry.get("sha256") is String or \
 			not path_has_no_links(root_path):
+		return false
+	# A correct hash/path by itself does not authorize opening or exporting a
+	# source. Require the current index/page to contain that source identity.
+	# Drag tokens are a *projection* of an indexed row (no bounds/usage), so
+	# compare identity fields and any optional displayed metadata provided.
+	var listed: bool = false
+	for indexed: Dictionary in entries:
+		if indexed.get("id") != entry.get("id") or \
+				indexed.get("path") != entry.get("path") or \
+				indexed.get("sha256") != entry.get("sha256") or \
+				indexed.get("revision") != entry.get("revision"):
+			continue
+		var metadata_matches: bool = true
+		for field: String in ["name", "bounds", "embedded_id", "embedded_revision", "usage"]:
+			if entry.has(field) and indexed.get(field) != entry[field]:
+				metadata_matches = false
+				break
+		if metadata_matches:
+			listed = true
+			break
+	if not listed:
 		return false
 	var path: String = String(entry["path"])
 	if not path.begins_with(root_path + "/") or not path_has_no_links(path):
