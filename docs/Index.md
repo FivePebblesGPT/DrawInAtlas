@@ -1548,6 +1548,21 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 cached native fixed-point pixel export (2026-11-09; In Progress):**
+Hokusai's Rust dirty-tile exporter now skips expensive linear→sRGB conversion
+for unchanged fix15 pixels and exports only byte-different RGBA8 values. A
+full-input preflight prevents an invalid later point from mutating native
+stroke state. Two offline Rust tests, Clippy, and **81/81** frozen pre-change
+native `.myb` delta-stream checks pass (hard/soft/ink/airbrush), along with
+selection, preview, navigation and framebuffer regressions. In a same-machine
+5×120-motion Xvfb control, native export CPU p95 changed **35.184→25.035ms**,
+but full-gesture staging p95 **237.346→253.152ms** did not improve; Legacy
+is still faster. The native raw cache costs 32 KiB extra per touched 64px
+tile. No hosted CI or hardware response evidence; T-095 remains **In Progress**,
+`manual_review: true`, and T-096 independently remains **Manual Review**.
+[Evidence](evidence/T-095-2026-11-09-native-raw-pixel-export.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 sparse detached-preview compositor checkpoint (2026-11-09; In Progress):**
 Small native/legacy live-paint patches previously triggered a full 128px
 display tile scan even with only a handful of source/preview pixels. Bounded

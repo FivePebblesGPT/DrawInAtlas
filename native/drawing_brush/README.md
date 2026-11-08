@@ -164,3 +164,28 @@ paired software brush witness improves staging p95 235.533→215.324ms;
 [measurements](../../docs/evidence/T-095-2026-11-09-tile-run-buffer.md).
 Hokusai remains opt-in and slower than Legacy under this workload. Owner
 input-to-photon acceptance and cross-platform packaging remain outstanding.
+
+
+### 2026-11-09 cached raw fixed-point Hokusai export (not owner acceptance)
+
+The native per-stroke dirty exporter now caches each tile's last fix15 4×u16
+raw pixels alongside the previously exported u32 RGBA8 buffer. Unchanged
+raw pixels skip per-pixel linear→sRGB conversion; a changed raw value only
+exports a new triple when the **quantized** RGBA8 differs. Additional memory
+is 32 KiB per visited 64×64 native tile. An invalid later input position
+or non-finite pressure is rejected before mutating any native brush state;
+the existing ABI still signals rejection with an empty output array.
+
+The new `drawing/tests/t095_native_export_cache.gd` fixture hashes the full
+batch-delimited stream against frozen old-library output for four real `.myb`
+presets and checks that rejected input cannot corrupt a following batch. It
+requires the actual native library and pinned Godot 4.8b2; it is not a
+binary-free CI test. Two Rust unit oracles independently check full-tile
+quantization, changed/unchanged raw bytes, transparent erasure and silent
+sub-RGBA8 fixed-point changes. `cargo test` and `cargo clippy --all-targets
+-- -D warnings` pass against the vendor archive in offline mode.
+
+Paired five-stroke Xvfb/Mesa evidence shows lower **native exporter** CPU
+p95 (35.184→25.035ms) but no improvement in **full gesture** staging p95
+(237.346→253.152ms); Legacy is still faster. [Measurements and limitations](../../docs/evidence/T-095-2026-11-09-native-raw-pixel-export.md).
+T-095 remains `In Progress` with owner manual review required.

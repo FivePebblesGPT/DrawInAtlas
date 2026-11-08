@@ -39,13 +39,71 @@ impl TiledSurface for TrackedSurface {
     }
 }
 
+/// Quantized output plus the last observed native fixed-point pixels. Most
+/// Hokusai dabs touch only a small part of an already painted 64px tile.
+/// Comparing the cheap fixed-point values before sRGB conversion avoids
+/// converting all 4096 pixels again at every native batch boundary.
+struct ExportedTile {
+    raw: Vec<[u16; 4]>,
+    rgba: Vec<u32>,
+}
+
+impl Default for ExportedTile {
+    fn default() -> Self {
+        Self {
+            raw: vec![[0; 4]; TILE_SIZE * TILE_SIZE],
+            rgba: vec![0; TILE_SIZE * TILE_SIZE],
+        }
+    }
+}
+
+fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
+    let alpha = hokusai::fix15::to_f32(pixel[3]).clamp(0.0, 1.0);
+    let mut rgba = 0_u32;
+    for (index, &channel) in pixel.iter().take(3).enumerate() {
+        let linear = if alpha > 0.0 {
+            hokusai::fix15::to_f32(channel) / alpha
+        } else {
+            0.0
+        };
+        let value = (hokusai::color::linear_to_srgb(linear).clamp(0.0, 1.0) * 255.0).round() as u32;
+        rgba |= value << (8 * index);
+    }
+    rgba | (((alpha * 255.0).round() as u32) << 24)
+}
+
+/// Only changed quantized bytes are exported, even when the native fixed-point
+/// value changed within the same 8-bit bucket. Never use raw equality to
+/// decide whether a pixel must be re-composited in DrawingDocument.
+fn scan_changed_pixels(
+    tile: &hokusai::tile::TilePixels,
+    published: &mut ExportedTile,
+    mut emit: impl FnMut(usize, u32),
+) {
+    for (row, tile_row) in tile.iter().enumerate() {
+        for (column, pixel) in tile_row.iter().enumerate() {
+            let index = row * TILE_SIZE + column;
+            if published.raw[index] == *pixel {
+                continue;
+            }
+            published.raw[index] = *pixel;
+            let rgba = quantize_pixel(pixel);
+            if rgba != published.rgba[index] {
+                published.rgba[index] = rgba;
+                emit(index, rgba);
+            }
+        }
+    }
+}
+
 struct PresetStroke {
     brush: Brush,
     state: BrushState,
     surface: TrackedSurface,
-    /// Last exported straight-alpha RGBA8 pixels; pixel-equal repeats never
-    /// re-enter slow GDScript staging or preview generation.
-    published: HashMap<(i32, i32), Vec<u32>>,
+    /// Last exported raw fixed-point and straight-alpha RGBA8 pixels. A
+    /// quantized repeat must not re-enter GDScript staging or invalidate a
+    /// detached preview, even when the underlying native surface changed.
+    published: HashMap<(i32, i32), ExportedTile>,
 }
 
 #[derive(GodotClass)]
@@ -203,14 +261,21 @@ impl DrawingNativeBrush {
         let Some(stroke) = self.preset.as_mut() else {
             return output;
         };
+        // Check the entire batch before calling into the stateful brush.
+        // Returning an empty array halfway through the loop used to leave
+        // native pigment and pending dirty tiles behind for the next call,
+        // while GDScript saw a harmless empty delta rather than a failed edit.
+        if !pressure.is_finite()
+            || points.as_slice().iter().any(|point| {
+                !point.x.is_finite()
+                    || !point.y.is_finite()
+                    || point.x.abs() >= 1_000_000_000.0
+                    || point.y.abs() >= 1_000_000_000.0
+            })
+        {
+            return output;
+        }
         for &point in points.as_slice() {
-            if !point.x.is_finite()
-                || !point.y.is_finite()
-                || point.x.abs() >= 1_000_000_000.0
-                || point.y.abs() >= 1_000_000_000.0
-            {
-                return PackedInt32Array::new();
-            }
             stroke.brush.stroke_to(
                 &mut stroke.state,
                 &mut stroke.surface,
@@ -228,34 +293,12 @@ impl DrawingNativeBrush {
             let Some(tile) = stroke.surface.inner.tile(tx, ty) else {
                 continue;
             };
-            let published = stroke
-                .published
-                .entry((tx, ty))
-                .or_insert_with(|| vec![0; TILE_SIZE * TILE_SIZE]);
-            for (row, tile_row) in tile.iter().enumerate() {
-                for (column, pixel) in tile_row.iter().enumerate() {
-                    let alpha = hokusai::fix15::to_f32(pixel[3]).clamp(0.0, 1.0);
-                    let mut rgba = 0_u32;
-                    for (index, &channel) in pixel.iter().take(3).enumerate() {
-                        let linear = if alpha > 0.0 {
-                            hokusai::fix15::to_f32(channel) / alpha
-                        } else {
-                            0.0
-                        };
-                        let value = (hokusai::color::linear_to_srgb(linear).clamp(0.0, 1.0) * 255.0)
-                            .round() as u32;
-                        rgba |= value << (8 * index);
-                    }
-                    rgba |= ((alpha * 255.0).round() as u32) << 24;
-                    let index = row * TILE_SIZE + column;
-                    if rgba != published[index] {
-                        published[index] = rgba;
-                        output.push(tx * TILE_SIZE as i32 + column as i32);
-                        output.push(ty * TILE_SIZE as i32 + row as i32);
-                        output.push(rgba as i32);
-                    }
-                }
-            }
+            let published = stroke.published.entry((tx, ty)).or_default();
+            scan_changed_pixels(tile, published, |index, rgba| {
+                output.push(tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32);
+                output.push(ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32);
+                output.push(rgba as i32);
+            });
         }
         output
     }
@@ -266,3 +309,104 @@ struct DrawingBrushExtension;
 // No Godot scene APIs are used by this Rust class outside the engine main thread.
 #[gdextension]
 unsafe impl ExtensionLibrary for DrawingBrushExtension {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cached_native_scan_matches_full_quantized_export() {
+        let mut raw = [[[0_u16; 4]; TILE_SIZE]; TILE_SIZE];
+        let mut cache = ExportedTile::default();
+        let mut reference = vec![0_u32; TILE_SIZE * TILE_SIZE];
+        for frame in 0..32_usize {
+            // Model clustered dabs, including changes at both signed tile
+            // edges, an erase to all zeros, and a reappearance after erase.
+            for index in 0..397_usize {
+                let column = (index * 137 + frame * 19) % TILE_SIZE;
+                let row = (index * 37 + frame * 13) % TILE_SIZE;
+                let alpha = if (index + frame) % 19 == 0 {
+                    0
+                } else {
+                    (index * 89 + frame * 271) % 32769
+                };
+                raw[row][column] = if frame % 9 == 8 {
+                    [0; 4]
+                } else {
+                    [
+                        ((index * 119 + frame * 11) % 32769) as u16,
+                        ((index * 81 + frame * 17) % 32769) as u16,
+                        ((index * 41 + frame * 29) % 32769) as u16,
+                        alpha as u16,
+                    ]
+                };
+            }
+            let mut expected = Vec::new();
+            for (row, pixels) in raw.iter().enumerate() {
+                for (column, pixel) in pixels.iter().enumerate() {
+                    let index = row * TILE_SIZE + column;
+                    let rgba = quantize_pixel(pixel);
+                    if rgba != reference[index] {
+                        reference[index] = rgba;
+                        expected.push((index, rgba));
+                    }
+                }
+            }
+            let mut actual = Vec::new();
+            scan_changed_pixels(&raw, &mut cache, |index, rgba| {
+                actual.push((index, rgba));
+            });
+            assert_eq!(
+                actual, expected,
+                "frame {frame} must export exact RGBA8 deltas"
+            );
+            assert_eq!(cache.rgba, reference);
+            let mut unchanged = Vec::new();
+            scan_changed_pixels(&raw, &mut cache, |index, rgba| {
+                unchanged.push((index, rgba));
+            });
+            assert!(
+                unchanged.is_empty(),
+                "unchanged native tile re-exported pixels"
+            );
+        }
+    }
+
+    #[test]
+    fn native_changes_with_identical_rgba_do_not_reenter_script() {
+        let mut raw = [[[0_u16; 4]; TILE_SIZE]; TILE_SIZE];
+        let mut cache = ExportedTile::default();
+        raw[0][0] = [200, 99, 71, 0]; // Hidden native RGB remains transparent.
+        let mut emitted = Vec::new();
+        scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
+        assert!(emitted.is_empty());
+        assert_eq!(cache.raw[0], raw[0][0]);
+
+        raw[0][0] = [5000, 4000, 3000, 20000];
+        scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(emitted[0], (0, quantize_pixel(&raw[0][0])));
+        emitted.clear();
+        raw[0][0] = [7000, 123, 456, 0]; // Exact erase must emit alpha zero.
+        scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
+        assert_eq!(emitted, vec![(0, 0)]);
+        emitted.clear();
+        raw[0][0] = [71, 55, 92, 0]; // Hidden RGB changes remain silent.
+        scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
+        assert!(emitted.is_empty());
+
+        // A native fix15 adjustment can stay inside one RGBA8 quantization
+        // bucket; it must update the raw cache without emitting an edit.
+        let same_bucket = (1_u16..=1000).find(|&value| {
+            quantize_pixel(&[value, 0, 0, 32768]) == quantize_pixel(&[value + 1, 0, 0, 32768])
+        });
+        let value = same_bucket.expect("sRGB quantization has repeated buckets");
+        raw[0][0] = [value, 0, 0, 32768];
+        scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
+        emitted.clear();
+        raw[0][0][0] += 1;
+        scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
+        assert!(emitted.is_empty());
+        assert_eq!(cache.raw[0], raw[0][0]);
+    }
+}
