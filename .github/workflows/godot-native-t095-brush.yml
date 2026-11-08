@@ -40,6 +40,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/t095-hokusai-delta.log
           python3 tools/check_godot_model_log.py /tmp/t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED
+      - name: T-095 signed native tile arithmetic and original-pixel parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_tile_shift_smoke.gd 2>&1 | tee /tmp/t095-tile-shift.log
+          python3 tools/check_godot_model_log.py /tmp/t095-tile-shift.log --marker T095_TILE_SHIFT_PASSED
       - name: T-095 native tile-commit and history parity (native binary not required)
         run: |
           set -euo pipefail
@@ -68,6 +74,7 @@ jobs:
           path: |
             /tmp/t095-oracle.log
             /tmp/t095-hokusai-delta.log
+            /tmp/t095-tile-shift.log
             /tmp/t095-tile-commit.log
             /tmp/t095-sparse-preview.log
             /tmp/t095-blend.log

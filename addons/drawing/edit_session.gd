@@ -422,6 +422,18 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	var stage_start_us: int = Time.get_ticks_usec()
 	var opacity: int = (rgba >> 24) & 255
 	var stride: int = document.tile_stride
+	# Power-of-two storage strides cover the default 256px tiles and the
+	# native 64px fixtures. Arithmetic right shifts implement floor division
+	# for negative signed 64-bit anchors, while masking gives the exact local
+	# remainder. Non-power-of-two strides retain the original general path.
+	var power_of_two: bool = (stride & (stride - 1)) == 0
+	var tile_shift: int = 0
+	var tile_mask: int = stride - 1
+	if power_of_two:
+		var size: int = stride
+		while size > 1:
+			tile_shift += 1
+			size >>= 1
 	# Group each accepted delta by its storage tile during preflight, then
 	# stage using integer offsets. Native quantized pixels may revisit the same
 	# source pixel across batches; never repeatedly construct global keys.
@@ -453,8 +465,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 			continue
 		var global_x: int = anchor_x + x
 		var global_y: int = anchor_y + y
-		var storage_x: int = DrawingDocument.TILES.floor_div(global_x, stride)
-		var storage_y: int = DrawingDocument.TILES.floor_div(global_y, stride)
+		var storage_x: int = (global_x >> tile_shift) if power_of_two else DrawingDocument.TILES.floor_div(global_x, stride)
+		var storage_y: int = (global_y >> tile_shift) if power_of_two else DrawingDocument.TILES.floor_div(global_y, stride)
 		if not has_cached_tile or storage_x != cached_tile_x or storage_y != cached_tile_y:
 			cached_tile_x = storage_x
 			cached_tile_y = storage_y
@@ -465,7 +477,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 			has_cached_tile = true
 		# floor_div (not 32-bit Vector2i conversion) keeps negative and >2^31
 		# world positions in their original storage tile and local offset.
-		var local_index: int = (global_y - storage_y * stride) * stride + global_x - storage_x * stride
+		var local_index: int = ((global_y & tile_mask) * stride + (global_x & tile_mask)) \
+			if power_of_two else (global_y - storage_y * stride) * stride + global_x - storage_x * stride
 		var pigment: int = int(changed[index + 2]) & 0xffffffff
 		var alpha: int = (((pigment >> 24) & 255) * opacity + 127) / 255
 		cached_pixels.push_back(local_index)

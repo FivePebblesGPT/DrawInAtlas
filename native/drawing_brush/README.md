@@ -189,3 +189,19 @@ Paired five-stroke Xvfb/Mesa evidence shows lower **native exporter** CPU
 p95 (35.184→25.035ms) but no improvement in **full gesture** staging p95
 (237.346→253.152ms); Legacy is still faster. [Measurements and limitations](../../docs/evidence/T-095-2026-11-09-native-raw-pixel-export.md).
 T-095 remains `In Progress` with owner manual review required.
+
+### 2026-11-09 signed native tile preflight (software-only checkpoint)
+
+For common power-of-two Drawing storage tiles, GDScript Hokusai-delta
+preflight now uses a signed arithmetic right shift (floor quotient) and
+bitmask (nonnegative local remainder) instead of per-delta signed division
+and coordinate reconstruction. Non-power-of-two strides retain the original
+exact path. An independent **422/422** deterministic oracle in
+`drawing/tests/t095_tile_shift_smoke.gd` tests both branches against
+original per-pixel staging at signed >32-bit anchors, including selection,
+clipping, preview, commit and Undo/Redo. Two paired Xvfb/Mesa 60px pointer
+comparisons reduced Hokusai CPU staging p95 201.491→183.443ms and
+204.460→186.535ms; Legacy still stages at 167.412ms p95. These software
+measurements do **not** establish physical input-to-photon responsiveness,
+so Legacy remains the default and T-095's owner gate is open.
+[Evidence and reproduction](../../docs/evidence/T-095-2026-11-09-signed-tile-shift.md).

@@ -1548,6 +1548,21 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 signed power-of-two Hokusai tile staging (2026-11-09; In Progress):**
+The native-delta path now maps signed global pixels to the common power-of-two
+storage tile using exact arithmetic shift/mask, while retaining signed floor
+division for arbitrary strides. An independent **422/422** oracle compares
+the old pixel-staging path across ten tile sizes, signed 64-bit anchors,
+selection holes, alpha, preview, canonical history and Undo/Redo.
+Two controlled 60px/786% five-stroke Xvfb/Mesa pairs reduced Hokusai staging
+p95 **201.491→183.443ms** and **204.460→186.535ms** (~9%);
+Legacy remains faster at 167.412ms p95. This is software CPU evidence, **not** physical input-to-photon or owner acceptance.
+Neighboring native, navigation, viewport and fallback tests pass locally;
+CI/export checks remain open. T-095 stays **In Progress**, `manual_review: true`,
+T-096 stays independently in Manual Review, and PR #16 remains unmerged.
+[Evidence](evidence/T-095-2026-11-09-signed-tile-shift.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 direct tile-local native commit (2026-11-09; In Progress):**
 Hokusai-only commits now avoid generating and reparsing global `"x,y"`
 pixel keys before publishing the detached preview. A shared atomic
