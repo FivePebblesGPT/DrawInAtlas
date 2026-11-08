@@ -40,6 +40,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_input_queue_compaction_smoke.gd 2>&1 | tee /tmp/t095-queue-compaction.log
           python3 tools/check_godot_model_log.py /tmp/t095-queue-compaction.log --marker T095_QUEUE_COMPACTION_PASSED
+      - name: T-095 bounded sample-age metrics and long Brush parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_latency_window_smoke.gd 2>&1 | tee /tmp/t095-latency-window.log
+          python3 tools/check_godot_model_log.py /tmp/t095-latency-window.log --marker T095_LATENCY_WINDOW_PASSED
       - name: T-095 signed Legacy tile/source lookup and history parity
         run: |
           set -euo pipefail

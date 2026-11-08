@@ -1561,6 +1561,20 @@ T-095 stays **In Progress**, `manual_review: true`; T-096 remains in separate
 Manual Review. [Evidence](evidence/T-095-2026-11-09-input-queue-compaction.md) ·
 [ticket](Tickets/T-095.md).
 
+**T-095 bounded input-latency telemetry (2026-11-09; In Progress):**
+The sustained-stroke queue fix still left an **unbounded** per-waypoint
+`sample_to_stage_us` array and final deep-copy. Short gestures keep full
+latency history; long gestures now retain the chronological latest **4,096**
+ages, with exact lifetime count and worst age. A new **22/22** oracle paints
+4,602 waypoints with exact RGBA8/history parity, tests 15,000 latency records
+and fails against the old source (4,602 retained versus the new 4,096 cap).
+This bounds profiler memory, **not raster latency**: two five-stroke Xvfb
+controls showed no staging speedup. T-095 remains **In Progress** with
+`manual_review: true`; hosted CI and owner-device acceptance are outstanding,
+and T-096 remains independently in Manual Review.
+[Evidence](evidence/T-095-2026-11-09-bounded-latency-telemetry.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 default Legacy Brush tile/source lookup checkpoint (2026-11-09; In Progress):**
 The common `DrawingEditSession._stage()` now reuses one signed storage-tile
 key and integer local offset for source reads, previews and rollback, reading

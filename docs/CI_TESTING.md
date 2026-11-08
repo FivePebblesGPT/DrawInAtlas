@@ -6,6 +6,19 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 bounded sample-to-stage telemetry witness — 2026-11-09
+
+The on-demand `godot-native-t095-brush.yml` now also runs the strictly
+validated `t095_latency_window_smoke.gd` (**22/22**, marker
+`T095_LATENCY_WINDOW_PASSED`). It checks the chronological last-4,096 latency
+window, exact lifetime count and worst age, plus a real 4,602-waypoint Brush
+stroke's source pixels, post-release navigation and Undo/Redo. Its original-
+source negative control fails the 4,096 cap. Longer-stroke input-latency
+percentiles from the retained array are **latest-window estimates**, not
+whole-stroke percentiles; exact worst age is separately recorded. This
+changes neither the 46 required fast-CI check IDs nor the independent
+physical owner-acceptance gate.
+
 ## T-095 sustained-input buffer retention witness — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` now includes the strictly

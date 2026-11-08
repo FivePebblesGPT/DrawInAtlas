@@ -202,9 +202,13 @@ const MAX_SEGMENT_LENGTH: float = 24.0
 # Discard only an already-consumed prefix of a sustained stroke. A paint
 # backlog may never become entirely empty while fresh OS samples arrive.
 const MIN_CONSUMED_SAMPLE_COMPACTION: int = 256
+## Keep exact history for short gestures and a chronological, rolling tail for
+## long ones. All-time count and worst age remain exact, including evicted ages.
+const MAX_SAMPLE_STAGE_LATENCIES: int = 4096
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
+var _sample_latency_write_index: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -1051,6 +1055,7 @@ func start_gesture(position: Vector2) -> void:
 	_samples.clear()
 	_sample_times_us.clear()
 	_sample_index = 0
+	_sample_latency_write_index = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1060,7 +1065,8 @@ func start_gesture(position: Vector2) -> void:
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"max_sample_buffer": 0, "sample_compactions": 0,
 		"drain_calls": 0, "max_drain_cpu_us": 0,
-		"sample_to_stage_us": [], "stage_batches_us": [],
+		"sample_to_stage_us": [], "sample_to_stage_total": 0,
+		"max_sample_to_stage_us": 0, "stage_batches_us": [],
 		"commit_cpu_us": 0, "preview_frames": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0,
 		"preview_index_cpu_us": 0, "bytes_uploaded": 0}
@@ -1169,9 +1175,8 @@ func _drain_segments(budget: int) -> void:
 		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
 		_staged_position = next_position
 		changed = true
-		var arrival_to_stage: Array = _metrics["sample_to_stage_us"] as Array
 		for arrival_us: int in completed_arrivals:
-			arrival_to_stage.append(maxi(0, staged_at_us - arrival_us))
+			_record_stage_latency(maxi(0, staged_at_us - arrival_us))
 		# The deadline is checked between atomic batches, never during a
 		# partially rasterized segment or while receiving a pointer event.
 		if staged_at_us - drain_start_us >= MAX_DRAIN_CPU_US:
@@ -1184,6 +1189,33 @@ func _drain_segments(budget: int) -> void:
 		queue_redraw()
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
+
+
+## An unbounded list of per-sample latencies defeats input queue compaction on
+## sustained strokes and makes final deep-copy cost depend on stroke duration.
+## The latest window stays bounded; the all-time maximum and count are exact.
+func _record_stage_latency(latency_us: int) -> void:
+	var samples: Array = _metrics["sample_to_stage_us"] as Array
+	var age: int = maxi(0, latency_us)
+	_metrics["sample_to_stage_total"] = int(_metrics["sample_to_stage_total"]) + 1
+	_metrics["max_sample_to_stage_us"] = maxi(int(_metrics["max_sample_to_stage_us"]), age)
+	if samples.size() < MAX_SAMPLE_STAGE_LATENCIES:
+		samples.append(age)
+	else:
+		samples[_sample_latency_write_index] = age
+		_sample_latency_write_index = (_sample_latency_write_index + 1) % MAX_SAMPLE_STAGE_LATENCIES
+
+
+## Return latency samples in temporal order for the existing profiler and
+## external consumers. Short strokes keep their original complete history.
+func _finalize_stage_latency_window() -> void:
+	if int(_metrics["sample_to_stage_total"]) <= MAX_SAMPLE_STAGE_LATENCIES \
+			or _sample_latency_write_index == 0:
+		return
+	var samples: Array = _metrics["sample_to_stage_us"] as Array
+	var ordered: Array = samples.slice(_sample_latency_write_index)
+	ordered.append_array(samples.slice(0, _sample_latency_write_index))
+	_metrics["sample_to_stage_us"] = ordered
 
 
 ## Bound retained input memory even when a long capture never catches up
@@ -1226,6 +1258,7 @@ func _commit_stroke() -> void:
 		active.cancel()
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
+	_finalize_stage_latency_window()
 	last_gesture_metrics = _metrics.duplicate(true)
 	_restore_input_accumulation()
 	_samples.clear()
