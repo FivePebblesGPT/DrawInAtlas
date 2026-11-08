@@ -265,5 +265,88 @@ func run() -> void:
 		mixed_fault_doc.read_pixel(mixed_fault_layer, ORIGIN_X - 12, ORIGIN_Y - 9).value != 0 and
 		mixed_fault_doc.read_pixel(mixed_fault_layer, ORIGIN_X + 12, ORIGIN_Y - 9).value == 0,
 		"native pigment commits after failed mixed API without leaking region pixels")
+	# Changed-pixel streams from Hokusai arrive in spatially clustered runs.
+	# Exercise the cached signed tile key across repeated/returning 32px tile
+	# boundaries, preflight skips, hidden RGB and signed 64-bit origins. The
+	# independent per-pixel _stage oracle deliberately does not use the fast path.
+	var boundary_clip: Rect2i = Rect2i(-75, -74, 150, 148)
+	var boundary_mask: DrawingSelection = DrawingSelection.new(
+		Rect2i(-83, -83, 166, 166), true)
+	check(boundary_mask.combine_rectangle(Rect2i(-11, -11, 22, 22), "Subtract"),
+		"cross-tile stress selection has a hole")
+	var boundary_documents: Array[DrawingDocument] = []
+	var boundary_layers: Array[String] = []
+	var boundary_sessions: Array[DrawingEditSession] = []
+	for variant: int in range(2):
+		var doc: DrawingDocument = DrawingDocument.new("boundary-%d" % variant, 32)
+		var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER,
+			"Paint", "root").value)
+		var seeded: DrawingEditSession = doc.begin_edit(layer, doc.revision,
+			Transform2D.IDENTITY, ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
+		var bytes: PackedByteArray = PackedByteArray()
+		for pixel: int in range(24 * 24):
+			bytes.append_array(PackedByteArray([255 - (pixel % 89),
+				33 + (pixel % 133), pixel % 251, 0 if pixel % 7 == 0 else 117]))
+		check(seeded.apply_region(Rect2i(-12, -12, 24, 24), bytes).ok and
+			seeded.commit().ok, "stress source preserves transparent hidden RGB")
+		boundary_documents.append(doc)
+		boundary_layers.append(layer)
+		boundary_sessions.append(doc.begin_edit(layer, doc.revision,
+			Transform2D.IDENTITY, ORIGIN_X, ORIGIN_Y).value as DrawingEditSession)
+	var pigments: Array[int] = [0x00332211, 0x10ee11cc, 0x4080aacc,
+		0x7f0accee, -1, 0x20406080, 0x00000000]
+	var boundary_area: Rect2i = Rect2i(-84, -84, 168, 168)
+	for batch: int in range(3):
+		var samples: PackedInt32Array = PackedInt32Array()
+		for y: int in range(-81, 82, 4):
+			for x: int in range(-81, 82, 3):
+				samples.push_back(x)
+				samples.push_back(y)
+				samples.push_back(pigments[posmod(x * 17 + y * 7 + batch * 11,
+					pigments.size())])
+		# Re-enter the first tile after a different tile and after a clipped
+		# sample. The key cache may not attach that pixel to the latest tile.
+		samples.append_array(PackedInt32Array([-100, 0, -1,
+			-65, -65, 0x60998877, 75, 75, -1,
+			-65, -65, 0x20335577]))
+		source.delta = samples
+		var batch_result: DrawingResult = boundary_sessions[0].paint_path_hokusai(
+			path, TINT, boundary_mask, source, boundary_clip)
+		check(batch_result.ok, "stress batch %d accepted" % batch)
+		var reference_session: DrawingEditSession = boundary_sessions[1]
+		var ok_reference: bool = true
+		for i: int in range(0, samples.size(), 3):
+			var at: Vector2i = Vector2i(samples[i], samples[i + 1])
+			if not boundary_clip.has_point(at) or not boundary_mask.allows(at):
+				continue
+			var pigment: int = int(samples[i + 2]) & 0xffffffff
+			var alpha: int = (((pigment >> 24) & 255) * ((TINT >> 24) & 255) + 127) / 255
+			var canonical: int = (pigment & 0xffffff) | (alpha << 24)
+			if not reference_session._stage(at.x, at.y, canonical, null, false, true).ok:
+				ok_reference = false
+				break
+		check(ok_reference, "stress batch %d per-pixel oracle staged" % batch)
+		var batch_actual: DrawingResult = DrawingRenderer.render(boundary_documents[0],
+			boundary_area, ORIGIN_X, ORIGIN_Y, 1048576, boundary_sessions[0])
+		var batch_expected: DrawingResult = DrawingRenderer.render(boundary_documents[1],
+			boundary_area, ORIGIN_X, ORIGIN_Y, 1048576, boundary_sessions[1])
+		check(batch_actual.ok and batch_expected.ok and
+			batch_actual.value.get_data() == batch_expected.value.get_data(),
+			"stress batch %d preview is byte-exact over signed tiles" % batch)
+		check(boundary_sessions[0].change_count() == reference_session.change_count(),
+			"stress batch %d changed-pixel count exact" % batch)
+	check(boundary_sessions[0].commit().ok and boundary_sessions[1].commit().ok,
+		"stress batch commits once in each independent document")
+	var final_actual: DrawingResult = DrawingRenderer.render(boundary_documents[0],
+		boundary_area, ORIGIN_X, ORIGIN_Y)
+	var final_expected: DrawingResult = DrawingRenderer.render(boundary_documents[1],
+		boundary_area, ORIGIN_X, ORIGIN_Y)
+	check(final_actual.ok and final_expected.ok and
+		final_actual.value.get_data() == final_expected.value.get_data(),
+		"stress committed pixels byte-exact after signed tile key reuse")
+	check(boundary_documents[0].undo().ok and boundary_documents[0].redo().ok and
+		DrawingRenderer.render(boundary_documents[0], boundary_area,
+			ORIGIN_X, ORIGIN_Y).value.get_data() == final_expected.value.get_data(),
+		"stress undo/redo reconstructs identical published image")
 	print("T095_BULK_DELTA_PASSED checks=%d failures=%d" % [checks, failures])
 	quit(1 if failures else 0)

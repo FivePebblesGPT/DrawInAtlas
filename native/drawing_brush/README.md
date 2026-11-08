@@ -133,3 +133,18 @@ stage CPU p95 347.704→281.002 ms; composition per-frame p95
 [control and test evidence](../../docs/evidence/T-095-2026-11-09-blend.md).
 This **does not** establish owner GPU input-to-photon responsiveness or
 justify setting the default backend to Hokusai.
+
+### 2026-11-09 signed-tile delta preflight checkpoint
+
+Hokusai's spatially clustered output now reuses the last formatted signed
+storage-tile key and derives local offsets from its integer origin. Rectangular
+clip rejection avoids a per-pixel `Vector2i`; boolean masks remain checked
+through the existing selection API. The tile key cache is never used to skip
+coordinate validation or source preflight. A two-case RGBA8 blend shortcut
+(fully opaque source, transparent destination) keeps all original float math
+for other alpha pairs, and normalizes signed packed pigments. The 114,688
+old-equation comparisons and expanded 119-check native delta oracle pass.
+Paired Xvfb mouse-input Hokusai stage CPU p95 changed
+275.158→239.448ms; [evidence and limitations](../../docs/evidence/T-095-2026-11-09-cached-tile-preflight.md).
+The Linux prototype remains opt-in: this is not a real-device responsiveness,
+pressure, cross-platform export or T-095 owner-approval milestone.

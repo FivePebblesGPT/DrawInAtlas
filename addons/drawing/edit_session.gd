@@ -414,25 +414,45 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	# stage using integer offsets. Native quantized pixels may revisit the same
 	# source pixel across batches; never repeatedly construct global keys.
 	var tile_deltas: Dictionary[String, PackedInt32Array] = {}
+	var clipping: bool = clip_bounds.has_area()
+	var clip_left: int = clip_bounds.position.x
+	var clip_top: int = clip_bounds.position.y
+	var clip_right: int = clip_bounds.end.x
+	var clip_bottom: int = clip_bounds.end.y
+	# Hokusai emits changed pixels in spatially clustered 64px tile runs.
+	# A Drawing storage tile usually covers many consecutive deltas, so
+	# resolve its signed-64-bit key once per run, not once per changed pixel.
+	var cached_tile_x: int = 0
+	var cached_tile_y: int = 0
+	var cached_tile_key: String = ""
+	var has_cached_tile: bool = false
 	for index: int in range(0, changed.size(), 3):
 		var x: int = changed[index]
 		var y: int = changed[index + 1]
 		if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
 			return DrawingResult.failure("COORD_RANGE", "Hokusai pixel exceeds safe edit coordinates")
-		if clip_bounds.has_area() and not clip_bounds.has_point(Vector2i(x, y)):
+		if clipping and (x < clip_left or y < clip_top or x >= clip_right or y >= clip_bottom):
 			continue
 		if selection != null and not selection.allows(Vector2i(x, y)):
 			continue
 		var global_x: int = anchor_x + x
 		var global_y: int = anchor_y + y
-		var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
-		var local_index: int = posmod(global_y, stride) * stride + posmod(global_x, stride)
+		var storage_x: int = DrawingDocument.TILES.floor_div(global_x, stride)
+		var storage_y: int = DrawingDocument.TILES.floor_div(global_y, stride)
+		if not has_cached_tile or storage_x != cached_tile_x or storage_y != cached_tile_y:
+			cached_tile_x = storage_x
+			cached_tile_y = storage_y
+			cached_tile_key = "%d,%d" % [storage_x, storage_y]
+			has_cached_tile = true
+		# floor_div (not 32-bit Vector2i conversion) keeps negative and >2^31
+		# world positions in their original storage tile and local offset.
+		var local_index: int = (global_y - storage_y * stride) * stride + global_x - storage_x * stride
 		var pigment: int = int(changed[index + 2]) & 0xffffffff
 		var alpha: int = (((pigment >> 24) & 255) * opacity + 127) / 255
-		var pixels: PackedInt32Array = tile_deltas.get(tile_key, PackedInt32Array())
+		var pixels: PackedInt32Array = tile_deltas.get(cached_tile_key, PackedInt32Array())
 		pixels.push_back(local_index)
 		pixels.push_back((pigment & 0xffffff) | (alpha << 24))
-		tile_deltas[tile_key] = pixels
+		tile_deltas[cached_tile_key] = pixels
 	# Any source failure aborts the entire batch BEFORE touching previews.
 	for source_key: String in tile_deltas:
 		if not _source_tiles.has(source_key):
@@ -749,9 +769,16 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 
 ## Source-over in unpremultiplied 8-bit color. Unmodified destination bytes stay exact.
 static func _blend(source: int, destination: int) -> int:
-	var sa: float = float((source >> 24) & 255) / 255.0
-	if sa <= 0.0:
+	var source_alpha: int = (source >> 24) & 255
+	if source_alpha == 0:
 		return destination
+	# Fully opaque source and fully transparent destination both produce the
+	# exact source RGBA8 bytes (regardless of hidden destination RGB). Avoid
+	# three floating-point divides for the common blank-canvas/solid dab.
+	# Mask sign-extended PackedInt32 pigment values to the canonical 32 bits.
+	if source_alpha == 255 or ((destination >> 24) & 255) == 0:
+		return source & 0xffffffff
+	var sa: float = float(source_alpha) / 255.0
 	var da: float = float((destination >> 24) & 255) / 255.0
 	var out_alpha: float = sa + da * (1.0 - sa)
 	var a: int = clampi(roundi(out_alpha * 255.0), 0, 255)

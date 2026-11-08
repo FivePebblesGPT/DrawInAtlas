@@ -1548,6 +1548,20 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 native preflight cached-key / transparent blend checkpoint (2026-11-09; In Progress):**
+The optional Hokusai pigment path now caches its last signed-64-bit storage
+tile key across clustered deltas and uses allocation-free rectangular clipping.
+Opaque source and transparent destination RGBA8 blending skip arithmetic only
+where byte-exact; independent **114,688** old-equation comparisons and the
+expanded **119/119** dense signed-tile/selection/mixed-edit delta oracle pass.
+In a paired 5×120 actual mouse-motion Xvfb/Mesa witness, Hokusai stage CPU
+p95 fell **275.158→239.448ms (~13%)**, compositor frame CPU p95
+**21.848→16.808ms (~23%)**. Hokusai remains slower than Legacy and has no
+owner-device approval; T-095 **In Progress**, `manual_review: true`; T-096
+independently remains in Manual Review.
+[Evidence](evidence/T-095-2026-11-09-cached-tile-preflight.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 exact RGBA8 blend / tile-read fast path (2026-11-09; In Progress):**
 The opt-in Hokusai path now uses directly indexed immutable source tile
 pixels and an allocation-free, byte-exact scalar RGBA8 source-over blend

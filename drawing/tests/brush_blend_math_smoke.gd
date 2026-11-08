@@ -91,6 +91,35 @@ func run() -> void:
 		sample_count += 1
 	verify(true, "deterministic RGB corpus preserves original formula")
 
+	# Exact endpoint laws used by the fast path: opaque source overwrites
+	# arbitrary destination; nonzero source alpha onto a transparent pixel
+	# keeps the source channels even when the destination has hidden RGB.
+	# Include negative signed PackedInt32 pigment values explicitly.
+	var edge_pairs: int = 0
+	for i: int in range(8192):
+		var rgb: int = (i * 81173 + (i >> 3) * 29) & 0xffffff
+		var hidden: int = (i * 11939 + (i >> 2) * 937) & 0xffffff
+		var opaque: int = rgb | 0xff000000
+		var destination: int = hidden | (((i * 17) & 255) << 24)
+		if i % 2 == 0:
+			opaque -= 0x100000000
+		if i % 3 == 0 and (destination & 0x80000000) != 0:
+			destination -= 0x100000000
+		if original_blend(opaque, destination) != DrawingEditSession._blend(opaque, destination):
+			verify(false, "opaque source mismatch at %d" % i)
+			quit(1)
+			return
+		var translucent: int = rgb | (((i % 255) + 1) << 24)
+		if i % 2 == 0 and (translucent & 0x80000000) != 0:
+			translucent -= 0x100000000
+		if original_blend(translucent, hidden) != DrawingEditSession._blend(translucent, hidden):
+			verify(false, "transparent destination mismatch at %d" % i)
+			quit(1)
+			return
+		edge_pairs += 2
+	verify(true, "opaque and transparent fast-path endpoints preserve original RGBA8 bytes")
+	sample_count += edge_pairs
+
 	# Time the exact same data for each implementation. Informational only:
 	# hardware/platform noise must not turn an otherwise exact test red.
 	var benchmark_sources: PackedInt32Array = PackedInt32Array()
