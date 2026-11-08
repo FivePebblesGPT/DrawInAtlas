@@ -6,6 +6,17 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 direct native-tile commit parity — 2026-11-09
+
+The on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_tile_commit_smoke.gd` (**56/56**) through the
+fail-closed `T095_TILE_COMMIT_PASSED` verifier, saving its raw log. This
+**native-independent** regression compares canonical history, dirty-region
+bounds, preview, commit, Undo/Redo and injected partial-failure cases against
+the original global-pixel edit path. It does not add a required fast-CI
+check ID, install Rust, prove an OS export works, or accept physical UI
+responsiveness. The T-095 manual owner gate stays open.
+
 ## T-095 Hokusai batch-delta parity — 2026-11-08
 
 The existing required `ci_t085_live_stroke_preview` fast-CI step now also

@@ -488,7 +488,7 @@ Dragging a floating host's left/top/right/bottom edge past the viewport
 previously moved its opposite fixed edge because whole-frame clamping was
 used for an edge resize. Each moving edge is now independently clamped at
 the client margin and the opposite edge remains anchored. Six new model
-boundary cases pass **54/54** total; four native real-pointer Xvfb/Mesa
+boundary cases pass **56/56** total; four native real-pointer Xvfb/Mesa
 overdrags pass **44/44** total. The old code fails 6 model / 4 native anchor
 assertions. The required T-091 model CI and on-demand native witness retain
 strict pass requirements; physical Windows/Linux and T-083 owner gates stay
@@ -1243,7 +1243,7 @@ The existing structural history supports exact Undo/Redo of this instance
 without copying any source artwork. Invalid/stale sources, unsafe offsets,
 failed publication and the 64-child graph limit reject atomically.
 `tests/object_child_duplicate_smoke.gd` passes **53/53** headless checks,
-plus **54/54** targeted native Xvfb/Mesa checks with a 420px inspector
+plus **56/56** targeted native Xvfb/Mesa checks with a 420px inspector
 screenshot. This is placement duplication, **not** the unresolved nested
 single-source Save As/export reference-versus-deep-copy policy. T-064 remains
 In Progress, with owner decisions and hardware validation outstanding.
@@ -1256,7 +1256,7 @@ The nested Object inspector now permits a 64-character optional label for
 source without renaming or copying its Drawing pixels. Label edits are
 parent-owned, version-checked registry publications, share the existing
 child-local Undo/Redo with structure/transforms/visibility, and preserve
-unrelated metadata. The **54/54** headless witness covers failed/stale edits,
+unrelated metadata. The **56/56** headless witness covers failed/stale edits,
 no-ops, duplicates, history, saved registry reload, portable Objects-component
 copy and live inspector controls. Its **62/62** targeted native Xvfb/Mesa
 witness captures a 420px inspector. The ticket remains **In Progress**:
@@ -1547,6 +1547,21 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 **225.456 ms**, and full application/owner-device responsiveness is not
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
+
+**T-095 direct tile-local native commit (2026-11-09; In Progress):**
+Hokusai-only commits now avoid generating and reparsing global `"x,y"`
+pixel keys before publishing the detached preview. A shared atomic
+installation routine preserves exact canonical history, region bounds,
+revision guards and Undo/Redo; mixed edit APIs keep the original path.
+The **56/56** independent history/preview oracle, 126/126 Hokusai oracle,
+30/30 native preset, 48/48 navigation, 153/153 viewport (after reimport)
+and fresh no-native 6/6 fallback pass. In paired five-stroke 60px/786%
+Xvfb tests, release→commit p95 fell **75.081→43.258ms**, confirmed at
+42.107ms, but full-gesture staging p95 remained ~206ms and was still slower
+than Legacy's 155.529ms. No hosted CI or physical hardware acceptance;
+T-095 stays **In Progress**, `manual_review: true`. T-096's review is
+independent. [Evidence](evidence/T-095-2026-11-09-direct-tile-commit.md) ·
+[ticket](Tickets/T-095.md).
 
 **T-095 cached native fixed-point pixel export (2026-11-09; In Progress):**
 Hokusai's Rust dirty-tile exporter now skips expensive linear→sRGB conversion

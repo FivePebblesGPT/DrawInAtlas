@@ -234,9 +234,21 @@ func cancel() -> void:
 func commit() -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
-	_materialize_hokusai_preview()
+	# Ordinary Hokusai-only strokes already have verified tile-local preview
+	# patches. Publish those directly rather than generating tens of thousands
+	# of global keys only for DrawingDocument to split them back into tiles.
+	# Other edit APIs materialize canonical keys before mixing, so their
+	# existing publication path stays unchanged.
+	var result: DrawingResult
+	if _hokusai_deferred and _after.is_empty():
+		result = document._publish_tile_edit(layer_id, expected_revision,
+			_preview_tiles, _source_tiles)
+	else:
+		_materialize_hokusai_preview()
+		result = document._publish_edit(layer_id, expected_revision, _before, _after)
 	_closed = true
-	var result: DrawingResult = document._publish_edit(layer_id, expected_revision, _before, _after)
+	_hokusai_deferred = false
+	_hokusai_change_count = 0
 	_before.clear()
 	_after.clear()
 	_covered_rows.clear()
