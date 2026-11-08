@@ -28,6 +28,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/t095-oracle.log
           python3 tools/check_godot_model_log.py /tmp/t095-oracle.log --marker T095_ORACLE_PASSED
+      - name: T-095 original source-over RGBA8 blend parity (all alpha pairs)
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/brush_blend_math_smoke.gd 2>&1 | tee /tmp/t095-blend.log
+          python3 tools/check_godot_model_log.py /tmp/t095-blend.log --marker T095_BLEND_PASSED
       - name: Hokusai batch-delta source/preview parity (native binary not required)
         run: |
           set -euo pipefail
@@ -50,5 +56,6 @@ jobs:
           path: |
             /tmp/t095-oracle.log
             /tmp/t095-hokusai-delta.log
+            /tmp/t095-blend.log
             /tmp/t095-native.log
           if-no-files-found: warn

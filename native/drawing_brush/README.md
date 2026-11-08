@@ -118,3 +118,18 @@ comparison. Reproduction/evidence belongs under
 actual input-to-photon timing; libmypaint byte parity; every `.myb` setting;
 future textured/custom brushes; complete pressure-device input; reliable
 Windows/macOS/export packaging. Do not mark T-095 Done without owner approval.
+
+### 2026-11-09 hot RGBA8 blend checkpoint
+
+The GDScript `DrawingEditSession._blend` keeps the original source-over
+float channel expression and rounding but removes per-pixel Array allocation.
+The Hokusai tile loop reads already-prevalidated, read-only source pixel
+maps via integer local offsets rather than invoking `get_rgba()` per dab.
+`drawing/tests/brush_blend_math_smoke.gd` independently preserves the
+previous array equation and compares 98,304 RGBA8 pairs exactly; the T-095
+on-demand workflow now runs it. Five-stroke Xvfb pointer evidence: Hokusai
+stage CPU p95 347.704→281.002 ms; composition per-frame p95
+29.247→21.833 ms; release→commit p95 approximately unchanged. See
+[control and test evidence](../../docs/evidence/T-095-2026-11-09-blend.md).
+This **does not** establish owner GPU input-to-photon responsiveness or
+justify setting the default backend to Hokusai.

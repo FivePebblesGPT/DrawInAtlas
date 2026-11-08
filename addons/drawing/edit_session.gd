@@ -65,13 +65,16 @@ func _materialize_hokusai_preview() -> void:
 		var tile_x: int = int(coordinates[0])
 		var tile_y: int = int(coordinates[1])
 		var source: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		var source_pixels: Dictionary[int, int] = {}
+		if source != null:
+			source_pixels = source._pixels
 		var patch: Dictionary = _preview_tiles[tile_key]
 		for local_index: int in patch:
 			var local_x: int = local_index % stride
 			var local_y: int = local_index / stride
 			var pixel_key: String = "%d,%d" % [tile_x * stride + local_x,
 				tile_y * stride + local_y]
-			_before[pixel_key] = source.get_rgba(local_x, local_y) if source != null else 0
+			_before[pixel_key] = int(source_pixels.get(local_index, 0))
 			_after[pixel_key] = int(patch[local_index])
 	_hokusai_change_count = 0
 	_hokusai_deferred = false
@@ -445,6 +448,11 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		_hokusai_deferred = true
 	for tile_key: String in tile_deltas:
 		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		# Local indices are prevalidated modulo the storage stride. Reading the
+		# resident map once per tile avoids a GDScript getter for every native dab.
+		var source_pixels: Dictionary[int, int] = {}
+		if tile != null:
+			source_pixels = tile._pixels
 		var pixels: PackedInt32Array = tile_deltas[tile_key]
 		var patch: Dictionary = _preview_tiles.get(tile_key, {})
 		var touched: bool = false
@@ -455,7 +463,7 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 			var local_index: int = pixels[index]
 			var local_x: int = local_index % stride
 			var local_y: int = local_index / stride
-			var old: int = tile.get_rgba(local_x, local_y) if tile != null else 0
+			var old: int = int(source_pixels.get(local_index, 0))
 			var replacement: int = _blend(pixels[index + 1], old)
 			var previous: int = int(patch.get(local_index, old))
 			if replacement == previous:
@@ -747,10 +755,14 @@ static func _blend(source: int, destination: int) -> int:
 	var da: float = float((destination >> 24) & 255) / 255.0
 	var out_alpha: float = sa + da * (1.0 - sa)
 	var a: int = clampi(roundi(out_alpha * 255.0), 0, 255)
-	var channels: Array[int] = []
-	for channel: int in range(3):
-		var shift: int = channel * 8
-		var sc: float = float((source >> shift) & 255)
-		var dc: float = float((destination >> shift) & 255)
-		channels.append(clampi(roundi((sc * sa + dc * da * (1.0 - sa)) / out_alpha), 0, 255))
-	return channels[0] | (channels[1] << 8) | (channels[2] << 16) | (a << 24)
+	# Exact original per-channel arithmetic, without allocating a typed Array
+	# and appending to it three times for every source-over pixel. Preserve the
+	# evaluation order and rounding; the independent T-095 blend oracle guards
+	# hidden RGB, both alpha edges, and intermediate-alpha parity.
+	var red: int = clampi(roundi((float(source & 255) * sa +
+		float(destination & 255) * da * (1.0 - sa)) / out_alpha), 0, 255)
+	var green: int = clampi(roundi((float((source >> 8) & 255) * sa +
+		float((destination >> 8) & 255) * da * (1.0 - sa)) / out_alpha), 0, 255)
+	var blue: int = clampi(roundi((float((source >> 16) & 255) * sa +
+		float((destination >> 16) & 255) * da * (1.0 - sa)) / out_alpha), 0, 255)
+	return red | (green << 8) | (blue << 16) | (a << 24)
