@@ -1548,6 +1548,17 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 deferred tile-local staging (2026-11-08; In Progress):**
+Prevalidated native pigment deltas now use signed storage-tile keys and integer
+local pixel offsets, deferring global-key history materialization until commit.
+The 101-check parity/rollback oracle and neighboring native Brush/navigation,
+missing-binary and viewport regressions pass. On the same Xvfb 60px/786%
+5×120-movement workload, Hokusai staging p95 fell **580.815→369.368 ms**,
+but commit p95 increased, and Legacy staging still takes only **168.023 ms**.
+This is **not** owner-device responsiveness evidence. **T-095 remains In
+Progress with manual review required; T-096 remains independently in Manual
+Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).
@@ -1659,7 +1670,7 @@ accepted. T-095 retains `manual_review: true`, status **In Progress**.
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native/Hokusai prototype, released-stroke navigation and tile-batch staging verified in software; owner performance recheck still required | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native/Hokusai tile-local staging and navigation verified in software; slower than Legacy, owner performance recheck required | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics

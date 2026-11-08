@@ -62,6 +62,16 @@ Both paths must remain atomic: invalid later deltas cannot partially alter a
 previously valid preview. The dedicated `hokusai_bulk_delta_smoke.gd` test
 runs without a native binary and checks the old pixel-at-a-time result.
 
+Hokusai staging now groups prevalidated source deltas by storage-tile key,
+updates detached integer-offset preview patches, and defers global `"x,y"`
+`_before`/`_after` creation to commit. A counted delta map retains O(1)
+`change_count()` while the paint button is held. A mixed edit API forces
+materialization before a transactional rollback snapshot; later Hokusai calls
+in that session use the original global-key staging route. This reduces
+repeated per-dab GDScript allocation but moves some CPU time to release;
+[paired Xvfb evidence](../../docs/evidence/T-095-2026-11-08-hokusai-tile-local.md)
+documents the regression matrix and the remaining latency deficit.
+
 The native class accumulates source-space points in batches and maintains its
 own native tile/dirty state. It reports only changed RGBA8 pixel triples per
 batch (rather than repeatedly copying each full 64px surface tile), avoiding

@@ -171,5 +171,99 @@ func run() -> void:
 	check(faulty.paint_path_hokusai(path, TINT, mask, source, CLIP).ok and
 		faulty.change_count() == 2 and faulty.commit().ok,
 		"retry after transient source load failure commits both pixels")
+	# Deferred storage must not build one global string key for every repeated
+	# native dab. Test no-op batches and a later mixed edit against the old oracle.
+	var tiled: Dictionary = make_document("tile-local-deferred")
+	var tiled_ref: Dictionary = make_document("tile-local-reference")
+	var optimized_edit: DrawingEditSession = tiled["doc"].begin_edit(
+		tiled["layer"], tiled["doc"].revision, Transform2D.IDENTITY,
+		ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
+	var legacy_edit: DrawingEditSession = tiled_ref["doc"].begin_edit(
+		tiled_ref["layer"], tiled_ref["doc"].revision, Transform2D.IDENTITY,
+		ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
+	source.delta = PackedInt32Array([-7, -4, 0x60406080, -7, -4, 0x60406080,
+		-4, 2, 0x70999010, -6, -4, 0x00303030])
+	check(optimized_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+		"tile-local staging accepts duplicate and transparent pigments")
+	legacy_oracle(legacy_edit, source.delta, mask)
+	check(optimized_edit._after.is_empty() and optimized_edit._before.is_empty() \
+		and optimized_edit._hokusai_deferred and optimized_edit.change_count() == legacy_edit.change_count(),
+		"native batches defer canonical global-key allocation while remaining countable")
+	var unchanged_stamp: int = optimized_edit._preview_epoch
+	source.delta = PackedInt32Array([-7, -4, 0x60406080, -4, 2, 0x70999010,
+		-6, -4, 0x00303030])
+	check(optimized_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+		"repeated native quantization is accepted")
+	legacy_oracle(legacy_edit, source.delta, mask)
+	check(optimized_edit._preview_epoch == unchanged_stamp and
+		optimized_edit.change_count() == legacy_edit.change_count(),
+		"repeated equal pigment does not bump preview texture generations")
+	check(preview(tiled["doc"], optimized_edit) == preview(tiled_ref["doc"], legacy_edit),
+		"tile-local deferred output is byte-identical to the per-pixel oracle")
+	var mixed_bytes: PackedByteArray = PackedByteArray([17, 39, 72, 141])
+	check(optimized_edit.apply_region(Rect2i(-7, -4, 1, 1), mixed_bytes).ok and
+		legacy_edit.apply_region(Rect2i(-7, -4, 1, 1), mixed_bytes).ok,
+		"a canonical region edit can follow deferred native pigment")
+	check(not optimized_edit._hokusai_deferred and optimized_edit.change_count() == legacy_edit.change_count() and
+		preview(tiled["doc"], optimized_edit) == preview(tiled_ref["doc"], legacy_edit),
+		"materialization before mixed edit preserves exact preview and history")
+	source.delta = PackedInt32Array([-7, -4, 0x4540aaff, -12, -8, 0x6030ee77])
+	check(optimized_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+		"subsequent native batch uses canonical-key fallback in mixed session")
+	legacy_oracle(legacy_edit, source.delta, mask)
+	check(preview(tiled["doc"], optimized_edit) == preview(tiled_ref["doc"], legacy_edit),
+		"mixed Hokusai-to-region-to-Hokusai preview agrees with old implementation")
+	check(optimized_edit.commit().ok and legacy_edit.commit().ok,
+		"mixed edit retains one atomic history transaction")
+	check(DrawingRenderer.render(tiled["doc"], CANVAS, ORIGIN_X, ORIGIN_Y).value.get_data() ==
+		DrawingRenderer.render(tiled_ref["doc"], CANVAS, ORIGIN_X, ORIGIN_Y).value.get_data(),
+		"mixed committed pixels match reference")
+	check(tiled["doc"].undo().ok and tiled["doc"].redo().ok,
+		"mixed transaction still supports undo/redo")
+	# A failing mixed region edit must restore the already staged native pixels.
+	var failed_edit: DrawingEditSession = tiled["doc"].begin_edit(
+		tiled["layer"], tiled["doc"].revision, Transform2D.IDENTITY,
+		ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
+	var failed_reference: DrawingEditSession = tiled_ref["doc"].begin_edit(
+		tiled_ref["layer"], tiled_ref["doc"].revision, Transform2D.IDENTITY,
+		ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
+	source.delta = PackedInt32Array([-12, -9, 0x607733aa])
+	check(failed_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+		"native batch staged before invalid region request")
+	legacy_oracle(failed_reference, source.delta, mask)
+	var expected_mixed_preview: PackedByteArray = preview(tiled_ref["doc"], failed_reference)
+	check(not failed_edit.apply_region(Rect2i(0, 0, 2, 2), PackedByteArray([1, 2])).ok,
+		"malformed canonical region rejects without publishing native pixels")
+	check(preview(tiled["doc"], failed_edit) == expected_mixed_preview and
+		failed_edit.change_count() == failed_reference.change_count(),
+		"failed region leaves deferred native preview intact")
+	check(failed_edit.commit().ok and failed_reference.commit().ok and
+		DrawingRenderer.render(tiled["doc"], CANVAS, ORIGIN_X, ORIGIN_Y).value.get_data() ==
+		DrawingRenderer.render(tiled_ref["doc"], CANVAS, ORIGIN_X, ORIGIN_Y).value.get_data(),
+		"successful commit after invalid mixed request remains exact")
+	var mixed_fault_doc: ReadFaultDocument = ReadFaultDocument.new("mixed-source-read", 16)
+	var mixed_fault_layer: String = String(mixed_fault_doc.create_layer(
+		DrawingLayerNode.RASTER, "Faulty", "root").value)
+	var mixed_fault: DrawingEditSession = mixed_fault_doc.begin_edit(mixed_fault_layer,
+		mixed_fault_doc.revision, Transform2D.IDENTITY, ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
+	source.delta = PackedInt32Array([-12, -9, 0x60eeee33])
+	check(mixed_fault.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+		"native edit begins deferred before a later source-read failure")
+	var pre_failure: PackedByteArray = preview(mixed_fault_doc, mixed_fault)
+	var pre_failure_count: int = mixed_fault.change_count()
+	mixed_fault_doc.rejected_key = DrawingDocument.TILES.tile_key64(
+		ORIGIN_X + 13, ORIGIN_Y - 9, mixed_fault_doc.tile_stride)
+	var fail_across_tiles: DrawingResult = mixed_fault.apply_region(
+		Rect2i(12, -9, 2, 1), PackedByteArray([20, 30, 40, 60, 60, 70, 80, 90]))
+	check(not fail_across_tiles.ok and fail_across_tiles.code == "INJECTED_TILE",
+		"late missing source rejects mixed batch after a successful first pixel")
+	mixed_fault_doc.rejected_key = ""  # Disable the injected read fault for framebuffer verification.
+	check(mixed_fault.change_count() == pre_failure_count and
+		preview(mixed_fault_doc, mixed_fault) == pre_failure,
+		"mixed batch rollback retains all earlier native pigment and exact preview")
+	check(mixed_fault.commit().ok and
+		mixed_fault_doc.read_pixel(mixed_fault_layer, ORIGIN_X - 12, ORIGIN_Y - 9).value != 0 and
+		mixed_fault_doc.read_pixel(mixed_fault_layer, ORIGIN_X + 12, ORIGIN_Y - 9).value == 0,
+		"native pigment commits after failed mixed API without leaking region pixels")
 	print("T095_BULK_DELTA_PASSED checks=%d failures=%d" % [checks, failures])
 	quit(1 if failures else 0)
