@@ -199,6 +199,9 @@ const MAX_SEGMENTS_PER_BATCH: int = 16
 const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
 const MAX_DRAIN_CPU_US: int = 6000
 const MAX_SEGMENT_LENGTH: float = 24.0
+# Discard only an already-consumed prefix of a sustained stroke. A paint
+# backlog may never become entirely empty while fresh OS samples arrive.
+const MIN_CONSUMED_SAMPLE_COMPACTION: int = 256
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
@@ -1055,6 +1058,7 @@ func start_gesture(position: Vector2) -> void:
 		"first_preview_submit_us": 0, "first_frame_post_draw_us": 0,
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
+		"max_sample_buffer": 0, "sample_compactions": 0,
 		"drain_calls": 0, "max_drain_cpu_us": 0,
 		"sample_to_stage_us": [], "stage_batches_us": [],
 		"commit_cpu_us": 0, "preview_frames": 0,
@@ -1095,6 +1099,7 @@ func _enqueue_sample(position: Vector2) -> void:
 	_sample_times_us.append(Time.get_ticks_usec())
 	_metrics["samples_received"] = int(_metrics["samples_received"]) + 1
 	_metrics["max_pending"] = maxi(int(_metrics["max_pending"]), _samples.size() - _sample_index)
+	_metrics["max_sample_buffer"] = maxi(int(_metrics["max_sample_buffer"]), _samples.size())
 
 
 func _drain_segments(budget: int) -> void:
@@ -1174,14 +1179,27 @@ func _drain_segments(budget: int) -> void:
 	_metrics["drain_calls"] = int(_metrics["drain_calls"]) + 1
 	_metrics["max_drain_cpu_us"] = maxi(int(_metrics["max_drain_cpu_us"]),
 		Time.get_ticks_usec() - drain_start_us)
-	if _sample_index == _samples.size():
-		_samples.clear()
-		_sample_times_us.clear()
-		_sample_index = 0
+	_compact_sample_queue()
 	if changed:
 		queue_redraw()
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
+
+
+## Bound retained input memory even when a long capture never catches up
+## completely between OS motion events. Only already dequeued waypoints are
+## discarded; the current interpolated target and its timestamp are separate.
+func _compact_sample_queue() -> void:
+	if _sample_index == _samples.size():
+		_samples.clear()
+		_sample_times_us.clear()
+		_sample_index = 0
+	elif _sample_index >= MIN_CONSUMED_SAMPLE_COMPACTION \
+			and _sample_index * 2 >= _samples.size():
+		_samples = _samples.slice(_sample_index)
+		_sample_times_us = _sample_times_us.slice(_sample_index)
+		_sample_index = 0
+		_metrics["sample_compactions"] = int(_metrics["sample_compactions"]) + 1
 
 
 func _commit_stroke() -> void:

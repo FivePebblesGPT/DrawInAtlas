@@ -1548,6 +1548,19 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 bounded sustained-input buffer checkpoint (2026-11-09; In Progress):**
+The Canvas now compacts an already-drained input prefix during a continuous
+pointer backlog without dropping queued source-space positions, timestamps
+or an active interpolated target. A new **31/31** strict-log oracle covers
+6,000 interleaved input events, a 1,600-point Brush stroke, post-release
+camera/tool navigation, exact independent RGBA8 parity and Undo/Redo.
+Original-source negative controls fail. The five-stroke 60px software
+benchmark remains approximately unchanged; this bounds retained input memory,
+**not physical Brush latency**. Hosted CI and owner acceptance remain open.
+T-095 stays **In Progress**, `manual_review: true`; T-096 remains in separate
+Manual Review. [Evidence](evidence/T-095-2026-11-09-input-queue-compaction.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 default Legacy Brush tile/source lookup checkpoint (2026-11-09; In Progress):**
 The common `DrawingEditSession._stage()` now reuses one signed storage-tile
 key and integer local offset for source reads, previews and rollback, reading
