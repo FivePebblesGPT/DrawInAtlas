@@ -1196,6 +1196,7 @@ func _commit_stroke() -> void:
 		canvas_error.emit("Stroke cancelled because the selection changed")
 		return
 	var active: DrawingEditSession = session
+	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
 	session = null
 	_stroke_selection = null
 	_native_brush = null

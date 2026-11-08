@@ -155,6 +155,8 @@ func run() -> void:
 		verify(canvas.session == null, "stroke %d: release drained" % run_index)
 		verify(doc.revision == before_revision + 1, "stroke %d: committed once" % run_index)
 		var stats: Dictionary = canvas.last_gesture_metrics
+		if canvas.brush_backend == "Hokusai":
+			print("T095_HOKUSAI_PROFILE ", stats.get("hokusai_perf", {}))
 		var stage: float = float(stats.get("stage_cpu_us", 0)) / 1000.0
 		var release: float = float(int(stats.get("commit_us", 0)) - int(stats.get("release_us", 0))) / 1000.0
 		stage_ms.append(stage)

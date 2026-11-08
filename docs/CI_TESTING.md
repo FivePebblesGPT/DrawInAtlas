@@ -6,6 +6,19 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 Hokusai batch-delta parity — 2026-11-08
+
+The existing required `ci_t085_live_stroke_preview` fast-CI step now also
+runs `drawing/tests/hokusai_bulk_delta_smoke.gd` with the fail-closed
+`T095_BULK_DELTA_PASSED` marker. Its deterministic native-output stub
+compares 57 source/preview/transaction assertions with the former pixel-at-a-
+time staging path, including invalid trailing coordinates, signed 64-bit
+anchors, and atomic rejection/retry after a failed lazy source-tile load.
+This does not require Rust to be installed in hosted CI, and does not change
+the 46 required check IDs. The on-demand T-095 workflow repeats it.
+Actual Rust/Hokusai or physical paint responsiveness still requires separate
+native/hardware evidence; test assertions alone are not performance approval.
+
 ## T-094 native POSIX signal failure classification — 2026-11-08
 
 The shared `tools/check_godot_model_log.py` verifier rejects bare and

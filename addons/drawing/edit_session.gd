@@ -30,6 +30,7 @@ var _preview_tile_versions: Dictionary[String, int] = {}
 var _paint_journal: Dictionary[String, Array] = {}
 var _journaling: bool = false
 var _closed: bool = false
+var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
 
@@ -346,9 +347,11 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 	return DrawingResult.success(_after.size())
 
 
-## The Hokusai preview surface holds isolated brush pigment, not canonical
-## layer pixels. Apply each dirty tile against the original source snapshot,
-## never the previous preview, so repeated batches cannot double-blend.
+## Hokusai samples paint a native pigment surface rather than the prior
+## detached preview. Apply exported deltas against the original layer snapshot;
+## never stack opacity against the previous preview of the same stroke.
+## Preflight ALL coordinates and source tiles before any write so a failed
+## source read cannot leave a partially published preview batch.
 func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
@@ -358,30 +361,80 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	var relative: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in path:
 		relative.append(inverse * point)
+	var native_start_us: int = Time.get_ticks_usec()
 	var changed: PackedInt32Array = native.call("preset_segments", relative, pressure)
+	hokusai_perf["native_us"] = int(hokusai_perf["native_us"]) + Time.get_ticks_usec() - native_start_us
+	hokusai_perf["pixels"] = int(hokusai_perf["pixels"]) + changed.size() / 3
 	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
 		return DrawingResult.failure("HOKUSAI_LIMIT", "Invalid or excessive native pixel delta")
+	var stage_start_us: int = Time.get_ticks_usec()
 	var opacity: int = (rgba >> 24) & 255
-	_journaling = true
-	_paint_journal.clear()
+	var stride: int = document.tile_stride
+	var valid_pixels: PackedInt32Array = PackedInt32Array()
+	var touched_tiles: Dictionary[String, bool] = {}
+	# Validate and snapshot all source chunks *before* mutating detached state.
+	# This also keeps the hot loop free from per-pixel error Result allocations,
+	# string parsing, rollback journal arrays and tile-revision lookups.
 	for index: int in range(0, changed.size(), 3):
 		var x: int = changed[index]
 		var y: int = changed[index + 1]
+		if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
+			return DrawingResult.failure("COORD_RANGE", "Hokusai pixel exceeds safe edit coordinates")
 		if clip_bounds.has_area() and not clip_bounds.has_point(Vector2i(x, y)):
 			continue
 		if selection != null and not selection.allows(Vector2i(x, y)):
 			continue
+		var global_x: int = anchor_x + x
+		var global_y: int = anchor_y + y
+		touched_tiles[DrawingDocument.TILES.tile_key64(global_x, global_y, stride)] = true
+		valid_pixels.push_back(x)
+		valid_pixels.push_back(y)
 		var pigment: int = int(changed[index + 2]) & 0xffffffff
 		var alpha: int = (((pigment >> 24) & 255) * opacity + 127) / 255
-		var value: int = (pigment & 0xffffff) | (alpha << 24)
-		# Alpha-zero deltas restore the original source pixel instead of
-		# permanently retaining a previous preview's pigment.
-		var staged: DrawingResult = _stage(x, y, value, null, false, true)
-		if not staged.ok:
-			_rollback_paint()
-			return staged
-	_paint_journal.clear()
-	_journaling = false
+		valid_pixels.push_back((pigment & 0xffffff) | (alpha << 24))
+	for source_key: String in touched_tiles:
+		if not _source_tiles.has(source_key):
+			var resolved: DrawingResult = document._resolve_chunk(layer_id, source_key)
+			if not resolved.ok:
+				return resolved
+			_source_tiles[source_key] = resolved.value
+	# One preview stamp per changed storage tile per batch, not one per
+	# overlapping dab/pixel. The display renderer reads only after this call.
+	var dirty_preview: Dictionary[String, Dictionary] = {}
+	for index: int in range(0, valid_pixels.size(), 3):
+		var global_x: int = anchor_x + valid_pixels[index]
+		var global_y: int = anchor_y + valid_pixels[index + 1]
+		var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		var local_x: int = posmod(global_x, stride)
+		var local_y: int = posmod(global_y, stride)
+		var old: int = tile.get_rgba(local_x, local_y) if tile != null else 0
+		var pixel_key: String = "%d,%d" % [global_x, global_y]
+		var original: int = int(_before.get(pixel_key, old))
+		var replacement: int = _blend(valid_pixels[index + 2], old)
+		if replacement == original:
+			_after.erase(pixel_key)
+			_before.erase(pixel_key)
+		else:
+			if not _before.has(pixel_key):
+				_before[pixel_key] = old
+			_after[pixel_key] = replacement
+		var tile_patch: Dictionary = dirty_preview.get(tile_key, _preview_tiles.get(tile_key, {}))
+		var local_index: int = local_y * stride + local_x
+		if _after.has(pixel_key):
+			tile_patch[local_index] = _after[pixel_key]
+		else:
+			tile_patch.erase(local_index)
+		dirty_preview[tile_key] = tile_patch
+	for key: String in dirty_preview:
+		_preview_epoch += 1
+		_preview_tile_versions[key] = _preview_epoch
+		var patch: Dictionary = dirty_preview[key]
+		if patch.is_empty():
+			_preview_tiles.erase(key)
+		else:
+			_preview_tiles[key] = patch
+	hokusai_perf["stage_us"] = int(hokusai_perf["stage_us"]) + Time.get_ticks_usec() - stage_start_us
 	return DrawingResult.success(_after.size())
 
 

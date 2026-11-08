@@ -50,6 +50,18 @@ explicit warning and falls back to the legacy path. A missing binary and
 manifest must never make the standalone project fail to import. Nothing
 rewrites existing sparse document files or edits committed history directly.
 
+For Hokusai pigment output, `DrawingEditSession.paint_path_hokusai()`
+prevalidates every transferred coordinate and source tile before mutating
+any detached transaction state. The hot loop then composites the validated
+straight-alpha pixels against immutable source tiles without constructing
+per-pixel rollback journals or per-pixel `DrawingResult` objects. Preview
+content generations advance once per touched storage tile **per batch**,
+not once per changed pixel. Native `preset_segments` and GDScript staging
+CPU measurements are exposed in `Canvas.last_gesture_metrics.hokusai_perf`.
+Both paths must remain atomic: invalid later deltas cannot partially alter a
+previously valid preview. The dedicated `hokusai_bulk_delta_smoke.gd` test
+runs without a native binary and checks the old pixel-at-a-time result.
+
 The native class accumulates source-space points in batches and maintains its
 own native tile/dirty state. It reports only changed RGBA8 pixel triples per
 batch (rather than repeatedly copying each full 64px surface tile), avoiding
@@ -73,6 +85,8 @@ rather than publishing an invalid transaction.
 From a **freshly imported** standalone stage using the bundled Godot wrapper:
 
 ```bash
+/path/to/tooling/run-godot-headless.sh --path /staged/drawing \
+    --script res://tests/hokusai_bulk_delta_smoke.gd
 /path/to/tooling/run-godot-headless.sh --path /staged/drawing \
     --script res://tests/native_brush_integration.gd
 /path/to/tooling/run-godot-headless.sh --path /staged/drawing \
