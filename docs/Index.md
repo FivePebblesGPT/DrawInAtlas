@@ -1548,6 +1548,22 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 sparse detached-preview compositor checkpoint (2026-11-09; In Progress):**
+Small native/legacy live-paint patches previously triggered a full 128px
+display tile scan even with only a handful of source/preview pixels. Bounded
+sparse union composition now honors source-over, preview erasure and signed
+64-bit tile coordinates; dense previews retain the existing scan. An
+independent **133/133** byte-exact compositor oracle passes along with
+Hokusai (126/126), hard Brush, blend, navigation, preset and viewport checks.
+A controlled 128×128 sparse-preview CPU median fell **2611→608µs (~4.3×)**;
+this is **not** the 60px sustained-stroke result. In the actual 5×120-event
+Hokusai pointer benchmark, compositor p95 changed only **16.710→16.562ms**,
+and Hokusai remains behind Legacy in staging. Owner real-device acceptance,
+hosted CI and clean export remain unverified. T-095 stays **In Progress**,
+`manual_review: true`; T-096's separate review is untouched.
+[Evidence](evidence/T-095-2026-11-09-sparse-preview-compositor.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 native tile-run buffering checkpoint (2026-11-09; In Progress):**
 The optional Hokusai preflight no longer fetches, extends and reassigns its
 per-tile `PackedInt32Array` for every native pigment pixel. Contiguous tile

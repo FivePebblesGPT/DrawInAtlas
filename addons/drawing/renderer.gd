@@ -181,28 +181,51 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				# occupied pixels pay for every destination pixel. Permit sparse
 				# iteration while it examines fewer than half the run's pixels,
 				# capped to bound work on wide/large storage tiles.
-				if preview == null and run_length >= 16 \
-						and source_pixels.size() <= mini(64, run_length >> 1):
-					var first_index: int = local_y * stride
+				# Extremely sparse previews need not scan every pixel of a
+				# 128px display tile. The detached patch *overrides* committed
+				# source, including transparent erasures; iterate each occupied
+				# source index and any preview-only additions exactly once.
+				# Cap per-run work and keep dense Brush footprints on the
+				# sequential scan path. This is independent of the source tile
+				# stride and never constructs 32-bit global coordinates.
+				if run_length >= 16 and source_pixels.size() + patch.size() <= mini(64, run_length >> 1):
+					var first_index: int = local_y * stride + local_x
+					var end_index: int = first_index + run_length
 					for pixel_index: int in source_pixels:
-						if pixel_index < first_index + local_x \
-								or pixel_index >= first_index + local_x + run_length:
+						if pixel_index < first_index or pixel_index >= end_index:
 							continue
-						var source: int = source_pixels[pixel_index]
+						var source: int = int(patch[pixel_index]) if has_preview_patch and patch.has(pixel_index) \
+							else int(source_pixels[pixel_index])
 						if (source & 0xff000000) == 0:
 							continue
-						var index: int = (y * size.x + x + pixel_index - first_index - local_x) * 4
+						var index: int = (y * size.x + x + pixel_index - first_index) * 4
 						if ((source >> 24) & 255) == 255:
 							bytes.encode_u32(index, source)
 						else:
 							bytes.encode_u32(index, DrawingEditSession._blend(
 								source, bytes.decode_u32(index)))
+					if has_preview_patch:
+						for pixel_index: int in patch:
+							if pixel_index < first_index or pixel_index >= end_index \
+									or source_pixels.has(pixel_index):
+								continue
+							var source: int = int(patch[pixel_index])
+							if (source & 0xff000000) == 0:
+								continue
+							var index: int = (y * size.x + x + pixel_index - first_index) * 4
+							if ((source >> 24) & 255) == 255:
+								bytes.encode_u32(index, source)
+							else:
+								bytes.encode_u32(index, DrawingEditSession._blend(
+									source, bytes.decode_u32(index)))
 				else:
 					for offset: int in range(run_length):
 						var pixel_index: int = local_y * stride + local_x + offset
-						var source: int = int(source_pixels.get(pixel_index, 0))
-						if has_preview_patch and patch.has(pixel_index):
-							source = int(patch[pixel_index])
+						# A native preview often supplies the replacement for most
+						# pixels in a brush footprint. Do not fetch the canonical
+						# source for coordinates overridden by the detached patch.
+						var source: int = int(patch[pixel_index]) if has_preview_patch and patch.has(pixel_index) \
+							else int(source_pixels.get(pixel_index, 0))
 						if (source & 0xff000000) == 0:
 							continue
 						var index: int = (y * size.x + x + offset) * 4

@@ -40,6 +40,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/t095-hokusai-delta.log
           python3 tools/check_godot_model_log.py /tmp/t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED
+      - name: T-095 independent sparse detached-preview compositor oracle
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_sparse_preview_smoke.gd 2>&1 | tee /tmp/t095-sparse-preview.log
+          python3 tools/check_godot_model_log.py /tmp/t095-sparse-preview.log --marker T095_SPARSE_PREVIEW_PASSED
       - name: Real mouse routing and held-button software framebuffer profile
         run: |
           set -euo pipefail
@@ -56,6 +62,7 @@ jobs:
           path: |
             /tmp/t095-oracle.log
             /tmp/t095-hokusai-delta.log
+            /tmp/t095-sparse-preview.log
             /tmp/t095-blend.log
             /tmp/t095-native.log
           if-no-files-found: warn
