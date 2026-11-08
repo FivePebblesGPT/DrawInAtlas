@@ -24,6 +24,8 @@ var _covered_rows: Dictionary[int, Dictionary] = {}
 # An edit sees one immutable source revision; avoid re-resolving its tile for
 # each covered pixel. Cache successful absent tiles (null), never failed loads.
 var _source_tiles: Dictionary[String, Variant] = {}
+## Immutable session storage stride. -1 selects the general signed-divide path.
+var _stage_tile_shift: int = -1
 ## Detached preview indexed by storage tile + pixel offset; never stored on the document.
 var _preview_tiles: Dictionary[String, Dictionary] = {}
 ## Per-storage-tile monotonic content versions. A display tile only needs
@@ -48,6 +50,12 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 	view_transform = transform
 	anchor_x = origin_x
 	anchor_y = origin_y
+	var size: int = document.tile_stride
+	if (size & (size - 1)) == 0:
+		_stage_tile_shift = 0
+		while size > 1:
+			_stage_tile_shift += 1
+			size >>= 1
 
 
 func change_count() -> int:
@@ -281,25 +289,34 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		if covered_row.has(global_x):
 			return DrawingResult.success()
 	var key: String = "%d,%d" % [global_x, global_y]
-	# Flood fill has already read this exact pixel through the verified source
-	# snapshot. Re-resolving its tile here needlessly allocates a tile key and
-	# repeats the pixel lookup. -1 means all other callers read it normally.
+	# Stage and preview access exactly the same source tile and local offset.
+	# Resolve these only once per accepted candidate, rather than recomputing
+	# tile keys/modulos and going through a per-pixel tile accessor twice.
+	var stride: int = document.tile_stride
+	var tile_key: String
+	var local_x: int
+	var local_y: int
+	if _stage_tile_shift >= 0:
+		tile_key = "%d,%d" % [global_x >> _stage_tile_shift,
+			global_y >> _stage_tile_shift]
+		local_x = global_x & (stride - 1)
+		local_y = global_y & (stride - 1)
+	else:
+		tile_key = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+		local_x = posmod(global_x, stride)
+		local_y = posmod(global_y, stride)
+	var local_index: int = local_y * stride + local_x
 	var old: int = verified_source
 	if old == -1:
-		var stride: int = document.tile_stride
-		var tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
 		if not _source_tiles.has(tile_key):
 			var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
 			if not resolved.ok:
 				return resolved
 			_source_tiles[tile_key] = resolved.value
 		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
-		old = tile.get_rgba(posmod(global_x, stride), posmod(global_y, stride)) \
-			if tile != null else 0
+		old = int(tile._pixels.get(local_index, 0)) if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
-	var stride_local: int = document.tile_stride
-	var preview_tile_key: String = DrawingDocument.TILES.tile_key64(global_x, global_y, stride_local)
-	var local_index: int = posmod(global_y, stride_local) * stride_local + posmod(global_x, stride_local)
+	var preview_tile_key: String = tile_key
 	if _journaling and not _paint_journal.has(key):
 		_paint_journal[key] = [_before.has(key), _before.get(key, 0),
 			_after.has(key), _after.get(key, 0), covered_row.has(global_x),

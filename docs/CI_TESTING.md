@@ -6,6 +6,18 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 Legacy 60px source-tile/original-geometry witnesses — 2026-11-09
+
+The on-demand `godot-native-t095-brush.yml` runs two additional fail-closed,
+Godot-headless oracles: `t095_oblique_geometry_smoke.gd` (**86/86**, original
+`Geometry2D` swept-circle output) and `t095_stage_tile_lookup_smoke.gd`
+(**4,193/4,193**, independent source-read/preview/history parity across
+signed anchors and seven tile strides). They use strict named success markers,
+retain their logs, and do **not** change the 46 required fast-CI check IDs.
+The paired five-stroke 60px/786% Xvfb Legacy witness measures GDScript
+staging CPU only, not physical input-to-photon latency. T-095 remains
+`In Progress` with owner manual review required.
+
 ## T-095 direct native-tile commit parity — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` now runs

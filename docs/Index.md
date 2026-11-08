@@ -1548,6 +1548,24 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 default Legacy Brush tile/source lookup checkpoint (2026-11-09; In Progress):**
+The common `DrawingEditSession._stage()` now reuses one signed storage-tile
+key and integer local offset for source reads, previews and rollback, reading
+verified immutable source pixels directly from the resident sparse map. A
+session-cached shift/mask handles power-of-two tile strides; irregular strides
+retain signed floor division. An independent **4,193/4,193** source-read and
+history oracle covers seven strides, negative/>32-bit anchors, selection holes,
+transparent source RGB, per-stroke coverage, commit and Undo/Redo. A separate
+**86/86** original-`Geometry2D` oracle protects oblique 60px Brush/Eraser
+coverage. In a same-machine 5×120-motion **actual Legacy pointer** Xvfb/Mesa
+comparison, staging p95 fell **168.123→148.419ms** (~11.7%). This does
+**not** prove owner-device responsiveness or acceptable release latency;
+no physical review was performed. Adjacent native, navigation and viewport
+regressions pass locally (viewport fonts required a clean reimport). T-095
+remains **In Progress**, `manual_review: true`; T-096's Manual Review is
+unaffected. [Evidence](evidence/T-095-2026-11-09-legacy-stage-lookup.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 signed power-of-two Hokusai tile staging (2026-11-09; In Progress):**
 The native-delta path now maps signed global pixels to the common power-of-two
 storage tile using exact arithmetic shift/mask, while retaining signed floor
