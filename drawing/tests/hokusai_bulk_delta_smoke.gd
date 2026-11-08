@@ -348,5 +348,63 @@ func run() -> void:
 		DrawingRenderer.render(boundary_documents[0], boundary_area,
 			ORIGIN_X, ORIGIN_Y).value.get_data() == final_expected.value.get_data(),
 		"stress undo/redo reconstructs identical published image")
+	# A full 64x64 native run must not copy a growing PackedInt32Array
+	# back into a Dictionary after every appended pixel. Then switch tiles,
+	# revisit the first tile, and overwrite one of its existing pigments.
+	# The independently staged reference proves the cached run is flushed
+	# and reloaded without losing order or changing source-over semantics.
+	var long_docs: Array[DrawingDocument] = []
+	var long_layers: Array[String] = []
+	var long_edits: Array[DrawingEditSession] = []
+	for variant: int in range(2):
+		var long_doc: DrawingDocument = DrawingDocument.new("long-run-%d" % variant, 64)
+		var long_layer: String = String(long_doc.create_layer(
+			DrawingLayerNode.RASTER, "Ink", "root").value)
+		long_docs.append(long_doc)
+		long_layers.append(long_layer)
+		long_edits.append(long_doc.begin_edit(long_layer, long_doc.revision,
+			Transform2D.IDENTITY, ORIGIN_X, ORIGIN_Y).value as DrawingEditSession)
+	var long_deltas: PackedInt32Array = PackedInt32Array()
+	for y: int in range(-41, 23):
+		for x: int in range(-3, 61):
+			long_deltas.push_back(x)
+			long_deltas.push_back(y)
+			long_deltas.push_back(0x30000000 | ((x + 3) << 8) | (y + 41))
+	long_deltas.append_array(PackedInt32Array([61, 0, -1,
+		-3, -41, 0x60a0b0c0, 61, 1, 0x40ff0000, -3, -41, 0x20001234]))
+	source.delta = long_deltas
+	var long_result: DrawingResult = long_edits[0].paint_path_hokusai(
+		path, TINT, null, source)
+	check(long_result.ok and long_edits[0].change_count() == 4098,
+		"full 64px tile plus alternating tile revisits stages all distinct pixels")
+	var long_reference_ok: bool = true
+	for i: int in range(0, long_deltas.size(), 3):
+		var pigment: int = int(long_deltas[i + 2]) & 0xffffffff
+		var a: int = (((pigment >> 24) & 255) * ((TINT >> 24) & 255) + 127) / 255
+		var rgba: int = (pigment & 0xffffff) | (a << 24)
+		if not long_edits[1]._stage(long_deltas[i], long_deltas[i + 1],
+				rgba, null, false, true).ok:
+			long_reference_ok = false
+			break
+	check(long_reference_ok, "long-run oracle accepts every signed pigment")
+	check(long_edits[0].change_count() == long_edits[1].change_count(),
+		"full tile run preserves old-oracle changed-pixel count")
+	var long_area: Rect2i = Rect2i(-4, -42, 68, 67)
+	var long_preview: DrawingResult = DrawingRenderer.render(long_docs[0],
+		long_area, ORIGIN_X, ORIGIN_Y, 1048576, long_edits[0])
+	var long_expected: DrawingResult = DrawingRenderer.render(long_docs[1],
+		long_area, ORIGIN_X, ORIGIN_Y, 1048576, long_edits[1])
+	check(long_preview.ok and long_expected.ok and
+		long_preview.value.get_data() == long_expected.value.get_data(),
+		"full tile and revisit preview remains byte-exact")
+	check(long_edits[0].commit().ok and long_edits[1].commit().ok,
+		"full tile transaction commits atomically in both documents")
+	check(DrawingRenderer.render(long_docs[0], long_area, ORIGIN_X, ORIGIN_Y).value.get_data() ==
+		DrawingRenderer.render(long_docs[1], long_area, ORIGIN_X, ORIGIN_Y).value.get_data(),
+		"full tile committed image remains byte-exact")
+	check(long_docs[0].undo().ok and long_docs[0].redo().ok and
+		DrawingRenderer.render(long_docs[0], long_area, ORIGIN_X, ORIGIN_Y).value.get_data() ==
+		DrawingRenderer.render(long_docs[1], long_area, ORIGIN_X, ORIGIN_Y).value.get_data(),
+		"long tile run retains one undoable history transaction")
 	print("T095_BULK_DELTA_PASSED checks=%d failures=%d" % [checks, failures])
 	quit(1 if failures else 0)

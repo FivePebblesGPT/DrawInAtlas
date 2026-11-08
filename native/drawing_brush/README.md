@@ -148,3 +148,19 @@ Paired Xvfb mouse-input Hokusai stage CPU p95 changed
 275.158→239.448ms; [evidence and limitations](../../docs/evidence/T-095-2026-11-09-cached-tile-preflight.md).
 The Linux prototype remains opt-in: this is not a real-device responsiveness,
 pressure, cross-platform export or T-095 owner-approval milestone.
+
+### 2026-11-09 tile-run buffered GDScript staging
+
+The GDScript native-delta preflight now keeps the current Drawing storage
+`PackedInt32Array` local until the next storage-tile boundary, instead of
+fetching and reassigning it through a Dictionary after **every** pixel.
+Packed arrays can detach on mutation after Dictionary retrieval. The
+batch still validates **all** coordinates and resolves all required source
+tiles before changing detached previews. A return to an earlier tile reloads
+its buffer and appends in input order; source alpha, selection and canonical
+commit behavior are unchanged. A new full 4,096-pixel tile / alternating
+signed-tile oracle is included in the existing 126-check Hokusai test. The
+paired software brush witness improves staging p95 235.533→215.324ms;
+[measurements](../../docs/evidence/T-095-2026-11-09-tile-run-buffer.md).
+Hokusai remains opt-in and slower than Legacy under this workload. Owner
+input-to-photon acceptance and cross-platform packaging remain outstanding.

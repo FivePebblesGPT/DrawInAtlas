@@ -413,6 +413,9 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	# Group each accepted delta by its storage tile during preflight, then
 	# stage using integer offsets. Native quantized pixels may revisit the same
 	# source pixel across batches; never repeatedly construct global keys.
+	# Packed arrays retrieved from a Dictionary can detach on mutation; keep
+	# the current tile run local and write it back only at the next tile switch.
+	# Spatial clustering usually keeps hundreds of deltas in one run.
 	var tile_deltas: Dictionary[String, PackedInt32Array] = {}
 	var clipping: bool = clip_bounds.has_area()
 	var clip_left: int = clip_bounds.position.x
@@ -426,6 +429,7 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	var cached_tile_y: int = 0
 	var cached_tile_key: String = ""
 	var has_cached_tile: bool = false
+	var cached_pixels: PackedInt32Array = PackedInt32Array()
 	for index: int in range(0, changed.size(), 3):
 		var x: int = changed[index]
 		var y: int = changed[index + 1]
@@ -442,17 +446,20 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		if not has_cached_tile or storage_x != cached_tile_x or storage_y != cached_tile_y:
 			cached_tile_x = storage_x
 			cached_tile_y = storage_y
+			if has_cached_tile:
+				tile_deltas[cached_tile_key] = cached_pixels
 			cached_tile_key = "%d,%d" % [storage_x, storage_y]
+			cached_pixels = tile_deltas.get(cached_tile_key, PackedInt32Array())
 			has_cached_tile = true
 		# floor_div (not 32-bit Vector2i conversion) keeps negative and >2^31
 		# world positions in their original storage tile and local offset.
 		var local_index: int = (global_y - storage_y * stride) * stride + global_x - storage_x * stride
 		var pigment: int = int(changed[index + 2]) & 0xffffffff
 		var alpha: int = (((pigment >> 24) & 255) * opacity + 127) / 255
-		var pixels: PackedInt32Array = tile_deltas.get(cached_tile_key, PackedInt32Array())
-		pixels.push_back(local_index)
-		pixels.push_back((pigment & 0xffffff) | (alpha << 24))
-		tile_deltas[cached_tile_key] = pixels
+		cached_pixels.push_back(local_index)
+		cached_pixels.push_back((pigment & 0xffffff) | (alpha << 24))
+	if has_cached_tile:
+		tile_deltas[cached_tile_key] = cached_pixels
 	# Any source failure aborts the entire batch BEFORE touching previews.
 	for source_key: String in tile_deltas:
 		if not _source_tiles.has(source_key):

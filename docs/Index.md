@@ -1548,6 +1548,22 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 native tile-run buffering checkpoint (2026-11-09; In Progress):**
+The optional Hokusai preflight no longer fetches, extends and reassigns its
+per-tile `PackedInt32Array` for every native pigment pixel. Contiguous tile
+runs accumulate locally, flushing only on tile changes or at batch end;
+revisiting a tile preserves native ordering. The independent signed-source,
+preview, mixed-edit, rollback and Undo/Redo oracle passes **126/126**,
+including a full 4,096-pixel tile and cross-tile returns. In a controlled
+5×120 mouse-motion Xvfb run, staging p95 fell **235.533→215.324ms**
+(~8.6%), but Legacy was **172.477ms**. Native preset, post-release navigation,
+missing-binary and adjoining rendering regressions pass locally. No owner
+hardware acceptance, hosted CI, or pressure/custom-brush performance is
+claimed; T-095 stays **In Progress**, `manual_review: true`, and T-096's
+independent review gate remains unchanged.
+[Evidence](evidence/T-095-2026-11-09-tile-run-buffer.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 native preflight cached-key / transparent blend checkpoint (2026-11-09; In Progress):**
 The optional Hokusai pigment path now caches its last signed-64-bit storage
 tile key across clustered deltas and uses allocation-free rectangular clipping.
@@ -1698,7 +1714,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native Hokusai tile-local and byte-exact blend optimization verified in software; still slower than Legacy, owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Tile-run buffered Hokusai preflight and exact-pixel oracle verified in software; still slower than Legacy, owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics
