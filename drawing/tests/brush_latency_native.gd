@@ -93,6 +93,18 @@ func run() -> void:
 	canvas.zoom = ZOOM
 	canvas.camera = Vector2(256, 256)
 	canvas.brush_width = BRUSH_WIDTH
+	var requested_backend: String = OS.get_environment("DRAWING_BRUSH_BACKEND")
+	if not requested_backend.is_empty():
+		if requested_backend not in ["Legacy", "NativeHard", "Hokusai"]:
+			verify(false, "Unknown DRAWING_BRUSH_BACKEND value")
+			quit(2)
+			return
+		if requested_backend != "Legacy" and not ClassDB.class_exists("DrawingNativeBrush"):
+			verify(false, "Requested native brush was not built/loaded")
+			quit(2)
+			return
+		canvas.brush_backend = requested_backend
+	print("T095_NATIVE_BACKEND selected=", canvas.brush_backend)
 	canvas.color_rgba = 0xa060bfee
 	canvas.image_bounds = Rect2i(0, 0, 512, 512)
 	canvas.clip_strokes_to_image_frame = true
@@ -122,7 +134,7 @@ func run() -> void:
 				record_frame(canvas)
 				if int(canvas._metrics.get("first_frame_post_draw_us", 0)) > 0:
 					saw_preview = true
-				if run_index == 0 and i == 4:
+				if run_index == 0 and i == (16 if canvas.brush_backend == "Hokusai" else 4):
 					var after_color: Color = sample(canvas, source_start)
 					changed_framebuffer_while_held = Vector3(before_color.r, before_color.g,
 						before_color.b).distance_to(Vector3(after_color.r, after_color.g,

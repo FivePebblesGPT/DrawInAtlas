@@ -314,6 +314,77 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 	return fill_rect(area, 0, selection, max_pixels)
 
 
+## Native batched coverage avoids revisiting every 60px candidate in
+## GDScript. Only newly hit pixels cross the ABI; the document's _stage()
+## still owns straight-alpha compositing, selection, previews and history.
+## Native output differences must be regression-tested before enabling Auto.
+func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
+		erase: bool, selection: DrawingSelection, native: Object,
+		clip_bounds: Rect2i = Rect2i()) -> DrawingResult:
+	if _closed or path.is_empty() or width <= 0.0 or not is_finite(width) or native == null:
+		return DrawingResult.failure("NATIVE_BRUSH", "Invalid native hard-brush stroke")
+	var inverse: Transform2D = view_transform.affine_inverse()
+	var relative: PackedVector2Array = PackedVector2Array()
+	for point: Vector2 in path:
+		relative.append(inverse * point)
+	var result: Dictionary = native.call("hard_segments", relative, width, clip_bounds)
+	if not result.get("ok", false):
+		return DrawingResult.failure("NATIVE_BRUSH", str(result.get("error", "Native coverage failed")))
+	var coordinates: PackedInt32Array = result.get("points", PackedInt32Array())
+	if coordinates.size() % 2 != 0:
+		return DrawingResult.failure("NATIVE_BRUSH", "Native coverage returned invalid coordinates")
+	_journaling = true
+	_paint_journal.clear()
+	for index: int in range(0, coordinates.size(), 2):
+		var staged: DrawingResult = _stage(coordinates[index], coordinates[index + 1],
+			0 if erase else rgba, selection, true, not erase)
+		if not staged.ok:
+			_rollback_paint()
+			return staged
+	_paint_journal.clear()
+	_journaling = false
+	return DrawingResult.success(_after.size())
+
+
+## The Hokusai preview surface holds isolated brush pigment, not canonical
+## layer pixels. Apply each dirty tile against the original source snapshot,
+## never the previous preview, so repeated batches cannot double-blend.
+func paint_path_hokusai(path: PackedVector2Array, rgba: int,
+		selection: DrawingSelection, native: Object,
+		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
+	if _closed or path.is_empty() or native == null:
+		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
+	var inverse: Transform2D = view_transform.affine_inverse()
+	var relative: PackedVector2Array = PackedVector2Array()
+	for point: Vector2 in path:
+		relative.append(inverse * point)
+	var changed: PackedInt32Array = native.call("preset_segments", relative, pressure)
+	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
+		return DrawingResult.failure("HOKUSAI_LIMIT", "Invalid or excessive native pixel delta")
+	var opacity: int = (rgba >> 24) & 255
+	_journaling = true
+	_paint_journal.clear()
+	for index: int in range(0, changed.size(), 3):
+		var x: int = changed[index]
+		var y: int = changed[index + 1]
+		if clip_bounds.has_area() and not clip_bounds.has_point(Vector2i(x, y)):
+			continue
+		if selection != null and not selection.allows(Vector2i(x, y)):
+			continue
+		var pigment: int = int(changed[index + 2]) & 0xffffffff
+		var alpha: int = (((pigment >> 24) & 255) * opacity + 127) / 255
+		var value: int = (pigment & 0xffffff) | (alpha << 24)
+		# Alpha-zero deltas restore the original source pixel instead of
+		# permanently retaining a previous preview's pigment.
+		var staged: DrawingResult = _stage(x, y, value, null, false, true)
+		if not staged.ok:
+			_rollback_paint()
+			return staged
+	_paint_journal.clear()
+	_journaling = false
+	return DrawingResult.success(_after.size())
+
+
 ## Swept hard brush; one alpha blend per covered pixel for the entire gesture.
 ## Pointer path is in view coordinates; transform freezes the raster-space mapping.
 func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
