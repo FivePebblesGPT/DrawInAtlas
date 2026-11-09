@@ -1548,6 +1548,22 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 Legacy Brush direct tile-publication checkpoint (2026-11-09; In Progress):**
+The normal 60px Brush/Eraser now commits from already detached preview-tile
+patches using the shared validated native tile publisher, avoiding a second
+per-pixel parse of global string keys on mouse-up. Mixed public edit APIs
+still use the original publication path. The independent **507/507**
+old-vs-new oracle verifies canonical history, preview/commit bytes, dirty
+regions, 64-bit anchors, irregular strides, selection holes, stale revisions,
+source replacement and Undo/Redo. Neighboring native, navigation, framebuffer,
+viewport and fresh no-native fallback tests pass locally. In two paired
+5×120-motion Xvfb runs, release→commit p95 fell **66.306→49.133ms** and
+**62.757→53.489ms**; Brush staging did not consistently improve. No hosted
+CI or owner-device evidence was obtained. **T-095 remains In Progress**,
+`manual_review: true`; T-096's separate owner review remains open.
+[Evidence](evidence/T-095-2026-11-09-legacy-direct-tile-publication.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 bounded latest stage-batch profiler (2026-11-09; In Progress):**
 The 4,096-entry `stage_batches_us` list previously kept only the first
 batches of a sustained stroke, hiding later overloads from p50/p95. It now

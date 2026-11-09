@@ -82,6 +82,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_tile_shift_smoke.gd 2>&1 | tee /tmp/t095-tile-shift.log
           python3 tools/check_godot_model_log.py /tmp/t095-tile-shift.log --marker T095_TILE_SHIFT_PASSED
+      - name: T-095 Legacy Brush-only tile-commit and history parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_legacy_tile_commit_smoke.gd 2>&1 | tee /tmp/t095-legacy-tile-commit.log
+          python3 tools/check_godot_model_log.py /tmp/t095-legacy-tile-commit.log --marker T095_LEGACY_TILE_COMMIT_PASSED
       - name: T-095 native tile-commit and history parity (native binary not required)
         run: |
           set -euo pipefail
@@ -118,6 +124,7 @@ jobs:
             /tmp/t095-hokusai-delta.log
             /tmp/t095-tile-shift.log
             /tmp/t095-tile-commit.log
+            /tmp/t095-legacy-tile-commit.log
             /tmp/t095-sparse-preview.log
             /tmp/t095-blend.log
             /tmp/t095-native.log

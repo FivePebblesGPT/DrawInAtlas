@@ -1,3 +1,15 @@
+## T-095 Legacy Brush direct tile-publication oracle — 2026-11-09
+
+The on-demand `godot-native-t095-brush.yml` workflow now runs
+`drawing/tests/t095_legacy_tile_commit_smoke.gd` and validates the exact
+`T095_LEGACY_TILE_COMMIT_PASSED` marker with the fail-closed model-log checker.
+It compares native-style validated tile publication against the original
+canonical pixel-key publisher for ordinary Brush/Eraser, mixed API fallback,
+signed coordinates, source replacement, stale revisions and atomic history
+(**507 local checks**). It adds no new required fast-CI check ID and does not
+make optional native packaging or physical owner responsiveness an approved
+gate. The selected local tests pass; hosted Actions was not run.
+
 # Godot CI policy: fast desktop core and deferred compatibility coverage
 
 **Policy (2026-11-03):** Required push/PR GDScript CI now verifies the implemented **Drawing package and shared Atlas composition foundation**. The approved complete Drawing Essential baseline remains unfinished under T-059. Windows/Linux desktop are the release-first targets. **Web export, broad native framebuffer sweeps, and historical Atlas pointer/shape tests are intentionally excluded from push CI.** They remain in source and are not claimed green.

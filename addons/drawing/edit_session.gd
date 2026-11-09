@@ -39,6 +39,11 @@ var _journaling: bool = false
 ## Only the internal swept-Brush loop reuses this immutable success sentinel.
 ## Public _stage() calls still receive independent result objects.
 var _brush_stage_ok: DrawingResult = DrawingResult.success()
+## Swept-Brush-only sessions have already built the exact tile-local patch and
+## verified source pointers while painting. Publish that patch directly instead
+## of parsing all global pixel string keys again on mouse-up. Any mixed public
+## edit API returns to the canonical pixel-key publisher.
+var _brush_tile_publish: bool = true
 var _closed: bool = false
 var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
 var _has_last: bool = false
@@ -245,13 +250,13 @@ func cancel() -> void:
 func commit() -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
-	# Ordinary Hokusai-only strokes already have verified tile-local preview
-	# patches. Publish those directly rather than generating tens of thousands
-	# of global keys only for DrawingDocument to split them back into tiles.
-	# Other edit APIs materialize canonical keys before mixing, so their
-	# existing publication path stays unchanged.
+	# Native Hokusai and ordinary Brush-only sessions already own verified
+	# tile-local patches. Publish them without reparsing global pixel keys.
+	# Mixed edit APIs retain the original canonical-key publication contract.
 	var result: DrawingResult
-	if _hokusai_deferred and _after.is_empty():
+	var tile_only: bool = (_hokusai_deferred and _after.is_empty()) \
+		or (_brush_tile_publish and not _after.is_empty())
+	if tile_only:
 		result = document._publish_tile_edit(layer_id, expected_revision,
 			_preview_tiles, _source_tiles)
 	else:
@@ -275,6 +280,8 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		internal_brush: bool = false) -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if not internal_brush:
+		_brush_tile_publish = false
 	# Ordinary GDScript Brush strokes must not pay an extra function call per
 	# covered pixel; only a session with native deferred edits needs a flush.
 	if _hokusai_deferred:
@@ -428,6 +435,7 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
+	_brush_tile_publish = false
 	if _closed or path.is_empty() or native == null:
 		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
 	var inverse: Transform2D = view_transform.affine_inverse()
