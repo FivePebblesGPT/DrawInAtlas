@@ -94,8 +94,9 @@ func run() -> void:
 			selection, 1048576, clip).ok, "optimized stroke %d succeeds" % index)
 		check(original_sweep(oracle, path, spec["width"], spec["erase"],
 			selection, clip), "original Geometry2D reference %d succeeds" % index)
-		check(edit._after == oracle._after and edit._before == oracle._before,
-			"exact canonical staged RGBA8 values match %d" % index)
+		check(edit._brush_deferred and edit._after.is_empty() and edit._before.is_empty()
+			and edit._brush_change_count == oracle._after.size(),
+			"deferred Brush retains exact changed-pixel count without global keys %d" % index)
 		check(edit.change_count() == oracle.change_count(),
 			"coverage size matches %d" % index)
 		var preview: PackedByteArray = snapshot(optimized, origin, edit)

@@ -1465,3 +1465,17 @@ known post-exit leak messages following one success marker. This additional
 verifier contract is exercised by `tests.test_t094_godot_model_log` in the
 existing T-073 required workflow step. No required check ID is added; local
 replay is not hosted CI or physical owner approval.
+
+
+### T-095 deferred Legacy Brush staging oracle — 2026-11-09
+
+The existing **on-demand**, non-gating `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_brush_deferred_staging_smoke.gd` and checks its exact
+`T095_BRUSH_DEFERRED_PASSED` success marker with the fail-closed model-log
+verifier. It compares the deferred tile-local Brush/Eraser preview and commit
+against the original canonical-key publisher, including mixed edit fallback,
+failed lazy-source rollback, signed anchors, source identity, and Undo/Redo.
+The current local oracle passes **492/492**; the updated existing Legacy
+publication oracle passes **519/519**. This adds no required fast-CI check ID,
+does not replace a hosted workflow result, and provides no physical GPU or
+owner usability acceptance.

@@ -64,9 +64,15 @@ func compare_case(stride: int, origin: Vector2i, erase: bool, mix: bool) -> void
 			label + " ordinary API mixes with stroke")
 	check(fast._brush_tile_publish == not mix,
 		label + " uses tile-only publisher iff paint-only")
-	check(fast.change_count() == reference.change_count() and
-		fast._before == reference._before and fast._after == reference._after,
-		label + " source and canonical pixel-delta maps agree")
+	check(fast.change_count() == reference.change_count(),
+		label + " exact changed-pixel count agrees")
+	if mix:
+		check(fast._before == reference._before and fast._after == reference._after,
+			label + " mixed API materializes canonical pixel-delta maps")
+	else:
+		check(fast._brush_deferred and fast._before.is_empty() and fast._after.is_empty()
+			and fast._brush_change_count == reference._after.size(),
+			label + " Brush-only staging retains only tile-local pixel deltas")
 	var preview: PackedByteArray = snapshot(direct, fast)
 	check(preview == snapshot(old, reference), label + " detached preview parity")
 	var baseline: int = direct["doc"].revision

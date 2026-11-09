@@ -1548,6 +1548,22 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 deferred Legacy Brush staging checkpoint (2026-11-09; In Progress):**
+The default swept Brush/Eraser now stages changed pixels directly into its
+validated detached storage-tile patches, deferring global pixel-string key
+creation until a mixed edit API needs it or the common document publisher
+builds canonical history at commit. A new **492/492** old-path comparison
+covers overlap, hidden RGB, selection holes, irregular strides, signed >32-bit
+anchors, mixed operations, failed lazy reads and retries, preverified source
+identity, preview/commit equality and Undo/Redo. Existing **519/519** Legacy
+tile publication assertions also pass. Two paired 5×120-motion, 60px, 786%
+Xvfb runs measured staging p95 **125.782→103.677ms** and
+**123.056→103.476ms**; a later optimized control was 109.536ms. These are
+software CPU timings, not owner-device acceptance; T-095 remains **In
+Progress**, `manual_review: true`, and T-096's separate review is unchanged.
+[Evidence](evidence/T-095-2026-11-09-deferred-legacy-staging.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 Legacy Brush direct tile-publication checkpoint (2026-11-09; In Progress):**
 The normal 60px Brush/Eraser now commits from already detached preview-tile
 patches using the shared validated native tile publisher, avoiding a second

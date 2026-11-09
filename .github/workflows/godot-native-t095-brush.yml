@@ -88,6 +88,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_legacy_tile_commit_smoke.gd 2>&1 | tee /tmp/t095-legacy-tile-commit.log
           python3 tools/check_godot_model_log.py /tmp/t095-legacy-tile-commit.log --marker T095_LEGACY_TILE_COMMIT_PASSED
+      - name: T-095 deferred Legacy Brush tile-local staging and mixed-edit parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_brush_deferred_staging_smoke.gd 2>&1 | tee /tmp/t095-brush-deferred.log
+          python3 tools/check_godot_model_log.py /tmp/t095-brush-deferred.log --marker T095_BRUSH_DEFERRED_PASSED
       - name: T-095 native tile-commit and history parity (native binary not required)
         run: |
           set -euo pipefail
@@ -115,6 +121,7 @@ jobs:
           name: t095-independent-source-and-software-frames
           path: |
             /tmp/t095-oracle.log
+            /tmp/t095-brush-deferred.log
             /tmp/t095-brush-result.log
             /tmp/t095-oblique.log
             /tmp/t095-stage-lookup.log

@@ -44,6 +44,15 @@ var _brush_stage_ok: DrawingResult = DrawingResult.success()
 ## of parsing all global pixel string keys again on mouse-up. Any mixed public
 ## edit API returns to the canonical pixel-key publisher.
 var _brush_tile_publish: bool = true
+## Ordinary swept Brush-only edits also keep their changed pixels tile-local
+## until an external edit API needs canonical global keys.
+var _brush_deferred: bool = false
+var _brush_change_count: int = 0
+## Rollback records each first-attempted local offset in the paint batch,
+## including source-identical pixels whose once-only coverage was recorded.
+## Each entry is [prior_patch_exists, prior_pixel, newly_covered, global_y, global_x].
+var _brush_tile_journal: Dictionary[String, Dictionary] = {}
+var _brush_change_count_before_batch: int = 0
 var _closed: bool = false
 var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
 var _has_last: bool = false
@@ -67,7 +76,7 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 
 
 func change_count() -> int:
-	return _after.size() + _hokusai_change_count
+	return _after.size() + _hokusai_change_count + _brush_change_count
 
 
 ## Publish uses canonical global string-keyed _before/_after; retain that
@@ -94,6 +103,31 @@ func _materialize_hokusai_preview() -> void:
 			_after[pixel_key] = int(patch[local_index])
 	_hokusai_change_count = 0
 	_hokusai_deferred = false
+
+
+## Materialize Brush-only tile-local edits on the first mixed edit API. This
+## keeps the canonical before/after contract for shape/fill/clipboard callers.
+func _materialize_brush_preview() -> void:
+	if not _brush_deferred:
+		return
+	var stride: int = document.tile_stride
+	for tile_key: String in _preview_tiles:
+		var coordinates: PackedStringArray = tile_key.split(",")
+		var tile_x: int = int(coordinates[0])
+		var tile_y: int = int(coordinates[1])
+		var source: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		var source_pixels: Dictionary[int, int] = {}
+		if source != null:
+			source_pixels = source._pixels
+		var patch: Dictionary = _preview_tiles[tile_key]
+		for local_index: int in patch:
+			var x: int = tile_x * stride + local_index % stride
+			var y: int = tile_y * stride + local_index / stride
+			var key: String = "%d,%d" % [x, y]
+			_before[key] = int(source_pixels.get(local_index, 0))
+			_after[key] = int(patch[local_index])
+	_brush_change_count = 0
+	_brush_deferred = false
 
 
 ## Renderer reads only this session's detached patch; a closed/stale session is blank.
@@ -230,10 +264,36 @@ func _rollback_paint() -> void:
 				_covered_rows.erase(row_y)
 		_sync_preview_pixel(String(snapshot[5]), int(snapshot[6]), key)
 	_paint_journal.clear()
+	# A failed batch must not lose any pixels staged in previous batches.
+	for tile_key: String in _brush_tile_journal:
+		var entries: Dictionary = _brush_tile_journal[tile_key]
+		var patch: Dictionary = _preview_tiles.get(tile_key, {})
+		for local_index: int in entries:
+			var snapshot: Array = entries[local_index]
+			if snapshot[0]:
+				patch[local_index] = snapshot[1]
+			else:
+				patch.erase(local_index)
+			if snapshot[2]:
+				var row: Dictionary = _covered_rows.get(int(snapshot[3]), {})
+				row.erase(int(snapshot[4]))
+				if row.is_empty():
+					_covered_rows.erase(int(snapshot[3]))
+		_preview_epoch += 1
+		_preview_tile_versions[tile_key] = _preview_epoch
+		if patch.is_empty():
+			_preview_tiles.erase(tile_key)
+		else:
+			_preview_tiles[tile_key] = patch
+	_brush_change_count = _brush_change_count_before_batch
+	_brush_tile_journal.clear()
 	_journaling = false
 
 
 func cancel() -> void:
+	_brush_deferred = false
+	_brush_change_count = 0
+	_brush_tile_journal.clear()
 	_before.clear()
 	_after.clear()
 	_hokusai_deferred = false
@@ -255,14 +315,19 @@ func commit() -> DrawingResult:
 	# Mixed edit APIs retain the original canonical-key publication contract.
 	var result: DrawingResult
 	var tile_only: bool = (_hokusai_deferred and _after.is_empty()) \
+		or (_brush_deferred and _after.is_empty()) \
 		or (_brush_tile_publish and not _after.is_empty())
 	if tile_only:
 		result = document._publish_tile_edit(layer_id, expected_revision,
 			_preview_tiles, _source_tiles)
 	else:
 		_materialize_hokusai_preview()
+		_materialize_brush_preview()
 		result = document._publish_edit(layer_id, expected_revision, _before, _after)
 	_closed = true
+	_brush_deferred = false
+	_brush_change_count = 0
+	_brush_tile_journal.clear()
 	_hokusai_deferred = false
 	_hokusai_change_count = 0
 	_before.clear()
@@ -280,8 +345,11 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		internal_brush: bool = false) -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if internal_brush and _brush_tile_publish and not _hokusai_deferred:
+		return _stage_brush_tile(x, y, rgba, selection, once, blend, verified_source)
 	if not internal_brush:
 		_brush_tile_publish = false
+		_materialize_brush_preview()
 	# Ordinary GDScript Brush strokes must not pay an extra function call per
 	# covered pixel; only a session with native deferred edits needs a flush.
 	if _hokusai_deferred:
@@ -344,6 +412,82 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		_after[key] = replacement
 	_sync_preview_pixel(preview_tile_key, local_index, key)
 	return _brush_stage_ok if internal_brush else DrawingResult.success()
+
+
+## Fast path used only by unmodified swept Brush/Eraser sessions. Resolve and
+## blend exactly as _stage() does, but omit redundant global pixel-string keys
+## and _before/_after mutations until a mixed edit API actually needs them.
+func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
+		once: bool, blend: bool, verified_source: int) -> DrawingResult:
+	if _closed:
+		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
+		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
+	if selection != null and not selection.allows(Vector2i(x, y)):
+		return _brush_stage_ok
+	var global_x: int = anchor_x + x
+	var global_y: int = anchor_y + y
+	var covered_row: Dictionary = {}
+	if once:
+		covered_row = _covered_rows.get(global_y, {})
+		if covered_row.has(global_x):
+			return _brush_stage_ok
+	var stride: int = document.tile_stride
+	var tile_key: String
+	var local_x: int
+	var local_y: int
+	if _stage_tile_shift >= 0:
+		tile_key = "%d,%d" % [global_x >> _stage_tile_shift,
+			global_y >> _stage_tile_shift]
+		local_x = global_x & (stride - 1)
+		local_y = global_y & (stride - 1)
+	else:
+		tile_key = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
+		local_x = posmod(global_x, stride)
+		local_y = posmod(global_y, stride)
+	var local_index: int = local_y * stride + local_x
+	# A preverified old pixel skips its individual source read, but the tile
+	# identity must still be captured for fail-closed publication.
+	if not _source_tiles.has(tile_key):
+		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+		if not resolved.ok:
+			return resolved
+		_source_tiles[tile_key] = resolved.value
+	var old: int = verified_source
+	if old == -1:
+		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
+		old = int(tile._pixels.get(local_index, 0)) if tile != null else 0
+	var replacement: int = _blend(rgba, old) if blend else rgba
+	var patch: Dictionary = _preview_tiles.get(tile_key, {})
+	var previous: int = int(patch.get(local_index, old))
+	if _journaling:
+		var entries: Dictionary = _brush_tile_journal.get(tile_key, {})
+		if not entries.has(local_index):
+			entries[local_index] = [patch.has(local_index), previous,
+				once and not covered_row.has(global_x), global_y, global_x]
+			_brush_tile_journal[tile_key] = entries
+	if once:
+		covered_row[global_x] = true
+		_covered_rows[global_y] = covered_row
+	if replacement != previous:
+		if previous == old and replacement != old:
+			_brush_change_count += 1
+		elif previous != old and replacement == old:
+			_brush_change_count -= 1
+		if replacement == old:
+			patch.erase(local_index)
+		else:
+			patch[local_index] = replacement
+		_preview_epoch += 1
+		_preview_tile_versions[tile_key] = _preview_epoch
+		if patch.is_empty():
+			_preview_tiles.erase(tile_key)
+		else:
+			_preview_tiles[tile_key] = patch
+	_brush_deferred = true
+	return _brush_stage_ok
 
 
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
@@ -416,6 +560,8 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 		return DrawingResult.failure("NATIVE_BRUSH", "Native coverage returned invalid coordinates")
 	_journaling = true
 	_paint_journal.clear()
+	_brush_tile_journal.clear()
+	_brush_change_count_before_batch = _brush_change_count
 	for index: int in range(0, coordinates.size(), 2):
 		var staged: DrawingResult = _stage(coordinates[index], coordinates[index + 1],
 			0 if erase else rgba, selection, true, not erase, -1, true)
@@ -423,8 +569,9 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 			_rollback_paint()
 			return staged
 	_paint_journal.clear()
+	_brush_tile_journal.clear()
 	_journaling = false
-	return DrawingResult.success(_after.size())
+	return DrawingResult.success(change_count())
 
 
 ## Hokusai samples paint a native pigment surface rather than the prior
@@ -435,9 +582,10 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
-	_brush_tile_publish = false
 	if _closed or path.is_empty() or native == null:
 		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
+	_brush_tile_publish = false
+	_materialize_brush_preview()
 	var inverse: Transform2D = view_transform.affine_inverse()
 	var relative: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in path:
@@ -596,6 +744,8 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 	var inverse: Transform2D = view_transform.affine_inverse()
 	_journaling = true
 	_paint_journal.clear()
+	_brush_tile_journal.clear()
+	_brush_change_count_before_batch = _brush_change_count
 	var previous: Vector2 = _last
 	for index: int in range(path.size()):
 		var position: Vector2 = inverse * path[index]
@@ -612,8 +762,9 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 	_has_last = true
 	_last = previous
 	_paint_journal.clear()
+	_brush_tile_journal.clear()
 	_journaling = false
-	return DrawingResult.success(_after.size())
+	return DrawingResult.success(change_count())
 
 
 func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,

@@ -411,8 +411,8 @@ func raster_may_cover(layer_id: String, left: int, top: int,
 	return false
 
 
-## Native Hokusai-only sessions already stage by signed storage tile and
-## integer local offset. Retain those coordinates through publication; history
+## Native Hokusai and ordinary Brush-only sessions already stage by signed
+## storage tile and integer local offset. Retain those coordinates through publication; history
 ## still receives the exact canonical before/after pixel maps. No live tile or
 ## revision changes until every source and patch is validated. Mixed edit APIs
 ## continue through _publish_edit() and its independent source-pixel oracle.
