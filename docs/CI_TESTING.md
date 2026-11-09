@@ -6,6 +6,20 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 bounded latest stage-batch profiler witness — 2026-11-09
+
+The existing on-demand `godot-native-t095-brush.yml` runs the new
+`drawing/tests/t095_stage_batch_window_smoke.gd` with fail-closed
+`T095_STAGE_BATCH_WINDOW_PASSED` and uploads its raw output. The **29/29**
+headless oracle checks the 4,096-entry latest-window ring, exact lifetime
+batch count/max, an evicted early outlier, full-wrap ordering, and a real
+Brush stroke with unchanged RGBA8 pixels, Undo/Redo and navigation. A
+previous-source negative control fails; the new test also passes on a clean
+standalone package without the native extension. Long-stroke p50/p95 describe
+**only the latest retained 4,096 batches**; exact worst and count are lifetime
+metrics. This is a telemetry integrity fix, not an owner-device speed result,
+and it does not change the 46 required fast-CI IDs or close the T-095 gate.
+
 ## T-095 per-pixel Brush result reuse witness — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` now checks

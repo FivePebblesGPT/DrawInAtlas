@@ -205,10 +205,12 @@ const MIN_CONSUMED_SAMPLE_COMPACTION: int = 256
 ## Keep exact history for short gestures and a chronological, rolling tail for
 ## long ones. All-time count and worst age remain exact, including evicted ages.
 const MAX_SAMPLE_STAGE_LATENCIES: int = 4096
+const MAX_STAGE_BATCH_LATENCIES: int = 4096
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
 var _sample_latency_write_index: int = 0
+var _batch_latency_write_index: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -1056,6 +1058,7 @@ func start_gesture(position: Vector2) -> void:
 	_sample_times_us.clear()
 	_sample_index = 0
 	_sample_latency_write_index = 0
+	_batch_latency_write_index = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1067,6 +1070,7 @@ func start_gesture(position: Vector2) -> void:
 		"drain_calls": 0, "max_drain_cpu_us": 0,
 		"sample_to_stage_us": [], "sample_to_stage_total": 0,
 		"max_sample_to_stage_us": 0, "stage_batches_us": [],
+		"stage_batch_total": 0, "max_stage_batch_us": 0,
 		"commit_cpu_us": 0, "preview_frames": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0,
 		"preview_index_cpu_us": 0, "bytes_uploaded": 0}
@@ -1162,10 +1166,9 @@ func _drain_segments(budget: int) -> void:
 		var staged_at_us: int = Time.get_ticks_usec()
 		var batch_cpu_us: int = staged_at_us - start_us
 		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + batch_cpu_us
-		# Cap debug samples during unbounded captures; keep aggregate timing exact.
-		var batch_times: Array = _metrics["stage_batches_us"] as Array
-		if batch_times.size() < 4096:
-			batch_times.append(batch_cpu_us)
+		# Keep the latest batch timings, not just the first 4096 of a long
+		# stroke. Lifetime count, total CPU and worst batch stay exact.
+		_record_stage_batch(batch_cpu_us)
 		if not stage.ok:
 			canvas_error.emit(stage.message)
 			cancel_gesture()
@@ -1189,6 +1192,33 @@ func _drain_segments(budget: int) -> void:
 		queue_redraw()
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
+
+
+## A long stroke must not freeze its batch latency profile at the first
+## 4096 batches; later overloads matter most when diagnosing pointer lag.
+## Record all-time count/worst with a fixed latest-window distribution.
+func _record_stage_batch(duration_us: int) -> void:
+	var batches: Array = _metrics["stage_batches_us"] as Array
+	var duration: int = maxi(0, duration_us)
+	_metrics["stage_batch_total"] = int(_metrics["stage_batch_total"]) + 1
+	_metrics["max_stage_batch_us"] = maxi(int(_metrics["max_stage_batch_us"]), duration)
+	if batches.size() < MAX_STAGE_BATCH_LATENCIES:
+		batches.append(duration)
+	else:
+		batches[_batch_latency_write_index] = duration
+		_batch_latency_write_index = (_batch_latency_write_index + 1) % MAX_STAGE_BATCH_LATENCIES
+
+
+## Present the bounded latest-batch window in chronological order, matching
+## the short-stroke metric consumers' existing expectations.
+func _finalize_stage_batch_window() -> void:
+	if int(_metrics["stage_batch_total"]) <= MAX_STAGE_BATCH_LATENCIES \
+			or _batch_latency_write_index == 0:
+		return
+	var batches: Array = _metrics["stage_batches_us"] as Array
+	var ordered: Array = batches.slice(_batch_latency_write_index)
+	ordered.append_array(batches.slice(0, _batch_latency_write_index))
+	_metrics["stage_batches_us"] = ordered
 
 
 ## An unbounded list of per-sample latencies defeats input queue compaction on
@@ -1259,6 +1289,7 @@ func _commit_stroke() -> void:
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	_finalize_stage_latency_window()
+	_finalize_stage_batch_window()
 	last_gesture_metrics = _metrics.duplicate(true)
 	_restore_input_accumulation()
 	_samples.clear()

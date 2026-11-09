@@ -1548,6 +1548,20 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 bounded latest stage-batch profiler (2026-11-09; In Progress):**
+The 4,096-entry `stage_batches_us` list previously kept only the first
+batches of a sustained stroke, hiding later overloads from p50/p95. It now
+retains the latest 4,096 in chronological order, with exact lifetime
+`stage_batch_total` and `max_stage_batch_us`; short-stroke timing remains
+unchanged. The **29/29** test verifies 13,001 synthetic timings, an evicted
+early worst batch, full ring wraps, real Brush/Undo/Redo and navigation.
+The old-source negative control fails, native/headless neighboring checks
+and fresh no-native fallback pass. A five-stroke Xvfb comparison did not
+establish a CPU speed change. No physical owner/hosted CI acceptance: T-095
+remains **In Progress**, `manual_review: true`; T-096's separate Manual Review
+is unchanged. [Evidence](evidence/T-095-2026-11-09-stage-batch-window.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 Brush stage-success allocation checkpoint (2026-11-09; In Progress):**
 The ordinary 60px Legacy Brush's internal pixel-staging calls now reuse one
 session-local success-only `DrawingResult`; failures and external `_stage()`

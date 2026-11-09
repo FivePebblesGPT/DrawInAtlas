@@ -52,6 +52,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_latency_window_smoke.gd 2>&1 | tee /tmp/t095-latency-window.log
           python3 tools/check_godot_model_log.py /tmp/t095-latency-window.log --marker T095_LATENCY_WINDOW_PASSED
+      - name: T-095 bounded latest stage-batch timing and Brush history parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_stage_batch_window_smoke.gd 2>&1 | tee /tmp/t095-stage-batch-window.log
+          python3 tools/check_godot_model_log.py /tmp/t095-stage-batch-window.log --marker T095_STAGE_BATCH_WINDOW_PASSED
       - name: T-095 signed Legacy tile/source lookup and history parity
         run: |
           set -euo pipefail
@@ -107,6 +113,8 @@ jobs:
             /tmp/t095-oblique.log
             /tmp/t095-stage-lookup.log
             /tmp/t095-queue-compaction.log
+            /tmp/t095-latency-window.log
+            /tmp/t095-stage-batch-window.log
             /tmp/t095-hokusai-delta.log
             /tmp/t095-tile-shift.log
             /tmp/t095-tile-commit.log
