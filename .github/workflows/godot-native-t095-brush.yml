@@ -94,6 +94,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_brush_deferred_staging_smoke.gd 2>&1 | tee /tmp/t095-brush-deferred.log
           python3 tools/check_godot_model_log.py /tmp/t095-brush-deferred.log --marker T095_BRUSH_DEFERRED_PASSED
+      - name: T-095 failed mixed edit preserves deferred Brush and retry history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_mixed_edit_rollback_smoke.gd 2>&1 | tee /tmp/t095-mixed-rollback.log
+          python3 tools/check_godot_model_log.py /tmp/t095-mixed-rollback.log --marker T095_MIXED_ROLLBACK_PASSED
       - name: T-095 native tile-commit and history parity (native binary not required)
         run: |
           set -euo pipefail

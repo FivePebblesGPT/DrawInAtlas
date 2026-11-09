@@ -1548,6 +1548,22 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 deferred Brush + failed mixed-edit rollback (2026-11-09; In Progress):**
+After deferring Brush pixel-key construction, Fill, Paste region, Polygon and
+Flood Fill took rollback snapshots before the prior Brush pixels were
+materialized. A later lazy-tile read failure could therefore erase an earlier
+valid uncommitted stroke. The four operations now materialize first, snapshot
+second, and preserve exact Brush preview/transaction history on failure.
+A new **504/504** headless oracle checks late failure, retry, immediate commit,
+signed coordinates, pixel/history parity and Undo/Redo at two strides; the
+original source fails **96** assertions. Native-present and fresh native-absent
+runs pass, as do adjacent model and software-framebuffer tests (the signed
+boundary test still exits with known Godot leak diagnostics). This is a
+correctness fix, **not** a hardware latency pass. T-095 remains **In Progress**
+with `manual_review: true`, and T-096 retains its independent owner review.
+[Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-09-mixed-edit-rollback.md).
+
 **T-095 deferred Legacy Brush staging checkpoint (2026-11-09; In Progress):**
 The default swept Brush/Eraser now stages changed pixels directly into its
 validated detached storage-tile patches, deferring global pixel-string key

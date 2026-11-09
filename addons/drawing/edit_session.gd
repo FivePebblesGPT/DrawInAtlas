@@ -501,6 +501,9 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 	if rgba8.size() != area.size.x * area.size.y * 4:
 		return DrawingResult.failure("RGBA", "Region bytes must be tightly packed RGBA8")
 	_materialize_hokusai_preview()
+	# A failed mixed edit must restore the already accepted deferred Brush, not
+	# an empty pre-materialization snapshot. Materialize before rollback state.
+	_materialize_brush_preview()
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	for row: int in range(area.size.y):
@@ -521,6 +524,9 @@ func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 	if area.size.x <= 0 or area.size.y <= 0 or area.size.x > max_pixels or area.size.y > max_pixels / area.size.x:
 		return DrawingResult.failure("REGION_LIMIT", "Rectangle is empty or over pixel budget")
 	_materialize_hokusai_preview()
+	# A failed mixed edit must restore the already accepted deferred Brush, not
+	# an empty pre-materialization snapshot. Materialize before rollback state.
+	_materialize_brush_preview()
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	for y: int in range(area.position.y, area.end.y):
@@ -888,6 +894,9 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 	if area.size.x <= 0 or area.size.y <= 0 or area.size.x > max_pixels or area.size.y > max_pixels / area.size.x:
 		return DrawingResult.failure("SHAPE_LIMIT", "Polygon exceeds candidate budget")
 	_materialize_hokusai_preview()
+	# A failed mixed edit must restore the already accepted deferred Brush, not
+	# an empty pre-materialization snapshot. Materialize before rollback state.
+	_materialize_brush_preview()
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	for y: int in range(area.position.y, area.end.y):
@@ -943,6 +952,9 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 	# The limit still counts unique examined candidates, including boundaries.
 	var queued: Dictionary[Vector2i, bool] = {seed: true}
 	_materialize_hokusai_preview()
+	# A failed mixed edit must restore the already accepted deferred Brush, not
+	# an empty pre-materialization snapshot. Materialize before rollback state.
+	_materialize_brush_preview()
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	var head: int = 0

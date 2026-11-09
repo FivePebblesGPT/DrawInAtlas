@@ -1479,3 +1479,27 @@ The current local oracle passes **492/492**; the updated existing Legacy
 publication oracle passes **519/519**. This adds no required fast-CI check ID,
 does not replace a hosted workflow result, and provides no physical GPU or
 owner usability acceptance.
+
+
+### T-095 deferred Brush + mixed operation rollback — 2026-11-09
+
+After `python3 tools/build_drawing_app.py --in-place`, run:
+
+```sh
+GODOT_SILENCE_ROOT_WARNING=1 godot --headless --audio-driver Dummy \
+  --path drawing --script res://tests/t095_mixed_edit_rollback_smoke.gd \
+  > /tmp/t095-mixed-rollback.log 2>&1
+python3 tools/check_godot_model_log.py /tmp/t095-mixed-rollback.log \
+  --marker T095_MIXED_ROLLBACK_PASSED
+```
+
+The **504/504** oracle tests four mixed APIs after an earlier deferred Brush,
+with a late lazy-tile failure, rollback, retry or immediate commit, source
+preview bytes, canonical before/after history and Undo/Redo at signed anchors
+for two tile strides. An original-source negative control fails 96 checks.
+The on-demand `godot-native-t095-brush.yml` workflow runs it through the
+existing fail-closed checker after staging and import; no required fast CI
+check ID is added. Native-present and fresh native-absent local runs passed.
+This is transaction correctness evidence, not full hosted CI or real hardware
+60px latency acceptance. T-095 remains In Progress and manual review stays
+open.
