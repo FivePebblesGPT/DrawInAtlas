@@ -1548,6 +1548,22 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 NativeHard whole-batch failure atomicity (2026-11-09; In Progress):**
+The opt-in Rust hard Brush previously mutated native coverage/cursor before
+rejecting an invalid later sample or oversized sweep, so retries could silently
+skip pixels. NativeHard now prevalidates all coordinates and bounded swept
+windows, including a checked 1,048,576-candidate total call limit, before
+mutating state. The previous binary fails **6/28** regression checks; the
+rebuild passes **28/28** plus Rust 3/3, native preset 30/30, navigation 48/48,
+Brush 32/32 and both 6/6 fallback variants. A single Xvfb 60px NativeHard
+run has staging p95 **166.331ms**, without a speedup claim. On-demand CI now
+builds the optional Rust extension and runs the fail-closed oracle; hosted CI,
+owner input-to-photon latency and explicit re-acceptance remain unverified.
+**T-095 stays In Progress**, `manual_review: true`; T-096's independent
+Manual Review remains open.
+[Evidence](evidence/T-095-2026-11-09-native-hard-preflight.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 deferred Brush + failed mixed-edit rollback (2026-11-09; In Progress):**
 After deferring Brush pixel-key construction, Fill, Paste region, Polygon and
 Flood Fill took rollback snapshots before the prior Brush pixels were

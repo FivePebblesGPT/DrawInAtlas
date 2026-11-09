@@ -1,3 +1,16 @@
+## T-095 optional NativeHard batch-atomicity witness — 2026-11-09
+
+The on-demand `godot-native-t095-brush.yml` workflow additionally builds the
+Linux Rust/GDExtension from the pinned `native/drawing_brush/Cargo.lock`, stages
+both manifest and binary, pre-registers the extension ahead of cold editor
+import, then runs `t095_native_hard_atomic.gd` with the fail-closed marker
+`T095_NATIVE_HARD_ATOMIC_PASSED`. This test **requires** the actual native
+class, never silently skips without a binary, and checks rejected later
+samples/oversized batches leave the native cursor and covered-pixel history
+unchanged. The local **28/28** pass and original-binary **6-failure** control
+do not count as hosted CI. The 46 required fast-GDScript checks are untouched;
+T-095 owner hardware review and T-096's separate manual gate remain open.
+
 ## T-095 Legacy Brush direct tile-publication oracle — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` workflow now runs

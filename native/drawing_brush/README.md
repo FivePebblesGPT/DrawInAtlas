@@ -79,6 +79,24 @@ per-pixel GDScript-to-Rust calls. Coordinates, color conversion and opacity
 are explicit, not assumed MyPaint/libmypaint raster parity. The presets are
 CC0 and accompanied by their upstream licensing file.
 
+## NativeHard whole-batch preflight
+
+The opt-in `hard_segments` class now validates the complete signed source-space
+point batch and the exact clipped candidate rectangles *before* updating the
+native once-per-stroke coverage set or previous point. A late invalid point,
+unsafe candidate rectangle or batch exceeding **1,048,576 candidate pixels**
+returns `ok=false` with no emitted pixels and no cursor/coverage mutation;
+retries from the same state remain deterministic. Valid swept-circle coverage
+still uses its original geometric predicate. This does not change the default
+Legacy brush or imply error rollback inside Hokusai's separate native surface.
+
+After a native build and standalone import, run
+`res://tests/t095_native_hard_atomic.gd` to check 28 independent assertions;
+its test must **not** be treated as passed without an installed native binary.
+The on-demand T-095 workflow builds the native library before running this
+fail-closed check. See
+[engineering evidence](../../docs/evidence/T-095-2026-11-09-native-hard-preflight.md).
+
 ## Gesture safety
 
 States are `IDLE → CAPTURING → DRAINING → COMMITTING → IDLE`. Source-space

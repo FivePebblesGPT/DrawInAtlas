@@ -106,6 +106,78 @@ struct PresetStroke {
     published: HashMap<(i32, i32), ExportedTile>,
 }
 
+/// A prevalidated segment whose candidate count fits the bounded batch.
+/// Validation must finish before mutating the per-stroke coverage or cursor:
+/// otherwise a bad *later* point can silently consume earlier brush pixels.
+struct HardWindow {
+    begin: Vector2,
+    end: Vector2,
+    left: i32,
+    right: i32,
+    top: i32,
+    bottom: i32,
+}
+
+const MAX_HARD_CANDIDATES: i64 = 1_048_576;
+
+fn validate_hard_windows(
+    points: &[Vector2],
+    width: f32,
+    clip: Rect2i,
+    previous: Option<Vector2>,
+) -> Result<Vec<HardWindow>, &'static str> {
+    if !width.is_finite() || width <= 0.0 || points.is_empty() {
+        return Err("Invalid hard-brush width or path");
+    }
+    let radius = width * 0.5;
+    let mut windows = Vec::with_capacity(points.len());
+    let mut last = previous;
+    let mut candidates = 0_i64;
+    for &end in points {
+        if !end.x.is_finite()
+            || !end.y.is_finite()
+            || end.x.abs() >= 1_000_000_000.0
+            || end.y.abs() >= 1_000_000_000.0
+        {
+            return Err("Brush position exceeds safe coordinates");
+        }
+        let begin = last.unwrap_or(end);
+        let mut left = (begin.x.min(end.x) - radius - 0.5).floor() as i32;
+        let mut right = (begin.x.max(end.x) + radius + 0.5).ceil() as i32;
+        let mut top = (begin.y.min(end.y) - radius - 0.5).floor() as i32;
+        let mut bottom = (begin.y.max(end.y) + radius + 0.5).ceil() as i32;
+        if clip.size.x > 0 && clip.size.y > 0 {
+            left = left.max(clip.position.x);
+            right = right.min(clip.position.x.saturating_add(clip.size.x));
+            top = top.max(clip.position.y);
+            bottom = bottom.min(clip.position.y.saturating_add(clip.size.y));
+        }
+        let columns = i64::from(right) - i64::from(left);
+        let rows = i64::from(bottom) - i64::from(top);
+        if columns > 0 && rows > 0 {
+            let area = columns
+                .checked_mul(rows)
+                .ok_or("Native brush candidate budget overflow")?;
+            candidates = candidates
+                .checked_add(area)
+                .ok_or("Native brush candidate budget overflow")?;
+            if candidates > MAX_HARD_CANDIDATES {
+                return Err("Native brush batch exceeds candidate budget");
+            }
+        }
+        windows.push(HardWindow {
+            begin,
+            end,
+            left,
+            right,
+            top,
+            bottom,
+        });
+        last = Some(end);
+    }
+    Ok(windows)
+}
+
 #[derive(GodotClass)]
 #[class(base=RefCounted)]
 struct DrawingNativeBrush {
@@ -152,67 +224,43 @@ impl DrawingNativeBrush {
             result.set("error", "Invalid hard-brush width or path");
             return result;
         }
-        let radius = width * 0.5;
-        let mut output = PackedInt32Array::new();
-        let mut last = self.last_hard;
-        for &end in points.as_slice() {
-            if !end.x.is_finite()
-                || !end.y.is_finite()
-                || end.x.abs() >= 1_000_000_000.0
-                || end.y.abs() >= 1_000_000_000.0
-            {
+        // Validate *all* segment bounds and the cumulative raster budget
+        // before touching self.covered or self.last_hard. A late malformed
+        // point, unsafe bound or oversized batch must be retryable.
+        let windows = match validate_hard_windows(points.as_slice(), width, clip, self.last_hard) {
+            Ok(windows) => windows,
+            Err(message) => {
                 result.set("ok", false);
-                result.set("error", "Brush position exceeds safe coordinates");
+                result.set("error", message);
                 return result;
             }
-            let begin = last.unwrap_or(end);
-            let left = (begin.x.min(end.x) - radius - 0.5).floor() as i32;
-            let right = (begin.x.max(end.x) + radius + 0.5).ceil() as i32;
-            let top = (begin.y.min(end.y) - radius - 0.5).floor() as i32;
-            let bottom = (begin.y.max(end.y) + radius + 0.5).ceil() as i32;
-            let (mut left, mut right, mut top, mut bottom) = (left, right, top, bottom);
-            if clip.size.x > 0 && clip.size.y > 0 {
-                left = left.max(clip.position.x);
-                right = right.min(clip.position.x.saturating_add(clip.size.x));
-                top = top.max(clip.position.y);
-                bottom = bottom.min(clip.position.y.saturating_add(clip.size.y));
-            }
-            let columns = i64::from(right) - i64::from(left);
-            let rows = i64::from(bottom) - i64::from(top);
-            if columns > 0 && rows > 0 {
-                if columns * rows > 1_048_576 {
-                    result.set("ok", false);
-                    result.set(
-                        "error",
-                        "Native brush candidate window exceeds safety limit",
-                    );
-                    return result;
-                }
-                let delta = end - begin;
-                let squared = delta.length_squared();
-                for y in top..bottom {
-                    for x in left..right {
-                        if self.covered.contains(&(x, y)) {
-                            continue;
-                        }
-                        let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
-                        let fraction = if squared > 0.0 {
-                            ((center - begin).dot(delta) / squared).clamp(0.0, 1.0)
-                        } else {
-                            0.0
-                        };
-                        let distance = center - (begin + delta * fraction);
-                        if distance.length_squared() <= radius * radius {
-                            self.covered.insert((x, y));
-                            output.push(x);
-                            output.push(y);
-                        }
+        };
+        let radius_squared = (width * 0.5) * (width * 0.5);
+        let mut output = PackedInt32Array::new();
+        for window in windows {
+            let delta = window.end - window.begin;
+            let squared = delta.length_squared();
+            for y in window.top..window.bottom {
+                for x in window.left..window.right {
+                    if self.covered.contains(&(x, y)) {
+                        continue;
+                    }
+                    let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
+                    let fraction = if squared > 0.0 {
+                        ((center - window.begin).dot(delta) / squared).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    let distance = center - (window.begin + delta * fraction);
+                    if distance.length_squared() <= radius_squared {
+                        self.covered.insert((x, y));
+                        output.push(x);
+                        output.push(y);
                     }
                 }
             }
-            last = Some(end);
+            self.last_hard = Some(window.end);
         }
-        self.last_hard = last;
         result.set("ok", true);
         result.set("points", &output);
         result
@@ -313,6 +361,36 @@ unsafe impl ExtensionLibrary for DrawingBrushExtension {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_hard_preflight_rejects_late_batch_errors() {
+        let clip = Rect2i::new(Vector2i::ZERO, Vector2i::ZERO);
+        let first = Vector2::new(-1.5, -2.5);
+        let good = [first, Vector2::new(7.5, 3.5)];
+        let windows = validate_hard_windows(&good, 12.0, clip, None).unwrap();
+        assert_eq!(windows.len(), good.len());
+        assert_eq!(windows[1].begin, first);
+        assert!(
+            validate_hard_windows(&[first, Vector2::new(f32::NAN, 1.0)], 12.0, clip, None).is_err()
+        );
+        assert!(
+            validate_hard_windows(&[first, Vector2::new(1_000_000.0, 1.0)], 12.0, clip, None)
+                .is_err()
+        );
+        assert!(validate_hard_windows(&[first], f32::MAX, clip, None).is_err());
+        // A small clip can safely bound a distant sweep. Validation must
+        // agree with the renderer's original clip-window behavior.
+        let clipped = Rect2i::new(Vector2i::new(-10, -10), Vector2i::new(20, 20));
+        assert!(
+            validate_hard_windows(
+                &[first, Vector2::new(1_000_000.0, 1.0)],
+                12.0,
+                clipped,
+                None
+            )
+            .is_ok()
+        );
+    }
 
     #[test]
     fn cached_native_scan_matches_full_quantized_export() {
