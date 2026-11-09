@@ -6,6 +6,18 @@
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 per-pixel Brush result reuse witness — 2026-11-09
+
+The on-demand `godot-native-t095-brush.yml` now checks
+`t095_brush_result_reuse_smoke.gd` (**30/30**, marker
+`T095_BRUSH_RESULT_PASSED`) through the strict fail-closed model-log
+validator. It tests that only internal Brush staging reuses a session-local
+immutable success, while ordinary `_stage()` calls and failures keep their
+independent result semantics, and exercises exact preview, history and
+Undo/Redo. It passes with and without the optional native extension. This
+changes no required fast-CI check IDs, does not represent hosted CI success,
+and does not replace hardware owner acceptance for T-095.
+
 ## T-095 bounded sample-to-stage telemetry witness — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` now also runs the strictly

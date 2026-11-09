@@ -1548,6 +1548,20 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 Brush stage-success allocation checkpoint (2026-11-09; In Progress):**
+The ordinary 60px Legacy Brush's internal pixel-staging calls now reuse one
+session-local success-only `DrawingResult`; failures and external `_stage()`
+callers retain distinct results. A new **30/30** headless ownership/history
+oracle, original Geometry2D and signed-tile regressions, native presets,
+post-release navigation, fresh no-native fallback and viewport tests pass
+locally. Two actual-pointer Xvfb five-stroke controls measured staging p95
+**138.769→123.404ms** and **150.340→128.852ms**; commit latency did not
+consistently improve. This does not establish physical-device responsiveness,
+and hosted CI/owner review remain outstanding. T-095 stays **In Progress**,
+`manual_review: true`; T-096's independent gate is unchanged.
+[Ticket](Tickets/T-095.md) ·
+[evidence](evidence/T-095-2026-11-09-brush-result-reuse.md).
+
 **T-095 bounded sustained-input buffer checkpoint (2026-11-09; In Progress):**
 The Canvas now compacts an already-drained input prefix during a continuous
 pointer backlog without dropping queued source-space positions, timestamps
@@ -1820,7 +1834,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Tile-run buffered Hokusai preflight and exact-pixel oracle verified in software; still slower than Legacy, owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Session-local Brush result reuse and native Hokusai prototype verified in software; owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics

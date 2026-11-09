@@ -28,6 +28,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/t095-oracle.log
           python3 tools/check_godot_model_log.py /tmp/t095-oracle.log --marker T095_ORACLE_PASSED
+      - name: T-095 internal Brush success-result ownership and history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_brush_result_reuse_smoke.gd 2>&1 | tee /tmp/t095-brush-result.log
+          python3 tools/check_godot_model_log.py /tmp/t095-brush-result.log --marker T095_BRUSH_RESULT_PASSED
       - name: T-095 original oblique Geometry2D Brush/Eraser parity
         run: |
           set -euo pipefail
@@ -97,6 +103,7 @@ jobs:
           name: t095-independent-source-and-software-frames
           path: |
             /tmp/t095-oracle.log
+            /tmp/t095-brush-result.log
             /tmp/t095-oblique.log
             /tmp/t095-stage-lookup.log
             /tmp/t095-queue-compaction.log

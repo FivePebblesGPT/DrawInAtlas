@@ -36,6 +36,9 @@ var _preview_tile_versions: Dictionary[String, int] = {}
 ## event grew quadratically over long strokes.
 var _paint_journal: Dictionary[String, Array] = {}
 var _journaling: bool = false
+## Only the internal swept-Brush loop reuses this immutable success sentinel.
+## Public _stage() calls still receive independent result objects.
+var _brush_stage_ok: DrawingResult = DrawingResult.success()
 var _closed: bool = false
 var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
 var _has_last: bool = false
@@ -268,7 +271,8 @@ func commit() -> DrawingResult:
 
 
 func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
-		once: bool = false, blend: bool = false, verified_source: int = -1) -> DrawingResult:
+		once: bool = false, blend: bool = false, verified_source: int = -1,
+		internal_brush: bool = false) -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	# Ordinary GDScript Brush strokes must not pay an extra function call per
@@ -280,14 +284,14 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
 		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
 	if selection != null and not selection.allows(Vector2i(x, y)):
-		return DrawingResult.success()
+		return _brush_stage_ok if internal_brush else DrawingResult.success()
 	var global_x: int = anchor_x + x
 	var global_y: int = anchor_y + y
 	var covered_row: Dictionary = {}
 	if once:
 		covered_row = _covered_rows.get(global_y, {})
 		if covered_row.has(global_x):
-			return DrawingResult.success()
+			return _brush_stage_ok if internal_brush else DrawingResult.success()
 	var key: String = "%d,%d" % [global_x, global_y]
 	# Stage and preview access exactly the same source tile and local offset.
 	# Resolve these only once per accepted candidate, rather than recomputing
@@ -332,7 +336,7 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	else:
 		_after[key] = replacement
 	_sync_preview_pixel(preview_tile_key, local_index, key)
-	return DrawingResult.success()
+	return _brush_stage_ok if internal_brush else DrawingResult.success()
 
 
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
@@ -407,7 +411,7 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 	_paint_journal.clear()
 	for index: int in range(0, coordinates.size(), 2):
 		var staged: DrawingResult = _stage(coordinates[index], coordinates[index + 1],
-			0 if erase else rgba, selection, true, not erase)
+			0 if erase else rgba, selection, true, not erase, -1, true)
 		if not staged.ok:
 			_rollback_paint()
 			return staged
@@ -650,7 +654,7 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			if center.distance_squared_to(nearest) > radius_squared:
 				continue
 			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
-				selection, true, not erase)
+				selection, true, not erase, -1, true)
 			if not result.ok:
 				return result
 	return DrawingResult.success()
@@ -676,7 +680,7 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 				if dx * dx + dy_squared > radius_squared:
 					continue
 				var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
-					selection, true, not erase)
+					selection, true, not erase, -1, true)
 				if not result.ok:
 					return result
 	else:
@@ -694,7 +698,7 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 				if dx * dx + dy_squared > radius_squared:
 					continue
 				var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
-					selection, true, not erase)
+					selection, true, not erase, -1, true)
 				if not result.ok:
 					return result
 	return DrawingResult.success()
