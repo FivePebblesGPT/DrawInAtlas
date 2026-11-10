@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -73,7 +74,12 @@ class StandaloneDrawingTests(unittest.TestCase):
             output = command("--headless", "--path", str(app),
                              "--script", "res://tests/standalone_smoke.gd")
             self.assertIn("DRAWING_STANDALONE_PASSED", output)
-            self.assertIn("38 passed; 0 failed", output)
+            summary = re.search(r"(?m)^DRAWING_STANDALONE: ([1-9][0-9]*) passed; 0 failed$", output)
+            self.assertIsNotNone(summary, output)
+            assert summary is not None
+            # New signed-pixel and floating-Move witnesses increase the count;
+            # fail on lost coverage, not the addition of valid assertions.
+            self.assertGreaterEqual(int(summary.group(1)), 42)
 
     @unittest.skipUnless(GODOT, "Godot needed for real third consumer tests")
     def test_third_project_uses_complete_package(self) -> None:

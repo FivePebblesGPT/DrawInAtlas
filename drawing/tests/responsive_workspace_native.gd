@@ -197,6 +197,48 @@ func run() -> void:
 		await screenshot("t090-scale-%d" % int(scale * 100.0))
 	root.content_scale_factor = 1.0
 	await frames(8)
+	# Native pointer opens the actual collapsed More popup. Checkboxes must
+	# remain visible there, not just in their now-hidden source menus.
+	root.size = Vector2i(800, 600)
+	app.size = Vector2(560, 600)
+	await frames(10)
+	var top: Control = app.top_bar
+	top._refresh_layout()
+	var more_popup: PopupMenu = top.more_menu.get_popup()
+	var grid_more_id: int = -1
+	var tabs_more_id: int = -1
+	for item: int in range(more_popup.item_count):
+		match more_popup.get_item_text(item):
+			"View › Show grid": grid_more_id = item
+			"Window › Show document tabs": tabs_more_id = item
+	check(top.more_menu.visible and tabs_more_id >= 0 and
+		(grid_more_id >= 0 or top._menus[2].visible),
+		"narrow native viewport moves Window and later menus into More")
+	if tabs_more_id >= 0:
+		check(more_popup.is_item_checkable(tabs_more_id) and
+			more_popup.is_item_checked(tabs_more_id) == app.show_document_tabs,
+			"native More popup mirrors the current document-tabs checkmark")
+		await click_at(top.more_menu.get_global_rect().get_center())
+		check(more_popup.visible, "real pointer opens the native More menu")
+		await screenshot("t090-more-checkmarks")
+		more_popup.id_pressed.emit(tabs_more_id)
+		check(not app.show_document_tabs and not more_popup.is_item_checked(tabs_more_id),
+			"native More action updates tabs and its checked state")
+		app._toggle_document_tabs()
+		more_popup.hide()
+	if grid_more_id >= 0:
+		check(more_popup.is_item_checkable(grid_more_id) and
+			more_popup.is_item_checked(grid_more_id) == app.canvas.show_grid,
+			"collapsed native View grid command retains checkable state")
+		app._toggle_grid()
+		check(more_popup.is_item_checked(grid_more_id) == app.canvas.show_grid,
+			"native View grid checkmark updates without rebuilding popup")
+		app._toggle_grid()
+	root.size = Vector2i(1280, 760)
+	app.size = Vector2(1280, 760)
+	await frames(10)
+	check(not top.more_menu.visible and top._menus[6].get_popup().is_item_checked(2),
+		"wide viewport restores original Window menu and its checked state")
 	app._change_tool("Brush")
 	app.width_spin.value = 5.0
 	await frames(3)

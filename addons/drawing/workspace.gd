@@ -1725,11 +1725,22 @@ func _use_recent_color(index: int) -> void:
 		_set_selected_color(recent_colors[index])
 
 
+## Color.html_is_valid also permits bare/abbreviated hex; the Colors editor
+## promises exactly six or eight digit channels with an explicit leading #.
+func _valid_color_hex(value: String) -> bool:
+	if not value.begins_with("#") or value.length() not in [7, 9]:
+		return false
+	for index: int in range(1, value.length()):
+		if "0123456789abcdefABCDEF".find(value.substr(index, 1)) < 0:
+			return false
+	return true
+
+
 func _commit_hex() -> void:
 	if color_hex == null:
 		return
 	var value: String = color_hex.text.strip_edges()
-	if Color.html_is_valid(value):
+	if _valid_color_hex(value):
 		_set_selected_color(Color.html(value))
 	_refresh_color_controls()
 
@@ -3137,6 +3148,17 @@ func _ask_open() -> void:
 	open_dialog.popup_centered()
 
 
+func _show_save_dialog() -> void:
+	# Godot headless reports a 0x0 screen: centering the native FileDialog
+	# spawns its window at a negative position and emits a runtime ERROR.
+	# Preserve the real dialog and Save/Close routing in headless CI without
+	# changing normal desktop placement.
+	if DisplayServer.get_name() == "headless":
+		save_dialog.show()
+	else:
+		save_dialog.popup_centered()
+
+
 func _ask_save() -> void:
 	if active_tab < 0:
 		return
@@ -3151,7 +3173,7 @@ func _ask_save() -> void:
 		variant_dialog.popup_centered()
 	else:
 		_local_save_as = session != null
-		save_dialog.popup_centered()
+		_show_save_dialog()
 
 
 func _save() -> void:
@@ -3166,7 +3188,7 @@ func _save() -> void:
 			return
 		if session.source_id.is_empty() and tabs[active_tab]["path"].is_empty():
 			_local_save_as = false
-			save_dialog.popup_centered()
+			_show_save_dialog()
 		else:
 			_publish_object(false)
 		return

@@ -14,6 +14,7 @@ var document: DrawingDocument:
 	set(value):
 		if (session != null or dragging or _floating_source_selection != null) and value != document:
 			cancel_gesture()
+			canvas_error.emit("Stroke cancelled because the document changed")
 		if document != value:
 			set_selection_mask(null, false)
 		document = value
@@ -22,39 +23,96 @@ var layer_id: String = "":
 	set(value):
 		if (session != null or dragging or _floating_source_selection != null) and value != layer_id:
 			cancel_gesture()
+			canvas_error.emit("Stroke cancelled because the layer changed")
 		layer_id = value
 var tool: String = "Brush":
 	set(value):
-		if (session != null or dragging or _floating_source_selection != null) and value != tool:
+		# Once released, queued source-space samples and frozen brush settings
+		# outlive a toolbar change (including selecting Pan).
+		if ((session != null and _stroke_phase == StrokePhase.CAPTURING) or dragging \
+				or _floating_source_selection != null) and value != tool:
 			cancel_gesture()
+			canvas_error.emit("Gesture cancelled because the tool changed during capture")
 		tool = value
 var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
+## Explicit opt-in until coverage parity and owner-device profiling pass.
+## "Hokusai" loads an actual bundled MyPaint .myb; "NativeHard" accelerates
+## the legacy hard shape while retaining document-owned alpha/history.
+var brush_backend: String = "Legacy"
+var brush_preset: String = "hard"
+const BUNDLED_PRESETS: Dictionary = {
+    "hard": "res://addons/drawing/brushes/hard_round.myb",
+    "soft": "res://addons/drawing/brushes/soft.myb",
+    "ink": "res://addons/drawing/brushes/ink.myb",
+    "airbrush": "res://addons/drawing/brushes/airbrush.myb",
+}
 ## Workspace presentation, independent of the unbounded document. Atlas hosts
 ## leave image_bounds empty unless they explicitly want an authoring frame.
 var image_bounds: Rect2i = Rect2i():
 	set(value):
 		if value != image_bounds and session != null:
 			cancel_gesture()
+			canvas_error.emit("Stroke cancelled because the image bounds changed")
 		image_bounds = value
 		queue_redraw()
 ## Only the standalone workspace enables this. Atlas can show a bounded guide
 ## without changing its intentionally unbounded authoring surface.
-var clip_strokes_to_image_frame: bool = false
+var clip_strokes_to_image_frame: bool = false:
+	set(value):
+		# Clipping is an edit-authorization policy, not a visual guide. A
+		# queued Brush/Eraser stroke must not outlive a host policy change.
+		if value != clip_strokes_to_image_frame and session != null:
+			cancel_gesture()
+			canvas_error.emit("Stroke cancelled because image clipping changed")
+		clip_strokes_to_image_frame = value
 var _stroke_clip: Rect2i = Rect2i()
+## A stroke uses the exact mask present on pointer-down, not a later edit
+## region that happens to share the same enclosing rectangle.
+var _stroke_selection: DrawingSelection
+var _native_brush: Object
+var _active_brush_backend: String = "Legacy"
 var show_grid: bool = false
 ## Pixel boundaries appear automatically when individual pixels become large.
 var show_pixel_grid: bool = true
-var snap_to_grid: bool = false
-var grid_spacing: int = 8
-var grid_origin: Vector2i = Vector2i.ZERO
+## A stroke/marquee/move drag must not mix two different input coordinate grids.
+## Guide visibility is presentation-only and never cancels a gesture.
+var snap_to_grid: bool = false:
+	set(value):
+		if value != snap_to_grid:
+			_cancel_on_effective_snap_change()
+		snap_to_grid = value
+var grid_spacing: int = 8:
+	set(value):
+		if value != grid_spacing and snap_to_grid:
+			_cancel_on_effective_snap_change()
+		grid_spacing = value
+var grid_origin: Vector2i = Vector2i.ZERO:
+	set(value):
+		if value != grid_origin and snap_to_grid:
+			_cancel_on_effective_snap_change()
+		grid_origin = value
 var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
-		if (session != null or dragging or _floating_source_selection != null) and value != zoom:
-			cancel_gesture()
+		if value != zoom:
+			# A released stroke no longer samples screen coordinates: viewport
+			# navigation must never discard its already queued source positions.
+			if (session != null and _stroke_phase == StrokePhase.CAPTURING) \
+					or dragging or _floating_source_selection != null:
+				cancel_gesture()
+				canvas_error.emit("Gesture cancelled because zoom changed during capture")
 		zoom = value
-var camera: Vector2 = Vector2.ZERO
+## Source coordinates depend on camera. Programmatic host pans during a held
+## Brush/Eraser or marquee/Move drag must not splice two viewport mappings
+## into one gesture. Idle panning and equivalent assignments remain harmless.
+var camera: Vector2 = Vector2.ZERO:
+	set(value):
+		if value != camera and ((session != null and _stroke_phase == StrokePhase.CAPTURING) \
+				or (dragging and (selecting or moving))):
+			cancel_gesture()
+			canvas_error.emit("Gesture cancelled because the camera moved during capture")
+		camera = value
 ## Legacy rectangular projection for hosts and history. The actual mask may
 ## contain islands/holes; assigning selected directly replaces it by a rect.
 var selection_mask: DrawingSelection = DrawingSelection.new()
@@ -66,12 +124,30 @@ var selected: Rect2i = Rect2i():
 			cancel_gesture()
 		selected = value
 		if not _updating_selection_bounds:
+			# Direct legacy rectangle writes must respect the same live-stroke
+			# authorization boundary as set_selection_mask().
+			var next_mask: DrawingSelection = DrawingSelection.new()
+			next_mask.set_rectangle(value)
+			_cancel_stroke_if_selection_changed(next_mask)
 			selection_mask.set_rectangle(value)
+			_mask_outline_cache.clear()
+			_mask_outline_window = Rect2i()
 var _marquee: Rect2i = Rect2i()
 var _marquee_dragged: bool = false
 var _marquee_start_screen: Vector2 = Vector2.ZERO
 var _move_preview: DrawingEditSession
+var _move_capture: DrawingClipboard
+var last_move_metrics: Dictionary[String, Variant] = {}
+var move_profile_samples: Array[Dictionary] = []
+## Cached source-coordinate contour tiles only for explicit pixel masks.
+## Expression-only masks are traced using cheap row intervals each frame.
+const MASK_OUTLINE_TILE: int = 64
+const MASK_OUTLINE_TILES_PER_FRAME: int = 4
+const MAX_MASK_OUTLINE_CACHE: int = 4096
+var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
+var _mask_outline_window: Rect2i = Rect2i()
 var _move_target: Vector2i = Vector2i.ZERO
+var _move_target_received_us: int = 0
 var _move_preview_offset: Vector2i = Vector2i.ZERO
 ## A floating selected-pixel Move retains its *original* mask and source
 ## revision across multiple drags. The shifted mask is display context only:
@@ -123,13 +199,26 @@ const MAX_SEGMENTS_PER_BATCH: int = 16
 const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
 const MAX_DRAIN_CPU_US: int = 6000
 const MAX_SEGMENT_LENGTH: float = 24.0
+# Discard only an already-consumed prefix of a sustained stroke. A paint
+# backlog may never become entirely empty while fresh OS samples arrive.
+const MIN_CONSUMED_SAMPLE_COMPACTION: int = 256
+## Keep exact history for short gestures and a chronological, rolling tail for
+## long ones. All-time count and worst age remain exact, including evicted ages.
+const MAX_SAMPLE_STAGE_LATENCIES: int = 4096
+const MAX_STAGE_BATCH_LATENCIES: int = 4096
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
+var _sample_latency_write_index: int = 0
+var _batch_latency_write_index: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
 var _staged_position: Vector2 = Vector2.ZERO
+## Capturing uses live screen->source mapping. Draining is source-only and
+## camera-independent; committing publishes one atomic history entry.
+enum StrokePhase { IDLE, CAPTURING, DRAINING, COMMITTING }
+var _stroke_phase: int = StrokePhase.IDLE
 var _finish_requested: bool = false
 var _stroke_color: int = 0
 var _stroke_width: float = 1.0
@@ -144,17 +233,42 @@ var last_gesture_metrics: Dictionary[String, Variant] = {}
 func set_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
 	if _floating_source_selection != null:
 		cancel_gesture()
+	_cancel_stroke_if_selection_changed(value)
 	_assign_selection_mask(value, notify)
+
+
+## Changing the edit region during a queued stroke must not combine pixels
+## authorized by two different masks in one document transaction. Equivalent
+## copies are harmless (e.g. a UI refresh that republishes the same mask).
+func _cancel_stroke_if_selection_changed(value: DrawingSelection) -> void:
+	if session == null or _stroke_selection == null:
+		return
+	var next_mask: DrawingSelection = value if value != null else DrawingSelection.new()
+	if not _stroke_selection.same_as(next_mask):
+		cancel_gesture()
+		canvas_error.emit("Stroke cancelled because the selection changed")
 
 
 func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> void:
 	selection_mask = value.detached_copy() if value != null else DrawingSelection.new()
+	_mask_outline_cache.clear()
+	_mask_outline_window = Rect2i()
 	_updating_selection_bounds = true
 	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
 	_updating_selection_bounds = false
 	queue_redraw()
 	if notify:
 		selection_changed.emit(selected)
+
+
+## Snap settings participate in source-coordinate interpretation. Discard an
+## in-flight transaction rather than stage a stroke or selection with samples
+## from two unrelated grids. A finished floating Move can still be adjusted
+## before the next drag, and changing guide visibility is always harmless.
+func _cancel_on_effective_snap_change() -> void:
+	if session != null or (dragging and (selecting or moving)):
+		cancel_gesture()
+		canvas_error.emit("Gesture cancelled because grid snapping changed")
 
 
 func clear_selection() -> void:
@@ -548,7 +662,8 @@ func _draw() -> void:
 		"preview_index_built": 0, "preview_index_keys": 0, "preview_index_fallback": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
-		"compose_cpu_us": 0, "texture_cpu_us": 0, "empty_skipped": 0,
+		"compose_cpu_us": 0, "texture_cpu_us": 0, "preview_index_cpu_us": 0,
+		"empty_skipped": 0,
 		"transparent_tiles_culled": 0,
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
@@ -575,8 +690,10 @@ func _draw() -> void:
 	var indexed_stamps: Dictionary = {}
 	var use_preview_index: bool = false
 	if preview_session != null:
+		var index_start_us: int = Time.get_ticks_usec()
 		preview_index = preview_session.preview_stamps_for_display_tiles(visible_tiles,
 			DISPLAY_TILE_SIZE)
+		metrics["preview_index_cpu_us"] = Time.get_ticks_usec() - index_start_us
 		use_preview_index = bool(preview_index["indexed"])
 		if use_preview_index:
 			indexed_stamps = preview_index["stamps"] as Dictionary
@@ -666,6 +783,12 @@ func _draw() -> void:
 	metrics["submit_us"] = Time.get_ticks_usec()
 	last_frame_metrics = metrics
 	_last_frame_submit_us = int(metrics["submit_us"])
+	if session != null:
+		# Capture per-gesture compositor/upload work before the next _draw
+		# replaces last_frame_metrics. This is CPU submission, not photon time.
+		_metrics["preview_frames"] = int(_metrics["preview_frames"]) + 1
+		for key: String in ["compose_cpu_us", "texture_cpu_us", "preview_index_cpu_us", "bytes_uploaded"]:
+			_metrics[key] = int(_metrics[key]) + int(metrics[key])
 
 	_draw_grid_overlay()
 	_draw_pixel_grid_overlay()
@@ -679,7 +802,9 @@ func _draw() -> void:
 		var anchor: Vector2 = pixel_to_position(Vector2(asset_origin))
 		draw_line(anchor + Vector2(-6, 0), anchor + Vector2(6, 0), Color(1, 0.75, 0.3), 1.0)
 		draw_line(anchor + Vector2(0, -6), anchor + Vector2(0, 6), Color(1, 0.75, 0.3), 1.0)
+	var outline_started_us: int = Time.get_ticks_usec()
 	_draw_selection_outline()
+	last_frame_metrics["selection_outline_cpu_us"] = Time.get_ticks_usec() - outline_started_us
 	if selecting and _marquee_dragged:
 		draw_rect(Rect2(pixel_to_position(Vector2(_marquee.position)),
 			Vector2(_marquee.size) * zoom), Color(0.95, 0.8, 0.24), false, 2.0)
@@ -691,49 +816,60 @@ func _draw() -> void:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
 
 
-## Trace the actual mask for small selections, including islands/holes.
-## Large selections use a bounded fallback (outer guide plus operation rects),
-## never O(number of source pixels) work for unbounded sparse documents.
+## The persistent selection always traces mask truth, never the conservative
+## enclosing bounds. Only viewport-intersecting rows are evaluated; rectangle
+## boolean expressions have a scanline cost independent of selected area.
 func _draw_selection_outline() -> void:
 	if not selection_mask.enabled or not selected.has_area():
 		return
-	var highlight: Color = Color(0.2, 0.65, 1.0, 0.95)
-	var count: int = selected.size.x * selected.size.y
-	if count <= 4096 and zoom >= 0.5:
-		var edges: PackedVector2Array = PackedVector2Array()
-		for y: int in range(selected.position.y, selected.end.y):
-			for x: int in range(selected.position.x, selected.end.x):
-				var at: Vector2i = Vector2i(x, y)
-				if not selection_mask.allows(at):
-					continue
-				var top_left: Vector2 = pixel_to_position(Vector2(at))
-				var bottom_right: Vector2 = top_left + Vector2.ONE * zoom
-				if not selection_mask.allows(at + Vector2i.LEFT):
-					edges.append(top_left)
-					edges.append(Vector2(top_left.x, bottom_right.y))
-				if not selection_mask.allows(at + Vector2i.RIGHT):
-					edges.append(Vector2(bottom_right.x, top_left.y))
-					edges.append(bottom_right)
-				if not selection_mask.allows(at + Vector2i.UP):
-					edges.append(top_left)
-					edges.append(Vector2(bottom_right.x, top_left.y))
-				if not selection_mask.allows(at + Vector2i.DOWN):
-					edges.append(Vector2(top_left.x, bottom_right.y))
-					edges.append(bottom_right)
-		if not edges.is_empty():
-			draw_multiline(edges, highlight, 1.5)
-		return
-	draw_rect(Rect2(pixel_to_position(Vector2(selected.position)),
-		Vector2(selected.size) * zoom), highlight, false, 1.5)
-	# Disclose known add/subtract/intersect contours even when the exact
-	# channel is too big to trace this frame. The crop/holes are never
-	# simulated by a filled bounding-box overlay.
-	for op: Dictionary in selection_mask._operations:
-		var region: Rect2i = op["rect"] as Rect2i
-		var accent: Color = Color(1.0, 0.47, 0.4, 0.85) if op["mode"] == "Subtract" \
-			else Color(0.35, 1.0, 0.7, 0.85)
-		draw_rect(Rect2(pixel_to_position(Vector2(region.position)),
-			Vector2(region.size) * zoom), accent, false, 1.0)
+	var top_left: Vector2 = (Vector2.ZERO - size * 0.5) / zoom + camera
+	var bottom_right: Vector2 = (size - size * 0.5) / zoom + camera
+	var visible: Rect2i = Rect2i(Vector2i(floori(top_left.x), floori(top_left.y)),
+		Vector2i(ceili(bottom_right.x) - floori(top_left.x),
+			ceili(bottom_right.y) - floori(top_left.y)))
+	var source_edges: PackedVector2Array = PackedVector2Array()
+	if selection_mask._pixel_mask.is_empty():
+		source_edges = selection_mask.contour_segments(visible)
+	else:
+		# Exact irregular masks may require millions of pixel probes at 25%.
+		# Build at most four 64px tiles per frame and keep already traced tiles.
+		var footprint: Rect2i = selected.intersection(visible.grow(1))
+		if not footprint.has_area():
+			return
+		var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+		var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+		var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+		var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+		var tile_window: Rect2i = Rect2i(left, top, right - left + 1, bottom - top + 1)
+		if tile_window != _mask_outline_window:
+			_mask_outline_cache.clear()
+			_mask_outline_window = tile_window
+		var created: int = 0
+		var pending: bool = false
+		for tile_y: int in range(top, bottom + 1):
+			for tile_x: int in range(left, right + 1):
+				var tile: Vector2i = Vector2i(tile_x, tile_y)
+				if not _mask_outline_cache.has(tile):
+					if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
+						# At extreme zoom-out/display sizes, an explicit mask may
+						# exceed the retained cache. Stop progressive redraw rather
+						# than evict/rebuild forever; a changed view starts fresh.
+						continue
+					if created >= MASK_OUTLINE_TILES_PER_FRAME:
+						pending = true
+						continue
+					created += 1
+					_mask_outline_cache[tile] = selection_mask.contour_segments(
+						Rect2i(tile * MASK_OUTLINE_TILE,
+							Vector2i(MASK_OUTLINE_TILE, MASK_OUTLINE_TILE)))
+				source_edges.append_array(_mask_outline_cache[tile])
+		if pending:
+			queue_redraw()
+	var screen_edges: PackedVector2Array = PackedVector2Array()
+	for source_point: Vector2 in source_edges:
+		screen_edges.append(pixel_to_position(source_point))
+	if not screen_edges.is_empty():
+		draw_multiline(screen_edges, Color(0.2, 0.65, 1.0, 0.95), 1.5)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -752,8 +888,10 @@ func _gui_input(event: InputEvent) -> void:
 			accept_event()
 			return
 		if button.button_index == MOUSE_BUTTON_MIDDLE or (tool == "Pan" and button.button_index == MOUSE_BUTTON_LEFT):
-			if button.pressed and session != null:
+			if button.pressed and session != null and _stroke_phase == StrokePhase.CAPTURING:
+				# We cannot remap later input while a paint button is held.
 				cancel_gesture()
+				canvas_error.emit("Stroke cancelled because panning began during capture")
 			panning = button.pressed
 			last_mouse = button.position
 			accept_event()
@@ -811,6 +949,7 @@ func _process(_delta: float) -> void:
 	if session != null:
 		if document == null or document.revision != session.expected_revision:
 			cancel_gesture()
+			canvas_error.emit("Stroke cancelled because the document revision changed")
 			return
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
 	if moving and _move_target != _move_preview_offset:
@@ -821,7 +960,10 @@ func _process(_delta: float) -> void:
 
 
 func start_gesture(position: Vector2) -> void:
-	if document == null or session != null:
+	if session != null:
+		canvas_error.emit("Previous stroke is still draining; wait for its commit")
+		return
+	if document == null:
 		return
 	gesture_start = position_to_pixel(position)
 	grab_focus()
@@ -849,11 +991,24 @@ func start_gesture(position: Vector2) -> void:
 					moving = false
 					dragging = false
 					return
+				var captured_at: int = Time.get_ticks_usec()
+				var captured: DrawingResult = DrawingClipboard.capture(document, layer_id,
+					selection_mask.bounds, selection_mask)
+				if not captured.ok:
+					moving = false
+					dragging = false
+					canvas_error.emit(captured.message)
+					return
+				_move_capture = captured.value as DrawingClipboard
+				last_move_metrics = {"capture_us": Time.get_ticks_usec() - captured_at,
+					"pixels": _move_capture._pixels.size()}
+				move_profile_samples.clear()
 				_floating_source_selection = selection_mask.detached_copy()
 				_floating_source_revision = document.revision
 				gesture_started.emit()
 			_move_drag_base = _floating_offset
 			_move_target = _floating_offset
+			_move_target_received_us = 0
 		return
 	if tool not in ["Brush", "Eraser"]:
 		dragging = false
@@ -870,6 +1025,7 @@ func start_gesture(position: Vector2) -> void:
 		dragging = false
 		return
 	session = result.value as DrawingEditSession
+	_stroke_phase = StrokePhase.CAPTURING
 	# Avoid Godot combining OS motion events during a captured paint gesture.
 	# This global option must be restored on all commit/cancel/exit paths.
 	_previous_accumulated_input = Input.use_accumulated_input
@@ -879,9 +1035,30 @@ func start_gesture(position: Vector2) -> void:
 	_stroke_width = brush_width
 	_stroke_erase = tool == "Eraser"
 	_stroke_clip = image_bounds if clip_strokes_to_image_frame else Rect2i()
+	_stroke_selection = selection_mask.detached_copy()
+	_native_brush = null
+	_active_brush_backend = "Legacy"
+	if brush_backend in ["NativeHard", "Hokusai"]:
+		if ClassDB.class_exists("DrawingNativeBrush"):
+			_native_brush = ClassDB.instantiate("DrawingNativeBrush")
+			if brush_backend == "Hokusai" and not _stroke_erase:
+				var preset_path: String = BUNDLED_PRESETS.get(brush_preset, "")
+				var settings: String = FileAccess.get_file_as_string(preset_path) if not preset_path.is_empty() else ""
+				if not settings.is_empty() and _native_brush.call("configure_preset",
+						settings, _stroke_width, _stroke_color):
+					_active_brush_backend = "Hokusai"
+				else:
+					canvas_error.emit("Hokusai preset unavailable; using the legacy Brush")
+			else:
+				_native_brush.call("reset_hard")
+				_active_brush_backend = "NativeHard"
+		else:
+			canvas_error.emit("Native brush unavailable; using the legacy Brush")
 	_samples.clear()
 	_sample_times_us.clear()
 	_sample_index = 0
+	_sample_latency_write_index = 0
+	_batch_latency_write_index = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -889,8 +1066,14 @@ func start_gesture(position: Vector2) -> void:
 		"first_preview_submit_us": 0, "first_frame_post_draw_us": 0,
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
+		"max_sample_buffer": 0, "sample_compactions": 0,
 		"drain_calls": 0, "max_drain_cpu_us": 0,
-		"sample_to_stage_us": []}
+		"sample_to_stage_us": [], "sample_to_stage_total": 0,
+		"max_sample_to_stage_us": 0, "stage_batches_us": [],
+		"stage_batch_total": 0, "max_stage_batch_us": 0,
+		"commit_cpu_us": 0, "preview_frames": 0,
+		"compose_cpu_us": 0, "texture_cpu_us": 0,
+		"preview_index_cpu_us": 0, "bytes_uploaded": 0}
 	gesture_started.emit()
 	_enqueue_sample(_staged_position)
 	# A stationary dab does not wait for the first motion or mouse-up event.
@@ -909,6 +1092,7 @@ func update_gesture(position: Vector2) -> void:
 		queue_redraw()
 	elif moving:
 		_move_target = _move_drag_base + current - gesture_start
+		_move_target_received_us = Time.get_ticks_usec()
 	elif session != null:
 		_enqueue_sample(source_position(position))
 
@@ -925,6 +1109,7 @@ func _enqueue_sample(position: Vector2) -> void:
 	_sample_times_us.append(Time.get_ticks_usec())
 	_metrics["samples_received"] = int(_metrics["samples_received"]) + 1
 	_metrics["max_pending"] = maxi(int(_metrics["max_pending"]), _samples.size() - _sample_index)
+	_metrics["max_sample_buffer"] = maxi(int(_metrics["max_sample_buffer"]), _samples.size())
 
 
 func _drain_segments(budget: int) -> void:
@@ -940,6 +1125,11 @@ func _drain_segments(budget: int) -> void:
 		_stroke_width * (_stroke_width + MAX_SEGMENT_LENGTH))
 	var batch_limit: int = clampi(int(MAX_BATCH_ESTIMATED_PIXELS / estimated_segment_pixels),
 		1, MAX_SEGMENTS_PER_BATCH)
+	# Hokusai accumulates pigment natively: exporting every intermediate 60px
+	# dab would repeatedly restage the same dirty tiles. Collapse up to sixteen
+	# adjacent source samples into one atomic native call/preview update.
+	if _active_brush_backend == "Hokusai":
+		batch_limit = MAX_SEGMENTS_PER_BATCH
 	while segments < budget:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
@@ -961,11 +1151,24 @@ func _drain_segments(budget: int) -> void:
 		if batch.is_empty():
 			break
 		var start_us: int = Time.get_ticks_usec()
-		var stage: DrawingResult = session.paint_path(batch,
-			_stroke_color, _stroke_width, _stroke_erase,
-			selection_mask if selection_mask.enabled else null, 1048576, _stroke_clip)
+		var stage: DrawingResult
+		if _active_brush_backend == "NativeHard":
+			stage = session.paint_path_native_hard(batch, _stroke_color, _stroke_width,
+				_stroke_erase, _stroke_selection if _stroke_selection.enabled else null,
+				_native_brush, _stroke_clip)
+		elif _active_brush_backend == "Hokusai":
+			stage = session.paint_path_hokusai(batch, _stroke_color,
+				_stroke_selection if _stroke_selection.enabled else null,
+				_native_brush, _stroke_clip)
+		else:
+			stage = session.paint_path(batch, _stroke_color, _stroke_width, _stroke_erase,
+				_stroke_selection if _stroke_selection.enabled else null, 1048576, _stroke_clip)
 		var staged_at_us: int = Time.get_ticks_usec()
-		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + staged_at_us - start_us
+		var batch_cpu_us: int = staged_at_us - start_us
+		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + batch_cpu_us
+		# Keep the latest batch timings, not just the first 4096 of a long
+		# stroke. Lifetime count, total CPU and worst batch stay exact.
+		_record_stage_batch(batch_cpu_us)
 		if not stage.ok:
 			canvas_error.emit(stage.message)
 			cancel_gesture()
@@ -975,9 +1178,8 @@ func _drain_segments(budget: int) -> void:
 		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
 		_staged_position = next_position
 		changed = true
-		var arrival_to_stage: Array = _metrics["sample_to_stage_us"] as Array
 		for arrival_us: int in completed_arrivals:
-			arrival_to_stage.append(maxi(0, staged_at_us - arrival_us))
+			_record_stage_latency(maxi(0, staged_at_us - arrival_us))
 		# The deadline is checked between atomic batches, never during a
 		# partially rasterized segment or while receiving a pointer event.
 		if staged_at_us - drain_start_us >= MAX_DRAIN_CPU_US:
@@ -985,26 +1187,109 @@ func _drain_segments(budget: int) -> void:
 	_metrics["drain_calls"] = int(_metrics["drain_calls"]) + 1
 	_metrics["max_drain_cpu_us"] = maxi(int(_metrics["max_drain_cpu_us"]),
 		Time.get_ticks_usec() - drain_start_us)
-	if _sample_index == _samples.size():
-		_samples.clear()
-		_sample_times_us.clear()
-		_sample_index = 0
+	_compact_sample_queue()
 	if changed:
 		queue_redraw()
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
 
 
+## A long stroke must not freeze its batch latency profile at the first
+## 4096 batches; later overloads matter most when diagnosing pointer lag.
+## Record all-time count/worst with a fixed latest-window distribution.
+func _record_stage_batch(duration_us: int) -> void:
+	var batches: Array = _metrics["stage_batches_us"] as Array
+	var duration: int = maxi(0, duration_us)
+	_metrics["stage_batch_total"] = int(_metrics["stage_batch_total"]) + 1
+	_metrics["max_stage_batch_us"] = maxi(int(_metrics["max_stage_batch_us"]), duration)
+	if batches.size() < MAX_STAGE_BATCH_LATENCIES:
+		batches.append(duration)
+	else:
+		batches[_batch_latency_write_index] = duration
+		_batch_latency_write_index = (_batch_latency_write_index + 1) % MAX_STAGE_BATCH_LATENCIES
+
+
+## Present the bounded latest-batch window in chronological order, matching
+## the short-stroke metric consumers' existing expectations.
+func _finalize_stage_batch_window() -> void:
+	if int(_metrics["stage_batch_total"]) <= MAX_STAGE_BATCH_LATENCIES \
+			or _batch_latency_write_index == 0:
+		return
+	var batches: Array = _metrics["stage_batches_us"] as Array
+	var ordered: Array = batches.slice(_batch_latency_write_index)
+	ordered.append_array(batches.slice(0, _batch_latency_write_index))
+	_metrics["stage_batches_us"] = ordered
+
+
+## An unbounded list of per-sample latencies defeats input queue compaction on
+## sustained strokes and makes final deep-copy cost depend on stroke duration.
+## The latest window stays bounded; the all-time maximum and count are exact.
+func _record_stage_latency(latency_us: int) -> void:
+	var samples: Array = _metrics["sample_to_stage_us"] as Array
+	var age: int = maxi(0, latency_us)
+	_metrics["sample_to_stage_total"] = int(_metrics["sample_to_stage_total"]) + 1
+	_metrics["max_sample_to_stage_us"] = maxi(int(_metrics["max_sample_to_stage_us"]), age)
+	if samples.size() < MAX_SAMPLE_STAGE_LATENCIES:
+		samples.append(age)
+	else:
+		samples[_sample_latency_write_index] = age
+		_sample_latency_write_index = (_sample_latency_write_index + 1) % MAX_SAMPLE_STAGE_LATENCIES
+
+
+## Return latency samples in temporal order for the existing profiler and
+## external consumers. Short strokes keep their original complete history.
+func _finalize_stage_latency_window() -> void:
+	if int(_metrics["sample_to_stage_total"]) <= MAX_SAMPLE_STAGE_LATENCIES \
+			or _sample_latency_write_index == 0:
+		return
+	var samples: Array = _metrics["sample_to_stage_us"] as Array
+	var ordered: Array = samples.slice(_sample_latency_write_index)
+	ordered.append_array(samples.slice(0, _sample_latency_write_index))
+	_metrics["sample_to_stage_us"] = ordered
+
+
+## Bound retained input memory even when a long capture never catches up
+## completely between OS motion events. Only already dequeued waypoints are
+## discarded; the current interpolated target and its timestamp are separate.
+func _compact_sample_queue() -> void:
+	if _sample_index == _samples.size():
+		_samples.clear()
+		_sample_times_us.clear()
+		_sample_index = 0
+	elif _sample_index >= MIN_CONSUMED_SAMPLE_COMPACTION \
+			and _sample_index * 2 >= _samples.size():
+		_samples = _samples.slice(_sample_index)
+		_sample_times_us = _sample_times_us.slice(_sample_index)
+		_sample_index = 0
+		_metrics["sample_compactions"] = int(_metrics["sample_compactions"]) + 1
+
+
 func _commit_stroke() -> void:
 	if session == null:
 		return
+	_stroke_phase = StrokePhase.COMMITTING
+	# Most changes use set_selection_mask() and cancel synchronously. This
+	# final comparison also rejects in-place changes to an exposed mask that
+	# bypassed that setter while input samples were queued.
+	if _stroke_selection == null or not _stroke_selection.same_as(selection_mask):
+		cancel_gesture()
+		canvas_error.emit("Stroke cancelled because the selection changed")
+		return
 	var active: DrawingEditSession = session
+	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
 	session = null
+	_stroke_selection = null
+	_native_brush = null
+	_active_brush_backend = "Legacy"
+	var commit_start_us: int = Time.get_ticks_usec()
 	if active.change_count() > 0:
 		_publish(active.commit())
 	else:
 		active.cancel()
+	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
+	_finalize_stage_latency_window()
+	_finalize_stage_batch_window()
 	last_gesture_metrics = _metrics.duplicate(true)
 	_restore_input_accumulation()
 	_samples.clear()
@@ -1012,6 +1297,7 @@ func _commit_stroke() -> void:
 	_sample_index = 0
 	_has_segment_target = false
 	_finish_requested = false
+	_stroke_phase = StrokePhase.IDLE
 	queue_redraw()
 
 
@@ -1021,12 +1307,16 @@ func cancel_gesture() -> void:
 	if session != null:
 		session.cancel()
 		session = null
+	_stroke_selection = null
+	_native_brush = null
+	_active_brush_backend = "Legacy"
 	if _move_preview != null:
 		_move_preview.cancel()
 		_move_preview = null
 	if _floating_source_selection != null:
 		_assign_selection_mask(_floating_source_selection, false)
 	_floating_source_selection = null
+	_move_capture = null
 	_floating_source_revision = -1
 	_floating_active = false
 	_floating_offset = Vector2i.ZERO
@@ -1036,8 +1326,10 @@ func cancel_gesture() -> void:
 	moving = false
 	_marquee_dragged = false
 	_move_target = Vector2i.ZERO
+	_move_target_received_us = 0
 	_move_preview_offset = Vector2i.ZERO
 	_finish_requested = false
+	_stroke_phase = StrokePhase.IDLE
 	_restore_input_accumulation()
 	_has_segment_target = false
 	_samples.clear()
@@ -1055,6 +1347,7 @@ func has_floating_move() -> bool:
 ## document transaction. The owning workspace captured the original context on
 ## the FIRST drag and receives only one gesture_committed at this final drop.
 func confirm_floating_move() -> bool:
+	var drop_started_us: int = Time.get_ticks_usec()
 	if not _floating_active or dragging or document == null:
 		return false
 	if document.revision != _floating_source_revision:
@@ -1064,11 +1357,13 @@ func confirm_floating_move() -> bool:
 	var original_selection: DrawingSelection = _floating_source_selection
 	_move_preview = null
 	_floating_source_selection = null
+	_move_capture = null
 	_floating_source_revision = -1
 	_floating_active = false
 	_floating_offset = Vector2i.ZERO
 	_move_drag_base = Vector2i.ZERO
 	_move_target = Vector2i.ZERO
+	_move_target_received_us = 0
 	_move_preview_offset = Vector2i.ZERO
 	if edit != null and edit.change_count() > 0:
 		var result: DrawingResult = edit.commit()
@@ -1082,6 +1377,7 @@ func confirm_floating_move() -> bool:
 		if edit != null:
 			edit.cancel()
 		selection_changed.emit(selected)
+	last_move_metrics["drop_cpu_us"] = Time.get_ticks_usec() - drop_started_us
 	queue_redraw()
 	return true
 
@@ -1105,13 +1401,15 @@ func _stage_move_preview(offset: Vector2i) -> void:
 		_assign_selection_mask(_floating_source_selection, false)
 		queue_redraw()
 		return
+	var motion_start_us: int = Time.get_ticks_usec()
 	var started: DrawingResult = document.begin_edit(layer_id, _floating_source_revision)
 	if not started.ok:
 		canvas_error.emit(started.message)
 		return
 	var edit: DrawingEditSession = started.value as DrawingEditSession
-	var staged: DrawingResult = DrawingClipboard.move_selection(edit,
-		_floating_source_selection.bounds, offset, _floating_source_selection)
+	var session_us: int = Time.get_ticks_usec() - motion_start_us
+	var staged: DrawingResult = DrawingClipboard.move_captured(edit, _move_capture, offset)
+	var staging_us: int = Time.get_ticks_usec() - motion_start_us - session_us
 	if not staged.ok:
 		edit.cancel()
 		canvas_error.emit(staged.message)
@@ -1123,6 +1421,14 @@ func _stage_move_preview(offset: Vector2i) -> void:
 	_floating_offset = offset
 	_floating_active = true
 	_assign_selection_mask(_floating_source_selection.translated(offset), false)
+	last_move_metrics["session_us"] = session_us
+	last_move_metrics["stage_us"] = staging_us
+	last_move_metrics["selection_us"] = Time.get_ticks_usec() - motion_start_us - session_us - staging_us
+	last_move_metrics["motion_to_preview_submit_us"] = Time.get_ticks_usec() - motion_start_us
+	last_move_metrics["input_to_preview_submit_us"] = (Time.get_ticks_usec() -
+		_move_target_received_us) if _move_target_received_us > 0 else -1
+	if move_profile_samples.size() < 512:
+		move_profile_samples.append(last_move_metrics.duplicate())
 	queue_redraw()
 
 
@@ -1142,16 +1448,19 @@ func finish_gesture(position: Vector2) -> void:
 	elif moving:
 		var target: Vector2i = _move_drag_base + position_to_pixel(position) - gesture_start
 		if target != _move_preview_offset:
+			_move_target_received_us = Time.get_ticks_usec()
 			_stage_move_preview(target)
 		# Mouse-up completes only this drag. The detached source-clear/target-
 		# paste preview and selection remain until Drop (Enter, outside click,
 		# an explicit command) or Cancel (Escape).
 		if not _floating_active:
 			_floating_source_selection = null
+			_move_capture = null
 			_floating_source_revision = -1
 	else:
 		_enqueue_sample(source_position(position))
 		_metrics["release_us"] = Time.get_ticks_usec()
+		_stroke_phase = StrokePhase.DRAINING
 		_finish_requested = true
 		# Finish small clicks synchronously; long queued strokes are drained
 		# across frames without blocking the input loop.

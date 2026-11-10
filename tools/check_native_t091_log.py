@@ -28,7 +28,7 @@ def verify(content: str, *, kind: str = "single") -> tuple[bool, list[str], int]
     if kind not in {"single", "grip"}:
         raise ValueError("unknown T-091 native witness")
     pattern, marker, minimum = ((GRIP_SUMMARY, GRIP_MARKER, 53) if kind == "grip"
-                                else (SUMMARY, MARKER, 36))
+                                else (SUMMARY, MARKER, 44))
     lines = content.splitlines()
     summaries = [(i, pattern.fullmatch(line)) for i, line in enumerate(lines)
                  if pattern.fullmatch(line)]

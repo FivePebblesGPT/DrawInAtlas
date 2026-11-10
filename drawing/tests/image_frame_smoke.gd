@@ -207,6 +207,121 @@ func run() -> void:
 	check(workspace.canvas.image_bounds == Rect2i(-42, 27, 75, 95) and
 		workspace.canvas.grid_spacing == 12 and workspace.canvas.show_grid,
 		"switching tabs preserves per-tab guide/grid preferences")
+	# Unlike Show grid, snap settings alter the meaning of a pending source
+	# position. A selection drag must not combine two coordinate mappings.
+	workspace.canvas.tool = "Select"
+	workspace.canvas.clear_selection()
+	workspace._set_snap_enabled(true)
+	var select_start: Vector2 = workspace.canvas.pixel_to_position(Vector2(-3, 40))
+	var select_end: Vector2 = workspace.canvas.pixel_to_position(Vector2(21, 64))
+	workspace.canvas.start_gesture(select_start)
+	workspace.canvas.update_gesture(select_end)
+	check(workspace.canvas.dragging and workspace.canvas.selecting and
+		workspace.canvas._marquee.has_area(),
+		"grid-snapped marquee is pending before editing snap settings")
+	workspace._toggle_grid()
+	workspace.canvas.grid_spacing = 12
+	workspace.canvas.grid_origin = Vector2i(-3, 5)
+	check(workspace.canvas.dragging and workspace.canvas.selecting,
+		"visual grid toggle and identical source-grid mapping retain marquee")
+	workspace.grid_fields[0].value = 14
+	workspace._apply_grid_settings()
+	check(not workspace.canvas.dragging and not workspace.canvas.selecting and
+		not workspace.canvas.selection_mask.enabled,
+		"effective grid-spacing change cancels the unpublished marquee")
+	workspace.canvas.finish_gesture(select_end)
+	check(not workspace.canvas.selection_mask.enabled,
+		"mouse-up after cancelled marquee cannot create a selection")
+	workspace.canvas.grid_spacing = 12
+	workspace.canvas.grid_origin = Vector2i(-3, 5)
+	workspace._set_snap_enabled(false)
+	# A host may turn standalone-style frame clipping on or off while input
+	# is queued. Neither direction may publish a stroke authorized by the
+	# old policy. Identical policy writes must not interrupt the gesture.
+	workspace.canvas.tool = "Brush"
+	workspace.canvas.brush_width = 1.0
+	workspace.canvas.clip_strokes_to_image_frame = false
+	var clip_canvas: Control = workspace.canvas
+	var clip_document: DrawingDocument = workspace.current_document()
+	var clip_revision: int = clip_document.revision
+	var outside_point: Vector2 = clip_canvas.pixel_to_position(Vector2(-60.5, 40.5))
+	clip_canvas.start_gesture(outside_point)
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"unbounded Brush is captured outside the image guide before policy change")
+	clip_canvas.clip_strokes_to_image_frame = true
+	check(clip_canvas.session == null and not clip_canvas.dragging and
+		clip_document.revision == clip_revision and not clip_canvas._owns_accumulated_input,
+		"enabling clipping cancels an unbounded queued Brush and restores input mode")
+	clip_canvas.finish_gesture(outside_point)
+	check(clip_document.revision == clip_revision,
+		"stale release after clipping enabled never publishes the old Brush")
+	var inside_point: Vector2 = clip_canvas.pixel_to_position(Vector2(-20.5, 40.5))
+	clip_canvas.start_gesture(inside_point)
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"frame-clipped Brush begins inside the guide")
+	clip_canvas.clip_strokes_to_image_frame = false
+	check(clip_canvas.session == null and not clip_canvas.dragging and
+		clip_document.revision == clip_revision and not clip_canvas._owns_accumulated_input,
+		"disabling clipping discards old-policy pixels without history")
+	clip_canvas.finish_gesture(inside_point)
+	check(clip_document.revision == clip_revision,
+		"stale release after disabling clipping has no document side effects")
+	clip_canvas.start_gesture(outside_point)
+	clip_canvas.clip_strokes_to_image_frame = false
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"equivalent clipping assignment preserves an active unbounded Brush")
+	clip_canvas.finish_gesture(outside_point)
+	check(clip_canvas.session == null and clip_document.revision == clip_revision + 1,
+		"unchanged clipping policy publishes exactly one normal history edit")
+	check(clip_document.undo().ok and clip_document.revision == clip_revision + 2,
+		"ordinary post-policy-change Brush remains undoable")
+	# An embedded host may reposition the source camera between captured
+	# events. It must not reinterpret the remainder of one pending edit or
+	# selection under a different source transform.
+	clip_canvas.clip_strokes_to_image_frame = false
+	clip_canvas.tool = "Brush"
+	clip_canvas.brush_width = 1.0
+	clip_canvas.snap_to_grid = false
+	clip_canvas.camera = Vector2.ZERO
+	var camera_revision: int = clip_document.revision
+	var camera_probe: Vector2 = clip_canvas.pixel_to_position(Vector2(35.5, 41.5))
+	clip_canvas.start_gesture(camera_probe)
+	check(clip_canvas.session != null and clip_canvas.dragging and
+		clip_document.read_pixel(clip_canvas.layer_id, 35, 41).value == 0,
+		"camera-change Brush starts with detached, unpublished pixels")
+	clip_canvas.camera = Vector2(9, -7)
+	check(clip_canvas.session == null and not clip_canvas.dragging and
+		not clip_canvas._owns_accumulated_input and clip_document.revision == camera_revision,
+		"host camera pan cancels queued Brush and restores input mode")
+	clip_canvas.finish_gesture(camera_probe)
+	check(clip_document.revision == camera_revision and
+		clip_document.read_pixel(clip_canvas.layer_id, 35, 41).value == 0,
+		"stale pointer release after camera pan cannot publish old Brush")
+	var same_camera_probe: Vector2 = clip_canvas.pixel_to_position(Vector2(36.5, 42.5))
+	clip_canvas.start_gesture(same_camera_probe)
+	clip_canvas.camera = Vector2(9, -7)
+	check(clip_canvas.session != null and clip_canvas.dragging,
+		"equivalent camera assignment preserves a queued stroke")
+	clip_canvas.finish_gesture(same_camera_probe)
+	check(clip_document.revision == camera_revision + 1 and
+		clip_document.read_pixel(clip_canvas.layer_id, 36, 42).value != 0,
+		"unchanged camera commits a Brush at the original source coordinate")
+	check(clip_document.undo().ok and
+		clip_document.read_pixel(clip_canvas.layer_id, 36, 42).value == 0,
+		"unchanged camera retains one-step Undo")
+	clip_canvas.tool = "Select"
+	clip_canvas.clear_selection()
+	var marquee_start: Vector2 = clip_canvas.pixel_to_position(Vector2(20, 20))
+	var marquee_end: Vector2 = clip_canvas.pixel_to_position(Vector2(30, 30))
+	clip_canvas.start_gesture(marquee_start)
+	clip_canvas.update_gesture(marquee_end)
+	check(clip_canvas.dragging and clip_canvas.selecting and clip_canvas._marquee.has_area(),
+		"source marquee is pending before programmatic camera pan")
+	clip_canvas.camera = Vector2(-3, 12)
+	clip_canvas.finish_gesture(marquee_end)
+	check(not clip_canvas.dragging and not clip_canvas.selecting and
+		not clip_canvas.selection_mask.enabled and clip_document.revision == camera_revision + 2,
+		"camera change aborts unpublished marquee without selection/history")
 	workspace.queue_free()
 	DirAccess.remove_absolute(path)
 	DirAccess.remove_absolute(legacy_path)

@@ -3,6 +3,7 @@ extends SceneTree
 const LAYOUT: Script = preload("res://addons/drawing/dock_layout.gd")
 const DRAG: Script = preload("res://addons/drawing/dock_drag.gd")
 const PERSIST: Script = preload("res://addons/drawing/dock_persistence.gd")
+const HOST: Script = preload("res://addons/drawing/floating_host.gd")
 var checks: int = 0
 var failures: int = 0
 
@@ -80,6 +81,45 @@ func run() -> void:
 		check(DrawingDockPersistence.recover(corrupt, layout).is_empty(), "duplicate group rejects corrupt settings")
 		var translated: Rect2 = DrawingDockPersistence.restore_rect(migrated["hosts"][0], Vector2(600, 400))
 		check(translated.size.x > 0.0 and translated.size.y > 0.0, "geometry remains usable across resolution")
+	# Dragged edge must stop at the client border without moving its opposite
+	# anchor. Clamping the whole oversized Rect2 would silently shift that edge.
+	var client: Control = Control.new()
+	client.size = Vector2(1280, 800)
+	root.add_child(client)
+	var host: DrawingFloatingHost = HOST.new()
+	client.add_child(host)
+	var frame: Rect2 = Rect2(290, 175, 325, 270)
+	var boundaries: Array[Dictionary] = [
+		{"name": "left", "sides": Vector4i(1, 0, 0, 0), "delta": Vector2(-700, 0),
+			"anchor": Vector2(615, 175), "moving": Vector2(5, 445)},
+		{"name": "right", "sides": Vector4i(0, 0, 1, 0), "delta": Vector2(2000, 0),
+			"anchor": Vector2(290, 175), "moving": Vector2(1275, 445)},
+		{"name": "top", "sides": Vector4i(0, 1, 0, 0), "delta": Vector2(0, -700),
+			"anchor": Vector2(290, 445), "moving": Vector2(615, 5)},
+		{"name": "bottom", "sides": Vector4i(0, 0, 0, 1), "delta": Vector2(0, 2000),
+			"anchor": Vector2(290, 175), "moving": Vector2(615, 795)},
+		{"name": "top-left", "sides": Vector4i(1, 1, 0, 0), "delta": Vector2(-700, -700),
+			"anchor": Vector2(615, 445), "moving": Vector2(5, 5)},
+		{"name": "bottom-right", "sides": Vector4i(0, 0, 1, 1), "delta": Vector2(2000, 2000),
+			"anchor": Vector2(290, 175), "moving": Vector2(1275, 795)}]
+	for boundary: Dictionary in boundaries:
+		host.set_host_rect(frame)
+		host._frame_start = Rect2(host.position, host.size)
+		host._resize_sides = boundary["sides"]
+		host._resize_from_pointer(boundary["delta"])
+		var actual: Rect2 = Rect2(host.position, host.size)
+		var anchor: Vector2 = boundary["anchor"]
+		var moving: Vector2 = boundary["moving"]
+		var horizontal_anchor: float = actual.end.x if host._resize_sides.x else actual.position.x
+		var vertical_anchor: float = actual.end.y if host._resize_sides.y else actual.position.y
+		var horizontal_moving: float = actual.position.x if host._resize_sides.x else actual.end.x
+		var vertical_moving: float = actual.position.y if host._resize_sides.y else actual.end.y
+		check(is_equal_approx(horizontal_anchor, anchor.x) and is_equal_approx(vertical_anchor, anchor.y),
+			"boundary resize preserves fixed anchors: " + boundary["name"])
+		check(is_equal_approx(horizontal_moving, moving.x) and is_equal_approx(vertical_moving, moving.y),
+			"boundary resize clamps only dragged edges: " + boundary["name"])
+	host.queue_free()
+	client.queue_free()
 	print("T091_MODEL: %d checks; %d failed" % [checks, failures])
 	if failures == 0:
 		print("T091_MODEL_PASSED")

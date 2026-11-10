@@ -1,0 +1,20 @@
+[package]
+name = "drawing-brush"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hokusai = { version = "=0.3.0" }
+godot = { version = "=0.5.5", default-features = false, features = ["api-4-7"] }
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.release]
+strip = "debuginfo"

@@ -26,13 +26,13 @@ class T092ColorsHistoryTests(unittest.TestCase):
                 self.assertIn(field, workflow)
 
     def test_log_retains_known_shutdown_warnings_only_after_success(self) -> None:
-        base = "T092_NATIVE: 42 checks; 0 failed\nT092_NATIVE_PASSED"
+        base = "T092_NATIVE: 51 checks; 0 failed\nT092_NATIVE_PASSED"
         self.assertEqual(verify(base), (True, [], 0))
         self.assertEqual(verify(base + "\nERROR: Texture with GL ID of 18: leaked 32 bytes."),
                          (True, [], 1))
         for bad in ("", "T092_NATIVE_PASSED", base + "\nT092_NATIVE_PASSED",
-                    "T092_NATIVE: 41 checks; 0 failed\nT092_NATIVE_PASSED",
-                    "T092_NATIVE: 42 checks; 1 failed\nT092_NATIVE_PASSED",
+                    "T092_NATIVE: 50 checks; 0 failed\nT092_NATIVE_PASSED",
+                    "T092_NATIVE: 51 checks; 1 failed\nT092_NATIVE_PASSED",
                     base + "\nSCRIPT ERROR: bad assignment", base + "\nERROR: compositor failed",
                     "ERROR: Texture with GL ID of 18: leaked 32 bytes.\n" + base):
             with self.subTest(bad=bad):

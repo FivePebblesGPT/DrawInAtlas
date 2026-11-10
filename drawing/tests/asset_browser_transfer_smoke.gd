@@ -39,6 +39,27 @@ func run() -> void:
 	check(write_source(source, "asset-portable", "Hero"), "publish valid external portable source")
 	var index: DrawingAssetBrowserIndex = INDEX.new() as DrawingAssetBrowserIndex
 	check(index.scan(objects).ok and index.entries.is_empty(), "start with empty Objects index")
+	var links: DirAccess = DirAccess.open(base)
+	var input_alias: String = base.path_join("InputAlias")
+	var output_alias: String = base.path_join("OutputAlias")
+	var campaign_alias: String = base.path_join("CampaignAlias")
+	check(links.create_link(input_folder, input_alias) == OK and
+		links.create_link(output_folder, output_alias) == OK and
+		links.create_link(base.path_join("Campaign"), campaign_alias) == OK,
+		"create aliases to real external source, export directory and campaign")
+	check(not index.scan(campaign_alias.path_join("Objects")).ok and
+		index.root_path == objects, "reject symlinked campaign root during re-scan")
+	# Reset the fixture if the vulnerable index accepted the alias, so that a
+	# negative-control failure cannot cascade into unrelated copy assertions.
+	index.scan(objects)
+	var alias_import: DrawingResult = TRANSFERS.import_file(index,
+		input_alias.path_join("renamed-on-disk.drawing"))
+	check(not alias_import.ok and
+		not FileAccess.file_exists(objects.path_join("asset-portable.drawing")),
+		"Import refuses source whose parent is a symlink")
+	if FileAccess.file_exists(objects.path_join("asset-portable.drawing")):
+		DirAccess.remove_absolute(objects.path_join("asset-portable.drawing"))
+	index.scan(objects)
 	var imported: DrawingResult = TRANSFERS.import_file(index, source)
 	var destination: String = objects.path_join("asset-portable.drawing")
 	check(imported.ok and imported.value == destination and FileAccess.file_exists(destination),
@@ -47,6 +68,19 @@ func run() -> void:
 		"Import is byte-for-byte lossless and leaves external source intact")
 	check(index.scan(objects).ok and index.entries.size() == 1 and
 		index.entries[0]["id"] == "asset-portable", "fresh index sees copied stable source")
+	# A caller may supply a correct filesystem hash for a source created after
+	# the user's index snapshot. Export must not treat that as selected authority.
+	var forged_path: String = objects.path_join("unlisted.drawing")
+	check(write_source(forged_path, "unlisted", "Unreviewed"),
+		"create source after the latest displayed index snapshot")
+	var forged: Dictionary = {"id": "unlisted", "name": "Unreviewed", "revision": 1,
+		"path": forged_path, "sha256": FileAccess.get_sha256(forged_path)}
+	var forged_export: String = output_folder.path_join("forged-export.drawing")
+	check(not TRANSFERS.export_file(index, forged, forged_export).ok and
+		not FileAccess.file_exists(forged_export),
+		"Export rejects a real byte-valid source that was not in the selected index")
+	check(DirAccess.remove_absolute(forged_path) == OK,
+		"clean up unindexed source without changing the authorized export")
 	check(not TRANSFERS.import_file(index, source).ok,
 		"duplicate source ID import is forbidden, even with different filename")
 	check(not TRANSFERS.import_file(index, destination).ok,
@@ -55,6 +89,14 @@ func run() -> void:
 	var exported: DrawingResult = TRANSFERS.export_file(index, index.entries[0], exported_path)
 	check(exported.ok and FileAccess.get_sha256(exported_path) == index.entries[0]["sha256"],
 		"Export produces exactly the indexed source's bytes")
+	check(not TRANSFERS.export_file(index, index.entries[0],
+		output_alias.path_join("through-link.drawing")).ok and
+		not FileAccess.file_exists(output_folder.path_join("through-link.drawing")),
+		"Export refuses an output directory reached through a symlinked parent")
+	check(DirAccess.remove_absolute(input_alias) == OK and
+		DirAccess.remove_absolute(output_alias) == OK and
+		DirAccess.remove_absolute(campaign_alias) == OK,
+		"remove aliases without touching original asset bytes")
 	check(FileAccess.file_exists(destination) and FileAccess.file_exists(source),
 		"Export never moves or deletes the indexed source")
 	check(not TRANSFERS.export_file(index, index.entries[0], exported_path).ok,
@@ -119,6 +161,29 @@ func run() -> void:
 	panel._export_file(output_folder.path_join("via-panel.drawing"))
 	check(FileAccess.file_exists(output_folder.path_join("via-panel.drawing")) and
 		panel.message.text.contains("Exported"), "Export callback creates a portable file")
+	# Revalidate the Objects path after discovery: a renamed parent may now
+	# point outside the campaign even when each indexed filename is unchanged.
+	var redirect_source: String = input_folder.path_join("redirect-test.drawing")
+	check(write_source(redirect_source, "asset-redirect-test", "Redirect probe"),
+		"prepare source with unused ID for post-scan root substitution")
+	var campaign_root: String = base.path_join("Campaign")
+	var campaign_moved: String = base.path_join("CampaignMoved")
+	check(DirAccess.rename_absolute(campaign_root, campaign_moved) == OK and
+		links.create_link(campaign_moved, campaign_root) == OK,
+		"replace scanned campaign parent with a symlink")
+	check(not panel.index.safe_to_open(panel.index.entries[0]),
+		"already-indexed source fails closed after campaign parent replacement")
+	check(not TRANSFERS.import_file(panel.index, redirect_source).ok and
+		not FileAccess.file_exists(campaign_moved.path_join("Objects/asset-redirect-test.drawing")),
+		"Import refuses a previously indexed Objects root redirected by link")
+	check(not TRANSFERS.export_file(panel.index, panel.index.entries[0],
+		output_folder.path_join("post-link.drawing")).ok and
+		not FileAccess.file_exists(output_folder.path_join("post-link.drawing")),
+		"Export refuses a previously indexed source after parent replacement")
+	check(DirAccess.remove_absolute(campaign_root) == OK and
+		DirAccess.rename_absolute(campaign_moved, campaign_root) == OK and
+		panel.index.safe_to_open(panel.index.entries[0]),
+		"restoring real campaign path restores authorized source access")
 	panel.queue_free()
 	print("T065_TRANSFERS: %d passed; %d failed" % [passed, failed])
 	if failed == 0:

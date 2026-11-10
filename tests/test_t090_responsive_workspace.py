@@ -109,17 +109,35 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
                      "click_at(close_point)", "wheel_at(hover, 1)", "KEY_BRACKETRIGHT"):
             self.assertIn(term, source)
 
+    def test_overflow_checkmarks_and_ci_oracle(self) -> None:
+        self.assertIn("var _more_item_ids: Dictionary", self.topbar)
+        self.assertIn("_more_item_ids[Vector2i(index, command)] = item_id", self.topbar)
+        self.assertIn("more.set_item_checked(item_id, original.is_item_checked(command))", self.topbar)
+        self.assertIn("more_popup.set_item_checked(more_id, enabled)", self.topbar)
+        model = (ROOT / "drawing/tests/topbar_overflow_smoke.gd").read_text()
+        for term in (
+            "T090_OVERFLOW_PASSED", "View › Show grid",
+            "View › Pixel grid at high zoom", "Window › Show document tabs",
+            "_more_selected(tabs_id)", "view_popup.set_item_disabled(0, true)",
+        ):
+            self.assertIn(term, model)
+        native = (ROOT / "drawing/tests/responsive_workspace_native.gd").read_text()
+        self.assertIn('await click_at(top.more_menu.get_global_rect().get_center())', native)
+        workflow = (ROOT / ".github/workflows/godot-check.yml").read_text()
+        self.assertIn("res://tests/topbar_overflow_smoke.gd", workflow)
+        self.assertIn("--marker T090_OVERFLOW_PASSED", workflow)
+
     def test_native_log_verifier_fails_closed(self) -> None:
-        good = "T090_NATIVE: 72 checks; 0 failed\nT090_NATIVE_PASSED: 72 checks\n"
+        good = "T090_NATIVE: 77 checks; 0 failed\nT090_NATIVE_PASSED: 77 checks\n"
         self.assertTrue(verify(good)[0])
         self.assertTrue(verify(good + "ERROR: Texture with GL ID of 24: leaked 1364 bytes.\n")[0])
         for bad in (
-            good.replace("72 checks", "71 checks"),
+            good.replace("77 checks", "76 checks"),
             good.replace("0 failed", "1 failed"),
             good + "SCRIPT ERROR: broken\n",
             "ERROR: runtime fail\n" + good,
             good + "ERROR: unknown fatal\n",
-            "T090_NATIVE_PASSED: 72 checks\n",
+            "T090_NATIVE_PASSED: 77 checks\n",
         ):
             with self.subTest(bad=bad[:40]):
                 self.assertFalse(verify(bad)[0])

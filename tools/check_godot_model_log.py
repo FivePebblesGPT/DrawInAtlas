@@ -18,6 +18,41 @@ KNOWN_POST_EXIT = (
     re.compile(r"ERROR: Texture with GL ID of \d+: leaked \d+ bytes\."),
 )
 MODEL_FAILURE = re.compile(r"\b[A-Z][A-Z0-9_]*FAILED:|\bFAILED:|\bDOCK MODEL FAILED:")
+# Godot errors can be indented by CI log forwarders or decorated by terminal
+# color codes. Such decoration must not hide a runtime failure behind a valid
+# success marker. Only *literal*, unadorned post-exit leaks are allowlisted.
+ANSI_SGR = re.compile(r"\x1b\[[0-9;]*m")
+# Native failures may be reported as bare POSIX signal names or by a shell
+# after its line number and child PID. A PASS marker must never hide them.
+NATIVE_SIGNAL = r"(?:Segmentation fault|Bus error|Illegal instruction|Floating point exception)"
+PROCESS_FAILURE = re.compile(
+    rf"(?:FATAL(?: ERROR)?:|CRASH:|{NATIVE_SIGNAL}(?: \(core dumped\))?"
+    r"|Aborted(?: \(core dumped\))?|Killed(?:\s|$)|terminate called after throwing)",
+    re.IGNORECASE,
+)
+# Bash wraps a fault with its shell name, source line and child PID. The bare
+# PROCESS_FAILURE prefix check cannot see these fatal child-process messages.
+SHELL_CRASH = re.compile(
+    r"^(?:bash|sh|dash|zsh|[^\s:]+\.sh):\s*"
+    r"(?:(?:line\s+)?\d+:\s*)?(?:\d+\s+)?"
+    rf"(?:{NATIVE_SIGNAL}|Aborted|Killed)(?:\s|$)",
+    re.IGNORECASE,
+)
+# Godot's concise timestamped diagnostics (E <h>:<mm>:<ss>[:<ms>])
+# are real engine errors, even without an explicit `ERROR:` prefix. Keep
+# this anchored to the engine severity and time fields so documentation
+# containing the same text does not trigger a false failure.
+GODOT_COMPACT_ERROR = re.compile(r"^E\s+\d+:\d{2}:\d{2}(?::\d{1,3})?(?:\s|$)")
+PYTHON_TRACEBACK = re.compile(
+    r"^(?:Traceback \(most recent call last\):|Exception in thread \S.*:|Fatal Python error:)"
+)
+
+# Glibc malloc/free fatal heap diagnostics are not Godot post-exit RID leaks.
+# Match only allocator-violation prefixes, not explanatory prose mentioning them.
+LIBC_HEAP_FAILURE = re.compile(
+    r"^(?:malloc\(\):|free\(\):|realloc\(\):|munmap_chunk\(\):|double free or corruption(?: \([^\n]*\))?(?:$|:))",
+    re.IGNORECASE,
+)
 
 
 def verify_log(content: str, marker: str) -> tuple[list[str], int]:
@@ -25,24 +60,47 @@ def verify_log(content: str, marker: str) -> tuple[list[str], int]:
     if not marker or not re.fullmatch(r"[A-Z][A-Z0-9_]+_PASSED", marker):
         raise ValueError("Expected exact uppercase *_PASSED marker")
     lines = content.splitlines()
-    # Legacy model witnesses may report an assertion count as
-    # `T089_MODEL_PASSED: 62 checks`; accept that exact form, not an
-    # arbitrary colon suffix that could disguise a diagnostic.
-    counted_marker = re.compile(re.escape(marker) + r": [1-9][0-9]* checks\Z")
-    markers = [i for i, line in enumerate(lines)
-               if line == marker or line.startswith(marker + " ")
-               or line.startswith(marker + "(") or counted_marker.fullmatch(line)]
+    # Only formats actually emitted by checked-in model witnesses are valid.
+    # A loose prefix check accepted misleading output such as `PASSED 0/99`
+    # and `PASSED (42 checks; 5 failed)` as success. Fail closed instead.
+    escaped = re.escape(marker)
+    positive = r"[1-9][0-9]*"
+    ratio = re.compile(rf"{escaped} ({positive})/({positive})\Z")
+    counted = re.compile(rf"{escaped}: {positive} checks\Z")
+    checked = re.compile(rf"{escaped} \({positive} checks; 0 failed\)\Z")
+    no_failures = re.compile(rf"{escaped} \(0 failures\)\Z")
+    comma_checked = re.compile(rf"{escaped} \({positive} checks, 0 failures\)\Z")
+    labeled_counts = re.compile(rf"{escaped} checks={positive} failures=0\Z")
+    inline_counts = re.compile(rf"{escaped} {positive} checks, failures=0\Z")
+    markers: list[int] = []
     problems: list[str] = []
+    for index, line in enumerate(lines):
+        if not line.startswith((marker + " ", marker + ":", marker + "(")) and line != marker:
+            continue
+        match = ratio.fullmatch(line)
+        if (line == marker or counted.fullmatch(line) or checked.fullmatch(line)
+                or no_failures.fullmatch(line) or comma_checked.fullmatch(line)
+                or labeled_counts.fullmatch(line) or inline_counts.fullmatch(line) or
+                (match is not None and match.group(1) == match.group(2))):
+            markers.append(index)
+        else:
+            problems.append(f"Line {index + 1}: Invalid or incomplete {marker} success summary: {line}")
     if len(markers) != 1:
         problems.append(f"Expected exactly one {marker} marker, got {len(markers)}")
     marker_line = markers[0] if len(markers) == 1 else len(lines)
     leaks = 0
     for number, line in enumerate(lines, 1):
-        if ("SCRIPT ERROR:" in line or "Parse Error:" in line or "Compile Error:" in line
-                or MODEL_FAILURE.search(line)):
+        diagnostic = ANSI_SGR.sub("", line).lstrip(" \t")
+        if ("SCRIPT ERROR:" in diagnostic or "Parse Error:" in diagnostic
+                or "Compile Error:" in diagnostic or MODEL_FAILURE.search(diagnostic)
+                or PROCESS_FAILURE.match(diagnostic)
+                or SHELL_CRASH.match(diagnostic)
+                or PYTHON_TRACEBACK.match(diagnostic) or LIBC_HEAP_FAILURE.match(diagnostic)
+                or GODOT_COMPACT_ERROR.match(diagnostic)):
             problems.append(f"Line {number}: {line}")
-        elif line.startswith("ERROR:"):
-            if number - 1 > marker_line and any(p.fullmatch(line) for p in KNOWN_POST_EXIT):
+        elif diagnostic.startswith("ERROR:"):
+            if (diagnostic == line and number - 1 > marker_line
+                    and any(pattern.fullmatch(line) for pattern in KNOWN_POST_EXIT)):
                 leaks += 1
             else:
                 problems.append(f"Line {number}: {line}")

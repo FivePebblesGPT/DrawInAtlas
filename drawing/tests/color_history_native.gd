@@ -27,6 +27,15 @@ func click(control: Control) -> void:
 	control.get_viewport().push_input(e, true)
 	await frames(4)
 
+func press_enter() -> void:
+	for pressed: bool in [true, false]:
+		var event: InputEventKey = InputEventKey.new()
+		event.keycode = KEY_ENTER
+		event.pressed = pressed
+		root.push_input(event, true)
+		await frames(2)
+
+
 func capture(label: String) -> void:
 	var folder: String = OS.get_environment("T092_SCREENSHOTS")
 	if folder.is_empty():
@@ -73,6 +82,29 @@ func run() -> void:
 	await click(app.color_swatch_buttons[4])
 	check(app.active_color == Color(0.12, 0.20, 0.35),
 		"native recent swatch click restores previous brush pigment")
+	app._set_foreground(Color8(25, 66, 208, 255))
+	# Exercise the actual focused LineEdit/Enter path, not just a direct helper.
+	app.inspector.ensure_control_visible(app.color_hex)
+	await frames(5)
+	await click(app.color_hex)
+	check(root.gui_get_focus_owner() == app.color_hex, "native hex field receives pointer focus")
+	var first_brush: int = app.canvas.color_rgba
+	for malformed: String in ["1942D0", "#1D0", "#1D0F", "#1942D0F", "#1942D0FG"]:
+		await click(app.color_hex)
+		app.color_hex.text = malformed
+		await press_enter()
+		check(app.active_color == Color8(25, 66, 208, 255) and
+			app.canvas.color_rgba == first_brush and app.color_hex.text == "#1942D0FF",
+			"native Enter rejects noncanonical pigment: " + malformed)
+	await click(app.color_hex)
+	app.color_hex.text = "#01234500"
+	await press_enter()
+	check(app.active_color == Color8(1, 35, 69, 0) and app.canvas.color_rgba == app._pack_color(app.active_color),
+		"native Enter commits full RGBA8 including hidden RGB at zero alpha")
+	await click(app.color_hex)
+	app.color_hex.text = "#1942D0FF"
+	await press_enter()
+	check(app.active_color == Color8(25, 66, 208, 255), "native hex editor restores original brush")
 	var active_before_bg: Color = app.active_color
 	var paint_before_bg: int = app.canvas.color_rgba
 	await click(app.background_button)

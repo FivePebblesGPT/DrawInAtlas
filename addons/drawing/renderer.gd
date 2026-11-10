@@ -170,22 +170,72 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				if tile != null:
 					source_pixels = tile._pixels
 				var has_preview_patch: bool = not patch.is_empty()
-				for offset: int in range(run_length):
-					var pixel_index: int = local_y * stride + local_x + offset
-					var source: int = int(source_pixels.get(pixel_index, 0))
-					if has_preview_patch and patch.has(pixel_index):
-						source = int(patch[pixel_index])
-					if (source & 0xff000000) == 0:
-						continue
-					var index: int = (y * size.x + x + offset) * 4
-					var result: int = source
-					if ((source >> 24) & 255) != 255:
-						var destination: int = int(bytes[index]) | (int(bytes[index + 1]) << 8) \
-							| (int(bytes[index + 2]) << 16) | (int(bytes[index + 3]) << 24)
-						result = DrawingEditSession._blend(source, destination)
-					bytes[index] = result & 255
-					bytes[index + 1] = (result >> 8) & 255
-					bytes[index + 2] = (result >> 16) & 255
-					bytes[index + 3] = (result >> 24) & 255
+				# A nearly empty 256px source tile can occupy four 128px
+				# display tiles. Scanning every destination pixel would be
+				# wasteful when only a handful of canonical pixels exist.
+				# Restrict this path to committed sparse chunks: detached preview
+				# patches may add or erase pixels not present in the source map.
+				# The short-run/dense fallback avoids O(rows * stored_pixels)
+				# iteration for 1px strides and ordinarily populated art.
+				# A fixed 12-pixel cutoff made a tile with only 13 or 24
+				# occupied pixels pay for every destination pixel. Permit sparse
+				# iteration while it examines fewer than half the run's pixels,
+				# capped to bound work on wide/large storage tiles.
+				# Extremely sparse previews need not scan every pixel of a
+				# 128px display tile. The detached patch *overrides* committed
+				# source, including transparent erasures; iterate each occupied
+				# source index and any preview-only additions exactly once.
+				# Cap per-run work and keep dense Brush footprints on the
+				# sequential scan path. This is independent of the source tile
+				# stride and never constructs 32-bit global coordinates.
+				if run_length >= 16 and source_pixels.size() + patch.size() <= mini(64, run_length >> 1):
+					var first_index: int = local_y * stride + local_x
+					var end_index: int = first_index + run_length
+					for pixel_index: int in source_pixels:
+						if pixel_index < first_index or pixel_index >= end_index:
+							continue
+						var source: int = int(patch[pixel_index]) if has_preview_patch and patch.has(pixel_index) \
+							else int(source_pixels[pixel_index])
+						if (source & 0xff000000) == 0:
+							continue
+						var index: int = (y * size.x + x + pixel_index - first_index) * 4
+						if ((source >> 24) & 255) == 255:
+							bytes.encode_u32(index, source)
+						else:
+							bytes.encode_u32(index, DrawingEditSession._blend(
+								source, bytes.decode_u32(index)))
+					if has_preview_patch:
+						for pixel_index: int in patch:
+							if pixel_index < first_index or pixel_index >= end_index \
+									or source_pixels.has(pixel_index):
+								continue
+							var source: int = int(patch[pixel_index])
+							if (source & 0xff000000) == 0:
+								continue
+							var index: int = (y * size.x + x + pixel_index - first_index) * 4
+							if ((source >> 24) & 255) == 255:
+								bytes.encode_u32(index, source)
+							else:
+								bytes.encode_u32(index, DrawingEditSession._blend(
+									source, bytes.decode_u32(index)))
+				else:
+					for offset: int in range(run_length):
+						var pixel_index: int = local_y * stride + local_x + offset
+						# A native preview often supplies the replacement for most
+						# pixels in a brush footprint. Do not fetch the canonical
+						# source for coordinates overridden by the detached patch.
+						var source: int = int(patch[pixel_index]) if has_preview_patch and patch.has(pixel_index) \
+							else int(source_pixels.get(pixel_index, 0))
+						if (source & 0xff000000) == 0:
+							continue
+						var index: int = (y * size.x + x + offset) * 4
+						var result: int = source
+						if ((source >> 24) & 255) != 255:
+							# RGBA8 is packed little-endian in the canonical tile map.
+							# Decode the destination as one native operation for blending.
+							result = DrawingEditSession._blend(source, bytes.decode_u32(index))
+						# Packed byte writes avoid four script-indexed assignments per
+						# visible pixel without changing byte order or alpha semantics.
+						bytes.encode_u32(index, result)
 			x += run_length
 	return DrawingResult.success()

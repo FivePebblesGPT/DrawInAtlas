@@ -108,6 +108,31 @@ func run() -> void:
 			host.get_global_rect().end.x <= app.get_global_rect().end.x + 1 and
 			host.get_global_rect().end.y <= app.get_global_rect().end.y + 1,
 			"resize stays in client: " + edge["name"])
+	# Real pointer drags into the client margin must stop the grabbed edge,
+	# not translate the opposite edge to accommodate an oversized frame.
+	var bounds_cases: Array[Dictionary] = [
+		{"name": "left", "frame": Rect2(48, 175, 325, 270),
+			"offset": Vector2(3, 135), "delta": Vector2(-49, 0), "fixed": 373.0, "limit": 5.0},
+		{"name": "right", "frame": Rect2(800, 175, 325, 270),
+			"offset": Vector2(322, 135), "delta": Vector2(155, 0), "fixed": 800.0, "limit": 1275.0},
+		{"name": "top", "frame": Rect2(290, 48, 325, 270),
+			"offset": Vector2(162, 3), "delta": Vector2(0, -49), "fixed": 318.0, "limit": 5.0},
+		{"name": "bottom", "frame": Rect2(290, 460, 325, 270),
+			"offset": Vector2(162, 267), "delta": Vector2(0, 70), "fixed": 460.0, "limit": 795.0}]
+	for boundary: Dictionary in bounds_cases:
+		host.set_host_rect(boundary["frame"])
+		await frames(3)
+		var down: Vector2 = host.get_global_rect().position + boundary["offset"]
+		await drag(down, down + boundary["delta"])
+		var actual: Rect2 = Rect2(host.position, host.size)
+		var left_or_top: bool = boundary["name"] == "left" or boundary["name"] == "top"
+		var horizontal: bool = boundary["name"] == "left" or boundary["name"] == "right"
+		var fixed_edge: float = (actual.end.x if left_or_top else actual.position.x) if horizontal else (actual.end.y if left_or_top else actual.position.y)
+		var dragged_edge: float = (actual.position.x if left_or_top else actual.end.x) if horizontal else (actual.position.y if left_or_top else actual.end.y)
+		check(absf(fixed_edge - boundary["fixed"]) < 1.0,
+			"native edge overdrag preserves opposite anchor: " + boundary["name"])
+		check(absf(dragged_edge - boundary["limit"]) < 1.0,
+			"native edge overdrag stops at client margin: " + boundary["name"])
 	# Move using the only grip. Escape/cancel does not affect model ownership.
 	host.set_host_rect(base)
 	await frames(4)
