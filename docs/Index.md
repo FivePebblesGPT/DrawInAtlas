@@ -1578,6 +1578,21 @@ Progress** with `manual_review: true`; **T-096 stays Manual Review**.
 [Evidence](evidence/T-095-2026-11-11-native-pigment-rollback.md) ·
 [ticket](Tickets/T-095.md).
 
+**T-095 native 60px hard-brush diagonal scanlines (2026-11-11; In Progress):**
+The opt-in Rust NativeHard now prunes impossible X candidates within each
+oblique swept row, without changing native f32 geometry, rectangular batch
+preflight, coverage/rollback, or GDScript publication. A **42/42**
+real-GDExtension original-rectangle oracle and **6/6** Rust tests pass,
+including high-coordinate reference cases; a narrowed-bound control fails.
+In an isolated native-only 60px diagonal benchmark, 29,175 identical pixels
+were emitted with median **3.530 / 5.909 / 3.474ms** optimized/control/
+optimized. The actual 5-stroke Xvfb NativeHard witness passed but is **not**
+a paired or physical hardware speedup. Hosted CI and the owner's reference
+hardware/review gate remain outstanding. **T-095 stays In Progress** with
+`manual_review: true`; T-096 stays in independent Manual Review.
+[Evidence](evidence/T-095-2026-11-11-native-hard-scanlines.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 NativeHard whole-batch failure atomicity (2026-11-09; In Progress):**
 The opt-in Rust hard Brush previously mutated native coverage/cursor before
 rejecting an invalid later sample or oversized sweep, so retries could silently
@@ -2002,7 +2017,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback, signed tile-key and source/preview reference cache tested; owner 60px device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback, signed tile/source cache, and NativeHard scanline parity tested; owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics

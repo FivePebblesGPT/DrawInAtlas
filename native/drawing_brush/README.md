@@ -118,6 +118,26 @@ Brush/Eraser real-native retry/skip and history checks. The original native
 binary fails **7/53** Brush checks; a previous binary with no new handshake
 still falls back to Legacy. [Evidence](../../docs/evidence/T-095-2026-11-11-native-hard-source-rollback.md).
 
+## NativeHard long-diagonal scanlines (2026-11-11)
+
+After the existing preflight validates the **whole rectangular candidate
+budget**, NativeHard now computes a conservative X span per oblique row before
+running the unchanged f32 nearest-segment coverage predicate and once-only
+set. The span uses double-precision bound arithmetic with a four-pixel safety
+margin, and falls back to the original complete rectangle at ≥1M source-space
+coordinates or near-horizontal strokes; the budget and rollback handshake are
+unchanged. This is an **internal candidate rejection optimization**, not a
+stamp/texture brush implementation. Native output order stays y-major/x-major.
+
+The real-extension `t095_native_hard_scanline_smoke.gd` passes 42/42 checks,
+with 12 exact original-rectangle oracle cases and an original native
+high-coordinate witness. Rust's `hard_scanlines_equal_original_rectangles`
+unit test compares exact native f32 results for 11 fixed and 96 additional
+sampled segments. The deliberately incorrect narrowed-row control fails the
+Godot oracle. The optional `t095_native_hard_scanline_bench.gd` is **native
+CPU only**; hardware catch-up and input-to-photon latency remain unverified.
+[Evidence](../../docs/evidence/T-095-2026-11-11-native-hard-scanlines.md).
+
 ## Gesture safety
 
 States are `IDLE → CAPTURING → DRAINING → COMMITTING → IDLE`. Source-space

@@ -1612,3 +1612,21 @@ check ID is added. Native-present and fresh native-absent local runs passed.
 This is transaction correctness evidence, not full hosted CI or real hardware
 60px latency acceptance. T-095 remains In Progress and manual review stays
 open.
+
+
+### T-095 NativeHard conservative scanline oracle — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` compiles the actual Rust
+GDExtension, then strictly checks `drawing/tests/t095_native_hard_scanline_smoke.gd`
+with marker `T095_NATIVE_HARD_SCANLINE_PASSED` and retains its raw log.
+The **42/42** native oracle checks byte-exact ordered output against the original
+full-candidate rectangle for twelve signed/fractional/60px and clipped sweeps;
+the high-coordinate case retains its original native witness because independent
+GDScript arithmetic rounds two edge pixels differently at ~10M positions.
+Rust's test suite independently compares the *exact native f32 predicate* on
+these 11 fixed and 96 deterministic sampled segments (6/6 Rust tests pass).
+A deliberately undersized row-bound control fails the GDExtension oracle.
+An opt-in `t095_native_hard_scanline_bench.gd` times **only native coverage
+and output**, not Godot staging, compositor, pointer motion or real display.
+It is not included in the required 46-step fast-GDScript CI. Hosted workflow
+and owner hardware acceptance remain unverified; T-095 stays In Progress.

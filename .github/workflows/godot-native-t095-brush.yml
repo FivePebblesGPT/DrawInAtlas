@@ -173,6 +173,14 @@ jobs:
             2>&1 | tee /tmp/t095-native-hard-atomic.log
           python3 tools/check_godot_model_log.py /tmp/t095-native-hard-atomic.log \
             --marker T095_NATIVE_HARD_ATOMIC_PASSED
+      - name: T-095 NativeHard conservative scanlines vs original full rectangles
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/t095_native_hard_scanline_smoke.gd \
+            2>&1 | tee /tmp/t095-native-hard-scanline.log
+          python3 tools/check_godot_model_log.py /tmp/t095-native-hard-scanline.log \
+            --marker T095_NATIVE_HARD_SCANLINE_PASSED
       - name: T-095 real NativeHard rollback across failed GDScript source reads
         run: |
           set -euo pipefail
@@ -221,6 +229,7 @@ jobs:
             /tmp/t095-sparse-preview.log
             /tmp/t095-blend.log
             /tmp/t095-native-hard-atomic.log
+            /tmp/t095-native-hard-scanline.log
             /tmp/t095-native-hard-source-atomic.log
             /tmp/t095-native-pigment-atomic.log
             /tmp/t095-native.log

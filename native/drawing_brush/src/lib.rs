@@ -242,6 +242,43 @@ fn validate_hard_windows(
     Ok(windows)
 }
 
+/// Conservative X interval for a single oblique NativeHard candidate row.
+/// The final f32 distance predicate is intentionally unchanged: this only
+/// avoids testing pixels farther than the swept disc can possibly reach.
+/// Use f64 for the bound, with extra error margin for f32 vector rounding.
+/// Very large coordinates and near-horizontal slopes retain the reference
+/// full-rectangle scan to avoid any change in edge-pixel semantics.
+fn hard_row_bounds(window: &HardWindow, y: i32, radius: f32) -> (i32, i32) {
+    let dy = window.end.y - window.begin.y;
+    if !radius.is_finite()
+        || dy.abs() < 0.001
+        || !dy.is_finite()
+        || [window.begin.x, window.begin.y, window.end.x, window.end.y]
+            .iter()
+            .any(|coordinate| coordinate.abs() >= 1_000_000.0)
+    {
+        return (window.left, window.right);
+    }
+    let broad = f64::from(radius) + 4.0;
+    let center_y = f64::from(y) + 0.5;
+    let begin_y = f64::from(window.begin.y);
+    let slope_y = f64::from(dy);
+    let a = (center_y - broad - begin_y) / slope_y;
+    let b = (center_y + broad - begin_y) / slope_y;
+    let lower = a.min(b).max(0.0);
+    let upper = a.max(b).min(1.0);
+    if lower > upper {
+        return (window.left, window.left);
+    }
+    let begin_x = f64::from(window.begin.x);
+    let slope_x = f64::from(window.end.x) - begin_x;
+    let x_a = begin_x + slope_x * lower;
+    let x_b = begin_x + slope_x * upper;
+    let left = (x_a.min(x_b) - broad - 1.0).floor() as i32;
+    let right = (x_a.max(x_b) + broad + 1.0).ceil() as i32;
+    (left.max(window.left), right.min(window.right))
+}
+
 /// Only newly accepted coverage is journaled per GDScript sample batch; do
 /// not copy the entire long-running coverage set on every input event.
 struct HardBatch {
@@ -351,7 +388,8 @@ impl DrawingNativeBrush {
             let delta = window.end - window.begin;
             let squared = delta.length_squared();
             for y in window.top..window.bottom {
-                for x in window.left..window.right {
+                let (row_left, row_right) = hard_row_bounds(&window, y, width * 0.5);
+                for x in row_left..row_right {
                     if self.covered.contains(&(x, y)) {
                         continue;
                     }
@@ -527,6 +565,130 @@ unsafe impl ExtensionLibrary for DrawingBrushExtension {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Exact native-f32 reference: never use hard_row_bounds to generate its
+    /// expected pixels. Checks order, fractional edges and large coordinates.
+    #[test]
+    fn hard_scanlines_equal_original_rectangles() {
+        let samples: &[(Vector2, Vector2, f32, Option<Rect2i>)] = &[
+            (
+                Vector2::new(-92.25, -86.5),
+                Vector2::new(94.75, 87.625),
+                60.0,
+                None,
+            ),
+            (
+                Vector2::new(91.875, -84.5),
+                Vector2::new(-91.625, 83.125),
+                60.0,
+                None,
+            ),
+            (
+                Vector2::new(-92.25, 1.125),
+                Vector2::new(94.75, 3.375),
+                60.0,
+                None,
+            ),
+            (
+                Vector2::new(-92.25, 1.125),
+                Vector2::new(94.75, 1.12505),
+                60.0,
+                None,
+            ),
+            (
+                Vector2::new(-94.5, 3.5),
+                Vector2::new(91.5, 3.5),
+                60.0,
+                None,
+            ),
+            (
+                Vector2::new(3.5, -91.5),
+                Vector2::new(3.5, 94.5),
+                60.0,
+                None,
+            ),
+            (Vector2::new(-7.5, 5.5), Vector2::new(-7.5, 5.5), 60.0, None),
+            (
+                Vector2::new(-68.125, -75.375),
+                Vector2::new(74.875, 69.625),
+                1.25,
+                None,
+            ),
+            (
+                Vector2::new(71.5, -71.5),
+                Vector2::new(-76.5, 74.5),
+                0.75,
+                None,
+            ),
+            (
+                Vector2::new(-88.5, -73.5),
+                Vector2::new(91.5, 78.5),
+                60.0,
+                Some(Rect2i::new(Vector2i::new(-43, -37), Vector2i::new(84, 69))),
+            ),
+            (
+                Vector2::new(10_000_012.0, -10_000_042.0),
+                Vector2::new(10_000_068.0, -10_000_001.0),
+                7.0,
+                Some(Rect2i::new(
+                    Vector2i::new(10_000_008, -10_000_048),
+                    Vector2i::new(75, 63),
+                )),
+            ),
+        ];
+        let mut cases = samples.to_vec();
+        // Deterministic additional slopes/centers exercise f32 edge rounding
+        // without pulling in an RNG dependency or altering the native path.
+        let mut seed = 0x9e37_79b9_u32;
+        for sample in 0..96 {
+            let mut draw = || {
+                seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (seed % 200_001) as f32 / 1000.0 - 100.0
+            };
+            let begin = Vector2::new(draw(), draw());
+            let end = Vector2::new(draw(), draw());
+            let width = [0.75, 1.25, 7.0, 16.5, 31.3, 60.0][sample % 6];
+            cases.push((begin, end, width, None));
+        }
+        for &(begin, end, width, clip) in &cases {
+            let window = validate_hard_windows(
+                &[end],
+                width,
+                clip.unwrap_or(Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)),
+                Some(begin),
+            )
+            .unwrap()
+            .pop()
+            .unwrap();
+            let radius_squared = (width * 0.5) * (width * 0.5);
+            let delta = end - begin;
+            let squared = delta.length_squared();
+            let accepted = |x: i32, y: i32| {
+                let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
+                let fraction = if squared > 0.0 {
+                    ((center - begin).dot(delta) / squared).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                (center - (begin + delta * fraction)).length_squared() <= radius_squared
+            };
+            let reference: Vec<_> = (window.top..window.bottom)
+                .flat_map(|y| (window.left..window.right).map(move |x| (x, y)))
+                .filter(|&(x, y)| accepted(x, y))
+                .collect();
+            let optimized: Vec<_> = (window.top..window.bottom)
+                .flat_map(|y| {
+                    let (left, right) = hard_row_bounds(&window, y, width * 0.5);
+                    (left..right).map(move |x| (x, y))
+                })
+                .filter(|&(x, y)| accepted(x, y))
+                .collect();
+            assert_eq!(
+                optimized, reference,
+                "width={width} begin={begin:?} end={end:?}"
+            );
+        }
+    }
 
     #[test]
     fn pigment_tile_batch_rolls_back_existing_and_new_surface_tiles() {
