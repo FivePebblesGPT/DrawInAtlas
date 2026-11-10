@@ -74,6 +74,14 @@ jobs:
             2>&1 | tee /tmp/t095-brush-tile-key-cache.log
           python3 tools/check_godot_model_log.py /tmp/t095-brush-tile-key-cache.log \
             --marker T095_BRUSH_TILE_KEY_CACHE_PASSED
+      - name: T-095 cached Brush source/preview references and failure retry
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_brush_tile_reference_cache_smoke.gd \
+            2>&1 | tee /tmp/t095-brush-tile-reference.log
+          python3 tools/check_godot_model_log.py /tmp/t095-brush-tile-reference.log \
+            --marker T095_BRUSH_TILE_REFERENCE_PASSED
       - name: T-095 signed Legacy tile/source lookup and history parity
         run: |
           set -euo pipefail
@@ -189,6 +197,7 @@ jobs:
           path: |
             /tmp/t095-oracle.log
             /tmp/t095-brush-deferred.log
+            /tmp/t095-brush-tile-reference.log
             /tmp/t095-brush-result.log
             /tmp/t095-oblique.log
             /tmp/t095-axis-scanline.log

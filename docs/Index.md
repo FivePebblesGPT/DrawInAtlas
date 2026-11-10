@@ -1792,6 +1792,23 @@ independent review gate remains unchanged.
 [Evidence](evidence/T-095-2026-11-09-tile-run-buffer.md) ·
 [ticket](Tickets/T-095.md).
 
+**T-095 current-tile Brush source/preview reference reuse (2026-11-11; In Progress):**
+The tile-local Brush/Eraser stage now reuses its resolved immutable source
+and detached preview patch while remaining within the same signed storage tile,
+instead of doing per-pixel source-dictionary and preview-dictionary lookups.
+Tile changes and failed source loads invalidate the appropriate reference;
+failed paint-batch rollback clears all cache state. The new independent
+canonical-publisher oracle passes **626/626** assertions over signed
+world coordinates, irregular strides, alpha/selection holes, tile revisits,
+source-read failures, retry/skip, preview and exact Undo/Redo. A staged
+incorrect-cache control fails **95** assertions. Isolated Godot beta3 60px
+stage medians improve for dabs/axis/oblique in short local comparisons, but
+five-stroke Xvfb pointer timings are mixed; **no full-gesture or owner-device
+speedup is established**. T-095 stays **In Progress**, `manual_review: true`,
+and T-096 remains in separate Manual Review.
+[Evidence](evidence/T-095-2026-11-11-brush-tile-reference-cache.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 stationary/axis Brush scanline bounds (2026-11-11; In Progress):**
 Conservative row spans skip candidate columns outside 60px stationary and
 horizontal/vertical hard Brush footprints without changing exact per-pixel
@@ -1969,7 +1986,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback and signed Brush tile-key reuse tested; owner 60px device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback, signed tile-key and source/preview reference cache tested; owner 60px device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics

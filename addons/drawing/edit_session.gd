@@ -33,6 +33,12 @@ var _stage_tile_shift: int = -1
 var _brush_cached_tile_x: int = 0
 var _brush_cached_tile_y: int = 0
 var _brush_cached_tile_key: String = ""
+## The current storage tile's immutable source and detached patch can be reused
+## across a scanline. A failed lazy read is never cached as a successful null
+## tile, and the preview reference is reset after transaction rollback.
+var _brush_cached_source: DrawingRasterTile = null
+var _brush_cached_source_ready: bool = false
+var _brush_cached_patch: Dictionary = {}
 ## Detached preview indexed by storage tile + pixel offset; never stored on the document.
 var _preview_tiles: Dictionary[String, Dictionary] = {}
 ## Per-storage-tile monotonic content versions. A display tile only needs
@@ -294,6 +300,12 @@ func _rollback_paint() -> void:
 			_preview_tiles[tile_key] = patch
 	_brush_change_count = _brush_change_count_before_batch
 	_brush_tile_journal.clear()
+	# Rollback may detach/rebuild the current preview tile's dictionary. Never
+	# reuse a reference which no longer corresponds to the published preview.
+	_brush_cached_tile_key = ""
+	_brush_cached_source_ready = false
+	_brush_cached_source = null
+	_brush_cached_patch = {}
 	_journaling = false
 
 
@@ -463,21 +475,27 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 		_brush_cached_tile_key = "%d,%d" % [tile_x, tile_y]
 		_brush_cached_tile_x = tile_x
 		_brush_cached_tile_y = tile_y
+		_brush_cached_source = null
+		_brush_cached_source_ready = false
+		_brush_cached_patch = _preview_tiles.get(_brush_cached_tile_key, {})
 	var tile_key: String = _brush_cached_tile_key
 	var local_index: int = local_y * stride + local_x
 	# A preverified old pixel skips its individual source read, but the tile
 	# identity must still be captured for fail-closed publication.
-	if not _source_tiles.has(tile_key):
-		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
-		if not resolved.ok:
-			return resolved
-		_source_tiles[tile_key] = resolved.value
+	if not _brush_cached_source_ready:
+		if not _source_tiles.has(tile_key):
+			var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+			if not resolved.ok:
+				return resolved
+			_source_tiles[tile_key] = resolved.value
+		_brush_cached_source = _source_tiles[tile_key] as DrawingRasterTile
+		_brush_cached_source_ready = true
 	var old: int = verified_source
 	if old == -1:
-		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
-		old = int(tile._pixels.get(local_index, 0)) if tile != null else 0
+		old = int(_brush_cached_source._pixels.get(local_index, 0)) \
+			if _brush_cached_source != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
-	var patch: Dictionary = _preview_tiles.get(tile_key, {})
+	var patch: Dictionary = _brush_cached_patch
 	var previous: int = int(patch.get(local_index, old))
 	if _journaling:
 		var entries: Dictionary = _brush_tile_journal.get(tile_key, {})

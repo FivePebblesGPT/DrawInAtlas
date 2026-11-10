@@ -85,6 +85,21 @@ gate. The selected local tests pass; hosted Actions was not run.
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 per-session source/preview tile-reference cache oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` runs the
+`drawing/tests/t095_brush_tile_reference_cache_smoke.gd` oracle and requires
+exact `T095_BRUSH_TILE_REFERENCE_PASSED` using the fail-closed model-log
+checker; it uploads the raw log even on subsequent CI failure. Locally the
+**626/626** independent canonical-publisher checks cover signed coordinates,
+irregular strides, Brush/Eraser, transparent pixels, selections, tile revisit,
+late source-read rejection, rollback, exact preview, before/after history,
+Undo and Redo. A deliberately invalid patch-reference control failed **95**
+checks. The test does not depend on native availability. Neither this local
+verification nor the on-demand workflow declaration constitutes hosted CI or
+physical owner-device acceptance. The **46 required fast-CI IDs** are unchanged;
+T-095 remains `In Progress` with manual review outstanding.
+
 ## T-095 source-tile-key reuse oracle — 2026-11-11
 
 The **on-demand** `godot-native-t095-brush.yml` runs
