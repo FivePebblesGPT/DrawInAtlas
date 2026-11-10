@@ -1044,11 +1044,16 @@ func start_gesture(position: Vector2) -> void:
 			if brush_backend == "Hokusai" and not _stroke_erase:
 				var preset_path: String = BUNDLED_PRESETS.get(brush_preset, "")
 				var settings: String = FileAccess.get_file_as_string(preset_path) if not preset_path.is_empty() else ""
-				if not settings.is_empty() and _native_brush.call("configure_preset",
-						settings, _stroke_width, _stroke_color):
+				# A pre-transaction native binary must fail over to Legacy;
+				# otherwise a lazy-source failure could consume pigment on retry.
+				var supports_transactions: bool = _native_brush.has_method("begin_preset_batch") and \
+					_native_brush.has_method("commit_preset_batch") and \
+					_native_brush.has_method("rollback_preset_batch")
+				if supports_transactions and not settings.is_empty() and _native_brush.call(
+						"configure_preset", settings, _stroke_width, _stroke_color):
 					_active_brush_backend = "Hokusai"
 				else:
-					canvas_error.emit("Hokusai preset unavailable; using the legacy Brush")
+					canvas_error.emit("Hokusai preset or batch rollback unavailable; using the legacy Brush")
 			else:
 				_native_brush.call("reset_hard")
 				_active_brush_backend = "NativeHard"

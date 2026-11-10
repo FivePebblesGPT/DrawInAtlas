@@ -1,3 +1,23 @@
+## T-095 native/GDScript Hokusai pigment rollback witness — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` builds the pinned
+GDExtension, then runs `drawing/tests/t095_native_pigment_atomic.gd` with the
+strict `T095_NATIVE_PIGMENT_ATOMIC_PASSED` log marker and retains the raw log.
+The test requires the actual native class and bundled `.myb`, not a simulated
+pixel list. It injects a *late* GDScript source-chunk read failure after one
+successful native pigment batch, compares failed-batch preview and history,
+then verifies exact same-object retry, subsequent pigment deltas, no-retry
+commit, signed >32-bit anchors, selection holes, RGBA8 source bytes and
+Undo/Redo against an uninterrupted native reference. Original 2026-11-11
+binary: **4 of 56 assertions failed**; transactional fix: **57/57** locally.
+Four Rust unit tests, Clippy and format pass. The existing fallback oracle
+now checks Hokusai transaction negotiation: 7/7 with current native,
+7/7 using the actual previous native binary (Legacy fallback), and
+7/7 on a fresh native-absent import. The GDScript stub-only
+126-check bulk-delta oracle remains independent and works without a native
+library. No change to the **46 required fast-CI check IDs**; hosted Actions
+and owner-hardware 60px responsiveness/approval remain unverified.
+
 ## T-095 optional NativeHard batch-atomicity witness — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` workflow additionally builds the

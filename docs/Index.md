@@ -1548,6 +1548,21 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 Hokusai native/GDScript pigment rollback (2026-11-11; In Progress):**
+The real native pigment surface previously advanced even when a later
+GDScript lazy-source read rejected the same sample batch. A fresh
+real-GDExtension negative control fails **4/56** preview/retry/commit checks.
+Two-phase native acknowledgement and sparse copy-on-first-write rollback
+now restore brush state, RGBA8 export cache and existing/new tile state;
+older non-transactional binaries explicitly fall back to Legacy. The
+fixed real Hokusai source-read oracle passes **57/57**, with 4/4 Rust tests,
+Clippy, native integration and signed preview/history neighbors locally
+passing. On-demand CI has the strict test, but hosted Actions, owner device
+60px timing and explicit owner re-acceptance remain open. **T-095 stays In
+Progress** with `manual_review: true`; **T-096 stays Manual Review**.
+[Evidence](evidence/T-095-2026-11-11-native-pigment-rollback.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 NativeHard whole-batch failure atomicity (2026-11-09; In Progress):**
 The opt-in Rust hard Brush previously mutated native coverage/cursor before
 rejecting an invalid later sample or oversized sweep, so retries could silently

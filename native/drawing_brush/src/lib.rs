@@ -5,37 +5,92 @@ use std::collections::{HashMap, HashSet};
 use godot::classes::IRefCounted;
 use godot::prelude::*;
 use hokusai::mapping::SettingValue;
-use hokusai::tile_mem::MemSurface;
 use hokusai::{Brush, BrushSetting, BrushState, TILE_SIZE, TiledSurface};
 
-/// MemSurface with per-batch dirty tracking, independent of Hokusai's
-/// internally nested atomic sections.
+type TileSnapshot = Option<Box<hokusai::tile::TilePixels>>;
+
+/// Hokusai-compatible sparse tile surface with per-batch dirty tracking.
+/// Unlike the stock MemSurface, the owned tile map can remove a newly created
+/// tile on rollback. Repeated rejected source reads must not retain blank
+/// native tiles and silently grow a long-lived brush stroke's memory.
 #[derive(Default)]
 struct TrackedSurface {
-    inner: MemSurface,
+    tiles: HashMap<(i32, i32), Box<hokusai::tile::TilePixels>>,
     changed: HashSet<(i32, i32)>,
+    atomic_dirty: HashSet<(i32, i32)>,
+    in_atomic: bool,
+    /// Copy-on-first-write source tiles for the unacknowledged GDScript batch.
+    /// None means the tile did not exist before the native call.
+    before_batch: Option<HashMap<(i32, i32), TileSnapshot>>,
+}
+
+impl TrackedSurface {
+    fn begin_batch(&mut self) {
+        self.before_batch = Some(HashMap::new());
+    }
+
+    fn commit_batch(&mut self) {
+        self.before_batch = None;
+    }
+
+    fn rollback_batch(&mut self) {
+        if let Some(before) = self.before_batch.take() {
+            for (position, previous) in before {
+                if let Some(previous) = previous {
+                    self.tiles.insert(position, previous);
+                } else {
+                    self.tiles.remove(&position);
+                }
+            }
+        }
+        self.changed.clear();
+        self.atomic_dirty.clear();
+        self.in_atomic = false;
+    }
+
+    fn tile(&self, x: i32, y: i32) -> Option<&hokusai::tile::TilePixels> {
+        self.tiles.get(&(x, y)).map(Box::as_ref)
+    }
 }
 
 impl TiledSurface for TrackedSurface {
     fn tile_request_start(&mut self, x: i32, y: i32) -> &mut hokusai::tile::TilePixels {
-        self.changed.insert((x, y));
-        self.inner.tile_request_start(x, y)
+        let key = (x, y);
+        if self
+            .before_batch
+            .as_ref()
+            .is_some_and(|before| !before.contains_key(&key))
+        {
+            let previous = self.tiles.get(&key).cloned();
+            self.before_batch
+                .as_mut()
+                .expect("active preset transaction")
+                .insert(key, previous);
+        }
+        self.changed.insert(key);
+        if self.in_atomic {
+            self.atomic_dirty.insert(key);
+        }
+        self.tiles
+            .entry(key)
+            .or_insert_with(|| Box::new([[[0; 4]; TILE_SIZE]; TILE_SIZE]))
+            .as_mut()
     }
 
-    fn tile_request_end(&mut self, x: i32, y: i32) {
-        self.inner.tile_request_end(x, y);
-    }
+    fn tile_request_end(&mut self, _x: i32, _y: i32) {}
 
     fn tile_lookup(&self, x: i32, y: i32) -> Option<&hokusai::tile::TilePixels> {
-        self.inner.tile_lookup(x, y)
+        self.tile(x, y)
     }
 
     fn begin_atomic(&mut self) {
-        self.inner.begin_atomic();
+        self.in_atomic = true;
+        self.atomic_dirty.clear();
     }
 
     fn end_atomic(&mut self) -> Vec<(i32, i32)> {
-        self.inner.end_atomic()
+        self.in_atomic = false;
+        self.atomic_dirty.drain().collect()
     }
 }
 
@@ -43,6 +98,7 @@ impl TiledSurface for TrackedSurface {
 /// Hokusai dabs touch only a small part of an already painted 64px tile.
 /// Comparing the cheap fixed-point values before sRGB conversion avoids
 /// converting all 4096 pixels again at every native batch boundary.
+#[derive(Clone)]
 struct ExportedTile {
     raw: Vec<[u16; 4]>,
     rgba: Vec<u32>,
@@ -96,6 +152,13 @@ fn scan_changed_pixels(
     }
 }
 
+struct PresetBatch {
+    state: BrushState,
+    /// Only quantized caches for touched tiles are journaled, never the
+    /// entire accumulated pigment surface or preview for a long gesture.
+    published: HashMap<(i32, i32), Option<ExportedTile>>,
+}
+
 struct PresetStroke {
     brush: Brush,
     state: BrushState,
@@ -104,6 +167,7 @@ struct PresetStroke {
     /// quantized repeat must not re-enter GDScript staging or invalidate a
     /// detached preview, even when the underlying native surface changed.
     published: HashMap<(i32, i32), ExportedTile>,
+    pending: Option<PresetBatch>,
 }
 
 /// A prevalidated segment whose candidate count fits the bounded batch.
@@ -293,10 +357,56 @@ impl DrawingNativeBrush {
             state: BrushState::new(1000),
             surface: TrackedSurface::default(),
             published: HashMap::new(),
+            pending: None,
         });
         self.covered.clear();
         self.last_hard = None;
         true
+    }
+
+    /// GDScript acknowledges the batch only after validating every source tile.
+    /// A rejected GDScript read must rewind native pigment, dab RNG/cursor and
+    /// the cached quantized output; retrying must be byte-identical.
+    #[func]
+    fn begin_preset_batch(&mut self) -> bool {
+        let Some(stroke) = self.preset.as_mut() else {
+            return false;
+        };
+        if stroke.pending.is_some() {
+            return false;
+        }
+        stroke.pending = Some(PresetBatch {
+            state: stroke.state.clone(),
+            published: HashMap::new(),
+        });
+        stroke.surface.begin_batch();
+        true
+    }
+
+    #[func]
+    fn commit_preset_batch(&mut self) {
+        if let Some(stroke) = self.preset.as_mut()
+            && stroke.pending.take().is_some()
+        {
+            stroke.surface.commit_batch();
+        }
+    }
+
+    #[func]
+    fn rollback_preset_batch(&mut self) {
+        if let Some(stroke) = self.preset.as_mut()
+            && let Some(snapshot) = stroke.pending.take()
+        {
+            stroke.surface.rollback_batch();
+            stroke.state = snapshot.state;
+            for (position, exported) in snapshot.published {
+                if let Some(exported) = exported {
+                    stroke.published.insert(position, exported);
+                } else {
+                    stroke.published.remove(&position);
+                }
+            }
+        }
     }
 
     /// One FFI call per sample batch. Only changed **quantized RGBA8** pixels
@@ -338,9 +448,15 @@ impl DrawingNativeBrush {
         let mut dirty: Vec<_> = stroke.surface.changed.drain().collect();
         dirty.sort_unstable();
         for (tx, ty) in dirty {
-            let Some(tile) = stroke.surface.inner.tile(tx, ty) else {
+            let Some(tile) = stroke.surface.tile(tx, ty) else {
                 continue;
             };
+            if let Some(batch) = stroke.pending.as_mut() {
+                batch
+                    .published
+                    .entry((tx, ty))
+                    .or_insert_with(|| stroke.published.get(&(tx, ty)).cloned());
+            }
             let published = stroke.published.entry((tx, ty)).or_default();
             scan_changed_pixels(tile, published, |index, rgba| {
                 output.push(tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32);
@@ -361,6 +477,33 @@ unsafe impl ExtensionLibrary for DrawingBrushExtension {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pigment_tile_batch_rolls_back_existing_and_new_surface_tiles() {
+        let mut surface = TrackedSurface::default();
+        surface.tile_request_start(-1, 2)[3][4] = [21, 43, 65, 32768];
+        surface.tile_request_end(-1, 2);
+        surface.changed.clear();
+
+        surface.begin_batch();
+        surface.tile_request_start(-1, 2)[3][4] = [10, 20, 30, 40];
+        surface.tile_request_end(-1, 2);
+        surface.tile_request_start(3, -2)[0][0] = [900, 800, 700, 600];
+        surface.tile_request_end(3, -2);
+        assert_eq!(surface.changed.len(), 2);
+        surface.rollback_batch();
+        assert_eq!(surface.tile(-1, 2).unwrap()[3][4], [21, 43, 65, 32768]);
+        assert!(surface.tile(3, -2).is_none());
+        assert!(surface.changed.is_empty());
+        assert_eq!(surface.tiles.len(), 1);
+
+        surface.begin_batch();
+        surface.tile_request_start(3, -2)[0][0] = [11, 12, 13, 14];
+        surface.tile_request_end(3, -2);
+        surface.commit_batch();
+        assert_eq!(surface.tile(3, -2).unwrap()[0][0], [11, 12, 13, 14]);
+        assert!(surface.before_batch.is_none());
+    }
 
     #[test]
     fn native_hard_preflight_rejects_late_batch_errors() {

@@ -141,6 +141,14 @@ jobs:
             2>&1 | tee /tmp/t095-native-hard-atomic.log
           python3 tools/check_godot_model_log.py /tmp/t095-native-hard-atomic.log \
             --marker T095_NATIVE_HARD_ATOMIC_PASSED
+      - name: T-095 real Hokusai pigment rollback across failed GDScript source reads
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/t095_native_pigment_atomic.gd \
+            2>&1 | tee /tmp/t095-native-pigment-atomic.log
+          python3 tools/check_godot_model_log.py /tmp/t095-native-pigment-atomic.log \
+            --marker T095_NATIVE_PIGMENT_ATOMIC_PASSED
       - name: Real mouse routing and held-button software framebuffer profile
         run: |
           set -euo pipefail
@@ -170,5 +178,6 @@ jobs:
             /tmp/t095-sparse-preview.log
             /tmp/t095-blend.log
             /tmp/t095-native-hard-atomic.log
+            /tmp/t095-native-pigment-atomic.log
             /tmp/t095-native.log
           if-no-files-found: warn

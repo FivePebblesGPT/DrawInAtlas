@@ -590,6 +590,15 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
 	if _closed or path.is_empty() or native == null:
 		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
+	# The real GDExtension must support acknowledgement/rollback. Scripted
+	# deterministic delta stubs have no native pigment surface to rewind.
+	var transactional: bool = native.has_method("begin_preset_batch") and \
+		native.has_method("commit_preset_batch") and native.has_method("rollback_preset_batch")
+	if native.get_class() == "DrawingNativeBrush" and not transactional:
+		return DrawingResult.failure("HOKUSAI_TRANSACTION",
+			"Native brush binary lacks rollback support")
+	if transactional and not native.call("begin_preset_batch"):
+		return DrawingResult.failure("HOKUSAI_TRANSACTION", "Native batch is already pending")
 	_brush_tile_publish = false
 	_materialize_brush_preview()
 	var inverse: Transform2D = view_transform.affine_inverse()
@@ -601,6 +610,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	hokusai_perf["native_us"] = int(hokusai_perf["native_us"]) + Time.get_ticks_usec() - native_start_us
 	hokusai_perf["pixels"] = int(hokusai_perf["pixels"]) + changed.size() / 3
 	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
+		if transactional:
+			native.call("rollback_preset_batch")
 		return DrawingResult.failure("HOKUSAI_LIMIT", "Invalid or excessive native pixel delta")
 	var stage_start_us: int = Time.get_ticks_usec()
 	var opacity: int = (rgba >> 24) & 255
@@ -641,6 +652,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		var x: int = changed[index]
 		var y: int = changed[index + 1]
 		if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
+			if transactional:
+				native.call("rollback_preset_batch")
 			return DrawingResult.failure("COORD_RANGE", "Hokusai pixel exceeds safe edit coordinates")
 		if clipping and (x < clip_left or y < clip_top or x >= clip_right or y >= clip_bottom):
 			continue
@@ -673,6 +686,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		if not _source_tiles.has(source_key):
 			var resolved: DrawingResult = document._resolve_chunk(layer_id, source_key)
 			if not resolved.ok:
+				if transactional:
+					native.call("rollback_preset_batch")
 				return resolved
 			_source_tiles[source_key] = resolved.value
 	# Sessions using another edit API already have canonical global keys; the
@@ -734,6 +749,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		else:
 			_preview_tiles[tile_key] = patch
 
+	if transactional:
+		native.call("commit_preset_batch")
 	hokusai_perf["stage_us"] = int(hokusai_perf["stage_us"]) + Time.get_ticks_usec() - stage_start_us
 	return DrawingResult.success(change_count())
 

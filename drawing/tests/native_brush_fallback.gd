@@ -57,6 +57,15 @@ func run() -> void:
         (not native_available and canvas._native_brush == null),
         "invalid Hokusai preset falls back explicitly")
     canvas.cancel_gesture()
+    # An old GDExtension may support Hokusai paint yet lack rollback.
+    # Such a binary must choose Legacy *before* source-pigment sampling.
+    canvas.brush_preset = "hard"
+    var transactional_native: bool = native_available and ClassDB.instantiate(
+        "DrawingNativeBrush").has_method("begin_preset_batch")
+    canvas.start_gesture(canvas.pixel_to_position(Vector2(-3.5, 4.5)))
+    check(canvas._active_brush_backend == ("Hokusai" if transactional_native else "Legacy"),
+        "Hokusai selects native only when real cross-boundary rollback is supported")
+    canvas.cancel_gesture()
     print("T095_NATIVE_FALLBACK_RESULT checks=%d failures=%d native=%s" %
         [checks, failures, str(native_available)])
     quit(1 if failures else 0)
