@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://cxjubfgx0xo06"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://c70b5wihku2c0" path="res://scripts/interface/canvas.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/interface/canvas.gd" id="1"]
 
 [node name="PreviewRenderer" type="SubViewport" unique_id=165862552]
 disable_3d = true

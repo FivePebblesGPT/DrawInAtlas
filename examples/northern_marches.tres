@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="AtlasExampleCampaign" format=3 uid="uid://cgkxmp8oo56d4"]
+[gd_resource type="Resource" script_class="AtlasExampleCampaign" format=3]
 
-[ext_resource type="Script" uid="uid://b0lj3qi34ur65" path="res://scripts/examples/campaign_preset.gd" id="1"]
-[ext_resource type="Script" uid="uid://fictj8d7ieki" path="res://scripts/examples/map_preset.gd" id="2"]
-[ext_resource type="Script" uid="uid://6ikvhh1mrjcf" path="res://scripts/campaign/grid.gd" id="3"]
-[ext_resource type="Script" uid="uid://dcatajsll0dtg" path="res://scripts/campaign/map_link.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/examples/campaign_preset.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/examples/map_preset.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/campaign/grid.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/campaign/map_link.gd" id="4"]
 
 [sub_resource type="Resource" id="CityGrid"]
 script = ExtResource("3")

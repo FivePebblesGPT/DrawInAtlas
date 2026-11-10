@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://dqrogil6sut2l"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://cbathj5lvql6s" path="res://scripts/interface/board_dialog.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/interface/board_dialog.gd" id="1"]
 [ext_resource type="PackedScene" path="res://prefab/grid_controls.tscn" id="2"]
 
 [node name="BoardDialog" type="ConfirmationDialog" unique_id=1579984016]

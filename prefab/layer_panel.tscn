@@ -1,7 +1,6 @@
-[gd_scene format=3 uid="uid://3lt7cpfn4qpc"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://b2jtxv1kjys3d" path="res://scripts/interface/layer_panel.gd" id="1"]
-
+[ext_resource type="Script" path="res://scripts/interface/layer_panel.gd" id="1"]
 [ext_resource type="Texture2D" path="res://img/controls/raise.svg" id="2"]
 [ext_resource type="Texture2D" path="res://img/controls/lower.svg" id="3"]
 [ext_resource type="Texture2D" path="res://img/controls/objects-layer.svg" id="4"]

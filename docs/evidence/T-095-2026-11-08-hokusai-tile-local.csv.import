@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://dk8emthrwcabp"
+
+[deps]
+
+files=["res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.variant.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.run.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.zoom.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.width.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.stage.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.release.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.max.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.max.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.commit.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.compose.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.upload.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.index.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.preview.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.uploaded.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.drains.translation"]
+
+source_file="res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.csv"
+dest_files=["res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.variant.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.run.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.zoom.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.width.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.stage.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.release.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.max.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.max.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.commit.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.compose.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.upload.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.index.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.preview.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.uploaded.translation", "res://docs/evidence/T-095-2026-11-08-hokusai-tile-local.drains.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

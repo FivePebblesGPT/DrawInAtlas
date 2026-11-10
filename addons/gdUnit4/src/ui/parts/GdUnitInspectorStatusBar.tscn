@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://c22l4odk7qesc"]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://addons/gdUnit4/src/ui/parts/GdUnitInspectorStatusBar.gd" id="3"]
 
