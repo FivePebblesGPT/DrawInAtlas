@@ -30,6 +30,13 @@ application shell is implemented under T-053; see `drawing/README.md` for the in
   Pixels are staged in the session; **only touched tiles** are cloned at commit.
   `cancel()` and revision conflicts publish nothing. A single swept gesture
   blends any covered pixel once against its original RGBA8 value.
+- The optional T-095 Hokusai-only stroke path stages paint as signed storage-
+  tile/local-offset preview patches until commit. `DrawingDocument` now
+  validates these patches and prepares canonical before/after history without
+  generating/reparsing global string pixel keys. Both tile and ordinary
+  global-key edit paths share atomic publication, revision guards, dirty
+  regions, and Undo/Redo; mixing edit APIs retains the ordinary path.
+  [Independent tile-commit oracle and software-only timing](../../docs/evidence/T-095-2026-11-09-direct-tile-commit.md).
 - `read_pixel(layer_id, x:int, y:int)` reads signed 64-bit absolute pixel
   coordinates. Public `request_chunk_at(layer_id, cx:int, cy:int)` returns a
   detached tile snapshot, never live storage. A missing **unreferenced** tile

@@ -116,6 +116,26 @@ func run() -> void:
 	app._commit_hex()
 	check(app.active_color == Color8(170, 187, 204, 221) and app.color_hex.text == "#AABBCCDD",
 		"malformed hex is rejected without changing paint")
+	# Only the advertised #RRGGBB/#RRGGBBAA forms are valid. Godot's
+	# Color.html_is_valid also accepts bare and abbreviated hex by default.
+	var strict_before: Color = app.active_color
+	var strict_brush: int = app.canvas.color_rgba
+	for malformed: String in ["abc", "#abc", "#abcd", "aabbcc", "aabbccdd",
+			"#12345", "#1234567", "#123456789", "#AABBCCDG", "#00FF00 00"]:
+		app.color_hex.text = malformed
+		app._commit_hex()
+		check(app.active_color == strict_before and app.canvas.color_rgba == strict_brush and
+			app.color_hex.text == "#AABBCCDD", "reject noncanonical hex: " + malformed)
+	app.color_hex.text = "#00aBcD"
+	app._commit_hex()
+	check(app.active_color == Color8(0, 171, 205, 255) and app.color_hex.text == "#00ABCDFF",
+		"six-digit mixed-case hex supplies opaque alpha and canonical RGBA")
+	app.color_hex.text = "  #12345600  "
+	app._commit_hex()
+	check(app.active_color == Color8(18, 52, 86, 0) and app.color_hex.text == "#12345600",
+		"trimmed eight-digit hex retains hidden RGB at zero alpha")
+	app.color_hex.text = "#AABBCCDD"
+	app._commit_hex()
 	app.color_rgb[0].value = 17
 	check(roundi(app.active_color.r * 255) == 17 and roundi(app.active_color.a * 255) == 221,
 		"RGB field changes one channel and retains alpha")

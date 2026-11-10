@@ -647,6 +647,54 @@ func run() -> void:
 	canvas.camera = Vector2.ZERO
 	canvas.zoom = 1.0
 
+	# A cold sparse 256px source chunk should reach the *native* texture path
+	# with the same RGBA blend and signed positions as the public pixel oracle.
+	var sparse_run_doc: DrawingDocument = DrawingDocument.new("t086-sparse-run-native", 256)
+	var sparse_run_low: String = String(sparse_run_doc.create_layer(
+		DrawingLayerNode.RASTER, "Base").value)
+	var sparse_run_high: String = String(sparse_run_doc.create_layer(
+		DrawingLayerNode.RASTER, "Overlay").value)
+	patch(sparse_run_doc, sparse_run_low, Rect2i(-1, -1, 1, 1),
+		PackedByteArray([240, 40, 10, 255]))
+	patch(sparse_run_doc, sparse_run_high, Rect2i(-1, -1, 1, 1),
+		PackedByteArray([30, 150, 220, 128]))
+	patch(sparse_run_doc, sparse_run_low, Rect2i(1, 1, 1, 1),
+		PackedByteArray([60, 220, 90, 255]))
+	patch(sparse_run_doc, sparse_run_high, Rect2i(1, 1, 1, 1),
+		PackedByteArray([15, 90, 200, 0]))
+	canvas.document = sparse_run_doc
+	canvas.layer_id = sparse_run_low
+	canvas.tool = "Pan"
+	canvas.pointer_known = false
+	canvas.zoom = 1.0
+	canvas.camera = Vector2.ZERO
+	canvas.queue_redraw()
+	await frames(5)
+	var expected_mix: int = DrawingEditSession._blend(0x80dc961e, 0xff0a28f0)
+	var expected_color: Color = Color8(expected_mix & 255, (expected_mix >> 8) & 255,
+		(expected_mix >> 16) & 255, (expected_mix >> 24) & 255)
+	var sparse_mix: Color = sample(canvas, Vector2(-0.5, -0.5))
+	check(sparse_mix.is_equal_approx(expected_color),
+		"native signed sparse overlay matches exact composited RGBA8: %s" % sparse_mix)
+	var sparse_visible: Color = sample(canvas, Vector2(1.5, 1.5))
+	check(sparse_visible.g > 0.8 and sparse_visible.r < 0.3,
+		"native hidden-RGB top pixel leaves lower opaque sparse source visible")
+	check(int(sparse_run_doc.read_pixel(sparse_run_high, 1, 1).value) == 0x00c85a0f,
+		"sparse hidden RGB preserved on source layer")
+	canvas.queue_redraw()
+	await frames(3)
+	check(int(canvas.last_frame_metrics["textures_updated"]) == 0
+		and int(canvas.last_frame_metrics["tiles_composited"]) == 0,
+		"warm redraw reuses the committed sparse composition")
+	canvas.zoom = 0.5
+	canvas.queue_redraw()
+	await frames(3)
+	canvas.zoom = 1.0
+	canvas.queue_redraw()
+	await frames(3)
+	check(sample(canvas, Vector2(-0.5, -0.5)).is_equal_approx(expected_color),
+		"native signed sparse RGBA pixel survives zoom-out and return")
+
 	# A dense viewport larger than the retained budget must not evict all
 	# currently visible entries every frame (the overflow is transient).
 	canvas._display_tiles.clear()

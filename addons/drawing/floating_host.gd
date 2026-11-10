@@ -414,24 +414,30 @@ func _hit_resize_edges(point: Vector2) -> Vector4i:
 
 
 func _resize_from_pointer(delta: Vector2) -> void:
+	# The ungrabbed edge must remain stationary when the pointer crosses a
+	# client boundary. Feeding an oversized rectangle to set_host_rect() would
+	# instead shift the *whole* host to fit, moving the opposite edge.
+	var extent: Vector2 = _client_extent().max(Vector2.ONE)
+	var margin: Vector2 = Vector2(minf(EDGE_MARGIN, (extent.x - 1.0) / 2.0),
+		minf(EDGE_MARGIN, (extent.y - 1.0) / 2.0))
+	var minimum: Vector2 = MIN_FRAME.min(extent - 2.0 * margin)
 	var rect: Rect2 = _frame_start
 	if _resize_sides.x == 1:
-		rect.position.x += delta.x
-		rect.size.x -= delta.x
-	if _resize_sides.z == 1:
-		rect.size.x += delta.x
+		var left: float = clampf(_frame_start.position.x + delta.x,
+			margin.x, _frame_start.end.x - minimum.x)
+		rect.position.x = left
+		rect.size.x = _frame_start.end.x - left
+	elif _resize_sides.z == 1:
+		rect.size.x = clampf(_frame_start.end.x + delta.x,
+			_frame_start.position.x + minimum.x, extent.x - margin.x) - _frame_start.position.x
 	if _resize_sides.y == 1:
-		rect.position.y += delta.y
-		rect.size.y -= delta.y
-	if _resize_sides.w == 1:
-		rect.size.y += delta.y
-	# Keep the opposite edge anchored when the minimum size is reached.
-	if _resize_sides.x == 1 and rect.size.x < MIN_FRAME.x:
-		rect.position.x = _frame_start.end.x - MIN_FRAME.x
-		rect.size.x = MIN_FRAME.x
-	if _resize_sides.y == 1 and rect.size.y < MIN_FRAME.y:
-		rect.position.y = _frame_start.end.y - MIN_FRAME.y
-		rect.size.y = MIN_FRAME.y
+		var top: float = clampf(_frame_start.position.y + delta.y,
+			margin.y, _frame_start.end.y - minimum.y)
+		rect.position.y = top
+		rect.size.y = _frame_start.end.y - top
+	elif _resize_sides.w == 1:
+		rect.size.y = clampf(_frame_start.end.y + delta.y,
+			_frame_start.position.y + minimum.y, extent.y - margin.y) - _frame_start.position.y
 	set_host_rect(rect)
 
 

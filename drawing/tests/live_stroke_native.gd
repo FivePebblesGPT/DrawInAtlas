@@ -287,6 +287,64 @@ func run() -> void:
 	verify(image_doc.undo().ok and image_doc.read_pixel(replacement_layer, 350, 0).value == 0,
 		"outside-canvas path is still a single undo operation")
 
+	# A physical pointer gesture must not silently switch its pixel edit
+	# authorization when a host changes the selection during mouse-down.
+	var masked_doc: DrawingDocument = DrawingDocument.new("t085-native-mask-change")
+	var masked_layer: String = String(masked_doc.create_layer(DrawingLayerNode.RASTER, "Masked", "root").value)
+	canvas.document = masked_doc
+	canvas.layer_id = masked_layer
+	canvas.zoom = 1.0
+	canvas.brush_width = 4.0
+	canvas.color_rgba = 0xffffbb44
+	canvas.tool = "Brush"
+	var mask: DrawingSelection = DrawingSelection.new()
+	mask.set_rectangle(Rect2i(4, 4, 30, 24))
+	verify(mask.combine_rectangle(Rect2i(12, 12, 5, 5), "Subtract"),
+		"native selection with a hole is valid")
+	canvas.set_selection_mask(mask)
+	await frames(3)
+	await RenderingServer.frame_post_draw
+	var masked_baseline: Color = sample(canvas, Vector2(7.5, 7.5))
+	var start_revision: int = masked_doc.revision
+	button(canvas, Vector2(7.5, 7.5), true)
+	motion(canvas, Vector2(9.5, 9.5))
+	await frames(4)
+	await RenderingServer.frame_post_draw
+	var live_dab: Color = sample(canvas, Vector2(7.5, 7.5))
+	verify(canvas.session != null and color_delta(live_dab, masked_baseline) > 0.1 and
+		masked_doc.read_pixel(masked_layer, 7, 7).value == 0,
+		"held Brush visibly previews uncommitted pixels inside the old selection")
+	canvas.set_selection_mask(mask.detached_copy())
+	verify(canvas.session != null and canvas.dragging,
+		"republishing exact same hole mask during held pointer retains the gesture")
+	var new_mask: DrawingSelection = DrawingSelection.new()
+	new_mask.set_rectangle(Rect2i(40, 40, 8, 8))
+	canvas.set_selection_mask(new_mask)
+	button(canvas, Vector2(23.5, 19.5), false)
+	await frames(4)
+	await RenderingServer.frame_post_draw
+	var after_change: Color = sample(canvas, Vector2(7.5, 7.5))
+	verify(color_delta(after_change, masked_baseline) < 0.05 and
+		masked_doc.read_pixel(masked_layer, 7, 7).value == 0,
+		"mask change removes the held-button framebuffer preview without ghost pixels")
+	verify(canvas.session == null and masked_doc.revision == start_revision and
+		masked_doc.history_length() == 0 and Input.use_accumulated_input == baseline_accumulation,
+		"mask change cancels stroke, release, history and process-global input state")
+	canvas.set_selection_mask(mask)
+	button(canvas, Vector2(7.5, 7.5), true)
+	motion(canvas, Vector2(17.5, 17.5))
+	button(canvas, Vector2(24.5, 24.5), false)
+	for attempt: int in range(40):
+		if canvas.session == null:
+			break
+		await frames(1)
+	verify(masked_doc.revision == start_revision + 1 and
+		masked_doc.read_pixel(masked_layer, 7, 7).value != 0 and
+		masked_doc.read_pixel(masked_layer, 14, 14).value == 0,
+		"unchanged selection permits a full real-pointer stroke, excluding its hole")
+	verify(masked_doc.undo().ok and masked_doc.read_pixel(masked_layer, 7, 7).value == 0,
+		"valid masked pointer stroke remains one Undo step")
+
 	# Three independent long input bursts at each requested zoom. The oracle
 	# and history checks are repeated; figures are software-frame diagnostics.
 	for test_zoom: float in [1.0, 0.5, 0.25]:

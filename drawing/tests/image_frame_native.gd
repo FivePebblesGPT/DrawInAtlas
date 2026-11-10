@@ -223,6 +223,85 @@ func run() -> void:
 		"native delivered click commits to configured snapped grid intersection")
 	check(doc.undo().ok and int(doc.read_pixel(layer, 9, 5).value) == 0,
 		"snapped pointer paints one normal reversible edit")
+
+	# Grid/snap controls may change from toolbar or an embedded host while
+	# a real pointer stream is held. Never commit a mixture of two mappings.
+	canvas.show_grid = false
+	canvas.brush_width = 1.0
+	canvas.color_rgba = 0xff33dd66
+	for setting: String in ["snap_to_grid", "grid_spacing", "grid_origin"]:
+		canvas.snap_to_grid = true
+		canvas.grid_spacing = 12
+		canvas.grid_origin = Vector2i(-3, 5)
+		canvas.queue_redraw()
+		await frames()
+		var probe: Vector2 = Vector2(26.3, 24.1)
+		var snap_pixel: Vector2i = canvas.position_to_pixel(canvas.pixel_to_position(probe))
+		var baseline: Color = at(canvas, canvas.pixel_to_position(Vector2(snap_pixel) + Vector2(0.5, 0.5)))
+		var previous_revision: int = doc.revision
+		var old_accumulation: bool = Input.use_accumulated_input
+		pointer(canvas, probe, true)
+		await frames(3)
+		check(canvas.session != null and canvas.dragging and
+			canvas.session.change_count() > 0 and doc.revision == previous_revision,
+			"held Brush has a detached preview before changing %s" % setting)
+		match setting:
+			"snap_to_grid":
+				canvas.snap_to_grid = false
+			"grid_spacing":
+				canvas.grid_spacing = 16
+			"grid_origin":
+				canvas.grid_origin = Vector2i(4, 5)
+		await frames(3)
+		check(canvas.session == null and not canvas.dragging and
+			doc.revision == previous_revision and Input.use_accumulated_input == old_accumulation,
+			"changing effective %s cancels queued preview and restores input" % setting)
+		check(distance(at(canvas, canvas.pixel_to_position(Vector2(snap_pixel) + Vector2(0.5, 0.5))),
+			baseline) < 0.025 and int(doc.read_pixel(layer, snap_pixel.x, snap_pixel.y).value) == 0,
+			"cancelled %s leaves no ghost pixel in the framebuffer or document" % setting)
+		pointer(canvas, probe, false)
+		await frames(4)
+		check(doc.revision == previous_revision and canvas.session == null,
+			"stale release after %s cannot publish an Undo step" % setting)
+
+	# Changing a purely visual grid guide or reassigning identical snap
+	# settings must not abort a legitimate held stroke.
+	canvas.snap_to_grid = true
+	canvas.grid_spacing = 12
+	canvas.grid_origin = Vector2i(-3, 5)
+	pointer(canvas, Vector2(26.3, 24.1), true)
+	await frames(2)
+	canvas.show_grid = true
+	canvas.snap_to_grid = true
+	canvas.grid_spacing = 12
+	canvas.grid_origin = Vector2i(-3, 5)
+	check(canvas.session != null and canvas.dragging,
+		"guide visibility and equivalent snap settings retain pending Brush")
+	pointer(canvas, Vector2(26.3, 24.1), false)
+	await frames(5)
+	check(canvas.session == null and int(doc.read_pixel(layer, 21, 29).value) != 0,
+		"unchanged grid mapping commits a normal snapped Brush")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 21, 29).value) == 0,
+		"unchanged grid mapping preserves one-step Undo")
+
+	# Spacing/origin and both visual grids are irrelevant to an unsnapped
+	# stroke. Changing these must not interrupt the actual pointer capture.
+	canvas.snap_to_grid = false
+	pointer(canvas, Vector2(40.2, 20.3), true)
+	await frames(2)
+	canvas.grid_spacing = 20
+	canvas.grid_origin = Vector2i(7, -4)
+	canvas.show_grid = false
+	canvas.show_pixel_grid = false
+	check(canvas.session != null and canvas.dragging,
+		"grid guides and inactive snap configuration do not cancel raw Brush")
+	pointer(canvas, Vector2(40.2, 20.3), false)
+	await frames(5)
+	check(canvas.session == null and int(doc.read_pixel(layer, 40, 20).value) != 0,
+		"raw Brush commits unchanged coordinates after inactive grid adjustments")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 40, 20).value) == 0,
+		"unsnapped grid adjustments preserve one-step Undo")
+	canvas.show_pixel_grid = true
 	# Standalone authoring refuses an outside-image mousedown and clips the
 	# complete wide stroke footprint at the signed frame, not only its center.
 	check(not canvas.clip_strokes_to_image_frame,
@@ -282,6 +361,65 @@ func run() -> void:
 	check(canvas.session == null and doc.revision == before_frame_resize,
 		"image-frame changes cancel a captured brush before any old-frame commit")
 	pointer(canvas, Vector2(0.5, 0.5), false)
+	# Changing the host's clip authorization while an actual pointer is held
+	# must discard the whole transaction, including its detached preview.
+	canvas.clip_strokes_to_image_frame = false
+	var policy_revision: int = doc.revision
+	pointer(canvas, Vector2(16.5, 1.5), true)
+	await frames(2)
+	check(canvas.session != null and canvas.dragging and
+		int(doc.read_pixel(layer, 16, 1).value) == 0,
+		"unbounded outside-frame Brush has a detached held-pointer preview")
+	canvas.clip_strokes_to_image_frame = true
+	check(canvas.session == null and not canvas.dragging and
+		canvas._move_capture == null and not canvas._owns_accumulated_input,
+		"enabling clipping cancels the held unbounded stroke and releases input")
+	pointer(canvas, Vector2(16.5, 1.5), false)
+	await frames(3)
+	check(doc.revision == policy_revision and int(doc.read_pixel(layer, 16, 1).value) == 0,
+		"outside-frame old-policy release cannot commit after clipping enabled")
+	pointer(canvas, Vector2(0.5, -5.5), true)
+	await frames(2)
+	check(canvas.session != null and canvas.dragging,
+		"frame-clipped Brush is held before clipping is disabled")
+	canvas.clip_strokes_to_image_frame = false
+	check(canvas.session == null and not canvas.dragging and not canvas._owns_accumulated_input,
+		"disabling clipping cancels the held frame-clipped stroke")
+	pointer(canvas, Vector2(0.5, -5.5), false)
+	await frames(3)
+	check(doc.revision == policy_revision and int(doc.read_pixel(layer, 0, -6).value) == 0,
+		"clipped old-policy release cannot commit after clipping disabled")
+	pointer(canvas, Vector2(16.5, 1.5), true)
+	await frames(2)
+	canvas.clip_strokes_to_image_frame = false
+	check(canvas.session != null and canvas.dragging,
+		"same-value clipping assignment preserves a held stroke")
+	pointer(canvas, Vector2(16.5, 1.5), false)
+	await frames(6)
+	check(doc.revision == policy_revision + 1 and
+		int(doc.read_pixel(layer, 16, 1).value) != 0,
+		"normal unbounded Brush after policy change publishes once")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 16, 1).value) == 0,
+		"normal unbounded Brush after policy change remains undoable")
+	# Eraser uses the same queued edit contract: reauthorizing its clip
+	# cannot silently clear already published pixels on mouse-up.
+	var eraser_original: int = int(doc.read_pixel(layer, 5, 0).value)
+	check(eraser_original != 0, "existing opaque pixel is available for held Eraser")
+	var eraser_revision: int = doc.revision
+	canvas.tool = "Eraser"
+	pointer(canvas, Vector2(5.5, 0.5), true)
+	await frames(2)
+	check(canvas.session != null and canvas.dragging,
+		"Eraser holds a detached clearing preview before clipping changes")
+	canvas.clip_strokes_to_image_frame = true
+	check(canvas.session == null and not canvas.dragging and not canvas._owns_accumulated_input,
+		"enabling clipping cancels a held Eraser and releases input")
+	pointer(canvas, Vector2(5.5, 0.5), false)
+	await frames(3)
+	check(doc.revision == eraser_revision and
+		int(doc.read_pixel(layer, 5, 0).value) == eraser_original,
+		"Eraser stale mouse-up preserves original pixel and history")
+	canvas.tool = "Brush"
 	canvas.clip_strokes_to_image_frame = false
 	pointer(canvas, Vector2(9.5, 0.5), true)
 	pointer(canvas, Vector2(9.5, 0.5), false)
@@ -290,6 +428,66 @@ func run() -> void:
 		"embedded/Atlas opt-out can paint outside a visible image guide")
 	check(doc.undo().ok and doc.read_pixel(layer, 9, 0).value == 0,
 		"unbounded host paint can be independently undone")
+	# A host can reposition the source camera while the actual mouse button is
+	# still held. Pending geometry was calculated with the old mapping: never
+	# splice later samples into that transaction or retain its old preview.
+	canvas.tool = "Brush"
+	canvas.brush_width = 2.0
+	canvas.snap_to_grid = false
+	canvas.show_grid = false
+	canvas.camera = Vector2.ZERO
+	canvas.zoom = 2.0
+	canvas.queue_redraw()
+	await frames(3)
+	var pan_probe: Vector2 = Vector2(25.5, 17.5)
+	var old_frame: Color = at(canvas, canvas.pixel_to_position(pan_probe))
+	var pan_revision: int = doc.revision
+	var prior_accumulation: bool = Input.use_accumulated_input
+	pointer(canvas, pan_probe, true)
+	await frames(3)
+	check(canvas.session != null and canvas.dragging and
+		int(doc.read_pixel(layer, 25, 17).value) == 0,
+		"real held Brush stages preview without committed source changes")
+	check(distance(at(canvas, canvas.pixel_to_position(pan_probe)), old_frame) > 0.04,
+		"real held Brush has a visible framebuffer preview before camera pan")
+	canvas.camera = Vector2(12, -8)
+	await frames(3)
+	check(canvas.session == null and not canvas.dragging and
+		Input.use_accumulated_input == prior_accumulation,
+		"host camera change cancels held Brush and restores input state")
+	stroke_motion(canvas, Vector2(27.5, 20.5))
+	pointer(canvas, Vector2(27.5, 20.5), false)
+	await frames(5)
+	check(doc.revision == pan_revision and
+		int(doc.read_pixel(layer, 25, 17).value) == 0 and
+		int(doc.read_pixel(layer, 27, 20).value) == 0,
+		"stale mouse motion/release cannot publish original or panned stroke")
+	var same_probe: Vector2 = Vector2(31.5, 23.5)
+	pointer(canvas, same_probe, true)
+	await frames(2)
+	canvas.camera = Vector2(12, -8)
+	check(canvas.session != null and canvas.dragging,
+		"equivalent camera write preserves native held stroke")
+	pointer(canvas, same_probe, false)
+	await frames(5)
+	check(doc.revision == pan_revision + 1 and
+		int(doc.read_pixel(layer, 31, 23).value) != 0,
+		"normal Brush after pan commits one history edit")
+	check(doc.undo().ok and int(doc.read_pixel(layer, 31, 23).value) == 0,
+		"normal post-pan Brush remains undoable")
+	canvas.tool = "Select"
+	canvas.clear_selection()
+	pointer(canvas, Vector2(18, 18), true)
+	stroke_motion(canvas, Vector2(26, 26))
+	await frames(2)
+	check(canvas.dragging and canvas.selecting and canvas._marquee.has_area(),
+		"native marquee is pending before a host camera pan")
+	canvas.camera = Vector2(0, 0)
+	pointer(canvas, Vector2(26, 26), false)
+	await frames(3)
+	check(not canvas.dragging and not canvas.selecting and
+		not canvas.selection_mask.enabled and doc.revision == pan_revision + 2,
+		"camera pan cancels marquee with no selection publication")
 	canvas.clip_strokes_to_image_frame = true
 	canvas.image_bounds = Rect2i(-80, -60, 160, 120)
 	canvas.zoom = 1.0

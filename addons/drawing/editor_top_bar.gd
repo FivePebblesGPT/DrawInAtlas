@@ -12,6 +12,8 @@ var more_menu: MenuButton
 var _menus: Array[MenuButton] = []
 var _entries: Array[Dictionary] = []
 var _more_actions: Array[Callable] = []
+# Map original menu/item coordinates to the corresponding More popup item.
+var _more_item_ids: Dictionary = {}
 var _unused_options: Control
 var active_options: String = ""
 const OPTION_STEP: int = 96
@@ -99,13 +101,21 @@ func add_menu_spec(title: String, labels: Array, handlers: Array) -> void:
 
 
 func set_menu_checked(menu_name: String, index: int, enabled: bool) -> void:
-	for menu: MenuButton in _menus:
-		if menu.text == menu_name:
-			var popup: PopupMenu = menu.get_popup()
-			if index >= 0 and index < popup.item_count:
-				popup.set_item_as_checkable(index, true)
-				popup.set_item_checked(index, enabled)
-			return
+	for menu_index: int in range(_menus.size()):
+		if _menus[menu_index].text != menu_name:
+			continue
+		var popup: PopupMenu = _menus[menu_index].get_popup()
+		if index >= 0 and index < popup.item_count:
+			popup.set_item_as_checkable(index, true)
+			popup.set_item_checked(index, enabled)
+			# The visible command can live in the overflow popup. Keep its
+			# checkmark up to date without rebuilding an open native popup.
+			var more_id: int = int(_more_item_ids.get(Vector2i(menu_index, index), -1))
+			if more_id >= 0:
+				var more_popup: PopupMenu = more_menu.get_popup()
+				more_popup.set_item_as_checkable(more_id, true)
+				more_popup.set_item_checked(more_id, enabled)
+		return
 
 
 func set_tool_controls(tool_name: String, controls: Array[Control]) -> void:
@@ -173,6 +183,7 @@ func _refresh_layout() -> void:
 	var more: PopupMenu = more_menu.get_popup()
 	more.clear()
 	_more_actions.clear()
+	_more_item_ids.clear()
 	for index: int in range(_menus.size()):
 		_menus[index].visible = index < visible_count
 		if index < visible_count:
@@ -180,9 +191,18 @@ func _refresh_layout() -> void:
 		var spec: Dictionary = _entries[index]
 		var labels: Array = spec["labels"]
 		var handlers: Array = spec["handlers"]
+		var original: PopupMenu = _menus[index].get_popup()
 		for command: int in range(labels.size()):
-			more.add_item("%s › %s" % [spec["title"], labels[command]], _more_actions.size())
+			var item_id: int = _more_actions.size()
+			more.add_item("%s › %s" % [spec["title"], labels[command]], item_id)
 			_more_actions.append(handlers[command])
+			_more_item_ids[Vector2i(index, command)] = item_id
+			# A narrow window must not lose the state of View/Window toggles.
+			# Consult the real PopupMenu so a later resize preserves updates.
+			if original.is_item_checkable(command):
+				more.set_item_as_checkable(item_id, true)
+				more.set_item_checked(item_id, original.is_item_checked(command))
+			more.set_item_disabled(item_id, original.is_item_disabled(command))
 	more_menu.visible = not _more_actions.is_empty()
 	call_deferred("_refresh_scroll_state")
 

@@ -66,6 +66,34 @@ def stage(destination: Path, in_place: bool = False) -> Path:
         if source.is_symlink():
             raise ValueError("Drawing icons must not be symbolic links")
         shutil.copy2(source, icon_destination / source.name)
+    # Preset text is deliberately small and platform-neutral. Its upstream
+    # attribution must accompany every separately staged Drawing application.
+    brushes = PACKAGE / "brushes"
+    if brushes.exists():
+        if brushes.is_symlink() or not brushes.is_dir():
+            raise ValueError("Invalid bundled brush directory")
+        brush_destination = staged / "brushes"
+        brush_destination.mkdir(exist_ok=True)
+        for source in brushes.iterdir():
+            if source.is_symlink():
+                raise ValueError("Bundled brushes cannot be symbolic links")
+            if source.is_file() and source.suffix in {".myb", ".dep5", ".md"}:
+                shutil.copy2(source, brush_destination / source.name)
+
+    # The optional GDExtension is only registered when its Linux binary was
+    # actually built. Never ship a manifest with a broken missing-library path.
+    native = PACKAGE / "native"
+    manifest = native / "drawing_brush.gdextension"
+    binary = native / "bin" / "libdrawing_brush.so"
+    if native.is_symlink() or manifest.is_symlink() or binary.is_symlink():
+        raise ValueError("Native extension paths cannot be symbolic links")
+    if manifest.exists() != binary.exists():
+        raise ValueError("Native extension manifest and library must be staged together")
+    if manifest.exists():
+        native_destination = staged / "native"
+        (native_destination / "bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(manifest, native_destination / manifest.name)
+        shutil.copy2(binary, native_destination / "bin" / binary.name)
     return output
 
 

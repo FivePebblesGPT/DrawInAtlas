@@ -190,6 +190,136 @@ func run() -> void:
 			"zoom %s batched queue exactly matches full source path bytes" % zoom_value)
 		check(queued_doc.undo().ok and queued_doc.read_pixel(queued_layer, 59, 23).value == 0,
 			"zoom %s one Undo reverses completed long queue" % zoom_value)
+	# Selection is an edit-authorization boundary. A long queued stroke must
+	# never combine source pixels from two masks if a host/shortcut changes it.
+	queued_canvas.zoom = 1.0
+	queued_canvas.brush_width = 1.0
+	queued_canvas.tool = "Brush"
+	var guarded: DrawingDocument = DrawingDocument.new("t085-selection-authorization")
+	var guarded_layer: String = String(guarded.create_layer(DrawingLayerNode.RASTER, "Masked", "root").value)
+	queued_canvas.document = guarded
+	queued_canvas.layer_id = guarded_layer
+	var original_mask: DrawingSelection = DrawingSelection.new()
+	original_mask.set_rectangle(Rect2i(3, 3, 24, 24))
+	check(original_mask.combine_rectangle(Rect2i(10, 10, 6, 6), "Subtract"),
+		"mask with a hole assembled for queued stroke")
+	queued_canvas.set_selection_mask(original_mask)
+	var original_revision: int = guarded.revision
+	var old_global_accumulation: bool = Input.use_accumulated_input
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	for i: int in range(120):
+		queued_canvas.paint_to(Vector2i(6 + (i % 18), 7 + (i % 16)))
+	check(queued_canvas.session != null and queued_canvas.session.change_count() > 0 and
+		int(queued_canvas._metrics["samples_received"]) == 121,
+		"complex-mask Brush has a staged dab and a long pending sample backlog")
+	var same_mask: DrawingSelection = original_mask.detached_copy()
+	queued_canvas.set_selection_mask(same_mask)
+	check(queued_canvas.session != null and queued_canvas.dragging,
+		"republishing equivalent island/hole selection does not cancel live Brush")
+	var changed_mask: DrawingSelection = DrawingSelection.new()
+	changed_mask.set_rectangle(Rect2i(20, 20, 18, 18))
+	queued_canvas.set_selection_mask(changed_mask)
+	queued_canvas.finish_gesture(queued_canvas.pixel_to_position(Vector2(25.5, 25.5)))
+	queued_canvas._process(0.0)
+	check(queued_canvas.session == null and not queued_canvas.dragging and
+		queued_canvas._samples.is_empty() and guarded.revision == original_revision and
+		guarded.history_length() == 0 and Input.use_accumulated_input == old_global_accumulation,
+		"changed selection cancels queued stroke, restores input, and publishes no history")
+	check(guarded.read_pixel(guarded_layer, 5, 5).value == 0 and
+		guarded.read_pixel(guarded_layer, 25, 25).value == 0 and
+		queued_canvas.selection_mask.same_as(changed_mask),
+		"neither old nor new selection leaks content after cancellation")
+
+	# The public legacy selected rectangle setter must obey the same guard,
+	# even if it replaces a nonrectangular expression with equal outer bounds.
+	queued_canvas.set_selection_mask(original_mask)
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	queued_canvas.selected = original_mask.bounds
+	check(queued_canvas.session == null and guarded.revision == original_revision and
+		queued_canvas.selection_mask._operations.is_empty(),
+		"collapsing a hole into an equal-bounds rectangle cancels the Brush")
+
+	# Direct mutation is unsupported as an API, but the final publication
+	# guard still fails closed instead of applying a mixed authorization region.
+	queued_canvas.set_selection_mask(original_mask)
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	queued_canvas.paint_to(Vector2i(24, 24))
+	queued_canvas.selection_mask.set_rectangle(Rect2i(21, 21, 4, 4))
+	queued_canvas.finish_gesture(queued_canvas.pixel_to_position(Vector2(24.5, 24.5)))
+	check(queued_canvas.session == null and guarded.revision == original_revision and
+		guarded.history_length() == 0 and guarded.read_pixel(guarded_layer, 5, 5).value == 0,
+		"direct in-place mask mutation cannot publish already-staged pixels")
+
+	# An unchanged complex mask must still finish and paint only its actual
+	# allowed pixels, not the conservative rectangular bounds.
+	queued_canvas.set_selection_mask(original_mask)
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	queued_canvas.paint_to(Vector2i(12, 12))
+	queued_canvas.paint_to(Vector2i(20, 20))
+	queued_canvas.finish_gesture(queued_canvas.pixel_to_position(Vector2(24.5, 24.5)))
+	for drain: int in range(50):
+		if queued_canvas.session == null:
+			break
+		queued_canvas._drain_segments(queued_canvas.MAX_SEGMENTS_PER_FRAME)
+	check(guarded.revision == original_revision + 1 and guarded.history_length() == 1 and
+		guarded.read_pixel(guarded_layer, 5, 5).value != 0 and
+		guarded.read_pixel(guarded_layer, 12, 12).value == 0 and
+		guarded.read_pixel(guarded_layer, 24, 24).value != 0,
+		"unchanged hole mask commits in one history step with precise clipping")
+	check(guarded.undo().ok and guarded.read_pixel(guarded_layer, 5, 5).value == 0 and
+		guarded.read_pixel(guarded_layer, 24, 24).value == 0,
+		"one Undo reverses every allowed pixel after a complex-mask stroke")
+
+	# A selection change during Eraser also leaves the original source intact.
+	var erase_setup: DrawingEditSession = guarded.begin_edit(guarded_layer, guarded.revision).value
+	check(erase_setup.paint_path(PackedVector2Array([Vector2(5.5, 5.5)]), 0xff0044ff, 1.0).ok and
+		erase_setup.commit().ok, "prepare committed source for guarded Eraser")
+	var erase_revision: int = guarded.revision
+	queued_canvas.tool = "Eraser"
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	check(queued_canvas.session != null and queued_canvas.session.change_count() > 0,
+		"masked Eraser stages real source deletion")
+	queued_canvas.clear_selection()
+	queued_canvas.finish_gesture(queued_canvas.pixel_to_position(Vector2(8.5, 8.5)))
+	check(guarded.revision == erase_revision and guarded.read_pixel(guarded_layer, 5, 5).value == 0xff0044ff and
+		queued_canvas.session == null and not queued_canvas.selection_mask.enabled,
+		"unselecting mid-Eraser cancels draft and preserves source and revision")
+	queued_canvas.tool = "Brush"
+
+	# Atlas can enable an empty selection as a deny-all edit boundary;
+	# clearing it while a Brush is active must not promote queued pixels to
+	# unrestricted paint. An inverted mask must also preserve that polarity.
+	var empty_mask: DrawingSelection = DrawingSelection.new(Rect2i(), true)
+	queued_canvas.set_selection_mask(empty_mask)
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	queued_canvas.paint_to(Vector2i(10, 10))
+	check(queued_canvas.session != null and queued_canvas.session.change_count() == 0 and
+		queued_canvas._stroke_selection.enabled and not queued_canvas._stroke_selection.allows(Vector2i(5, 5)),
+		"enabled-empty selection remains deny-all inside queued Brush")
+	queued_canvas.clear_selection()
+	queued_canvas.finish_gesture(queued_canvas.pixel_to_position(Vector2(10.5, 10.5)))
+	check(queued_canvas.session == null and guarded.history_length() == 1 and
+		guarded.read_pixel(guarded_layer, 10, 10).value == 0,
+		"clearing enabled-empty selection cannot publish previously forbidden pixels")
+	var inverted_mask: DrawingSelection = DrawingSelection.new()
+	inverted_mask.set_rectangle(Rect2i(11, 11, 4, 4))
+	inverted_mask.inverted = true
+	queued_canvas.set_selection_mask(inverted_mask)
+	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(6.5, 6.5)))
+	queued_canvas.paint_to(Vector2i(12, 12))
+	queued_canvas.finish_gesture(queued_canvas.pixel_to_position(Vector2(18.5, 18.5)))
+	for drain: int in range(50):
+		if queued_canvas.session == null:
+			break
+		queued_canvas._drain_segments(queued_canvas.MAX_SEGMENTS_PER_FRAME)
+	check(guarded.read_pixel(guarded_layer, 6, 6).value != 0 and
+		guarded.read_pixel(guarded_layer, 12, 12).value == 0 and
+		guarded.read_pixel(guarded_layer, 18, 18).value != 0,
+		"inverted selection permits only outside pixels throughout queued path")
+	check(guarded.undo().ok and guarded.read_pixel(guarded_layer, 6, 6).value == 0,
+		"inverted mask's permitted region remains one Undo operation")
+	queued_canvas.set_selection_mask(null)
+
 	# A queued press interrupted before draining must leave no ghost pixels,
 	# history, or captured process-wide input configuration behind.
 	var abandoned: DrawingDocument = DrawingDocument.new("t085-abandon")

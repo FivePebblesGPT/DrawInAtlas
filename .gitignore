@@ -82,3 +82,9 @@ __pycache__/
 /addons/drawing/fonts/*.ttf.import
 
 .opencode/
+
+# Optional compiled Drawing native engine; generate with tools/build_native_brush.sh.
+/native/drawing_brush/target/
+/native/drawing_brush/.cargo/
+/addons/drawing/native/
+/drawing/addons/drawing/native/

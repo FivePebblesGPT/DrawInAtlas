@@ -7,7 +7,8 @@ const MAX_BYTES: int = DrawingAssetBrowserIndex.MAX_OBJECT_BYTES
 
 
 static func import_file(index: DrawingAssetBrowserIndex, source_path: String) -> DrawingResult:
-	if index == null or index.root_path.is_empty() or not index.warnings.is_empty():
+	if index == null or index.root_path.is_empty() or not index.warnings.is_empty() or \
+			not DrawingAssetBrowserIndex.path_has_no_links(index.root_path):
 		return DrawingResult.failure("INDEX", "Refresh and resolve Object source warnings before Import")
 	if index.entries.size() >= DrawingAssetBrowserIndex.MAX_ASSETS:
 		return DrawingResult.failure("LIMIT", "Object source folder is full")
@@ -63,13 +64,12 @@ static func _safe_source_file(path: String) -> bool:
 	if not path.is_absolute_path() or not path.ends_with(".drawing") or \
 			path != path.simplify_path():
 		return false
-	var parent: DirAccess = DirAccess.open(path.get_base_dir())
-	return parent != null and not parent.is_link(path.get_file()) and FileAccess.file_exists(path)
+	return DrawingAssetBrowserIndex.path_has_no_links(path) and FileAccess.file_exists(path)
 
 
 static func _copy_to_new_file(source: String, target: String) -> DrawingResult:
-	if not _safe_source_file(source) or not target.is_absolute_path() or \
-			target != target.simplify_path() or not target.ends_with(".drawing"):
+	if not _safe_source_file(source) or not DrawingAssetBrowserIndex.path_has_no_links(target) or \
+			not target.ends_with(".drawing"):
 		return DrawingResult.failure("FILE_PATH", "Unsafe Object source or destination")
 	var target_directory: DirAccess = DirAccess.open(target.get_base_dir())
 	if target_directory == null or target_directory.is_link(target.get_file()) or \
@@ -93,6 +93,7 @@ static func _copy_to_new_file(source: String, target: String) -> DrawingResult:
 	writer.close()
 	if status != OK or FileAccess.get_sha256(staged) != before or \
 			FileAccess.get_sha256(source) != before or \
+			not DrawingAssetBrowserIndex.path_has_no_links(target) or \
 			FileAccess.file_exists(target) or target_directory.is_link(target.get_file()):
 		DirAccess.remove_absolute(staged)
 		return DrawingResult.failure("STALE_SOURCE", "Destination/source changed during staging")

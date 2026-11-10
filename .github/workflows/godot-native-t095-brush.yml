@@ -1,0 +1,174 @@
+name: Godot T-095 60px Brush profile and independent oracle (on demand, software only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  brush-profile-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 2
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta2
+          use-dotnet: false
+      - name: Install software-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Stage and import from canonical Drawing source
+        run: |
+          set -euo pipefail
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Exact 60px Brush/Eraser source oracle and transaction rollback
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/t095-oracle.log
+          python3 tools/check_godot_model_log.py /tmp/t095-oracle.log --marker T095_ORACLE_PASSED
+      - name: T-095 internal Brush success-result ownership and history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_brush_result_reuse_smoke.gd 2>&1 | tee /tmp/t095-brush-result.log
+          python3 tools/check_godot_model_log.py /tmp/t095-brush-result.log --marker T095_BRUSH_RESULT_PASSED
+      - name: T-095 original oblique Geometry2D Brush/Eraser parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_oblique_geometry_smoke.gd 2>&1 | tee /tmp/t095-oblique.log
+          python3 tools/check_godot_model_log.py /tmp/t095-oblique.log --marker T095_OBLIQUE_GEOMETRY_PASSED
+      - name: T-095 sustained input queue compaction and full-path parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_input_queue_compaction_smoke.gd 2>&1 | tee /tmp/t095-queue-compaction.log
+          python3 tools/check_godot_model_log.py /tmp/t095-queue-compaction.log --marker T095_QUEUE_COMPACTION_PASSED
+      - name: T-095 bounded sample-age metrics and long Brush parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_latency_window_smoke.gd 2>&1 | tee /tmp/t095-latency-window.log
+          python3 tools/check_godot_model_log.py /tmp/t095-latency-window.log --marker T095_LATENCY_WINDOW_PASSED
+      - name: T-095 bounded latest stage-batch timing and Brush history parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_stage_batch_window_smoke.gd 2>&1 | tee /tmp/t095-stage-batch-window.log
+          python3 tools/check_godot_model_log.py /tmp/t095-stage-batch-window.log --marker T095_STAGE_BATCH_WINDOW_PASSED
+      - name: T-095 signed Legacy tile/source lookup and history parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_stage_tile_lookup_smoke.gd 2>&1 | tee /tmp/t095-stage-lookup.log
+          python3 tools/check_godot_model_log.py /tmp/t095-stage-lookup.log --marker T095_STAGE_LOOKUP_PASSED
+      - name: T-095 original source-over RGBA8 blend parity (all alpha pairs)
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/brush_blend_math_smoke.gd 2>&1 | tee /tmp/t095-blend.log
+          python3 tools/check_godot_model_log.py /tmp/t095-blend.log --marker T095_BLEND_PASSED
+      - name: Hokusai batch-delta source/preview parity (native binary not required)
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/t095-hokusai-delta.log
+          python3 tools/check_godot_model_log.py /tmp/t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED
+      - name: T-095 signed native tile arithmetic and original-pixel parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_tile_shift_smoke.gd 2>&1 | tee /tmp/t095-tile-shift.log
+          python3 tools/check_godot_model_log.py /tmp/t095-tile-shift.log --marker T095_TILE_SHIFT_PASSED
+      - name: T-095 Legacy Brush-only tile-commit and history parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_legacy_tile_commit_smoke.gd 2>&1 | tee /tmp/t095-legacy-tile-commit.log
+          python3 tools/check_godot_model_log.py /tmp/t095-legacy-tile-commit.log --marker T095_LEGACY_TILE_COMMIT_PASSED
+      - name: T-095 deferred Legacy Brush tile-local staging and mixed-edit parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_brush_deferred_staging_smoke.gd 2>&1 | tee /tmp/t095-brush-deferred.log
+          python3 tools/check_godot_model_log.py /tmp/t095-brush-deferred.log --marker T095_BRUSH_DEFERRED_PASSED
+      - name: T-095 failed mixed edit preserves deferred Brush and retry history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_mixed_edit_rollback_smoke.gd 2>&1 | tee /tmp/t095-mixed-rollback.log
+          python3 tools/check_godot_model_log.py /tmp/t095-mixed-rollback.log --marker T095_MIXED_ROLLBACK_PASSED
+      - name: T-095 native tile-commit and history parity (native binary not required)
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_tile_commit_smoke.gd 2>&1 | tee /tmp/t095-tile-commit.log
+          python3 tools/check_godot_model_log.py /tmp/t095-tile-commit.log --marker T095_TILE_COMMIT_PASSED
+      - name: T-095 independent sparse detached-preview compositor oracle
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_sparse_preview_smoke.gd 2>&1 | tee /tmp/t095-sparse-preview.log
+          python3 tools/check_godot_model_log.py /tmp/t095-sparse-preview.log --marker T095_SPARSE_PREVIEW_PASSED
+      # Opt-in native checks are separate from the required fast GDScript CI.
+      # Build at the pinned Rust crate versions; do not commit this binary.
+      - name: Select Rust for optional NativeHard GDExtension
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build and preimport optional native brush
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path native/drawing_brush/Cargo.toml --locked --release
+          mkdir -p addons/drawing/native/bin
+          cp native/drawing_brush/target/release/libdrawing_brush.so \
+            addons/drawing/native/bin/libdrawing_brush.so
+          cp native/drawing_brush/drawing_brush.gdextension.template \
+            addons/drawing/native/drawing_brush.gdextension
+          python3 tools/build_drawing_app.py --in-place
+          # Pin the extension in Godot's initial registry before editor import;
+          # registering after cold editor startup is unsafe on the beta runtime.
+          mkdir -p drawing/.godot
+          printf 'res://addons/drawing/native/drawing_brush.gdextension\n' \
+            > drawing/.godot/extension_list.cfg
+          timeout --signal=TERM --kill-after=5s 240s \
+            godot --headless --editor --path drawing --import --quit
+      - name: T-095 NativeHard whole-batch preflight and retry atomicity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/t095_native_hard_atomic.gd \
+            2>&1 | tee /tmp/t095-native-hard-atomic.log
+          python3 tools/check_godot_model_log.py /tmp/t095-native-hard-atomic.log \
+            --marker T095_NATIVE_HARD_ATOMIC_PASSED
+      - name: Real mouse routing and held-button software framebuffer profile
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s xvfb-run -a -s '-screen 0 1280x900x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/brush_latency_native.gd \
+            2>&1 | tee /tmp/t095-native.log
+          python3 tools/check_godot_model_log.py /tmp/t095-native.log --marker T095_NATIVE_PASSED
+      - name: Upload timing data (not owner GPU acceptance)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t095-independent-source-and-software-frames
+          path: |
+            /tmp/t095-oracle.log
+            /tmp/t095-brush-deferred.log
+            /tmp/t095-brush-result.log
+            /tmp/t095-oblique.log
+            /tmp/t095-stage-lookup.log
+            /tmp/t095-queue-compaction.log
+            /tmp/t095-latency-window.log
+            /tmp/t095-stage-batch-window.log
+            /tmp/t095-hokusai-delta.log
+            /tmp/t095-tile-shift.log
+            /tmp/t095-tile-commit.log
+            /tmp/t095-legacy-tile-commit.log
+            /tmp/t095-sparse-preview.log
+            /tmp/t095-blend.log
+            /tmp/t095-native-hard-atomic.log
+            /tmp/t095-native.log
+          if-no-files-found: warn

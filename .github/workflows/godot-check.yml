@@ -71,6 +71,14 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/live_stroke_smoke.gd 2>&1 | tee /tmp/godot-t085-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t085-model.log --marker T085_MODEL_PASSED || ci_fail_marker 'T085 live-stroke model log rejected'
+          # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
+          # its pointer/framebuffer timing witness stays opt-in and software-only.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t095-oracle.log --marker T095_ORACLE_PASSED || ci_fail_marker 'T095 Brush/Eraser independent pixel oracle rejected'
+          # T-095 Hokusai batch delta staging must match the original pixel
+          # transaction path even when no optional Rust binary is installed.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/godot-t095-hokusai-delta.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED || ci_fail_marker 'T095 Hokusai bulk delta model log rejected'
           ci_finish
       - name: Verify T-086 source-space dirty-display tile invalidation
         id: ci_t086_viewport_cache_model
@@ -87,6 +95,8 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-focus.log --marker T086_FOCUS_PASSED || ci_fail_marker 'T086 dense viewport retention priority witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cold-model.log --marker T086_COLD_PASSED || ci_fail_marker 'T086 cold renderer parity witness error'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_pixel_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-pixels.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-sparse-pixels.log --marker T086_SPARSE_PIXEL_PASSED || ci_fail_marker 'T086 sparse source-pixel oracle rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_visible_plan_smoke.gd 2>&1 | tee /tmp/godot-t086-visible-plan.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-visible-plan.log --marker T086_PLAN_PASSED || ci_fail_marker 'T086 visible-layer plan parity witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_shared_chunks_smoke.gd 2>&1 | tee /tmp/godot-t086-shared-chunks.log
@@ -120,6 +130,16 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd 2>&1 | tee /tmp/godot-t088-selection-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-selection-model.log --marker T088_MODEL_PASSED || ci_fail_marker 'T088_MODEL_PASSED log rejected'
+          # T-088 sparse transparent Paste must match a separate dense source oracle.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_paste_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-paste.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-paste.log --marker T088_SPARSE_PASTE_PASSED || ci_fail_marker 'T088 sparse paste source oracle rejected'
+          # T-088 capture must skip empty source tiles and preserve lazy-source failures.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_capture_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-capture.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-capture.log --marker T088_SPARSE_CAPTURE_PASSED || ci_fail_marker 'T088 sparse capture source oracle rejected'
+          # T-096 exact large-mask contours/Move source oracle is mandatory;
+          # real pointer/display and owner acceptance remain separate.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t096-model.log --marker T096_MODEL_PASSED || ci_fail_marker 'T096 large selection and Move oracle rejected'
           ci_finish
       - name: Verify T-089 layer hierarchy, row actions, and structural history
         id: ci_t089_layer_structure_model
@@ -139,7 +159,13 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
+          source tools/ci_fail_late.sh
           python3 -m unittest discover -s tests -p 'test_t090_responsive_workspace.py' -v
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/topbar_overflow_smoke.gd 2>&1 | tee /tmp/godot-t090-overflow.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t090-overflow.log --marker T090_OVERFLOW_PASSED || ci_fail_marker 'T090 overflow checkmark and command parity rejected'
+          ci_finish
       - name: Verify T-091 one-group floating dock and legacy settings migration
         id: ci_t091_single_group_docking_model
         if: ${{ !cancelled() }}

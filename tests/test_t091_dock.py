@@ -27,7 +27,7 @@ class T091DockTests(unittest.TestCase):
                 self.assertIn(required, workflow)
 
     def test_log_recognizes_only_post_success_known_leaks(self) -> None:
-        base = "T091_NATIVE: 36 checks; 0 failed\nT091_NATIVE_PASSED"
+        base = "T091_NATIVE: 44 checks; 0 failed\nT091_NATIVE_PASSED"
         expected = base + "\nERROR: Texture with GL ID of 18: leaked 32 bytes."
         self.assertEqual(verify(expected), (True, [], 1))
         for invalid in (
@@ -35,9 +35,9 @@ class T091DockTests(unittest.TestCase):
             base + "\nSCRIPT ERROR: stack overflow",
             base + "\nERROR: compositor crashed",
             "ERROR: Texture with GL ID of 18: leaked 32 bytes.\n" + base,
-            "T091_NATIVE: 35 checks; 0 failed\nT091_NATIVE_PASSED",
-            "T091_NATIVE: 36 checks; 1 failed\nT091_NATIVE_PASSED",
-            "T091_NATIVE_PASSED\nT091_NATIVE: 36 checks; 0 failed",
+            "T091_NATIVE: 43 checks; 0 failed\nT091_NATIVE_PASSED",
+            "T091_NATIVE: 44 checks; 1 failed\nT091_NATIVE_PASSED",
+            "T091_NATIVE_PASSED\nT091_NATIVE: 44 checks; 0 failed",
             base + "\nT091_NATIVE_PASSED", ""):
             with self.subTest(invalid=invalid):
                 self.assertFalse(verify(invalid)[0])
