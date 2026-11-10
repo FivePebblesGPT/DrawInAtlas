@@ -26,6 +26,13 @@ var _covered_rows: Dictionary[int, Dictionary] = {}
 var _source_tiles: Dictionary[String, Variant] = {}
 ## Immutable session storage stride. -1 selects the general signed-divide path.
 var _stage_tile_shift: int = -1
+## Hard Brush pixels arrive in spatial runs. A stable per-session tile-key
+## cache avoids allocating the same "x,y" String for every covered pixel.
+## Cache the *tile indices*, not the pixel offsets, so signed/irregular
+## strides and transitions back to an earlier tile remain exact.
+var _brush_cached_tile_x: int = 0
+var _brush_cached_tile_y: int = 0
+var _brush_cached_tile_key: String = ""
 ## Detached preview indexed by storage tile + pixel offset; never stored on the document.
 var _preview_tiles: Dictionary[String, Dictionary] = {}
 ## Per-storage-tile monotonic content versions. A display tile only needs
@@ -435,18 +442,28 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 		if covered_row.has(global_x):
 			return _brush_stage_ok
 	var stride: int = document.tile_stride
-	var tile_key: String
 	var local_x: int
 	var local_y: int
+	var tile_x: int
+	var tile_y: int
 	if _stage_tile_shift >= 0:
-		tile_key = "%d,%d" % [global_x >> _stage_tile_shift,
-			global_y >> _stage_tile_shift]
+		tile_x = global_x >> _stage_tile_shift
+		tile_y = global_y >> _stage_tile_shift
 		local_x = global_x & (stride - 1)
 		local_y = global_y & (stride - 1)
 	else:
-		tile_key = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
 		local_x = posmod(global_x, stride)
 		local_y = posmod(global_y, stride)
+		# Dividing after subtracting the nonnegative local remainder avoids
+		# truncation toward zero on negative signed world coordinates.
+		tile_x = (global_x - local_x) / stride
+		tile_y = (global_y - local_y) / stride
+	if _brush_cached_tile_key.is_empty() or tile_x != _brush_cached_tile_x \
+			or tile_y != _brush_cached_tile_y:
+		_brush_cached_tile_key = "%d,%d" % [tile_x, tile_y]
+		_brush_cached_tile_x = tile_x
+		_brush_cached_tile_y = tile_y
+	var tile_key: String = _brush_cached_tile_key
 	var local_index: int = local_y * stride + local_x
 	# A preverified old pixel skips its individual source read, but the tile
 	# identity must still be captured for fail-closed publication.

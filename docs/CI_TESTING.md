@@ -69,6 +69,18 @@ gate. The selected local tests pass; hosted Actions was not run.
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 source-tile-key reuse oracle — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_brush_tile_key_cache_smoke.gd` and requires the strict
+`T095_BRUSH_TILE_KEY_CACHE_PASSED` marker, preserving the raw test log. The
+33,037-assertion source/history oracle covers signed >32-bit coordinates,
+eight power-of-two and irregular strides, transparent/partial-alpha source,
+Brush and Eraser, selection holes, tile revisits, exact preview/commit and
+Undo/Redo, plus source-load failure/retry. Local beta3 results pass; hosted
+CI is unverified. The required fast-CI 46-step matrix and owner device
+approval are unchanged.
+
 ## T-095 bounded latest stage-batch profiler witness — 2026-11-09
 
 The existing on-demand `godot-native-t095-brush.yml` runs the new

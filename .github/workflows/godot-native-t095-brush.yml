@@ -58,6 +58,14 @@ jobs:
           timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_stage_batch_window_smoke.gd 2>&1 | tee /tmp/t095-stage-batch-window.log
           python3 tools/check_godot_model_log.py /tmp/t095-stage-batch-window.log --marker T095_STAGE_BATCH_WINDOW_PASSED
+      - name: T-095 Brush tile-key reuse and signed source/history parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_brush_tile_key_cache_smoke.gd \
+            2>&1 | tee /tmp/t095-brush-tile-key-cache.log
+          python3 tools/check_godot_model_log.py /tmp/t095-brush-tile-key-cache.log \
+            --marker T095_BRUSH_TILE_KEY_CACHE_PASSED
       - name: T-095 signed Legacy tile/source lookup and history parity
         run: |
           set -euo pipefail

@@ -1792,6 +1792,17 @@ independent review gate remains unchanged.
 [Evidence](evidence/T-095-2026-11-09-tile-run-buffer.md) ·
 [ticket](Tickets/T-095.md).
 
+**T-095 per-session Brush tile-key reuse (2026-11-11; In Progress):**
+The Brush/Eraser tile-local staging path now reuses the previous signed tile
+key across adjacent source pixels, avoiding repeated string formatting, with
+an independent 33,037-check, eight-stride Brush/Eraser pixel/history/Undo
+oracle and source-read failure/retry. Two 60px/786% five-stroke Xvfb/Mesa
+Legacy staging-p95 comparisons measured 191.922→171.555ms and
+203.621→189.425ms, but NativeHard readings were mixed and the physical
+60px latency/owner gate is **not** satisfied. T-095 stays In Progress;
+T-096 is independently in Manual Review. [Evidence](evidence/T-095-2026-11-11-brush-tile-key-cache.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 native preflight cached-key / transparent blend checkpoint (2026-11-09; In Progress):**
 The optional Hokusai pigment path now caches its last signed-64-bit storage
 tile key across clustered deltas and uses allocation-free rectangular clipping.
@@ -1942,7 +1953,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | NativeHard/Hokusai source rollback and Brush parity tested in software; owner 60px device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback and signed Brush tile-key reuse tested; owner 60px device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics
