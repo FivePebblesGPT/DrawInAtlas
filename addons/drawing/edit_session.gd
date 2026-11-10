@@ -853,10 +853,16 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
 			selection, max_candidates, clip_bounds, depth + 1)
-	# A stationary dab has no segment projection. Axis-aligned segments can
-	# compute squared distance without a Geometry2D call per candidate. Keep
-	# the original native geometry oracle for all oblique sweeps.
-	if start != finish and (start.x == finish.x or start.y == finish.y):
+	# Scanline bounds discard only candidates that cannot touch a dab/capsule.
+	# Keep the original per-pixel squared-distance predicate at the edge. For
+	# very large view coordinates, float32 Vector2 rounding could exceed our
+	# two-pixel conservative margin; use the unbounded reference loop instead.
+	var span_safe: bool = absf(start.x) < 1000000.0 and absf(start.y) < 1000000.0 \
+		and absf(finish.x) < 1000000.0 and absf(finish.y) < 1000000.0
+	if span_safe and start == finish:
+		return _paint_dab_scanlines(start, radius, left, top, right, bottom,
+			rgba, erase, selection)
+	if span_safe and start != finish and (start.x == finish.x or start.y == finish.y):
 		return _paint_axis_segment(start, finish, left, top, right, bottom,
 			radius * radius, rgba, erase, selection)
 	var stationary: bool = start == finish
@@ -877,6 +883,35 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 	return DrawingResult.success()
 
 
+## Conservative scanline windows are deliberately wider than the exact
+## footprint; final acceptance uses the original Vector2 distance operation.
+func _paint_dab_scanlines(center: Vector2, radius: float, left: int, top: int,
+		right: int, bottom: int, rgba: int, erase: bool,
+		selection: DrawingSelection) -> DrawingResult:
+	var radius_squared: float = radius * radius
+	var broad_radius: float = radius + 2.0
+	var broad_squared: float = broad_radius * broad_radius
+	for y: int in range(top, bottom):
+		var dy: float = (y + 0.5) - center.y
+		if dy * dy > broad_squared:
+			continue
+		var reach: float = sqrt(maxf(0.0, broad_squared - dy * dy))
+		var first_x: int = maxi(left, floori(center.x - reach - 2.5))
+		var last_x: int = mini(right, ceili(center.x + reach + 1.5))
+		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
+		for x: int in range(first_x, last_x):
+			if covered_row.has(anchor_x + x):
+				continue
+			var pixel_center: Vector2 = Vector2(x + 0.5, y + 0.5)
+			if pixel_center.distance_squared_to(center) > radius_squared:
+				continue
+			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+				selection, true, not erase, -1, true)
+			if not result.ok:
+				return result
+	return DrawingResult.success()
+
+
 func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 		right: int, bottom: int, radius_squared: float, rgba: int, erase: bool,
 		selection: DrawingSelection) -> DrawingResult:
@@ -888,8 +923,11 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			var dy_squared: float = dy * dy
 			if dy_squared > radius_squared:
 				continue
+			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
+			var first_x: int = maxi(left, floori(min_x - reach - 2.5))
+			var last_x: int = mini(right, ceili(max_x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
-			for x: int in range(left, right):
+			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
 					continue
 				var center_x: float = x + 0.5
@@ -907,8 +945,13 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			var center_y: float = y + 0.5
 			var dy: float = center_y - clampf(center_y, min_y, max_y)
 			var dy_squared: float = dy * dy
+			if dy_squared > radius_squared:
+				continue
+			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
+			var first_x: int = maxi(left, floori(start.x - reach - 2.5))
+			var last_x: int = mini(right, ceili(start.x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
-			for x: int in range(left, right):
+			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
 					continue
 				var dx: float = (x + 0.5) - start.x

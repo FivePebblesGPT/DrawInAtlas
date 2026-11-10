@@ -1792,6 +1792,22 @@ independent review gate remains unchanged.
 [Evidence](evidence/T-095-2026-11-09-tile-run-buffer.md) ·
 [ticket](Tickets/T-095.md).
 
+**T-095 stationary/axis Brush scanline bounds (2026-11-11; In Progress):**
+Conservative row spans skip candidate columns outside 60px stationary and
+horizontal/vertical hard Brush footprints without changing exact per-pixel
+geometry, signed tile, preview or history semantics. High-view-coordinate
+axis strokes now use Geometry2D, correcting four original-code oracle failures.
+The independent full-bounds oracle passes **278/278**, and a staged wrong-bound
+negative control fails **22** checks. A fresh native-absent
+standalone passes 278/278 geometry and 7/7 fallback checks. Isolated dab/horizontal CPU medians
+improve, but three paired-order real Xvfb 60px/786% pointer runs give
+**no credible whole-gesture speedup**. Neighboring native rollback, source,
+history, 48/48 navigation and 30/30 extension checks pass. Physical hardware,
+owner UX acceptance and hosted CI remain unverified; **T-095 stays In Progress**
+with manual review required, and T-096 stays separately in Manual Review.
+[Evidence](evidence/T-095-2026-11-11-axis-scanline-bounds.md) ·
+[T-095](Tickets/T-095.md).
+
 **T-095 per-session Brush tile-key reuse (2026-11-11; In Progress):**
 The Brush/Eraser tile-local staging path now reuses the previous signed tile
 key across adjacent source pixels, avoiding repeated string formatting, with

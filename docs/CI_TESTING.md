@@ -1,3 +1,19 @@
+## T-095 stationary/axis scanline bounds independent oracle — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` checks
+`drawing/tests/t095_axis_scanline_bounds_smoke.gd` with the strict exact
+`T095_AXIS_SCANLINE_PASSED` marker and preserves its log. The **278/278**
+headless oracle computes every candidate using original full-rectangle
+Geometry2D/Vector2 distances, independently of the conservative optimized
+stationary/axis scanline bounds. It covers 60px and narrow/fractional widths,
+signed anchors, irregular storage tiles, masks, clipping/splitting, exact
+preview, commit delta and Undo/Redo, including three ~10-million-coordinate
+float32 axis-fallback cases that fail four checks on the original source.
+A staged-only wrong-bound control fails 22 checks. No required fast-CI step or owner acceptance status changes;
+local Xvfb measured no credible full-pointer-gesture speedup. Hosted Actions
+and physical input-to-photon acceptance remain unverified.
+[Evidence](evidence/T-095-2026-11-11-axis-scanline-bounds.md).
+
 ## T-095 native/GDScript Hokusai pigment rollback witness — 2026-11-11
 
 The **on-demand** `godot-native-t095-brush.yml` builds the pinned
