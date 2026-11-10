@@ -1548,6 +1548,21 @@ batch-delta oracle and adjacent tests. The same-run Legacy staging p95 was
 accepted. T-095 retains `manual_review: true`, status **In Progress**.
 [Evidence](evidence/T-095-2026-11-08-hokusai.md) · [ticket](Tickets/T-095.md).
 
+**T-095 NativeHard Rust/GDScript source-read rollback (2026-11-11; In Progress):**
+The real NativeHard previously consumed covered pixels and advanced its
+sweep endpoint before GDScript rejected a later lazy source tile. An
+independent original-binary control fails **7/53** Brush retry/skip/history
+checks. New per-batch native coverage journals and a source-staging
+acknowledgement/rollback handshake make the expanded real-extension
+Brush/Eraser oracle pass **113/113**; older binaries fall back to Legacy.
+Five Rust tests, NativeHard/Hokusai exact-pixel regressions, native
+integration and Xvfb navigation pass locally. Xvfb 60px pointer stage p95
+**188.052ms** is software-only and **not** a paired speedup or physical
+acceptance. T-095 stays **In Progress** (`manual_review: true`) with owner
+60px responsiveness signoff still missing; T-096 stays **Manual Review**.
+[Evidence](evidence/T-095-2026-11-11-native-hard-source-rollback.md) ·
+[ticket](Tickets/T-095.md).
+
 **T-095 Hokusai native/GDScript pigment rollback (2026-11-11; In Progress):**
 The real native pigment surface previously advanced even when a later
 GDScript lazy-source read rejected the same sample batch. A fresh
@@ -1927,7 +1942,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Session-local Brush result reuse and native Hokusai prototype verified in software; owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | NativeHard/Hokusai source rollback and Brush parity tested in software; owner 60px device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics

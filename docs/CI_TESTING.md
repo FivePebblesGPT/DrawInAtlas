@@ -18,6 +18,24 @@ now checks Hokusai transaction negotiation: 7/7 with current native,
 library. No change to the **46 required fast-CI check IDs**; hosted Actions
 and owner-hardware 60px responsiveness/approval remain unverified.
 
+## T-095 NativeHard/GDScript source-read rollback witness — 2026-11-11
+
+The **on-demand** native workflow builds the pinned Rust extension and then
+runs `drawing/tests/t095_native_hard_source_atomic.gd` with the strict
+`T095_NATIVE_HARD_SOURCE_ATOMIC_PASSED` marker. The test does not skip if
+no native class is installed. It injects a late Drawing source-tile failure
+after native coverage has advanced, and verifies reject/retry and reject/skip
+parity on the **actual GDExtension** for both Brush and Eraser, with
+independent document/native pairs, 64-bit signed anchors, selection holes,
+RGBA8 preview, commit and Undo/Redo. The previous addon/native binary fails
+**7/53** Brush assertions; the expanded fix passes **113/113**, plus Rust
+**5/5**, Clippy and release build. The workflow uploads the raw log even if
+later steps fail, and the 46 fast required GDScript check IDs are unchanged.
+An old installed real binary without the NativeHard transaction handshake
+selects Legacy at the start of a stroke. Neither local software assertions
+nor the on-demand CI declaration prove hosted CI or owner hardware latency
+acceptance. [Evidence](evidence/T-095-2026-11-11-native-hard-source-rollback.md).
+
 ## T-095 optional NativeHard batch-atomicity witness — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` workflow additionally builds the

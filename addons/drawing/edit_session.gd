@@ -558,11 +558,25 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 	var relative: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in path:
 		relative.append(inverse * point)
+	# NativeHard's coverage/cursor must be rolled back on a failed *GDScript*
+	# source read too. Scripted deterministic oracles without native state keep
+	# their original contract; an incompatible installed binary fails closed.
+	var transactional: bool = native.has_method("begin_hard_batch") and \
+		native.has_method("commit_hard_batch") and native.has_method("rollback_hard_batch")
+	if native.get_class() == "DrawingNativeBrush" and not transactional:
+		return DrawingResult.failure("NATIVE_BRUSH_TRANSACTION",
+			"Native hard brush binary lacks source-read rollback")
+	if transactional and not native.call("begin_hard_batch"):
+		return DrawingResult.failure("NATIVE_BRUSH_TRANSACTION", "Native hard batch is already pending")
 	var result: Dictionary = native.call("hard_segments", relative, width, clip_bounds)
 	if not result.get("ok", false):
+		if transactional:
+			native.call("rollback_hard_batch")
 		return DrawingResult.failure("NATIVE_BRUSH", str(result.get("error", "Native coverage failed")))
 	var coordinates: PackedInt32Array = result.get("points", PackedInt32Array())
 	if coordinates.size() % 2 != 0:
+		if transactional:
+			native.call("rollback_hard_batch")
 		return DrawingResult.failure("NATIVE_BRUSH", "Native coverage returned invalid coordinates")
 	_journaling = true
 	_paint_journal.clear()
@@ -573,10 +587,14 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 			0 if erase else rgba, selection, true, not erase, -1, true)
 		if not staged.ok:
 			_rollback_paint()
+			if transactional:
+				native.call("rollback_hard_batch")
 			return staged
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_journaling = false
+	if transactional:
+		native.call("commit_hard_batch")
 	return DrawingResult.success(change_count())
 
 

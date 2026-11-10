@@ -1055,8 +1055,15 @@ func start_gesture(position: Vector2) -> void:
 				else:
 					canvas_error.emit("Hokusai preset or batch rollback unavailable; using the legacy Brush")
 			else:
-				_native_brush.call("reset_hard")
-				_active_brush_backend = "NativeHard"
+				# Reject a pre-transaction binary at gesture start rather than
+				# letting a failed source read consume native hard coverage.
+				if _native_brush.has_method("begin_hard_batch") and \
+						_native_brush.has_method("commit_hard_batch") and \
+						_native_brush.has_method("rollback_hard_batch"):
+					_native_brush.call("reset_hard")
+					_active_brush_backend = "NativeHard"
+				else:
+					canvas_error.emit("Native hard rollback unavailable; using the legacy Brush")
 		else:
 			canvas_error.emit("Native brush unavailable; using the legacy Brush")
 	_samples.clear()

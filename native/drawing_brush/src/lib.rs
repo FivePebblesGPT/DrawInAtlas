@@ -242,12 +242,29 @@ fn validate_hard_windows(
     Ok(windows)
 }
 
+/// Only newly accepted coverage is journaled per GDScript sample batch; do
+/// not copy the entire long-running coverage set on every input event.
+struct HardBatch {
+    last_hard: Option<Vector2>,
+    inserted: Vec<(i32, i32)>,
+}
+
+impl HardBatch {
+    fn rollback(self, covered: &mut HashSet<(i32, i32)>, last_hard: &mut Option<Vector2>) {
+        for pixel in self.inserted {
+            covered.remove(&pixel);
+        }
+        *last_hard = self.last_hard;
+    }
+}
+
 #[derive(GodotClass)]
 #[class(base=RefCounted)]
 struct DrawingNativeBrush {
     base: Base<RefCounted>,
     last_hard: Option<Vector2>,
     covered: HashSet<(i32, i32)>,
+    pending_hard: Option<HardBatch>,
     preset: Option<PresetStroke>,
 }
 
@@ -258,6 +275,7 @@ impl IRefCounted for DrawingNativeBrush {
             base,
             last_hard: None,
             covered: HashSet::new(),
+            pending_hard: None,
             preset: None,
         }
     }
@@ -270,7 +288,35 @@ impl DrawingNativeBrush {
     fn reset_hard(&mut self) {
         self.covered.clear();
         self.last_hard = None;
+        self.pending_hard = None;
         self.preset = None;
+    }
+
+    /// Begin the native half of a GDScript sample transaction. Source tile
+    /// loads can fail *after* rasterization; until acknowledged, all newly
+    /// covered pixels and the last sweep endpoint must remain reversible.
+    #[func]
+    fn begin_hard_batch(&mut self) -> bool {
+        if self.pending_hard.is_some() {
+            return false;
+        }
+        self.pending_hard = Some(HardBatch {
+            last_hard: self.last_hard,
+            inserted: Vec::new(),
+        });
+        true
+    }
+
+    #[func]
+    fn commit_hard_batch(&mut self) {
+        self.pending_hard = None;
+    }
+
+    #[func]
+    fn rollback_hard_batch(&mut self) {
+        if let Some(batch) = self.pending_hard.take() {
+            batch.rollback(&mut self.covered, &mut self.last_hard);
+        }
     }
 
     /// Returns only *new* pixel positions, not an RGBA buffer for every dab.
@@ -318,6 +364,9 @@ impl DrawingNativeBrush {
                     let distance = center - (window.begin + delta * fraction);
                     if distance.length_squared() <= radius_squared {
                         self.covered.insert((x, y));
+                        if let Some(batch) = self.pending_hard.as_mut() {
+                            batch.inserted.push((x, y));
+                        }
                         output.push(x);
                         output.push(y);
                     }
@@ -361,6 +410,7 @@ impl DrawingNativeBrush {
         });
         self.covered.clear();
         self.last_hard = None;
+        self.pending_hard = None;
         true
     }
 
@@ -591,6 +641,26 @@ mod tests {
                 "unchanged native tile re-exported pixels"
             );
         }
+    }
+
+    #[test]
+    fn hard_batch_rollback_keeps_previous_coverage_and_cursor() {
+        let mut covered = HashSet::from([(-9, 3), (2, 2)]);
+        let mut last_hard = Some(Vector2::new(-8.5, 3.5));
+        let saved = last_hard;
+        let mut batch = HardBatch {
+            last_hard: saved,
+            inserted: Vec::new(),
+        };
+        for point in [(-9, 3), (3, 2), (-11, -1), (3, 2)] {
+            if covered.insert(point) {
+                batch.inserted.push(point);
+            }
+        }
+        last_hard = Some(Vector2::new(22.5, -12.5));
+        batch.rollback(&mut covered, &mut last_hard);
+        assert_eq!(covered, HashSet::from([(-9, 3), (2, 2)]));
+        assert_eq!(last_hard, saved);
     }
 
     #[test]

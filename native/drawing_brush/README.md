@@ -97,6 +97,27 @@ The on-demand T-095 workflow builds the native library before running this
 fail-closed check. See
 [engineering evidence](../../docs/evidence/T-095-2026-11-09-native-hard-preflight.md).
 
+## NativeHard source-read transaction (2026-11-11)
+
+Whole-window preflight is insufficient when Rust returns valid coverage but
+a later GDScript source tile fails to load. Canvas selects NativeHard only
+when the installed `DrawingNativeBrush` implements `begin_hard_batch`,
+`commit_hard_batch` and `rollback_hard_batch`; older binaries explicitly
+fall back to Legacy. `DrawingEditSession.paint_path_native_hard()` begins
+the transaction before invoking `hard_segments`, rolls back native coverage,
+previous endpoint and detached preview on a failed source read, and commits
+the native journal only after all GDScript pixels are staged. Native rollback
+journals **only newly accepted pixel positions** rather than copying the
+whole accumulated coverage set per motion event. Existing direct hard-brush
+raster calls without this acknowledgement are not a substitute for the
+safe `DrawingEditSession` wrapper.
+
+After a local native release build and cold standalone import, run
+`res://tests/t095_native_hard_source_atomic.gd`: **113/113** signed
+Brush/Eraser real-native retry/skip and history checks. The original native
+binary fails **7/53** Brush checks; a previous binary with no new handshake
+still falls back to Legacy. [Evidence](../../docs/evidence/T-095-2026-11-11-native-hard-source-rollback.md).
+
 ## Gesture safety
 
 States are `IDLE → CAPTURING → DRAINING → COMMITTING → IDLE`. Source-space
