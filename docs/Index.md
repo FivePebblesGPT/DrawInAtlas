@@ -1792,6 +1792,22 @@ independent review gate remains unchanged.
 [Evidence](evidence/T-095-2026-11-09-tile-run-buffer.md) ·
 [ticket](Tickets/T-095.md).
 
+**T-095 conservative oblique Brush scanlines (2026-11-11; In Progress):**
+Legacy 60px long-diagonal strokes now prune impossible bounding-box columns
+using conservative per-row segment-parameter bounds, while preserving the
+original Geometry2D pixel-distance acceptance, high-coordinate fallback,
+rollback, exact RGBA8 preview and Undo/Redo. The independent **513/513**
+full-rectangle oracle covers fractional/60px widths, signed tiles, selection
+holes, recursive splitting and >10-million view coordinates; a staged-only
+incorrect-bound control fails **55** checks. Paired headless isolated
+long-diagonal staging medians were **156.566 / 184.701 / 158.213ms**
+optimized/control/optimized, but mixed workloads were noisy and no
+whole-pointer-gesture or physical-hardware speedup is claimed. Local native
+rollback/integration and the 786% Xvfb mouse witness pass. The on-demand
+workflow has a strict marker; hosted CI and owner approval remain unverified.
+**T-095 is In Progress**, `manual_review: true`; T-096 remains independent
+Manual Review. [Evidence](evidence/T-095-2026-11-11-oblique-scanline-bounds.md).
+
 **T-095 current-tile Brush source/preview reference reuse (2026-11-11; In Progress):**
 The tile-local Brush/Eraser stage now reuses its resolved immutable source
 and detached preview patch while remaining within the same signed storage tile,

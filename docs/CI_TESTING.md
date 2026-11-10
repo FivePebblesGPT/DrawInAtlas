@@ -85,6 +85,21 @@ gate. The selected local tests pass; hosted Actions was not run.
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
 
+## T-095 conservative oblique Brush scanline oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_oblique_scanline_bounds_smoke.gd`, requiring the exact
+`T095_OBLIQUE_SCANLINE_PASSED` marker via the fail-closed model-log verifier
+and preserving its raw log. Local pinned-beta3 results **513/513** compare
+oblique optimized candidate pruning against the original full-rectangle
+Geometry2D and `_stage()` oracle across 22 signed, masked, clipped, split,
+high-coordinate, fractional-width/60px Brush/Eraser cases. A deliberately
+undersized staged-only bound fails **55** of the initial 466 checks. The
+optional long-diagonal CPU benchmark reports local stage-only gains, **not**
+a controlled physical pointer/compositor result; full mixed-workload results
+are noisy. No required fast-CI check ID or manual-review approval changed.
+Hosted CI and owner-hardware latency remain unverified.
+
 ## T-095 per-session source/preview tile-reference cache oracle — 2026-11-11
 
 The **on-demand**, non-gating `godot-native-t095-brush.yml` runs the

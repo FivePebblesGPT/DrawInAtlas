@@ -48,6 +48,14 @@ jobs:
             2>&1 | tee /tmp/t095-axis-scanline.log
           python3 tools/check_godot_model_log.py /tmp/t095-axis-scanline.log \
             --marker T095_AXIS_SCANLINE_PASSED
+      - name: T-095 conservative oblique Brush scanlines vs full Geometry2D
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_oblique_scanline_bounds_smoke.gd \
+            2>&1 | tee /tmp/t095-oblique-scanlines.log
+          python3 tools/check_godot_model_log.py /tmp/t095-oblique-scanlines.log \
+            --marker T095_OBLIQUE_SCANLINE_PASSED
       - name: T-095 sustained input queue compaction and full-path parity
         run: |
           set -euo pipefail
@@ -201,6 +209,7 @@ jobs:
             /tmp/t095-brush-result.log
             /tmp/t095-oblique.log
             /tmp/t095-axis-scanline.log
+            /tmp/t095-oblique-scanlines.log
             /tmp/t095-stage-lookup.log
             /tmp/t095-queue-compaction.log
             /tmp/t095-latency-window.log

@@ -883,6 +883,11 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 	if span_safe and start != finish and (start.x == finish.x or start.y == finish.y):
 		return _paint_axis_segment(start, finish, left, top, right, bottom,
 			radius * radius, rgba, erase, selection)
+	# Near-horizontal float32 deltas can underflow the Y-to-parameter
+	# division. The original full-bounds Geometry2D path remains exact.
+	if span_safe and start != finish and absf(finish.y - start.y) >= 0.001:
+		return _paint_oblique_scanlines(start, finish, radius, left, top,
+			right, bottom, rgba, erase, selection)
 	var stationary: bool = start == finish
 	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
@@ -892,6 +897,46 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 				continue
 			var center: Vector2 = Vector2(x + 0.5, y + 0.5)
 			var nearest: Vector2 = start if stationary else Geometry2D.get_closest_point_to_segment(center, start, finish)
+			if center.distance_squared_to(nearest) > radius_squared:
+				continue
+			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+				selection, true, not erase, -1, true)
+			if not result.ok:
+				return result
+	return DrawingResult.success()
+
+
+## Bound an oblique capsule one row at a time. If a pixel center can be
+## within radius of the segment, some point on the segment must be within
+## radius in Y *and* X. The Y interval gives a conservative range of segment
+## parameters; expanding its X range by the radius cannot discard a hit.
+## Four extra pixels accommodate float32 arithmetic at supported view scales.
+## Retain Geometry2D for final inclusion, and use the original full rectangle
+## above 1M view coordinates where float32 rounding can be coarser.
+func _paint_oblique_scanlines(start: Vector2, finish: Vector2, radius: float,
+		left: int, top: int, right: int, bottom: int, rgba: int, erase: bool,
+		selection: DrawingSelection) -> DrawingResult:
+	var vertical_span: float = finish.y - start.y
+	var broad_radius: float = radius + 4.0
+	var radius_squared: float = radius * radius
+	for y: int in range(top, bottom):
+		var center_y: float = y + 0.5
+		var t_a: float = (center_y - broad_radius - start.y) / vertical_span
+		var t_b: float = (center_y + broad_radius - start.y) / vertical_span
+		var t_low: float = maxf(0.0, minf(t_a, t_b))
+		var t_high: float = minf(1.0, maxf(t_a, t_b))
+		if t_low > t_high:
+			continue
+		var x_a: float = lerpf(start.x, finish.x, t_low)
+		var x_b: float = lerpf(start.x, finish.x, t_high)
+		var first_x: int = maxi(left, floori(minf(x_a, x_b) - broad_radius))
+		var last_x: int = mini(right, ceili(maxf(x_a, x_b) + broad_radius + 1.0))
+		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
+		for x: int in range(first_x, last_x):
+			if covered_row.has(anchor_x + x):
+				continue
+			var center: Vector2 = Vector2(x + 0.5, center_y)
+			var nearest: Vector2 = Geometry2D.get_closest_point_to_segment(center, start, finish)
 			if center.distance_squared_to(nearest) > radius_squared:
 				continue
 			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
