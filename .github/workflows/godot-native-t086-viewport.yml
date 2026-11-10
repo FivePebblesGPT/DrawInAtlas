@@ -11,10 +11,10 @@ jobs:
         with:
           lfs: true
           fetch-depth: 1 # Archived pre-cache fixture works even after squashing commits.
-      - name: Install pinned Godot 4.8 beta 2
+      - name: Install pinned Godot 4.8 beta 3
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta2
+          version: 4.8.0-beta3
           use-dotnet: false
       - name: Install software-display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
