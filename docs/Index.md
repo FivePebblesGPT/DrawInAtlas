@@ -6,6 +6,17 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 offline owner trace analysis (2026-11-11; In Progress):**
+A local, stdlib-only analyzer now summarizes the existing opt-in Brush JSONL
+records with nearest-rank retained-window p50/p95, lifetime counts/maxima,
+matched callback exclusions and a strict schema/error boundary. The six Python
+contracts pass; two actual headless Godot-exported strokes parse without
+fabricating missing callback latency. It does not alter the Brush or prove
+physical input-to-photon responsiveness. T-095 retains `In Progress` and its
+manual gate, while T-096 stays independently in `Manual Review`.
+[Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-owner-trace-analysis.md).
+
 **T-095 opt-in owner-device Brush trace (2026-11-11; In Progress):**
 The app can now export whitelisted, bounded stage/queue/renderer/post-draw
 metrics for actual pointer strokes to a local `user://` JSONL file, **only**

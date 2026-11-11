@@ -152,6 +152,14 @@ jobs:
             2>&1 | tee /tmp/t095-preview-input-postdraw.log
           python3 tools/check_godot_model_log.py /tmp/t095-preview-input-postdraw.log \
             --marker T095_PREVIEW_INPUT_POSTDRAW_PASSED
+      - name: T-095 owner-device trace analyzer (fail-closed offline contracts)
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t095_trace_analyzer.py -v \
+            2>&1 | tee /tmp/t095-trace-analyzer.log
+          echo "T095_TRACE_ANALYZER_PASSED" | tee -a /tmp/t095-trace-analyzer.log
+          python3 tools/check_godot_model_log.py /tmp/t095-trace-analyzer.log \
+            --marker T095_TRACE_ANALYZER_PASSED
       - name: T-095 opt-in bounded owner-device Brush timing trace
         run: |
           set -euo pipefail
@@ -334,6 +342,7 @@ jobs:
             /tmp/t095-postdraw-pairing.log
             /tmp/t095-preview-stage-postdraw.log
             /tmp/t095-preview-input-postdraw.log
+            /tmp/t095-trace-analyzer.log
             /tmp/t095-owner-trace.log
             /tmp/t095-hokusai-delta.log
             /tmp/t095-tile-shift.log

@@ -1,3 +1,19 @@
+## T-095 offline owner-device trace analysis — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` workflow now executes
+`tests/test_t095_trace_analyzer.py` (six stdlib Python contracts), preserving
+`/tmp/t095-trace-analyzer.log` and requiring one exact
+`T095_TRACE_ANALYZER_PASSED` marker through T-094's fail-closed log checker.
+The tool `tools/analyze_t095_trace.py` validates and summarizes existing
+schema-1 opt-in `user://` Brush JSONL records. It clearly separates retained
+percentiles, lifetime maxima, absent Godot callbacks and physical display
+latency; malformed or incompatible records fail without a partial report.
+The canonical Drawing Brush and exporter are unchanged, and this **does not**
+introduce a new required fast-CI check, physical hardware acceptance or a
+hosted Actions pass. T-095 remains In Progress with an owner review gate;
+T-096 remains in Manual Review.
+[Detailed verification](evidence/T-095-2026-11-11-owner-trace-analysis.md).
+
 ## T-095 opt-in local Brush profile trace — 2026-11-11
 
 The non-gating `godot-native-t095-brush.yml` now checks
