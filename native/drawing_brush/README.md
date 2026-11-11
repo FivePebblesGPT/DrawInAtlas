@@ -138,6 +138,21 @@ Godot oracle. The optional `t095_native_hard_scanline_bench.gd` is **native
 CPU only**; hardware catch-up and input-to-photon latency remain unverified.
 [Evidence](../../docs/evidence/T-095-2026-11-11-native-hard-scanlines.md).
 
+## NativeHard packed RGBA coordinate transfer (2026-11-11)
+
+The native coverage loop now appends accepted signed `(x, y)` coordinates to
+one Rust `Vec<i32>`, then converts it into Godot's `PackedInt32Array` in one
+allocation/copy. Previously it pushed **two Godot packed-array elements per
+pixel**, including 29,175 writes for each coordinate in a 60px diagonal run.
+The exact f32 coverage predicate, row bounds, once-only coverage, output order,
+whole-batch preflight and GDScript transaction handshake remain unchanged.
+A real-extension, independent full-rectangle oracle compares exact ordered
+pixels across a large sweep, overlapping and return paths, empty repeated
+output, and a rejected/rolled-back batch. It requires the extension and the
+`T095_NATIVE_HARD_PACKED_OUTPUT_PASSED` marker; see
+[engineering evidence](../../docs/evidence/T-095-2026-11-11-native-hard-packed-output.md).
+The opt-in native-call benchmark is not a full Brush/preview/GPU latency test.
+
 ## Gesture safety
 
 States are `IDLE → CAPTURING → DRAINING → COMMITTING → IDLE`. Source-space

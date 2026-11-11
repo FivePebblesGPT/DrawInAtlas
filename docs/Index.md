@@ -1906,6 +1906,18 @@ This is **not** owner-device responsiveness evidence. **T-095 remains In
 Progress with manual review required; T-096 remains independently in Manual
 Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md).
 
+**T-095 native output transfer checkpoint (2026-11-11; In Progress):**
+The optional NativeHard GDExtension now accumulates ordered signed 60px
+candidate coordinates in a Rust vector and transfers them once to Godot,
+without repeated per-pixel packed-array pushes. The independent full-rectangle
+oracle passes 20/20 including rollback/retry; Rust 6/6, native preflight,
+rollback, export, coverage and Xvfb pointer/navigation checks pass locally.
+Isolated native-call medians were 3.529/3.221ms original,
+2.642/2.774ms optimized and 3.358/3.189ms original recheck, with identical
+29,175-pixel output. **No whole-pointer or owner-device latency claim**;
+T-095 remains `In Progress` with manual review required and T-096 stays
+`Manual Review`. [Evidence](evidence/T-095-2026-11-11-native-hard-packed-output.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).
@@ -2017,7 +2029,7 @@ Review.** [Checkpoint evidence](evidence/T-095-2026-11-08-hokusai-tile-local.md)
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback, signed tile/source cache, and NativeHard scanline parity tested; owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback/scanlines/output transport tested; owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics

@@ -383,7 +383,11 @@ impl DrawingNativeBrush {
             }
         };
         let radius_squared = (width * 0.5) * (width * 0.5);
-        let mut output = PackedInt32Array::new();
+        // Accumulate coordinates in contiguous native memory, then transfer
+        // once to the Godot packed array. Pushing two Godot elements per hit
+        // crosses the extension API boundary tens of thousands of times for
+        // a single 60px sweep; conversion retains exact y/x insertion order.
+        let mut coordinates: Vec<i32> = Vec::new();
         for window in windows {
             let delta = window.end - window.begin;
             let squared = delta.length_squared();
@@ -405,13 +409,14 @@ impl DrawingNativeBrush {
                         if let Some(batch) = self.pending_hard.as_mut() {
                             batch.inserted.push((x, y));
                         }
-                        output.push(x);
-                        output.push(y);
+                        coordinates.push(x);
+                        coordinates.push(y);
                     }
                 }
             }
             self.last_hard = Some(window.end);
         }
+        let output = PackedInt32Array::from(coordinates);
         result.set("ok", true);
         result.set("points", &output);
         result
