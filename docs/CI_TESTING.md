@@ -1970,3 +1970,20 @@ The 46 required fast-CI check IDs, T-094 fail-closed log policy and
 T-095/T-096 manual-review gates are unchanged. Hosted Actions and owner
 physical-device acceptance remain unverified.
 [Evidence](evidence/T-095-2026-11-11-trace-runtime-token.md).
+
+
+## T-095 96px red 512×512 full-canvas graphical Brush witness — 2026-11-11
+
+The on-demand, non-gating `godot-native-t095-brush.yml` executes
+`drawing/tests/t095_full_canvas_brush_native.gd` under Xvfb with actual
+Godot pointer down/motion/up (100 events; one Brush stroke), one history edit,
+byte-exact four-tile RGBA8 red hashes (all 262,144 pixels), framebuffer
+samples and Undo/Redo. The T-094 strict log checker requires the exact
+`T095_FULL_CANVAS_PASSED` marker and `if: always()` retains the raw log at
+`/tmp/t095-full-canvas.log`. Godot's engine post-draw measurement and the
+`target_met` field are diagnostic only; a proposed 100ms p95 threshold is
+activated solely by explicitly setting `T095_FULL_CANVAS_P95_BUDGET_MS=100`
+on reference hardware. A failure must not be mislabeled as success. On local
+llvmpipe, three independently started Legacy runs were 8.94–11.38 seconds,
+far above that target. This does not modify 46 required fast CI check IDs or
+satisfy physical owner approval. [Evidence](evidence/T-095-2026-11-11-full-canvas-96px-red-brush.md).

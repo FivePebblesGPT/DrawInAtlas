@@ -307,6 +307,18 @@ jobs:
             2>&1 | tee /tmp/t095-native-pigment-atomic.log
           python3 tools/check_godot_model_log.py /tmp/t095-native-pigment-atomic.log \
             --marker T095_NATIVE_PIGMENT_ATOMIC_PASSED
+      - name: T-095 rapid 96px red Brush across 512x512 through real pointer routing
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s xvfb-run -a -s '-screen 0 1280x900x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/t095_full_canvas_brush_native.gd \
+            2>&1 | tee /tmp/t095-full-canvas.log
+          python3 tools/check_godot_model_log.py /tmp/t095-full-canvas.log \
+            --marker T095_FULL_CANVAS_PASSED
+          # No synthetic-speed pass/fail threshold: the test reports whether the
+          # proposed 100ms target is met, but only owner reference hardware can
+          # apply the opt-in T095_FULL_CANVAS_P95_BUDGET_MS ceiling.
       - name: Real mouse routing and held-button software framebuffer profile
         run: |
           set -euo pipefail
@@ -356,5 +368,6 @@ jobs:
             /tmp/t095-native-hard-source-atomic.log
             /tmp/t095-native-pigment-atomic.log
             /tmp/t095-native-preset-packed-output.log
+            /tmp/t095-full-canvas.log
             /tmp/t095-native.log
           if-no-files-found: warn

@@ -6,6 +6,24 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+## T-095 96px red full-canvas pointer baseline (2026-11-11; In Progress)
+
+A new real graphical pointer integration witness sends 100 Godot mouse events
+through a single 96px opaque red Brush gesture covering an entire 512×512
+layer. Four 256px source-tile SHA-256 checks and framebuffer center/inset
+corners verify all 262,144 bytes-exact red pixels, a single history revision,
+Undo/Redo and input accounting. Three separate Xvfb/llvmpipe Legacy trials
+measured **8.94–11.38 seconds** virtual pointer-start to Godot post-draw;
+owner's proposed **100ms** budget is decidedly **not met**. A PhotoCraft 0.21
+same-host GUI/MCP burst measured 78.62–88.78ms internal stroke work (not the
+same timing boundary; its MCP calls took 125–158ms). A strict on-demand
+software correctness witness reports this gap without setting a hardware
+speed pass gate. T-095 stays `In Progress`, `manual_review: true` and T-096
+remains independently `Manual Review`; real owner-device evidence and hosted
+CI are outstanding. [Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-full-canvas-96px-red-brush.md).
+
+
 **T-095 anonymous trace-runtime cohort boundaries (2026-11-11; In Progress):**
 Opt-in Brush JSONL now includes a 128-bit random `trace_session_id` generated
 once per Canvas runtime, never derived from OS/device/user information. The
