@@ -6,6 +6,21 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 preview staging-to-render correlation (2026-11-11; In Progress):**
+For changed 60px Brush previews, the bounded Canvas frame history now records
+Godot staging completion → Canvas draw submission and, for a matched frame,
+→ `frame_post_draw` callback. Unchanged and unmatched frames are explicitly
+excluded. The new real-Canvas and ring oracle passes **22/22**; the old source
+fails four checks. Eleven adjacent headless, Xvfb native pointer/navigation
+and clean standalone native-absent tests pass. One software witness reports
+**129** changed-preview submissions and **124** matched callbacks, with
+stage→draw p95 **26.483 ms** and stage→callback p95 **41.884 ms**. This is
+engine observability, **not physical device responsiveness or owner approval**.
+T-095 remains **In Progress** with `manual_review: true`; T-096 retains
+**Manual Review**. [Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-preview-stage-postdraw.md).
+
+
 **Standalone Drawing usability is NOT accepted.** The owner reproduced missing live paint feedback, ~1-second strokes, zoom-out lag, insufficient selection and Move, opaque/unclear canvas bounds, ineffective layer hierarchy/visibility, cramped floating docks, responsive layout defects, and poor Object discovery. `.drawing` save/open **worked** in the exercised flow; undo's monotonic internal revision is **not itself a bug**. This assessment supersedes any implication that T-053/T-063/T-078–T-083 engineering checks constitute final interactive UX approval. [Full 23-finding matrix and milestones](DRAWING_USABILITY_REVIEW_2026-11-05.md).
 
 **Delivery order:** M0 [T-094](Tickets/T-094.md) CI restoration and independent [T-084](Tickets/T-084.md) PhotoCraft scout; M1 [T-085](Tickets/T-085.md) live strokes and [T-086](Tickets/T-086.md) incremental display/zoom; M2 [T-087](Tickets/T-087.md) visible bounds/grid, [T-088](Tickets/T-088.md) selection/Move and [T-089](Tickets/T-089.md) layers; M3 [T-090](Tickets/T-090.md) responsive chrome/menus, [T-091](Tickets/T-091.md) one-group floating docks, [T-092](Tickets/T-092.md) Colors/History, [T-093](Tickets/T-093.md) Objects; M4 separate unapproved **owner** gates [T-056](Tickets/T-056.md), [T-059](Tickets/T-059.md), [T-083](Tickets/T-083.md), [T-065](Tickets/T-065.md). T-068 remains research, not the blocking implementation prerequisite. **T-083 returns to In Progress pending corrective UX work.**

@@ -1794,3 +1794,20 @@ exact retained/total count. No physical input-to-photon or owner approval is
 inferred; hosted Actions were not run. The required fast-CI check IDs and
 T-094 fail-closed log policy are unchanged.
 [Detailed evidence](evidence/T-095-2026-11-11-postdraw-callback-pairing.md).
+
+## T-095 changed-preview staging to Godot callback — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` additionally runs
+`drawing/tests/t095_preview_stage_postdraw_smoke.gd` and strictly requires
+`T095_PREVIEW_STAGE_POSTDRAW_PASSED` through
+`tools/check_godot_model_log.py`. Its raw log
+`/tmp/t095-preview-stage-postdraw.log` is retained when a job fails.
+The **22/22** local oracle tests only pixel-changing batch stage timestamps
+correlated to Canvas `_draw` and matched `frame_post_draw` callbacks, including
+no-op/unmatched frame exclusion, cancelled sessions, bounded ring rollover,
+RGBA8 and Undo/Redo parity. The previous staged Canvas fails four assertions.
+The pointer witness emits a changed-preview-only p50/p95 summary; unmatched
+frames never masquerade as zero-delay callbacks. These observations are engine
+intervals, **not physical input-to-photon**. Required fast-CI check IDs and
+T-094 strict logging are unchanged; hosted Actions and owner acceptance remain
+unverified. [Evidence](evidence/T-095-2026-11-11-preview-stage-postdraw.md).

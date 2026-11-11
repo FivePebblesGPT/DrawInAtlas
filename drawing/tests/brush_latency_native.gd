@@ -24,6 +24,10 @@ var frame_pending_count: Array[float] = []
 var frame_total: int = 0
 var frame_callback_matches: int = 0
 var frame_callback_delay_ms: Array[float] = []
+var preview_stage_submit_ms: Array[float] = []
+var preview_stage_callback_ms: Array[float] = []
+var preview_stage_submissions: int = 0
+var preview_stage_callback_matches: int = 0
 
 
 func verify(ok: bool, message: String) -> void:
@@ -178,6 +182,8 @@ func run() -> void:
 		var frame_samples: Array = stats.get("frame_phases_us", []) as Array
 		frame_total += int(stats.get("frame_phase_total", 0))
 		frame_callback_matches += int(stats.get("frame_post_draw_matches", 0))
+		preview_stage_submissions += int(stats.get("frame_preview_stage_submissions", 0))
+		preview_stage_callback_matches += int(stats.get("preview_stage_post_draw_matches", 0))
 		for frame_variant: Variant in frame_samples:
 			var frame: Dictionary = frame_variant as Dictionary
 			frame_full_draw_ms.append(float(frame.get("full_draw_cpu_us", 0)) / 1000.0)
@@ -185,6 +191,10 @@ func run() -> void:
 			frame_pending_count.append(float(frame.get("pending_input_count", 0)))
 			if frame.has("frame_end_to_post_draw_us"):
 				frame_callback_delay_ms.append(float(frame["frame_end_to_post_draw_us"]) / 1000.0)
+			if frame.has("preview_stage_to_frame_end_us"):
+				preview_stage_submit_ms.append(float(frame["preview_stage_to_frame_end_us"]) / 1000.0)
+			if frame.has("preview_stage_to_post_draw_us"):
+				preview_stage_callback_ms.append(float(frame["preview_stage_to_post_draw_us"]) / 1000.0)
 		for microseconds: Variant in stats.get("sample_to_stage_us", []):
 			input_stage_ms.append(float(microseconds) / 1000.0)
 		for microseconds: Variant in stats.get("stage_batches_us", []):
@@ -236,6 +246,13 @@ func run() -> void:
 	print("T095_NATIVE_POSTDRAW_SUMMARY callback_matches=%d retained_matches=%d total_draws=%d callback_delay_p50_ms=%.3f callback_delay_p95_ms=%.3f" % [
 		frame_callback_matches, frame_callback_delay_ms.size(), frame_total,
 		percentile(frame_callback_delay_ms, 0.5), percentile(frame_callback_delay_ms, 0.95)])
+	# Only changed-preview frames have a stage timestamp; unmatched callbacks
+	# are excluded from the latter percentile. Neither interval measures scanout.
+	print("T095_NATIVE_PREVIEW_STAGE_SUMMARY stage_submissions=%d retained_stages=%d matched_callbacks=%d retained_callbacks=%d stage_draw_p50_ms=%.3f stage_draw_p95_ms=%.3f stage_callback_p50_ms=%.3f stage_callback_p95_ms=%.3f" % [
+		preview_stage_submissions, preview_stage_submit_ms.size(),
+		preview_stage_callback_matches, preview_stage_callback_ms.size(),
+		percentile(preview_stage_submit_ms, 0.5), percentile(preview_stage_submit_ms, 0.95),
+		percentile(preview_stage_callback_ms, 0.5), percentile(preview_stage_callback_ms, 0.95)])
 	print("T095_NATIVE_FRAME_BACKLOG_SUMMARY retained_frames=%d total_frames=%d draw_p50_ms=%.3f draw_p95_ms=%.3f pending_age_p50_ms=%.3f pending_age_p95_ms=%.3f pending_age_max_ms=%.3f pending_count_p95=%.0f pending_count_max=%.0f" % [
 		frame_pending_age_ms.size(), frame_total,
 		percentile(frame_full_draw_ms, 0.5), percentile(frame_full_draw_ms, 0.95),

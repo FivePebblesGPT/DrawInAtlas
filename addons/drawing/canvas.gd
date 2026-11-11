@@ -230,6 +230,9 @@ var _frame_phase_write_index: int = 0
 ## never attach a callback from a completed/cancelled session to a new stroke.
 var _pending_frame_phase_sample: Dictionary = {}
 var _pending_frame_phase_session: DrawingEditSession
+## First successful pixel-changing stage not yet represented by a Canvas draw.
+## Monotonic Godot CPU time only; never interpret as device receipt or photons.
+var _unsubmitted_preview_stage_us: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -357,6 +360,31 @@ func _finish_pending_frame_post_draw(callback_us: int) -> void:
 	_metrics["frame_post_draw_matches"] = int(_metrics.get("frame_post_draw_matches", 0)) + 1
 	_metrics["max_frame_end_to_post_draw_us"] = maxi(
 		int(_metrics.get("max_frame_end_to_post_draw_us", 0)), delay_us)
+	if sample.has("preview_stage_completed_us"):
+		var stage_to_callback_us: int = maxi(0,
+			recorded_us - int(sample["preview_stage_completed_us"]))
+		sample["preview_stage_to_post_draw_us"] = stage_to_callback_us
+		_metrics["preview_stage_post_draw_matches"] = int(
+			_metrics.get("preview_stage_post_draw_matches", 0)) + 1
+		_metrics["max_preview_stage_to_post_draw_us"] = maxi(
+			int(_metrics.get("max_preview_stage_to_post_draw_us", 0)),
+			stage_to_callback_us)
+
+
+## A single Canvas draw may represent multiple completed edit batches. Retain
+## the *earliest* pixel-changing stage until its first Canvas submission.
+func _mark_unsubmitted_preview_stage(stage_completed_us: int) -> void:
+	if _unsubmitted_preview_stage_us == 0:
+		_unsubmitted_preview_stage_us = maxi(1, stage_completed_us)
+
+
+func _tag_frame_preview_stage(frame: Dictionary, frame_end_us: int) -> void:
+	if _unsubmitted_preview_stage_us <= 0:
+		return
+	frame["preview_stage_completed_us"] = _unsubmitted_preview_stage_us
+	frame["preview_stage_to_frame_end_us"] = maxi(0,
+		frame_end_us - _unsubmitted_preview_stage_us)
+	_unsubmitted_preview_stage_us = 0
 
 
 func source_position(position: Vector2) -> Vector2:
@@ -903,6 +931,7 @@ func _draw() -> void:
 		# samples; both count even when one was already dequeued for staging.
 		last_frame_metrics["frame_end_us"] = frame_end_us
 		last_frame_metrics.merge(_frame_input_backlog(frame_end_us), true)
+		_tag_frame_preview_stage(last_frame_metrics, frame_end_us)
 		_record_frame_phase(last_frame_metrics)
 
 
@@ -1164,6 +1193,7 @@ func start_gesture(position: Vector2) -> void:
 	_frame_phase_write_index = 0
 	_pending_frame_phase_sample = {}
 	_pending_frame_phase_session = null
+	_unsubmitted_preview_stage_us = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1181,6 +1211,10 @@ func start_gesture(position: Vector2) -> void:
 		"preview_index_cpu_us": 0, "bytes_uploaded": 0,
 		"frame_phase_total": 0, "frame_phases_us": [],
 		"frame_post_draw_matches": 0, "max_frame_end_to_post_draw_us": 0,
+		"frame_preview_stage_submissions": 0,
+		"max_frame_preview_stage_to_frame_end_us": 0,
+		"preview_stage_post_draw_matches": 0,
+		"max_preview_stage_to_post_draw_us": 0,
 		"max_frame_full_draw_cpu_us": 0, "max_frame_compose_cpu_us": 0,
 		"max_frame_texture_cpu_us": 0, "max_frame_preview_index_cpu_us": 0,
 		"max_frame_selection_outline_cpu_us": 0,
@@ -1282,6 +1316,7 @@ func _drain_segments(budget: int) -> void:
 		if batch.is_empty():
 			break
 		var start_us: int = Time.get_ticks_usec()
+		var preview_epoch_before_batch: int = session._preview_epoch
 		var stage: DrawingResult
 		if _active_brush_backend == "NativeHard":
 			stage = session.paint_path_native_hard(batch, _stroke_color, _stroke_width,
@@ -1307,6 +1342,8 @@ func _drain_segments(budget: int) -> void:
 		if int(_metrics["first_stage_us"]) == 0:
 			_metrics["first_stage_us"] = staged_at_us
 		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
+		if session._preview_epoch != preview_epoch_before_batch:
+			_mark_unsubmitted_preview_stage(staged_at_us)
 		_staged_position = next_position
 		for arrival_us: int in completed_arrivals:
 			_record_stage_latency(maxi(0, staged_at_us - arrival_us))
@@ -1355,6 +1392,17 @@ func _record_frame_phase(frame: Dictionary) -> void:
 		sample[key] = value
 		var max_key: String = "max_frame_" + key
 		_metrics[max_key] = maxi(int(_metrics.get(max_key, 0)), value)
+	if frame.has("preview_stage_completed_us"):
+		var stage_us: int = maxi(0, int(frame["preview_stage_completed_us"]))
+		var submit_delay_us: int = maxi(0, int(frame.get(
+			"preview_stage_to_frame_end_us", 0)))
+		sample["preview_stage_completed_us"] = stage_us
+		sample["preview_stage_to_frame_end_us"] = submit_delay_us
+		_metrics["frame_preview_stage_submissions"] = int(
+			_metrics.get("frame_preview_stage_submissions", 0)) + 1
+		_metrics["max_frame_preview_stage_to_frame_end_us"] = maxi(
+			int(_metrics.get("max_frame_preview_stage_to_frame_end_us", 0)),
+			submit_delay_us)
 	# Monotonic engine time allows phase and backlog spikes to be correlated
 	# without pretending to measure physical input-to-photon latency.
 	sample["frame_end_us"] = maxi(0, int(frame.get("frame_end_us", 0)))
@@ -1466,6 +1514,7 @@ func _commit_stroke() -> void:
 		return
 	var active: DrawingEditSession = session
 	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
+	_unsubmitted_preview_stage_us = 0
 	session = null
 	_stroke_selection = null
 	_native_brush = null
@@ -1494,6 +1543,7 @@ func _commit_stroke() -> void:
 ## Escape, stale revision and direct host changes discard the entire floating
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
+	_unsubmitted_preview_stage_us = 0
 	if session != null:
 		session.cancel()
 		session = null
