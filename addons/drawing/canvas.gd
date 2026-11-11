@@ -219,6 +219,11 @@ const MAX_STAGE_BATCH_LATENCIES: int = 4096
 # Preserve the latest real Canvas frames for per-phase p50/p95 on owner
 # hardware without retaining an unbounded history on long pointer strokes.
 const MAX_FRAME_PHASE_SAMPLES: int = 1024
+## Owner-device diagnostics are disabled unless this environment variable
+## explicitly names a user:// JSONL file. Never record document content,
+## source coordinates, layer names, brush color, or OS pointer identifiers.
+const T095_TRACE_ENV: String = "DRAWING_T095_TRACE_JSONL"
+const MAX_T095_TRACE_BYTES: int = 4 * 1024 * 1024
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
@@ -1539,6 +1544,90 @@ func _compact_sample_queue() -> void:
 		_metrics["sample_compactions"] = int(_metrics["sample_compactions"]) + 1
 
 
+## Optional bounded, local-only stroke capture for the owner's physical-device
+## recheck. This runs after a successful commit, never on the input/draw path.
+## All observations are Godot CPU / renderer callbacks, NOT input-to-photon.
+func _write_t095_trace(profile: Dictionary, backend: String) -> void:
+	var path: String = OS.get_environment(T095_TRACE_ENV)
+	# Never let a diagnostic environment variable redirect writes into the
+	# project or escape the app's local user-data directory via traversal.
+	if path.is_empty() or not path.begins_with("user://") \
+			or path.contains("..") or path.contains("\\") \
+			or path == "user://":
+		return
+	var record: Dictionary = {
+		"schema": 1, "capture_kind": "engine_timing_only",
+		"backend": backend, "zoom": zoom, "brush_width_px": _stroke_width,
+		"viewport_px": [roundi(size.x), roundi(size.y)],
+		"image_size_px": [image_bounds.size.x, image_bounds.size.y],
+		"frame_phases_us": [], "sample_to_stage_us": [],
+		"stage_batches_us": []}
+	for key: String in ["down_us", "release_us", "commit_us", "first_stage_us",
+			"first_preview_submit_us", "first_frame_post_draw_us",
+			"samples_received", "segments_staged", "stage_cpu_us",
+			"max_pending", "max_sample_buffer", "sample_compactions",
+			"duplicate_drain_batched", "drain_calls", "max_drain_cpu_us",
+			"sample_to_stage_total", "max_sample_to_stage_us",
+			"stage_batch_total", "max_stage_batch_us", "commit_cpu_us",
+			"preview_frames", "compose_cpu_us", "texture_cpu_us",
+			"preview_index_cpu_us", "bytes_uploaded", "frame_phase_total",
+			"frame_post_draw_matches", "max_frame_end_to_post_draw_us",
+			"frame_preview_stage_submissions",
+			"max_frame_preview_stage_to_frame_end_us",
+			"preview_stage_post_draw_matches", "max_preview_stage_to_post_draw_us",
+			"preview_input_post_draw_matches", "max_preview_input_to_post_draw_us",
+			"max_preview_input_to_frame_end_us", "max_frame_full_draw_cpu_us",
+			"max_frame_compose_cpu_us", "max_frame_texture_cpu_us",
+			"max_frame_preview_index_cpu_us", "max_frame_selection_outline_cpu_us",
+			"max_frame_pending_input_count", "max_frame_oldest_pending_age_us"]:
+		record[key] = maxi(0, int(profile.get(key, 0)))
+	for key: String in ["sample_to_stage_us", "stage_batches_us"]:
+		var values: Array = profile.get(key, []) as Array
+		var limit: int = MAX_SAMPLE_STAGE_LATENCIES if key == "sample_to_stage_us" \
+			else MAX_STAGE_BATCH_LATENCIES
+		var safe: Array = []
+		for value: Variant in values.slice(maxi(0, values.size() - limit)):
+			safe.append(maxi(0, int(value)))
+		record[key] = safe
+	var phase_keys: Array[String] = ["frame_end_us", "full_draw_cpu_us",
+		"compose_cpu_us", "texture_cpu_us", "preview_index_cpu_us",
+		"selection_outline_cpu_us", "pending_input_count",
+		"oldest_pending_age_us", "frame_post_draw_callback_us",
+		"frame_end_to_post_draw_us", "preview_stage_completed_us",
+		"preview_stage_to_frame_end_us", "preview_stage_to_post_draw_us",
+		"preview_input_received_us", "preview_input_to_frame_end_us",
+		"preview_input_to_post_draw_us"]
+	var phases: Array = profile.get("frame_phases_us", []) as Array
+	var safe_phases: Array = []
+	for phase_variant: Variant in phases.slice(maxi(0,
+			phases.size() - MAX_FRAME_PHASE_SAMPLES)):
+		if not phase_variant is Dictionary:
+			continue
+		var phase: Dictionary = phase_variant as Dictionary
+		var safe_phase: Dictionary = {}
+		for key: String in phase_keys:
+			if phase.has(key):
+				safe_phase[key] = maxi(0, int(phase[key]))
+		safe_phases.append(safe_phase)
+	record["frame_phases_us"] = safe_phases
+	var encoded: String = JSON.stringify(record) + "\n"
+	var additional_bytes: int = encoded.to_utf8_buffer().size()
+	if additional_bytes > MAX_T095_TRACE_BYTES:
+		return
+	var existed: bool = FileAccess.file_exists(path)
+	var stream: FileAccess = FileAccess.open(path,
+		FileAccess.READ_WRITE if existed else FileAccess.WRITE)
+	if stream == null:
+		return
+	if existed:
+		if stream.get_length() + additional_bytes > MAX_T095_TRACE_BYTES:
+			stream.close()
+			return
+		stream.seek_end()
+	stream.store_string(encoded)
+	stream.close()
+
+
 func _commit_stroke() -> void:
 	if session == null:
 		return
@@ -1551,6 +1640,7 @@ func _commit_stroke() -> void:
 		canvas_error.emit("Stroke cancelled because the selection changed")
 		return
 	var active: DrawingEditSession = session
+	var trace_backend: String = _active_brush_backend
 	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
@@ -1559,8 +1649,11 @@ func _commit_stroke() -> void:
 	_native_brush = null
 	_active_brush_backend = "Legacy"
 	var commit_start_us: int = Time.get_ticks_usec()
+	var published_ok: bool = true
 	if active.change_count() > 0:
-		_publish(active.commit())
+		var result: DrawingResult = active.commit()
+		published_ok = result.ok
+		_publish(result)
 	else:
 		active.cancel()
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
@@ -1569,6 +1662,8 @@ func _commit_stroke() -> void:
 	_finalize_stage_batch_window()
 	_finalize_frame_phase_window()
 	last_gesture_metrics = _metrics.duplicate(true)
+	if published_ok:
+		_write_t095_trace(last_gesture_metrics, trace_backend)
 	_restore_input_accumulation()
 	_samples.clear()
 	_sample_times_us.clear()

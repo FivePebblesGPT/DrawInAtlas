@@ -6,6 +6,20 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 opt-in owner-device Brush trace (2026-11-11; In Progress):**
+The app can now export whitelisted, bounded stage/queue/renderer/post-draw
+metrics for actual pointer strokes to a local `user://` JSONL file, **only**
+when explicitly enabled by an environment variable. No content, coordinates
+or layer identity is logged; cancellation writes nothing, and the trace caps
+at 4 MiB. The independent **17/17** red/green oracle, 12 neighboring strict
+headless suites, native Xvfb pointer/navigation and clean no-native fallback
+pass. This enables—but does not replace—physical-device profiling. Owner
+hardware acceptance is still open; T-095 stays `In Progress` with its manual
+gate, and T-096 stays `Manual Review`.
+[Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-owner-trace-jsonl.md).
+
+
 **T-095 input-receipt to changed-preview frame correlation (2026-11-11; In Progress):**
 For pixel-changing Brush batches, the bounded Canvas profiler now pairs the
 oldest Godot-received source sample with its changed-preview Canvas draw and,

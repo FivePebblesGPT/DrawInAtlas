@@ -1,3 +1,21 @@
+## T-095 opt-in local Brush profile trace — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` now checks
+`drawing/tests/t095_owner_trace_smoke.gd` with the strict exact
+`T095_OWNER_TRACE_PASSED` marker and retains
+`/tmp/t095-owner-trace.log` under `if: always()`. The local independent
+**17/17** regression covers default-disabled logging, two appended successful
+gestures, a bounded numeric JSONL schema, no document/pixel identifiers,
+cancelled gesture suppression, traversal rejection, 4 MiB file ceiling and
+RGBA8/Undo/Redo parity. The original Canvas and staged disabled-writer control
+fail one test each. Twelve adjacent strict-marker headless tests, real Xvfb
+navigation/integration/pointer runs, and a clean native-absent import passed.
+The feature is a local, explicit opt-in **owner hardware diagnostic**, not
+telemetry by default and not evidence of physical input-to-photon latency.
+The 46 fast-CI check IDs, T-094 fail-closed log policy, T-095 owner gate and
+T-096 Manual Review are unchanged. Hosted CI remains unverified.
+[Evidence](evidence/T-095-2026-11-11-owner-trace-jsonl.md).
+
 ## T-095 preview input-receipt to Canvas/post-draw correlation — 2026-11-11
 
 The **non-gating** on-demand `godot-native-t095-brush.yml` stages canonical
