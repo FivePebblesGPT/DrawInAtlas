@@ -1970,6 +1970,20 @@ responsiveness are **not** established as faster. T-095 stays **In Progress**
 with manual review pending, and T-096 remains **Manual Review**. Hosted CI and
 owner device checks remain unverified. [Evidence](evidence/T-095-2026-11-11-duplicate-waypoints.md).
 
+**T-095 render-frame phase history (2026-11-11; In Progress):**
+Canvas now retains the latest **1,024 active-stroke frame CPU phase samples**
+(full draw including overlays, compositor, texture upload, preview indexing,
+selection outline), while preserving lifetime frame count/worst values and
+existing input/stage instrumentation. The new **19/19** oracle covers multiple
+ring wraps, a late stall, actual preview callbacks, byte-exact Brush pixels
+and Undo/Redo; disabling live recording fails two checks. Adjacent model,
+Xvfb pointer/navigation and native-absent import checks pass locally.
+**This is profiling instrumentation, not a physical latency fix.** Owner
+GPU/input-to-photon recheck, documented hardware budget, explicit manual
+acceptance and hosted CI remain open. T-095 stays **In Progress**;
+T-096 remains **Manual Review**. [Ticket](Tickets/T-095.md) ·
+[evidence](evidence/T-095-2026-11-11-frame-phase-window.md).
+
 **T-095 duplicate input-target bounded drain (2026-11-11; In Progress):**
 At 60px, the Legacy input drain previously dispatched each repeated source
 point as a separate paint call even though consecutive stationary dabs add no

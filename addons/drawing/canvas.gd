@@ -216,11 +216,15 @@ const MIN_CONSUMED_SAMPLE_COMPACTION: int = 256
 ## long ones. All-time count and worst age remain exact, including evicted ages.
 const MAX_SAMPLE_STAGE_LATENCIES: int = 4096
 const MAX_STAGE_BATCH_LATENCIES: int = 4096
+# Preserve the latest real Canvas frames for per-phase p50/p95 on owner
+# hardware without retaining an unbounded history on long pointer strokes.
+const MAX_FRAME_PHASE_SAMPLES: int = 1024
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
 var _sample_latency_write_index: int = 0
 var _batch_latency_write_index: int = 0
+var _frame_phase_write_index: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -856,6 +860,12 @@ func _draw() -> void:
 		draw_arc(last_pointer_position, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.9), 1.0)
 	if session != null and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
+	# Unlike the earlier draw_cpu_us field, this includes grid, selection and
+	# cursor overlays. Capture actual rendered preview frames only, not the
+	# post-commit idle redraw. Frame callbacks do not measure photons.
+	last_frame_metrics["full_draw_cpu_us"] = Time.get_ticks_usec() - draw_start
+	if session != null:
+		_record_frame_phase(last_frame_metrics)
 
 
 ## The persistent selection always traces mask truth, never the conservative
@@ -1113,6 +1123,7 @@ func start_gesture(position: Vector2) -> void:
 	_sample_index = 0
 	_sample_latency_write_index = 0
 	_batch_latency_write_index = 0
+	_frame_phase_write_index = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1127,7 +1138,11 @@ func start_gesture(position: Vector2) -> void:
 		"stage_batch_total": 0, "max_stage_batch_us": 0,
 		"commit_cpu_us": 0, "preview_frames": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0,
-		"preview_index_cpu_us": 0, "bytes_uploaded": 0}
+		"preview_index_cpu_us": 0, "bytes_uploaded": 0,
+		"frame_phase_total": 0, "frame_phases_us": [],
+		"max_frame_full_draw_cpu_us": 0, "max_frame_compose_cpu_us": 0,
+		"max_frame_texture_cpu_us": 0, "max_frame_preview_index_cpu_us": 0,
+		"max_frame_selection_outline_cpu_us": 0}
 	gesture_started.emit()
 	_enqueue_sample(_staged_position)
 	# A stationary dab does not wait for the first motion or mouse-up event.
@@ -1269,6 +1284,37 @@ func _drain_segments(budget: int) -> void:
 		_commit_stroke()
 
 
+## Keep an ordered, bounded per-frame profile instead of just cumulative
+## compose/texture/index time. Total frame count and worst samples remain exact
+## even when the oldest observations are evicted. Never infer physical
+## input-to-photon latency from a Godot CPU draw callback.
+func _record_frame_phase(frame: Dictionary) -> void:
+	var sample: Dictionary = {}
+	for key: String in ["full_draw_cpu_us", "compose_cpu_us", "texture_cpu_us",
+			"preview_index_cpu_us", "selection_outline_cpu_us"]:
+		var value: int = maxi(0, int(frame.get(key, 0)))
+		sample[key] = value
+		var max_key: String = "max_frame_" + key
+		_metrics[max_key] = maxi(int(_metrics.get(max_key, 0)), value)
+	_metrics["frame_phase_total"] = int(_metrics["frame_phase_total"]) + 1
+	var records: Array = _metrics["frame_phases_us"] as Array
+	if records.size() < MAX_FRAME_PHASE_SAMPLES:
+		records.append(sample)
+	else:
+		records[_frame_phase_write_index] = sample
+		_frame_phase_write_index = (_frame_phase_write_index + 1) % MAX_FRAME_PHASE_SAMPLES
+
+
+func _finalize_frame_phase_window() -> void:
+	if int(_metrics["frame_phase_total"]) <= MAX_FRAME_PHASE_SAMPLES \
+			or _frame_phase_write_index == 0:
+		return
+	var records: Array = _metrics["frame_phases_us"] as Array
+	var ordered: Array = records.slice(_frame_phase_write_index)
+	ordered.append_array(records.slice(0, _frame_phase_write_index))
+	_metrics["frame_phases_us"] = ordered
+
+
 ## A long stroke must not freeze its batch latency profile at the first
 ## 4096 batches; later overloads matter most when diagnosing pointer lag.
 ## Record all-time count/worst with a fixed latest-window distribution.
@@ -1365,6 +1411,7 @@ func _commit_stroke() -> void:
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	_finalize_stage_latency_window()
 	_finalize_stage_batch_window()
+	_finalize_frame_phase_window()
 	last_gesture_metrics = _metrics.duplicate(true)
 	_restore_input_accumulation()
 	_samples.clear()

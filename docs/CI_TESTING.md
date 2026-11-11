@@ -1743,3 +1743,21 @@ An opt-in `t095_native_hard_scanline_bench.gd` times **only native coverage
 and output**, not Godot staging, compositor, pointer motion or real display.
 It is not included in the required 46-step fast-GDScript CI. Hosted workflow
 and owner hardware acceptance remain unverified; T-095 stays In Progress.
+
+### T-095 bounded render-frame phase instrumentation — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_frame_phase_window_smoke.gd` after staging the canonical
+Drawing app. It requires the exact `T095_FRAME_PHASE_PASSED` marker through
+the existing fail-closed `check_godot_model_log.py` tool and retains
+`/tmp/t095-frame-phase.log` under `if: always()`.
+
+The local **19/19** test covers a 1024-frame bounded ring, three wraps plus
+late samples, a retained lifetime maximum for an evicted compositor outlier,
+chronologically aligned five-phase CPU samples, real Canvas preview callbacks,
+independent pixel/history parity, and Undo/Redo. Disabling live recording in a
+temporary staged copy fails two checks. A fresh native-absent standalone import
+passes. Required fast desktop check IDs and the T-094 strict log policy are
+unchanged. CPU callback times **cannot prove physical input-to-photon latency**;
+reference-device owner acceptance, hosted CI and T-095 manual review remain
+outstanding. [Evidence](evidence/T-095-2026-11-11-frame-phase-window.md).
