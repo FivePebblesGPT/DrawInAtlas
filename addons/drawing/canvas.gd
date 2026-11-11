@@ -863,8 +863,14 @@ func _draw() -> void:
 	# Unlike the earlier draw_cpu_us field, this includes grid, selection and
 	# cursor overlays. Capture actual rendered preview frames only, not the
 	# post-commit idle redraw. Frame callbacks do not measure photons.
-	last_frame_metrics["full_draw_cpu_us"] = Time.get_ticks_usec() - draw_start
+	var frame_end_us: int = Time.get_ticks_usec()
+	last_frame_metrics["full_draw_cpu_us"] = frame_end_us - draw_start
 	if session != null:
+		# Capture pending pointer age at the same instant as the draw phases.
+		# A queued waypoint and a partly interpolated target are distinct input
+		# samples; both count even when one was already dequeued for staging.
+		last_frame_metrics["frame_end_us"] = frame_end_us
+		last_frame_metrics.merge(_frame_input_backlog(frame_end_us), true)
 		_record_frame_phase(last_frame_metrics)
 
 
@@ -1142,7 +1148,8 @@ func start_gesture(position: Vector2) -> void:
 		"frame_phase_total": 0, "frame_phases_us": [],
 		"max_frame_full_draw_cpu_us": 0, "max_frame_compose_cpu_us": 0,
 		"max_frame_texture_cpu_us": 0, "max_frame_preview_index_cpu_us": 0,
-		"max_frame_selection_outline_cpu_us": 0}
+		"max_frame_selection_outline_cpu_us": 0,
+		"max_frame_pending_input_count": 0, "max_frame_oldest_pending_age_us": 0}
 	gesture_started.emit()
 	_enqueue_sample(_staged_position)
 	# A stationary dab does not wait for the first motion or mouse-up event.
@@ -1284,6 +1291,22 @@ func _drain_segments(budget: int) -> void:
 		_commit_stroke()
 
 
+## Sample the oldest *outstanding* pointer timestamp, including the current
+## interpolation target that has already been dequeued. Ignore consumed array
+## prefixes, so queue compaction and long source-space segments do not skew
+## frame age/depth. These are engine-receipt timestamps, not OS device times.
+func _frame_input_backlog(now_us: int) -> Dictionary:
+	var queued: int = maxi(0, _sample_times_us.size() - _sample_index)
+	var oldest_us: int = now_us
+	if queued > 0:
+		oldest_us = mini(oldest_us, _sample_times_us[_sample_index])
+	if _has_segment_target:
+		queued += 1
+		oldest_us = mini(oldest_us, _target_arrival_us)
+	return {"pending_input_count": queued,
+		"oldest_pending_age_us": maxi(0, now_us - oldest_us) if queued > 0 else 0}
+
+
 ## Keep an ordered, bounded per-frame profile instead of just cumulative
 ## compose/texture/index time. Total frame count and worst samples remain exact
 ## even when the oldest observations are evicted. Never infer physical
@@ -1291,11 +1314,15 @@ func _drain_segments(budget: int) -> void:
 func _record_frame_phase(frame: Dictionary) -> void:
 	var sample: Dictionary = {}
 	for key: String in ["full_draw_cpu_us", "compose_cpu_us", "texture_cpu_us",
-			"preview_index_cpu_us", "selection_outline_cpu_us"]:
+			"preview_index_cpu_us", "selection_outline_cpu_us",
+			"pending_input_count", "oldest_pending_age_us"]:
 		var value: int = maxi(0, int(frame.get(key, 0)))
 		sample[key] = value
 		var max_key: String = "max_frame_" + key
 		_metrics[max_key] = maxi(int(_metrics.get(max_key, 0)), value)
+	# Monotonic engine time allows phase and backlog spikes to be correlated
+	# without pretending to measure physical input-to-photon latency.
+	sample["frame_end_us"] = maxi(0, int(frame.get("frame_end_us", 0)))
 	_metrics["frame_phase_total"] = int(_metrics["frame_phase_total"]) + 1
 	var records: Array = _metrics["frame_phases_us"] as Array
 	if records.size() < MAX_FRAME_PHASE_SAMPLES:

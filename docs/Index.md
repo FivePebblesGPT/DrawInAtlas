@@ -2149,3 +2149,16 @@ The Web-only [T-044 historical ticket](Archive/Web/T-044.md) is paused; native p
 ## Maintaining this index
 
 When adding or changing a ticket, keep its frontmatter and this table synchronized. Run `python3 tools/validate_ticket_store.py`; CI also checks these on repository updates. Never turn a manually gated ticket or any dependent ticket Done without the owner's explicit recorded approval.
+
+**T-095 frame-aligned pointer backlog telemetry (2026-11-11; In Progress):**
+The bounded 1,024-sample render-frame history now correlates actual Canvas
+full-draw and compositor CPU with monotonic frame time, pending sample count
+and oldest outstanding pointer age (including partial interpolation). Peak
+age/depth survive window wrap and queue compaction does not skew measurements.
+The graphical 60px mouse-event witness reports retained-window p50/p95 and
+max pending ages; a separate **24/24** pixel/Undo/Redo and ring-buffer oracle
+passes while the old Canvas fails four checks. This is diagnostics only, **not
+physical responsiveness acceptance or a speedup claim**. T-095 stays
+**In Progress** with `manual_review: true`; T-096 stays **Manual Review**;
+owner hardware and hosted CI remain unverified.
+[Evidence](evidence/T-095-2026-11-11-frame-backlog-correlation.md).

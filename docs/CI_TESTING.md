@@ -144,6 +144,23 @@ benchmarks are **not** pointer-to-photon or owner-hardware acceptance. The
 
 # Godot CI policy: fast desktop core and deferred compatibility coverage
 
+## T-095 aligned input-backlog/Canvas-frame diagnostics — 2026-11-11
+
+The non-gating, manually dispatched `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_frame_input_backlog_smoke.gd` after staging the canonical
+addon. The strict T-094 fail-closed checker requires exactly one
+`T095_FRAME_BACKLOG_PASSED` marker, and `if: always()` uploads the raw
+`/tmp/t095-frame-backlog.log`. The **24/24** local oracle verifies pending
+sample age/count across interpolation and queue compaction, the latest-1024
+frame ring with lifetime maxima, actual 60px Brush draw samples, independent
+RGBA8 source parity and Undo/Redo. The previous Canvas fails four checks.
+The graphical `brush_latency_native.gd` witness additionally prints bounded
+frame-pending-age/depth p50/p95/max statistics alongside draw CPU p50/p95;
+these are engine CPU/receipt times, not physical GPU or input-to-photon
+measurements. The 46 required fast-CI IDs remain unchanged. Hosted CI and
+owner-device acceptance are unverified.
+[Evidence](evidence/T-095-2026-11-11-frame-backlog-correlation.md).
+
 ## T-095 Canvas preview projection reuse — 2026-11-11
 
 The non-gating, on-demand `godot-native-t095-brush.yml` stages the canonical

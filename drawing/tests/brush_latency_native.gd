@@ -17,6 +17,11 @@ var batch_ms: Array[float] = []
 var commit_ms: Array[float] = []
 var post_draw_ms: Array[float] = []
 var pending: Array[float] = []
+# Completed gesture's bounded frames, not repeated reads of the last draw.
+var frame_full_draw_ms: Array[float] = []
+var frame_pending_age_ms: Array[float] = []
+var frame_pending_count: Array[float] = []
+var frame_total: int = 0
 
 
 func verify(ok: bool, message: String) -> void:
@@ -165,6 +170,16 @@ func run() -> void:
 		commit_ms.append(float(stats.get("commit_cpu_us", 0)) / 1000.0)
 		post_draw_ms.append(float(int(stats.get("first_frame_post_draw_us", 0)) -
 			int(stats.get("down_us", 0))) / 1000.0)
+		# The engine's actual per-gesture draw history preserves the pairing of
+		# rendering cost and pending input age. It is a latest-1024-frame window,
+		# not a physical device/input-to-photon measurement.
+		var frame_samples: Array = stats.get("frame_phases_us", []) as Array
+		frame_total += int(stats.get("frame_phase_total", 0))
+		for frame_variant: Variant in frame_samples:
+			var frame: Dictionary = frame_variant as Dictionary
+			frame_full_draw_ms.append(float(frame.get("full_draw_cpu_us", 0)) / 1000.0)
+			frame_pending_age_ms.append(float(frame.get("oldest_pending_age_us", 0)) / 1000.0)
+			frame_pending_count.append(float(frame.get("pending_input_count", 0)))
 		for microseconds: Variant in stats.get("sample_to_stage_us", []):
 			input_stage_ms.append(float(microseconds) / 1000.0)
 		for microseconds: Variant in stats.get("stage_batches_us", []):
@@ -211,6 +226,13 @@ func run() -> void:
 		percentile(preview_index_ms, 0.95), percentile(commit_ms, 0.5),
 		percentile(commit_ms, 0.95), percentile(post_draw_ms, 0.95),
 		int(pending.max()), failures])
+	print("T095_NATIVE_FRAME_BACKLOG_SUMMARY retained_frames=%d total_frames=%d draw_p50_ms=%.3f draw_p95_ms=%.3f pending_age_p50_ms=%.3f pending_age_p95_ms=%.3f pending_age_max_ms=%.3f pending_count_p95=%.0f pending_count_max=%.0f" % [
+		frame_pending_age_ms.size(), frame_total,
+		percentile(frame_full_draw_ms, 0.5), percentile(frame_full_draw_ms, 0.95),
+		percentile(frame_pending_age_ms, 0.5), percentile(frame_pending_age_ms, 0.95),
+		frame_pending_age_ms.max() if not frame_pending_age_ms.is_empty() else 0.0,
+		percentile(frame_pending_count, 0.95),
+		frame_pending_count.max() if not frame_pending_count.is_empty() else 0.0])
 	if failures == 0:
 		print("T095_NATIVE_PASSED")
 	quit(1 if failures > 0 else 0)
