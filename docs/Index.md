@@ -1931,6 +1931,18 @@ benchmarks vary with warmup and do not establish whole-gesture speedup.
 Review.** Owner-device responsiveness and hosted CI remain unverified.
 [Evidence](evidence/T-095-2026-11-11-native-preset-packed-output.md).
 
+**T-095 unchanged-preview Canvas redraw scheduling (2026-11-11; In Progress):**
+The Brush drain no longer queues an image redraw merely for successfully
+consumed input: it compares the detached preview generation before/after
+each drain and retains redraws for changed pixels, commits and pointer cursor
+motion. A 24-assertion real-Canvas draw callback oracle passes (**7** draws),
+while the previous source fails three assertions (**55** draws); independent
+source/history, rollback, native and Xvfb witnesses remain green locally.
+This is not a physical 60px input-to-photon result. **T-095 remains In
+Progress**, `manual_review: true`, and **T-096 remains Manual Review**;
+owner-device acceptance and hosted CI are unverified.
+[Evidence](evidence/T-095-2026-11-11-noop-preview-redraw.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).

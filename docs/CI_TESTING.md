@@ -94,6 +94,22 @@ benchmarks are **not** pointer-to-photon or owner-hardware acceptance. The
 
 # Godot CI policy: fast desktop core and deferred compatibility coverage
 
+## T-095 unchanged-preview Canvas redraw oracle — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_noop_redraw_smoke.gd` in the headless Drawing package,
+requires the exact `T095_NOOP_REDRAW_PASSED` marker through the T-094
+fail-closed log verifier, and uploads the raw log under `if: always()`.
+The **24/24** local SceneTree test counts real Canvas `draw` callbacks
+across consecutive consumed samples, compares source/history with an
+independent edit, and exercises a fully selection-masked stroke. Against the
+original staged Canvas it fails three checks (**55** callbacks); with the
+preview-generation check it passes (**7** callbacks). This is a software
+redraw-scheduling witness, **not** owner-device 60px Brush acceptance, a
+whole-gesture latency benchmark, or hosted CI verification. No required
+fast-CI check ID, ticket status, or manual-review gate changes.
+[Evidence](evidence/T-095-2026-11-11-noop-preview-redraw.md).
+
 ## T-095 Hokusai buffered native pigment delta oracle — 2026-11-11
 
 The **on-demand**, non-gating `godot-native-t095-brush.yml` builds the real

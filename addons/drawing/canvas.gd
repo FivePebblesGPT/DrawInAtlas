@@ -1129,7 +1129,11 @@ func _drain_segments(budget: int) -> void:
 		return
 	var drain_start_us: int = Time.get_ticks_usec()
 	var segments: int = 0
-	var changed: bool = false
+	# Staging an already covered or selection-masked sample does not change
+	# the detached preview. Avoid forcing an expensive canvas draw just
+	# because an input sample was consumed; actual pixel mutations increment
+	# the session preview generation (including edits that restore old bytes).
+	var preview_before: int = session._preview_epoch
 	# A wide brush can rasterize more candidates in one segment than a
 	# narrow one does in 16. Limit the atomic batch by swept footprint so
 	# the soft deadline is not defeated by one oversized paint_path call.
@@ -1189,7 +1193,6 @@ func _drain_segments(budget: int) -> void:
 			_metrics["first_stage_us"] = staged_at_us
 		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
 		_staged_position = next_position
-		changed = true
 		for arrival_us: int in completed_arrivals:
 			_record_stage_latency(maxi(0, staged_at_us - arrival_us))
 		# The deadline is checked between atomic batches, never during a
@@ -1200,7 +1203,9 @@ func _drain_segments(budget: int) -> void:
 	_metrics["max_drain_cpu_us"] = maxi(int(_metrics["max_drain_cpu_us"]),
 		Time.get_ticks_usec() - drain_start_us)
 	_compact_sample_queue()
-	if changed:
+	# A failed batch cancels above; a finished stroke queues its own redraw
+	# from _commit_stroke(). Do not dereference the discarded session.
+	if session != null and session._preview_epoch != preview_before:
 		queue_redraw()
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
