@@ -152,7 +152,7 @@ jobs:
             2>&1 | tee /tmp/t095-preview-input-postdraw.log
           python3 tools/check_godot_model_log.py /tmp/t095-preview-input-postdraw.log \
             --marker T095_PREVIEW_INPUT_POSTDRAW_PASSED
-      - name: T-095 owner trace analyzer file, clock-reset and overlapping-commit epochs
+      - name: T-095 trace analyzer epoch and retained-observation consistency
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p test_t095_trace_analyzer.py -v \

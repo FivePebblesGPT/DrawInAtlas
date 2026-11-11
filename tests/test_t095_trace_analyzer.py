@@ -101,6 +101,41 @@ class T095TraceAnalyzerTest(unittest.TestCase):
                 with self.assertRaises(analyzer.TraceError):
                     analyzer.summarize_stroke(row, 1)
 
+    def test_inconsistent_retained_histories_fail_closed(self) -> None:
+        """Never report a false lifetime maximum or impossible callback coverage."""
+        corruptions = [
+            ("sample_max_under_retained", {"max_sample_to_stage_us": 2_999}),
+            ("pending_max_under_retained", {"max_frame_oldest_pending_age_us": 8_899}),
+            ("callback_count_under_retained", {"frame_post_draw_matches": 0}),
+            ("input_match_count_under_retained", {"preview_input_post_draw_matches": 0}),
+            ("stage_matches_exceed_submissions", {"preview_stage_post_draw_matches": 4}),
+            ("stage_to_draw_without_submission", {
+                "frame_preview_stage_submissions": 0,
+                "frame_phases_us": [
+                    {"preview_stage_to_frame_end_us": 400},
+                ],
+            }),
+            ("stage_callback_without_match", {
+                "preview_stage_post_draw_matches": 0,
+                "frame_phases_us": [
+                    {"preview_stage_to_frame_end_us": 400,
+                     "preview_stage_to_post_draw_us": 800,
+                     "frame_end_to_post_draw_us": 400},
+                ],
+            }),
+            ("callback_delay_without_frame_match", {
+                "frame_phases_us": [
+                    {"preview_input_to_post_draw_us": 900},
+                ],
+            }),
+        ]
+        for name, edits in corruptions:
+            with self.subTest(name=name):
+                row = record()
+                row.update(edits)
+                with self.assertRaises(analyzer.TraceError):
+                    analyzer.summarize_stroke(row, 1)
+
     def test_different_backends_or_zoom_never_aggregate_together(self) -> None:
         a = analyzer.summarize_stroke(record(), 1)
         b = analyzer.summarize_stroke(record(start=200_000), 2)

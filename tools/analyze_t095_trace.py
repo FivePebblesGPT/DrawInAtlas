@@ -136,10 +136,13 @@ def summarize_stroke(
         raise TraceError(f"stroke {index}: non-monotonic input/release/commit timestamps")
 
     metrics: dict[str, dict[str, Any]] = {}
+    metrics_sample: list[int] = []
     for label, key, total_key in SAMPLE_SPECS:
         metric = samples(record.get(key), f"stroke {index} {key}", 4096)
         total = nonnegative_int(record.get(total_key), f"stroke {index} {total_key}")
         metrics[label] = distribution(metric, total)
+        if label == "sample_to_stage":
+            metrics_sample = metric
     phases = record.get("frame_phases_us")
     if not isinstance(phases, list) or len(phases) > 1024:
         raise TraceError(f"stroke {index}: invalid frame window")
@@ -166,8 +169,34 @@ def summarize_stroke(
                 "frame_phase_total", "frame_post_draw_matches",
                 "preview_input_post_draw_matches"):
         counts[key] = nonnegative_int(record.get(key), f"stroke {index} {key}")
-    if counts["preview_stage_post_draw_matches"] > frame_matches or input_matches > counts["frame_preview_stage_submissions"]:
+    if (counts["preview_stage_post_draw_matches"] > frame_matches
+            or counts["preview_stage_post_draw_matches"] > counts["frame_preview_stage_submissions"]
+            or input_matches > counts["frame_preview_stage_submissions"]):
         raise TraceError(f"stroke {index}: impossible changed-preview match counts")
+
+    # The exporter records exact lifetime counts/maxima even after evicting
+    # old samples. Retained observations cannot exceed those declarations:
+    # accepting such traces would report an understated worst-case stall.
+    if (any(value > counts["max_sample_to_stage_us"] for value in metrics_sample)
+            or any(phase.get("oldest_pending_age_us", 0)
+                   > counts["max_frame_oldest_pending_age_us"] for phase in phases)):
+        raise TraceError(f"stroke {index}: retained sample exceeds lifetime maximum")
+    observed_counts = (
+        ("post_draw_callback", frame_matches),
+        ("preview_stage_to_draw", counts["frame_preview_stage_submissions"]),
+        ("preview_stage_to_callback", counts["preview_stage_post_draw_matches"]),
+        ("preview_input_to_callback", input_matches),
+    )
+    if any(metrics[label]["retained"] > lifetime for label, lifetime in observed_counts):
+        raise TraceError(f"stroke {index}: retained event exceeds lifetime count")
+    # A preview callback is paired with a particular completed Canvas draw.
+    # It is not a separate measurement when its draw was never recorded.
+    for phase in phases:
+        for prefix in ("preview_stage", "preview_input"):
+            if f"{prefix}_to_post_draw_us" in phase and (
+                    "frame_end_to_post_draw_us" not in phase
+                    or f"{prefix}_to_frame_end_us" not in phase):
+                raise TraceError(f"stroke {index}: orphaned preview callback timing")
     return {
         "stroke": index, "source_file_index": source_file_index,
         "timestamp_epoch_index": timestamp_epoch_index,

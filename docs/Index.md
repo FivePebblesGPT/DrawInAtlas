@@ -2216,7 +2216,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Native rollback/scanlines/output transport tested; owner device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Brush/native regressions and owner-trace validation tested; physical-device/review gate outstanding | [T-053](Tickets/T-053.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 
 ## Epics
@@ -2267,3 +2267,15 @@ observability, **not physical input-to-photon timing or a responsiveness
 speedup**. T-095 stays **In Progress** (`manual_review: true`); T-096 remains
 **Manual Review**, and hosted CI/owner hardware acceptance are unverified.
 [Evidence](evidence/T-095-2026-11-11-postdraw-callback-pairing.md).
+
+**T-095 owner-trace internal consistency (2026-11-11; In Progress):**
+The offline owner trace analyzer now rejects contradictory retained observations:
+measured input/backlog samples exceeding recorded lifetime maxima, matched
+callback or changed-preview observations exceeding lifetime counts, and
+preview callbacks without a corresponding draw. An independent failing
+control exposed five accepted contradictions on the previous analyzer; the
+updated Python suite passes **11/11**. The real schema-1 Godot exporter and
+five-stroke Xvfb trace still parse; Brush/native rollback checks pass.
+This is diagnostic integrity, not a hardware responsiveness improvement or
+owner acceptance. T-095 stays In Progress (`manual_review: true`) and T-096
+remains Manual Review. [Evidence](evidence/T-095-2026-11-11-trace-retained-consistency.md).

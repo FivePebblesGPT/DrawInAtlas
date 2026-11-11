@@ -1912,3 +1912,23 @@ frames never masquerade as zero-delay callbacks. These observations are engine
 intervals, **not physical input-to-photon**. Required fast-CI check IDs and
 T-094 strict logging are unchanged; hosted Actions and owner acceptance remain
 unverified. [Evidence](evidence/T-095-2026-11-11-preview-stage-postdraw.md).
+
+## T-095 offline owner trace retained-history consistency — 2026-11-11
+
+The existing non-gating `godot-native-t095-brush.yml` Python analyzer step now
+checks **11 contracts** (previously 10) under the same fail-closed
+`T095_TRACE_ANALYZER_PASSED` marker. New negative controls assert that the
+schema-1 Godot exporter cannot be misrepresented by retained samples greater
+than lifetime timing maxima, callback observations greater than matched
+counts, changed-preview callbacks greater than submissions, or callbacks
+without their source draw. A previous-analyzer control fails five subcases;
+corrected analyzer passes all eight corruptions and 11/11 contracts.
+
+The unchanged real Godot exporter passes 17/17 and its graphical 60px
+five-stroke trace parses with real callback samples. The adjacent Brush
+coverage, input-to-preview timing, NativeHard and Hokusai rollback smoke
+checks also pass. Analysis remains schema `t095_trace_analysis_v3`, input
+remains Godot schema 1, and existing fast CI check IDs and the T-094 strict
+log guard are unchanged. Neither Xvfb renderer callbacks nor an offline
+analyzer establish physical responsiveness or owner approval.
+[Evidence](evidence/T-095-2026-11-11-trace-retained-consistency.md).
