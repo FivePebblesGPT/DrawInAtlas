@@ -1958,6 +1958,18 @@ font import. **T-095 remains In Progress, `manual_review: true`; T-096 remains
 Manual Review.** Hosted CI and real-device acceptance are unverified.
 [Evidence](evidence/T-095-2026-11-11-preview-index-reuse.md).
 
+**T-095 same-batch duplicate hard-brush waypoint optimization (2026-11-11; In Progress):**
+Legacy `paint_path()` now avoids rewalking identical adjacent 60px dabs
+*inside a call* while preserving the first dab of every new call, since
+selection, clipping or width can change across calls. An independent
+**276/276** oracle checks signed Brush/Eraser pixels, preview, rollback,
+changed-settings batches and Undo/Redo; disabling the optimization fails ten
+checks. The isolated 360-waypoint CPU median fell from **127.162 ms** to
+**11.837 ms**, but default one-waypoint pointer drains and physical GPU
+responsiveness are **not** established as faster. T-095 stays **In Progress**
+with manual review pending, and T-096 remains **Manual Review**. Hosted CI and
+owner device checks remain unverified. [Evidence](evidence/T-095-2026-11-11-duplicate-waypoints.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).

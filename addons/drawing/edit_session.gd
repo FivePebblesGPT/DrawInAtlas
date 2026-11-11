@@ -68,6 +68,9 @@ var _brush_tile_journal: Dictionary[String, Dictionary] = {}
 var _brush_change_count_before_batch: int = 0
 var _closed: bool = false
 var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
+## Count stationary waypoints elided by the once-only Legacy hard-brush path.
+## Native pigment presets intentionally retain every pressure/dab sample.
+var _duplicate_waypoints_skipped: int = 0
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
 
@@ -829,6 +832,15 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 			_rollback_paint()
 			return DrawingResult.failure("COORD_RANGE", "Brush point is outside the view-relative range")
 		var start: Vector2 = previous if index > 0 or _has_last else position
+		# A repeated source position adds no coverage to the once-only hard
+		# Brush/Eraser *within the same batch*. Repaint the first point of
+		# every call: public callers may change width, selection or clip
+		# between calls, exposing previously uncovered pixels at that point.
+		# Hokusai uses a separate accumulating-pigment API and is untouched.
+		if index > 0 and position == start:
+			_duplicate_waypoints_skipped += 1
+			previous = position
+			continue
 		var touched: DrawingResult = _paint_segment(start, position, width * 0.5, rgba,
 			erase, selection, max_candidates, clip_bounds)
 		if not touched.ok:

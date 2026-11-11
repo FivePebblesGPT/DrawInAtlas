@@ -1,3 +1,19 @@
+## T-095 same-batch duplicate waypoint oracle — 2026-11-11
+
+The on-demand `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_duplicate_waypoints_smoke.gd` using the same fail-closed
+`check_godot_model_log.py` and its exact `T095_DUPLICATE_WAYPOINT_PASSED`
+marker, retaining `/tmp/t095-duplicate-waypoints.log` even when later steps
+fail. The independent 276-check test validates signed RGBA8 preview/commit,
+Brush/Eraser history, clipping and mask changes *across* batches, and
+failure/retry. The skip applies only to consecutive identical points **inside**
+one Legacy `paint_path()` call, not to native Hokusai pigment or changed
+settings at the same position across calls. A disabled-shortcut control fails
+ten checks. The isolated seven-run 60px batch CPU witness has no CI timing
+budget. Neither the 46 required fast-CI checks nor T-094's fail-closed logging
+policy changes. Hosted CI, whole-pointer latency and owner hardware approval
+remain unverified. [Evidence](evidence/T-095-2026-11-11-duplicate-waypoints.md).
+
 ## T-095 stationary/axis scanline bounds independent oracle — 2026-11-11
 
 The **on-demand** `godot-native-t095-brush.yml` checks

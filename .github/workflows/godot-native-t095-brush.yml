@@ -28,6 +28,14 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/t095-oracle.log
           python3 tools/check_godot_model_log.py /tmp/t095-oracle.log --marker T095_ORACLE_PASSED
+      - name: T-095 duplicate stationary hard-brush waypoint/source-history oracle
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_duplicate_waypoints_smoke.gd \
+            2>&1 | tee /tmp/t095-duplicate-waypoints.log
+          python3 tools/check_godot_model_log.py /tmp/t095-duplicate-waypoints.log \
+            --marker T095_DUPLICATE_WAYPOINT_PASSED
       - name: T-095 suppress unchanged-preview redraws across delivered input frames
         run: |
           set -euo pipefail
@@ -245,6 +253,7 @@ jobs:
           path: |
             /tmp/t095-oracle.log
             /tmp/t095-noop-redraw.log
+            /tmp/t095-duplicate-waypoints.log
             /tmp/t095-preview-index-reuse.log
             /tmp/t095-brush-deferred.log
             /tmp/t095-brush-tile-reference.log
