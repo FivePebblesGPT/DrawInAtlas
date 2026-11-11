@@ -187,6 +187,16 @@ var _cache_access: int = 0
 var _occupied_display_tiles: Dictionary[String, bool] = {}
 var _occupancy_unknown: bool = false
 var last_frame_metrics: Dictionary[String, Variant] = {}
+## Cursor/overlay redraws can happen without a detached pixel changing. Retain
+## only the last bounded visible preview index; it is owned by this Canvas and
+## never returned to external callers for mutation. Source edits advance the
+## session epoch, and navigation changes the visible tile rectangle.
+var _preview_index_owner: DrawingEditSession
+var _preview_index_epoch: int = -1
+var _preview_index_revision: int = -1
+var _preview_index_window: Rect2i = Rect2i()
+var _preview_index_result: Dictionary = {}
+var _preview_index_reused: bool = false
 var _last_frame_submit_us: int = 0
 var _reported_render_errors: Dictionary[String, bool] = {}
 ## Motion handlers append raw canvas-source positions only. Bounded pieces are
@@ -653,6 +663,32 @@ func _raster_screen_rect(area: Rect2i) -> Rect2:
 	return Rect2(first, last - first)
 
 
+## Cache the expensive storage-to-display stamp projection only while its
+## inputs are identical. The result is private to this Canvas: neither the
+## edit session nor another consumer can mutate the cached stamp dictionary.
+## A closed or revision-invalidated session always recomputes (and returns
+## blank stamps), even if its last paint epoch happens to match.
+func _preview_index_for_draw(edit: DrawingEditSession, window: Rect2i) -> Dictionary:
+	_preview_index_reused = false
+	if edit == null:
+		_preview_index_owner = null
+		_preview_index_result = {}
+		return {}
+	var revision: int = edit.document.revision
+	if not edit._closed and _preview_index_owner == edit \
+			and _preview_index_epoch == edit._preview_epoch \
+			and _preview_index_revision == revision and _preview_index_window == window:
+		_preview_index_reused = true
+		return _preview_index_result
+	var result: Dictionary = edit.preview_stamps_for_display_tiles(window, DISPLAY_TILE_SIZE)
+	_preview_index_owner = edit
+	_preview_index_epoch = edit._preview_epoch
+	_preview_index_revision = revision
+	_preview_index_window = window
+	_preview_index_result = result
+	return result
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -660,6 +696,7 @@ func _draw() -> void:
 		"cache_hits": 0, "tiles_composited": 0, "source_pixels_rendered": 0,
 		"visible_layer_plan_builds": 0, "source_chunks_shared": 0,
 		"preview_index_built": 0, "preview_index_keys": 0, "preview_index_fallback": 0,
+		"preview_index_cache_hit": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0, "preview_index_cpu_us": 0,
@@ -668,6 +705,7 @@ func _draw() -> void:
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
+		_preview_index_for_draw(null, Rect2i())
 		last_frame_metrics = metrics
 		return
 	_draw_image_backdrop()
@@ -691,9 +729,9 @@ func _draw() -> void:
 	var use_preview_index: bool = false
 	if preview_session != null:
 		var index_start_us: int = Time.get_ticks_usec()
-		preview_index = preview_session.preview_stamps_for_display_tiles(visible_tiles,
-			DISPLAY_TILE_SIZE)
+		preview_index = _preview_index_for_draw(preview_session, visible_tiles)
 		metrics["preview_index_cpu_us"] = Time.get_ticks_usec() - index_start_us
+		metrics["preview_index_cache_hit"] = 1 if _preview_index_reused else 0
 		use_preview_index = bool(preview_index["indexed"])
 		if use_preview_index:
 			indexed_stamps = preview_index["stamps"] as Dictionary
@@ -701,6 +739,10 @@ func _draw() -> void:
 			metrics["preview_index_keys"] = indexed_stamps.size()
 		else:
 			metrics["preview_index_fallback"] = 1
+	else:
+		# Release the last detached index after commit/cancel, and avoid
+		# retaining an otherwise completed edit session from an idle Canvas.
+		_preview_index_for_draw(null, visible_tiles)
 	for y: int in range(start_y, end_y + 1):
 		for x: int in range(start_x, end_x + 1):
 			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1

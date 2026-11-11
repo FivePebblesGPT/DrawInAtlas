@@ -1943,6 +1943,21 @@ Progress**, `manual_review: true`, and **T-096 remains Manual Review**;
 owner-device acceptance and hosted CI are unverified.
 [Evidence](evidence/T-095-2026-11-11-noop-preview-redraw.md).
 
+**T-095 unchanged-preview display-index reuse (2026-11-11; In Progress):**
+The Canvas now retains one bounded detached preview-to-display-tile stamp
+projection across cursor/overlay redraws when its session identity, preview
+content generation, document revision and visible tile rectangle are stable.
+Real paint, pan, stale revisions, cancellation and no-session frames invalidate
+it; the existing overflow-budget fallback remains exact. A new independent
+**529/529** scene/model oracle and deliberate disabled-cache control (**5
+failures**) confirm parity and actual Canvas cache reuse. The synthetic
+240-storage-key 80-lookup witness measured ~58–62 ms recomputing the index
+versus ~0.04 ms reusing it, **not** a physical UI latency improvement.
+Adjacent T-086 model/native and Brush tests pass locally after a clean
+font import. **T-095 remains In Progress, `manual_review: true`; T-096 remains
+Manual Review.** Hosted CI and real-device acceptance are unverified.
+[Evidence](evidence/T-095-2026-11-11-preview-index-reuse.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).

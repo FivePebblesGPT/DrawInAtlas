@@ -94,6 +94,22 @@ benchmarks are **not** pointer-to-photon or owner-hardware acceptance. The
 
 # Godot CI policy: fast desktop core and deferred compatibility coverage
 
+## T-095 Canvas preview projection reuse — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` stages the canonical
+Drawing addon and runs `drawing/tests/t095_preview_index_reuse_smoke.gd`,
+requiring the exact `T095_PREVIEW_REUSE_PASSED` marker through the existing
+fail-closed `check_godot_model_log.py` verifier. The raw log is uploaded even
+if later workflow steps fail. This model/SceneTree oracle checks exact signed
+storage-to-display stamp parity, live paint invalidation, unchanged cursor
+redraw reuse, view changes, session swaps, cancellation, external document
+revisions and the over-budget fallback. A staged-only disabled-cache control
+failed 5 expectations. The isolated repeated index build timing is not a
+real-frame or hardware latency measurement. Neither the required fast-CI IDs
+nor T-094's strict crash and leak log policy changes; hosted CI and owner
+physical acceptance remain unverified.
+[Evidence](evidence/T-095-2026-11-11-preview-index-reuse.md).
+
 ## T-095 unchanged-preview Canvas redraw oracle — 2026-11-11
 
 The non-gating, on-demand `godot-native-t095-brush.yml` now runs
