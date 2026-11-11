@@ -1,3 +1,17 @@
+## T-095 built-in Godot script profiler and 96px stage attribution — 2026-11-11
+
+`godot --profiling --debug` captures real GDScript function-level cost on
+an Xvfb graphical 96px full-canvas pointer test. Its output is a subset of
+per-frame measurements with significant profiler overhead, **not** a complete
+wall-clock latency trace. The on-demand T-095 witness still requires its exact
+`T095_FULL_CANVAS_PASSED` marker and now emits cumulative preview/compositor,
+commit and drain phase CPU totals. One staged-only 30ms drain-budget test
+cut wall time while increasing frame-blocking CPU; the production 6ms value
+was restored and no acceptance or timing budget is added to hosted CI.
+The existing required 46 fast desktop check IDs, T-094 fail-closed log rules,
+manual review and owner-device gates are unchanged.
+[Evidence](evidence/T-095-2026-11-11-96px-godot-profiler.md).
+
 ## T-095 owner trace overlapping-commit epoch isolation — 2026-11-11
 
 The non-gating `godot-native-t095-brush.yml` now labels its existing analyzer

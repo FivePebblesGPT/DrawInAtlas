@@ -76,11 +76,11 @@ func check_all_red(doc: DrawingDocument, layer: String, label: String) -> void:
 			check(tile.pixel_count() == 256 * 256,
 				label + ": tile %d,%d contains every pixel" % [cx, cy])
 			var bytes: PackedByteArray = tile.to_rgba8()
-			var hash: HashingContext = HashingContext.new()
-			check(hash.start(HashingContext.HASH_SHA256) == OK,
+			var digest: HashingContext = HashingContext.new()
+			check(digest.start(HashingContext.HASH_SHA256) == OK,
 				label + ": SHA-256 initialized")
-			hash.update(bytes)
-			check(hash.finish().hex_encode() == RED_TILE_SHA256,
+			digest.update(bytes)
+			check(digest.finish().hex_encode() == RED_TILE_SHA256,
 				label + ": tile %d,%d matches independent all-red RGBA8 bytes" % [cx, cy])
 
 
@@ -171,9 +171,16 @@ func run() -> void:
 			"stroke %d has actual commit timestamps" % run_index)
 		check(Input.use_accumulated_input == original_accumulation,
 			"stroke %d restores engine input accumulation" % run_index)
-		print("T095_FULL_CANVAS_RUN index=%d backend=%s source_pixels=%d width_px=96 input_events=100 total_to_postdraw_ms=%.3f release_to_commit_ms=%.3f stage_cpu_ms=%.3f drain_frames=%d max_pending=%d" % [
+		print("T095_FULL_CANVAS_RUN index=%d backend=%s source_pixels=%d width_px=96 input_events=100 total_to_postdraw_ms=%.3f release_to_commit_ms=%.3f stage_cpu_ms=%.3f drain_frames=%d max_pending=%d commit_cpu_ms=%.3f compose_cpu_ms=%.3f texture_cpu_ms=%.3f preview_frames=%d segments_staged=%d drain_calls=%d max_batch_ms=%.3f max_drain_ms=%.3f" % [
 			run_index, canvas.brush_backend, SIDE * SIDE, elapsed, release, stage,
-			drained_frames, int(stats.get("max_pending", 0))])
+			drained_frames, int(stats.get("max_pending", 0)),
+			float(stats.get("commit_cpu_us", 0)) / 1000.0,
+			float(stats.get("compose_cpu_us", 0)) / 1000.0,
+			float(stats.get("texture_cpu_us", 0)) / 1000.0,
+			int(stats.get("preview_frames", 0)), int(stats.get("segments_staged", 0)),
+			int(stats.get("drain_calls", 0)),
+			float(stats.get("max_stage_batch_us", 0)) / 1000.0,
+			float(stats.get("max_drain_cpu_us", 0)) / 1000.0])
 		check_all_red(doc, layer, "stroke %d" % run_index)
 		var framebuffer: Image = root.get_texture().get_image()
 		var screen_point: Vector2i = Vector2i(canvas.global_position +

@@ -6,6 +6,18 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 built-in Godot profiler attribution (2026-11-11; In Progress):**
+The real 96px/512×512 mouse-event witness now reports full-stroke
+compositor, staging, commit and drain counters. The pinned `--profiling
+--debug` capture identifies GDScript compositor/Brush/commit hotspots.
+In one unprofiled llvmpipe run, preview compositing consumed **4.875s**
+of CPU, commit **1.578s** and staging **1.423s** across 161 draining frames
+(9.222s wall). A **staged-only** 30ms soft drain deadline reduced wall
+time to 4.719s but raised the maximum single drain call to 38ms; that
+setting was restored and must not ship as a responsiveness fix.
+T-095 and T-096 review gates are unchanged; owner hardware and hosted
+CI are unverified. [Evidence](evidence/T-095-2026-11-11-96px-godot-profiler.md).
+
 ## T-095 96px red full-canvas pointer baseline (2026-11-11; In Progress)
 
 A new real graphical pointer integration witness sends 100 Godot mouse events
