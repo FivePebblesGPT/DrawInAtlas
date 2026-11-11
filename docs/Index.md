@@ -6,6 +6,19 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 owner trace cohort isolation (2026-11-11; In Progress):**
+The offline trace analyzer no longer pools strokes from **different input files**
+merely because backend, width, zoom, viewport and canvas bounds match. The
+input file's 1-based index now scopes per-stroke and group summaries, without
+exposing filenames; the analysis output schema is v2. A red control merged
+indistinguishable 80 ms and 5 ms device traces; the corrected eight-contract
+suite keeps them separate and retains same-file grouping. An appended file
+can still contain multiple unidentifiable sessions; no hardware acceptance,
+owner approval or performance improvement is inferred. T-095 remains
+`In Progress` with `manual_review: true`; T-096 remains `Manual Review`.
+[Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-trace-cohort-isolation.md).
+
 **T-095 offline owner trace analysis (2026-11-11; In Progress):**
 A local, stdlib-only analyzer now summarizes the existing opt-in Brush JSONL
 records with nearest-rank retained-window p50/p95, lifetime counts/maxima,

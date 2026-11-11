@@ -103,8 +103,11 @@ def distribution(values: Sequence[int], total: int | None = None) -> dict[str, A
     }
 
 
-def summarize_stroke(record: Any, index: int) -> dict[str, Any]:
-    """Validate schema 1 and summarize a single successfully exported stroke."""
+def summarize_stroke(record: Any, index: int, *, source_file_index: int = 1) -> dict[str, Any]:
+    """Validate one stroke, retaining its input-file cohort without a filename."""
+    nonnegative_int(source_file_index, "source_file_index")
+    if source_file_index == 0:
+        raise TraceError("source_file_index: expected a positive integer")
     if not isinstance(record, dict):
         raise TraceError(f"stroke {index}: expected a JSON object")
     if record.get("schema") != 1 or record.get("capture_kind") != "engine_timing_only":
@@ -161,7 +164,8 @@ def summarize_stroke(record: Any, index: int) -> dict[str, Any]:
     if counts["preview_stage_post_draw_matches"] > frame_matches or input_matches > counts["frame_preview_stage_submissions"]:
         raise TraceError(f"stroke {index}: impossible changed-preview match counts")
     return {
-        "stroke": index, "backend": backend, "zoom": zoom, "brush_width_px": width,
+        "stroke": index, "source_file_index": source_file_index,
+        "backend": backend, "zoom": zoom, "brush_width_px": width,
         "viewport_px": record["viewport_px"], "image_size_px": record["image_size_px"],
         "held_ms": (release - down) / 1000,
         "release_to_commit_ms": (commit - release) / 1000,
@@ -177,7 +181,7 @@ def summarize_stroke(record: Any, index: int) -> dict[str, Any]:
 def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
     """Read and strictly validate every nonempty line of the provided files."""
     strokes: list[dict[str, Any]] = []
-    for path in paths:
+    for source_file_index, path in enumerate(paths, start=1):
         with path.open("rb") as handle:
             line_number = 0
             while raw := handle.readline(MAX_LINE_BYTES + 2):
@@ -193,7 +197,9 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
                 except (ValueError, UnicodeDecodeError) as exc:
                     raise TraceError(f"{path}:{line_number}: malformed JSONL record") from exc
                 try:
-                    strokes.append(summarize_stroke(decoded, len(strokes) + 1))
+                    strokes.append(summarize_stroke(
+                        decoded, len(strokes) + 1, source_file_index=source_file_index
+                    ))
                 except TraceError as exc:
                     raise TraceError(f"{path}:{line_number}: {exc}") from exc
     if not strokes:
@@ -202,10 +208,10 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
 
 
 def aggregate(strokes: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Group only like-for-like reproduction setups; label retained windows."""
+    """Never pool traces from separate files without verified device identity."""
     groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for stroke in strokes:
-        key = (stroke["backend"], stroke["brush_width_px"], stroke["zoom"],
+        key = (stroke["source_file_index"], stroke["backend"], stroke["brush_width_px"], stroke["zoom"],
                tuple(stroke["viewport_px"]), tuple(stroke["image_size_px"]))
         groups.setdefault(key, []).append(stroke)
     results: list[dict[str, Any]] = []
@@ -215,28 +221,34 @@ def aggregate(strokes: Sequence[dict[str, Any]]) -> dict[str, Any]:
             values = [round(item["release_to_commit_ms"] * 1000) for item in group]
             metrics[label] = distribution(values, len(values))
         results.append({
-            "backend": key[0], "brush_width_px": key[1], "zoom": key[2],
-            "viewport_px": list(key[3]), "image_size_px": list(key[4]),
+            "source_file_index": key[0], "backend": key[1],
+            "brush_width_px": key[2], "zoom": key[3],
+            "viewport_px": list(key[4]), "image_size_px": list(key[5]),
             "strokes": len(group), "first_stroke_release_to_commit_ms": group[0]["release_to_commit_ms"],
             "later_strokes": max(0, len(group) - 1),
             "release_to_commit": metrics["release_to_commit"],
         })
-    return {"schema": "t095_trace_analysis_v1", "measurement": "godot_engine_only_not_input_to_photon",
-            "percentile_method": "nearest_rank", "strokes": list(strokes), "groups": results}
+    return {"schema": "t095_trace_analysis_v2", "measurement": "godot_engine_only_not_input_to_photon",
+            "percentile_method": "nearest_rank",
+            "cohort_boundary": "input_file_index_plus_brush_settings_not_verified_hardware",
+            "strokes": list(strokes), "groups": results}
 
 
 def human_report(report: dict[str, Any]) -> str:
     """Render a small summary without suggesting an unsupported latency target."""
     lines = ["T-095 Godot engine trace (NOT physical input-to-photon latency)",
-             "Percentiles use nearest rank on retained samples only; missing callbacks are excluded."]
+             "Percentiles use nearest rank on retained samples only; missing callbacks are excluded.",
+             "Cohorts are separate per input file; one appended file may still contain multiple devices/sessions."]
     for group in report["groups"]:
         result = group["release_to_commit"]
-        lines.append(f"{group['backend']} {group['brush_width_px']:g}px at {group['zoom']:g}x: "
+        lines.append(f"File #{group['source_file_index']}: "
+                     f"{group['backend']} {group['brush_width_px']:g}px at {group['zoom']:g}x: "
                      f"{group['strokes']} strokes; release→commit p50/p95 "
                      f"{result['p50_ms']:.3f}/{result['p95_ms']:.3f} ms "
                      f"(first {group['first_stroke_release_to_commit_ms']:.3f} ms)")
     for stroke in report["strokes"]:
-        lines.append(f"Stroke {stroke['stroke']}: {stroke['backend']} "
+        lines.append(f"Stroke {stroke['stroke']} (file #{stroke['source_file_index']}): "
+                     f"{stroke['backend']} "
                      f"held {stroke['held_ms']:.3f} ms, release→commit "
                      f"{stroke['release_to_commit_ms']:.3f} ms")
         lines.append(f"  samples received {stroke['counts']['samples_received']}; "

@@ -1,7 +1,24 @@
+## T-095 offline trace cohort isolation — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` continues to run
+`tests/test_t095_trace_analyzer.py` with the strict
+`T095_TRACE_ANALYZER_PASSED` marker and retained raw log; the suite now has
+**eight** Python contracts. It fails closed if separate input JSONL files
+with identical Brush settings are pooled, or if strokes within the same file
+are incorrectly split. The new **analysis output schema v2** adds
+`source_file_index` (1-based argument position) to per-stroke/group output
+and declares `cohort_boundary`; the application-exported `schema: 1` format
+is unchanged. No filename or device identity is included in generated
+reports. Even a single appended file may mix sessions, so these groups do
+**not** prove hardware equivalence. The required fast-CI matrix, T-094
+log checker and T-095/T-096 manual-review gates are unchanged.
+Hosted CI and reference-device responsiveness remain unverified.
+[Evidence](evidence/T-095-2026-11-11-trace-cohort-isolation.md).
+
 ## T-095 offline owner-device trace analysis — 2026-11-11
 
 The non-gating `godot-native-t095-brush.yml` workflow now executes
-`tests/test_t095_trace_analyzer.py` (six stdlib Python contracts), preserving
+`tests/test_t095_trace_analyzer.py` (eight stdlib Python contracts), preserving
 `/tmp/t095-trace-analyzer.log` and requiring one exact
 `T095_TRACE_ANALYZER_PASSED` marker through T-094's fail-closed log checker.
 The tool `tools/analyze_t095_trace.py` validates and summarizes existing

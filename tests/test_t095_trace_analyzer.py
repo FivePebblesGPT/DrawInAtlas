@@ -124,7 +124,11 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             data = json.loads(completed.stdout)
             self.assertEqual(len(data["strokes"]), 2)
             self.assertEqual(data["measurement"], "godot_engine_only_not_input_to_photon")
-            self.assertEqual(data["groups"][0]["strokes"], 2)
+            self.assertEqual(len(data["groups"]), 2)
+            self.assertEqual([group["strokes"] for group in data["groups"]], [1, 1])
+            self.assertEqual(data["schema"], "t095_trace_analysis_v2")
+            self.assertEqual(data["cohort_boundary"],
+                             "input_file_index_plus_brush_settings_not_verified_hardware")
             self.assertNotIn("private", completed.stdout)
             second.write_text("{\"schema\": 1\n", encoding="utf8")
             failed = subprocess.run([sys.executable, str(SCRIPT), str(first), str(second)],
@@ -132,6 +136,35 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             self.assertNotEqual(failed.returncode, 0)
             self.assertIn("T095_TRACE_ANALYSIS_FAILED", failed.stderr)
             self.assertEqual(failed.stdout, "")
+
+    def test_separate_input_files_never_pool_indistinguishable_hardware(self) -> None:
+        """Identical canvas settings cannot prove identical owner hardware."""
+        with tempfile.TemporaryDirectory() as directory:
+            slow = Path(directory) / "device_a.jsonl"
+            fast = Path(directory) / "device_b.jsonl"
+            slow.write_text(json.dumps(record()) + "\n", encoding="utf8")
+            second = record(start=240_000)
+            second["commit_us"] = second["release_us"] + 5_000
+            fast.write_text(json.dumps(second) + "\n", encoding="utf8")
+            analysis = analyzer.aggregate(analyzer.read_traces([slow, fast]))
+            self.assertEqual(len(analysis["groups"]), 2)
+            self.assertEqual([g["source_file_index"] for g in analysis["groups"]], [1, 2])
+            self.assertEqual([g["release_to_commit"]["p95_ms"] for g in analysis["groups"]],
+                             [80.0, 5.0])
+            self.assertEqual([s["source_file_index"] for s in analysis["strokes"]], [1, 2])
+            self.assertIn("file #1", analyzer.human_report(analysis))
+            self.assertIn("file #2", analyzer.human_report(analysis))
+            self.assertNotIn("device_a.jsonl", analyzer.human_report(analysis))
+
+    def test_multiple_strokes_from_one_file_remain_a_single_cohort(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "same-file.jsonl"
+            rows = [record(), record(start=250_000)]
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf8")
+            analysis = analyzer.aggregate(analyzer.read_traces([path]))
+            self.assertEqual(len(analysis["groups"]), 1)
+            self.assertEqual(analysis["groups"][0]["strokes"], 2)
+            self.assertEqual(analysis["groups"][0]["source_file_index"], 1)
 
     def test_oversized_record_fails_without_partial_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
