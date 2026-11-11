@@ -6,6 +6,18 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 appended owner trace timestamp-epoch isolation (2026-11-11; In Progress):**
+The offline analyzer now partitions one JSONL file at observable backwards
+`down_us` transitions, as well as by file and matching Brush settings. Its
+analysis schema v3 labels one-based timestamp epochs, avoiding a misleading
+pooled p95 when a trace file spans Godot restarts. A red control pooled
+80 ms and 5 ms strokes into one group; the nine-test green suite keeps them
+separate. Undetected restarts and real hardware equivalence still require
+owner metadata and review. The original exporter/Brush code are unchanged;
+T-095 retains `manual_review: true` and In Progress, and T-096 remains
+in Manual Review. [Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-trace-epoch-isolation.md).
+
 **T-095 owner trace cohort isolation (2026-11-11; In Progress):**
 The offline trace analyzer no longer pools strokes from **different input files**
 merely because backend, width, zoom, viewport and canvas bounds match. The

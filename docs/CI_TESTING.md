@@ -1,3 +1,19 @@
+## T-095 appended owner trace timestamp-epoch isolation — 2026-11-11
+
+The **non-gating** `godot-native-t095-brush.yml` retains the strict
+`T095_TRACE_ANALYZER_PASSED` marker and raw analyzer log, now with **nine**
+stdlib Python contracts. The analysis output schema v3 adds
+`timestamp_epoch_index` (one-based per input file) and partitions matching
+Brush-setting groups when `down_us` moves backward in an appended JSONL file.
+A red old-analyzer control pools the 80 ms and 5 ms example into one group;
+the updated version keeps both cohorts distinct. A timestamp regression is
+only an observable clock boundary, not a verified hardware or session ID;
+restarts without a regression remain undetectable. The Godot schema-1
+exporter and canonical Brush path are unchanged. The required fast-CI matrix,
+T-094 fail-closed log policy and T-095/T-096 review gates remain intact.
+Hosted CI and owner-device acceptance were not verified.
+[Evidence](evidence/T-095-2026-11-11-trace-epoch-isolation.md).
+
 ## T-095 offline trace cohort isolation — 2026-11-11
 
 The non-gating `godot-native-t095-brush.yml` continues to run

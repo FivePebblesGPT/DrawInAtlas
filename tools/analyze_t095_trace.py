@@ -103,11 +103,16 @@ def distribution(values: Sequence[int], total: int | None = None) -> dict[str, A
     }
 
 
-def summarize_stroke(record: Any, index: int, *, source_file_index: int = 1) -> dict[str, Any]:
-    """Validate one stroke, retaining its input-file cohort without a filename."""
-    nonnegative_int(source_file_index, "source_file_index")
-    if source_file_index == 0:
-        raise TraceError("source_file_index: expected a positive integer")
+def summarize_stroke(
+    record: Any, index: int, *, source_file_index: int = 1,
+    timestamp_epoch_index: int = 1,
+) -> dict[str, Any]:
+    """Validate a stroke, retaining file and observed monotonic-clock epoch."""
+    for name, value in (("source_file_index", source_file_index),
+                        ("timestamp_epoch_index", timestamp_epoch_index)):
+        nonnegative_int(value, name)
+        if value == 0:
+            raise TraceError(f"{name}: expected a positive integer")
     if not isinstance(record, dict):
         raise TraceError(f"stroke {index}: expected a JSON object")
     if record.get("schema") != 1 or record.get("capture_kind") != "engine_timing_only":
@@ -165,6 +170,7 @@ def summarize_stroke(record: Any, index: int, *, source_file_index: int = 1) -> 
         raise TraceError(f"stroke {index}: impossible changed-preview match counts")
     return {
         "stroke": index, "source_file_index": source_file_index,
+        "timestamp_epoch_index": timestamp_epoch_index,
         "backend": backend, "zoom": zoom, "brush_width_px": width,
         "viewport_px": record["viewport_px"], "image_size_px": record["image_size_px"],
         "held_ms": (release - down) / 1000,
@@ -182,6 +188,8 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
     """Read and strictly validate every nonempty line of the provided files."""
     strokes: list[dict[str, Any]] = []
     for source_file_index, path in enumerate(paths, start=1):
+        previous_down_us: int | None = None
+        timestamp_epoch_index = 1
         with path.open("rb") as handle:
             line_number = 0
             while raw := handle.readline(MAX_LINE_BYTES + 2):
@@ -197,9 +205,21 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
                 except (ValueError, UnicodeDecodeError) as exc:
                     raise TraceError(f"{path}:{line_number}: malformed JSONL record") from exc
                 try:
-                    strokes.append(summarize_stroke(
-                        decoded, len(strokes) + 1, source_file_index=source_file_index
-                    ))
+                    # get_ticks_usec() is monotonic within one Godot process,
+                    # but an appended file can contain a later process restart.
+                    down_us = nonnegative_int(
+                        decoded.get("down_us") if isinstance(decoded, dict) else None,
+                        "down_us",
+                    )
+                    if previous_down_us is not None and down_us < previous_down_us:
+                        timestamp_epoch_index += 1
+                    stroke = summarize_stroke(
+                        decoded, len(strokes) + 1,
+                        source_file_index=source_file_index,
+                        timestamp_epoch_index=timestamp_epoch_index,
+                    )
+                    strokes.append(stroke)
+                    previous_down_us = down_us
                 except TraceError as exc:
                     raise TraceError(f"{path}:{line_number}: {exc}") from exc
     if not strokes:
@@ -208,10 +228,11 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
 
 
 def aggregate(strokes: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Never pool traces from separate files without verified device identity."""
+    """Separate files and observable monotonic-clock resets, not hardware IDs."""
     groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for stroke in strokes:
-        key = (stroke["source_file_index"], stroke["backend"], stroke["brush_width_px"], stroke["zoom"],
+        key = (stroke["source_file_index"], stroke["timestamp_epoch_index"],
+               stroke["backend"], stroke["brush_width_px"], stroke["zoom"],
                tuple(stroke["viewport_px"]), tuple(stroke["image_size_px"]))
         groups.setdefault(key, []).append(stroke)
     results: list[dict[str, Any]] = []
@@ -221,16 +242,16 @@ def aggregate(strokes: Sequence[dict[str, Any]]) -> dict[str, Any]:
             values = [round(item["release_to_commit_ms"] * 1000) for item in group]
             metrics[label] = distribution(values, len(values))
         results.append({
-            "source_file_index": key[0], "backend": key[1],
-            "brush_width_px": key[2], "zoom": key[3],
-            "viewport_px": list(key[4]), "image_size_px": list(key[5]),
+            "source_file_index": key[0], "timestamp_epoch_index": key[1],
+            "backend": key[2], "brush_width_px": key[3], "zoom": key[4],
+            "viewport_px": list(key[5]), "image_size_px": list(key[6]),
             "strokes": len(group), "first_stroke_release_to_commit_ms": group[0]["release_to_commit_ms"],
             "later_strokes": max(0, len(group) - 1),
             "release_to_commit": metrics["release_to_commit"],
         })
-    return {"schema": "t095_trace_analysis_v2", "measurement": "godot_engine_only_not_input_to_photon",
+    return {"schema": "t095_trace_analysis_v3", "measurement": "godot_engine_only_not_input_to_photon",
             "percentile_method": "nearest_rank",
-            "cohort_boundary": "input_file_index_plus_brush_settings_not_verified_hardware",
+            "cohort_boundary": "input_file_and_observed_timestamp_epoch_plus_brush_settings_not_verified_hardware",
             "strokes": list(strokes), "groups": results}
 
 
@@ -238,16 +259,18 @@ def human_report(report: dict[str, Any]) -> str:
     """Render a small summary without suggesting an unsupported latency target."""
     lines = ["T-095 Godot engine trace (NOT physical input-to-photon latency)",
              "Percentiles use nearest rank on retained samples only; missing callbacks are excluded.",
-             "Cohorts are separate per input file; one appended file may still contain multiple devices/sessions."]
+             "Cohorts separate input files and observed monotonic-clock resets;",
+             "unobserved restarts and same-clock sessions/devices cannot be identified."]
     for group in report["groups"]:
         result = group["release_to_commit"]
-        lines.append(f"File #{group['source_file_index']}: "
+        lines.append(f"File #{group['source_file_index']}, epoch #{group['timestamp_epoch_index']}: "
                      f"{group['backend']} {group['brush_width_px']:g}px at {group['zoom']:g}x: "
                      f"{group['strokes']} strokes; release→commit p50/p95 "
                      f"{result['p50_ms']:.3f}/{result['p95_ms']:.3f} ms "
                      f"(first {group['first_stroke_release_to_commit_ms']:.3f} ms)")
     for stroke in report["strokes"]:
-        lines.append(f"Stroke {stroke['stroke']} (file #{stroke['source_file_index']}): "
+        lines.append(f"Stroke {stroke['stroke']} (file #{stroke['source_file_index']}, "
+                     f"epoch #{stroke['timestamp_epoch_index']}): "
                      f"{stroke['backend']} "
                      f"held {stroke['held_ms']:.3f} ms, release→commit "
                      f"{stroke['release_to_commit_ms']:.3f} ms")

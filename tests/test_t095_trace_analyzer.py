@@ -126,9 +126,9 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             self.assertEqual(data["measurement"], "godot_engine_only_not_input_to_photon")
             self.assertEqual(len(data["groups"]), 2)
             self.assertEqual([group["strokes"] for group in data["groups"]], [1, 1])
-            self.assertEqual(data["schema"], "t095_trace_analysis_v2")
+            self.assertEqual(data["schema"], "t095_trace_analysis_v3")
             self.assertEqual(data["cohort_boundary"],
-                             "input_file_index_plus_brush_settings_not_verified_hardware")
+                             "input_file_and_observed_timestamp_epoch_plus_brush_settings_not_verified_hardware")
             self.assertNotIn("private", completed.stdout)
             second.write_text("{\"schema\": 1\n", encoding="utf8")
             failed = subprocess.run([sys.executable, str(SCRIPT), str(first), str(second)],
@@ -165,6 +165,26 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             self.assertEqual(len(analysis["groups"]), 1)
             self.assertEqual(analysis["groups"][0]["strokes"], 2)
             self.assertEqual(analysis["groups"][0]["source_file_index"], 1)
+
+    def test_restarted_clock_inside_one_file_does_not_pool_strokes(self) -> None:
+        """An appended JSONL file can span Godot launches with reset ticks."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "appended.jsonl"
+            rows = [record(start=1_000), record(start=250_000),
+                    record(start=900), record(start=280_000)]
+            for row in rows[2:]:
+                row["commit_us"] = row["release_us"] + 5_000
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf8")
+            analysis = analyzer.aggregate(analyzer.read_traces([path]))
+            self.assertEqual([stroke["timestamp_epoch_index"] for stroke in analysis["strokes"]],
+                             [1, 1, 2, 2])
+            self.assertEqual([group["strokes"] for group in analysis["groups"]], [2, 2])
+            self.assertEqual([group["release_to_commit"]["p95_ms"]
+                              for group in analysis["groups"]], [80.0, 5.0])
+            self.assertEqual([group["timestamp_epoch_index"]
+                              for group in analysis["groups"]], [1, 2])
+            self.assertIn("epoch #2", analyzer.human_report(analysis))
+            self.assertNotIn("appended.jsonl", analyzer.human_report(analysis))
 
     def test_oversized_record_fails_without_partial_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
