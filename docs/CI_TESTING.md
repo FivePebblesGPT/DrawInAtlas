@@ -1,3 +1,20 @@
+## T-095 preview input-receipt to Canvas/post-draw correlation — 2026-11-11
+
+The **non-gating** on-demand `godot-native-t095-brush.yml` stages canonical
+Drawing and runs `drawing/tests/t095_preview_input_postdraw_smoke.gd`, requiring
+exactly one `T095_PREVIEW_INPUT_POSTDRAW_PASSED` marker through T-094's
+fail-closed `check_godot_model_log.py` checker. The raw
+`/tmp/t095-preview-input-postdraw.log` is retained under `if: always()`.
+The local **22/22** independent oracle verifies earliest batch-receipt
+correlation, no-op and coalesced callbacks, cancellation, bounded history,
+real 60px Brush pixels and Undo/Redo; deliberately discarding receipt stamps
+fails **8** assertions. The actual native five-stroke witness reports retained
+receipt→draw/callback p50/p95 and unmatched callback counts. These are engine
+input-receipt/render-callback intervals, **not** device-to-photon measurements.
+The 46 required fast-CI check IDs and T-094 strict logging policy remain
+unchanged; hosted CI and owner physical-device acceptance are unverified.
+[Evidence](evidence/T-095-2026-11-11-preview-input-postdraw.md).
+
 ## T-095 bounded duplicate-target input drain — 2026-11-11
 
 The non-gating, on-demand `godot-native-t095-brush.yml` now runs

@@ -233,6 +233,9 @@ var _pending_frame_phase_session: DrawingEditSession
 ## First successful pixel-changing stage not yet represented by a Canvas draw.
 ## Monotonic Godot CPU time only; never interpret as device receipt or photons.
 var _unsubmitted_preview_stage_us: int = 0
+## Receipt time of the oldest input in the first pixel-changing batch pending
+## Canvas submission. This is engine receipt, not an OS hardware timestamp.
+var _unsubmitted_preview_input_us: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -360,6 +363,15 @@ func _finish_pending_frame_post_draw(callback_us: int) -> void:
 	_metrics["frame_post_draw_matches"] = int(_metrics.get("frame_post_draw_matches", 0)) + 1
 	_metrics["max_frame_end_to_post_draw_us"] = maxi(
 		int(_metrics.get("max_frame_end_to_post_draw_us", 0)), delay_us)
+	if sample.has("preview_input_received_us"):
+		var input_to_callback_us: int = maxi(0,
+			recorded_us - int(sample["preview_input_received_us"]))
+		sample["preview_input_to_post_draw_us"] = input_to_callback_us
+		_metrics["preview_input_post_draw_matches"] = int(
+			_metrics.get("preview_input_post_draw_matches", 0)) + 1
+		_metrics["max_preview_input_to_post_draw_us"] = maxi(
+			int(_metrics.get("max_preview_input_to_post_draw_us", 0)),
+			input_to_callback_us)
 	if sample.has("preview_stage_completed_us"):
 		var stage_to_callback_us: int = maxi(0,
 			recorded_us - int(sample["preview_stage_completed_us"]))
@@ -373,9 +385,12 @@ func _finish_pending_frame_post_draw(callback_us: int) -> void:
 
 ## A single Canvas draw may represent multiple completed edit batches. Retain
 ## the *earliest* pixel-changing stage until its first Canvas submission.
-func _mark_unsubmitted_preview_stage(stage_completed_us: int) -> void:
+func _mark_unsubmitted_preview_stage(stage_completed_us: int,
+		input_received_us: int = 0) -> void:
 	if _unsubmitted_preview_stage_us == 0:
 		_unsubmitted_preview_stage_us = maxi(1, stage_completed_us)
+		# Never substitute a later batch receipt for a missing first one.
+		_unsubmitted_preview_input_us = maxi(0, input_received_us)
 
 
 func _tag_frame_preview_stage(frame: Dictionary, frame_end_us: int) -> void:
@@ -384,7 +399,12 @@ func _tag_frame_preview_stage(frame: Dictionary, frame_end_us: int) -> void:
 	frame["preview_stage_completed_us"] = _unsubmitted_preview_stage_us
 	frame["preview_stage_to_frame_end_us"] = maxi(0,
 		frame_end_us - _unsubmitted_preview_stage_us)
+	if _unsubmitted_preview_input_us > 0:
+		frame["preview_input_received_us"] = _unsubmitted_preview_input_us
+		frame["preview_input_to_frame_end_us"] = maxi(0,
+			frame_end_us - _unsubmitted_preview_input_us)
 	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
 
 
 func source_position(position: Vector2) -> Vector2:
@@ -1194,6 +1214,7 @@ func start_gesture(position: Vector2) -> void:
 	_pending_frame_phase_sample = {}
 	_pending_frame_phase_session = null
 	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1215,6 +1236,9 @@ func start_gesture(position: Vector2) -> void:
 		"max_frame_preview_stage_to_frame_end_us": 0,
 		"preview_stage_post_draw_matches": 0,
 		"max_preview_stage_to_post_draw_us": 0,
+		"preview_input_post_draw_matches": 0,
+		"max_preview_input_to_post_draw_us": 0,
+		"max_preview_input_to_frame_end_us": 0,
 		"max_frame_full_draw_cpu_us": 0, "max_frame_compose_cpu_us": 0,
 		"max_frame_texture_cpu_us": 0, "max_frame_preview_index_cpu_us": 0,
 		"max_frame_selection_outline_cpu_us": 0,
@@ -1282,6 +1306,7 @@ func _drain_segments(budget: int) -> void:
 	while segments < budget:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
+		var batch_first_receipt_us: int = 0
 		var next_position: Vector2 = _staged_position
 		# A 60px stroke normally gets a one-segment atomic budget. Allow a
 		# *consecutive identical* Legacy source position to extend that batch:
@@ -1308,6 +1333,10 @@ func _drain_segments(budget: int) -> void:
 				_metrics["duplicate_drain_batched"] = int(
 					_metrics["duplicate_drain_batched"]) + 1
 			next_position = candidate
+			if batch_first_receipt_us == 0:
+				batch_first_receipt_us = _target_arrival_us
+			else:
+				batch_first_receipt_us = mini(batch_first_receipt_us, _target_arrival_us)
 			batch.append(next_position)
 			segments += 1
 			if next_position == _segment_target:
@@ -1343,7 +1372,7 @@ func _drain_segments(budget: int) -> void:
 			_metrics["first_stage_us"] = staged_at_us
 		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
 		if session._preview_epoch != preview_epoch_before_batch:
-			_mark_unsubmitted_preview_stage(staged_at_us)
+			_mark_unsubmitted_preview_stage(staged_at_us, batch_first_receipt_us)
 		_staged_position = next_position
 		for arrival_us: int in completed_arrivals:
 			_record_stage_latency(maxi(0, staged_at_us - arrival_us))
@@ -1392,6 +1421,15 @@ func _record_frame_phase(frame: Dictionary) -> void:
 		sample[key] = value
 		var max_key: String = "max_frame_" + key
 		_metrics[max_key] = maxi(int(_metrics.get(max_key, 0)), value)
+	if frame.has("preview_input_received_us"):
+		var receipt_us: int = maxi(0, int(frame["preview_input_received_us"]))
+		var receipt_to_draw_us: int = maxi(0, int(frame.get(
+			"preview_input_to_frame_end_us", 0)))
+		sample["preview_input_received_us"] = receipt_us
+		sample["preview_input_to_frame_end_us"] = receipt_to_draw_us
+		_metrics["max_preview_input_to_frame_end_us"] = maxi(
+			int(_metrics.get("max_preview_input_to_frame_end_us", 0)),
+			receipt_to_draw_us)
 	if frame.has("preview_stage_completed_us"):
 		var stage_us: int = maxi(0, int(frame["preview_stage_completed_us"]))
 		var submit_delay_us: int = maxi(0, int(frame.get(
@@ -1515,6 +1553,7 @@ func _commit_stroke() -> void:
 	var active: DrawingEditSession = session
 	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
 	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
 	session = null
 	_stroke_selection = null
 	_native_brush = null
@@ -1544,6 +1583,7 @@ func _commit_stroke() -> void:
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
 	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
 	if session != null:
 		session.cancel()
 		session = null

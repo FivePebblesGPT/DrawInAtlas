@@ -144,6 +144,14 @@ jobs:
             2>&1 | tee /tmp/t095-preview-stage-postdraw.log
           python3 tools/check_godot_model_log.py /tmp/t095-preview-stage-postdraw.log \
             --marker T095_PREVIEW_STAGE_POSTDRAW_PASSED
+      - name: T-095 correlate input receipt with changed Brush Canvas callback
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_preview_input_postdraw_smoke.gd \
+            2>&1 | tee /tmp/t095-preview-input-postdraw.log
+          python3 tools/check_godot_model_log.py /tmp/t095-preview-input-postdraw.log \
+            --marker T095_PREVIEW_INPUT_POSTDRAW_PASSED
       - name: T-095 Brush tile-key reuse and signed source/history parity
         run: |
           set -euo pipefail
@@ -317,6 +325,7 @@ jobs:
             /tmp/t095-frame-backlog.log
             /tmp/t095-postdraw-pairing.log
             /tmp/t095-preview-stage-postdraw.log
+            /tmp/t095-preview-input-postdraw.log
             /tmp/t095-hokusai-delta.log
             /tmp/t095-tile-shift.log
             /tmp/t095-tile-commit.log

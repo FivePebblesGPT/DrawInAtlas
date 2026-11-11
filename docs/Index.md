@@ -6,6 +6,20 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 input-receipt to changed-preview frame correlation (2026-11-11; In Progress):**
+For pixel-changing Brush batches, the bounded Canvas profiler now pairs the
+oldest Godot-received source sample with its changed-preview Canvas draw and,
+only on a matching callback, `frame_post_draw`. The **22/22** independent test
+passes and an intentionally disabled recorder fails eight checks. Fourteen
+neighboring headless tests, native rollback, native-absent import and actual
+Xvfb pointer/navigation tests pass. Software receipt→draw p95 **111.903 ms**
+and receipt→callback p95 **125.007 ms** are batch-age diagnostics, **not**
+physical input-to-photon or a speedup. T-095 remains **In Progress** with
+`manual_review: true`; T-096 remains **Manual Review**.
+[Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-preview-input-postdraw.md).
+
+
 **T-095 preview staging-to-render correlation (2026-11-11; In Progress):**
 For changed 60px Brush previews, the bounded Canvas frame history now records
 Godot staging completion → Canvas draw submission and, for a matched frame,

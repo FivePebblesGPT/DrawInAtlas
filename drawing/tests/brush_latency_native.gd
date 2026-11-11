@@ -28,6 +28,9 @@ var preview_stage_submit_ms: Array[float] = []
 var preview_stage_callback_ms: Array[float] = []
 var preview_stage_submissions: int = 0
 var preview_stage_callback_matches: int = 0
+var preview_input_submit_ms: Array[float] = []
+var preview_input_callback_ms: Array[float] = []
+var preview_input_callback_matches: int = 0
 
 
 func verify(ok: bool, message: String) -> void:
@@ -184,6 +187,7 @@ func run() -> void:
 		frame_callback_matches += int(stats.get("frame_post_draw_matches", 0))
 		preview_stage_submissions += int(stats.get("frame_preview_stage_submissions", 0))
 		preview_stage_callback_matches += int(stats.get("preview_stage_post_draw_matches", 0))
+		preview_input_callback_matches += int(stats.get("preview_input_post_draw_matches", 0))
 		for frame_variant: Variant in frame_samples:
 			var frame: Dictionary = frame_variant as Dictionary
 			frame_full_draw_ms.append(float(frame.get("full_draw_cpu_us", 0)) / 1000.0)
@@ -195,6 +199,10 @@ func run() -> void:
 				preview_stage_submit_ms.append(float(frame["preview_stage_to_frame_end_us"]) / 1000.0)
 			if frame.has("preview_stage_to_post_draw_us"):
 				preview_stage_callback_ms.append(float(frame["preview_stage_to_post_draw_us"]) / 1000.0)
+			if frame.has("preview_input_to_frame_end_us"):
+				preview_input_submit_ms.append(float(frame["preview_input_to_frame_end_us"]) / 1000.0)
+			if frame.has("preview_input_to_post_draw_us"):
+				preview_input_callback_ms.append(float(frame["preview_input_to_post_draw_us"]) / 1000.0)
 		for microseconds: Variant in stats.get("sample_to_stage_us", []):
 			input_stage_ms.append(float(microseconds) / 1000.0)
 		for microseconds: Variant in stats.get("stage_batches_us", []):
@@ -253,6 +261,14 @@ func run() -> void:
 		preview_stage_callback_matches, preview_stage_callback_ms.size(),
 		percentile(preview_stage_submit_ms, 0.5), percentile(preview_stage_submit_ms, 0.95),
 		percentile(preview_stage_callback_ms, 0.5), percentile(preview_stage_callback_ms, 0.95)])
+	# Earliest input receipt in each changed-preview batch; a changed batch can
+	# include masked or repeated samples. This is an engine-receipt upper-bound
+	# witness, not an exact pixel cause or OS-device-to-photon interval.
+	print("T095_NATIVE_PREVIEW_INPUT_SUMMARY retained_draws=%d callback_matches=%d retained_callbacks=%d input_draw_p50_ms=%.3f input_draw_p95_ms=%.3f input_callback_p50_ms=%.3f input_callback_p95_ms=%.3f" % [
+		preview_input_submit_ms.size(), preview_input_callback_matches,
+		preview_input_callback_ms.size(),
+		percentile(preview_input_submit_ms, 0.5), percentile(preview_input_submit_ms, 0.95),
+		percentile(preview_input_callback_ms, 0.5), percentile(preview_input_callback_ms, 0.95)])
 	print("T095_NATIVE_FRAME_BACKLOG_SUMMARY retained_frames=%d total_frames=%d draw_p50_ms=%.3f draw_p95_ms=%.3f pending_age_p50_ms=%.3f pending_age_p95_ms=%.3f pending_age_max_ms=%.3f pending_count_p95=%.0f pending_count_max=%.0f" % [
 		frame_pending_age_ms.size(), frame_total,
 		percentile(frame_full_draw_ms, 0.5), percentile(frame_full_draw_ms, 0.95),
