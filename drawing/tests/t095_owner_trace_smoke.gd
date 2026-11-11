@@ -97,6 +97,10 @@ func run() -> void:
 		check(int(first.get("samples_received", 0)) > 0 and
 			int(second.get("commit_us", 0)) >= int(second.get("down_us", 0)),
 			"records retain input count and monotonic timing")
+		var token_a: String = String(first.get("trace_session_id", ""))
+		check(token_a.length() == 32 and
+			String(second.get("trace_session_id", "")) == token_a,
+			"same Canvas retains one anonymous token across completed strokes")
 		var content: String = FileAccess.get_file_as_string(TRACE_PATH)
 		check(not content.contains("private-document-name") and
 			not content.contains("private-layer-name") and
@@ -106,6 +110,26 @@ func run() -> void:
 			"trace does not expose document identity, pixel contents or coordinates")
 	check(doc.undo().ok and doc.redo().ok and source_bytes(doc) != first_bytes,
 		"trace preserves one-step document Undo/Redo and resulting Brush pixels")
+	# Another Canvas instance appending the same file must expose a distinct
+	# anonymous runtime boundary, even when monotonic ticks have not reset.
+	var other: Control = canvas_instance()
+	other.document = doc
+	other.layer_id = layer
+	other.zoom = canvas.zoom
+	other.brush_width = canvas.brush_width
+	other.color_rgba = canvas.color_rgba
+	root.add_child(other)
+	await process_frame
+	stroke(other, Vector2(4.5, -21.5), Vector2(8.5, -15.5))
+	var appended: Array = records()
+	check(appended.size() == 3, "second Canvas appends a third completed stroke")
+	if appended.size() == 3 and appended[0] is Dictionary and appended[2] is Dictionary:
+		var token_first: String = String((appended[0] as Dictionary).get("trace_session_id", ""))
+		var token_other: String = String((appended[2] as Dictionary).get("trace_session_id", ""))
+		check(token_other.length() == 32 and token_other != token_first,
+			"distinct Canvas runtimes do not share an anonymous trace token")
+	other.queue_free()
+	await process_frame
 	var before_cancel: String = FileAccess.get_file_as_string(TRACE_PATH)
 	var revision_before_cancel: int = doc.revision
 	canvas.start_gesture(canvas.pixel_to_position(Vector2(1.5, -30.5)))

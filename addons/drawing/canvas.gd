@@ -224,6 +224,9 @@ const MAX_FRAME_PHASE_SAMPLES: int = 1024
 ## source coordinates, layer names, brush color, or OS pointer identifiers.
 const T095_TRACE_ENV: String = "DRAWING_T095_TRACE_JSONL"
 const MAX_T095_TRACE_BYTES: int = 4 * 1024 * 1024
+# Generated only when tracing is enabled. Random per Canvas lifetime, never an OS
+# or hardware identifier; prevents silently pooling appended launch sessions.
+var _t095_trace_session_id: String = ""
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
@@ -1555,8 +1558,14 @@ func _write_t095_trace(profile: Dictionary, backend: String) -> void:
 			or path.contains("..") or path.contains("\\") \
 			or path == "user://":
 		return
+	if _t095_trace_session_id.is_empty():
+		var token: PackedByteArray = Crypto.new().generate_random_bytes(16)
+		if token.size() != 16:
+			return
+		_t095_trace_session_id = token.hex_encode()
 	var record: Dictionary = {
 		"schema": 1, "capture_kind": "engine_timing_only",
+		"trace_session_id": _t095_trace_session_id,
 		"backend": backend, "zoom": zoom, "brush_width_px": _stroke_width,
 		"viewport_px": [roundi(size.x), roundi(size.y)],
 		"image_size_px": [image_bounds.size.x, image_bounds.size.y],

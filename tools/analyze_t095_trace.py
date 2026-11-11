@@ -40,6 +40,21 @@ MAX_LINE_BYTES = 4 * 1024 * 1024  # One exported record cannot exceed the 4 MiB 
 MAX_ROWS = 100_000  # Avoid unbounded aggregation on malformed or hostile files.
 
 
+def trace_session_id(record: dict[str, Any], context: str) -> str | None:
+    """Validate an optional anonymous per-runtime token without exporting it.
+
+    Older schema-1 JSONL records omitted this field. A token identifies one
+    Canvas runtime, not a machine, user, process, driver or physical display.
+    """
+    if "trace_session_id" not in record:
+        return None
+    value = record["trace_session_id"]
+    if (not isinstance(value, str) or len(value) != 32
+            or any(digit not in "0123456789abcdef" for digit in value)):
+        raise TraceError(f"{context}: invalid anonymous trace session token")
+    return value
+
+
 def nonnegative_int(value: Any, context: str) -> int:
     """Accept JSON integer counters only, rejecting bools and floats."""
     if type(value) is not int or value < 0:
@@ -168,6 +183,7 @@ def summarize_stroke(
         raise TraceError(f"stroke {index}: expected a JSON object")
     if record.get("schema") != 1 or record.get("capture_kind") != "engine_timing_only":
         raise TraceError(f"stroke {index}: unsupported T-095 trace schema or capture kind")
+    trace_session_id(record, f"stroke {index}")
     backend = record.get("backend")
     if backend not in ("Legacy", "NativeHard", "Hokusai"):
         raise TraceError(f"stroke {index}: unsupported Brush backend")
@@ -270,6 +286,7 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
     strokes: list[dict[str, Any]] = []
     for source_file_index, path in enumerate(paths, start=1):
         previous_commit_us: int | None = None
+        previous_session_id: str | None = None
         timestamp_epoch_index = 1
         with path.open("rb") as handle:
             line_number = 0
@@ -293,7 +310,10 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
                         decoded.get("down_us") if isinstance(decoded, dict) else None,
                         "down_us",
                     )
-                    if previous_commit_us is not None and down_us < previous_commit_us:
+                    current_session_id = trace_session_id(decoded, f"stroke {len(strokes) + 1}")
+                    if previous_commit_us is not None and (
+                            down_us < previous_commit_us
+                            or current_session_id != previous_session_id):
                         timestamp_epoch_index += 1
                     stroke = summarize_stroke(
                         decoded, len(strokes) + 1,
@@ -304,6 +324,7 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
                     # summarize_stroke already validated the integer and
                     # ordered down/release/commit timestamps.
                     previous_commit_us = decoded["commit_us"]
+                    previous_session_id = current_session_id
                 except TraceError as exc:
                     raise TraceError(f"{path}:{line_number}: {exc}") from exc
     if not strokes:
@@ -312,7 +333,7 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
 
 
 def aggregate(strokes: Sequence[dict[str, Any]]) -> dict[str, Any]:
-    """Separate files and observable monotonic-clock resets, not hardware IDs."""
+    """Separate files and runtime tokens/clock resets, not hardware IDs."""
     groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
     for stroke in strokes:
         key = (stroke["source_file_index"], stroke["timestamp_epoch_index"],
@@ -333,9 +354,9 @@ def aggregate(strokes: Sequence[dict[str, Any]]) -> dict[str, Any]:
             "later_strokes": max(0, len(group) - 1),
             "release_to_commit": metrics["release_to_commit"],
         })
-    return {"schema": "t095_trace_analysis_v3", "measurement": "godot_engine_only_not_input_to_photon",
+    return {"schema": "t095_trace_analysis_v4", "measurement": "godot_engine_only_not_input_to_photon",
             "percentile_method": "nearest_rank",
-            "cohort_boundary": "input_file_and_observed_timestamp_epoch_plus_brush_settings_not_verified_hardware",
+            "cohort_boundary": "input_file_and_anonymous_runtime_or_timestamp_epoch_plus_brush_settings_not_verified_hardware",
             "strokes": list(strokes), "groups": results}
 
 
@@ -343,8 +364,8 @@ def human_report(report: dict[str, Any]) -> str:
     """Render a small summary without suggesting an unsupported latency target."""
     lines = ["T-095 Godot engine trace (NOT physical input-to-photon latency)",
              "Percentiles use nearest rank on retained samples only; missing callbacks are excluded.",
-             "Cohorts separate input files and observed monotonic-clock resets;",
-             "unobserved restarts and same-clock sessions/devices cannot be identified."]
+             "Cohorts separate input files, anonymous runtime tokens, and observed clock resets;",
+             "legacy traces without tokens may still conceal restarts; hardware equivalence is unverified."]
     for group in report["groups"]:
         result = group["release_to_commit"]
         lines.append(f"File #{group['source_file_index']}, epoch #{group['timestamp_epoch_index']}: "

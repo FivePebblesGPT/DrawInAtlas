@@ -6,6 +6,20 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 anonymous trace-runtime cohort boundaries (2026-11-11; In Progress):**
+Opt-in Brush JSONL now includes a 128-bit random `trace_session_id` generated
+once per Canvas runtime, never derived from OS/device/user information. The
+offline analyzer uses token transitions (plus existing timestamp inconsistencies)
+to split appended-file cohorts even when Godot clocks do not regress; its v4
+report omits raw tokens and accepts older schema-1 records without them.
+A negative control pooled two 80ms and two 5ms strokes, while the corrected
+13-test suite splits them. The real Godot exporter passes **21/21** and
+existing pixel/native rollback checks pass. This improves the owner's
+measurement integrity, **not** physical input-to-photon latency or owner
+acceptance. T-095 remains `In Progress` with `manual_review: true`; T-096
+remains `Manual Review`. [Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-trace-runtime-token.md).
+
 **T-095 owner trace overlapping-commit epoch isolation (2026-11-11; In Progress):**
 The offline analyzer now splits an appended JSONL file whenever the next
 stroke's Godot receipt timestamp is earlier than the **previous stroke's

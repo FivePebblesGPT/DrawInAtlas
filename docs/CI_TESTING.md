@@ -1950,3 +1950,23 @@ The analyzer's report remains v3 and no runtime or fast-CI changes were
 made. T-094's fail-closed policy, unverified hosted CI, and owner-device
 manual review requirements are unchanged.
 [Evidence](evidence/T-095-2026-11-11-trace-frame-arithmetic.md).
+
+
+## T-095 anonymous runtime trace cohorts — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` now checks the optional schema-1
+Godot `trace_session_id` and offline analysis schema
+`t095_trace_analysis_v4`. A 16-byte cryptographically random token, created
+only while opt-in local JSONL export is enabled, separates Canvas runtimes
+without storing verified hardware/device identity. Older traces without tokens
+remain supported; same-clock appends with different tokens no longer pollute
+cohort p95. The raw token never appears in analyzer human/JSON reports.
+The **13/13** analyzer contracts and **21/21** real Godot exporter checks
+retain their exact strict `T095_TRACE_ANALYZER_PASSED` and
+`T095_OWNER_TRACE_PASSED` markers and raw logs. The old analyzer pools the
+80ms/5ms negative-control records, and the previous Canvas fails two token
+assertions. Brush, preview, frame and native rollback oracles remain green.
+The 46 required fast-CI check IDs, T-094 fail-closed log policy and
+T-095/T-096 manual-review gates are unchanged. Hosted Actions and owner
+physical-device acceptance remain unverified.
+[Evidence](evidence/T-095-2026-11-11-trace-runtime-token.md).

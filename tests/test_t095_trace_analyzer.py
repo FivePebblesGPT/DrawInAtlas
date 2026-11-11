@@ -197,9 +197,9 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             self.assertEqual(data["measurement"], "godot_engine_only_not_input_to_photon")
             self.assertEqual(len(data["groups"]), 2)
             self.assertEqual([group["strokes"] for group in data["groups"]], [1, 1])
-            self.assertEqual(data["schema"], "t095_trace_analysis_v3")
+            self.assertEqual(data["schema"], "t095_trace_analysis_v4")
             self.assertEqual(data["cohort_boundary"],
-                             "input_file_and_observed_timestamp_epoch_plus_brush_settings_not_verified_hardware")
+                             "input_file_and_anonymous_runtime_or_timestamp_epoch_plus_brush_settings_not_verified_hardware")
             self.assertNotIn("private", completed.stdout)
             second.write_text("{\"schema\": 1\n", encoding="utf8")
             failed = subprocess.run([sys.executable, str(SCRIPT), str(first), str(second)],
@@ -236,6 +236,43 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             self.assertEqual(len(analysis["groups"]), 1)
             self.assertEqual(analysis["groups"][0]["strokes"], 2)
             self.assertEqual(analysis["groups"][0]["source_file_index"], 1)
+
+    def test_anonymous_runtime_token_separates_same_clock_appends(self) -> None:
+        """Two launches can share monotonically increasing ticks and canvas settings."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "same-clock-append.jsonl"
+            first = "a" * 32
+            second = "b" * 32
+            rows = [record(start=1_000), record(start=300_000),
+                    record(start=600_000), record(start=900_000)]
+            for row, token in zip(rows, (first, first, second, second)):
+                row["trace_session_id"] = token
+                if token == second:
+                    row["commit_us"] = row["release_us"] + 5_000
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf8")
+            analysis = analyzer.aggregate(analyzer.read_traces([path]))
+            self.assertEqual([s["timestamp_epoch_index"] for s in analysis["strokes"]],
+                             [1, 1, 2, 2])
+            self.assertEqual([g["strokes"] for g in analysis["groups"]], [2, 2])
+            self.assertEqual([g["release_to_commit"]["p95_ms"]
+                              for g in analysis["groups"]], [80.0, 5.0])
+            self.assertNotIn(first, json.dumps(analysis))
+            self.assertNotIn(second, json.dumps(analysis))
+            self.assertNotIn(first, analyzer.human_report(analysis))
+
+            # Transitioning between old schema-1 records (no token) and new
+            # records is an explicit cohort boundary; no guessing identity.
+            del rows[0]["trace_session_id"]
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf8")
+            old_new = analyzer.read_traces([path])
+            self.assertEqual([s["timestamp_epoch_index"] for s in old_new],
+                             [1, 2, 3, 3])
+
+            for invalid in ("short", "G" * 32, 32, "", "a" * 33):
+                malformed = record()
+                malformed["trace_session_id"] = invalid
+                with self.subTest(invalid=invalid), self.assertRaises(analyzer.TraceError):
+                    analyzer.summarize_stroke(malformed, 1)
 
     def test_restarted_clock_inside_one_file_does_not_pool_strokes(self) -> None:
         """An appended JSONL file can span Godot launches with reset ticks."""
