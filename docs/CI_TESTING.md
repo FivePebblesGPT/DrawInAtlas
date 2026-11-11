@@ -1778,3 +1778,19 @@ passes. Required fast desktop check IDs and the T-094 strict log policy are
 unchanged. CPU callback times **cannot prove physical input-to-photon latency**;
 reference-device owner acceptance, hosted CI and T-095 manual review remain
 outstanding. [Evidence](evidence/T-095-2026-11-11-frame-phase-window.md).
+
+
+## T-095 Canvas post-draw callback pairing — 2026-11-11
+
+The optional, non-gating `godot-native-t095-brush.yml` workflow now invokes
+`drawing/tests/t095_frame_post_draw_pairing_smoke.gd` with the strict
+`T095_POSTDRAW_PAIR_PASSED` marker and keeps
+`/tmp/t095-postdraw-pairing.log` on every outcome. The **23/23** local oracle
+checks matching one Godot `frame_post_draw` callback to the latest active
+Canvas frame, rejecting duplicate/stale callbacks, ring-wrap corruption and
+RGB/history divergence. Previous-source control fails five checks. The
+five-stroke Xvfb witness emits a *matched-frame-only* callback p50/p95 and
+exact retained/total count. No physical input-to-photon or owner approval is
+inferred; hosted Actions were not run. The required fast-CI check IDs and
+T-094 fail-closed log policy are unchanged.
+[Detailed evidence](evidence/T-095-2026-11-11-postdraw-callback-pairing.md).

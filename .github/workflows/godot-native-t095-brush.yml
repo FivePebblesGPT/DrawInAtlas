@@ -128,6 +128,14 @@ jobs:
             --script res://tests/t095_frame_input_backlog_smoke.gd 2>&1 | tee /tmp/t095-frame-backlog.log
           python3 tools/check_godot_model_log.py /tmp/t095-frame-backlog.log \
             --marker T095_FRAME_BACKLOG_PASSED
+      - name: T-095 correlate latest Canvas draw with Godot post-draw callback
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_frame_post_draw_pairing_smoke.gd \
+            2>&1 | tee /tmp/t095-postdraw-pairing.log
+          python3 tools/check_godot_model_log.py /tmp/t095-postdraw-pairing.log \
+            --marker T095_POSTDRAW_PAIR_PASSED
       - name: T-095 Brush tile-key reuse and signed source/history parity
         run: |
           set -euo pipefail
@@ -299,6 +307,7 @@ jobs:
             /tmp/t095-stage-batch-window.log
             /tmp/t095-frame-phase.log
             /tmp/t095-frame-backlog.log
+            /tmp/t095-postdraw-pairing.log
             /tmp/t095-hokusai-delta.log
             /tmp/t095-tile-shift.log
             /tmp/t095-tile-commit.log

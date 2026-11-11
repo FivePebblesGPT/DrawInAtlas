@@ -225,6 +225,11 @@ var _sample_index: int = 0
 var _sample_latency_write_index: int = 0
 var _batch_latency_write_index: int = 0
 var _frame_phase_write_index: int = 0
+## A frame_post_draw signal is not guaranteed for every Canvas draw. Associate
+## only the latest actually submitted stroke frame with the next callback;
+## never attach a callback from a completed/cancelled session to a new stroke.
+var _pending_frame_phase_sample: Dictionary = {}
+var _pending_frame_phase_session: DrawingEditSession
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -321,10 +326,37 @@ func _restore_input_accumulation() -> void:
 
 
 func _on_frame_post_draw() -> void:
-	last_frame_metrics["post_draw_us"] = Time.get_ticks_usec()
+	var callback_us: int = Time.get_ticks_usec()
+	last_frame_metrics["post_draw_us"] = callback_us
+	_finish_pending_frame_post_draw(callback_us)
 	if session != null and int(_metrics.get("first_preview_submit_us", 0)) > 0 \
 			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0:
 		_metrics["first_frame_post_draw_us"] = Time.get_ticks_usec()
+
+
+## Godot's frame_post_draw callback is a renderer-side timing witness, NOT a
+## display-scanout or input-to-photon timestamp. A callback can be missing,
+## repeated, or delivered after a stroke was cancelled/published. Never
+## synthesize a completed callback for those frames.
+func _finish_pending_frame_post_draw(callback_us: int) -> void:
+	if _pending_frame_phase_sample.is_empty():
+		return
+	var sample: Dictionary = _pending_frame_phase_sample
+	var owner: DrawingEditSession = _pending_frame_phase_session
+	_pending_frame_phase_sample = {}
+	_pending_frame_phase_session = null
+	if owner == null or owner != session:
+		return
+	var end_us: int = int(sample.get("frame_end_us", 0))
+	if end_us <= 0:
+		return
+	var recorded_us: int = maxi(end_us, callback_us)
+	var delay_us: int = recorded_us - end_us
+	sample["frame_post_draw_callback_us"] = recorded_us
+	sample["frame_end_to_post_draw_us"] = delay_us
+	_metrics["frame_post_draw_matches"] = int(_metrics.get("frame_post_draw_matches", 0)) + 1
+	_metrics["max_frame_end_to_post_draw_us"] = maxi(
+		int(_metrics.get("max_frame_end_to_post_draw_us", 0)), delay_us)
 
 
 func source_position(position: Vector2) -> Vector2:
@@ -1130,6 +1162,8 @@ func start_gesture(position: Vector2) -> void:
 	_sample_latency_write_index = 0
 	_batch_latency_write_index = 0
 	_frame_phase_write_index = 0
+	_pending_frame_phase_sample = {}
+	_pending_frame_phase_session = null
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1146,6 +1180,7 @@ func start_gesture(position: Vector2) -> void:
 		"compose_cpu_us": 0, "texture_cpu_us": 0,
 		"preview_index_cpu_us": 0, "bytes_uploaded": 0,
 		"frame_phase_total": 0, "frame_phases_us": [],
+		"frame_post_draw_matches": 0, "max_frame_end_to_post_draw_us": 0,
 		"max_frame_full_draw_cpu_us": 0, "max_frame_compose_cpu_us": 0,
 		"max_frame_texture_cpu_us": 0, "max_frame_preview_index_cpu_us": 0,
 		"max_frame_selection_outline_cpu_us": 0,
@@ -1328,8 +1363,14 @@ func _record_frame_phase(frame: Dictionary) -> void:
 	if records.size() < MAX_FRAME_PHASE_SAMPLES:
 		records.append(sample)
 	else:
+		# An evicted unmatched frame cannot be completed retroactively.
+		_pending_frame_phase_sample = {}
+		_pending_frame_phase_session = null
 		records[_frame_phase_write_index] = sample
 		_frame_phase_write_index = (_frame_phase_write_index + 1) % MAX_FRAME_PHASE_SAMPLES
+	if session != null:
+		_pending_frame_phase_sample = sample
+		_pending_frame_phase_session = session
 
 
 func _finalize_frame_phase_window() -> void:

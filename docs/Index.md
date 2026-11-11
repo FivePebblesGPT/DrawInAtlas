@@ -2162,3 +2162,17 @@ physical responsiveness acceptance or a speedup claim**. T-095 stays
 **In Progress** with `manual_review: true`; T-096 stays **Manual Review**;
 owner hardware and hosted CI remain unverified.
 [Evidence](evidence/T-095-2026-11-11-frame-backlog-correlation.md).
+
+
+**T-095 Canvas post-draw callback pairing (2026-11-11; In Progress):**
+The bounded 1,024-frame CPU/queue profile now pairs each *matched* active
+Canvas draw with a single Godot `frame_post_draw` callback; stale/duplicate or
+post-cancel callbacks are not misattributed. Lifetime callback count/worst
+delay survive ring wrap, while missing callbacks are explicitly unmatched.
+A **23/23** independent source/Undo and timing oracle passes, versus five
+failures on the previous Canvas. The five-stroke 60px Xvfb witness, graphical
+navigation and native-absent fallback also pass. This is engine-callback
+observability, **not physical input-to-photon timing or a responsiveness
+speedup**. T-095 stays **In Progress** (`manual_review: true`); T-096 remains
+**Manual Review**, and hosted CI/owner hardware acceptance are unverified.
+[Evidence](evidence/T-095-2026-11-11-postdraw-callback-pairing.md).
