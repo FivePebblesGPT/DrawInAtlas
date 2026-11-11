@@ -71,6 +71,22 @@ var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
 ## Count stationary waypoints elided by the once-only Legacy hard-brush path.
 ## Native pigment presets intentionally retain every pressure/dab sample.
 var _duplicate_waypoints_skipped: int = 0
+## A stationary hard Brush/Eraser dab may repeat in the *next* one-point
+## pointer batch. Reuse it only after a successful identical prior dab; a
+## different selection, clip, width, color, budget or coordinate mapping must
+## revalidate all candidates. Never apply this to accumulating Hokusai pigment.
+var _cross_batch_dabs_skipped: int = 0
+var _stationary_dab_valid: bool = false
+var _stationary_dab_width: float = 0.0
+var _stationary_dab_rgba: int = 0
+var _stationary_dab_erase: bool = false
+var _stationary_dab_clip: Rect2i = Rect2i()
+var _stationary_dab_budget: int = 0
+var _stationary_dab_transform: Transform2D = Transform2D.IDENTITY
+var _stationary_dab_anchor_x: int = 0
+var _stationary_dab_anchor_y: int = 0
+var _stationary_dab_revision: int = -1
+var _stationary_dab_preview_epoch: int = -1
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
 
@@ -261,6 +277,7 @@ func _rebuild_preview_tiles() -> void:
 
 
 func _rollback_paint() -> void:
+	_stationary_dab_valid = false
 	for key: String in _paint_journal:
 		var snapshot: Array = _paint_journal[key]
 		if snapshot[0]:
@@ -313,6 +330,7 @@ func _rollback_paint() -> void:
 
 
 func cancel() -> void:
+	_stationary_dab_valid = false
 	_brush_deferred = false
 	_brush_change_count = 0
 	_brush_tile_journal.clear()
@@ -330,6 +348,7 @@ func cancel() -> void:
 
 
 func commit() -> DrawingResult:
+	_stationary_dab_valid = false
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	# Native Hokusai and ordinary Brush-only sessions already own verified
@@ -365,6 +384,8 @@ func commit() -> DrawingResult:
 func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		once: bool = false, blend: bool = false, verified_source: int = -1,
 		internal_brush: bool = false) -> DrawingResult:
+	if not internal_brush:
+		_stationary_dab_valid = false
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if internal_brush and _brush_tile_publish and not _hokusai_deferred:
@@ -590,6 +611,7 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 		erase: bool, selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i()) -> DrawingResult:
+	_stationary_dab_valid = false
 	if _closed or path.is_empty() or width <= 0.0 or not is_finite(width) or native == null:
 		return DrawingResult.failure("NATIVE_BRUSH", "Invalid native hard-brush stroke")
 	var inverse: Transform2D = view_transform.affine_inverse()
@@ -644,6 +666,7 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
+	_stationary_dab_valid = false
 	if _closed or path.is_empty() or native == null:
 		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
 	# The real GDExtension must support acknowledgement/rollback. Scripted
@@ -826,12 +849,32 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 	_brush_tile_journal.clear()
 	_brush_change_count_before_batch = _brush_change_count
 	var previous: Vector2 = _last
+	var reusable_stationary_dab: bool = _stationary_dab_valid and _has_last \
+		and selection == null and _stationary_dab_width == width \
+		and _stationary_dab_rgba == rgba and _stationary_dab_erase == erase \
+		and _stationary_dab_clip == clip_bounds \
+		and _stationary_dab_budget == max_candidates \
+		and _stationary_dab_transform == view_transform \
+		and _stationary_dab_anchor_x == anchor_x \
+		and _stationary_dab_anchor_y == anchor_y \
+		and _stationary_dab_revision == document.revision \
+		and _stationary_dab_preview_epoch == _preview_epoch
+	var last_rasterized_was_dab: bool = false
 	for index: int in range(path.size()):
 		var position: Vector2 = inverse * path[index]
 		if not position.is_finite() or absf(position.x) > 1000000000.0 or absf(position.y) > 1000000000.0:
 			_rollback_paint()
 			return DrawingResult.failure("COORD_RANGE", "Brush point is outside the view-relative range")
 		var start: Vector2 = previous if index > 0 or _has_last else position
+		# One-point batches from actual mouse events commonly repeat an
+		# already accepted stationary dab. Only an unchanged, unmasked brush
+		# context can reuse that result across calls. A different candidate
+		# budget must still fail when the original dab would fail.
+		if index == 0 and position == start and reusable_stationary_dab:
+			_cross_batch_dabs_skipped += 1
+			last_rasterized_was_dab = true
+			previous = position
+			continue
 		# A repeated source position adds no coverage to the once-only hard
 		# Brush/Eraser *within the same batch*. Repaint the first point of
 		# every call: public callers may change width, selection or clip
@@ -846,9 +889,22 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 		if not touched.ok:
 			_rollback_paint()
 			return touched
+		last_rasterized_was_dab = (start == position)
 		previous = position
 	_has_last = true
 	_last = previous
+	_stationary_dab_valid = last_rasterized_was_dab and selection == null
+	if _stationary_dab_valid:
+		_stationary_dab_width = width
+		_stationary_dab_rgba = rgba
+		_stationary_dab_erase = erase
+		_stationary_dab_clip = clip_bounds
+		_stationary_dab_budget = max_candidates
+		_stationary_dab_transform = view_transform
+		_stationary_dab_anchor_x = anchor_x
+		_stationary_dab_anchor_y = anchor_y
+		_stationary_dab_revision = document.revision
+		_stationary_dab_preview_epoch = _preview_epoch
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_journaling = false

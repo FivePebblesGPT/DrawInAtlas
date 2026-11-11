@@ -1970,6 +1970,22 @@ responsiveness are **not** established as faster. T-095 stays **In Progress**
 with manual review pending, and T-096 remains **Manual Review**. Hosted CI and
 owner device checks remain unverified. [Evidence](evidence/T-095-2026-11-11-duplicate-waypoints.md).
 
+**T-095 cross-batch stationary Legacy Brush/Eraser dabs (2026-11-11; In Progress):**
+The previous same-batch shortcut now also reuses successfully completed
+identical one-point stationary dabs across pointer batches, only when color,
+width, mode, null selection, clipping, budget, transform, signed anchor, source
+revision and detached preview generation match. Mixed edits, failed batches,
+movement and native preset paths cannot reuse stale coverage. A new independent
+**663/663** signed source/preview/history oracle covers 121 one-point calls,
+changed contexts, late source-read rollback/retry, exact Undo/Redo; an explicitly
+disabled staged-copy control fails 4 checks. Six-trial isolated 60px batch CPU
+median was **47.487 ms** for full raster versus **11.910 ms** with reuse; real
+Xvfb mouse events, navigation and native suites pass, but this is **not** an
+owner-device pointer-to-photon result. Fresh native-absent import/fallback
+passes. **T-095 remains In Progress, `manual_review: true`**, T-096 stays
+separately in Manual Review, and hosted CI and hardware approval are unverified.
+[Evidence](evidence/T-095-2026-11-11-cross-batch-dab.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).

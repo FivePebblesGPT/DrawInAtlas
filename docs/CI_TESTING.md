@@ -1,3 +1,21 @@
+## T-095 cross-batch stationary Legacy dab regression — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` workflow stages the
+canonical Drawing source and runs `drawing/tests/t095_cross_batch_dab_smoke.gd`,
+requiring exactly one `T095_CROSS_BATCH_DAB_PASSED` marker through the existing
+fail-closed `check_godot_model_log.py` verifier. The raw
+`/tmp/t095-cross-batch-dab.log` is uploaded under `if: always()`. The
+**663/663** local oracle compares 121 separate Brush/Eraser 60px one-point
+batches against independent full-raster controls and validates signed bytes,
+RGBA8, preview/history, moved endpoints, changed width/color/mode/selection,
+clip/budget, transform/anchor, late source-tile failure and exact retry/Undo.
+Disabling reuse in a staged copy triggers four intentional failures. The
+isolated six-run alternated `t095_cross_batch_dab_bench.gd` is opt-in and has
+**no CI timing budget**. The native absence fallback remains safe; the 46
+required fast-CI check IDs and T-094 strict log policy remain unchanged.
+Hosted CI and owner physical-device responsiveness/approval are unverified.
+[Evidence](evidence/T-095-2026-11-11-cross-batch-dab.md).
+
 ## T-095 same-batch duplicate waypoint oracle — 2026-11-11
 
 The on-demand `godot-native-t095-brush.yml` runs
