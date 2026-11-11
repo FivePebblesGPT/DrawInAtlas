@@ -16,7 +16,7 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   **Done** *(paired Xvfb compositor improvement, not latency acceptance)*;
   [T-099 bounded held-preview scheduling](Tickets/T-099.md) **Done**;
   [T-100 sparse publication](Tickets/T-100.md) **Done**;
-  [T-101 optional native throughput](Tickets/T-101.md) **Ready**.
+  [T-101 optional native throughput](Tickets/T-101.md) **Done**.
 - **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md),
   [T-103](Tickets/T-103.md); T-068 → [T-104](Tickets/T-104.md),
   [T-105](Tickets/T-105.md); T-094 → [T-106](Tickets/T-106.md),
@@ -69,6 +69,22 @@ control. Four 96px pointer runs per variant reduced publication CPU p50 from
 Xvfb/Mesa. This is *not* T-095 physical responsiveness or frame-time
 acceptance; T-095 and T-096 manual gates stay open. [Ticket](Tickets/T-100.md)
 · [Evidence](evidence/T-100-2026-11-12-sparse-publication.md).
+
+## T-101 optional NativeHard dispatch throughput (2026-11-12; Done)
+
+After profiling the real optional Rust/Hokusai GDExtension, NativeHard's
+per-pixel GDScript staging still dominates its native rasterizer. NativeHard
+now selects the existing tile-local Brush path **once per batch** instead of
+calling the generic `_stage()` dispatcher for each returned coordinate; mixed
+edits retain generic publication and full rollback. No Rust ABI, pigment
+semantics, native availability requirements or 6ms soft drain budget changed.
+The 5,035-check signed/masked Brush/Eraser and failure/retry oracle passes;
+its original-source control fails four dedicated dispatch assertions. A
+seven-trial 65,536-pixel isolated CPU witness improved p50 **284 → 233ms**
+(first same-host comparison), with full 96px mouse correctness and independent
+Hokusai preset tests retained. This does **not** establish a physical
+100ms response, eliminate frame stalls, or approve T-095/T-096. [Ticket]
+(Tickets/T-101.md) · [Evidence](evidence/T-101-2026-11-12-native-dispatch.md).
 
 ## T-098 exact 128px preview invalidation (2026-11-11; Done)
 
@@ -2330,7 +2346,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-098 · Incremental detached Brush preview compositing](Tickets/T-098.md) | Done | — | [T-097](Tickets/T-097.md) |
 | [T-099 · Frame-safe Brush input draining and held-preview scheduling](Tickets/T-099.md) | Done | Bounded preview coalescing; software/native oracles pass, owner T-095 acceptance still open | [T-097](Tickets/T-097.md) |
 | [T-100 · Bounded sparse atomic Brush publication and Undo](Tickets/T-100.md) | Done | Signed/masked source/history, performance red control and native oracles pass; T-095 owner gate remains open | [T-097](Tickets/T-097.md) |
-| [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Done | NativeHard per-batch dispatch bypass; real Rust/Hokusai/rollback checks pass, T-095 owner gate open | [T-097](Tickets/T-097.md) |
 | [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Ready | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |

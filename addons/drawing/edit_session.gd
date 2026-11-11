@@ -719,14 +719,33 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_brush_change_count_before_batch = _brush_change_count
-	for index: int in range(0, coordinates.size(), 2):
-		var staged: DrawingResult = _stage(coordinates[index], coordinates[index + 1],
-			0 if erase else rgba, selection, true, not erase, -1, true)
-		if not staged.ok:
-			_rollback_paint()
-			if transactional:
-				native.call("rollback_hard_batch")
-			return staged
+	# Native coverage is already prevalidated by Rust. Avoid routing every
+	# returned pixel through _stage's generic/mixed-edit dispatch; preserve that
+	# dispatch when an earlier public operation has disabled tile-only staging.
+	var tile_staging: bool = _brush_tile_publish and not _hokusai_deferred
+	var ink: int = 0 if erase else rgba
+	if tile_staging:
+		# Keep the dispatch outside the pixel loop: a 96px full-canvas
+		# NativeHard gesture can contain more than 262,000 covered pixels.
+		for index: int in range(0, coordinates.size(), 2):
+			var staged: DrawingResult = _stage_brush_tile(coordinates[index],
+				coordinates[index + 1], ink, selection, true, not erase, -1)
+			if not staged.ok:
+				_rollback_paint()
+				if transactional:
+					native.call("rollback_hard_batch")
+				return staged
+	else:
+		# Public edits or Hokusai staging in the same session require the
+		# original global-key bookkeeping and atomic rollback semantics.
+		for index: int in range(0, coordinates.size(), 2):
+			var staged: DrawingResult = _stage(coordinates[index],
+				coordinates[index + 1], ink, selection, true, not erase, -1, true)
+			if not staged.ok:
+				_rollback_paint()
+				if transactional:
+					native.call("rollback_hard_batch")
+				return staged
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_journaling = false

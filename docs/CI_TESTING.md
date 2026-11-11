@@ -1,3 +1,21 @@
+## T-101 optional NativeHard dispatch without requiring native adoption — 2026-11-12
+
+The non-gating, manually dispatched `godot-native-t095-brush.yml` runs
+`drawing/tests/t101_native_hard_dispatch_smoke.gd` after canonical standalone
+staging, checks exactly one `T101_NATIVE_DISPATCH_PASSED` via T-094's strict
+log verifier and retains `/tmp/t101-native-dispatch.log` under `if: always()`.
+The 5,035-check synthetic packed-output oracle uses a transactional native
+stub to verify signed/masked Brush/Eraser, hidden RGB, mixed edit handling,
+late source-read failure, retry, atomic history, Undo/Redo and the direct
+NativeHard tile-local dispatch; the original T-100 source fails four of the
+new dispatch assertions. Real Rust and Hokusai preset regressions in the same
+on-demand workflow remain separate. The `t101_native_hard_dispatch_bench.gd`
+CPU-only diagnostic is **not** a CI speed gate or substitute for real-pointer
+runs; it omits Rust raster, screen composition and input timing. The fast
+46 required CI check IDs, on-demand CI hosting status, native-absent fallback,
+T-095/T-096 owner acceptance and 6ms soft drain budget are unchanged.
+[Evidence](evidence/T-101-2026-11-12-native-dispatch.md).
+
 ## T-100 sparse atomic Brush publication and Undo — 2026-11-12
 
 The existing **on-demand** `godot-native-t095-brush.yml` now runs
