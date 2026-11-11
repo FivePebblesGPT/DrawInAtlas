@@ -1,3 +1,19 @@
+## T-095 bounded duplicate-target input drain — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_duplicate_drain_batch_smoke.gd` with the strict
+`T095_DUPLICATE_DRAIN_PASSED` marker via the existing T-094 fail-closed
+log checker and uploads its raw log regardless of later job failures.
+The **195/195** local Canvas witness compares 162 chronological source
+samples, individual timestamp accounting, exact RGBA8 preview/commit,
+Undo/Redo and bounded Legacy same-position staging against a full-raster
+reference. The original Canvas fails three new grouping assertions. No
+input is dropped, no Hokusai/NativeHard staging semantics change, and the
+required fast desktop CI check IDs are unchanged. Isolated batch/CPU metrics
+and Xvfb/Mesa tests do **not** establish owner physical responsiveness or
+hosted CI acceptance.
+[Detailed evidence](evidence/T-095-2026-11-11-duplicate-drain.md).
+
 ## T-095 cross-batch stationary Legacy dab regression — 2026-11-11
 
 The non-gating, on-demand `godot-native-t095-brush.yml` workflow stages the

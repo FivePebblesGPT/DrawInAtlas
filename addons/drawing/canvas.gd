@@ -1121,7 +1121,7 @@ func start_gesture(position: Vector2) -> void:
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"max_sample_buffer": 0, "sample_compactions": 0,
-		"drain_calls": 0, "max_drain_cpu_us": 0,
+		"duplicate_drain_batched": 0, "drain_calls": 0, "max_drain_cpu_us": 0,
 		"sample_to_stage_us": [], "sample_to_stage_total": 0,
 		"max_sample_to_stage_us": 0, "stage_batches_us": [],
 		"stage_batch_total": 0, "max_stage_batch_us": 0,
@@ -1192,7 +1192,14 @@ func _drain_segments(budget: int) -> void:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
 		var next_position: Vector2 = _staged_position
-		while batch.size() < batch_limit and segments < budget:
+		# A 60px stroke normally gets a one-segment atomic budget. Allow a
+		# *consecutive identical* Legacy source position to extend that batch:
+		# it adds no new candidate footprint, and paint_path already skips
+		# duplicate waypoints exactly. Never collapse Hokusai pigment input or
+		# enlarge a batch with a moving segment beyond the original budget.
+		var batch_capacity: int = MAX_SEGMENTS_PER_BATCH \
+			if _active_brush_backend == "Legacy" else batch_limit
+		while batch.size() < batch_capacity and segments < budget:
 			if not _has_segment_target:
 				if _sample_index == _samples.size():
 					break
@@ -1200,7 +1207,16 @@ func _drain_segments(budget: int) -> void:
 				_target_arrival_us = _sample_times_us[_sample_index]
 				_sample_index += 1
 				_has_segment_target = true
-			next_position = next_position.move_toward(_segment_target, MAX_SEGMENT_LENGTH)
+			var candidate: Vector2 = next_position.move_toward(
+				_segment_target, MAX_SEGMENT_LENGTH)
+			if batch.size() >= batch_limit:
+				if candidate != next_position:
+					# Target is already dequeued, but remains pending. Do not
+					# consume its timestamp or advance the staged position.
+					break
+				_metrics["duplicate_drain_batched"] = int(
+					_metrics["duplicate_drain_batched"]) + 1
+			next_position = candidate
 			batch.append(next_position)
 			segments += 1
 			if next_position == _segment_target:

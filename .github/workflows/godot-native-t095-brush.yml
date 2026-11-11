@@ -44,6 +44,14 @@ jobs:
             2>&1 | tee /tmp/t095-cross-batch-dab.log
           python3 tools/check_godot_model_log.py /tmp/t095-cross-batch-dab.log \
             --marker T095_CROSS_BATCH_DAB_PASSED
+      - name: T-095 bounded Legacy duplicate-target drain and exact input accounting
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t095_duplicate_drain_batch_smoke.gd \
+            2>&1 | tee /tmp/t095-duplicate-drain.log
+          python3 tools/check_godot_model_log.py /tmp/t095-duplicate-drain.log \
+            --marker T095_DUPLICATE_DRAIN_PASSED
       - name: T-095 suppress unchanged-preview redraws across delivered input frames
         run: |
           set -euo pipefail
@@ -263,6 +271,7 @@ jobs:
             /tmp/t095-noop-redraw.log
             /tmp/t095-duplicate-waypoints.log
             /tmp/t095-cross-batch-dab.log
+            /tmp/t095-duplicate-drain.log
             /tmp/t095-preview-index-reuse.log
             /tmp/t095-brush-deferred.log
             /tmp/t095-brush-tile-reference.log

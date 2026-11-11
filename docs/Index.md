@@ -1970,6 +1970,20 @@ responsiveness are **not** established as faster. T-095 stays **In Progress**
 with manual review pending, and T-096 remains **Manual Review**. Hosted CI and
 owner device checks remain unverified. [Evidence](evidence/T-095-2026-11-11-duplicate-waypoints.md).
 
+**T-095 duplicate input-target bounded drain (2026-11-11; In Progress):**
+At 60px, the Legacy input drain previously dispatched each repeated source
+point as a separate paint call even though consecutive stationary dabs add no
+new geometry. It now batches up to 16 *identical* targets without dropping
+input timestamps or delaying the next moved segment. An independent actual
+Canvas **195/195** preview/history and source oracle passes; previous-source
+negative control fails **3** batching checks, while 162 samples require
+**12** instead of **162** native-engine GDScript stage calls. Nearby queue,
+rollback, native and Xvfb software witnesses pass. These are local CPU and
+software framebuffer checks, **not owner GPU/input-to-photon acceptance**.
+T-095 stays **In Progress**, `manual_review: true`; T-096 stays separately
+**Manual Review**. Hosted CI unverified.
+[Evidence](evidence/T-095-2026-11-11-duplicate-drain.md).
+
 **T-095 cross-batch stationary Legacy Brush/Eraser dabs (2026-11-11; In Progress):**
 The previous same-batch shortcut now also reuses successfully completed
 identical one-point stationary dabs across pointer batches, only when color,
