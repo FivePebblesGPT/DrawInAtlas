@@ -163,6 +163,8 @@ func run() -> void:
 		canvas.layer_id = layer
 		await process_frame
 		var previous_revision: int = doc.revision
+		var memory_before: int = OS.get_static_memory_usage()
+		var peak_before: int = OS.get_static_memory_peak_usage()
 		var begin_us: int = Time.get_ticks_usec()
 		mouse_button(canvas, path[0], true)
 		check(canvas.session != null, "stroke %d begins via pointer down" % run_index)
@@ -216,6 +218,10 @@ func run() -> void:
 			float(stats.get("max_frame_full_draw_cpu_us", 0)) / 1000.0,
 			canvas._display_tiles.size() * canvas.DISPLAY_TILE_SIZE *
 			canvas.DISPLAY_TILE_SIZE * 4])
+		print("T100_POINTER_MEMORY index=%d static_before_bytes=%d " % [
+			run_index, memory_before] +
+			"static_after_bytes=%d peak_before_bytes=%d peak_after_bytes=%d" % [
+			OS.get_static_memory_usage(), peak_before, OS.get_static_memory_peak_usage()])
 		print("T099_FRAME_METRICS index=%d input_draw_p50_ms=%.3f input_draw_p95_ms=%.3f input_draw_max_ms=%.3f input_callback_p50_ms=%.3f input_callback_p95_ms=%.3f input_callback_max_ms=%.3f pending_depth_p95=%.0f pending_depth_max=%d pending_age_p95_ms=%.3f pending_age_max_ms=%.3f preview_draws=%d drain_calls=%d max_drain_ms=%.3f" % [
 			run_index,
 			frame_metric_p_ms(stats, "preview_input_to_frame_end_us", 0.5),

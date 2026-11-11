@@ -12,3 +12,13 @@ func _init(target: String = "", originals: Dictionary[String, int] = {},
 	layer_id = target
 	before = originals.duplicate()
 	after = replacements.duplicate()
+
+
+## Internal handoff for freshly built, unaliased publication maps only.
+## Public construction intentionally continues to detach caller-owned maps.
+static func from_owned_maps(target: String, originals: Dictionary[String, int],
+		replacements: Dictionary[String, int]) -> DrawingDelta:
+	var result: DrawingDelta = DrawingDelta.new(target)
+	result.before = originals
+	result.after = replacements
+	return result

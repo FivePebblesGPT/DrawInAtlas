@@ -77,6 +77,14 @@ jobs:
             2>&1 | tee /tmp/t098-preview-display.log
           python3 tools/check_godot_model_log.py /tmp/t098-preview-display.log \
             --marker T098_PREVIEW_DISPLAY_PASSED
+      - name: T-100 sparse atomic tile publication and canonical Undo/Redo oracle
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/t100_sparse_publication_smoke.gd \
+            2>&1 | tee /tmp/t100-sparse-publication.log
+          python3 tools/check_godot_model_log.py /tmp/t100-sparse-publication.log \
+            --marker T100_SPARSE_PUBLICATION_PASSED
       - name: T-095 internal Brush success-result ownership and history
         run: |
           set -euo pipefail
@@ -358,6 +366,7 @@ jobs:
             /tmp/t095-duplicate-drain.log
             /tmp/t095-preview-index-reuse.log
             /tmp/t098-preview-display.log
+            /tmp/t100-sparse-publication.log
             /tmp/t095-brush-deferred.log
             /tmp/t095-brush-tile-reference.log
             /tmp/t095-brush-result.log

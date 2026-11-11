@@ -450,9 +450,11 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		# unsafe. The session's preflight captured the authoritative tile.
 		if original != session_sources[tile_key]:
 			return DrawingResult.failure("STALE_PIXEL", "Source tile changed during gesture")
-		var candidate: DrawingRasterTile = original.detached_copy() if original != null \
-			else DrawingRasterTile.new(tile_stride)
+		var source_pixels: Dictionary[int, int] = {}
+		if original != null:
+			source_pixels = original._pixels
 		var patch: Dictionary = patches[tile_key]
+		var has_zero_replacements: bool = false
 		for local_index: int in patch:
 			if local_index < 0 or local_index >= tile_stride * tile_stride:
 				return DrawingResult.failure("COORD", "Invalid storage tile offset")
@@ -464,12 +466,13 @@ func _publish_tile_edit(layer_id: String, expected: int,
 			var x: int = tile_x * tile_stride + local_x
 			var y: int = tile_y * tile_stride + local_y
 			var pixel_key: String = "%d,%d" % [x, y]
-			var old: int = original.get_rgba(local_x, local_y) if original != null else 0
+			var old: int = int(source_pixels.get(local_index, 0))
 			if replacement == old:
 				return DrawingResult.failure("STALE_PIXEL", "Native patch contains an unchanged pixel")
 			before[pixel_key] = old
 			after[pixel_key] = replacement
-			candidate.set_rgba(local_x, local_y, replacement)
+			if replacement == 0:
+				has_zero_replacements = true
 			if not bounds.has(tile_key):
 				bounds[tile_key] = [x, y, x, y]
 			else:
@@ -479,11 +482,26 @@ func _publish_tile_edit(layer_id: String, expected: int,
 				rect[2] = maxi(int(rect[2]), x)
 				rect[3] = maxi(int(rect[3]), y)
 		if not patch.is_empty():
+			# A complete tile-local patch is already validated. Merge nonzero
+			# replacements in native Dictionary code, rather than making one
+			# GDScript set_rgba call per pixel. Transparent-black erasures must
+			# remove sparse keys; hidden-RGB alpha-zero values stay as stored.
+			var candidate: DrawingRasterTile = original.detached_copy() if original != null \
+				else DrawingRasterTile.new(tile_stride)
+			if not has_zero_replacements:
+				candidate._pixels.merge(patch, true)
+			else:
+				for local_index: int in patch:
+					var replacement: int = int(patch[local_index])
+					if replacement == 0:
+						candidate._pixels.erase(local_index)
+					else:
+						candidate._pixels[local_index] = replacement
 			detached[tile_key] = candidate
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history)
+		detached, bounds, record_history, true)
 
 
 ## Read and compare originals before publication, then detach only touched tiles.
@@ -545,7 +563,8 @@ func _publish_edit(layer_id: String, expected: int,
 func _install_prepared_edit(layer_id: String, expected: int,
 		before: Dictionary[String, int], after: Dictionary[String, int],
 		detached: Dictionary[String, DrawingRasterTile],
-		bounds: Dictionary[String, Array], record_history: bool) -> DrawingResult:
+		bounds: Dictionary[String, Array], record_history: bool,
+		owned_history_maps: bool = false) -> DrawingResult:
 	# A lazy source provider can invoke application code while resolving a tile.
 	# Reject reentrant revision/visibility changes before installing detached data.
 	if revision != expected:
@@ -567,7 +586,12 @@ func _install_prepared_edit(layer_id: String, expected: int,
 	revision += 1
 	_content_committed = true
 	result.revision = revision
-	result.delta = DrawingDelta.new(layer_id, before, after)
+	# The tile publisher built these two canonical maps privately, so it can
+	# transfer them into the delta without duplicating hundreds of thousands
+	# of String keys. The mixed/global publisher receives caller-owned maps
+	# and must keep DrawingDelta.new()'s defensive-copy contract.
+	result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
+		else DrawingDelta.new(layer_id, before, after)
 	if record_history:
 		if external_history:
 			_mark_untracked_change()

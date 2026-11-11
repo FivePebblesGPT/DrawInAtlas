@@ -1,6 +1,6 @@
 # Ticket Kanban Index
 
-**As of 2026-11-07 · merged owner review and ongoing validation checkpoints.** This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
+**As of 2026-11-12 · merged owner review and ongoing validation checkpoints.** This index includes the historical work and the Draw/Atlas separation documentation tasks introduced since [a9a3bc2](https://github.com/FivePebblesGPT/DrawInAtlas/commit/a9a3bc23d4c03b577d00526e1993f93cac1b121c).
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
@@ -15,7 +15,7 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   *(harness only; latency target fails)*; [T-098 incremental preview](Tickets/T-098.md)
   **Done** *(paired Xvfb compositor improvement, not latency acceptance)*;
   [T-099 bounded held-preview scheduling](Tickets/T-099.md) **Done**;
-  [T-100 sparse publication](Tickets/T-100.md) **Ready**;
+  [T-100 sparse publication](Tickets/T-100.md) **Done**;
   [T-101 optional native throughput](Tickets/T-101.md) **Ready**.
 - **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md),
   [T-103](Tickets/T-103.md); T-068 → [T-104](Tickets/T-104.md),
@@ -55,6 +55,21 @@ not a frame-time guarantee. T-095 owner/device approval, T-096 and hosted
 CI are not inferred. [Ticket](Tickets/T-099.md) ·
 [Evidence](evidence/T-099-2026-11-12-held-preview-scheduling.md).
 
+## T-100 bounded sparse atomic Brush publication (2026-11-12; Done)
+
+Validated tile-local commits now merge signed sparse-pixel patches using native
+Dictionary operations after full source/preflight checks, and transfer their
+privately built canonical Undo maps without duplicating all entries again.
+Public DrawingDelta construction and mixed-edit publication retain defensive
+copies. A 197-check independent source/history oracle covers signed, masked,
+hidden-RGB and failure/retry scenarios, with an old-source performance red
+control. Four 96px pointer runs per variant reduced publication CPU p50 from
+**1349 to 1041ms** and first-stroke Godot peak static memory from ~226MB to
+~183MB; **whole-gesture p50 was slightly worse** (5382 → 5543ms) on variable
+Xvfb/Mesa. This is *not* T-095 physical responsiveness or frame-time
+acceptance; T-095 and T-096 manual gates stay open. [Ticket](Tickets/T-100.md)
+· [Evidence](evidence/T-100-2026-11-12-sparse-publication.md).
+
 ## T-098 exact 128px preview invalidation (2026-11-11; Done)
 
 Canvas now avoids recompositing untouched 128px display quadrants when a
@@ -64,7 +79,7 @@ bulk/rollback/oversized cases. The old lookup fails three focused assertions;
 27/27 headless and 29/29 graphical checks pass. Two paired 96px pointer runs
 reduced compositor CPU from **4.393–4.429s** to **1.699–1.770s** on software
 Mesa; whole-stroke lag remains **5.265–6.164s**, not owner accepted.
-T-099 is now Done as a narrow scheduler change; T-100 and T-095 remain open. [Ticket](Tickets/T-098.md) ·
+T-099 and T-100 are now Done as separate narrow optimizations; T-095 remains open. [Ticket](Tickets/T-098.md) ·
 [Evidence](evidence/T-098-2026-11-11-exact-preview-display-tiles.md).
 
 ## T-095 96px red full-canvas pointer baseline (2026-11-11; In Progress)
@@ -2314,7 +2329,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-097 · 96px full-canvas Brush correctness and profiling baseline](Tickets/T-097.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-098 · Incremental detached Brush preview compositing](Tickets/T-098.md) | Done | — | [T-097](Tickets/T-097.md) |
 | [T-099 · Frame-safe Brush input draining and held-preview scheduling](Tickets/T-099.md) | Done | Bounded preview coalescing; software/native oracles pass, owner T-095 acceptance still open | [T-097](Tickets/T-097.md) |
-| [T-100 · Bounded sparse atomic Brush publication and Undo](Tickets/T-100.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-100 · Bounded sparse atomic Brush publication and Undo](Tickets/T-100.md) | Done | Signed/masked source/history, performance red control and native oracles pass; T-095 owner gate remains open | [T-097](Tickets/T-097.md) |
 | [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Ready | — | [T-097](Tickets/T-097.md) |
 | [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Ready | — | [T-053](Tickets/T-053.md) |

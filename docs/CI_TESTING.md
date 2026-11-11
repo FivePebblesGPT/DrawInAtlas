@@ -1,3 +1,20 @@
+## T-100 sparse atomic Brush publication and Undo — 2026-11-12
+
+The existing **on-demand** `godot-native-t095-brush.yml` now runs
+`drawing/tests/t100_sparse_publication_smoke.gd` headlessly after standalone
+staging and editor import, requires a single `T100_SPARSE_PUBLICATION_PASSED`
+marker through T-094's fail-closed verifier and retains
+`/tmp/t100-sparse-publication.log` even if later checks fail. Its 197
+source/history assertions include full 512×512 red RGBA8 SHA-256, independent
+canonical pixel map parity, signed/masked Brush/Eraser, hidden RGB, Undo/Redo,
+multi-layer isolation, cancellation, invalid late-tile rollback and retry.
+The optional `T100_MAX_COMMIT_MS` is reserved for **paired diagnostic red/green
+controls** (the original publisher fails an 1850ms local control); it is not
+set in CI or interpreted as hardware responsiveness. The real 96px pointer
+suite also logs Godot static/peak memory by stroke. Its 6ms soft drain budget,
+T-095/T-096 owner gates, unchanged **46 required fast-CI check IDs**, and
+T-094 log policy remain authoritative. [Evidence](evidence/T-100-2026-11-12-sparse-publication.md).
+
 ## T-099 held-preview scheduling and exact input parity — 2026-11-12
 
 The existing non-gating `godot-native-t095-brush.yml` now applies
