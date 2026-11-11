@@ -4,6 +4,27 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## Active delivery slices — 2026-11-11
+
+The oversized implementation logs have been preserved verbatim as
+`docs/Tickets/History-T*.md`. Canonical ticket files now show the open
+acceptance criteria and **small deliverables**, rather than appending every
+checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
+
+- **Brush T-095:** [T-097 benchmark/profiler](Tickets/T-097.md) **Done**
+  *(harness only; latency target fails)*; [T-098 incremental preview](Tickets/T-098.md),
+  [T-099 bounded input draining](Tickets/T-099.md),
+  [T-100 sparse publication](Tickets/T-100.md) **Ready**;
+  [T-101 optional native throughput](Tickets/T-101.md) **Ready**.
+- **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md),
+  [T-103](Tickets/T-103.md); T-068 → [T-104](Tickets/T-104.md),
+  [T-105](Tickets/T-105.md); T-094 → [T-106](Tickets/T-106.md),
+  [T-107](Tickets/T-107.md); T-064 → [T-108](Tickets/T-108.md);
+  T-065 → [T-109](Tickets/T-109.md).
+
+**No performance fix is claimed by this ticket-store split.** PR #17’s
+required CI and owner reference hardware must be rechecked independently.
+
 ## Current priority — owner Drawing review (2026-11-05)
 
 **T-095 built-in Godot profiler attribution (2026-11-11; In Progress):**
@@ -2228,11 +2249,11 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-061 · Floor layer groups, world coordinates and blank LOD](Tickets/T-061.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-062 · Object Editor, Save and Save As](Tickets/T-062.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-058](Tickets/T-058.md) |
 | [T-063 · Compact Drawing UI and BarDivider overflow](Tickets/T-063.md) | Done | — | [T-053](Tickets/T-053.md) |
-| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | In Progress | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
-| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | In Progress | **Owner** | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
+| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | In Progress | — | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md), [T-108](Tickets/T-108.md) |
+| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | In Progress | **Owner** | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md), [T-109](Tickets/T-109.md) |
 | [T-066 · Sparse multi-file floor/detail DrawingDocument persistence](Tickets/T-066.md) | Done | — | [T-051](Tickets/T-051.md), [T-052](Tickets/T-052.md) |
 | [T-067 · Benchmark larger chunk geometry and packed storage](Tickets/T-067.md) | Done | — | [T-051](Tickets/T-051.md) |
-| [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | — | [T-052](Tickets/T-052.md) |
+| [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-104](Tickets/T-104.md), [T-105](Tickets/T-105.md) |
 | [T-069 · Reconcile architecture and typed model docs](Tickets/T-069.md) | Done | — | — |
 | [T-070 · Reconcile world, authored detail and navigation docs](Tickets/T-070.md) | Done | — | — |
 | [T-071 · Sparse multi-file Drawing storage and recovery docs](Tickets/T-071.md) | Done | — | — |
@@ -2251,7 +2272,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | — | [T-052](Tickets/T-052.md) |
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
-| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
+| [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-102](Tickets/T-102.md), [T-103](Tickets/T-103.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | — | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md) |
 | [T-089 · Layer hierarchy, row eye/lock and undo](Tickets/T-089.md) | Done | — | [T-053](Tickets/T-053.md) |
@@ -2259,9 +2280,22 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | — | [T-082](Tickets/T-082.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | — | [T-063](Tickets/T-063.md) |
 | [T-093 · Discoverable Object source/open workflows](Tickets/T-093.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
-| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md) |
-| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Brush/native regressions and owner-trace validation tested; physical-device/review gate outstanding | [T-053](Tickets/T-053.md) |
+| [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | — | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md), [T-106](Tickets/T-106.md), [T-107](Tickets/T-107.md) |
+| [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | Brush/native regressions and owner-trace validation tested; physical-device/review gate outstanding | [T-053](Tickets/T-053.md), [T-098](Tickets/T-098.md), [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
+| [T-097 · 96px full-canvas Brush correctness and profiling baseline](Tickets/T-097.md) | Done | — | [T-053](Tickets/T-053.md) |
+| [T-098 · Incremental detached Brush preview compositing](Tickets/T-098.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-099 · Frame-safe Brush input draining and held-preview scheduling](Tickets/T-099.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-100 · Bounded sparse atomic Brush publication and Undo](Tickets/T-100.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Ready | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
+| [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | Ready | — | [T-052](Tickets/T-052.md) |
+| [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | Ready | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 
 ## Epics
 

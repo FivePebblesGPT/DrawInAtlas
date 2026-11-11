@@ -1,0 +1,734 @@
+---
+status: "In Progress"
+manual_review: false
+id: T-094
+type: ticket
+kind: implementation
+priority: P0
+epics: ["[[E-009]]", "[[E-004]]"]
+depends_on: ["[[T-053]]", "[[T-055]]", "[[T-063]]"]
+related: ["[[T-056]]", "[[T-059]]", "[[T-068]]", "[[T-083]]"]
+---
+# Restore reliable Drawing CI and capture owner acceptance evidence
+
+**Status: In Progress (2026-11-06).** First reproducible CI/acceptance checkpoint is implemented and locally validated; upstream CI has **not** been rerun on this patch, and physical Windows/Linux owner evidence remains outstanding. Newly scoped corrective work from the owner's first hands-on standalone Drawing review. Source observations are in [the owner review](../DRAWING_USABILITY_REVIEW_2026-11-05.md). Existing earlier "Done" tickets retain their original, narrower acceptance; this ticket does **not** inherit their UX approval.
+
+## Problem / scope
+The reviewed `aidev` GitHub Actions build reports **35/37 check groups passing**, with failures in `test_t068_quad_stress.QuadStressContracts.test_live_strict_compiler_profiles` ('Native stress ABI rejected or corrupted a mask') and a T-073 documentation test expecting T-064 `Ready` instead of its legitimate `In Progress` status. Existing green standalone export checks do not substitute for usability acceptance.
+
+## Engineering tasks
+1. Reproduce the strict native stress failure under the same compiler/toolchain, identify case and ABI return/canary behavior; fix implementation or explicitly scoped test setup **without weakening correctness** or hiding a failing native probe.
+2. Remove hardcoded stale ticket-state expectations in T-073 and any related docs tests; assert the intended workflow/requirements instead of freezing unrelated ticket statuses.
+3. Keep fast deterministic CI distinct from opt-in hardware/input/visual checks, but show both states clearly and do not mask production regressions as non-gating.
+4. Build an owner-run acceptance checklist from [the 23 findings](../DRAWING_USABILITY_REVIEW_2026-11-05.md), mapping each corrective ticket to a native pointer/framebuffer witness, OS, DPI, image, action and expected result.
+5. Re-run clean Drawing package staging, Linux export, actual standalone `.drawing` roundtrip and Atlas integration after affected milestones are delivered.
+
+## Acceptance / verification
+- [ ] CI report is green (no ignored errors), with named reproducible regression tests; T-068 native ABI parity cannot silently regress.
+- [ ] All 23 user findings have a test/review outcome: fixed, intentionally deferred with an approved scope, or verified intended behavior. `#22` remains a positive roundtrip regression test; `#23` remains a documented generation/history distinction.
+- [x] Explicit **owner** signoff remains on T-056/T-059/T-083 (and T-065), never inferred from automated checks.
+- [ ] Record baseline and post-fix native logs and desktop Linux/Windows usability evidence.
+
+## Boundaries
+- Preserve the one canonical Drawing package shared with Atlas, byte-exact saved RGBA8, source identity, one undoable content transaction per gesture and signed sparse coordinates.
+- Add headless model tests and **actual native pointer/framebuffer tests** where interaction or visible pixels are involved; source/README checks alone are insufficient.
+- Do not mark complete merely because earlier T-053/T-063/Docking smoke tests pass. Report hardware, Godot version, viewport, zoom, timing and limitations for applicable evidence.
+
+## 2026-11-06 implementation checkpoint — strict-FP portability, docs CI and owner runbook
+
+**State: In Progress, not owner approved.** Verified remote `main` at
+`28daaa9be850508a530639ddbc63fe9057552b82` (PR #6 squash-merged); this
+single-ticket change is based on that exact commit. The [remote baseline
+workflow](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/42140327784)
+remained red. Its job log explicitly names the T-068 strict quad-stress test
+(`Native stress ABI rejected or corrupted a mask`) and the T-073 T-064 `Ready`
+assumption. A separate T-074 docs contract also asserted T-064 `Ready`; it
+failed in a fresh local test run (T-073 had 1 failing test, T-074 had 2).
+T-064 is legitimately `In Progress`; no ticket was reverted for the test.
+
+**Root-cause diagnostic and bounded fix:** A Debian 13 / GCC 14.2 `-O3 -mfma`
+variant of the detached quad scope ABI reproduced **70/96** rejected convex
+cases (`-3`, with untouched output). The same source on this host passes 96/96
+at strict `-O3 -mfma -ffp-contract=off`. FP contraction can alter near-zero
+convex orientation signs in the historical Godot float32 oracle. T-068's
+strict **test build** now explicitly uses `-ffp-contract=off`, while preserving
+all mask-by-mask pixel comparisons, output canary checks, pinned source/oracle
+hashes and fail-late CI reporting. A new CPU-capability-gated regression
+executes all 96 masks with GCC `-O3 -mfma` and contraction disabled. A future
+ABI fault reports its case ID, negative return code, untouched-output state,
+invalid bytes and counted coverage rather than a generic error. **This local
+reproducer is not proof that the GitHub runner used FMA**; green remote CI
+still has to be observed. The detached C++ renderer remains research-only.
+
+**Stale Kanban assertions:** T-073 and T-074 Python checks now verify that
+related tickets are present and have recognized states and explicit manual
+gates where applicable; they no longer freeze unrelated T-064 or future
+feature tickets at `Ready`. The authoritative ticket index validator still
+checks complete frontmatter/ID/dependency consistency. The tests do not
+change T-064 or assert that its remaining UI features are shipped.
+
+**Owner re-review instructions:** [DRAWING_OWNER_ACCEPTANCE_MATRIX.md](../DRAWING_OWNER_ACCEPTANCE_MATRIX.md)
+maps **all 23 numbered findings** to the corrective ticket, physical action,
+observable result, prior evidence limit and current pending/positive/expected
+state. It documents Linux/Windows, DPI, viewport, 100/50/25% zoom, RGBA8,
+before-release framebuffer pixels, required sample timing, file hashes and
+separate owner signoff. Three new Python contracts prove coverage, link
+integrity, exact positive roundtrip check and preservation of all manual
+gates. These contracts run in the existing fail-late T-073 CI step, **not** a
+new required hardware job. The user review's positive #22 and expected #23
+are preserved, not reclassified as bugs.
+
+**Fresh local validation** (not the remote CI result):
+
+| Command / scenario | Observation |
+| --- | --- |
+| `python3 -m unittest tests.test_t073_feature_ux_docs tests.test_t074_object_docs tests.test_t094_owner_matrix tests.test_t068_quad_stress -q` | 28 selected tests pass, 1 optional Godot fixture test skips unless enabled; explicit enabled test also passes separately |
+| `T068_QUAD_GODOT=godot python3 -m unittest tests.test_t068_quad_stress -v` | 6/6 tests pass, including independent fixture regeneration and FMA-mode regression |
+| `python3 tools/validate_ticket_store.py` | All 94 tickets and review ancestry valid (rerun on this exact patch) |
+| Clean external `tools/build_drawing_app.py --output /tmp/t094-standalone/project`, Godot 4.8 beta2 `--headless --editor --import --quit`, `drawing/tests/standalone_smoke.gd` | Stage/import succeeded; 38/38 assertions passed, including hidden-transparent RGB, stable IDs and corrupt-file rejection |
+| `godot --headless --path . --script res://tests/drawing_composition_smoke.gd` and `.../drawing_world_mapping_smoke.gd` | 89/89 and 125/125 passed (existing Atlas example unresolved UID fallback warnings noted; tests have zero assertion failures) |
+| `godot --headless --path . --script res://tests/campaign_bundle_smoke.gd` and `.../drawing_edit_tile_cache_smoke.gd` | 86/86 and 31/31 passed |
+| Godot 4.8 beta2 `--export-release Linux`, then `t068_release_gate.py --stage ... --linux ... --launch-linux` | Standalone x86_64 ELF + PCK verified and launched in isolated profile/workdir; Windows not tested |
+| Xvfb 1280×720, Mesa 25.0.7 llvmpipe, `drawing/tests/native_pointer.gd` + `workspace_keyboard_smoke.gd` | 6/6 and 8/8 checked; **software-rendered** X11 only, not device input-to-photon or physical hardware |
+
+Host: **Debian GNU/Linux 13**, Godot `4.8.beta2.official.cafc17a19`,
+GCC **14.2.0**, Clang **17.0.0**, Mesa **llvmpipe**, virtual X11 1280×720.
+No physical pointer-to-photon, p50/p95, VRAM, Windows input or owner review
+measurements were collected. Fresh stage/export files and local logs were
+kept **outside Git**; no generated `drawing/addons/` files enter this commit.
+
+**Remaining before T-094 Done:** rerun and record actual *remote* green CI on
+this diff, get follow-up outcome evidence for every currently `PENDING` row
+from T-085–T-093 (not just a promised test), and capture distinct physical
+Windows/Linux acceptance evidence at the applicable milestones. Re-run the
+clean staged/exported app and shared Atlas composition after those changes;
+keep T-056/T-059/T-065/T-083 owner gates untouched. There is no claimed
+owner approval here and no reason to block independently Ready T-085/T-086.
+
+**Environment-limited checks:** A *full* clean import of the substantially
+larger root Atlas editor (including its external asset/icon tree) reached the
+reimport stage but exceeded this session's 120-second command window; the
+selected headless Atlas integration tests above ran successfully. An attempted
+all-T-068 optional Python suite exceeded a separate execution limit without
+returning a summary and is **not counted as a passing test run**. CI on the
+remote runner, Windows and physical display tests remain necessary.
+
+## 2026-11-06 follow-up checkpoint — complete CI step accounting and owner evidence manifests
+
+**State: In Progress; no physical reviewer decision.** The terminal fast-CI
+report previously considered only the `ci_` step outcomes that appeared in
+`toJSON(steps)`. If an expected check was absent from that result, a partial
+set of successful checks could be reported as all green. The reporter now
+reads the committed workflow's 46 required check IDs, rejects duplicate
+identifiers and missing, skipped, malformed or unexpected outcomes. It still
+reports successes and failures after all executable steps finish. Eight
+local fail-late/reporting contracts pass, including missing first/last checks.
+
+`tools/drawing_owner_evidence.py` now creates *NOT RUN* physical Linux/Windows
+manifests from the current 23 finding/ticket mappings. Its verifier rejects
+omitted/duplicate findings, false physical reports on software rasterizers,
+missing OS/version/commit/scale and device metadata, missing/modified/unsafe
+relative evidence artifacts, and missing 25/50/100% timed brush observations.
+Six additional tests exercise partial evidence, tampering, symlinks, malformed
+results, incomplete two-OS acceptance, and non-overwriting initialization.
+Only a physical tester can fill observed outcomes; the format validator never
+changes a manual-review flag or claims owner attestation. CI runs the schema
+contracts in the existing T-073 documentation group; no new required hardware
+job or fast-CI step has been added.
+
+**Outstanding** from the ticket's original acceptance remains exactly:
+remote GitHub CI must run against the **patched** revision and be green, all 23
+owner rows need dated outcomes, and physical Linux/Windows before/after
+pointer, display and file-integrity evidence is still NOT RUN. Previous local
+Xvfb/Mesa tests and the pre-patch red GitHub baseline are **not** substitutes
+for that evidence. T-056/T-059/T-065/T-083 approval remains untouched.
+
+**Local post-change validation (same source revision before commit):**
+`python3 -m unittest discover` for T-094 evidence (6), T-094 matrix (3),
+CI fail-late (8), CI order (1), T-068 quad stress (6, including one
+opt-in Godot-regeneration skip), T-073 (10), T-074 (10), and T-090
+contracts (7) all passed; explicit typing reports 342 GDScript files
+and 33 skill documents. `tools/validate_ticket_store.py` validates 94
+records. A fresh *external* standalone staged/imported with Godot
+`4.8.beta2.official.cafc17a19` passed 38/38 save/open checks.
+Atlas composition, history and world-map scripts returned 89/89, 101/101
+and 125/125 assertions respectively. The existing root Atlas composition
+run still emitted unresolved SVG/loader diagnostics, and Godot standalone
+shutdown emitted RID-leak warnings; therefore those commands are reported as
+passing **assertions**, not clean error-free runs. No real Windows or physical
+Linux owner evidence or patched GitHub Actions result was collected.
+
+## 2026-11-06 follow-up checkpoint — reject cross-build physical evidence
+
+**State: In Progress; no hardware or owner result inferred.** An aggregate
+review previously accepted individually valid Linux and Windows manifests
+from **different Git commits** or Godot builds. That allowed a purportedly
+complete two-platform result without any single revision having passed both.
+`drawing_owner_evidence.py verify` now rejects mixed observed revisions and
+engine builds; `--expected-commit <full-40-digit-SHA>` additionally pins all
+observed outcomes to the explicitly selected candidate. Partial `NOT RUN`
+OS templates remain valid and cannot be mistaken for observed results. Three
+new schema/CLI regression tests cover correct, mismatched, malformed, and
+partial combinations (nine owner-evidence tests total).
+
+**Fresh root import diagnosis:** The local Atlas composition test initially
+passed **89/89 assertions** but emitted sixteen missing SVG/icon-loader errors
+when run against a stale editor import cache. After a normal Godot 4.8 beta2
+root editor import, the same unmodified composition witness passed **89/89**
+with **no runtime SVG-loader errors**. It still reports Godot dummy-renderer
+RID/resource leaks **after** its success marker; those remain visible and are
+not considered clean teardown. The fast CI workflow already imports the root
+project before any Atlas script consumer, and its import/log checks remain
+strict. No renderer leak has been suppressed or fixed by this checkpoint.
+
+**Open acceptance:** patched remote CI has not run, physical Linux/Windows
+pointer and framebuffer outcomes are NOT RUN, and manual owner approvals are
+unchanged. This narrows the integrity of eventual evidence, not T-094's
+remaining acceptance obligations.
+
+## 2026-11-06 checkpoint — reproducible local fast-CI replay
+
+**State: In Progress; local rehearsal is not GitHub CI.** The checked-in fast
+workflow has 46 `ci_` checks. New `tools/replay_godot_ci.py` extracts their
+original Bash scripts in order, validates the workflow format/step inventory,
+runs each in a separate killable process group under a watchdog, and records
+per-step stdout/stderr, exit code, duration, script/log SHA-256 and candidate
+engine/workflow metadata. It continues after failed tests and uses the same
+fail-closed `report_godot_ci.summarize` outcome accounting: missing checks
+prevent a partial run from appearing green. The runner does not download or
+substitute a new engine or assert physical input-to-photon measurements.
+
+The tool requires a clean worktree for commit-specific results. Uncommitted
+development runs require explicit `--allow-dirty` and do **not** produce a
+`candidate_commit` attestation. `--expected-commit` additionally refuses
+dirty trees, preventing a report for changed-but-uncommitted code from being
+misidentified as the HEAD revision. The new 8-test regression suite verifies
+the real 46-step inventory, parser failure modes, partial/fail-late outcomes,
+log digests, timeout process-group termination and source-identity checks.
+It runs under the existing fast T-073 CI job, with no new mandatory native
+hardware job. The [CI policy](../CI_TESTING.md) documents exact commands.
+
+**Observed pre-commit exploratory sample:** four selected local replay checks
+(T-094 CI fail-late, T-085 live-stroke model, T-086 cache model and T-073/T-094
+doc/evidence suite) all succeeded. The tool correctly reported only 4/46
+executed, `complete=false`, `passed=false`; this is **not** a complete green CI
+result or an attributable clean-commit run. Full patched remote CI, all owner
+review rows and physical Windows/Linux evidence remain outstanding. No manual
+review gate was changed.
+
+## 2026-11-06 checkpoint — actual 46-step local CI replay and shutdown classification
+
+**State: In Progress; still no patched GitHub-hosted CI or physical owner review.**
+With the newly committed replay runner and the exact Godot 4.8 beta2 binary,
+executed **all 46 fast-CI checks** against local commit `71ab793` before this
+fix. The fail-late report recorded **35 success / 11 failure / 0 missing**.
+The 11 failed steps were T-087, T-088, standalone Linux release, T-058,
+T-064 project copy, T-062, T-055, T-078 dock layout, and three T-065
+browser/thumbnail/Atlas bridge tests. Inspection of the **retained raw logs**
+found that every affected smoke printed its intended passing marker (zero
+assertion failures) before the **only** `ERROR:` lines: Godot 4.8-beta2
+headless `RID allocations ... were leaked at exit` diagnostics. No other
+pre-success error was present in those failed logs. The test runner correctly
+reported them as failures under the old `grep '^ERROR:'` rule; this is a
+classification gap, not permission to ignore arbitrary runtime errors.
+
+A shared `tools/check_godot_model_log.py` now validates exactly one named
+`*_PASSED` marker and rejects all parse/script/model errors and **every**
+unknown `ERROR:` line, whether before or after success. Only explicitly
+matched Godot RID/GL leak diagnostics **after** the marker are distinguished
+and counted, not discarded from the log. The affected fast-CI model steps
+use that verifier rather than broad `grep` exceptions. A 6-test regression
+suite checks duplicates/missing markers, pre-success leaks, arbitrary later
+errors, native model failures and retention. The exported Linux release gate
+likewise requires exit code zero and identified Godot startup; it records
+only specifically named post-exit RID leaks and rejects any unrelated
+errors. The release-stage CI step now uses a fresh `mktemp` directory per
+run, fixing the observed collision on repeated local rehearsals.
+
+**Post-fix local targeted verification:** All **11 previously failed** fast
+checks passed when re-executed in selected local development replays,
+including real Linux ELF/PCK export, standalone isolated launch (4 recorded
+post-exit RID diagnostics), T-062/T-055, T-064, T-078, and T-065. The
+replays intentionally report incomplete (11/46 selected) and do **not** count
+as a full verified CI run. The exact patched Git revision still requires a
+complete clean-tree local replay and a real GitHub Actions run. Physical
+Linux/Windows findings and the four owner-review gates remain outstanding.
+
+## 2026-11-06 checkpoint — complete clean-commit local replay and artifact audit
+
+**State: In Progress.** The uninterrupted 46-check local fast-CI replay finished
+against committed `c18e69b9b4d08b6e62de625005479351c33f088a` using
+`4.8.beta2.official.cafc17a19`: **46 success / 0 failure / 0 missing** in
+**295.2 seconds** of step runtimes. It used workflow digest
+`4f4791c4ace85ca9dd476fa445f8c3003ee931eb3deb9b40c5d06494709df1cc`.
+The recorded `report.json` SHA-256 is
+`a99f7a2c4ce42d0593574d1e5351438a4092adb1d299987f4b08f4ca8e99930d`.
+Raw logs still contain **56 recognized resource-leak diagnostic lines across
+13 steps**; no `SCRIPT ERROR` or `Parse Error` was found in the retained logs.
+These are **not** clean engine teardown results, and all diagnostics remain
+visible to the reviewer. This is reproducible *local* evidence, **not** a
+patched GitHub Actions run or physical input/display acceptance.
+
+An independent `tools/verify_godot_ci_replay.py` command now audits an archived
+replay directory before its 46/46 result is quoted. It matches all step IDs,
+names, scripts and stored digests to the current workflow, checks the exact
+retained log bytes (rejecting symlinked artifacts), validates clean-commit
+attribution, and regenerates the fail-late summary. Its four additional
+regression tests cover script tampering, log modification/redirection,
+forged outcomes, partial inventory, and altered summaries. Audit verification
+is **consistency checking**, not cryptographic proof that the test process ran
+on an independently trusted machine; a local report does not acquire remote
+CI or owner approval from a passing schema check.
+
+Reproduce for the **same commit and Godot version** (with a clean checkout):
+
+```sh
+python3 tools/replay_godot_ci.py --output /tmp/t094-ci-replay \
+  --expected-commit "$(git rev-parse HEAD)"
+python3 tools/verify_godot_ci_replay.py /tmp/t094-ci-replay \
+  --expected-commit "$(git rev-parse HEAD)"
+python3 -m unittest discover -s tests -p 'test_t094_ci_replay.py' -v
+```
+
+The full clean-commit replay above was at `c18e69b`; the audit addition is a
+subsequent documentation/tooling change, not a fresh full run of its own
+resulting SHA. **Still open:** a real hosted CI run of the final patch,
+23 dated physical Linux/Windows finding outcomes, and four explicit owner
+manual-review decisions. None have been inferred or changed.
+
+## 2026-11-06 checkpoint — sanitized hosted-CI artifact for final verification
+
+**Status stays In Progress.** The fast GitHub Actions workflow now records
+`ci-evidence/godot-fast-ci.json` **after** the fail-late summary and uploads
+it with `actions/upload-artifact@v4` even if the check summary is red. The
+original 46 test/check commands, `continue-on-error` behavior and reporting
+gate remain unchanged. This new artifact captures the checked-in workflow
+SHA-256, exact 40-character checkout SHA, GitHub run ID/attempt, runner OS,
+Godot 4.8-beta2 build and **every expected `ci_` step's original `outcome`**.
+A masked step `conclusion: success` cannot hide an `outcome: failure`.
+Missing/skipped/extra checks, invalid environment metadata, mismatched engine
+or incomplete uploads cannot be presented as all-green evidence. No arbitrary
+step metadata or outputs (potentially containing tokens) are serialized;
+unknown `ci_` keys are counted rather than reproduced.
+
+`tools/export_godot_ci_evidence.py --verify <downloaded-json>
+--expected-commit <sha> --expected-run-id <id>` checks structure, source
+workflow, order, count and claimed verdict. A report with failed check steps
+remains available for triage and remains **red**. The validator proves local
+consistency only: reviewers must independently inspect the artifact's
+provenance in the corresponding **actual GitHub Actions run/attempt**. A
+JSON report is not cryptographically signed hardware evidence, does not
+verify pointer-to-photon performance, and does not authorize any manual
+review. PR `GITHUB_SHA` can be GitHub's tested synthetic merge commit;
+verify that exact checkout when reviewing the hosted run.
+
+The existing fast T-073 documentation group runs the nine
+`tests/test_t094_hosted_ci_evidence.py` contracts; the two added non-check
+workflow steps bring the total to 51 while **46 required check IDs remain**.
+The contracts cover green/red output, missing/extra/skipped checks,
+sanitization of secret-like step output, candidate/run/build mismatches,
+tampered reports and the actual workflow upload position. Local synthetic
+tests do **not** establish any new successful hosted CI run.
+
+**Pending:** Run the new workflow on the candidate in GitHub Actions,
+retain and inspect its uploaded artifact, complete 23 Linux/Windows physical
+finding reports, and obtain the four separate owner-review decisions.
+No ticket state or `manual_review_approved` field was advanced.
+
+## 2026-11-07 checkpoint — docking documentation test reads approval metadata, not prose
+
+**State: In Progress; no owner approval or new hosted CI result.** The
+pre-existing `tests/test_t078_t083_docking_plan.py` contract failed locally
+(7/8) while checking T-081's historical explanatory text that literally
+mentions `manual_review_approved: true`. A similar instruction is present in
+T-083. Neither ticket's YAML frontmatter contains owner approval, and the
+canonical `tools/validate_ticket_store.py` correctly validates their actual
+Kanban state. Rejecting prose examples prevented accurate documentation CI
+without protecting a real manual gate.
+
+The corrected T-078–T-083 contract calls `parse_ticket` on the canonical YAML
+frontmatter and checks the expected T-083 manual gate, no unauthorized
+approval on non-manual tickets, and evidence whenever an actual manual ticket
+is Done. Negative and positive synthetic records verify that prose examples
+do **not** become approval, whereas a real approved field without
+`review_evidence`, or on a non-manual ticket, is rejected. The test is now
+executed by the existing required T-073/T-094 fast-CI documentation step,
+without adding a step ID or changing fail-late semantics; a T-094 replay
+contract asserts that wiring remains present. **No approval metadata, status,
+or application code was modified.**
+
+**Local evidence (Godot 4.8 beta 2, Linux headless; not a hosted run):**
+
+- `python3 -m unittest tests.test_t078_t083_docking_plan -v`: **10/10** pass,
+  including three assertions that did not exist in the formerly failing
+  8-test suite; `tests.test_t094_ci_replay` additionally passes **13/13**.
+- Selected local `tools/replay_godot_ci.py --allow-dirty --check
+  ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux`
+  executes the real workflow Bash step successfully: **60/60 Python tests**
+  across seven groups. The replay explicitly reports only **1/46 required
+  steps**, `complete=false`, `passed=false`; its nonzero command status is
+  expected for an incomplete replay. Uncommitted source is not attributed
+  to a tested commit.
+- `python3 tools/build_drawing_app.py --in-place` followed by fresh Godot
+  editor import, then `dock_layout_smoke.gd`, `dock_drag_smoke.gd`,
+  `dock_float_smoke.gd`, `dock_cross_smoke.gd` and
+  `dock_persistence_smoke.gd`: all five print their required success
+  markers and pass strict `check_godot_model_log.py` validation. The layout
+  model reports **82/82**, persistence **46/46**; the first model retains
+  four explicitly classified post-success RID diagnostics, not runtime
+  errors.
+- `python3 tools/validate_ticket_store.py`: **94 records** validate;
+  T-083 remains `In Progress` with `manual_review: true`, and T-056/T-059
+  retain their distinct owner review requirements.
+
+**Still outstanding:** The full 46-step hosted CI run on the final candidate,
+actual Windows/Linux physical review of the remaining 23 findings, and
+explicit manual approvals under their own tickets. A local documentation-test
+repair or headless Godot green does not close these gates.
+
+## 2026-11-07 checkpoint — consistent strict model-log gates for T-085–T-093
+
+**State: In Progress.** A follow-up audit found six fast-CI Drawing model
+steps (T-085, T-086's first cache witness, T-089, T-091, T-092 and T-093)
+using separate `grep -q` success checks and inconsistent error filters. In
+particular T-089, T-092 and T-093 did not reject arbitrary `ERROR:` lines
+at all; a `*_PASSED` substring could appear next to a runtime fault. Other
+steps rejected all `ERROR:` output, including previously classified Godot
+4.8 beta 2 **post-exit** RID diagnostics. This was not a pixel-renderer fix.
+
+All eight fast T-085–T-093 Godot model steps (excluding T-090's Python-only
+step) now use `tools/check_godot_model_log.py` with their exact marker and
+`ci_fail_marker` to preserve the existing fail-late contract. The verifier
+accepts T-089's existing **exact counted marker** `T089_MODEL_PASSED: 62 checks`
+without allowing arbitrary trailing colon text or accepting zero counts.
+It still requires exactly one marker and rejects pre-success `ERROR:`,
+unknown post-success errors, script/parse/compile/model failures, and spoofed
+substrings. Identified Godot shutdown leaks remain in raw logs and are counted
+rather than hidden. No Godot application logic, test assertion counts, fast
+check IDs or manual-review approvals changed.
+
+**Local evidence (Godot `4.8.beta2.official.cafc17a19`, Linux headless,
+Dummy audio; not a hosted run):**
+
+- The first six-check selected replay reported **5 success / 1 failure**:
+  T-089 emitted `T089_MODEL_PASSED: 62 checks`, exposing the verifier's
+  unsupported counted format. That false rejection was fixed by a
+  positive-count-only marker rule with new negative tests.
+- The second selected replay logged success for T-085, T-086, T-089, T-091
+  and T-092. Its wrapper terminated before writing the sixth step's summary;
+  that sixth step (T-093) **separately passed** its actual workflow command
+  in an isolated selected replay. These are **partial, exploratory** local
+  checks, not a complete 46/46 result or a SHA-attested CI report.
+- The T-089, T-092 and T-093 logs each retain **four recognized post-success
+  RID-leak diagnostics**. Runtime/model checks pass; leaks have not been
+  resolved or treated as clean shutdowns.
+- `tests/test_t094_godot_model_log.py` adds workflow coverage for all eight
+  Drawing model steps, strict counted-marker cases, and an actual shell
+  fail-late error-propagation witness. `tests/test_t094_ci_replay.py` and
+  the 94-ticket dependency validator pass.
+
+**Remaining:** A complete pinned candidate/hosted GitHub fast-CI run,
+physical Linux/Windows owner evidence and explicit T-056/T-059/T-065/T-083
+manual approval. This checkpoint grants none of those gates.
+
+## 2026-11-07 checkpoint — physical brush timing evidence must be per zoom
+
+**State: In Progress; no owner or physical result was recorded.** The
+T-094 owner-evidence validator previously accepted a `PASS` for finding
+#01 or #15 when `zooms_percent` listed 25/50/100 but `timings_ms` contained
+only **one pooled array per phase**. Such evidence can hide the slower zoom
+and does not support a per-zoom p50/p95 review. This was reproduced against
+the unchanged local baseline: a synthetic pooled report passed validation.
+
+`tools/drawing_owner_evidence.py` now requires **one complete per-phase
+sample object per claimed zoom**, keyed by `"25"`, `"50"`, `"100"` (and
+any additional recorded zooms). Each zoom needs at least five finite,
+nonnegative millisecond samples for down→preview, motion→preview and
+release→commit. The validator rejects pooled/omitted/extra zoom keys,
+missing phases, malformed/duplicate zooms, booleans, NaN, nonfinite or
+out-of-range sample values and stale zoom claims on `NOT RUN` rows. The
+`docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md` runbook now illustrates the
+required JSON shape and asks reviewers to record the per-zoom median/p95;
+that example is **not** actual evidence. Blank physical Linux/Windows
+`NOT RUN` manifests remain valid; the older pooled `PASS` shape does not.
+
+**Verification:** The expanded `tests/test_t094_owner_evidence.py` suite
+passes **12/12** (formerly nine) including negative pooled and independent
+#01/#15 witnesses. The existing T-073 fast documentation step still executes
+these tests, without adding any CI check IDs. `tools/validate_ticket_store.py`
+validates all 94 ticket records. This is a Python evidence-schema correction,
+not a graphics or pointer behavior change, so no simulated input is claimed
+as physical verification.
+
+**Unmet T-094 gates:** GitHub-hosted CI on the final candidate, all 23
+physical Windows and Linux findings, and owner acceptance remain outstanding.
+T-056, T-059, T-065 and T-083 manual gates are unchanged.
+
+
+## 2026-11-07 checkpoint — deterministic per-zoom physical timing summary
+
+**State: In Progress; no physical result or owner signoff.** Following the
+previous per-zoom schema repair, a reviewer still had to manually calculate
+p50/p95 for each of the nine timing series in a successful #01 or #15
+physical observation. That repeated transcription could mix zoom levels or
+obscure outliers. `tools/drawing_owner_evidence.py verify --timing-summary`
+now prints sample count, median and p95 separately per recorded zoom and per
+phase, *only after* validating all 23 rows, artifact hashes, physical metadata
+and any cross-OS commit/Godot-build consistency.
+
+The percentile method is explicit and reproducible: R-7 linear interpolation
+between ordered millisecond values (the common NumPy default), with 3 decimal
+places in the CLI report. It does not set a performance pass/fail threshold or
+interpret a Godot frame callback as hardware input-to-photon. Invalid timing
+or inconsistent OS/build evidence exits without printing a plausible-looking
+latency summary. `FAIL`/`NOT RUN` rows never emit PASS timing claims; an
+untested manifest reports that no validated observations exist.
+
+**Local evidence (format/logic only):** `tests/test_t094_owner_evidence.py`
+now has 16 passing tests, including unsorted/outlier samples (R-7 p95), stable
+25/50/100 order, both #01/#15 findings on Linux and Windows, positive CLI
+output, exclusion of `FAIL`/`NOT RUN`, malformed samples and mixed-commit
+refusal before output. This does not replace
+physical Linux/Windows acquisition or the 46-step hosted fast-CI run. The
+existing T-073 documentation CI step runs this suite without a new check ID.
+All 94 ticket frontmatter records remain valid; T-094 stays In Progress and
+manual T-056/T-059/T-065/T-083 gates are untouched.
+
+## 2026-11-07 checkpoint — required Brush/selection source oracles and fail-closed result summaries
+
+**State: In Progress, no owner/hardware/hosted CI approval.** Following the
+T-095/T-096 engineering commits, their independent `brush_coverage_smoke.gd`
+and `selection_large_smoke.gd` byte/mask oracles only ran in **opt-in native
+workflows**. A future performance refactor could therefore pass the required
+fast-CI checks despite changing Brush once-per-pixel coverage, rollback,
+selection islands/holes or floating Move source bytes. The existing 46-check
+workflow now runs the T-095 oracle inside `ci_t085_live_stroke_preview` and
+the T-096 oracle inside `ci_t088_selection_clipboard_model`, after staging
+canonical source and importing resources, with distinct log files and the
+shared fail-late verifier. No timing budgets, display dependencies, check IDs
+or new ticket approvals are introduced: physical pointer/framebuffer and
+input-to-photon evidence remain separate on-demand/owner gates.
+
+**Verified CI-log correctness issue:** Previously the shared verifier accepted
+*any* line starting with `<MARKER> ` or `<MARKER>(`, including a partially
+passing `T086_COLD_PASSED 44/45` or
+`DRAWING_TEXT_UI_PASSED (91 checks; 2 failed)`. It now recognizes only
+an exact marker, positive matching `N/N`, positive `: N checks`, positive
+`(N checks; 0 failed)`, `(N checks, 0 failures)`, `checks=N failures=0`,
+`N checks, failures=0`, or the existing package-font `(0 failures)` summary.
+Malformed/partial/spoofed summaries are fatal even if another valid marker
+exists, and real pre-success/unknown post-success errors stay fatal. Existing
+known Godot post-exit resource-leak diagnostics remain separately reported.
+
+**Local evidence, pinned `4.8.beta2.official.cafc17a19`:** The exploratory
+local CI replay passes `ci_t085_live_stroke_preview` and
+`ci_t088_selection_clipboard_model` with respectively **32/32 T-095** and
+**13,847/13,847 T-096** source/oracle checks; `ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux`
+passes its model-log/CI and owner-manifest contracts. The replay correctly
+labels the selected **3/46** checks *incomplete*, never a green full workflow.
+The expanded model-log contract passes 13/13 including malformed-success
+negative controls and mandatory-workflow wiring. No source RGBA8 implementation
+or selection behavior was modified in this checkpoint.
+
+**Outstanding T-094 gates:** complete clean candidate replay and real hosted
+GitHub Actions result, 23 physical Linux/Windows owner findings, and explicit
+T-056/T-059/T-065/T-083 UX approval. New T-095/T-096 owner manual gates are
+unchanged. This checkpoint is not acceptance and does not change Kanban state.
+
+### CI replay follow-up — stale count, watchdog, headless FileDialog
+
+A complete **diagnostic** replay on the first checkpoint exposed two additional
+CI contracts, not changed artwork semantics: T-053's isolated standalone
+witness now executes 42 checks while the Python caller still expected exactly
+38, and the shared watchdog contract requires 120/240-second Godot commands
+(the first T-096 fast step had used 150 seconds). The test now requires a
+strict, zero-failure standalone summary with **at least 42** checks, so newer
+checks cannot break CI without silently accepting reduced coverage. The T-096
+invocation uses the standard 120-second watchdog. Both repaired contracts pass.
+
+The first complete replay also exposed checked-in valid counted-success forms
+from T-055/T-064/T-065 that the initial strict grammar did not recognize.
+These are now explicitly whitelisted with **positive** assertion counts and
+zero failures only; partial/malformed variants still fail. A separate
+`FileDialog.popup_centered()` diagnosis under the **headless 0×0 display**
+reproduced `ERROR: Window 0 spawned at invalid position` even for a minimal
+FileDialog, without a source or selection failure. `DrawingWorkspace` now
+shows the *same* save FileDialog without centering only when the Godot display
+driver is `headless`; normal desktop display drivers still center it. The
+existing T-062 Save-and-Close script tests the real `_save_and_close()` route,
+now with an explicit pending-close-index assertion (26/26 headless checks).
+The strict verifier still rejects **all** unexpected window/errors; it does
+not whitelist this headless positioning diagnostic. The 14 T-094 log/CI
+contracts and all 96 Kanban records validate. This is an engine-specific CI
+witness fix, **not** approval of actual native file dialog UX.
+
+### Full 46-step local replay and T-068 oracle compatibility (2026-11-07)
+
+A **complete** local replay using `tools/replay_godot_ci.py` against the
+working candidate and pinned `4.8.beta2.official.cafc17a19` under an
+isolated Linux/XDG profile (including the supplied matching Linux export
+templates) executed **46/46 required fast-workflow checks, all passing**.
+The runner preserved separate scripts/logs, hashes, and an explicit
+`complete=true`, `passed=true` diagnostic report at
+`/tmp/t094-full-46-ci-replay-nov7-v5/` (outside the repository). It used
+`--allow-dirty`, so **it is not a commit-SHA-attested or GitHub-hosted run**.
+The preceding complete replay had **45/46** passes; its one failure was the
+T-068 fixture generator accessing the deleted `DrawingEditSession._covered`
+member after T-095 replaced string-key coverage with global integer scanlines.
+`tests/drawing_t068_skia_brush_oracle.gd` now enumerates `_covered_rows`
+and converts those signed global coordinates to the *same* pinned source
+indices. A separate `T068_GODOT=<pinned Godot> ...test_t068_skia_brush.py`
+run passes all nine available contracts (the optional external live Skia
+wheel remains skipped), including **byte-for-byte equality of all 16
+regenerated real-Godot fixtures**. The T-068 fast-CI block then passed in
+the complete replay without weakening its independent RGBA8/coverage oracle.
+
+The other repaired CI contracts pass: **14/14** T-094 log/workflow tests,
+**26** headless T-062 Object Editor checks including Save-and-Close, strict
+T-053 standalone package summary **42** assertions, and the required T-095
+(**32**) / T-096 (**13,847**) source-model oracles in their existing steps.
+The ticket validator accepts **96 tickets** and all unchanged owner/manual
+gates. The normal desktop save-dialog path was **not** physically accepted;
+an attempted Xvfb native run timed out and is explicitly not evidence.
+
+**Still open for T-094 closure:** a **hosted** GitHub Actions fast-CI run
+against the committed candidate, the outstanding Linux/Windows physical
+owner findings, and separate explicit UX approval of the dependent manual
+gates (including T-056/T-059/T-065/T-083 and new T-095/T-096). Keep this
+ticket **In Progress**; local test success does not authorize Done.
+
+## 2026-11-07 checkpoint — decorated runtime errors must not pass model CI
+
+**T-094 stays In Progress.** The required shared Godot log checker previously
+recognized generic `ERROR:` diagnostics only at column zero. A model witness
+could print its exact `*_PASSED` marker and then emit an indented or ANSI-SGR
+colored `ERROR:` (for example when a log forwarder decorates output), yet
+`check_godot_model_log.py` returned **exit 0**. The same false-green result
+occurred for shell-reported `Segmentation fault (core dumped)`, `Aborted
+(core dumped)`, `FATAL ERROR:` and `CRASH:` lines after an otherwise valid
+marker. This is a CI-evidence integrity defect, not proof of a current Godot
+crash or a Drawing pixel bug.
+
+The checker now examines a whitespace/SGR-normalized **diagnostic copy** of
+each log line for runtime errors and process-crash banners. It preserves the
+**original exact marker grammar** and limits the known shutdown RID/texture
+leak exception to unchanged, column-zero, exact post-success Godot lines;
+colored/indented leaks are rejected rather than silently whitelisted. The
+original log text is retained verbatim in diagnostics. No model witness,
+Drawing runtime, check ID, fail-late step, success-count rule or file format
+changed.
+
+**Reproduction and validation:** Running the original committed checker on
+`T094_MODEL_PASSED` followed by `\x1b[31mERROR: invalid renderer state\x1b[0m`
+returned **0**; the changed checker returns **1** and reports line 2. The
+expanded `tests/test_t094_godot_model_log.py` exercises indented/colored
+runtime errors, literal-only leak allowlisting, crash banners, and real CLI
+exit status alongside its existing good-marker, genuine leak and regression
+contracts (**16/16** passing, including CLI behavior). The T-073 required
+fast documentation CI step passes in an exploratory **1/46 selected replay**;
+the runner deliberately reports that selection **incomplete**, not green.
+The broader `tests.test_godot_ci_fail_late` contracts also pass (**8/8**),
+and the Kanban validator accepts **96/96** ticket records. No new CI check ID
+is needed. The complete local replay is reported separately; neither a
+selected nor complete local run is GitHub-hosted evidence.
+
+**Outstanding gates remain:** a real GitHub-hosted Actions run on the final
+candidate, physical Windows/Linux findings and explicit owner reviews
+(T-056/T-059/T-065/T-083/T-095/T-096). No owner review flag was changed.
+
+## 2026-11-07 checkpoint — shell-wrapped crashes and Python tracebacks in model logs
+
+**Status remains In Progress; no review gate is approved.** The shared
+`tools/check_godot_model_log.py` verifier previously returned success for
+`*_PASSED` followed by Bash/Dash/Sh wrapped `Segmentation fault` or `Aborted`
+lines (with shell line numbers and process IDs), and for a Python `Traceback
+(most recent call last):` banner. Its prior crash matcher only recognized
+fault text at the beginning of the line. This was reproduced directly against
+the pre-fix committed module: three representative fault logs returned
+`([], 0)` despite containing an actual crash/traceback indicator.
+
+The verifier now recognizes shell-prefixed child crashes and Python traceback
+headers after ANSI/whitespace normalization; the narrow exact-match exception
+for known post-success Godot RID/texture leaks is unchanged. Explanatory prose
+that merely mentions these terms mid-line remains accepted. Two new Python
+contracts cover eight negative cases, benign prose, and the actual CLI exit
+status. The required T-073 step already invokes this test module; no new CI
+check ID or test suppression was introduced. These are log-integrity checks,
+not evidence that physical GPU tests, GitHub-hosted actions, T-056/T-059/T-083
+owner decisions, or the 23-finding matrix have been completed.
+
+## 2026-11-07 checkpoint — OOM termination and allocator corruption fail closed
+
+**Still In Progress; no manual-review decision changed.** After the previous
+shell-crash guard, a valid `T094_MODEL_PASSED` followed by `bash: line 8: 12345
+Killed ./godot`, glibc `malloc(): corrupted top size` / `free(): double free`,
+`Fatal Python error:` or uncaught `Exception in thread` still made the
+standalone `check_godot_model_log.py` verifier return success with no leaks.
+Direct reproduction against the unchanged predecessor returned `([], 0)` for
+all four representative faults. The new checker fails closed for bare and
+shell-wrapped `Killed`, known glibc allocator-violation headers, and Python
+fatal/thread exception headers, even when indented or ANSI-decorated. It does
+**not** match normal explanatory prose containing the same words mid-line.
+
+The expanded `tests/test_t094_godot_model_log.py` suite passes **20/20** tests,
+including both real CLI rejection and benign-prose/known-leak controls. The
+legacy Godot beta shutdown RID/texture leak allowance remains exact and only
+after a positive marker. This is log-integrity defense in depth: shell command
+exit codes are separately protected by `ci_fail_late.sh`/pipefail; synthetic
+verifier tests are not evidence that a hosted failure occurred or that hardware
+was tested. The existing T-073 fast-CI check executes these contracts; no new
+46-check workflow ID, Drawing runtime changes, artifact format changes, or
+manual approval is introduced.
+
+**Still outstanding:** hosted GitHub Actions on the final candidate, real
+Linux/Windows owner hardware evidence, and the independent T-056/T-059/T-065/
+T-083/T-095/T-096 manual gates. Keep T-094 In Progress.
+
+## 2026-11-08 checkpoint — compact Godot engine errors cannot pass model logs
+
+**Status stays In Progress; no owner gate is approved.** The shared
+`tools/check_godot_model_log.py` recognized verbose `ERROR:` and script faults,
+but did **not** recognize Godot's compact timestamped `E 0:00:00:542 ...`
+engine-error rows. A valid `T094_MODEL_PASSED` followed by this diagnostic
+previously returned `([], 0)`, so a log-based CI gate could falsely pass.
+The checker now fails closed for timestamped `E <hours>:<minutes>:<seconds>`
+rows, optionally including milliseconds, after stripping terminal SGR codes
+and leading whitespace. It does not match normal `I`/`W` severity rows or
+prose documenting the format. Existing success-marker semantics and the
+literal-only post-success shutdown RID/texture leak exception are unchanged.
+
+Two regression contracts test four compact Godot faults, benign rows, real
+CLI failure, and the original known-leak exception. The original unmodified
+checker is retained as a negative control in the evidence for this turn.
+The required T-073 CI documentation step already runs these contracts; the
+46-check inventory is not expanded. No Drawing/Atlas source bytes, history,
+or owner approval are changed. **Pending:** GitHub-hosted CI on the candidate,
+physical Windows/Linux evidence, all 23 findings, and explicit T-056/T-059/
+T-065/T-083/T-095/T-096 manual decisions.
+
+## 2026-11-08 checkpoint — native POSIX signal banners cannot pass model CI
+
+**T-094 remains In Progress; manual gates remain open.** A Godot model log
+containing a valid exact `*_PASSED` marker followed by a native `Bus error`,
+`Illegal instruction` or `Floating point exception` still passed the shared
+log verifier, including Bash/Dash/Sh wrapped child-process diagnostics with
+line numbers and PIDs. The pre-fix committed checker returned `([], 0)` for
+all six representative bare and wrapped signals; these are genuine failure
+banners, not valid post-exit Godot RID/texture leak diagnostics.
+
+`tools/check_godot_model_log.py` now recognizes these additional POSIX signal
+names both at line start and in the existing shell-crash grammar, after the
+same whitespace/ANSI-SGR normalization. `tests/test_t094_godot_model_log.py`
+adds direct verifier/CLI fail-closed coverage of bare, wrapped, colored and
+indented signals, plus benign prose and the unchanged exact post-success leak
+exception. The broader T-094 log/replay contracts pass **37/37** locally;
+the previously committed checker fails the new negative controls. The
+existing required T-073 fast-CI step runs the tests: no new CI check ID,
+weakened success grammar, runtime Drawing/Atlas change, or bypassed error
+classification is introduced.
+
+This is CI evidence integrity, **not** evidence that such a crash happened in
+hosted CI or that physical Windows/Linux input and output are accepted. A
+GitHub-hosted run on the final candidate, the owner 23-finding review matrix,
+physical GPU/Windows/Linux evidence and explicit T-056/T-059/T-065/T-083/
+T-095/T-096 approvals are still outstanding.
