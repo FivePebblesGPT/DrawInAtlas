@@ -1,3 +1,25 @@
+## T-102 cold dense viewport first-population — 2026-11-12
+
+The existing **required** `ci_t086_viewport_cache_model` step additionally runs
+`drawing/tests/t102_cold_population_smoke.gd` with the exact
+`T102_MODEL_PASSED` marker and T-094 fail-closed `check_godot_model_log.py`.
+It validates signed nearest-tile priority, cache dirty and stale preview
+invalidation, partial index fallback, and the original complete-frame path
+for >144 visible content tiles. The **46 required fast check IDs** are unchanged.
+
+The **non-gating on-demand** `godot-native-t086-viewport.yml` runs this oracle
+and `drawing/tests/t102_cold_dense_viewport_native.gd` after source staging,
+editor import, and an Xvfb/Mesa software framebuffer. The latter requires
+**110/110** native assertions and exact straight-RGBA8 source hashes at
+25/50/100% zoom, real signed framebuffer coverage, hidden RGB, visibility,
+pan, Undo/Redo and bounded retained texture counts. Both logs are retained
+under `if: always()`, with strict success-marker verification and process
+exit-code checks. The cold/warm CPU p50/p95, frame maxima, process HWM and
+texture bytes are **diagnostics**, not CI latency thresholds or physical
+input-to-photon results. Repeated real-software cold frames are much shorter,
+but full settlement is slower; soft-budget outliers and T-086/T-095/T-096
+owner gates remain open. [Paired red/green evidence](evidence/T-102-2026-11-12-cold-viewport.md).
+
 ## T-101 optional NativeHard dispatch without requiring native adoption — 2026-11-12
 
 The non-gating, manually dispatched `godot-native-t095-brush.yml` runs

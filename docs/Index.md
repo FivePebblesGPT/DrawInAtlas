@@ -17,8 +17,9 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   [T-099 bounded held-preview scheduling](Tickets/T-099.md) **Done**;
   [T-100 sparse publication](Tickets/T-100.md) **Done**;
   [T-101 optional native throughput](Tickets/T-101.md) **Done**.
-- **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md),
-  [T-103](Tickets/T-103.md); T-068 → [T-104](Tickets/T-104.md),
+- **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md)
+  **Done** *(software cold-frame scheduling, not owner hardware acceptance)*,
+  [T-103](Tickets/T-103.md) **Ready**; T-068 → [T-104](Tickets/T-104.md),
   [T-105](Tickets/T-105.md); T-094 → [T-106](Tickets/T-106.md),
   [T-107](Tickets/T-107.md); T-064 → [T-108](Tickets/T-108.md);
   T-065 → [T-109](Tickets/T-109.md).
@@ -85,6 +86,23 @@ seven-trial 65,536-pixel isolated CPU witness improved p50 **284 → 233ms**
 Hokusai preset tests retained. This does **not** establish a physical
 100ms response, eliminate frame stalls, or approve T-095/T-096. [Ticket]
 (Tickets/T-101.md) · [Evidence](evidence/T-101-2026-11-12-native-dispatch.md).
+
+## T-102 bounded cold dense first population (2026-11-12; Done)
+
+For fully retainable dense 512² source views, Canvas now chooses up to four
+near-focus missing display tiles and composes them over successive actual
+frames with a **10ms soft** cold CPU deadline. It uses bounded display
+occupancy hints rather than full source scans, retains conservative immediate
+rendering for active previews and >144-tile/unknown occupancy cases, and
+revalidates pan, visibility and revisions each draw. The real 110-check
+signed/hidden-RGB/Undo graphical witness and 13-check headless oracle pass;
+the pre-T-102 source fails 20 new graphical assertions. On Xvfb/Mesa at 50%,
+three-trial cold first-frame p50 improved **350–357ms → 51ms**, but full
+settling **worsened 350–357ms → 438ms**; max sampled draw p95 fell from
+**356–397ms → 26ms**. A separate candidate trial showed a 95ms outlier,
+so this is neither a hard frame bound nor physical-GPU acceptance. T-086 stays
+In Progress and T-103 remains Ready for over-budget stress. [Ticket](Tickets/T-102.md)
+· [Evidence](evidence/T-102-2026-11-12-cold-viewport.md).
 
 ## T-098 exact 128px preview invalidation (2026-11-11; Done)
 
@@ -2347,7 +2365,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-099 · Frame-safe Brush input draining and held-preview scheduling](Tickets/T-099.md) | Done | Bounded preview coalescing; software/native oracles pass, owner T-095 acceptance still open | [T-097](Tickets/T-097.md) |
 | [T-100 · Bounded sparse atomic Brush publication and Undo](Tickets/T-100.md) | Done | Signed/masked source/history, performance red control and native oracles pass; T-095 owner gate remains open | [T-097](Tickets/T-097.md) |
 | [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Done | NativeHard per-batch dispatch bypass; real Rust/Hokusai/rollback checks pass, T-095 owner gate open | [T-097](Tickets/T-097.md) |
-| [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Ready | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | Ready | — | [T-052](Tickets/T-052.md) |

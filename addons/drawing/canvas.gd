@@ -175,11 +175,19 @@ var pointer_known: bool = false
 ## The bounded LRU owns every retained texture; a draw call need not create any.
 const DISPLAY_TILE_SIZE: int = 128
 const MAX_DISPLAY_TILES: int = 144
+## Cold *committed* content with a wholly retainable visible footprint can be
+## populated over multiple draw callbacks. Each synchronous raster composite
+## is atomic, so this is a soft CPU budget, never a hard real-time deadline.
+## Over-budget dense views use the original complete-frame transient path:
+## they cannot retain a correct full framebuffer between incremental draws.
+const MAX_COLD_TILES_PER_DRAW: int = 4
+const MAX_COLD_COMPOSE_CPU_US: int = 10000
 const MAX_OCCUPANCY_ENTRIES: int = 40000
 var _display_tiles: Dictionary[String, Dictionary] = {}
 ## Keep evicted draw-command RIDs alive through the submitted frame. This is
 ## transient and separate from the bounded retained LRU (see instrumentation).
 var _frame_references: Array[ImageTexture] = []
+var _cold_population_pending: bool = false
 var _cache_document: DrawingDocument
 var _cache_revision: int = -1
 var _cache_source_epoch: int = -1
@@ -790,6 +798,58 @@ func _preview_index_for_draw(edit: DrawingEditSession, window: Rect2i) -> Dictio
 	return result
 
 
+## Choose the nearest missing cold tiles before traversing the draw list.
+## Scans only the bounded *display occupancy* index, never canonical pixels.
+## All tiles must fit the persistent cache; otherwise the old full-frame path
+## is necessary to display transient overflow tiles without holes.
+func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
+	if _occupancy_unknown or session != null or _move_preview != null:
+		return {}
+	var occupied_tiles: Dictionary[String, Vector2i] = {}
+	# A large sparse zoom-out can expose thousands of empty *display* cells;
+	# enumerate the much smaller existing occupancy index instead. For dense
+	# documents, keep iteration bounded by the viewport rather than the entire
+	# (up to 40,000-entry) document occupancy map.
+	if _occupied_display_tiles.size() * 2 < window.get_area():
+		for key: String in _occupied_display_tiles:
+			var comma: int = key.find(",")
+			if comma < 1:
+				return {} # Invalid hint: use the conservative full-frame path.
+			var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
+			if window.has_point(tile):
+				occupied_tiles[key] = tile
+				if occupied_tiles.size() > MAX_DISPLAY_TILES:
+					return {}
+	else:
+		for y: int in range(window.position.y, window.end.y):
+			for x: int in range(window.position.x, window.end.x):
+				var key: String = "%d,%d" % [x, y]
+				if _occupied_display_tiles.has(key):
+					occupied_tiles[key] = Vector2i(x, y)
+					if occupied_tiles.size() > MAX_DISPLAY_TILES:
+						return {}
+	var occupied: int = occupied_tiles.size()
+	var missing: Array[Dictionary] = []
+	for key: String in occupied_tiles:
+		var entry: Dictionary = _display_tiles.get(key, {})
+		if entry.is_empty() or bool(entry.get("dirty", true)) \
+				or int(entry.get("preview_stamp", 0)) != 0 \
+				or entry.get("preview_owner") != null:
+			missing.append({"key": key,
+				"distance": _tile_focus_distance(occupied_tiles[key], focus)})
+	# Do not spread a small or sparsely occupied viewport over multiple frames.
+	if occupied <= MAX_COLD_TILES_PER_DRAW or missing.size() <= 1:
+		return {}
+	missing.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		if float(left["distance"]) != float(right["distance"]):
+			return float(left["distance"]) < float(right["distance"])
+		return String(left["key"]) < String(right["key"]))
+	var selected: Dictionary[String, bool] = {}
+	for i: int in range(mini(missing.size(), MAX_COLD_TILES_PER_DRAW)):
+		selected[missing[i]["key"]] = true
+	return selected
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -803,6 +863,7 @@ func _draw() -> void:
 		"compose_cpu_us": 0, "texture_cpu_us": 0, "preview_index_cpu_us": 0,
 		"empty_skipped": 0,
 		"transparent_tiles_culled": 0,
+		"cold_tiles_deferred": 0, "cold_budgeted": 0,
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
@@ -821,6 +882,11 @@ func _draw() -> void:
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
 	var cache_focus: Vector2 = _display_cache_focus()
+	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus)
+	var cold_budgeted: bool = not cold_targets.is_empty()
+	var cold_rendered: int = 0
+	var cold_failed: bool = false
+	metrics["cold_budgeted"] = 1 if cold_budgeted else 0
 	# Resolve visible layers lazily: an idle redraw consisting entirely of
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
@@ -865,6 +931,10 @@ func _draw() -> void:
 					and entry["preview_owner"] == preview_owner:
 				metrics["cache_hits"] = int(metrics["cache_hits"]) + 1
 			else:
+				if cold_budgeted and (not cold_targets.has(key) \
+						or (cold_rendered > 0 and Time.get_ticks_usec() - draw_start >= MAX_COLD_COMPOSE_CPU_US)):
+					metrics["cold_tiles_deferred"] = int(metrics["cold_tiles_deferred"]) + 1
+					continue
 				if visible_plan.is_empty():
 					visible_plan = DrawingRenderer.prepare_visible_layers(document)
 					metrics["visible_layer_plan_builds"] = int(metrics["visible_layer_plan_builds"]) + 1
@@ -877,7 +947,10 @@ func _draw() -> void:
 						_reported_render_errors[composite.code] = true
 						canvas_error.emit(composite.message)
 					if not composite.ok:
+						cold_failed = true
 						continue
+				if cold_budgeted:
+					cold_rendered += 1
 				var image: Image = composite.value as Image
 				metrics["tiles_composited"] = int(metrics["tiles_composited"]) + 1
 				metrics["source_pixels_rendered"] = int(metrics["source_pixels_rendered"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE
@@ -926,6 +999,9 @@ func _draw() -> void:
 	metrics["submit_us"] = Time.get_ticks_usec()
 	last_frame_metrics = metrics
 	_last_frame_submit_us = int(metrics["submit_us"])
+	# The next callback revalidates document, epoch, revision, viewport and
+	# preview state afresh. Never spin forever on a failed render.
+	_cold_population_pending = int(metrics["cold_tiles_deferred"]) > 0 and not cold_failed
 	if session != null:
 		# Capture per-gesture compositor/upload work before the next _draw
 		# replaces last_frame_metrics. This is CPU submission, not photon time.
@@ -1102,6 +1178,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	if _cold_population_pending:
+		_cold_population_pending = false
+		queue_redraw()
 	if session != null:
 		if document == null or document.revision != session.expected_revision:
 			cancel_gesture()

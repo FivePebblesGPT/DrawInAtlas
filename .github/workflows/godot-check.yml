@@ -93,6 +93,10 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-model.log --marker T086_MODEL_PASSED || ci_fail_marker 'T086 viewport model log rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_focus_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-focus.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-focus.log --marker T086_FOCUS_PASSED || ci_fail_marker 'T086 dense viewport retention priority witness error'
+          # T-102 bounded cold scheduling: signed focal priority, dirty/preview
+          # invalidation and conservative over-budget/unknown occupancy fallback.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t102_cold_population_smoke.gd 2>&1 | tee /tmp/godot-t102-cold-population.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t102-cold-population.log --marker T102_MODEL_PASSED || ci_fail_marker 'T102 cold population scheduling log rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cold-model.log --marker T086_COLD_PASSED || ci_fail_marker 'T086 cold renderer parity witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_pixel_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-pixels.log
