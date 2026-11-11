@@ -508,9 +508,9 @@ impl DrawingNativeBrush {
     /// Result is [signed_x, signed_y, straight_rgba_le_as_i32] repeated.
     #[func]
     fn preset_segments(&mut self, points: PackedVector2Array, pressure: f32) -> PackedInt32Array {
-        let mut output = PackedInt32Array::new();
+        let empty = PackedInt32Array::new();
         let Some(stroke) = self.preset.as_mut() else {
-            return output;
+            return empty;
         };
         // Check the entire batch before calling into the stateful brush.
         // Returning an empty array halfway through the loop used to leave
@@ -524,8 +524,13 @@ impl DrawingNativeBrush {
                     || point.y.abs() >= 1_000_000_000.0
             })
         {
-            return output;
+            return empty;
         }
+        // Accumulate sparse quantized deltas in native memory. Three Godot
+        // packed-array push calls per changed pixel add repeated Godot
+        // container work; preserve sorted-tile, row-major output order while
+        // transferring the entire packed array once per successful batch.
+        let mut coordinates: Vec<i32> = Vec::new();
         for &point in points.as_slice() {
             stroke.brush.stroke_to(
                 &mut stroke.state,
@@ -552,12 +557,12 @@ impl DrawingNativeBrush {
             }
             let published = stroke.published.entry((tx, ty)).or_default();
             scan_changed_pixels(tile, published, |index, rgba| {
-                output.push(tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32);
-                output.push(ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32);
-                output.push(rgba as i32);
+                coordinates.push(tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32);
+                coordinates.push(ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32);
+                coordinates.push(rgba as i32);
             });
         }
-        output
+        PackedInt32Array::from(coordinates)
     }
 }
 

@@ -1918,6 +1918,19 @@ Isolated native-call medians were 3.529/3.221ms original,
 T-095 remains `In Progress` with manual review required and T-096 stays
 `Manual Review`. [Evidence](evidence/T-095-2026-11-11-native-hard-packed-output.md).
 
+**T-095 buffered Hokusai pigment output (2026-11-11; In Progress):**
+The optional real Hokusai GDExtension now constructs changed signed
+`(x,y,RGBA8)` triples in native memory and transfers one packed array instead
+of three Godot element pushes per pixel. Four pre-change full-stream SHA-256
+oracles plus actual rollback/retry pass **69/69** across 242,651 output pixels;
+a deliberately swapped-coordinate native binary fails all four hashes.
+Adjacent export-cache (81), native pigment transaction (57), integration (30),
+navigation (48) and pointer witnesses pass locally. Paired **native-call**
+benchmarks vary with warmup and do not establish whole-gesture speedup.
+**T-095 stays In Progress, `manual_review: true`; T-096 stays in Manual
+Review.** Owner-device responsiveness and hosted CI remain unverified.
+[Evidence](evidence/T-095-2026-11-11-native-preset-packed-output.md).
+
 ## Next-sprint handoff — 2026-11-07
 
 **2026-11-08 T-095 follow-up:** An optional pinned offline Rust/Hokusai GDExtension prototype is staged alongside the default legacy path. The new capture/drain/commit lifecycle prevents pan/zoom from cancelling post-release Brush backlog; targeted source-byte, Undo/Redo, 4 `.myb` preset, selection-hole, and missing-native fallback checks pass. In five-stroke Xvfb comparisons the NativeHard software stage p95 was 139.976ms versus Legacy 159.339ms, but Hokusai `.myb` stage p95 was **934.532ms**. No owner-device paint latency acceptance, Windows/export support or PR merge is implied. [Evidence](evidence/T-095-2026-11-08-hokusai.md).

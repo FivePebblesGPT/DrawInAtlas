@@ -153,6 +153,20 @@ output, and a rejected/rolled-back batch. It requires the extension and the
 [engineering evidence](../../docs/evidence/T-095-2026-11-11-native-hard-packed-output.md).
 The opt-in native-call benchmark is not a full Brush/preview/GPU latency test.
 
+## Hokusai packed pigment delta transfer (2026-11-11)
+
+`preset_segments` accumulates exact signed `(x, y, straight-RGBA8)` triples
+in a Rust vector, then converts to one Godot `PackedInt32Array` instead of
+calling Godot's packed-array `push` three times for every changed pixel.
+The sorted dirty-tile order, row-major pixel order, fixed-point-to-RGBA8
+quantization, native surface state and GDScript batch acknowledgement are
+unchanged. `t095_native_preset_packed_output.gd` hashes the complete exported
+stream against all four **pre-change** MyPaint preset binaries and checks
+real-native rejected-batch rollback/retry against an uninterrupted reference.
+The opt-in `t095_native_preset_packed_bench.gd` measures native calls only;
+performance measurements do not prove interactive or hardware acceptance.
+[Evidence](../../docs/evidence/T-095-2026-11-11-native-preset-packed-output.md).
+
 ## Gesture safety
 
 States are `IDLE → CAPTURING → DRAINING → COMMITTING → IDLE`. Source-space

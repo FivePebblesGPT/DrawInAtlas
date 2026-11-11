@@ -197,6 +197,14 @@ jobs:
             2>&1 | tee /tmp/t095-native-hard-source-atomic.log
           python3 tools/check_godot_model_log.py /tmp/t095-native-hard-source-atomic.log \
             --marker T095_NATIVE_HARD_SOURCE_ATOMIC_PASSED
+      - name: T-095 Hokusai packed pigment output bytes and transaction parity
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/t095_native_preset_packed_output.gd \
+            2>&1 | tee /tmp/t095-native-preset-packed-output.log
+          python3 tools/check_godot_model_log.py /tmp/t095-native-preset-packed-output.log \
+            --marker T095_NATIVE_PRESET_PACKED_PASSED
       - name: T-095 real Hokusai pigment rollback across failed GDScript source reads
         run: |
           set -euo pipefail
@@ -241,5 +249,6 @@ jobs:
             /tmp/t095-native-hard-packed-output.log
             /tmp/t095-native-hard-source-atomic.log
             /tmp/t095-native-pigment-atomic.log
+            /tmp/t095-native-preset-packed-output.log
             /tmp/t095-native.log
           if-no-files-found: warn

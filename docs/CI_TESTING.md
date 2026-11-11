@@ -94,6 +94,22 @@ benchmarks are **not** pointer-to-photon or owner-hardware acceptance. The
 
 # Godot CI policy: fast desktop core and deferred compatibility coverage
 
+## T-095 Hokusai buffered native pigment delta oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` builds the real
+Rust extension and runs `drawing/tests/t095_native_preset_packed_output.gd`.
+The fail-closed model-log checker requires the exact
+`T095_NATIVE_PRESET_PACKED_PASSED` marker; the raw log is uploaded even if a
+subsequent step fails. Four SHA-256 digests were recorded from the **old native
+binary**, not regenerated from the optimized path. The 69/69 pass spans four
+bundled presets, ordered 32-bit signed (x,y,RGBA8) triples, 242,651 exported
+pixels, real batch rollback and exact same-object retry. A temporary
+coordinate-order reversal fails four golden checks. Optional native-call
+CPU timings exhibit warmup variation; no hardware input-to-photon or owner
+review approval is inferred. No required fast-CI check IDs change; hosted CI
+is still unverified.
+
+
 **Policy (2026-11-03):** Required push/PR GDScript CI now verifies the implemented **Drawing package and shared Atlas composition foundation**. The approved complete Drawing Essential baseline remains unfinished under T-059. Windows/Linux desktop are the release-first targets. **Web export, broad native framebuffer sweeps, and historical Atlas pointer/shape tests are intentionally excluded from push CI.** They remain in source and are not claimed green.
 
 ## Owner-facing Drawing quality gates — 2026-11-05
