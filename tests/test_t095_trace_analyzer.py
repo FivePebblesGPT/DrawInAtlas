@@ -136,6 +136,42 @@ class T095TraceAnalyzerTest(unittest.TestCase):
                 with self.assertRaises(analyzer.TraceError):
                     analyzer.summarize_stroke(row, 1)
 
+    def test_frame_phase_timestamp_arithmetic_is_consistent(self) -> None:
+        """An engine callback interval must agree with its draw and input times."""
+        good = record()
+        good["frame_phases_us"][0] = {
+            "frame_end_us": 50_000,
+            "frame_post_draw_callback_us": 52_500,
+            "frame_end_to_post_draw_us": 2_500,
+            "preview_stage_completed_us": 48_000,
+            "preview_stage_to_frame_end_us": 2_000,
+            "preview_stage_to_post_draw_us": 4_500,
+            "preview_input_received_us": 47_000,
+            "preview_input_to_frame_end_us": 3_000,
+            "preview_input_to_post_draw_us": 5_500,
+            "pending_input_count": 3,
+        }
+        self.assertEqual(
+            analyzer.summarize_stroke(good, 1)["metrics"]["preview_input_to_callback"]["p95_ms"],
+            5.5,
+        )
+        bad_phases = (
+            ("callback_delay", {"frame_end_to_post_draw_us": 2_400}),
+            ("callback_timestamp", {"frame_post_draw_callback_us": 52_400}),
+            ("stage_callback_sum", {"preview_stage_to_post_draw_us": 4_400}),
+            ("input_callback_sum", {"preview_input_to_post_draw_us": 5_400}),
+            ("stage_completion", {"preview_stage_completed_us": 48_100}),
+            ("input_receipt_after_stage", {"preview_input_received_us": 48_100}),
+            ("bad_pending_depth", {"pending_input_count": "3"}),
+            ("negative_frame_timestamp", {"frame_end_us": -1}),
+        )
+        for name, edits in bad_phases:
+            with self.subTest(name=name):
+                corrupt = record()
+                corrupt["frame_phases_us"][0] = {**good["frame_phases_us"][0], **edits}
+                with self.assertRaises(analyzer.TraceError):
+                    analyzer.summarize_stroke(corrupt, 1)
+
     def test_different_backends_or_zoom_never_aggregate_together(self) -> None:
         a = analyzer.summarize_stroke(record(), 1)
         b = analyzer.summarize_stroke(record(start=200_000), 2)

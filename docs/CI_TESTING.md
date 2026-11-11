@@ -1932,3 +1932,21 @@ remains Godot schema 1, and existing fast CI check IDs and the T-094 strict
 log guard are unchanged. Neither Xvfb renderer callbacks nor an offline
 analyzer establish physical responsiveness or owner approval.
 [Evidence](evidence/T-095-2026-11-11-trace-retained-consistency.md).
+
+
+## T-095 owner trace frame-clock arithmetic — 2026-11-11
+
+The non-gating on-demand `godot-native-t095-brush.yml` analyzer step now runs
+**12** stdlib contracts behind the existing strict
+`T095_TRACE_ANALYZER_PASSED` marker. The new red control shows eight
+contradictory frame timestamp/interval variants previously accepted, while
+the corrected analyzer checks nonnegative exported phase fields and available
+stage/input→draw→callback interval arithmetic without inventing absent
+callbacks. A real five-stroke 60px/786% Godot beta3 Xvfb trace with 274
+Canvas frames and 150 matched callbacks parses; schema-1 exporter 17/17,
+Brush pixels 32/32, NativeHard rollback 113/113, Hokusai rollback 57/57,
+preview-input correlation 22/22 pass individually with strict logs.
+The analyzer's report remains v3 and no runtime or fast-CI changes were
+made. T-094's fail-closed policy, unverified hosted CI, and owner-device
+manual review requirements are unchanged.
+[Evidence](evidence/T-095-2026-11-11-trace-frame-arithmetic.md).

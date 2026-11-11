@@ -103,6 +103,57 @@ def distribution(values: Sequence[int], total: int | None = None) -> dict[str, A
     }
 
 
+# The schema-1 Canvas exporter computes these durations from the same
+# monotonic clock. A mismatch is corrupt telemetry, not another latency sample.
+FRAME_EXPORT_FIELDS: tuple[str, ...] = (
+    "frame_end_us", "full_draw_cpu_us", "compose_cpu_us", "texture_cpu_us",
+    "preview_index_cpu_us", "selection_outline_cpu_us", "pending_input_count",
+    "oldest_pending_age_us", "frame_post_draw_callback_us",
+    "frame_end_to_post_draw_us", "preview_stage_completed_us",
+    "preview_stage_to_frame_end_us", "preview_stage_to_post_draw_us",
+    "preview_input_received_us", "preview_input_to_frame_end_us",
+    "preview_input_to_post_draw_us",
+)
+
+
+def validate_frame_timing(phase: dict[str, Any], context: str) -> None:
+    """Reject contradictory engine-clock timing without inventing missing events."""
+    for key in FRAME_EXPORT_FIELDS:
+        if key in phase:
+            nonnegative_int(phase[key], f"{context} {key}")
+
+    def check_difference(start: str, end: str, duration: str) -> None:
+        if all(key in phase for key in (start, end, duration)):
+            if phase[end] < phase[start] or phase[duration] != phase[end] - phase[start]:
+                raise TraceError(f"{context}: inconsistent {duration}")
+
+    check_difference("frame_end_us", "frame_post_draw_callback_us",
+                     "frame_end_to_post_draw_us")
+    check_difference("preview_stage_completed_us", "frame_end_us",
+                     "preview_stage_to_frame_end_us")
+    check_difference("preview_input_received_us", "frame_end_us",
+                     "preview_input_to_frame_end_us")
+    check_difference("preview_stage_completed_us", "frame_post_draw_callback_us",
+                     "preview_stage_to_post_draw_us")
+    check_difference("preview_input_received_us", "frame_post_draw_callback_us",
+                     "preview_input_to_post_draw_us")
+
+    for prefix in ("preview_stage", "preview_input"):
+        callback_key = f"{prefix}_to_post_draw_us"
+        draw_key = f"{prefix}_to_frame_end_us"
+        if all(key in phase for key in (callback_key, draw_key,
+                                         "frame_end_to_post_draw_us")):
+            if phase[callback_key] != phase[draw_key] + phase["frame_end_to_post_draw_us"]:
+                raise TraceError(f"{context}: inconsistent {callback_key}")
+
+    if "frame_post_draw_callback_us" in phase and (
+            "frame_end_us" not in phase or "frame_end_to_post_draw_us" not in phase):
+        raise TraceError(f"{context}: callback lacks matching frame duration")
+    if ("preview_input_received_us" in phase and "preview_stage_completed_us" in phase
+            and phase["preview_input_received_us"] > phase["preview_stage_completed_us"]):
+        raise TraceError(f"{context}: input receipt follows stage completion")
+
+
 def summarize_stroke(
     record: Any, index: int, *, source_file_index: int = 1,
     timestamp_epoch_index: int = 1,
@@ -149,6 +200,7 @@ def summarize_stroke(
     for phase_index, phase in enumerate(phases):
         if not isinstance(phase, dict):
             raise TraceError(f"stroke {index}: frame {phase_index} must be an object")
+        validate_frame_timing(phase, f"stroke {index} frame {phase_index}")
     frame_total = nonnegative_int(record.get("frame_phase_total"), "frame_phase_total")
     if frame_total < len(phases):
         raise TraceError(f"stroke {index}: frame total below retained frame count")

@@ -2279,3 +2279,14 @@ five-stroke Xvfb trace still parse; Brush/native rollback checks pass.
 This is diagnostic integrity, not a hardware responsiveness improvement or
 owner acceptance. T-095 stays In Progress (`manual_review: true`) and T-096
 remains Manual Review. [Evidence](evidence/T-095-2026-11-11-trace-retained-consistency.md).
+
+**T-095 owner-trace frame-clock integrity (2026-11-11; In Progress):**
+The offline analyzer rejects non-integer exported frame timestamps and
+contradictory stage→draw→post-draw intervals rather than reporting unreliable
+owner-machine percentiles. The previous analyzer fails eight new controls;
+updated Python contracts pass **12/12**, a five-stroke Xvfb trace with
+**274 frames/150 callbacks** parses, and exporter/pixel/native rollback
+checks pass. This changes neither Brush runtime nor trace schema, and does
+not establish physical responsiveness. T-095 remains `manual_review: true`,
+T-096 remains in Manual Review, and hosted/owner acceptance is pending.
+[Evidence](evidence/T-095-2026-11-11-trace-frame-arithmetic.md).
