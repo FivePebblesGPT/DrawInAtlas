@@ -1,3 +1,23 @@
+## T-098 exact 128px detached preview invalidation — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` runs
+`drawing/tests/t098_preview_display_cache_smoke.gd` on graphical Xvfb,
+requires exactly one `T098_PREVIEW_DISPLAY_PASSED` via the existing
+T-094 fail-closed log checker, and uploads its raw `/tmp/t098-preview-display.log`
+even if a later check fails. The 29-check graphical test compares actual
+Canvas GPU textures and framebuffer pixels across two 128px display quadrants
+sharing a 256px source tile. A staged-only old Canvas lookup fails three
+new assertions; the optimized lookup preserves exact RGBA8 preview/commit,
+alpha/layers, signed Eraser, rollback, cancellation, bounded memory and Undo.
+The 96px graphical pointer witness now also reports per-frame compositor p95,
+maximum frame CPU and retained display texture bytes. Two paired cold/warm
+Xvfb/Mesa runs measured 4.393–4.429s prior versus 1.699–1.770s updated
+compositor CPU; no claim is made of meeting the 100ms whole-gesture target.
+The 6ms soft drain deadline, all 46 required fast CI check IDs and T-095
+manual approval remain unchanged. Hosted CI and owner-device responsiveness
+are not accepted by these local results.
+[Evidence](evidence/T-098-2026-11-11-exact-preview-display-tiles.md).
+
 ## T-095 built-in Godot script profiler and 96px stage attribution — 2026-11-11
 
 `godot --profiling --debug` captures real GDScript function-level cost on

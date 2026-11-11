@@ -772,7 +772,7 @@ func _preview_index_for_draw(edit: DrawingEditSession, window: Rect2i) -> Dictio
 			and _preview_index_revision == revision and _preview_index_window == window:
 		_preview_index_reused = true
 		return _preview_index_result
-	var result: Dictionary = edit.preview_stamps_for_display_tiles(window, DISPLAY_TILE_SIZE)
+	var result: Dictionary = edit.preview_display_stamps_for_canvas(window, DISPLAY_TILE_SIZE)
 	_preview_index_owner = edit
 	_preview_index_epoch = edit._preview_epoch
 	_preview_index_revision = revision

@@ -23,6 +23,13 @@ func check(ok: bool, label: String) -> void:
 		printerr("T095_FULL_CANVAS_FAILED: " + label)
 
 
+func frame_compose_p95_ms(stats: Dictionary) -> float:
+	var values: Array[float] = []
+	for phase: Dictionary in (stats.get("frame_phases_us", []) as Array):
+		values.append(float(phase.get("compose_cpu_us", 0)) / 1000.0)
+	return percentile(values, 0.95)
+
+
 func percentile(values: Array[float], fraction: float) -> float:
 	if values.is_empty():
 		return 0.0
@@ -171,7 +178,7 @@ func run() -> void:
 			"stroke %d has actual commit timestamps" % run_index)
 		check(Input.use_accumulated_input == original_accumulation,
 			"stroke %d restores engine input accumulation" % run_index)
-		print("T095_FULL_CANVAS_RUN index=%d backend=%s source_pixels=%d width_px=96 input_events=100 total_to_postdraw_ms=%.3f release_to_commit_ms=%.3f stage_cpu_ms=%.3f drain_frames=%d max_pending=%d commit_cpu_ms=%.3f compose_cpu_ms=%.3f texture_cpu_ms=%.3f preview_frames=%d segments_staged=%d drain_calls=%d max_batch_ms=%.3f max_drain_ms=%.3f" % [
+		print("T095_FULL_CANVAS_RUN index=%d backend=%s source_pixels=%d width_px=96 input_events=100 total_to_postdraw_ms=%.3f release_to_commit_ms=%.3f stage_cpu_ms=%.3f drain_frames=%d max_pending=%d commit_cpu_ms=%.3f compose_cpu_ms=%.3f texture_cpu_ms=%.3f preview_frames=%d segments_staged=%d drain_calls=%d max_batch_ms=%.3f max_drain_ms=%.3f frame_compose_p95_ms=%.3f max_frame_compose_ms=%.3f max_frame_draw_ms=%.3f retained_texture_bytes=%d" % [
 			run_index, canvas.brush_backend, SIDE * SIDE, elapsed, release, stage,
 			drained_frames, int(stats.get("max_pending", 0)),
 			float(stats.get("commit_cpu_us", 0)) / 1000.0,
@@ -180,7 +187,12 @@ func run() -> void:
 			int(stats.get("preview_frames", 0)), int(stats.get("segments_staged", 0)),
 			int(stats.get("drain_calls", 0)),
 			float(stats.get("max_stage_batch_us", 0)) / 1000.0,
-			float(stats.get("max_drain_cpu_us", 0)) / 1000.0])
+			float(stats.get("max_drain_cpu_us", 0)) / 1000.0,
+			frame_compose_p95_ms(stats),
+			float(stats.get("max_frame_compose_cpu_us", 0)) / 1000.0,
+			float(stats.get("max_frame_full_draw_cpu_us", 0)) / 1000.0,
+			canvas._display_tiles.size() * canvas.DISPLAY_TILE_SIZE *
+			canvas.DISPLAY_TILE_SIZE * 4])
 		check_all_red(doc, layer, "stroke %d" % run_index)
 		var framebuffer: Image = root.get_texture().get_image()
 		var screen_point: Vector2i = Vector2i(canvas.global_position +

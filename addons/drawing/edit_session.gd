@@ -45,6 +45,72 @@ var _preview_tiles: Dictionary[String, Dictionary] = {}
 ## recomposition when a storage tile touching its source footprint changes.
 var _preview_epoch: int = 0
 var _preview_tile_versions: Dictionary[String, int] = {}
+## The renderer's display tiles are 128px, but storage chunks may cover many
+## such tiles. Keep a bounded *exact* touched-display index for ordinary
+## Brush/Eraser pixel updates. Any path that cannot prove the index complete
+## falls back to the existing conservative storage-tile stamps.
+const PREVIEW_DISPLAY_STRIDE: int = 128
+const MAX_PREVIEW_DISPLAY_KEYS: int = 4096
+var _preview_display_versions: Dictionary[String, int] = {}
+var _preview_display_exact: bool = true
+var _preview_display_last_epoch: int = 0
+var _preview_display_cached_x: int = 0
+var _preview_display_cached_y: int = 0
+var _preview_display_cached_key: String = ""
+
+
+func _invalidate_exact_preview_display_index() -> void:
+	_preview_display_exact = false
+	_preview_display_versions.clear()
+
+
+func _mark_preview_display_pixel(global_x: int, global_y: int) -> void:
+	if not _preview_display_exact:
+		return
+	# Arithmetic shifts are floor division by 128 even for signed world pixels.
+	var tile_x: int = global_x >> 7
+	var tile_y: int = global_y >> 7
+	if (_preview_display_cached_key.is_empty()
+			or tile_x != _preview_display_cached_x
+			or tile_y != _preview_display_cached_y):
+		_preview_display_cached_x = tile_x
+		_preview_display_cached_y = tile_y
+		_preview_display_cached_key = "%d,%d" % [tile_x, tile_y]
+	var key: String = _preview_display_cached_key
+	if (not _preview_display_versions.has(key)
+			and _preview_display_versions.size() >= MAX_PREVIEW_DISPLAY_KEYS):
+		_invalidate_exact_preview_display_index()
+		return
+	_preview_display_versions[key] = _preview_epoch
+	_preview_display_last_epoch = _preview_epoch
+
+
+## Canvas-only refinement: pixels in one 256px storage tile should not dirty
+## all four 128px display tiles. Preserve the existing public conservative
+## stamp API and fail back to it for bulk edits, rollbacks, oversized
+## gestures, nonstandard display strides, or synthetic legacy mutation tests.
+func preview_display_stamps_for_canvas(visible_tiles: Rect2i, display_stride: int,
+		max_entries: int = 40000) -> Dictionary:
+	if (not _preview_display_exact
+			or _preview_display_last_epoch != _preview_epoch
+			or (_preview_display_versions.is_empty() and not _preview_tile_versions.is_empty())
+			or display_stride != PREVIEW_DISPLAY_STRIDE):
+		return preview_stamps_for_display_tiles(visible_tiles, display_stride, max_entries)
+	var stamps: Dictionary[String, int] = {}
+	if _closed or document.revision != expected_revision:
+		return {"indexed": true, "stamps": stamps}
+	if not visible_tiles.has_area() or max_entries <= 0:
+		return {"indexed": false, "stamps": stamps}
+	for key: String in _preview_display_versions:
+		var parts: PackedStringArray = key.split(",")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		if (x >= visible_tiles.position.x and x < visible_tiles.end.x
+				and y >= visible_tiles.position.y and y < visible_tiles.end.y):
+			if stamps.size() >= max_entries:
+				return {"indexed": false, "stamps": {}}
+			stamps[key] = _preview_display_versions[key]
+	return {"indexed": true, "stamps": stamps}
 ## Only touched pixels need rollback. A full triple-dictionary duplicate per motion
 ## event grew quadratically over long strokes.
 var _paint_journal: Dictionary[String, Array] = {}
@@ -253,6 +319,9 @@ func preview_stamps_for_display_tiles(visible_tiles: Rect2i, display_stride: int
 func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) -> void:
 	_preview_epoch += 1
 	_preview_tile_versions[tile_key] = _preview_epoch
+	if _preview_display_exact:
+		var point: PackedStringArray = pixel_key.split(",")
+		_mark_preview_display_pixel(int(point[0]), int(point[1]))
 	var tile_patch: Dictionary = _preview_tiles.get(tile_key, {})
 	if _after.has(pixel_key):
 		tile_patch[local_index] = _after[pixel_key]
@@ -266,6 +335,7 @@ func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) 
 ## Rare failure path for the other edit APIs which still use full snapshots.
 ## Their preview index must never outlive a rolled-back staging dictionary.
 func _rebuild_preview_tiles() -> void:
+	_invalidate_exact_preview_display_index()
 	_preview_tiles.clear()
 	for key: String in _after:
 		var parts: PackedStringArray = key.split(",")
@@ -277,6 +347,7 @@ func _rebuild_preview_tiles() -> void:
 
 
 func _rollback_paint() -> void:
+	_invalidate_exact_preview_display_index()
 	_stationary_dab_valid = false
 	for key: String in _paint_journal:
 		var snapshot: Array = _paint_journal[key]
@@ -314,6 +385,7 @@ func _rollback_paint() -> void:
 					_covered_rows.erase(int(snapshot[3]))
 		_preview_epoch += 1
 		_preview_tile_versions[tile_key] = _preview_epoch
+		_invalidate_exact_preview_display_index()
 		if patch.is_empty():
 			_preview_tiles.erase(tile_key)
 		else:
@@ -342,6 +414,8 @@ func cancel() -> void:
 	_source_tiles.clear()
 	_preview_tiles.clear()
 	_preview_tile_versions.clear()
+	_preview_display_versions.clear()
+	_preview_display_cached_key = ""
 	_paint_journal.clear()
 	_journaling = false
 	_closed = true
@@ -377,6 +451,8 @@ func commit() -> DrawingResult:
 	_source_tiles.clear()
 	_preview_tiles.clear()
 	_preview_tile_versions.clear()
+	_preview_display_versions.clear()
+	_preview_display_cached_key = ""
 	_paint_journal.clear()
 	return result
 
@@ -541,6 +617,7 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 			patch[local_index] = replacement
 		_preview_epoch += 1
 		_preview_tile_versions[tile_key] = _preview_epoch
+		_mark_preview_display_pixel(global_x, global_y)
 		if patch.is_empty():
 			_preview_tiles.erase(tile_key)
 		else:
@@ -823,6 +900,7 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 			continue
 		_preview_epoch += 1
 		_preview_tile_versions[tile_key] = _preview_epoch
+		_invalidate_exact_preview_display_index()
 		if patch.is_empty():
 			_preview_tiles.erase(tile_key)
 		else:
