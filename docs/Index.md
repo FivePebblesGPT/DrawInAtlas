@@ -6,6 +6,18 @@
 
 ## Current priority — owner Drawing review (2026-11-05)
 
+**T-095 owner trace overlapping-commit epoch isolation (2026-11-11; In Progress):**
+The offline analyzer now splits an appended JSONL file whenever the next
+stroke's Godot receipt timestamp is earlier than the **previous stroke's
+commit**, even if it exceeds the previous receipt time. A new red/green
+regression demonstrates an 80 ms / 5 ms cohort otherwise pooled by the old
+23-commit analyzer; the ten-test Python suite and five pinned Godot neighbors
+pass. This detects timestamp-order incompatibility, not verified hardware or
+session identity. The schema-1 exporter and Brush behavior are unchanged;
+T-095 remains `In Progress` with `manual_review: true`, and T-096 stays in
+`Manual Review`. [Ticket](Tickets/T-095.md) ·
+[Evidence](evidence/T-095-2026-11-11-trace-commit-overlap.md).
+
 **T-095 appended owner trace timestamp-epoch isolation (2026-11-11; In Progress):**
 The offline analyzer now partitions one JSONL file at observable backwards
 `down_us` transitions, as well as by file and matching Brush settings. Its

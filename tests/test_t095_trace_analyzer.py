@@ -186,6 +186,32 @@ class T095TraceAnalyzerTest(unittest.TestCase):
             self.assertIn("epoch #2", analyzer.human_report(analysis))
             self.assertNotIn("appended.jsonl", analyzer.human_report(analysis))
 
+    def test_append_reset_with_overlapping_commit_intervals_is_isolated(self) -> None:
+        """Non-overlapping completed strokes cannot overlap within one Canvas session.
+
+        A restarted clock may advance beyond the preceding down timestamp
+        while remaining behind its commit timestamp. Comparing only down_us
+        misses that observable boundary and pools unrelated device timings.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "overlapping-clocks.jsonl"
+            first = record(start=1_000_000)  # commit=1_180_000
+            restarted = record(start=1_150_000)  # down increases, but before commit
+            restarted["commit_us"] = restarted["release_us"] + 5_000
+            later = record(start=1_400_000)
+            later["commit_us"] = later["release_us"] + 5_000
+            path.write_text("".join(json.dumps(row) + "\n" for row in
+                                    (first, restarted, later)), encoding="utf8")
+            analysis = analyzer.aggregate(analyzer.read_traces([path]))
+            self.assertEqual([s["timestamp_epoch_index"] for s in analysis["strokes"]],
+                             [1, 2, 2])
+            self.assertEqual([g["strokes"] for g in analysis["groups"]], [1, 2])
+            self.assertEqual([g["release_to_commit"]["p95_ms"]
+                              for g in analysis["groups"]], [80.0, 5.0])
+            # No file names, unverified device IDs, or fake photon latency.
+            self.assertNotIn(path.name, analyzer.human_report(analysis))
+            self.assertIn("NOT physical", analyzer.human_report(analysis))
+
     def test_oversized_record_fails_without_partial_report(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "huge.jsonl"

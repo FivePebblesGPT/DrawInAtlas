@@ -188,7 +188,7 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
     """Read and strictly validate every nonempty line of the provided files."""
     strokes: list[dict[str, Any]] = []
     for source_file_index, path in enumerate(paths, start=1):
-        previous_down_us: int | None = None
+        previous_commit_us: int | None = None
         timestamp_epoch_index = 1
         with path.open("rb") as handle:
             line_number = 0
@@ -205,13 +205,14 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
                 except (ValueError, UnicodeDecodeError) as exc:
                     raise TraceError(f"{path}:{line_number}: malformed JSONL record") from exc
                 try:
-                    # get_ticks_usec() is monotonic within one Godot process,
-                    # but an appended file can contain a later process restart.
+                    # One Canvas completes a stroke before starting the next.
+                    # Appended traces may restart the clock without decreasing
+                    # down_us, yet still overlap a prior completed gesture.
                     down_us = nonnegative_int(
                         decoded.get("down_us") if isinstance(decoded, dict) else None,
                         "down_us",
                     )
-                    if previous_down_us is not None and down_us < previous_down_us:
+                    if previous_commit_us is not None and down_us < previous_commit_us:
                         timestamp_epoch_index += 1
                     stroke = summarize_stroke(
                         decoded, len(strokes) + 1,
@@ -219,7 +220,9 @@ def read_traces(paths: Sequence[Path]) -> list[dict[str, Any]]:
                         timestamp_epoch_index=timestamp_epoch_index,
                     )
                     strokes.append(stroke)
-                    previous_down_us = down_us
+                    # summarize_stroke already validated the integer and
+                    # ordered down/release/commit timestamps.
+                    previous_commit_us = decoded["commit_us"]
                 except TraceError as exc:
                     raise TraceError(f"{path}:{line_number}: {exc}") from exc
     if not strokes:

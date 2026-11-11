@@ -1,3 +1,20 @@
+## T-095 owner trace overlapping-commit epoch isolation — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` now labels its existing analyzer
+check as covering overlapping completed-stroke timestamps. The strict
+`T095_TRACE_ANALYZER_PASSED` marker and saved raw log remain mandatory. The
+**10/10** stdlib Python contracts include a red/green appended-file case
+where a later `down_us` exceeds the previous `down_us` but precedes the
+previous `commit_us`; the old analyzer pooled unrelated 80 ms and 5 ms
+release→commit observations. The corrected analyzer partitions these cohorts
+without changing its output schema v3 or the Godot schema-1 exporter. Five
+pinned-engine neighbors pass with strict log checks. This identifies an
+observable timestamp-order discontinuity, not a verified process/device
+boundary or physical GPU responsiveness result. The required fast-CI matrix,
+T-094 fail-closed policy and T-095/T-096 review gates are unchanged; hosted
+Actions remain unverified.
+[Evidence](evidence/T-095-2026-11-11-trace-commit-overlap.md).
+
 ## T-095 appended owner trace timestamp-epoch isolation — 2026-11-11
 
 The **non-gating** `godot-native-t095-brush.yml` retains the strict
