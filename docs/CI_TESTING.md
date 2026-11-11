@@ -1,3 +1,26 @@
+## T-099 held-preview scheduling and exact input parity — 2026-11-12
+
+The existing non-gating `godot-native-t095-brush.yml` now applies
+`T099_MAX_PREVIEW_FRAMES=110` to the already required 100-event, 96px full-red
+real-mouse Xvfb witness; the T-098 Canvas source fails that independent
+structural redraw oracle (160), while the T-099 scheduler passes (79–81).
+This checks batching of **display submissions, not rasterization**: the
+6ms soft raster budget and all 296 source fragments remain unchanged, and
+all SHA-256/framebuffer/Undo/Redo assertions still run. The same on-demand
+workflow also runs `drawing/tests/t099_preview_schedule_native.gd` with the
+strict `T099_PREVIEW_SCHEDULE_PASSED` marker and uploads its raw
+`/tmp/t099-preview-schedule.log` even after failure. This 46-check graphical
+witness covers held changing-preview frames, signed/masked Brush/Eraser RGBA8,
+post-release Pan/Zoom, one-step history and capture cancellation.
+
+Only the on-demand workflow changes; the **46 required fast-CI check IDs**, its
+T-094 fail-closed policy, pending hosted runs and T-095/T-096 owner/manual
+review gates remain unaffected. No synthetic Godot post-draw measurement is
+physical input-to-photon proof, and a 6ms soft deadline does not bound one
+atomic `paint_path` call. The paired CPU numbers and a 76.6ms one-off
+candidate drain outlier are reported, not silently promoted to a hardware
+frame-time pass. [T-099 evidence](evidence/T-099-2026-11-12-held-preview-scheduling.md).
+
 ## T-098 exact 128px detached preview invalidation — 2026-11-11
 
 The non-gating, on-demand `godot-native-t095-brush.yml` runs

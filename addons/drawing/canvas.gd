@@ -208,6 +208,11 @@ const MAX_SEGMENTS_PER_FRAME: int = 256
 const MAX_SEGMENTS_PER_BATCH: int = 16
 const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
 const MAX_DRAIN_CPU_US: int = 6000
+# Preview draw scheduling never changes the 6ms soft raster-stage deadline.
+# During a sustained input backlog a display frame may represent two bounded
+# drain calls; first/last isolated changes remain immediate.
+const MAX_PENDING_PREVIEW_DRAINS: int = 2
+const MAX_PENDING_PREVIEW_US: int = 20000
 const MAX_SEGMENT_LENGTH: float = 24.0
 # Discard only an already-consumed prefix of a sustained stroke. A paint
 # backlog may never become entirely empty while fresh OS samples arrive.
@@ -244,6 +249,8 @@ var _unsubmitted_preview_stage_us: int = 0
 ## Receipt time of the oldest input in the first pixel-changing batch pending
 ## Canvas submission. This is engine receipt, not an OS hardware timestamp.
 var _unsubmitted_preview_input_us: int = 0
+var _pending_preview_drain_calls: int = 0
+var _pending_preview_first_us: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -413,6 +420,8 @@ func _tag_frame_preview_stage(frame: Dictionary, frame_end_us: int) -> void:
 			frame_end_us - _unsubmitted_preview_input_us)
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 
 
 func source_position(position: Vector2) -> Vector2:
@@ -1223,6 +1232,8 @@ func start_gesture(position: Vector2) -> void:
 	_pending_frame_phase_session = null
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1392,10 +1403,23 @@ func _drain_segments(budget: int) -> void:
 	_metrics["max_drain_cpu_us"] = maxi(int(_metrics["max_drain_cpu_us"]),
 		Time.get_ticks_usec() - drain_start_us)
 	_compact_sample_queue()
-	# A failed batch cancels above; a finished stroke queues its own redraw
-	# from _commit_stroke(). Do not dereference the discarded session.
-	if session != null and session._preview_epoch != preview_before:
-		queue_redraw()
+	# The detached preview may aggregate two *separate*, deadline-limited
+	# drain calls into one display submission while the input queue is busy.
+	# Never enlarge an atomic paint_path call, defer an isolated edit, or
+	# starve a held pointer when the producer pauses.
+	if session != null:
+		if session._preview_epoch != preview_before:
+			if _pending_preview_drain_calls == 0:
+				_pending_preview_first_us = Time.get_ticks_usec()
+			_pending_preview_drain_calls += 1
+		var more_input: bool = _has_segment_target or _sample_index < _samples.size()
+		if _pending_preview_drain_calls > 0 and (
+				_pending_preview_drain_calls >= MAX_PENDING_PREVIEW_DRAINS or
+				Time.get_ticks_usec() - _pending_preview_first_us >= MAX_PENDING_PREVIEW_US or
+				not more_input):
+			queue_redraw()
+			_pending_preview_drain_calls = 0
+			_pending_preview_first_us = 0
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
 
@@ -1653,6 +1677,8 @@ func _commit_stroke() -> void:
 	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 	session = null
 	_stroke_selection = null
 	_native_brush = null
@@ -1688,6 +1714,8 @@ func _commit_stroke() -> void:
 func cancel_gesture() -> void:
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 	if session != null:
 		session.cancel()
 		session = null

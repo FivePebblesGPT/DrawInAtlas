@@ -38,6 +38,21 @@ func percentile(values: Array[float], fraction: float) -> float:
 	return sorted[clampi(ceili(float(sorted.size()) * fraction) - 1, 0, sorted.size() - 1)]
 
 
+func frame_metric_p_ms(stats: Dictionary, key: String, fraction: float) -> float:
+	var values: Array[float] = []
+	for sample: Dictionary in (stats.get("frame_phases_us", []) as Array):
+		if sample.has(key):
+			values.append(float(sample[key]) / 1000.0)
+	return percentile(values, fraction)
+
+
+func frame_depth_p(stats: Dictionary, fraction: float) -> float:
+	var values: Array[float] = []
+	for sample: Dictionary in (stats.get("frame_phases_us", []) as Array):
+		values.append(float(sample.get("pending_input_count", 0)))
+	return percentile(values, fraction)
+
+
 ## Nine 64px-spaced, alternating horizontal sweeps. At every source pixel
 ## center there is a point on a sweep within 32px, less than the 48px radius.
 ## This is a SINGLE Brush gesture, not a rectangle/fill API substitution.
@@ -176,6 +191,14 @@ func run() -> void:
 			"stroke %d received every 100 pointer event" % run_index)
 		check(int(stats.get("commit_us", 0)) > int(stats.get("release_us", 0)),
 			"stroke %d has actual commit timestamps" % run_index)
+		var max_previews: String = OS.get_environment("T099_MAX_PREVIEW_FRAMES")
+		if not max_previews.is_empty():
+			check(max_previews.is_valid_int() and int(max_previews) > 0,
+				"T-099 changed-preview threshold is valid")
+			if max_previews.is_valid_int():
+				check(int(stats.get("preview_frames", 0)) <= int(max_previews),
+					"T-099 drains all input with at most %d changed preview redraws (got %d)" % [
+						int(max_previews), int(stats.get("preview_frames", 0))])
 		check(Input.use_accumulated_input == original_accumulation,
 			"stroke %d restores engine input accumulation" % run_index)
 		print("T095_FULL_CANVAS_RUN index=%d backend=%s source_pixels=%d width_px=96 input_events=100 total_to_postdraw_ms=%.3f release_to_commit_ms=%.3f stage_cpu_ms=%.3f drain_frames=%d max_pending=%d commit_cpu_ms=%.3f compose_cpu_ms=%.3f texture_cpu_ms=%.3f preview_frames=%d segments_staged=%d drain_calls=%d max_batch_ms=%.3f max_drain_ms=%.3f frame_compose_p95_ms=%.3f max_frame_compose_ms=%.3f max_frame_draw_ms=%.3f retained_texture_bytes=%d" % [
@@ -193,6 +216,21 @@ func run() -> void:
 			float(stats.get("max_frame_full_draw_cpu_us", 0)) / 1000.0,
 			canvas._display_tiles.size() * canvas.DISPLAY_TILE_SIZE *
 			canvas.DISPLAY_TILE_SIZE * 4])
+		print("T099_FRAME_METRICS index=%d input_draw_p50_ms=%.3f input_draw_p95_ms=%.3f input_draw_max_ms=%.3f input_callback_p50_ms=%.3f input_callback_p95_ms=%.3f input_callback_max_ms=%.3f pending_depth_p95=%.0f pending_depth_max=%d pending_age_p95_ms=%.3f pending_age_max_ms=%.3f preview_draws=%d drain_calls=%d max_drain_ms=%.3f" % [
+			run_index,
+			frame_metric_p_ms(stats, "preview_input_to_frame_end_us", 0.5),
+			frame_metric_p_ms(stats, "preview_input_to_frame_end_us", 0.95),
+			float(stats.get("max_preview_input_to_frame_end_us", 0)) / 1000.0,
+			frame_metric_p_ms(stats, "preview_input_to_post_draw_us", 0.5),
+			frame_metric_p_ms(stats, "preview_input_to_post_draw_us", 0.95),
+			float(stats.get("max_preview_input_to_post_draw_us", 0)) / 1000.0,
+			frame_depth_p(stats, 0.95),
+			int(stats.get("max_frame_pending_input_count", 0)),
+			frame_metric_p_ms(stats, "oldest_pending_age_us", 0.95),
+			float(stats.get("max_frame_oldest_pending_age_us", 0)) / 1000.0,
+			int(stats.get("preview_frames", 0)),
+			int(stats.get("drain_calls", 0)),
+			float(stats.get("max_drain_cpu_us", 0)) / 1000.0])
 		check_all_red(doc, layer, "stroke %d" % run_index)
 		var framebuffer: Image = root.get_texture().get_image()
 		var screen_point: Vector2i = Vector2i(canvas.global_position +

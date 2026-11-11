@@ -14,7 +14,7 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Brush T-095:** [T-097 benchmark/profiler](Tickets/T-097.md) **Done**
   *(harness only; latency target fails)*; [T-098 incremental preview](Tickets/T-098.md)
   **Done** *(paired Xvfb compositor improvement, not latency acceptance)*;
-  [T-099 bounded input draining](Tickets/T-099.md),
+  [T-099 bounded held-preview scheduling](Tickets/T-099.md) **Done**;
   [T-100 sparse publication](Tickets/T-100.md) **Ready**;
   [T-101 optional native throughput](Tickets/T-101.md) **Ready**.
 - **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md),
@@ -40,6 +40,21 @@ setting was restored and must not ship as a responsiveness fix.
 T-095 and T-096 review gates are unchanged; owner hardware and hosted
 CI are unverified. [Evidence](evidence/T-095-2026-11-11-96px-godot-profiler.md).
 
+## T-099 bounded held-preview scheduling (2026-11-12; Done)
+
+The 96px real-pointer Brush now coalesces display submissions across at most
+**two separate 6ms-soft-budget drains** (or 20ms elapsed), without changing
+atomic paint stages, 24px interpolation, 100 input samples or 296 staged
+segments. Two cold/warm pairs reduced changed preview drawings from **158–160
+to 79–81** and compositor CPU from **1.36–1.50s to 0.76–0.89s** while
+retaining full 512×512 red source/framebuffer/Undo parity. A failing old-source
+control and the new **46-check** held real-pointer signed-mask Brush/Eraser,
+post-release navigation and cancellation witness pass. One candidate trial
+had a **76.6ms** stage drain outlier; the unaltered 6ms budget is **soft**,
+not a frame-time guarantee. T-095 owner/device approval, T-096 and hosted
+CI are not inferred. [Ticket](Tickets/T-099.md) ·
+[Evidence](evidence/T-099-2026-11-12-held-preview-scheduling.md).
+
 ## T-098 exact 128px preview invalidation (2026-11-11; Done)
 
 Canvas now avoids recompositing untouched 128px display quadrants when a
@@ -49,7 +64,7 @@ bulk/rollback/oversized cases. The old lookup fails three focused assertions;
 27/27 headless and 29/29 graphical checks pass. Two paired 96px pointer runs
 reduced compositor CPU from **4.393–4.429s** to **1.699–1.770s** on software
 Mesa; whole-stroke lag remains **5.265–6.164s**, not owner accepted.
-T-099/T-100 and T-095 stay open. [Ticket](Tickets/T-098.md) ·
+T-099 is now Done as a narrow scheduler change; T-100 and T-095 remain open. [Ticket](Tickets/T-098.md) ·
 [Evidence](evidence/T-098-2026-11-11-exact-preview-display-tiles.md).
 
 ## T-095 96px red full-canvas pointer baseline (2026-11-11; In Progress)
@@ -2298,7 +2313,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Manual Review | Owner physical selection/Move UX recheck | [T-053](Tickets/T-053.md) |
 | [T-097 · 96px full-canvas Brush correctness and profiling baseline](Tickets/T-097.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-098 · Incremental detached Brush preview compositing](Tickets/T-098.md) | Done | — | [T-097](Tickets/T-097.md) |
-| [T-099 · Frame-safe Brush input draining and held-preview scheduling](Tickets/T-099.md) | Ready | — | [T-097](Tickets/T-097.md) |
+| [T-099 · Frame-safe Brush input draining and held-preview scheduling](Tickets/T-099.md) | Done | Bounded preview coalescing; software/native oracles pass, owner T-095 acceptance still open | [T-097](Tickets/T-097.md) |
 | [T-100 · Bounded sparse atomic Brush publication and Undo](Tickets/T-100.md) | Ready | — | [T-097](Tickets/T-097.md) |
 | [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Ready | — | [T-097](Tickets/T-097.md) |
 | [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Ready | — | [T-053](Tickets/T-053.md) |
