@@ -35,7 +35,8 @@ def main() -> int:
         env["T065_POINTER_HANDSHAKE"] = str(handshake)
         if args.screenshot:
             env["T065_POINTER_SCREENSHOT"] = str(args.screenshot)
-        command = [args.godot, "--path", str(args.project), "--rendering-driver", "opengl3", "-s", "res://tests/asset_browser_atlas_pointer_native.gd"]
+        command = [args.godot, "--path", str(args.project), "--rendering-driver", "opengl3",
+                   "--audio-driver", "Dummy", "-s", "res://tests/asset_browser_atlas_pointer_native.gd"]
         process = subprocess.Popen(command, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         try:
             ready_path = handshake / "ready.json"

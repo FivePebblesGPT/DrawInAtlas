@@ -134,14 +134,40 @@ func scan(objects_path: String) -> DrawingResult:
 
 func _read_source(path: String, seen: Dictionary, target: Array[Dictionary],
 		issues: Array[String], directory_id: String = "") -> void:
-	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
-	if file == null or file.get_length() > MAX_OBJECT_BYTES:
-		issues.append("Skipped unreadable or oversized Object source")
+	# Capture once, decode that same bounded buffer and advertise its exact hash.
+	# A separate post-decode path hash could instead authorize another writer's
+	# replacement. Open/Preview/Export must revalidate this captured digest.
+	if not path_has_no_links(path):
+		issues.append("Skipped unsafe Object source path")
 		return
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		issues.append("Skipped unreadable Object source")
+		return
+	var length: int = file.get_length()
+	if length <= 0 or length > MAX_OBJECT_BYTES:
+		file.close()
+		issues.append("Skipped empty or oversized Object source")
+		return
+	var bytes: PackedByteArray = file.get_buffer(length)
 	file.close()
-	var loaded: DrawingResult = DrawingObjectEditorFile.open(path)
+	if bytes.size() != length:
+		issues.append("Skipped truncated Object source")
+		return
+	var hashed: HashingContext = HashingContext.new()
+	hashed.start(HashingContext.HASH_SHA256)
+	hashed.update(bytes)
+	var digest: String = hashed.finish().hex_encode()
+	var json: JSON = JSON.new()
+	if json.parse(bytes.get_string_from_utf8()) != OK or not json.data is Dictionary:
+		issues.append("Skipped invalid Object source: " + path.get_file())
+		return
+	var loaded: DrawingResult = DrawingObjectEditorFile.decode_payload(json.data, path)
 	if not loaded.ok:
 		issues.append("Skipped invalid Object source: " + path.get_file())
+		return
+	if not path_has_no_links(path):
+		issues.append("Skipped Object source path changed during index scan")
 		return
 	var data: Dictionary = loaded.value
 	var source_id: String = String(data["source_id"])
@@ -165,7 +191,7 @@ func _read_source(path: String, seen: Dictionary, target: Array[Dictionary],
 	seen[source_id] = true
 	target.append({"id": source_id, "name": String(data["name"]),
 		"revision": int(data["source_revision"]), "path": path,
-		"bounds": data["bounds"], "sha256": FileAccess.get_sha256(path)})
+		"bounds": data["bounds"], "sha256": digest})
 
 
 ## Listings are not authority to open files after filesystem changes.

@@ -86,7 +86,12 @@ static func open(path: String) -> DrawingResult:
 	var envelope: DrawingResult = DrawingFileIO.read_payload(path)
 	if not envelope.ok:
 		return envelope
-	var parsed: Dictionary = envelope.value
+	return decode_payload(envelope.value, path)
+
+
+## Reuse a previously parsed envelope when its bytes were captured and hashed
+## by the Asset Browser index; do not reopen the path for unrelated metadata.
+static func decode_payload(parsed: Dictionary, path: String) -> DrawingResult:
 	var opened: DrawingResult = DrawingFileIO.decode(parsed)
 	if not opened.ok:
 		return opened

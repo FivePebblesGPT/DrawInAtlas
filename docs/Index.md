@@ -24,10 +24,27 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md)
   **In Progress** *(beta3 local repairs; hosted 46/46 pending)*,
   [T-107](Tickets/T-107.md) **In Progress**; T-064 → [T-108](Tickets/T-108.md) **In Progress** *(manual policy decision open)*;
-  T-065 → [T-109](Tickets/T-109.md).
+  T-065 → [T-109](Tickets/T-109.md) **Done** *(real-directory safety; not owner UX approval)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-109 production-scale Asset Browser hardening (2026-11-12; Done)
+
+The portable browser now binds indexed metadata and SHA-256 to the **same
+bounded decoded source buffer**, while Import rechecks the complete current
+Objects/ index and Export pins selected bytes through staging. The new real
+512/513-source oracle passes **32/32** checks for capacity rollback, late ID
+duplicates, link/path swaps, 511-slot stale import, relocation and bounded
+thumbnail pagination. An exact T-108 negative control failed the stale
+import/digest-copy checks. Existing standalone/Atlas, NULL repair and source
+manager software witnesses pass; a real XTEST linked drag passes **19/19**.
+The security checks increase measured 512-source scan CPU (candidate p50
+205–211 ms versus baseline 100–144 ms on local Mesa/Linux); process RSS and
+p95 are recorded separately, and no speedup or cross-process atomicity is
+claimed. T-065 remains **In Progress** with its original manual review gate.
+[Ticket](Tickets/T-109.md) ·
+[Evidence](evidence/T-109-2026-11-12-asset-scale-and-path-hardening.md).
 
 ## T-108 nested Save As explicit prototypes (2026-11-12; In Progress)
 
@@ -2470,7 +2487,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | In Progress | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
-| [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
+| [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 
 ## Epics
 

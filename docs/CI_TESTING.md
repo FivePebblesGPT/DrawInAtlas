@@ -1,3 +1,23 @@
+## T-109 real-directory Asset Browser scale and transfer safety (2026-11-12)
+
+Existing required `ci_t065_asset_browser_model` additionally runs
+`drawing/tests/t109_asset_browser_scale_smoke.gd` under the same 120-second
+watchdog, verifying `T109_SCALE_PASSED` through
+`tools/check_godot_model_log.py` with raw logs retained by CI. Its 32 checks
+create real portable 512/513-source folders, late duplicates, digest-bound
+Export, stale Import rejection, symlink replacement, relocations, and 24-entry
+thumbnail pressure, then clean the isolated fixtures. The original T-108
+source fails the stale Import and pinned-copy controls. Run the opt-in paired
+`drawing/tests/t109_scan_benchmark.gd` with `T109_SCAN_ROOT` set to the **same
+real 512-source directory** for CPU p50/p95 and engine-tracked memory; capture
+process peak RSS separately (not VRAM). The existing `tools/test_t065_x11_pointer.py`
+uses Dummy audio to keep real XTEST drag logs fail-closed; it is an opt-in
+Xvfb witness, not physical owner input approval.
+
+The **46 required CI check IDs** are unchanged. No hosted run on the local
+candidate, cross-process filesystem lease, Windows device validation or T-065
+owner manual gate completion is implied. [Evidence](evidence/T-109-2026-11-12-asset-scale-and-path-hardening.md).
+
 ## T-108 opt-in nested Save As policy regression (2026-11-12)
 
 The existing required `ci_11b_verify_t_064_nested_object_graph` check also

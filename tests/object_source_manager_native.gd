@@ -84,6 +84,9 @@ func _run() -> void:
 	manager._ask_delete()
 	_check(manager._pending_delete.get("asset_id") == chosen,
 		"Delete Source captures exact stable ID")
+	# Mirror the dialog custom-action callback: it hides the exclusive modal
+	# before applying Keep NULL, so the later Import dialog can open safely.
+	manager.delete_confirmation.hide()
 	manager._delete_with_policy("null")
 	_check(registry.instance_info(instance_id)["status"] == "NULL" and manager.missing.item_count == 1,
 		"Keep NULL retains selection-compatible missing instance")

@@ -1,0 +1,9 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T109_SCALE_FAILED: Import fails on stale root rather than using its spare capacity
+T109_SCALE_FAILED: restore complete trusted index after stale-source rejection
+SCRIPT ERROR: Invalid call to function '_copy_to_new_file' in base 'GDScript'. Expected 2 argument(s).
+          at: run (res://drawing/tests/t109_asset_browser_scale_smoke.gd:153)
+          GDScript backtrace (most recent call first):
+              [0] run (res://drawing/tests/t109_asset_browser_scale_smoke.gd:153)
