@@ -44,6 +44,7 @@ var text_editor: AtlasTextEditorPopup
 ## A text dialog retains the exact authorization it opened under, even when
 ## another editor action changes the selected cell, grid or underlying layer.
 var _text_scope_at_open: AtlasEditScope
+var _text_campaign_at_open: AtlasCampaign
 var _text_map_at_open: AtlasMapDocument
 var _text_floor_at_open: AtlasFloor
 var _text_layer_at_open: AtlasObjectsLayer
@@ -1550,6 +1551,7 @@ func _on_text_editor_visibility_changed() -> void:
 	if text_editor.visible:
 		return
 	_text_scope_at_open = null
+	_text_campaign_at_open = null
 	_text_map_at_open = null
 	_text_floor_at_open = null
 	_text_layer_at_open = null
@@ -1563,6 +1565,7 @@ func _open_text_editor(anchor: Vector2, index: int) -> void:
 	if index >= 0 and index < layer.strokes.size():
 		original = layer.strokes[index]
 	_text_scope_at_open = artwork.scope()
+	_text_campaign_at_open = canvas.campaign
 	_text_map_at_open = canvas.map
 	_text_floor_at_open = canvas.floor
 	_text_layer_at_open = layer
@@ -1573,9 +1576,15 @@ func _open_text_editor(anchor: Vector2, index: int) -> void:
 func _confirm_text_edit(index: int, expected: AtlasStroke, replacement: AtlasStroke,
 		map_id: String, floor_id: String, layer_id: String) -> void:
 	var current_scope: AtlasEditScope = artwork.scope()
-	if _text_scope_at_open == null or canvas.map != _text_map_at_open \
-			or canvas.floor != _text_floor_at_open \
-			or canvas.floor == null or canvas.floor.layer_by_id(layer_id) != _text_layer_at_open \
+	# IDs and even identical Resource bytes cannot authorize a modal after its
+	# original source was detached from the live campaign registry.
+	if _text_scope_at_open == null or _text_campaign_at_open == null \
+			or campaign != _text_campaign_at_open or canvas.campaign != _text_campaign_at_open \
+			or canvas.map != _text_map_at_open or canvas.floor != _text_floor_at_open \
+			or _text_map_at_open == null or _text_floor_at_open == null \
+			or _text_campaign_at_open.get_map(_text_map_at_open.id) != _text_map_at_open \
+			or _text_map_at_open.floor_by_id(_text_floor_at_open.id) != _text_floor_at_open \
+			or canvas.floor.layer_by_id(layer_id) != _text_layer_at_open \
 			or current_scope.enabled != _text_scope_at_open.enabled \
 			or current_scope.polygon != _text_scope_at_open.polygon:
 		text_editor.show_error("Text was not applied: its target or selected-cell edit mask "

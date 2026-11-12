@@ -39,9 +39,28 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Polygon T-025:** [T-114 registered draft ownership](Tickets/T-114.md)
   **Done** *(detached campaign/map/floor registry entries reject pending
   Polygon closure; T-025 interaction-policy approval remains open)*.
+- **Atlas Text T-027:** [T-115 modal registered-owner authorization](Tickets/T-115.md)
+  **Done** *(stale campaign/map/floor registry changes cannot inherit a
+  Text modal's draft; T-027 control/readability approval remains open)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-115 Text modal registered source ownership (2026-11-12; Done)
+
+The Atlas Text modal previously checked exact map/floor/layer pointers and
+frozen edit-mask data, but not whether the original map/floor still belonged
+to the registered campaign when Apply was pressed. T-115 captures the
+campaign owner and validates both registry edges before publishing. The
+unmodified T-114 source fails **8/42** new assertions; the changed source
+passes **42/42**, preserving rejected draft text and Undo history while
+allowing an unrelated map change and an exact one-step Undo/Redo. The real
+Xvfb Text witness passes **22/22**. The historical `text_smoke.gd` still
+fails its two obsolete `.scn` Save/Open assertions identically on both
+sources; T-115 does not alter persistence. The required CI inventory remains
+**46 checks**. T-027's owner interaction/readability choices stay open.
+[Ticket](Tickets/T-115.md) ·
+[Evidence](evidence/T-115-2026-11-12-text-modal-registered-source.md).
 
 ## T-114 Polygon registered source ownership (2026-11-12; Done)
 
@@ -2582,6 +2601,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-112 · Atlas Line/Polygon portable Save/Open regression](Tickets/T-112.md) | Done | — | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
 | [T-113 · Bucket same-ID map/floor release authorization](Tickets/T-113.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-114 · Polygon registered campaign/map/floor authorization](Tickets/T-114.md) | Done | — | [T-028](Tickets/T-028.md) |
+| [T-115 · Text modal registered campaign/map/floor authorization](Tickets/T-115.md) | Done | — | [T-028](Tickets/T-028.md) |
 
 ## Epics
 

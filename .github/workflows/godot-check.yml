@@ -458,6 +458,10 @@ jobs:
           # campaign/map/floor, not a detached same-ID Resource graph.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t114_polygon_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t114-polygon-owner.log
           python3 tools/check_godot_model_log.py /tmp/godot-t114-polygon-owner.log --marker T114_POLYGON_PASSED
+          # T-115: a Text modal cannot publish after its original map/floor is
+          # detached from the current campaign registry, even with equal IDs.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t115_text_modal_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t115-text-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t115-text-owner.log --marker T115_TEXT_PASSED
           # T-112: the Atlas Editor saves generation-based portable projects,
           # not the retired one-file .scn head. Check both raster authoring tools.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-t112-line-portable.log

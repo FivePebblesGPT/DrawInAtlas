@@ -1,3 +1,20 @@
+## T-115 Text modal campaign registry ownership (2026-11-12)
+
+The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step now runs `tests/t115_text_modal_registered_target_smoke.gd` with its own
+120-second watchdog, raw log and strict `T115_TEXT_PASSED` success-marker
+check. It rejects Text Apply after the captured campaign, map or floor is
+replaced/detached in the registry, even when the dialog still points at
+byte-identical same-ID Resources. It also verifies that invalid Apply keeps
+the draft, does not add Undo history, and that an unrelated-map change permits
+a valid text edit with byte-exact Undo/Redo. The original T-114 source fails
+eight new assertions; the candidate passes 42/42. The required fast-CI
+inventory remains **46**. The separate old `text_smoke.gd` still has two
+obsolete native `.scn` persistence assertions failing under beta3 on both
+sources; no such pass or hosted CI success is claimed. T-027 owner UX and
+physical readability approval remain outstanding.
+[Evidence](evidence/T-115-2026-11-12-text-modal-registered-source.md).
+
 ## T-114 Polygon registered-owner authorization (2026-11-12)
 
 The existing required Atlas composition step
