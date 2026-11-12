@@ -238,6 +238,20 @@ func run() -> void:
 			int(stats.get("drain_calls", 0)),
 			float(stats.get("max_drain_cpu_us", 0)) / 1000.0])
 		check_all_red(doc, layer, "stroke %d" % run_index)
+		# T-102 intentionally populates missing display tiles over successive
+		# frames. The first post-draw callback certifies frame submission, not
+		# that every cold corner has reached the framebuffer.
+		var settle_frames: int = 0
+		while settle_frames < 40 and (canvas._cold_population_pending or
+				int(canvas.last_frame_metrics.get("cold_tiles_deferred", 0)) > 0):
+			await process_frame
+			await RenderingServer.frame_post_draw
+			settle_frames += 1
+		check(not canvas._cold_population_pending and
+			int(canvas.last_frame_metrics.get("cold_tiles_deferred", 0)) == 0,
+			"stroke %d finishes progressive display population" % run_index)
+		print("T104_DISPLAY_SETTLE index=%d backend=%s extra_frames=%d" % [
+			run_index, canvas.brush_backend, settle_frames])
 		var framebuffer: Image = root.get_texture().get_image()
 		var screen_point: Vector2i = Vector2i(canvas.global_position +
 			canvas.pixel_to_position(Vector2(256.5, 256.5)))

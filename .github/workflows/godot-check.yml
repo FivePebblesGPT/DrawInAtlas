@@ -464,6 +464,8 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py
           python3 -m unittest discover -s tests -p test_t068_matched_brush.py
+          python3 -m unittest discover -s tests -p test_t104_backend_decision.py
+          python3 tools/benchmarks/t104_backend_decision.py --verify
           python3 -m unittest discover -s tests -p test_t068_native_memory.py
           python3 -m unittest discover -s tests -p test_t068_visual_device.py
           python3 -m unittest discover -s tests -p test_t068_visual_contention.py

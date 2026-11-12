@@ -1,3 +1,20 @@
+## T-104 operation-specific backend decision evidence — 2026-11-12
+
+The existing required T-068 hard-dab/source-tile CI step also executes
+`tests/test_t104_backend_decision.py` and replays
+`tools/benchmarks/t104_backend_decision.py --verify` (no new required check ID,
+46 remain). The report binds existing T-068 Godot source oracles, ten matched
+scalar/Blend2D warm-call cohorts, Skia nonparity, and fresh Linux-worker memory
+to pinned evidence digests; it refuses a forged backend choice/p95 or missing
+source case. Optional native libraries are **not needed** to replay the
+research decision. The manually run 96px X11 pointer witness now waits for
+T-102's bounded progressive display completion **after preserving the
+original first post-draw metric** before framebuffer checks. Its actual exit
+code and T-094 fail-closed log marker remain mandatory. Neither software
+frame callback nor the decision report establishes physical input-to-photon,
+Windows builds, native resident memory/VRAM or owner approval. Hosted CI
+remains unverified. [Evidence](evidence/T-104-2026-11-12-operation-backends.md).
+
 ## T-103 dense over-budget focal retention — 2026-11-12
 
 The existing required `ci_t086_viewport_cache_model` step now also runs the

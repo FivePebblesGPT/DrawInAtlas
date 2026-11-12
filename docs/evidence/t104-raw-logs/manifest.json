@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "source_commit": "6f6032471b327d2327e57117aab106c489294479",
+  "engine": "4.8.beta3.official.c51ff06e8",
+  "renderer": "Xvfb Mesa llvmpipe, software only",
+  "logs": [
+    {
+      "file": "pointer-Legacy-0.log",
+      "sha256": "e42ab97bfaa05b301cc46344ba45543983468adb8d4b6183558195ad560fbac9",
+      "process_exit_code": 1,
+      "strict_checker_exit_code": 1,
+      "interpretation": "old single-frame corner check fails four pixels; NOT a pass"
+    },
+    {
+      "file": "pointer-NativeHard-0.log",
+      "sha256": "ba4a61b5d0354f5857ac0e5655d8a66e23094f01dea5be46c8b19a4d1fd197cb",
+      "process_exit_code": 1,
+      "strict_checker_exit_code": 1,
+      "interpretation": "old single-frame corner check fails four pixels; NOT a pass"
+    },
+    {
+      "file": "settled-Legacy.log",
+      "sha256": "78842e551298cfd9a9432f4c45295406d33ad7672a5dc7e1e49807da4e443c08",
+      "process_exit_code": 0,
+      "strict_checker_exit_code": 0,
+      "interpretation": "single-stroke graphical, source, settled framebuffer, Undo/Redo pass"
+    },
+    {
+      "file": "settled-NativeHard.log",
+      "sha256": "cd52b800ee7f236883c3112d3ef03c2b69ea8a88477767086b0ddf32333e6ada",
+      "process_exit_code": 0,
+      "strict_checker_exit_code": 0,
+      "interpretation": "single-stroke graphical, source, settled framebuffer, Undo/Redo pass"
+    },
+    {
+      "file": "three-Legacy.log",
+      "sha256": "9f273de12e0524f0ec6c84936780be75ef9e4d7b557f9793972db60c61aba0c8",
+      "process_exit_code": 0,
+      "strict_checker_exit_code": 0,
+      "interpretation": "cold + two warm graphical strokes, source/framebuffer/Undo pass"
+    },
+    {
+      "file": "three-NativeHard-retry.log",
+      "sha256": "68b7f826d197794aa0d32bd2ecb1b25207dd9909b2181f5e86cb426150523061",
+      "process_exit_code": null,
+      "strict_checker_exit_code": null,
+      "interpretation": "printed success marker, but outer command timed out; NOT a verified pass"
+    }
+  ]
+}

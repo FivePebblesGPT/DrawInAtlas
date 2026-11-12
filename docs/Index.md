@@ -19,13 +19,32 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   [T-101 optional native throughput](Tickets/T-101.md) **Done**.
 - **Other unfinished large tickets:** T-086 → [T-102](Tickets/T-102.md)
   **Done** *(software cold-frame scheduling, not owner hardware acceptance)*,
-  [T-103](Tickets/T-103.md) **Done** *(over-budget software retention, not hardware acceptance)*; T-068 → [T-104](Tickets/T-104.md),
-  [T-105](Tickets/T-105.md); T-094 → [T-106](Tickets/T-106.md),
+  [T-103](Tickets/T-103.md) **Done** *(over-budget software retention, not hardware acceptance)*; T-068 → [T-104](Tickets/T-104.md) **Done**
+  *(operation-specific choice/defer/reject; no native default adoption)*,
+  [T-105](Tickets/T-105.md) **Ready**; T-094 → [T-106](Tickets/T-106.md),
   [T-107](Tickets/T-107.md); T-064 → [T-108](Tickets/T-108.md);
   T-065 → [T-109](Tickets/T-109.md).
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-104 operation-specific raster backend decision (2026-11-12; Done)
+
+The pinned Godot straight-RGBA8 native corpus has exact Blend2D output and
+coverage for **7/10** matched hard-brush cases but discrepancies in three
+large/masked/no-op cases; Skia disagrees on four of sixteen cases. Warm native
+ABI p50/p95 and 512–2048 Linux-process HWM are sourced from hash-verified
+archived controls, not falsely presented as whole-editor timings. A current
+96px graphical same-source Legacy/NativeHard comparison exposed T-102's
+progressive-display race in the pointer oracle; the bounded test fix and
+red/green control confirm source, framebuffer and Undo parity. Whole gestures
+remain **4–5 seconds** in software; a multi-run NativeHard process did not
+exit and is excluded from warm editor evidence. **Decision:** keep portable
+GDScript as default, optional NativeHard/Hokusai only for their matching
+operations, reject Blend2D/Skia as hard-brush drop-ins, defer fill/AA/text
+integration. No new native dependency; T-068, T-105 and owner/manual gates
+remain open. [Ticket](Tickets/T-104.md) ·
+[Evidence](evidence/T-104-2026-11-12-operation-backends.md).
 
 ## T-103 over-budget dense viewport retention (2026-11-12; Done)
 
@@ -2383,7 +2402,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-101 · Optional NativeHard and Hokusai end-to-end throughput](Tickets/T-101.md) | Done | NativeHard per-batch dispatch bypass; real Rust/Hokusai/rollback checks pass, T-095 owner gate open | [T-097](Tickets/T-097.md) |
 | [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Done | Focal cache planning, 150-check software stress; owner device remains open | [T-053](Tickets/T-053.md) |
-| [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Ready | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
+| [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Done | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | Ready | — | [T-052](Tickets/T-052.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | Ready | — | [T-053](Tickets/T-053.md) |

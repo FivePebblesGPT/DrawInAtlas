@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T095_FULL_CANVAS_RUN index=0 backend=Legacy source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=4391.721 release_to_commit_ms=4341.932 stage_cpu_ms=1365.151 drain_frames=156 max_pending=99 commit_cpu_ms=1107.126 compose_cpu_ms=805.386 texture_cpu_ms=24.823 preview_frames=78 segments_staged=296 drain_calls=158 max_batch_ms=11.271 max_drain_ms=15.050 frame_compose_p95_ms=20.519 max_frame_compose_ms=21.636 max_frame_draw_ms=22.532 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=0 static_before_bytes=57341220 static_after_bytes=145452040 peak_before_bytes=75708976 peak_after_bytes=183052504
+T099_FRAME_METRICS index=0 input_draw_p50_ms=1595.434 input_draw_p95_ms=3094.377 input_draw_max_ms=3214.143 input_callback_p50_ms=1601.270 input_callback_p95_ms=3100.352 input_callback_max_ms=3220.580 pending_depth_p95=94 pending_depth_max=99 pending_age_p95_ms=3094.370 pending_age_max_ms=3214.125 preview_draws=78 drain_calls=158 max_drain_ms=15.050
+T104_DISPLAY_SETTLE index=0 backend=Legacy extra_frames=6
+T095_FULL_CANVAS_SUMMARY backend=Legacy runs=1 total_p50_ms=4391.721 total_p95_ms=4391.721 release_p95_ms=4341.932 stage_p95_ms=1365.151 proposed_target_ms=100 target_met=false failures=0
+T095_FULL_CANVAS_PASSED
