@@ -38,7 +38,7 @@ class PortableReleaseGateTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.base = Path(self.temporary.name)
-        self.stage = stage(self.base / "project")
+        self.stage = stage(self.base / "project", without_native=True)
         self.linux = self.base / "linux"
         self.linux.mkdir()
         self.windows = self.base / "windows"

@@ -1,0 +1,8 @@
+test_evidence_tampering_fails_closed (test_t068_quad_compiler_matrix.QuadCompilerMatrixTests.test_evidence_tampering_fails_closed) ... ok
+test_live_compiler_parity_guards_and_invalid_buffers (test_t068_quad_compiler_matrix.QuadCompilerMatrixTests.test_live_compiler_parity_guards_and_invalid_buffers) ... ok
+test_pinned_six_builds_and_failure_atomicity (test_t068_quad_compiler_matrix.QuadCompilerMatrixTests.test_pinned_six_builds_and_failure_atomicity) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 3.584s
+
+OK

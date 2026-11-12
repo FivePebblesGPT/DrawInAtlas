@@ -21,7 +21,7 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   **Done** *(software cold-frame scheduling, not owner hardware acceptance)*,
   [T-103](Tickets/T-103.md) **Done** *(over-budget software retention, not hardware acceptance)*; T-068 → [T-104](Tickets/T-104.md) **Done**
   *(operation-specific choice/defer/reject; no native default adoption)*,
-  [T-105](Tickets/T-105.md) **Ready**; T-094 → [T-106](Tickets/T-106.md),
+  [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md),
   [T-107](Tickets/T-107.md); T-064 → [T-108](Tickets/T-108.md);
   T-065 → [T-109](Tickets/T-109.md).
 
@@ -61,6 +61,23 @@ process RAM peaks around 1.1 GiB, and **physical Windows/Linux responsiveness
 is not accepted**. T-086 remains In Progress; T-095/T-096 owner gates are
 unchanged. [Ticket](Tickets/T-103.md) ·
 [Evidence](evidence/T-103-2026-11-12-overbudget-retention.md).
+
+## T-105 portable native ABI/export checkpoint (2026-11-12; In Progress)
+
+A real pinned beta3 Linux standalone Drawing release without optional native
+binaries now passes isolated ELF/PCK and process-exit checks. Three fresh
+headless Godot application processes report **~145 MiB full-process VmHWM
+p50/p95**; these include startup/idle frames, **not a 96px edit or GPU VRAM**.
+An opt-in test-only adapter for the pinned detached quad/scalar C++ kernels
+now rejects MSVC `/fp:fast` and explicitly exports the quad Windows symbol,
+without invalidating the original SHA-pinned T-068 sources. New fail-closed diagnostics and
+an opt-in Windows/MSVC + Windows-export workflow are ready to run, but **no
+actual Windows run, Windows RAM/VRAM, physical device measurement or hosted
+workflow success is claimed**. The Linux detached Python worker HWM must not
+be substituted for Godot process RAM. T-105/T-068 stay In Progress;
+T-095/T-096 manual gates unchanged.
+[Ticket](Tickets/T-105.md) ·
+[Evidence](evidence/T-105-2026-11-12-portable-native.md).
 
 ## Current priority — owner Drawing review (2026-11-05)
 
@@ -2403,7 +2420,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-102 · Cold dense viewport first-population performance](Tickets/T-102.md) | Done | — | [T-053](Tickets/T-053.md) |
 | [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Done | Focal cache planning, 150-check software stress; owner device remains open | [T-053](Tickets/T-053.md) |
 | [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Done | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
-| [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | Ready | — | [T-052](Tickets/T-052.md) |
+| [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Linux native-free export + OS RSS verified; Windows/MSVC/VRAM and editor gesture evidence open | [T-052](Tickets/T-052.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | Ready | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |

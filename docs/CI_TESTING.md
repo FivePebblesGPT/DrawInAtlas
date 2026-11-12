@@ -1,3 +1,26 @@
+## T-105 Linux standalone RSS and unverified Windows/MSVC portability (2026-11-12)
+
+The opt-in `.github/workflows/godot-native-t105-portability.yml` installs
+pinned Godot 4.8 beta3 and templates. Linux imports and exports an isolated
+`build_drawing_app.py --without-native` consumer, statically inspects the
+ELF/PCK, performs a clean-profile standalone launch and records three fresh
+actual Godot-process RSS/HWM and CPU/wall samples (not detached workers).
+`tools/benchmarks/t105_release_residency.py --verify --output
+ docs/benchmarks/T105_2026-11-12_linux_export_residency.json` fail-closes
+on missing/malformed runs, fake Windows/VRAM completions and changed percentiles.
+`tests/test_t105_portability.py` includes red/green controls for a generated
+Windows-only source shim: historical C++ bytes are unchanged; only the shim
+adds `_M_FP_FAST` rejection and a Windows quad export. Original GCC `-Ofast`
+rejection is preserved. The separate Windows job uses real MSVC `cl`
+for strict `/fp:strict` native quad/scalar builds, rejects `/fp:fast`, checks
+pinned Godot signed-mask and straight-RGBA8 source parity, then exports and
+isolated-launches a native-absent PE/PCK and measures Windows OS process CPU
+and peak working set. **This Windows workflow has not run**; source/wiring
+is not acceptance, and physical VRAM is not measured. On-demand jobs do not
+change the fast desktop's **46 required check IDs** or owner-review gates.
+The T-094 strict raw-log policy and nonzero process-exit rejection remain
+mandatory. [T-105 evidence](evidence/T-105-2026-11-12-portable-native.md).
+
 ## T-104 operation-specific backend decision evidence — 2026-11-12
 
 The existing required T-068 hard-dab/source-tile CI step also executes

@@ -1,0 +1,15 @@
+test_msvc_fast_math_macro_and_gcc_fast_math_both_fail_before_compilation (test_t105_portability.T105EvidenceTests.test_msvc_fast_math_macro_and_gcc_fast_math_both_fail_before_compilation) ... ok
+test_msvc_runner_rejects_linux_host (test_t105_portability.T105EvidenceTests.test_msvc_runner_rejects_linux_host) ... ok
+test_nearest_rank_rejects_invalid_samples (test_t105_portability.T105EvidenceTests.test_nearest_rank_rejects_invalid_samples) ... ok
+test_on_demand_workflow_preserves_both_platforms_and_fast_inventory (test_t105_portability.T105EvidenceTests.test_on_demand_workflow_preserves_both_platforms_and_fast_inventory) ... ok
+test_portable_stage_excludes_native_even_when_built (test_t105_portability.T105EvidenceTests.test_portable_stage_excludes_native_even_when_built) ... ok
+test_reject_forged_windows_gpu_or_completion (test_t105_portability.T105EvidenceTests.test_reject_forged_windows_gpu_or_completion) ... ok
+test_reject_missing_runs_or_changed_cpu_memory_statistics (test_t105_portability.T105EvidenceTests.test_reject_missing_runs_or_changed_cpu_memory_statistics) ... ok
+test_valid_linux_report_is_explicitly_incomplete (test_t105_portability.T105EvidenceTests.test_valid_linux_report_is_explicitly_incomplete) ... ok
+test_windows_adapter_refuses_unpinned_cpp_source (test_t105_portability.T105EvidenceTests.test_windows_adapter_refuses_unpinned_cpp_source) ... ok
+test_windows_quad_shim_exports_pinned_symbol_without_modifying_source (test_t105_portability.T105EvidenceTests.test_windows_quad_shim_exports_pinned_symbol_without_modifying_source) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 2.136s
+
+OK

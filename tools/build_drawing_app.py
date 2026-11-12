@@ -16,7 +16,7 @@ APP = ROOT / "drawing"
 PACKAGE = ROOT / "addons" / "drawing"
 
 
-def stage(destination: Path, in_place: bool = False) -> Path:
+def stage(destination: Path, in_place: bool = False, *, without_native: bool = False) -> Path:
     """Copy the allowlisted app and canonical package; reject unsafe targets."""
     output = destination.resolve()
     if in_place:
@@ -87,9 +87,9 @@ def stage(destination: Path, in_place: bool = False) -> Path:
     binary = native / "bin" / "libdrawing_brush.so"
     if native.is_symlink() or manifest.is_symlink() or binary.is_symlink():
         raise ValueError("Native extension paths cannot be symbolic links")
-    if manifest.exists() != binary.exists():
+    if not without_native and manifest.exists() != binary.exists():
         raise ValueError("Native extension manifest and library must be staged together")
-    if manifest.exists():
+    if not without_native and manifest.exists():
         native_destination = staged / "native"
         (native_destination / "bin").mkdir(parents=True, exist_ok=True)
         shutil.copy2(manifest, native_destination / manifest.name)
@@ -102,8 +102,11 @@ def main() -> None:
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--in-place", action="store_true")
     target.add_argument("--output", type=Path)
+    parser.add_argument("--without-native", action="store_true",
+                        help="Produce a portable Drawing consumer without optional native binaries")
     args = parser.parse_args()
-    print(stage(APP if args.in_place else args.output, args.in_place))
+    print(stage(APP if args.in_place else args.output, args.in_place,
+                without_native=args.without_native))
 
 
 if __name__ == "__main__":

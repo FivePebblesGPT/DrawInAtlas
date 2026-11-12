@@ -1,0 +1,31 @@
+t068_scalar_hard_brush.cpp red_original
+command: g++ -std=c++17 -D_M_FP_FAST=1 -c /mnt/data/work/DrawInAtlas.11-12/tools/benchmarks/t068_scalar_hard_brush.cpp -o /tmp/t105-guard-3evvc2un/output.o
+exit_code: 0
+stderr:
+
+
+t068_scalar_hard_brush.cpp green_shim
+command: g++ -std=c++17 -D_M_FP_FAST=1 -c /tmp/t105-guard-3evvc2un/adapted.cpp -o /tmp/t105-guard-3evvc2un/output.o
+exit_code: 1
+stderr:
+/tmp/t105-guard-3evvc2un/adapted.cpp:2:2: error: #error "T-105 Windows ABI requires strict floating-point semantics"
+    2 | #error "T-105 Windows ABI requires strict floating-point semantics"
+      |  ^~~~~
+
+
+t068_quad_scope_kernel.cpp red_original
+command: g++ -std=c++17 -D_M_FP_FAST=1 -c /mnt/data/work/DrawInAtlas.11-12/tools/benchmarks/t068_quad_scope_kernel.cpp -o /tmp/t105-guard-uu8l291l/output.o
+exit_code: 0
+stderr:
+
+
+t068_quad_scope_kernel.cpp green_shim
+command: g++ -std=c++17 -D_M_FP_FAST=1 -c /tmp/t105-guard-uu8l291l/adapted.cpp -o /tmp/t105-guard-uu8l291l/output.o
+exit_code: 1
+stderr:
+/tmp/t105-guard-uu8l291l/adapted.cpp:2:2: error: #error "T-105 Windows ABI requires strict floating-point semantics"
+    2 | #error "T-105 Windows ABI requires strict floating-point semantics"
+      |  ^~~~~
+/tmp/t105-guard-uu8l291l/adapted.cpp:97:22: error: expected constructor, destructor, or type conversion before ‘(’ token
+   97 | extern "C" __declspec(dllexport) int32_t t068_quad_scope_mask(
+      |                      ^
