@@ -165,14 +165,24 @@ func _run() -> void:
 	canvas._begin_text_edit(origin + Vector2(4, 4))
 	editor.text_editor.close_editor()
 	_check(active.strokes[0].text == "Revised label", "cancel never alters artwork")
+	var saved_campaign: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
-	var restored: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
-	_check(restored != null and restored.get_map(canvas.map.id) != null, "native campaign save and reload")
-	var native_map: AtlasMapDocument = restored.get_map(canvas.map.id) if restored != null else null
-	var native_ink: AtlasObjectsLayer = native_map.floor_by_id(canvas.floor.id).layer_by_id(active.id) as AtlasObjectsLayer if native_map != null else null
-	_check(native_ink != null and native_ink.strokes.size() == 1 and native_ink.strokes[0].text == "Revised label", "native save preserves editable content")
-	if native_ink != null and not native_ink.strokes.is_empty():
-		editor.text_editor.open_editor(native_ink.strokes[0].points[0], native_ink.strokes[0], 0)
+	var portable: AtlasStoreResult = AtlasCampaignStore.load_portable_result(editor.save_path)
+	var restored: AtlasCampaign = portable.campaign
+	_check(editor.status_label.text.contains("Saved generation") and portable.error == OK
+		and portable.generation != "" and restored != null and restored.to_dict() == saved_campaign,
+		"Editor Save publishes an exact portable campaign generation")
+	_check(FileAccess.file_exists(AtlasCampaignBundle.root_path(ProjectSettings.globalize_path(editor.save_path)))
+		and not FileAccess.file_exists(ProjectSettings.globalize_path(editor.save_path)),
+		"portable Save creates a generation root, not a legacy native head")
+	var portable_map: AtlasMapDocument = restored.get_map(canvas.map.id) if restored != null else null
+	var portable_floor: AtlasFloor = portable_map.floor_by_id(canvas.floor.id) if portable_map != null else null
+	var portable_ink: AtlasObjectsLayer = portable_floor.layer_by_id(active.id) as AtlasObjectsLayer if portable_floor != null else null
+	_check(portable_ink != null and portable_ink.to_dict() == active.to_dict()
+		and portable_ink.strokes.size() == 1 and portable_ink.strokes[0].text == "Revised label",
+		"portable generation preserves editable text metadata and content")
+	if portable_ink != null and not portable_ink.strokes.is_empty():
+		editor.text_editor.open_editor(portable_ink.strokes[0].points[0], portable_ink.strokes[0], 0)
 		_check(editor.text_editor.text_input.text == "Revised label" and
 			editor.text_editor.apply_button.text == "Update text", "saved text reopens as editable text")
 		editor.text_editor.close_editor()
@@ -196,10 +206,24 @@ func _run() -> void:
 	_check(not canvas.editing_target_is_presented() and detail.strokes[0].text == "Street name", "presentation change retains hidden text")
 	editor.select_layer(detail_id)
 	_check(canvas.presented_detail_level == 1 and detail.strokes[0].is_text(), "returning to D1 restores text editability")
-	_check(AtlasCampaignStore.save_campaign(editor.campaign, editor.save_path) == OK, "D1 save")
-	var both: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
-	var persisted: AtlasObjectsLayer = both.get_map(canvas.map.id).floor_by_id(canvas.floor.id).layer_by_id(detail_id) as AtlasObjectsLayer if both != null else null
-	_check(persisted != null and persisted.strokes.size() == 1 and persisted.strokes[0].text == "Street name", "D1 native save preserves text")
+	var detail_snapshot: Dictionary = editor.campaign.to_dict().duplicate(true)
+	editor._on_save()
+	var detail_result: AtlasStoreResult = AtlasCampaignStore.load_portable_result(editor.save_path)
+	var both: AtlasCampaign = detail_result.campaign
+	_check(detail_result.error == OK and detail_result.generation != portable.generation
+		and both != null and both.to_dict() == detail_snapshot,
+		"D1 portable Save publishes a new immutable campaign generation")
+	var detail_map: AtlasMapDocument = both.get_map(canvas.map.id) if both != null else null
+	var detail_floor: AtlasFloor = detail_map.floor_by_id(canvas.floor.id) if detail_map != null else null
+	var persisted: AtlasObjectsLayer = detail_floor.layer_by_id(detail_id) as AtlasObjectsLayer if detail_floor != null else null
+	_check(persisted != null and persisted.to_dict() == detail.to_dict()
+		and persisted.strokes.size() == 1 and persisted.strokes[0].text == "Street name",
+		"D1 portable generation preserves editable text and detail level")
+	_check(editor.edits.undo() and editor.campaign.to_dict() != detail_snapshot
+		and both != null and both.to_dict() == detail_snapshot,
+		"Undo after D1 Save cannot mutate the published generation")
+	_check(editor.edits.redo() and editor.campaign.to_dict() == detail_snapshot,
+		"Redo restores exact D1 text without rewriting saved bytes")
 	# A map change can reuse an object index: the modal must still bind to its source map.
 	editor._choose_tool(AtlasCanvas.Tool.TEXT)
 	canvas._begin_text_edit(origin + Vector2(280, 160))

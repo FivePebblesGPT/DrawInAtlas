@@ -42,9 +42,27 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Text T-027:** [T-115 modal registered-owner authorization](Tickets/T-115.md)
   **Done** *(stale campaign/map/floor registry changes cannot inherit a
   Text modal's draft; T-027 control/readability approval remains open)*.
+- **Atlas Text portable persistence:** [T-116 Text Save/Open regression](Tickets/T-116.md)
+  **Done** *(D0/D1 portable generations and editable metadata verified;
+  T-027 interaction/readability approval remains open)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-116 Text portable-generation Save/Open regression (2026-11-12; Done)
+
+The original Atlas `text_smoke.gd` saved through the current portable Editor
+but reopened the obsolete single-file native `.scn` head, failing 2/69
+assertions. The test now reloads both real D0/D1 portable campaign
+generations, checks exact campaign/Objects-layer dictionaries, editable Text
+content, no legacy head and post-Save Undo/Redo immutability. It passes
+**73/73** with a zero process exit and strict T-094 log verification. T-115
+source ownership (42/42), 22-check Xvfb Text, Atlas composition, portable
+Editor Save/Load and current Line/Polygon suites also pass. The required CI
+inventory remains **46 checks**. There is no runtime format change or owner
+approval of T-027's modal controls and 9px readability rule.
+[Ticket](Tickets/T-116.md) ·
+[Evidence](evidence/T-116-2026-11-12-text-portable-save.md).
 
 ## T-115 Text modal registered source ownership (2026-11-12; Done)
 
@@ -2602,6 +2620,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-113 · Bucket same-ID map/floor release authorization](Tickets/T-113.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-114 · Polygon registered campaign/map/floor authorization](Tickets/T-114.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-115 · Text modal registered campaign/map/floor authorization](Tickets/T-115.md) | Done | — | [T-028](Tickets/T-028.md) |
+| [T-116 · Atlas Text portable Save/Open regression](Tickets/T-116.md) | Done | D0/D1 portable generation and editable text validated; T-027 owner UX open | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
 
 ## Epics
 

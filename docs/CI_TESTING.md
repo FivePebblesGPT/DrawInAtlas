@@ -1,3 +1,16 @@
+## T-116 Atlas Text portable Save/Open regression (2026-11-12)
+
+Existing required check `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+now also runs `tests/text_smoke.gd` with its own 120-second watchdog,
+retained raw log and strict `ATLAS_TEXT_PASSED` T-094 verifier. The old test
+failed 2/69 assertions by calling the retired single-file native loader
+after the real Editor published a portable generation. The corrected
+**73/73** suite checks two portable generations, exact D0/D1 editable text,
+source dictionaries, no legacy head and published-snapshot immutability after
+Undo/Redo. No production persistence format changes, no new required CI step
+(**46 IDs unchanged**), and no owner/hosted acceptance is implied.
+[Evidence](evidence/T-116-2026-11-12-text-portable-save.md).
+
 ## T-115 Text modal campaign registry ownership (2026-11-12)
 
 The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
