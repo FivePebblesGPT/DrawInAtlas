@@ -30,9 +30,25 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Line T-024:** [T-111 release authorization](Tickets/T-111.md)
   **Done** *(same-resource map/floor/layer eligibility gate; original
   T-024 interaction approval remains open)*.
+- **Atlas Line/Polygon persistence:** [T-112 portable generation Save/Open](Tickets/T-112.md)
+  **Done** *(regression test correction for T-066 portable storage;
+  owner interaction approvals remain unchanged)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-112 Line/Polygon portable Save/Open regression repair (2026-11-12; Done)
+
+The old headless Line/Polygon suites had stale Save/Open assertions: they
+called the **portable** Editor Save, then tried the retired single-file native
+campaign loader. Both failed on the unmodified T-111 source (Line 1 failure,
+Polygon 2). They now inspect the live saved generation, exact loaded campaign
+and raster bytes, root versus legacy head, and post-Save Undo independence.
+The required Atlas composition CI step runs both under the strict T-094 log
+policy without adding a CI check ID. This repairs regression coverage, **not**
+application persistence, product UX approval or hosted CI.
+[Ticket](Tickets/T-112.md) ·
+[Evidence](evidence/T-112-2026-11-12-atlas-portable-authoring-roundtrip.md).
 
 ## T-111 Line target identity and lock/visibility release safety (2026-11-12; Done)
 
@@ -2525,6 +2541,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-110 · Byte-exact UTF-8 authorization for portable Object sources](Tickets/T-110.md) | Done | — | [T-109](Tickets/T-109.md) |
 | [T-111 · Line release target identity and layer eligibility](Tickets/T-111.md) | Done | — | [T-028](Tickets/T-028.md) |
+| [T-112 · Atlas Line/Polygon portable Save/Open regression](Tickets/T-112.md) | Done | — | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
 
 ## Epics
 

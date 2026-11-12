@@ -1,5 +1,5 @@
 extends SceneTree
-## T-024: solid round line with optional angular/centered drawing on an active ink layer.
+## T-024/T-112: Line gestures, source history, and portable-generation Save/Open.
 
 var checks: int = 0
 var failures: int = 0
@@ -280,8 +280,17 @@ func _run() -> void:
 		"cell selection with masking disabled does not block a Line")
 	var saved: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
-	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
-	_check(loaded != null and loaded.to_dict() == saved, "native save roundtrip preserves line")
+	var portable: AtlasStoreResult = AtlasCampaignStore.load_portable_result(editor.save_path)
+	var loaded: AtlasCampaign = portable.campaign
+	_check(editor.status_label.text.contains("Saved generation") and portable.error == OK
+		and portable.generation != "" and loaded != null and loaded.to_dict() == saved,
+		"portable campaign generation roundtrip preserves line and exact raster bytes")
+	_check(FileAccess.file_exists(AtlasCampaignBundle.root_path(ProjectSettings.globalize_path(editor.save_path)))
+		and not FileAccess.file_exists(ProjectSettings.globalize_path(editor.save_path)),
+		"Save writes a portable generation, never a legacy native head")
+	_check(editor.edits.undo() and editor.campaign.to_dict() != saved
+		and loaded != null and loaded.to_dict() == saved,
+		"a later Undo cannot mutate the published portable generation")
 	root.remove_child(scene)
 	scene.free()
 	_remove(folder)

@@ -450,6 +450,12 @@ jobs:
           # locked, or unpresented raster target even when IDs are unchanged.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t111_line_release_authorization_smoke.gd 2>&1 | tee /tmp/godot-t111-line-gate.log
           python3 tools/check_godot_model_log.py /tmp/godot-t111-line-gate.log --marker T111_LINE_GATE_PASSED
+          # T-112: the Atlas Editor saves generation-based portable projects,
+          # not the retired one-file .scn head. Check both raster authoring tools.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-t112-line-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t112-line-portable.log --marker ATLAS_LINE_PASSED
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/polygon_smoke.gd 2>&1 | tee /tmp/godot-t112-polygon-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t112-polygon-portable.log --marker ATLAS_POLYGON_PASSED
       - name: Verify T-068 hard-dab parity and source-tile cache transactions
         id: ci_t068_stationary_dab_parity
         if: ${{ !cancelled() }}

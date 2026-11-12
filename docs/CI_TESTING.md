@@ -1,3 +1,16 @@
+## T-112 Atlas authoring portable-generation regression (2026-11-12)
+
+The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step additionally runs `tests/line_smoke.gd` and `tests/polygon_smoke.gd`
+with separate 120-second watchdogs and raw logs. Both now load the **current
+portable campaign generation** after the real Editor Save, rather than the
+retired single-file `.scn` codec. The tests verify an actual published root,
+exact preserved raster bytes, and Undo independence; the original suites
+failed 1 and 2 assertions, respectively. `tools/check_godot_model_log.py`
+requires `ATLAS_LINE_PASSED` and `ATLAS_POLYGON_PASSED` with process exit 0.
+The workflow retains **46 required check IDs**; this is regression coverage,
+not a hosted CI pass or owner acceptance. [T-112 evidence](evidence/T-112-2026-11-12-atlas-portable-authoring-roundtrip.md).
+
 ## T-111 Atlas Line mid-gesture target authorization (2026-11-12)
 
 The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`

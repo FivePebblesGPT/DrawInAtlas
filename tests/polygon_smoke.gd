@@ -1,5 +1,5 @@
 extends SceneTree
-## T-025: point-authored polygons, closed shape modes, protections and persistence.
+## T-025/T-112: polygon gestures, protections and portable-generation persistence.
 
 var checks: int = 0
 var failures: int = 0
@@ -132,11 +132,19 @@ func _run() -> void:
 	_check(canvas.floor.objects_layer().strokes.is_empty(), "polygon does not create an editable object")
 	var saved: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
-	var loaded: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
-	_check(loaded != null and loaded.to_dict() == saved, "filled polygon native-save round-trip")
+	var portable: AtlasStoreResult = AtlasCampaignStore.load_portable_result(editor.save_path)
+	var loaded: AtlasCampaign = portable.campaign
+	_check(editor.status_label.text.contains("Saved generation") and portable.error == OK
+		and portable.generation != "" and loaded != null and loaded.to_dict() == saved,
+		"filled polygon portable generation round-trip retains exact raster bytes")
+	_check(FileAccess.file_exists(AtlasCampaignBundle.root_path(ProjectSettings.globalize_path(editor.save_path)))
+		and not FileAccess.file_exists(ProjectSettings.globalize_path(editor.save_path)),
+		"Save creates a portable generation rather than a legacy native head")
 	var stored: AtlasRasterLayer = loaded.get_map(canvas.map.id).floor_by_id(canvas.floor.id).raster_layer() if loaded != null else null
-	_check(stored != null and stored.to_dict() == canvas.floor.raster_layer().to_dict(), "native file keeps exact filled pixels")
+	_check(stored != null and stored.to_dict() == canvas.floor.raster_layer().to_dict(), "portable generation keeps exact filled pixels")
 	_check(editor.edits.undo() and canvas.floor.raster_layer().chunks.is_empty(), "filled polygon one undo")
+	_check(loaded != null and loaded.to_dict() == saved,
+		"Undo after Save leaves published polygon generation immutable")
 
 	# Esc, Backspace and failed geometry produce no partial history commands.
 	_vertex(canvas, triangle[0])
