@@ -17,10 +17,10 @@ func check(condition: bool, description: String) -> void:
 
 
 func make_target(title: String) -> Dictionary:
-	var doc := DrawingDocument.new(title, 32)
+	var doc: DrawingDocument = DrawingDocument.new(title, 32)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
 	var seed: DrawingEditSession = doc.begin_edit(layer, doc.revision).value
-	var pixels := PackedByteArray()
+	var pixels: PackedByteArray = PackedByteArray()
 	for i: int in range(17 * 17):
 		pixels.append_array(PackedByteArray([i % 256, (i * 7) % 256,
 			(i * 13) % 256, 0 if i % 5 == 0 else 181]))
@@ -48,7 +48,7 @@ func run() -> void:
 	var fast: Dictionary = make_target("duplicate-drain-fast")
 	var reference: Dictionary = make_target("duplicate-drain-reference")
 	var doc: DrawingDocument = fast["doc"]
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(980, 700)
 	canvas.zoom = 7.86
@@ -61,15 +61,15 @@ func run() -> void:
 	await process_frame
 	await process_frame
 
-	var start := Vector2(-0.5, 0.5)
-	var points := PackedVector2Array([start])
+	var start: Vector2 = Vector2(-0.5, 0.5)
+	var points: PackedVector2Array = PackedVector2Array([start])
 	canvas.start_gesture(canvas.pixel_to_position(start))
 	check(canvas.session != null, "real Canvas gesture started")
 	var edit: DrawingEditSession = canvas.session
 	# 80 duplicates, a short movement, then another 80 repeated endpoints.
 	# All are queued before staging, as in a backlog of real mouse motions.
 	for i: int in range(80):
-		var sample := Vector2(-0.5, 0.5)
+		var sample: Vector2 = Vector2(-0.5, 0.5)
 		points.append(sample)
 		canvas.paint_to(Vector2i(-1, 0))
 	points.append(Vector2(4.5, -3.5))

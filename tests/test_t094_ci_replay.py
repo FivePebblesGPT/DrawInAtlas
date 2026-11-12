@@ -154,7 +154,7 @@ class VerifiedReplayArtifactTests(unittest.TestCase):
             "schema_version": 1, "runner": "local-fast-CI-replay-not-GitHub",
             "candidate_commit": commit, "base_head_sha": commit,
             "working_tree_clean": True,
-            "godot_version": "4.8.beta2.official.cafc17a19",
+            "godot_version": "4.8.beta3.official.c51ff06e8",
             "workflow_sha256": hashlib.sha256(workflow.encode()).hexdigest(),
         })
         (directory / "report.json").write_text(json.dumps(report), encoding="utf-8")
@@ -172,6 +172,20 @@ class VerifiedReplayArtifactTests(unittest.TestCase):
             self.assertTrue(any("expected candidate" in p for p in verify_replay(
                 directory, extract_checks(workflow), workflow,
                 expected_commit="b" * 40)))
+
+    def test_old_beta2_identity_cannot_verify_beta3_replay(self) -> None:
+        from verify_godot_ci_replay import verify_replay
+        with tempfile.TemporaryDirectory() as temporary:
+            directory, workflow, commit = self.create_sample(Path(temporary))
+            record = directory / "report.json"
+            saved = json.loads(record.read_text())
+            for version in ("4.8.beta2.official.cafc17a19",
+                            "4.8.beta4.official.not-pinned", "4.8.beta3.custom"):
+                with self.subTest(version=version):
+                    record.write_text(json.dumps({**saved, "godot_version": version}))
+                    self.assertTrue(any("pinned Godot 4.8 beta3" in p for p in
+                                        verify_replay(directory, extract_checks(workflow), workflow,
+                                                      expected_commit=commit)))
 
     def test_missing_tampered_or_symlinked_log_is_not_accepted(self) -> None:
         from verify_godot_ci_replay import verify_replay

@@ -18,7 +18,7 @@ func run() -> void:
         return
     var paths: Array[PackedVector2Array] = []
     for batch: int in range(12):
-        var path := PackedVector2Array()
+        var path: PackedVector2Array = PackedVector2Array()
         for sample: int in range(8):
             var t: float = float(batch * 8 + sample) / 95.0
             path.append(Vector2(-70.5 + 141.0 * t,

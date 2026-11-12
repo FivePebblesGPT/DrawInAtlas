@@ -17,7 +17,7 @@ func check(condition: bool, description: String) -> void:
 
 
 func make_document(name: String, stride: int, anchor: Vector2i) -> Dictionary:
-	var doc := DrawingDocument.new(name, stride)
+	var doc: DrawingDocument = DrawingDocument.new(name, stride)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
 	var seed: DrawingEditSession = doc.begin_edit(layer, doc.revision,
 		Transform2D.IDENTITY, anchor.x, anchor.y).value
@@ -40,7 +40,7 @@ func image_bytes(target: Dictionary, anchor: Vector2i,
 
 func exercise_case(index: int, erase: bool, selection_enabled: bool, stride: int) -> void:
 	var name: String = "case-%d" % index
-	var anchor := Vector2i(-2147483761, 2147483823) if index % 2 == 0 \
+	var anchor: Vector2i = Vector2i(-2147483761, 2147483823) if index % 2 == 0 \
 		else Vector2i(2147483819, -2147483757)
 	var actual: Dictionary = make_document(name + "-actual", stride, anchor)
 	var baseline: Dictionary = make_document(name + "-baseline", stride, anchor)
@@ -57,8 +57,8 @@ func exercise_case(index: int, erase: bool, selection_enabled: bool, stride: int
 		selection = DrawingSelection.new(Rect2i(-45, -48, 92, 95), true)
 		check(selection.combine_rectangle(Rect2i(-8, -7, 16, 14), "Subtract"),
 			name + " selection hole")
-	var clip := Rect2i(-51, -50, 103, 101)
-	var points := PackedVector2Array([Vector2(-19.5, -17.5),
+	var clip: Rect2i = Rect2i(-51, -50, 103, 101)
+	var points: PackedVector2Array = PackedVector2Array([Vector2(-19.5, -17.5),
 		Vector2(12.5, 7.5), Vector2(20.5, 20.5), Vector2(-6.5, 22.5)])
 	var width: float = 60.0 if index % 2 == 0 else 9.5
 	var expected_skips: int = 0
@@ -103,7 +103,7 @@ func exercise_case(index: int, erase: bool, selection_enabled: bool, stride: int
 
 
 func failure_and_retry() -> void:
-	var anchor := Vector2i(-2147483779, 2147483697)
+	var anchor: Vector2i = Vector2i(-2147483779, 2147483697)
 	var target: Dictionary = make_document("invalid-retry", 30, anchor)
 	var doc: DrawingDocument = target["document"]
 	var edit: DrawingEditSession = doc.begin_edit(target["layer"], doc.revision,
@@ -130,17 +130,17 @@ func failure_and_retry() -> void:
 
 
 func changed_settings_between_batches() -> void:
-	var anchor := Vector2i(2147483807, -2147483701)
+	var anchor: Vector2i = Vector2i(2147483807, -2147483701)
 	var a: Dictionary = make_document("settings-actual", 64, anchor)
 	var b: Dictionary = make_document("settings-reference", 64, anchor)
 	var first: DrawingEditSession = a["document"].begin_edit(a["layer"],
 		a["document"].revision, Transform2D.IDENTITY, anchor.x, anchor.y).value
 	var reference: DrawingEditSession = b["document"].begin_edit(b["layer"],
 		b["document"].revision, Transform2D.IDENTITY, anchor.x, anchor.y).value
-	var point := Vector2(3.5, 4.5)
-	var tight_clip := Rect2i(0, 0, 8, 8)
-	var broad_clip := Rect2i(-53, -51, 107, 104)
-	var denied := DrawingSelection.new(Rect2i(-40, -40, 2, 2), true)
+	var point: Vector2 = Vector2(3.5, 4.5)
+	var tight_clip: Rect2i = Rect2i(0, 0, 8, 8)
+	var broad_clip: Rect2i = Rect2i(-53, -51, 107, 104)
+	var denied: DrawingSelection = DrawingSelection.new(Rect2i(-40, -40, 2, 2), true)
 	check(first.paint_path(PackedVector2Array([point]), INK, 5.0,
 		false, denied, 1048576, tight_clip).ok,
 		"first batch selection excludes initial dab")

@@ -16,7 +16,7 @@ func check(ok: bool, message: String) -> void:
 
 
 func canvas_instance() -> Control:
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(520, 380)
 	return canvas
@@ -43,7 +43,7 @@ func test_manual_pairing() -> void:
 	check(canvas.has_method("_tag_frame_preview_stage") and
 		canvas.has_method("_mark_unsubmitted_preview_stage"),
 		"receipt pairing has staged/draw entry points")
-	var doc := DrawingDocument.new("input-correlation", 64)
+	var doc: DrawingDocument = DrawingDocument.new("input-correlation", 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	canvas.session = doc.begin_edit(layer, doc.revision).value
@@ -95,7 +95,7 @@ func test_manual_pairing() -> void:
 
 func test_bounded_ring() -> void:
 	var canvas: Control = canvas_instance()
-	var doc := DrawingDocument.new("input-correlation-ring", 64)
+	var doc: DrawingDocument = DrawingDocument.new("input-correlation-ring", 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	canvas.session = doc.begin_edit(layer, doc.revision).value
@@ -133,7 +133,7 @@ func snapshot(doc: DrawingDocument) -> PackedByteArray:
 
 
 func test_live_stroke() -> void:
-	var doc := DrawingDocument.new("input-correlation-live", 64)
+	var doc: DrawingDocument = DrawingDocument.new("input-correlation-live", 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var canvas: Control = canvas_instance()
@@ -146,8 +146,8 @@ func test_live_stroke() -> void:
 	await process_frame
 	await process_frame
 	var before: PackedByteArray = snapshot(doc)
-	var a := Vector2(-17.5, -9.5)
-	var b := Vector2(18.5, 12.5)
+	var a: Vector2 = Vector2(-17.5, -9.5)
+	var b: Vector2 = Vector2(18.5, 12.5)
 	canvas.start_gesture(canvas.pixel_to_position(a))
 	canvas.queue_redraw()
 	await process_frame
@@ -173,7 +173,7 @@ func test_live_stroke() -> void:
 	check(canvas.session == null and doc.revision == 2,
 		"real mouse-path stroke publishes a single history revision")
 	var actual: PackedByteArray = snapshot(doc)
-	var reference := DrawingDocument.new("input-correlation-reference", 64)
+	var reference: DrawingDocument = DrawingDocument.new("input-correlation-reference", 64)
 	var ref_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var edit: DrawingEditSession = reference.begin_edit(ref_layer,

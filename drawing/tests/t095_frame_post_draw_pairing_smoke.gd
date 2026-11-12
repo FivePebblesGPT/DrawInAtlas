@@ -15,7 +15,7 @@ func check(ok: bool, reason: String) -> void:
 
 
 func canvas_new() -> Control:
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(500, 360)
 	return canvas
@@ -35,7 +35,7 @@ func test_exact_callback_matching() -> void:
 	if not canvas.has_method("_finish_pending_frame_post_draw"):
 		canvas.free()
 		return
-	var document := DrawingDocument.new("callback-synthetic", 64)
+	var document: DrawingDocument = DrawingDocument.new("callback-synthetic", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	canvas.session = document.begin_edit(layer, document.revision).value
@@ -94,7 +94,7 @@ func test_bounded_callback_history() -> void:
 		check(false, "ring callback helper exists")
 		canvas.free()
 		return
-	var document := DrawingDocument.new("callback-ring", 64)
+	var document: DrawingDocument = DrawingDocument.new("callback-ring", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	canvas.session = document.begin_edit(layer, document.revision).value
@@ -131,7 +131,7 @@ func test_bounded_callback_history() -> void:
 
 
 func test_live_brush() -> void:
-	var document := DrawingDocument.new("callback-live", 64)
+	var document: DrawingDocument = DrawingDocument.new("callback-live", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var canvas: Control = canvas_new()
@@ -176,7 +176,7 @@ func test_live_brush() -> void:
 	check(int(published.get("frame_post_draw_matches", -1)) >= 1,
 		"completed gesture retains callback matching evidence")
 	var after: PackedByteArray = snapshot(document)
-	var reference := DrawingDocument.new("callback-reference", 64)
+	var reference: DrawingDocument = DrawingDocument.new("callback-reference", 64)
 	var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var edit: DrawingEditSession = reference.begin_edit(reference_layer,

@@ -37,7 +37,7 @@ func settled() -> void:
 
 
 func run() -> void:
-	var doc := DrawingDocument.new("preview-cache", 16)
+	var doc: DrawingDocument = DrawingDocument.new("preview-cache", 16)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Ink").value)
 	var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision).value
 	check(edit != null, "first detached edit opened")
@@ -53,7 +53,7 @@ func run() -> void:
 	root.add_child(canvas)
 	await settled()
 
-	var window := Rect2i(-3, -3, 7, 7)
+	var window: Rect2i = Rect2i(-3, -3, 7, 7)
 	check(edit.paint_path(PackedVector2Array([Vector2(-1.5, -1.5)]),
 		0xff4875a6, 9.0).ok, "initial signed-seam Brush staged")
 	expect_index(canvas, edit, window, false, "initial projection")
@@ -118,14 +118,14 @@ func run() -> void:
 
 	# Synthetic longer stroke: many changed storage tiles and a stable
 	# viewport. Timings deliberately carry no CI threshold or device claim.
-	var perf_doc := DrawingDocument.new("preview-cache-bench", 1)
+	var perf_doc: DrawingDocument = DrawingDocument.new("preview-cache-bench", 1)
 	var perf_layer: String = String(perf_doc.create_layer(DrawingLayerNode.RASTER, "Ink").value)
 	var perf: DrawingEditSession = perf_doc.begin_edit(perf_layer, perf_doc.revision).value
 	for i: int in range(240):
 		perf._preview_epoch += 1
 		perf._preview_tile_versions["%d,%d" % [(i * 117) % 1900 - 950,
 			(i * 199) % 1100 - 550]] = perf._preview_epoch
-	var perf_window := Rect2i(-16, -12, 32, 24)
+	var perf_window: Rect2i = Rect2i(-16, -12, 32, 24)
 	var perf_canvas: Control = Control.new()
 	perf_canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	var cold: Dictionary = perf_canvas._preview_index_for_draw(perf, perf_window)
@@ -147,7 +147,7 @@ func run() -> void:
 
 	# The cached result must preserve a bounded failure, never retain the
 	# partial index when a source tile overlaps more than 40,000 display keys.
-	var huge_doc := DrawingDocument.new("preview-cache-large", 2048)
+	var huge_doc: DrawingDocument = DrawingDocument.new("preview-cache-large", 2048)
 	var huge_layer: String = String(huge_doc.create_layer(DrawingLayerNode.RASTER, "Ink").value)
 	var huge: DrawingEditSession = huge_doc.begin_edit(huge_layer, huge_doc.revision).value
 	for i: int in range(170):
@@ -155,7 +155,7 @@ func run() -> void:
 		huge._preview_tile_versions["%d,%d" % [i % 16, i / 16]] = huge._preview_epoch
 	var huge_canvas: Control = Control.new()
 	huge_canvas.set_script(load("res://addons/drawing/canvas.gd"))
-	var huge_window := Rect2i(0, 0, 256, 256)
+	var huge_window: Rect2i = Rect2i(0, 0, 256, 256)
 	var huge_first: Dictionary = huge_canvas._preview_index_for_draw(huge, huge_window)
 	check(not bool(huge_first["indexed"]) and 		(huge_first["stamps"] as Dictionary).is_empty(),
 		"over-budget index fails closed to per-area fallback")

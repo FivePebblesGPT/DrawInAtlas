@@ -3,9 +3,9 @@ extends SceneTree
 ## earlier valid stroke and remain retryable. Compare against the canonical
 ## (non-deferred) publisher on an independent document.
 
-const ORIGIN := Vector2i(2147483648, -2147483648)
-const VIEW := Rect2i(-12, -8, 105, 24)
-const SAFE_VIEW := Rect2i(-12, -8, 23, 20)
+const ORIGIN = Vector2i(2147483648, -2147483648)
+const VIEW = Rect2i(-12, -8, 105, 24)
+const SAFE_VIEW = Rect2i(-12, -8, 23, 20)
 const BRUSH_RGBA: int = 0x9052acd3
 const SEED_RGBA: int = 0xff3a6b7c
 const FILL_RGBA: int = 0xb0c59441
@@ -19,7 +19,7 @@ func check(condition: bool, label: String) -> void:
 		printerr("T095_MIXED_ROLLBACK_FAILED: " + label)
 
 func make_target(stride: int, flood: bool) -> Dictionary:
-	var doc := DrawingDocument.new("mixed-rollback-%d" % stride, stride)
+	var doc: DrawingDocument = DrawingDocument.new("mixed-rollback-%d" % stride, stride)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Paint", "root").value)
 	if flood:
 		var seed: DrawingEditSession = doc.begin_edit(layer, doc.revision,
@@ -50,7 +50,7 @@ func operation(edit: DrawingEditSession, kind: String, stride: int) -> DrawingRe
 		"rect":
 			return edit.fill_rect(Rect2i(left, 0, width, 1), FILL_RGBA)
 		"region":
-			var bytes := PackedByteArray()
+			var bytes: PackedByteArray = PackedByteArray()
 			for i: int in range(width):
 				bytes.append_array(PackedByteArray([65, 148, 197, 176]))
 			return edit.apply_region(Rect2i(left, 0, width, 1), bytes)
@@ -63,12 +63,12 @@ func operation(edit: DrawingEditSession, kind: String, stride: int) -> DrawingRe
 	return DrawingResult.failure("TEST", "Unknown operation")
 
 func scenario(kind: String, stride: int, retry: bool) -> void:
-	var fast_target := make_target(stride, kind == "flood")
-	var slow_target := make_target(stride, kind == "flood")
+	var fast_target: Dictionary = make_target(stride, kind == "flood")
+	var slow_target: Dictionary = make_target(stride, kind == "flood")
 	var fast: DrawingEditSession = begin(fast_target, true)
 	var slow: DrawingEditSession = begin(slow_target, false)
 	var baseline: PackedByteArray = pixels(fast_target)
-	var dab := PackedVector2Array([Vector2(0.5, 0.5)])
+	var dab: PackedVector2Array = PackedVector2Array([Vector2(0.5, 0.5)])
 	check(fast.paint_path(dab, BRUSH_RGBA, 5.0).ok and
 		slow.paint_path(dab, BRUSH_RGBA, 5.0).ok,
 		"initial deferred and original Brush strokes")

@@ -3,7 +3,7 @@ extends SceneTree
 ## whole ordered buffer against a separate full-rectangle f32 capsule raster,
 ## not against the native scanline bounds or another native brush instance.
 
-const CLIP := Rect2i(-192, -192, 384, 384)
+const CLIP = Rect2i(-192, -192, 384, 384)
 const WIDTH: float = 60.0
 var checks: int = 0
 var failures: int = 0
@@ -17,7 +17,7 @@ func check(condition: bool, label: String) -> void:
 
 func reference(batch: PackedVector2Array, previous: Variant,
 		covered: Dictionary) -> PackedInt32Array:
-	var emitted := PackedInt32Array()
+	var emitted: PackedInt32Array = PackedInt32Array()
 	var last: Variant = previous
 	for finish: Vector2 in batch:
 		var start: Vector2 = last if last != null else finish
@@ -30,10 +30,10 @@ func reference(batch: PackedVector2Array, previous: Variant,
 		var squared: float = delta.length_squared()
 		for y: int in range(top, bottom):
 			for x: int in range(left, right):
-				var key := Vector2i(x, y)
+				var key: Vector2i = Vector2i(x, y)
 				if covered.has(key):
 					continue
-				var center := Vector2(float(x) + 0.5, float(y) + 0.5)
+				var center: Vector2 = Vector2(float(x) + 0.5, float(y) + 0.5)
 				var fraction: float = clampf((center - start).dot(delta) / squared, 0.0, 1.0) if squared > 0.0 else 0.0
 				var distance: Vector2 = center - (start + delta * fraction)
 				if distance.length_squared() <= radius * radius:
@@ -57,8 +57,8 @@ func run() -> void:
 	if not ClassDB.class_exists("DrawingNativeBrush"):
 		quit(1)
 		return
-	var first := PackedVector2Array([Vector2(-164.25, -146.5), Vector2(166.75, 145.625)])
-	var second := PackedVector2Array([Vector2(-160.25, 142.125), Vector2(158.375, -144.5)])
+	var first: PackedVector2Array = PackedVector2Array([Vector2(-164.25, -146.5), Vector2(166.75, 145.625)])
+	var second: PackedVector2Array = PackedVector2Array([Vector2(-160.25, 142.125), Vector2(158.375, -144.5)])
 	var first_covered: Dictionary = {}
 	var expected_first: PackedInt32Array = reference(first, null, first_covered)
 	check(expected_first.size() > 50000, "stress oracle contains tens of thousands of ordered pixels")
@@ -80,7 +80,7 @@ func run() -> void:
 	brush.call("commit_hard_batch")
 	check(output(brush, PackedVector2Array([second[1]]), "repeat final dab").is_empty(),
 		"identical final dab produces empty packed array")
-	var return_batch := PackedVector2Array([first[0]])
+	var return_batch: PackedVector2Array = PackedVector2Array([first[0]])
 	var expected_return: PackedInt32Array = reference(return_batch, second[1], first_covered)
 	check(output(brush, return_batch, "return sweep") == expected_return,
 		"return sweep preserves ordered once-only coverage across batches")

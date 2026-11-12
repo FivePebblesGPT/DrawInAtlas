@@ -61,7 +61,7 @@ func run() -> void:
 	OS.set_environment(ENV, "")
 	if FileAccess.file_exists(TRACE_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(TRACE_PATH))
-	var doc := DrawingDocument.new("private-document-name", 64)
+	var doc: DrawingDocument = DrawingDocument.new("private-document-name", 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER,
 		"private-layer-name", "root").value)
 	var canvas: Control = canvas_instance()

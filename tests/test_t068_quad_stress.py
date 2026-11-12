@@ -11,6 +11,8 @@ import math
 import os
 import platform
 from pathlib import Path
+
+from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2
 import subprocess
 import tempfile
 import unittest
@@ -126,7 +128,8 @@ class QuadStressContracts(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("T068_QUAD_STRESS_ORACLE_PASSED: 96 cases", result.stdout)
             self.assertNotIn("SCRIPT ERROR:", result.stdout + result.stderr)
-            self.assertEqual(hashlib.sha256(output.read_bytes()).hexdigest(), stress.ORACLE_SHA256)
+            require_beta3_matches_pinned_beta2(
+                json.loads(stress.ORACLE.read_text()), json.loads(output.read_text()))
 
 
 if __name__ == "__main__":

@@ -20,12 +20,12 @@ func on_draw() -> void:
 	draw_count += 1
 
 func make_document(name: String) -> Dictionary:
-	var doc := DrawingDocument.new(name, 64)
+	var doc: DrawingDocument = DrawingDocument.new(name, 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Paint", "root").value)
 	return {"doc": doc, "layer": layer}
 
 func make_canvas(setup: Dictionary) -> Control:
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(340, 240)
 	canvas.document = setup["doc"]
@@ -118,7 +118,7 @@ func test_selection_rejected() -> void:
 	var doc: DrawingDocument = setup["doc"]
 	var original: PackedByteArray = snapshot(doc)
 	var canvas: Control = make_canvas(setup)
-	var mask := DrawingSelection.new(Rect2i(-10, -10, 3, 3), true)
+	var mask: DrawingSelection = DrawingSelection.new(Rect2i(-10, -10, 3, 3), true)
 	canvas.set_selection_mask(mask)
 	await settle()
 	var point: Vector2i = Vector2i(15, 13)

@@ -4,7 +4,7 @@ extends SceneTree
 const INK: int = 0x9052acd3
 
 func trial(kind: String, rep: int) -> Dictionary:
-	var doc := DrawingDocument.new("ref-bench-%s-%d" % [kind, rep], 64)
+	var doc: DrawingDocument = DrawingDocument.new("ref-bench-%s-%d" % [kind, rep], 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Paint", "root").value)
 	var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision, Transform2D.IDENTITY, 0, 0).value
 	var start_us: int = Time.get_ticks_usec()

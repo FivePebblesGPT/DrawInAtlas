@@ -14,7 +14,7 @@ func check(ok: bool, label: String) -> void:
 
 func full_rectangle(points: PackedVector2Array, width: float, clip: Rect2i,
 		previous: Variant, covered: Dictionary) -> PackedInt32Array:
-	var output := PackedInt32Array()
+	var output: PackedInt32Array = PackedInt32Array()
 	var last: Variant = previous
 	var radius: float = width * 0.5
 	for finish: Vector2 in points:

@@ -22,7 +22,7 @@ func fill_occupancy(canvas: Control, window: Rect2i) -> void:
 func run() -> void:
 	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
-	var window := Rect2i(-3, -3, 6, 6)
+	var window: Rect2i = Rect2i(-3, -3, 6, 6)
 	fill_occupancy(canvas, window)
 	var selected: Dictionary = canvas._cold_population_targets(window, Vector2(-1.5, -1.5))
 	check(canvas.MAX_COLD_TILES_PER_DRAW == 4 and selected.size() == 4,
@@ -61,7 +61,7 @@ func run() -> void:
 	check(canvas._cold_population_targets(window, Vector2.ZERO).is_empty(),
 		"unknown occupancy never skips potentially visible content")
 	canvas._occupancy_unknown = false
-	var doc := DrawingDocument.new("t102-preview-guard")
+	var doc: DrawingDocument = DrawingDocument.new("t102-preview-guard")
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "pixels").value)
 	var started: DrawingResult = doc.begin_edit(layer, doc.revision)
 	check(started.ok, "create an authentic detached session for gating")

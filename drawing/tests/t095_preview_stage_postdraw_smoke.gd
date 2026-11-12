@@ -16,7 +16,7 @@ func check(ok: bool, reason: String) -> void:
 
 
 func make_canvas() -> Control:
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(500, 360)
 	return canvas
@@ -51,7 +51,7 @@ func test_pairing_and_noop() -> void:
 			not canvas.has_method("_mark_unsubmitted_preview_stage"):
 		canvas.free()
 		return
-	var document := DrawingDocument.new("stage-postdraw", 64)
+	var document: DrawingDocument = DrawingDocument.new("stage-postdraw", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	canvas.session = document.begin_edit(layer, document.revision).value
@@ -104,7 +104,7 @@ func test_bounded_lifetime_maxima() -> void:
 		check(false, "ring test requires stage pairing helper")
 		canvas.free()
 		return
-	var document := DrawingDocument.new("stage-postdraw-ring", 64)
+	var document: DrawingDocument = DrawingDocument.new("stage-postdraw-ring", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	canvas.session = document.begin_edit(layer, document.revision).value
@@ -146,7 +146,7 @@ func snapshot(document: DrawingDocument) -> PackedByteArray:
 
 
 func test_real_brush_and_history() -> void:
-	var document := DrawingDocument.new("stage-postdraw-live", 64)
+	var document: DrawingDocument = DrawingDocument.new("stage-postdraw-live", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var canvas: Control = make_canvas()
@@ -159,8 +159,8 @@ func test_real_brush_and_history() -> void:
 	await process_frame
 	await process_frame
 	var before: PackedByteArray = snapshot(document)
-	var a := Vector2(-15.5, -9.5)
-	var b := Vector2(18.5, 12.5)
+	var a: Vector2 = Vector2(-15.5, -9.5)
+	var b: Vector2 = Vector2(18.5, 12.5)
 	canvas.start_gesture(canvas.pixel_to_position(a))
 	canvas.queue_redraw()
 	await process_frame
@@ -189,7 +189,7 @@ func test_real_brush_and_history() -> void:
 	check(int(published.get("preview_stage_post_draw_matches", 0)) >= 1,
 		"completed gesture retains preview stage/callback evidence")
 	var actual: PackedByteArray = snapshot(document)
-	var reference := DrawingDocument.new("stage-postdraw-reference", 64)
+	var reference: DrawingDocument = DrawingDocument.new("stage-postdraw-reference", 64)
 	var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var edit: DrawingEditSession = reference.begin_edit(reference_layer,

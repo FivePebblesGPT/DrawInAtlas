@@ -18,7 +18,7 @@ func make_document(label: String, anchor: Vector2i, stride: int) -> Dictionary:
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Paint", "root").value)
 	var seed: DrawingEditSession = doc.begin_edit(layer, doc.revision,
 		Transform2D.IDENTITY, anchor.x, anchor.y).value
-	var bytes := PackedByteArray()
+	var bytes: PackedByteArray = PackedByteArray()
 	for i: int in range(14 * 14):
 		bytes.append_array(PackedByteArray([i % 256, (i * 37) % 256,
 			(i * 19 + 3) % 256, 0 if i % 7 == 0 else (255 if i % 3 == 0 else 77)]))
@@ -141,7 +141,7 @@ func run() -> void:
 	]
 	for i: int in range(cases.size()):
 		var spec: Dictionary = cases[i]
-		var path := PackedVector2Array(spec["p"])
+		var path: PackedVector2Array = PackedVector2Array(spec["p"])
 		one_case(i, path, spec["w"], bool(spec.get("e", false)),
 			bool(spec.get("split", false)), bool(spec.get("large", false)))
 	print("T095_OBLIQUE_SCANLINE_RESULT checks=%d failures=%d" % [checks, failures])

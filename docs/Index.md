@@ -21,12 +21,28 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   **Done** *(software cold-frame scheduling, not owner hardware acceptance)*,
   [T-103](Tickets/T-103.md) **Done** *(over-budget software retention, not hardware acceptance)*; T-068 → [T-104](Tickets/T-104.md) **Done**
   *(operation-specific choice/defer/reject; no native default adoption)*,
-  [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md),
-  [T-107](Tickets/T-107.md); T-064 → [T-108](Tickets/T-108.md);
+  [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md)
+  **In Progress** *(beta3 local repairs; hosted 46/46 pending)*,
+  [T-107](Tickets/T-107.md) **Ready**; T-064 → [T-108](Tickets/T-108.md);
   T-065 → [T-109](Tickets/T-109.md).
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-106 required fast-CI beta3 repairs (2026-11-12; In Progress)
+
+The known red explicit-type, T-072 stale `_covered`, T-094 beta2 replay
+sample and T-068 beta2/beta3 generation mismatch have local fixes.
+The SHA-pinned beta2 native parity fixtures are unchanged; beta3 reproduction
+must match every other field exactly. The hosted-evidence exporter now
+recognizes beta3 and rejects historical beta2 as current run identity.
+The clean native-absent local exploratory replay passed **46/46** after
+correcting export-template and ignored native-staging environment issues;
+the earlier contaminated local replay was red (30/46). The checker, strict
+Godot logs, fail-late 46-check inventory and all owner review gates remain
+unchanged. **A fresh GitHub-hosted PR check is still
+required** before T-106 can be Done. [Ticket](Tickets/T-106.md) ·
+[Evidence](evidence/T-106-2026-11-12-beta3-fast-ci.md).
 
 ## T-104 operation-specific raster backend decision (2026-11-12; Done)
 
@@ -2421,7 +2437,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-103 · Zoom-out, cache-budget and large-layer viewport stress](Tickets/T-103.md) | Done | Focal cache planning, 150-check software stress; owner device remains open | [T-053](Tickets/T-053.md) |
 | [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Done | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Linux native-free export + OS RSS verified; Windows/MSVC/VRAM and editor gesture evidence open | [T-052](Tickets/T-052.md) |
-| [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | Ready | — | [T-053](Tickets/T-053.md) |
 | [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | Ready | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |

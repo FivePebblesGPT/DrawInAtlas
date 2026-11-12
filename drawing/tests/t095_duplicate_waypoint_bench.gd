@@ -8,7 +8,7 @@ const REPEATS: int = 7
 func run() -> void:
 	var timings: Array[int] = []
 	for repeat: int in range(REPEATS):
-		var doc := DrawingDocument.new("duplicate-cpu-%d" % repeat, 64)
+		var doc: DrawingDocument = DrawingDocument.new("duplicate-cpu-%d" % repeat, 64)
 		var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Ink").value)
 		var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision).value
 		var path: PackedVector2Array = PackedVector2Array()

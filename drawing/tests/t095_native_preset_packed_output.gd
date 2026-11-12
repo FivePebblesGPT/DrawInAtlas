@@ -23,7 +23,7 @@ func check(ok: bool, label: String) -> void:
         printerr("T095_NATIVE_PRESET_PACKED_FAILED: " + label)
 
 func points_for(index: int, length: int, y_scale: float = 1.0) -> PackedVector2Array:
-    var values := PackedVector2Array()
+    var values: PackedVector2Array = PackedVector2Array()
     for j: int in range(length):
         var t: float = float(j) / float(length - 1)
         values.append(Vector2(-91.5 + float(index) * 7.0 + 171.0 * t,
@@ -37,7 +37,7 @@ func make_native(settings: String) -> Object:
     return native
 
 func add_digest(digest: HashingContext, pixels: PackedInt32Array) -> void:
-    var length := PackedByteArray()
+    var length: PackedByteArray = PackedByteArray()
     length.resize(4)
     length.encode_u32(0, pixels.size())
     digest.update(length)
@@ -49,7 +49,7 @@ func run_preset(name: String, file_stem: String) -> void:
     check(not settings.is_empty(), name + " bundled .myb exists")
     var subject: Object = make_native(settings)
     var reference: Object = make_native(settings)
-    var digest := HashingContext.new()
+    var digest: HashingContext = HashingContext.new()
     check(digest.start(HashingContext.HASH_SHA256) == OK, name + " digest starts")
     var total_pixels: int = 0
     var paths: Array[PackedVector2Array] = [

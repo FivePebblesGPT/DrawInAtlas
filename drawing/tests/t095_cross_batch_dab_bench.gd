@@ -7,10 +7,10 @@ const BATCHES: int = 120
 const RUNS: int = 6
 
 func run_case(use_cache: bool, run_index: int) -> int:
-	var doc := DrawingDocument.new("stationary-%s-%d" % [use_cache, run_index], 64)
+	var doc: DrawingDocument = DrawingDocument.new("stationary-%s-%d" % [use_cache, run_index], 64)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Paint").value)
 	var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision).value
-	var point := PackedVector2Array([Vector2(0.5, -0.5)])
+	var point: PackedVector2Array = PackedVector2Array([Vector2(0.5, -0.5)])
 	var start: int = Time.get_ticks_usec()
 	for i: int in range(BATCHES):
 		if not use_cache:

@@ -17,7 +17,7 @@ func check(ok: bool, description: String) -> void:
 
 
 func make_canvas() -> Control:
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(480, 320)
 	return canvas
@@ -107,7 +107,7 @@ func snapshot(document: DrawingDocument) -> PackedByteArray:
 
 
 func test_live_preview() -> void:
-	var document := DrawingDocument.new("frame-phase-live", 64)
+	var document: DrawingDocument = DrawingDocument.new("frame-phase-live", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var canvas: Control = make_canvas()
@@ -161,7 +161,7 @@ func test_live_preview() -> void:
 		int(published.get("frame_phase_total", -1)) >= actual_frames,
 		"final snapshot retains the real short-stroke chronological distribution")
 	var committed: PackedByteArray = snapshot(document)
-	var reference := DrawingDocument.new("frame-phase-control", 64)
+	var reference: DrawingDocument = DrawingDocument.new("frame-phase-control", 64)
 	var reference_layer: String = String(reference.create_layer(
 		DrawingLayerNode.RASTER, "Paint", "root").value)
 	var reference_edit: DrawingEditSession = reference.begin_edit(reference_layer,

@@ -2,14 +2,14 @@ extends SceneTree
 ## Opt-in T-095 native-only profiling witness. Time only the NativeHard
 ## candidate/coverage/delta call, not pixels staged, GPU frames, or input.
 
-const CLIP := Rect2i(-192, -192, 384, 384)
+const CLIP = Rect2i(-192, -192, 384, 384)
 
 func run() -> void:
 	if not ClassDB.class_exists("DrawingNativeBrush"):
 		printerr("T095_NATIVE_HARD_SCANLINE_BENCH_FAILED: extension absent")
 		quit(1)
 		return
-	var path := PackedVector2Array([Vector2(-164.25, -146.5), Vector2(166.75, 145.625)])
+	var path: PackedVector2Array = PackedVector2Array([Vector2(-164.25, -146.5), Vector2(166.75, 145.625)])
 	var timings: Array[float] = []
 	var expected: int = -1
 	for trial: int in range(11):

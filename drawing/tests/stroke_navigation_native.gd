@@ -25,7 +25,7 @@ func frames(count: int = 1) -> void:
 
 
 func mouse_button(canvas: Control, index: MouseButton, pressed: bool) -> void:
-    var event := InputEventMouseButton.new()
+    var event: InputEventMouseButton = InputEventMouseButton.new()
     event.button_index = index
     event.pressed = pressed
     event.position = canvas.size * 0.5
@@ -77,14 +77,14 @@ func scenario(mode: String) -> void:
     if mode == "wheel_middle":
         mouse_button(canvas, MOUSE_BUTTON_WHEEL_UP, true)
         mouse_button(canvas, MOUSE_BUTTON_MIDDLE, true)
-        var move := InputEventMouseMotion.new()
+        var move: InputEventMouseMotion = InputEventMouseMotion.new()
         move.position = canvas.size * 0.5 + Vector2(30, 22)
         canvas._gui_input(move)
         mouse_button(canvas, MOUSE_BUTTON_MIDDLE, false)
     elif mode == "toolbar_pan":
         canvas.tool = "Pan"
         mouse_button(canvas, MOUSE_BUTTON_LEFT, true)
-        var move := InputEventMouseMotion.new()
+        var move: InputEventMouseMotion = InputEventMouseMotion.new()
         move.position = canvas.size * 0.5 + Vector2(45, 18)
         canvas._gui_input(move)
         mouse_button(canvas, MOUSE_BUTTON_LEFT, false)

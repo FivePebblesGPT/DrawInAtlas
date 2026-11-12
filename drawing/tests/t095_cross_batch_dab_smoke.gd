@@ -28,13 +28,13 @@ func check(condition: bool, label: String) -> void:
 
 
 func make_target(name: String, stride: int, faultable: bool = false) -> Dictionary:
-	var anchor := Vector2i(-2147483779, 2147483701)
+	var anchor: Vector2i = Vector2i(-2147483779, 2147483701)
 	var doc: DrawingDocument = FaultDocument.new(name, stride) if faultable \
 		else DrawingDocument.new(name, stride)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Paint", "root").value)
 	var seed: DrawingEditSession = doc.begin_edit(layer, doc.revision,
 		Transform2D.IDENTITY, anchor.x, anchor.y).value
-	var pixels := PackedByteArray()
+	var pixels: PackedByteArray = PackedByteArray()
 	for i: int in range(26 * 26):
 		pixels.append_array(PackedByteArray([i % 255, (i * 11) % 255,
 			(i * 31) % 255, 0 if i % 8 == 0 else 179]))
@@ -91,8 +91,8 @@ func repeat_single_point(name: String, erase: bool, stride: int) -> void:
 	var b: Dictionary = make_target(name + "-control", stride)
 	var actual: DrawingEditSession = begin(a)
 	var control: DrawingEditSession = begin(b)
-	var point := PackedVector2Array([Vector2(0.5, -0.5)])
-	var clip := Rect2i(-53, -50, 106, 102)
+	var point: PackedVector2Array = PackedVector2Array([Vector2(0.5, -0.5)])
+	var clip: Rect2i = Rect2i(-53, -50, 106, 102)
 	for i: int in range(121):
 		check(actual.paint_path(point, INK, 60.0, erase, null, 1048576, clip).ok,
 			name + " accepted batch %d" % i)
@@ -113,9 +113,9 @@ func changed_context_and_budget() -> void:
 	var b: Dictionary = make_target("context-control", 30)
 	var edit: DrawingEditSession = begin(a)
 	var reference: DrawingEditSession = begin(b)
-	var point := PackedVector2Array([Vector2(3.5, -1.5)])
-	var small := Rect2i(1, -3, 6, 6)
-	var wide := Rect2i(-53, -51, 106, 102)
+	var point: PackedVector2Array = PackedVector2Array([Vector2(3.5, -1.5)])
+	var small: Rect2i = Rect2i(1, -3, 6, 6)
+	var wide: Rect2i = Rect2i(-53, -51, 106, 102)
 	check(edit.paint_path(point, INK, 5.0, false, null, 1048576, small).ok,
 		"small first dab accepted")
 	check(reference.paint_path(point, INK, 5.0, false, null, 1048576, small).ok,
@@ -131,7 +131,7 @@ func changed_context_and_budget() -> void:
 		"larger reference dab accepted")
 	check(edit._cross_batch_dabs_skipped == 0, "changed width and clip are rerasterized")
 	# Changing the color, eraser mode, and selection must not reuse a dab.
-	var selection := DrawingSelection.new(Rect2i(-40, -40, 90, 90), true)
+	var selection: DrawingSelection = DrawingSelection.new(Rect2i(-40, -40, 90, 90), true)
 	check(selection.combine_rectangle(Rect2i(-5, -5, 12, 12), "Subtract"),
 		"selection mask hole established")
 	for mode: int in range(3):
@@ -164,9 +164,9 @@ func moving_endpoint_and_external_edit() -> void:
 	var b: Dictionary = make_target("movement-control", 64)
 	var edit: DrawingEditSession = begin(a)
 	var reference: DrawingEditSession = begin(b)
-	var clip := Rect2i(-52, -54, 104, 108)
-	var p := PackedVector2Array([Vector2(-14.5, 8.5)])
-	var q := PackedVector2Array([Vector2(14.5, 8.5)])
+	var clip: Rect2i = Rect2i(-52, -54, 104, 108)
+	var p: PackedVector2Array = PackedVector2Array([Vector2(-14.5, 8.5)])
+	var q: PackedVector2Array = PackedVector2Array([Vector2(14.5, 8.5)])
 	for path: PackedVector2Array in [p, q, q, q]:
 		check(edit.paint_path(path, INK, 37.5, false, null, 1048576, clip).ok,
 			"movement step accepted")
@@ -195,8 +195,8 @@ func coordinate_mapping_invalidation() -> void:
 	var b: Dictionary = make_target("mapping-reference", 16)
 	var edit: DrawingEditSession = begin(a)
 	var reference: DrawingEditSession = begin(b)
-	var point := PackedVector2Array([Vector2(4.5, 2.5)])
-	var clip := Rect2i(-45, -42, 90, 84)
+	var point: PackedVector2Array = PackedVector2Array([Vector2(4.5, 2.5)])
+	var clip: Rect2i = Rect2i(-45, -42, 90, 84)
 	check(edit.paint_path(point, INK, 8.0, false, null, 1048576, clip).ok and
 		reference.paint_path(point, INK, 8.0, false, null, 1048576, clip).ok,
 		"mapping baseline stationary dab")
@@ -213,10 +213,10 @@ func coordinate_mapping_invalidation() -> void:
 		"changed global anchor cannot skip the repeated dab")
 	# A new view transform can represent the same source-relative endpoint.
 	# It must nevertheless invalidate the prior cross-call witness.
-	var transform := Transform2D.IDENTITY.translated(Vector2(6.0, -3.0))
+	var transform: Transform2D = Transform2D.IDENTITY.translated(Vector2(6.0, -3.0))
 	edit.view_transform = transform
 	reference.view_transform = transform
-	var transformed := PackedVector2Array([transform * point[0]])
+	var transformed: PackedVector2Array = PackedVector2Array([transform * point[0]])
 	check(edit.paint_path(transformed, INK, 8.0, false, null, 1048576, clip).ok,
 		"transformed repeated source position accepted")
 	reference._stationary_dab_valid = false
@@ -232,9 +232,9 @@ func late_source_failure() -> void:
 	var b: Dictionary = make_target("failed-control", 16)
 	var edit: DrawingEditSession = begin(a)
 	var reference: DrawingEditSession = begin(b)
-	var first := PackedVector2Array([Vector2(-20.5, -17.5)])
-	var second := PackedVector2Array([Vector2(30.5, 29.5)])
-	var clip := Rect2i(-53, -52, 106, 104)
+	var first: PackedVector2Array = PackedVector2Array([Vector2(-20.5, -17.5)])
+	var second: PackedVector2Array = PackedVector2Array([Vector2(30.5, 29.5)])
+	var clip: Rect2i = Rect2i(-53, -52, 106, 104)
 	check(edit.paint_path(first, INK, 3.0, false, null, 1048576, clip).ok and
 		reference.paint_path(first, INK, 3.0, false, null, 1048576, clip).ok,
 		"failure test baseline accepted")

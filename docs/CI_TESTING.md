@@ -1,3 +1,29 @@
+## T-106 required fast-desktop Godot 4.8-beta3 repair (2026-11-12)
+
+The push/PR workflow `.github/workflows/godot-check.yml` runs pinned
+`4.8.beta3.official.*` with all **46 original required check IDs**. T-106
+repairs previously red strict explicit-type declarations in 25 test scripts,
+the current `_covered_rows` workflow contract, and the local T-094 replay
+fixture's old beta2 identity **without relaxing** the original strict checkers.
+`tools/export_godot_ci_evidence.py` now enforces beta3 for current hosted
+artifacts (the previous beta2 regex could produce a false-red record on a
+successful beta3 run). `tests/test_t094_hosted_ci_evidence.py` includes an
+explicit old-beta2 rejection control.
+
+Four regenerated T-068 masks/Brush fixture sets from beta3 must match the
+original SHA-pinned beta2 arrays, case IDs, ordering, RGBA8 values and hashes;
+**only** the `godot_version` metadata label is allowed to differ, checked
+through `tests/t068_oracle_engine_compat.py` and its negative-control suite.
+Historical beta2 files and their hashes are not rewritten. Live regeneration
+still requires root project import, and the T-068 detached native oracles
+continue in the *existing* CI check (no 47th required check). A local replay
+can establish software parity but **cannot** establish GitHub-hosted green,
+reviewer approval, physical input-to-photon timing or a clean Godot teardown.
+[T-106 evidence](evidence/T-106-2026-11-12-beta3-fast-ci.md) and
+[ticket](Tickets/T-106.md) retain the reproducible commands and outstanding
+hosted gate. Older beta2 historical CI notes below remain dated records, not
+instructions for the current beta3 PR run.
+
 ## T-105 Linux standalone RSS and unverified Windows/MSVC portability (2026-11-12)
 
 The opt-in `.github/workflows/godot-native-t105-portability.yml` installs

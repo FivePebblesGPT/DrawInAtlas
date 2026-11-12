@@ -22,7 +22,7 @@ func frames(count: int = 1) -> void:
 
 
 func paint(doc: DrawingDocument, layer: String, area: Rect2i, rgba: int) -> bool:
-	var bytes := PackedByteArray()
+	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(area.size.x * area.size.y * 4)
 	for i: int in range(area.size.x * area.size.y):
 		bytes.encode_u32(i * 4, rgba)

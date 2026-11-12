@@ -16,7 +16,7 @@ func check(ok: bool, reason: String) -> void:
 
 
 func make_canvas() -> Control:
-	var canvas := Control.new()
+	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(500, 360)
 	return canvas
@@ -127,7 +127,7 @@ func snapshot(document: DrawingDocument) -> PackedByteArray:
 
 
 func test_live_brush_frames() -> void:
-	var document := DrawingDocument.new("frame-backlog-live", 64)
+	var document: DrawingDocument = DrawingDocument.new("frame-backlog-live", 64)
 	var layer: String = String(document.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var canvas: Control = make_canvas()
@@ -183,7 +183,7 @@ func test_live_brush_frames() -> void:
 		int(published.get("frame_phase_total", -1)) == completed.size(),
 		"committed profile retains every short-gesture frame")
 	var committed: PackedByteArray = snapshot(document)
-	var reference := DrawingDocument.new("frame-backlog-control", 64)
+	var reference: DrawingDocument = DrawingDocument.new("frame-backlog-control", 64)
 	var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
 		"Paint", "root").value)
 	var edit: DrawingEditSession = reference.begin_edit(reference_layer,
