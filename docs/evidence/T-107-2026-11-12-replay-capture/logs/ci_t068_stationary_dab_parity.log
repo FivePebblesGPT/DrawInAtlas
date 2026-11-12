@@ -1,0 +1,204 @@
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 2.040s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.492s
+
+OK
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 14.097s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.055s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.061s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.062s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.208s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.053s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.796s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.229s
+
+OK
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.516s
+
+OK
+.....s
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+OK (skipped=1)
+....s
+----------------------------------------------------------------------
+Ran 4 tests in 0.204s
+
+OK (skipped=1)
+s...
+----------------------------------------------------------------------
+Ran 4 tests in 1.579s
+
+OK (skipped=1)
+......
+----------------------------------------------------------------------
+Ran 6 tests in 6.602s
+
+OK
+T104_BACKEND_DECISION_PASSED
+s....
+----------------------------------------------------------------------
+Ran 5 tests in 3.774s
+
+OK (skipped=1)
+..s...
+----------------------------------------------------------------------
+Ran 6 tests in 0.005s
+
+OK (skipped=1)
+s..
+----------------------------------------------------------------------
+Ran 3 tests in 0.006s
+
+OK (skipped=1)
+s..
+----------------------------------------------------------------------
+Ran 3 tests in 0.013s
+
+OK (skipped=1)
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.567s
+
+OK
+...s
+----------------------------------------------------------------------
+Ran 3 tests in 4.744s
+
+OK (skipped=1)
+....s.
+----------------------------------------------------------------------
+Ran 6 tests in 8.692s
+
+OK (skipped=1)
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 19.130s
+
+OK
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 13.497s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 12.794s
+
+OK
+s....
+----------------------------------------------------------------------
+Ran 4 tests in 0.982s
+
+OK (skipped=1)
+......
+----------------------------------------------------------------------
+Ran 6 tests in 1.793s
+
+OK
+......
+----------------------------------------------------------------------
+Ran 6 tests in 3.231s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 3.787s
+
+OK
+.
+----------------------------------------------------------------------
+Ran 1 test in 0.025s
+
+OK
+..
+----------------------------------------------------------------------
+Ran 2 tests in 5.350s
+
+OK
+....
+----------------------------------------------------------------------
+Ran 4 tests in 5.868s
+
+OK
+...s
+----------------------------------------------------------------------
+Ran 3 tests in 0.003s
+
+OK (skipped=1)
+.........s
+----------------------------------------------------------------------
+Ran 9 tests in 1.548s
+
+OK (skipped=1)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_DAB_PASSED checks=125 failures=0
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_AXIS_SWEEP_PASSED checks=239 failures=0
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_TILE_CACHE_PASSED checks=31 failures=0
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_FILL_CACHE_PASSED checks=30 failures=0
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_FRONTIER_PASSED checks=56 failures=0
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_VERIFIED_STAGE_PASSED checks=29 failures=0
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_PUBLICATION_PASSED checks=30 failures=0

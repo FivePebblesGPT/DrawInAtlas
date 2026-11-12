@@ -1,0 +1,8 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T066_BENCHMARK initial_ms=20.821 incremental_ms=15.103 initial_writes=8 incremental_writes=6 initial_renames=8 incremental_renames=6 chunk_count=3
+ATLAS_BUNDLE_PASSED (86 checks, 0 failures)

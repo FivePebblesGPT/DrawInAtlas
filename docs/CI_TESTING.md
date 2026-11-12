@@ -1,3 +1,19 @@
+## T-107 replay-log and owner-evidence integrity (2026-11-12)
+
+`tools/t107_evidence_audit.py` independently verifies all 46 required check
+IDs, Bash scripts, original exit status and raw SHA-256 logs against the
+checked-in `.github/workflows/godot-check.yml`. The local T-106 46/46
+capture has a **null commit provenance** and is marked `local-exploratory`;
+it cannot satisfy hosted CI. The same command validates all 23 canonical
+finding-to-ticket mappings and emits explicit physical Linux/Windows `NOT RUN`
+actions, preserving the historical #22 positive Save/Open and #23 monotonic
+revision semantics. Separate fresh beta3 standalone/Atlas raw logs and their
+strict success markers are retained. `tests/test_t107_evidence_audit.py` has
+tamper/omission controls; the existing mandatory T-073 matrix suite checks
+the archived evidence without adding a 47th CI step. This is evidence
+integrity, **not** a fresh hosted run, physical-device measurement or manual
+signoff. [T-107 evidence](evidence/T-107-2026-11-12-hosted-owner-readiness.md).
+
 ## T-106 required fast-desktop Godot 4.8-beta3 repair (2026-11-12)
 
 The push/PR workflow `.github/workflows/godot-check.yml` runs pinned

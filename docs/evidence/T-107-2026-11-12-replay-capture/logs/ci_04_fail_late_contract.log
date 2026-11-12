@@ -1,0 +1,13 @@
+test_all_checks_run_even_after_earlier_failure (test_godot_ci_fail_late.GodotCIFailLateTests.test_all_checks_run_even_after_earlier_failure) ... ok
+test_bash_group_continues_after_command_and_marker_failures (test_godot_ci_fail_late.GodotCIFailLateTests.test_bash_group_continues_after_command_and_marker_failures) ... ok
+test_every_godot_script_has_a_process_watchdog (test_godot_ci_fail_late.GodotCIFailLateTests.test_every_godot_script_has_a_process_watchdog) ... ok
+test_fast_desktop_ci_excludes_unfinished_and_costly_suites (test_godot_ci_fail_late.GodotCIFailLateTests.test_fast_desktop_ci_excludes_unfinished_and_costly_suites) ... ok
+test_multi_suite_steps_collect_errors (test_godot_ci_fail_late.GodotCIFailLateTests.test_multi_suite_steps_collect_errors) ... ok
+test_reporting_uses_original_outcome_not_masked_conclusion (test_godot_ci_fail_late.GodotCIFailLateTests.test_reporting_uses_original_outcome_not_masked_conclusion) ... ok
+test_summary_fails_closed_when_workflow_step_is_missing_or_unexpected (test_godot_ci_fail_late.GodotCIFailLateTests.test_summary_fails_closed_when_workflow_step_is_missing_or_unexpected) ... ok
+test_workflow_id_extraction_rejects_duplicate_or_missing_ids (test_godot_ci_fail_late.GodotCIFailLateTests.test_workflow_id_extraction_rejects_duplicate_or_missing_ids) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.015s
+
+OK

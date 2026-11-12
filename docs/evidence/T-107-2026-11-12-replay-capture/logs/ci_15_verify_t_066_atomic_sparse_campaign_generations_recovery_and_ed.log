@@ -1,0 +1,9 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T066_BENCHMARK initial_ms=21.168 incremental_ms=15.635 initial_writes=8 incremental_writes=6 initial_renames=8 incremental_renames=6 chunk_count=3
+ATLAS_BUNDLE_PASSED (86 checks, 0 failures)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ATLAS_BUNDLE_EDITOR_PASSED (23 checks, 0 failures)

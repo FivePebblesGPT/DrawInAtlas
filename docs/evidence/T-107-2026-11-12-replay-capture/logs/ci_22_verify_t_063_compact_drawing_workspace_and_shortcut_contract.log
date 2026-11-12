@@ -1,0 +1,14 @@
+test_approved_feature_scope_is_not_ux_approval (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_approved_feature_scope_is_not_ux_approval) ... ok
+test_can_be_used_without_atlas_code (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_can_be_used_without_atlas_code) ... ok
+test_commands_and_history_preference_are_real (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_commands_and_history_preference_are_real) ... ok
+test_context_options_and_scrolling (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_context_options_and_scrolling) ... ok
+test_dock_and_status (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_dock_and_status) ... ok
+test_menu_order_and_no_duplicate_action_toolbar (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_menu_order_and_no_duplicate_action_toolbar) ... ok
+test_native_witness_is_live_and_touches_required_behaviors (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_native_witness_is_live_and_touches_required_behaviors) ... ok
+test_ticket_and_browser_dependencies_are_consistent (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_ticket_and_browser_dependencies_are_consistent) ... ok
+test_user_refinements_are_packaged_and_tested (test_t063_workspace_docs.CompactDrawingWorkspaceContractTests.test_user_refinements_are_packaged_and_tested) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.003s
+
+OK

@@ -1,0 +1,134 @@
+test_accepted_tab_and_browser_requirements_are_not_conflated (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_accepted_tab_and_browser_requirements_are_not_conflated) ... ok
+test_actual_keyboard_routing_and_known_save_as_gap (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_actual_keyboard_routing_and_known_save_as_gap) ... ok
+test_actual_palette_and_menu_claims_match_source (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_actual_palette_and_menu_claims_match_source) ... ok
+test_all_99_scope_rows_preserved_with_authoritative_priorities (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_all_99_scope_rows_preserved_with_authoritative_priorities) ... ok
+test_bounded_first_slice_and_future_baseline_not_all_done (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_bounded_first_slice_and_future_baseline_not_all_done) ... ok
+test_markdown_local_links_in_scoped_docs_resolve (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_markdown_local_links_in_scoped_docs_resolve) ... ok
+test_pointer_keyboard_cases_have_observable_results_and_witness_paths (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_pointer_keyboard_cases_have_observable_results_and_witness_paths) ... ok
+test_review_gates_and_dependencies_unchanged (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_review_gates_and_dependencies_unchanged) ... ok
+test_scope_approval_not_ux_approval (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_scope_approval_not_ux_approval) ... ok
+test_ui_spec_preserves_original_proposal_hierarchy (test_t073_feature_ux_docs.ApprovedScopeAndProposedUXTests.test_ui_spec_preserves_original_proposal_hierarchy) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.004s
+
+OK
+test_every_owner_finding_is_actionable_and_mapped_to_same_tickets (test_t094_owner_matrix.OwnerAcceptanceMatrixContracts.test_every_owner_finding_is_actionable_and_mapped_to_same_tickets) ... ok
+test_physical_evidence_cannot_be_replaced_by_headless_or_software_gpu (test_t094_owner_matrix.OwnerAcceptanceMatrixContracts.test_physical_evidence_cannot_be_replaced_by_headless_or_software_gpu) ... ok
+test_positive_roundtrip_is_a_real_regression_not_an_invented_bug (test_t094_owner_matrix.OwnerAcceptanceMatrixContracts.test_positive_roundtrip_is_a_real_regression_not_an_invented_bug) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+OK
+test_all_six_tickets_have_ordered_hard_dependencies (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_all_six_tickets_have_ordered_hard_dependencies) ... ok
+test_drag_previews_and_cancel_are_explicit (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_drag_previews_and_cancel_are_explicit) ... ok
+test_example_approval_text_in_body_does_not_set_owner_gate (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_example_approval_text_in_body_does_not_set_owner_gate) ... ok
+test_floating_hosts_are_tabbed_and_non_os (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_floating_hosts_are_tabbed_and_non_os) ... ok
+test_icon_rail_has_panel_icons_but_group_boundaries (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_icon_rail_has_panel_icons_but_group_boundaries) ... ok
+test_kanban_rows_match_ticket_frontmatter (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_kanban_rows_match_ticket_frontmatter) ... ok
+test_no_existing_feature_or_owner_gate_is_claimed_complete (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_no_existing_feature_or_owner_gate_is_claimed_complete) ... ok
+test_only_final_ticket_has_new_manual_review_gate (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_only_final_ticket_has_new_manual_review_gate) ... ok
+test_real_approval_metadata_requires_evidence_and_manual_gate (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_real_approval_metadata_requires_evidence_and_manual_gate) ... ok
+test_spec_and_index_cross_reference_all_six_tickets (test_t078_t083_docking_plan.GroupedPanelDockRoadmapTests.test_spec_and_index_cross_reference_all_six_tickets) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.014s
+
+OK
+test_both_timed_findings_require_independent_zoom_timings (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_both_timed_findings_require_independent_zoom_timings) ... ok
+test_cli_summary_requires_valid_evidence_and_does_not_forge_results (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_cli_summary_requires_valid_evidence_and_does_not_forge_results) ... ok
+test_complete_cli_rejects_mixed_commits_and_revisions_other_than_target (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_complete_cli_rejects_mixed_commits_and_revisions_other_than_target) ... ok
+test_init_never_overwrites_and_incomplete_two_os_is_not_pass (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_init_never_overwrites_and_incomplete_two_os_is_not_pass) ... ok
+test_mixed_revision_summary_fails_before_printing_statistics (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_mixed_revision_summary_fails_before_printing_statistics) ... ok
+test_never_silently_drops_rows_or_changes_the_runbook_mapping (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_never_silently_drops_rows_or_changes_the_runbook_mapping) ... ok
+test_partial_cohort_accepts_unrun_os_without_faking_comparability (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_partial_cohort_accepts_unrun_os_without_faking_comparability) ... ok
+test_physical_cohort_must_represent_one_revision_and_godot_build (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_physical_cohort_must_represent_one_revision_and_godot_build) ... ok
+test_rejects_file_integrity_and_path_escape (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_rejects_file_integrity_and_path_escape) ... ok
+test_rejects_unsupported_hardware_missing_metadata_and_broken_timings (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_rejects_unsupported_hardware_missing_metadata_and_broken_timings) ... ok
+test_summary_uses_independent_r7_percentiles_and_stable_zoom_order (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_summary_uses_independent_r7_percentiles_and_stable_zoom_order) ... ok
+test_templates_remain_not_run_and_match_every_current_finding (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_templates_remain_not_run_and_match_every_current_finding) ... ok
+test_timed_pass_requires_unpooled_samples_at_every_recorded_zoom (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_timed_pass_requires_unpooled_samples_at_every_recorded_zoom) ... ok
+test_timing_summary_reports_both_findings_and_both_operating_systems (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_timing_summary_reports_both_findings_and_both_operating_systems) ... ok
+test_untested_rows_cannot_carry_stale_zoom_claims (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_untested_rows_cannot_carry_stale_zoom_claims) ... ok
+test_valid_annotated_row_is_not_equivalent_to_complete_owner_acceptance (test_t094_owner_evidence.OwnerPhysicalEvidenceTests.test_valid_annotated_row_is_not_equivalent_to_complete_owner_acceptance) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 19.431s
+
+OK
+test_all_commands_execute_after_failure_and_report_exact_status (test_t094_ci_replay.LocalReplayTests.test_all_commands_execute_after_failure_and_report_exact_status) ... FAILURE  ci_fail (0.0s)
+SUCCESS  ci_after (0.0s)
+ok
+test_checked_in_inventory_extracts_all_real_commands_in_order (test_t094_ci_replay.LocalReplayTests.test_checked_in_inventory_extracts_all_real_commands_in_order) ... ok
+test_cli_rejects_wrong_git_commit_before_execution (test_t094_ci_replay.LocalReplayTests.test_cli_rejects_wrong_git_commit_before_execution) ... ok
+test_dirty_tree_cannot_impersonate_committed_candidate (test_t094_ci_replay.LocalReplayTests.test_dirty_tree_cannot_impersonate_committed_candidate) ... ok
+test_docking_review_metadata_contract_is_required_in_fast_ci (test_t094_ci_replay.LocalReplayTests.test_docking_review_metadata_contract_is_required_in_fast_ci) ... ok
+test_invalid_selection_does_not_create_artifacts (test_t094_ci_replay.LocalReplayTests.test_invalid_selection_does_not_create_artifacts) ... ok
+test_parser_rejects_unreplayable_step_changes (test_t094_ci_replay.LocalReplayTests.test_parser_rejects_unreplayable_step_changes) ... ok
+test_partial_replay_never_reports_complete_or_passed (test_t094_ci_replay.LocalReplayTests.test_partial_replay_never_reports_complete_or_passed) ... SUCCESS  ci_one (0.0s)
+ok
+test_timeout_kills_process_group_and_continues_next_check (test_t094_ci_replay.LocalReplayTests.test_timeout_kills_process_group_and_continues_next_check) ... TIMEOUT  ci_slow (1.0s)
+SUCCESS  ci_after (0.0s)
+ok
+test_full_record_is_checked_against_original_scripts_and_hashes (test_t094_ci_replay.VerifiedReplayArtifactTests.test_full_record_is_checked_against_original_scripts_and_hashes) ... SUCCESS  ci_example (0.0s)
+ok
+test_missing_tampered_or_symlinked_log_is_not_accepted (test_t094_ci_replay.VerifiedReplayArtifactTests.test_missing_tampered_or_symlinked_log_is_not_accepted) ... SUCCESS  ci_example (0.0s)
+ok
+test_modified_script_or_forged_status_is_rejected (test_t094_ci_replay.VerifiedReplayArtifactTests.test_modified_script_or_forged_status_is_rejected) ... SUCCESS  ci_example (0.0s)
+ok
+test_old_beta2_identity_cannot_verify_beta3_replay (test_t094_ci_replay.VerifiedReplayArtifactTests.test_old_beta2_identity_cannot_verify_beta3_replay) ... SUCCESS  ci_example (0.0s)
+ok
+test_partial_or_changed_summary_cannot_be_reported_green (test_t094_ci_replay.VerifiedReplayArtifactTests.test_partial_or_changed_summary_cannot_be_reported_green) ... SUCCESS  ci_example (0.0s)
+ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 2.049s
+
+OK
+test_cli_export_persists_red_without_leaking_output_data (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_cli_export_persists_red_without_leaking_output_data) ... ok
+test_cli_verify_downloaded_artifact_against_explicit_identity (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_cli_verify_downloaded_artifact_against_explicit_identity) ... ok
+test_complete_pass_covers_all_workflow_ids_and_pinned_identity (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_complete_pass_covers_all_workflow_ids_and_pinned_identity) ... ok
+test_failed_original_outcome_beats_masked_success_conclusion (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_failed_original_outcome_beats_masked_success_conclusion) ... ok
+test_mismatched_workflow_commit_run_engine_or_order_rejected (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_mismatched_workflow_commit_run_engine_or_order_rejected) ... ok
+test_missing_skipped_and_unknown_checks_cannot_show_green (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_missing_skipped_and_unknown_checks_cannot_show_green) ... ok
+test_sensitive_step_outputs_never_enter_evidence (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_sensitive_step_outputs_never_enter_evidence) ... ok
+test_ungrounded_identity_is_not_green (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_ungrounded_identity_is_not_green) ... ok
+test_workflow_uploads_red_and_green_artifacts_after_summary (test_t094_hosted_ci_evidence.HostedCIEvidenceTests.test_workflow_uploads_red_and_green_artifacts_after_summary) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 2.884s
+
+OK
+CI_EVIDENCE_EXPORTED: 46/46 required outcomes; verdict=failed_or_incomplete; not owner approval
+test_cli_preserves_actual_model_log_and_reports_leaks (test_t094_godot_model_log.ModelLogTests.test_cli_preserves_actual_model_log_and_reports_leaks) ... ok
+test_compact_godot_error_is_rejected_by_cli (test_t094_godot_model_log.ModelLogTests.test_compact_godot_error_is_rejected_by_cli) ... ok
+test_compact_godot_timestamped_errors_fail_after_success (test_t094_godot_model_log.ModelLogTests.test_compact_godot_timestamped_errors_fail_after_success) ... ok
+test_embedded_marker_and_post_success_runtime_fault_cannot_hide (test_t094_godot_model_log.ModelLogTests.test_embedded_marker_and_post_success_runtime_fault_cannot_hide) ... ok
+test_every_drawing_model_uses_one_strict_log_check (test_t094_godot_model_log.ModelLogTests.test_every_drawing_model_uses_one_strict_log_check)
+Prevent a future loose substring grep from becoming a false-green gate. ... ok
+test_exact_known_leaks_after_one_success_marker_are_reported (test_t094_godot_model_log.ModelLogTests.test_exact_known_leaks_after_one_success_marker_are_reported) ... ok
+test_fail_late_shell_rejects_marker_plus_runtime_error (test_t094_godot_model_log.ModelLogTests.test_fail_late_shell_rejects_marker_plus_runtime_error)
+Exercise the exact CI guard's exit path, not merely its source text. ... ok
+test_fast_ci_affected_smokes_call_shared_strict_verifier (test_t094_godot_model_log.ModelLogTests.test_fast_ci_affected_smokes_call_shared_strict_verifier) ... ok
+test_headless_save_dialog_keeps_real_dialog_and_desktop_centering (test_t094_godot_model_log.ModelLogTests.test_headless_save_dialog_keeps_real_dialog_and_desktop_centering) ... ok
+test_heap_failure_is_rejected_by_real_log_cli (test_t094_godot_model_log.ModelLogTests.test_heap_failure_is_rejected_by_real_log_cli) ... ok
+test_known_positive_summary_formats_are_accepted (test_t094_godot_model_log.ModelLogTests.test_known_positive_summary_formats_are_accepted) ... ok
+test_legacy_counted_success_marker_requires_exact_positive_check_count (test_t094_godot_model_log.ModelLogTests.test_legacy_counted_success_marker_requires_exact_positive_check_count) ... ok
+test_missing_or_duplicate_or_ambiguous_marker_fails (test_t094_godot_model_log.ModelLogTests.test_missing_or_duplicate_or_ambiguous_marker_fails) ... ok
+test_native_signal_crash_rejected_by_real_cli (test_t094_godot_model_log.ModelLogTests.test_native_signal_crash_rejected_by_real_cli) ... ok
+test_native_signal_crashes_cannot_follow_a_pass_marker (test_t094_godot_model_log.ModelLogTests.test_native_signal_crashes_cannot_follow_a_pass_marker) ... ok
+test_new_source_pixel_oracles_are_required_without_new_check_ids (test_t094_godot_model_log.ModelLogTests.test_new_source_pixel_oracles_are_required_without_new_check_ids) ... ok
+test_partial_or_spoofed_success_summaries_are_fatal (test_t094_godot_model_log.ModelLogTests.test_partial_or_spoofed_success_summaries_are_fatal) ... ok
+test_post_success_oom_heap_and_uncaught_python_failures (test_t094_godot_model_log.ModelLogTests.test_post_success_oom_heap_and_uncaught_python_failures) ... ok
+test_pre_success_leak_is_never_whitelisted (test_t094_godot_model_log.ModelLogTests.test_pre_success_leak_is_never_whitelisted) ... ok
+test_shell_crash_and_python_traceback_fail_through_cli (test_t094_godot_model_log.ModelLogTests.test_shell_crash_and_python_traceback_fail_through_cli) ... ok
+test_shell_wrapped_crashes_and_tracebacks_cannot_follow_pass (test_t094_godot_model_log.ModelLogTests.test_shell_wrapped_crashes_and_tracebacks_cannot_follow_pass) ... ok
+test_unknown_error_after_success_is_fatal (test_t094_godot_model_log.ModelLogTests.test_unknown_error_after_success_is_fatal) ... ok
+test_wrapped_diagnostics_and_process_crashes_cannot_claim_success (test_t094_godot_model_log.ModelLogTests.test_wrapped_diagnostics_and_process_crashes_cannot_claim_success) ... ok
+test_wrapped_diagnostics_fail_through_cli (test_t094_godot_model_log.ModelLogTests.test_wrapped_diagnostics_fail_through_cli) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 13.912s
+
+OK

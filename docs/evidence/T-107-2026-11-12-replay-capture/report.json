@@ -1,0 +1,475 @@
+{
+  "complete": true,
+  "passed": true,
+  "checks_total": 46,
+  "checks_executed": 46,
+  "checks": [
+    {
+      "id": "ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples",
+      "name": "Enforce explicit types in owned GDScript and skill examples",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 1.373,
+      "script_sha256": "5044e1052c4e791b873da2bc3ef275e03ca482bc145208a2ef3072fcd9d75899",
+      "log_sha256": "fabc9dd0b2bb17a330ad1506b3ffb4b371e59f2e36f1c307350f2c536fdd0f92",
+      "log": "logs/ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples.log"
+    },
+    {
+      "id": "ci_03_verify_ci_initializes_main_project_before_gdscript_smokes",
+      "name": "Verify CI initializes main project before GDScript smokes",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.924,
+      "script_sha256": "6b70242747cb5c403f5e9e5a6bea8cb2d6f3820153a3a9f212f6003bc33d6d41",
+      "log_sha256": "48e59303758da4efaae5cc5fc097e37504c0ff08150b5af64cf59d0261aafa2f",
+      "log": "logs/ci_03_verify_ci_initializes_main_project_before_gdscript_smokes.log"
+    },
+    {
+      "id": "ci_04_fail_late_contract",
+      "name": "Verify fail-late CI execution and reporting",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 1.026,
+      "script_sha256": "936e5df0880812e8dd5075a37b37925ac4ec748d36783bfad738c40ac756aaff",
+      "log_sha256": "561234dd0ba7868530fdee35fa83aa85e30147c183c25aea675c0e9e17a6b2bd",
+      "log": "logs/ci_04_fail_late_contract.log"
+    },
+    {
+      "id": "ci_04_verify_t_051_isolated_drawing_contract_consumer",
+      "name": "Verify T-051 isolated Drawing contract consumer",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 6.688,
+      "script_sha256": "5317770af0565ea79128ca04767228bc8fd5459a16bfe876e070a4bd1e367e05",
+      "log_sha256": "5f363ea508119cb14b02dd0f264b35209d85ea4ce5120eaa09639490e8701439",
+      "log": "logs/ci_04_verify_t_051_isolated_drawing_contract_consumer.log"
+    },
+    {
+      "id": "ci_05_verify_t_052_extracted_independent_drawing_core",
+      "name": "Verify T-052 extracted independent Drawing core",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 6.479,
+      "script_sha256": "be7e8de28da29986146c2f07b689d90cf95f31f52e19a8d040afda59abecc747",
+      "log_sha256": "be151534f5c8016f91534867afd2835be238c2067344672b5f5d7841bae0609f",
+      "log": "logs/ci_05_verify_t_052_extracted_independent_drawing_core.log"
+    },
+    {
+      "id": "ci_06_verify_t_053_isolated_standalone_drawing_and_third_package_cons",
+      "name": "Verify T-053 isolated standalone Drawing and third package consumer",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 14.817,
+      "script_sha256": "4ae55ce2f86ef1d843576164307da4af7b7bfdc275279b376eb4242214ab2c66",
+      "log_sha256": "9a9d475cd01bfe01a66326521418a8c2c9eb4dd97498d5d286c46f7cead4bfe4",
+      "log": "logs/ci_06_verify_t_053_isolated_standalone_drawing_and_third_package_cons.log"
+    },
+    {
+      "id": "ci_t085_live_stroke_preview",
+      "name": "Verify T-085 detached live-stroke preview and history",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 13.186,
+      "script_sha256": "4224717f61b832f891f48eb185ce7d361a7c65bc5346f1a710b2906b3858dcfd",
+      "log_sha256": "f707eeb685f86f6b51e3a290fa79a7ad81cad7603189e1ffad56043fdffdd44d",
+      "log": "logs/ci_t085_live_stroke_preview.log"
+    },
+    {
+      "id": "ci_t086_viewport_cache_model",
+      "name": "Verify T-086 source-space dirty-display tile invalidation",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 32.171,
+      "script_sha256": "9d493d69ad7e3ca055afeddf385a119ca932347c5c58389ded82c0dd054c0a7f",
+      "log_sha256": "c5c25b5bd04a408866767e9c636022f76fa18b186d49c8af3a20cccaca1c4771",
+      "log": "logs/ci_t086_viewport_cache_model.log"
+    },
+    {
+      "id": "ci_t087_image_frame_model",
+      "name": "Verify T-087 standalone image frame, portable metadata and independent grid",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 11.358,
+      "script_sha256": "72e03c23b24e833506c3b31f711730c99ca225b27f9727142fba5b8c64f4cab3",
+      "log_sha256": "f81e9d2119128efb1602d29a340236f5a5fd5deeaa8adc01fa0d9d07a4860606",
+      "log": "logs/ci_t087_image_frame_model.log"
+    },
+    {
+      "id": "ci_t088_selection_clipboard_model",
+      "name": "Verify T-088 selection channel, clipboard, and transaction history",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 16.962,
+      "script_sha256": "9031e6a8b20cf4ebc8b29db884b39bb81f8d566e23a41c6f078abba022d4f41e",
+      "log_sha256": "7733d37b84186045722790e029ee86e430c816e7217ee7a5c05d945973fa7971",
+      "log": "logs/ci_t088_selection_clipboard_model.log"
+    },
+    {
+      "id": "ci_t089_layer_structure_model",
+      "name": "Verify T-089 layer hierarchy, row actions, and structural history",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 11.946,
+      "script_sha256": "46579972c43f2a96aba9137cabd32ea46dccaf4d866dd42339fd8f967cf553d9",
+      "log_sha256": "360b92c7f6c2c776f5ad6646dfc79a0b4ffe23cf5f0f93a10bfb476fc5b8823e",
+      "log": "logs/ci_t089_layer_structure_model.log"
+    },
+    {
+      "id": "ci_t090_responsive_workspace_contracts",
+      "name": "Verify T-090 responsive workspace, command routing, and licensed tool icon contracts",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 10.848,
+      "script_sha256": "d2b70785b9406e212c0a58d627c681e688766c8aa6254878c61af89bfeab1666",
+      "log_sha256": "ebb7e459a0c8b52ba5c545d7700c2596468e7debe637d5fe1ab108ccbbfe778c",
+      "log": "logs/ci_t090_responsive_workspace_contracts.log"
+    },
+    {
+      "id": "ci_t091_single_group_docking_model",
+      "name": "Verify T-091 one-group floating dock and legacy settings migration",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 3.287,
+      "script_sha256": "4b151b2d62a571382d883b1eb029df0fc44207c4f45d7867a93cf594afe9973e",
+      "log_sha256": "c47570411db6f37c25a846c2c276ab7d5b90398fcbaa3d1a4dcb7332be160309",
+      "log": "logs/ci_t091_single_group_docking_model.log"
+    },
+    {
+      "id": "ci_t092_compact_color_history_model",
+      "name": "Verify T-092 compact Colors, history cursor, and isolated app preferences",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 12.947,
+      "script_sha256": "cee4c2b918cb40192f65dfbfaf565dec2cec325a5732df4407a01b0d150c83c4",
+      "log_sha256": "a6df33bc29a8dd26fbedeb7fcb343b6f660bc7c2337cc770ad9f81c355c40cac",
+      "log": "logs/ci_t092_compact_color_history_model.log"
+    },
+    {
+      "id": "ci_t093_object_discovery_model",
+      "name": "Verify T-093 Object source discovery, recent-root consent, image import and safe Open",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 15.259,
+      "script_sha256": "b2bcbae3c261c0046bdcfe09d7a931dbcbc074f2ccf030b19bdb0019001c5eaf",
+      "log_sha256": "f4dcd37f9a4c9689ee86c474821c814288becfa1949b2cedeb68659f4fdfff3e",
+      "log": "logs/ci_t093_object_discovery_model.log"
+    },
+    {
+      "id": "ci_07_verify_t_053_standalone_linux_release_package",
+      "name": "Verify T-053 standalone Linux release package",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 17.322,
+      "script_sha256": "c31e39945be4faa0fde3d6bde90d21ca09f80a8455ee958227d0aec228023c33",
+      "log_sha256": "36759d18fdfa47a8dc1140cf4d11b3b2a3578bd4a4138119a916c597ca7fbe6a",
+      "log": "logs/ci_07_verify_t_053_standalone_linux_release_package.log"
+    },
+    {
+      "id": "ci_08_import_resources_and_parse_scripts",
+      "name": "Import resources and parse scripts",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 9.315,
+      "script_sha256": "391a3132bbf47b16a187788a0c73d0029eda9381e1718a71ffbb81c3bb8d0e77",
+      "log_sha256": "1a92e68d529749acf8fe38b33aa5c50daeb4f1a0e4029daa0e24c78c9ac33036",
+      "log": "logs/ci_08_import_resources_and_parse_scripts.log"
+    },
+    {
+      "id": "ci_t015_retired_battlemat_authoring",
+      "name": "Verify T-015 retired battlemat authoring and marker-only links",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 15.248,
+      "script_sha256": "acbd6e2d9b1634c5c7585fc84841a0bd2a1c13169bab88dd7d6fe89269912fe5",
+      "log_sha256": "12f38c734bf2210572ecbbae9a261229757a3c041b1d44145fd1b59e6b2e5110",
+      "log": "logs/ci_t015_retired_battlemat_authoring.log"
+    },
+    {
+      "id": "ci_09_verify_t_054_drawing_atlas_chronological_history",
+      "name": "Verify T-054 Drawing/Atlas chronological history",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 3.28,
+      "script_sha256": "4445a282f7ad9cf107138528aed630c289728e074fcefe817f91395451ae47f7",
+      "log_sha256": "a413700040c092b4abca96213057fa64a4b9505a40262392597170576e7a09dd",
+      "log": "logs/ci_09_verify_t_054_drawing_atlas_chronological_history.log"
+    },
+    {
+      "id": "ci_10_verify_t_058_editable_text_font_integrity_and_undoable_rasteriz",
+      "name": "Verify T-058 editable text, font integrity and undoable rasterization",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 14.278,
+      "script_sha256": "5a58dd96160531c9d778b2daa8a822de201842b2db214f7037506463521d5727",
+      "log_sha256": "fcfe2d51960506b6048fb53f01f9ac34a5e40837f24c4c3b08b78cdbaf320132",
+      "log": "logs/ci_10_verify_t_058_editable_text_font_integrity_and_undoable_rasteriz.log"
+    },
+    {
+      "id": "ci_11_verify_t_060_reusable_object_assets_and_atomic_save_as",
+      "name": "Verify T-060 reusable Object Assets and atomic Save As",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 2.374,
+      "script_sha256": "51ef2211581f3c42773ef9e82660128733eb9d38b6a3a3e644aa56937382d971",
+      "log_sha256": "ba5cb71fd9be2738407dc0137705a9263de55f1739149757613963d10585af26",
+      "log": "logs/ci_11_verify_t_060_reusable_object_assets_and_atomic_save_as.log"
+    },
+    {
+      "id": "ci_11b_verify_t_064_nested_object_graph",
+      "name": "Verify T-064 nested Object child graph, safe saves and cycle rejection",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.766,
+      "script_sha256": "ec23f02a41fc9780b1df35bf43b30112fb0ad2ff9cd3ef5f1de35e02b6b42ecd",
+      "log_sha256": "4730d4ac0a3516dc1cf886fdc04559733fc6169c073e19ef053488fd907ce469",
+      "log": "logs/ci_11b_verify_t_064_nested_object_graph.log"
+    },
+    {
+      "id": "ci_t064_nested_project_copy",
+      "name": "Verify T-064 atomic nested Objects project copying",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 8.126,
+      "script_sha256": "e7cfccbaa1e5b03c08259234a59e00b03567c0f3009ae59e9e4ea8af944ca8e4",
+      "log_sha256": "e9aaf7bccfdce42b73cb15eb40a5c31244d9026dc4599df7e744be230a211503",
+      "log": "logs/ci_t064_nested_project_copy.log"
+    },
+    {
+      "id": "ci_t064_nested_source_render",
+      "name": "Verify T-064 bounded nested source composition and hit paths",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.867,
+      "script_sha256": "9a3aeb009128de5961818d7eac9e40f478738ee3e2f5bc277b07fb5c812ad097",
+      "log_sha256": "7317f48832ba8c698dedcdeb7c89500984d816f0ea6144d8394cd6ad6d229689",
+      "log": "logs/ci_t064_nested_source_render.log"
+    },
+    {
+      "id": "ci_t064_nested_child_edit",
+      "name": "Verify T-064 parent-scoped nested child transforms and history",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 13.223,
+      "script_sha256": "1057f2d9dae4de9401f1575d7e4ac6188cc905ce3b1209522d26934cd085699a",
+      "log_sha256": "37d0ccfb5f44ea5c5e671911ed84542ffa2c67b85d75381c9c741372a8031bb1",
+      "log": "logs/ci_t064_nested_child_edit.log"
+    },
+    {
+      "id": "ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s",
+      "name": "Verify T-062 Object Editor source publishing, bound origin and saved variants",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 14.868,
+      "script_sha256": "766658b61a1dae84da98858f5bac5cf23d66ba7381890f7811e0eca1d3292d2c",
+      "log_sha256": "1cef70f53eb11372d3fdcbdf11291f3511c305b7166540412995ac3c61c0b038",
+      "log": "logs/ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s.log"
+    },
+    {
+      "id": "ci_13_verify_t_061_signed_floor_detail_world_mapping_and_blank_d_leve",
+      "name": "Verify T-061 signed floor/detail world mapping and blank D-levels",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 1.169,
+      "script_sha256": "4bd199e5a1a6941a2592027cf4fb4a808d151ae0d68f0dd0da306aaacda3fa04",
+      "log_sha256": "57b4b79a5f6d18fe10403a01cdec613ae8f212f59f1d808b535c3ebf726e8fdc",
+      "log": "logs/ci_13_verify_t_061_signed_floor_detail_world_mapping_and_blank_d_leve.log"
+    },
+    {
+      "id": "ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input",
+      "name": "Verify T-055 Atlas canonical Drawing composition and input",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 5.04,
+      "script_sha256": "8b1fdc4684f0c7b923f210081fd10c8e5ec0b124ec8c06460522a11d441bd923",
+      "log_sha256": "7453b6e888a887c8019cf3f04398ad3af71306a8fcf9e9c8ff5aebf3fad7d3b5",
+      "log": "logs/ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input.log"
+    },
+    {
+      "id": "ci_t068_stationary_dab_parity",
+      "name": "Verify T-068 hard-dab parity and source-tile cache transactions",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 163.087,
+      "script_sha256": "96ed6843f8e7154ce0a84508e0f4194bfd358a5759977208ad6169ae903dfb62",
+      "log_sha256": "6fe3714c2c145578411c7476997c91ccc1b269cc6d9770ff3a924ea90b3f4710",
+      "log": "logs/ci_t068_stationary_dab_parity.log"
+    },
+    {
+      "id": "ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed",
+      "name": "Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 4.582,
+      "script_sha256": "6b753d9eadbdb7b9722a41c813fd1078b9c310c6079e58933bdbb0d9dbb15fa5",
+      "log_sha256": "b9501e6bac9d97d623086cfee9cd15c8b745a49530d69b362c293355596ffd19",
+      "log": "logs/ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed.log"
+    },
+    {
+      "id": "ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux",
+      "name": "Verify T-073 approved inventory versus proposed workspace UX",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 45.296,
+      "script_sha256": "2e3036b6f399c9976c38c3e49be63d8cdba92dafe6ecad78b03524cca287bb6d",
+      "log_sha256": "b950bf15e1996d79bef931059418402bd6110e2614bdf4e4cfec7b084c043e9d",
+      "log": "logs/ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux.log"
+    },
+    {
+      "id": "ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract",
+      "name": "Verify T-063 compact Drawing workspace and shortcut contract",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 1.034,
+      "script_sha256": "eae0529e0a79a7f5f94e7a448c7bb47243bb710728f1652da61617100ccddbf6",
+      "log_sha256": "89296cfde9dabe3ab7feea50f5e3af96809225f9aa3cdb663fec6af7e01398b6",
+      "log": "logs/ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract.log"
+    },
+    {
+      "id": "ci_dock_layout_model",
+      "name": "Verify T-078 reusable grouped dock layout model",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 2.576,
+      "script_sha256": "dbcb062772e395f5b78cad84625f68a000ce0121691652f5fbe69f66d88a849f",
+      "log_sha256": "45e2e359392d7fac9d5a3e91467921b76e8b50521506c9d38540b1598860fae9",
+      "log": "logs/ci_dock_layout_model.log"
+    },
+    {
+      "id": "ci_dock_drag_model",
+      "name": "Verify T-080 transactional dock drag/drop model",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.315,
+      "script_sha256": "202bc0c3bf9eb557697279783bdc970b3f2af42d7f6e961a2d3d49055e23ffb5",
+      "log_sha256": "4636c486ae75d99b5d50b57cb8813878b94f1e35434eb72c7a485a8f608fea56",
+      "log": "logs/ci_dock_drag_model.log"
+    },
+    {
+      "id": "ci_dock_floating_model",
+      "name": "Verify T-081 floating host ownership and transaction model",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.424,
+      "script_sha256": "0260ac0f386fd09a5891f6fc60358136d27a68c95e750abe36315bd47fa53c16",
+      "log_sha256": "0fccd544ec572d3c0a9c6f010c080f9aece23ffba530257e99b4e2edeb467768",
+      "log": "logs/ci_dock_floating_model.log"
+    },
+    {
+      "id": "ci_dock_cross_model",
+      "name": "Verify T-082 cross-container docking transaction model",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.517,
+      "script_sha256": "39788e7c5d69a50a1113c4ffd896e0d70389ef3e96dd38ff50bdd8e4339de379",
+      "log_sha256": "04c496f81e8caaab7b0d75b0e434e8a5dca9a444bb181fc792eb42cd68d64f9a",
+      "log": "logs/ci_dock_cross_model.log"
+    },
+    {
+      "id": "ci_dock_persistence_model",
+      "name": "Verify T-083 versioned dock layout persistence and corrupt-data recovery",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.421,
+      "script_sha256": "6568d85f70aa4780281db749c7ec6933814fa81b745b333baa2acc6fea998106",
+      "log_sha256": "0bb3fa4faaa35a57e6a2ad6bd8a3f497a330bad7edc1b6ec9906f6f28cd673e3",
+      "log": "logs/ci_dock_persistence_model.log"
+    },
+    {
+      "id": "ci_t065_asset_browser_model",
+      "name": "Verify T-065 portable Object Asset Browser and dock integration",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 4.843,
+      "script_sha256": "8322e34ac2a789c0e5a93beea150a4e5ea634014d9dac844006f7221977d390a",
+      "log_sha256": "aa4b4db04c69a4a5b5dbd40a5c3da9014f7635732884eabb3987a56c4cfa056d",
+      "log": "logs/ci_t065_asset_browser_model.log"
+    },
+    {
+      "id": "ci_t065_asset_thumbnail_model",
+      "name": "Verify T-065 lazily rendered Object source thumbnails",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 3.349,
+      "script_sha256": "67f484fec5c163b5dfb56978efc16c41c9417a1110a19c1d47c2cb273b12412f",
+      "log_sha256": "3b99a515412d47a393c7ba40e63036afadf93242fc276159f0f7fa58c79b2751",
+      "log": "logs/ci_t065_asset_thumbnail_model.log"
+    },
+    {
+      "id": "ci_t065_real_source_io",
+      "name": "Verify T-065 Object metadata listing, full pixel decoding and cache safety",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 1.471,
+      "script_sha256": "e1c8fe4edd724fa5a62da1a53e2be68014a45999c14b35fd42c8e23838505dd8",
+      "log_sha256": "43ea7fca8d6db23d93155c83cbd61004c3ee31afebaad19b07b6ff68527c355f",
+      "log": "logs/ci_t065_real_source_io.log"
+    },
+    {
+      "id": "ci_t065_asset_transfer_model",
+      "name": "Verify T-065 explicit portable Object source transfers",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.768,
+      "script_sha256": "51597d7a8bd786ab37911b20d20e50010a271630c1b30b0ce11a0bf82e5effc3",
+      "log_sha256": "74af768ee389491e2d9e92d63cf7539bf5a6af87a868d82b171347fdd7120157",
+      "log": "logs/ci_t065_asset_transfer_model.log"
+    },
+    {
+      "id": "ci_t065_atlas_null_transactions",
+      "name": "Verify T-065 Atlas source deletion and NULL repair transaction safety",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.918,
+      "script_sha256": "68dae3814304629d5bee4377196c5ac6b286dd35d126a989a39c7d414ea4f89d",
+      "log_sha256": "7fc800d865158ec2a76145960776f8456bf8296604359c8b8441500028dfd4c6",
+      "log": "logs/ci_t065_atlas_null_transactions.log"
+    },
+    {
+      "id": "ci_t065_atlas_source_manager",
+      "name": "Verify T-065 Atlas source manager and deliberate NULL actions",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 1.069,
+      "script_sha256": "52b809bb436f25725d67907427c5b60b58b389feec69b124f4733e2cb2030442",
+      "log_sha256": "862c672570fceb3788233dcbed393f710e6cef11577888183ace45f1f24e8843",
+      "log": "logs/ci_t065_atlas_source_manager.log"
+    },
+    {
+      "id": "ci_t065_atlas_portable_registry",
+      "name": "Verify T-065 Atlas-owned portable Object registration and export",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 0.847,
+      "script_sha256": "fe888c7639be794ca6851a0de288b971fa9d671316ea305ac7639fe43d3619a3",
+      "log_sha256": "991d6c21e5811ebdadabdf62a7d924ada0a0794ecb58adfd96a9e9bed6d2fd9e",
+      "log": "logs/ci_t065_atlas_portable_registry.log"
+    },
+    {
+      "id": "ci_t065_atlas_browser_bridge",
+      "name": "Verify T-065 shared Atlas Asset Browser and guarded linked drops",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 4.348,
+      "script_sha256": "682675ef94a72e1a7933f3a1aef715664a5188e71991b96c345b7a79fe036e53",
+      "log_sha256": "75d154a3a964be81a24ca018972c645e2bc7fd47b633266e9ca8e98782fc3eca",
+      "log": "logs/ci_t065_atlas_browser_bridge.log"
+    },
+    {
+      "id": "ci_t065_atlas_browser_paging",
+      "name": "Verify T-065 large Atlas source catalog paging and global search",
+      "outcome": "success",
+      "exit_code": 0,
+      "duration_seconds": 2.876,
+      "script_sha256": "440dd4f52fa19352ed024ad39ebd8958de249cbe8013ea656fb3a8c30063fd66",
+      "log_sha256": "abdf69d6d24dcffcac4a49f7d37e819b3ca2ff77908aa422612cf0f0c62c9bee",
+      "log": "logs/ci_t065_atlas_browser_paging.log"
+    }
+  ],
+  "schema_version": 1,
+  "candidate_commit": null,
+  "base_head_sha": "9c6f0289cd46552f1f4e1d819d2f56d54a762fa3",
+  "working_tree_clean": false,
+  "godot_version": "4.8.beta3.official.c51ff06e8",
+  "workflow_sha256": "835f044bf57224999dea386959bbc14b4f60e3d5b4a4bf798db8ff2da79a411f",
+  "runner": "local-fast-CI-replay-not-GitHub"
+}

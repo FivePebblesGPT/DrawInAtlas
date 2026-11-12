@@ -1,0 +1,6 @@
+test_main_project_import_precedes_script_consumers (test_godot_ci_order.GodotCIOrderTests.test_main_project_import_precedes_script_consumers) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+OK

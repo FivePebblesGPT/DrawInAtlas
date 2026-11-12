@@ -23,11 +23,25 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   *(operation-specific choice/defer/reject; no native default adoption)*,
   [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md)
   **In Progress** *(beta3 local repairs; hosted 46/46 pending)*,
-  [T-107](Tickets/T-107.md) **Ready**; T-064 → [T-108](Tickets/T-108.md);
+  [T-107](Tickets/T-107.md) **In Progress**; T-064 → [T-108](Tickets/T-108.md);
   T-065 → [T-109](Tickets/T-109.md).
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-107 archived CI and 23-finding owner audit (2026-11-12; In Progress)
+
+All 46 **historical exploratory** T-106 fast-CI outcomes and exact raw log/script
+SHA-256s are archived and fail-closed audited; a fresh beta3 standalone
+`.drawing` Save/Open (42/42), Atlas composition (89/89), and campaign Save/Open
+(86/86) also pass exact-marker checks, preserving known exit-leak diagnostics.
+The machine-readable ledger maps all 23 owner findings to source/tickets and
+separate Linux/Windows **NOT RUN** actions. #22 remains an owner-reported
+working Save/Open path and #23 expected internal revision semantics, not new
+hardware approvals. PR #17 still points at T-098; no hosted 46/46 check on
+the later candidate is verified, so T-107/T-106/T-094 stay In Progress and
+all manual gates remain pending. [Ticket](Tickets/T-107.md) ·
+[Evidence](evidence/T-107-2026-11-12-hosted-owner-readiness.md).
 
 ## T-106 required fast-CI beta3 repairs (2026-11-12; In Progress)
 
@@ -2438,7 +2452,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-104 · Operation-specific native raster backend decision](Tickets/T-104.md) | Done | — | [T-052](Tickets/T-052.md), [T-097](Tickets/T-097.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Linux native-free export + OS RSS verified; Windows/MSVC/VRAM and editor gesture evidence open | [T-052](Tickets/T-052.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | — | [T-053](Tickets/T-053.md) |
-| [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | Ready | — | [T-053](Tickets/T-053.md) |
+| [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | Ready | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 
