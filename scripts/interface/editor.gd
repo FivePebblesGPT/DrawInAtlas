@@ -1392,6 +1392,13 @@ func _restyle_selected_token() -> void:
 func _edit_token(before: AtlasToken, after: AtlasToken) -> void:
 	if canvas.map == null or canvas.floor == null or not canvas.editing_target_is_presented():
 		return
+	# The history command addresses stable IDs; do not redirect a token change
+	# from detached Canvas Resources into a same-ID registered replacement.
+	if campaign == null or canvas.campaign != campaign \
+			or campaign.get_map(canvas.map.id) != canvas.map \
+			or canvas.map.floor_by_id(canvas.floor.id) != canvas.floor:
+		_message("Token action rejected: source map or floor is no longer registered.")
+		return
 	var layer: AtlasTokenLayer = canvas.floor.layer_by_id(canvas.active_layer_id) as AtlasTokenLayer
 	if layer == null or not layer.is_editable():
 		return

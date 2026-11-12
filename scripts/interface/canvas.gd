@@ -167,6 +167,7 @@ var _token_drag_start: Vector2 = Vector2.ZERO
 ## A token's pointer drag is authorized by its press-time layer instance,
 ## source revision and effective cell mask, not whatever is selected at release.
 var _token_scope_at_press: AtlasEditScope
+var _token_campaign_at_press: AtlasCampaign
 var _token_map_at_press: AtlasMapDocument
 var _token_floor_at_press: AtlasFloor
 var _token_layer_at_press: AtlasTokenLayer
@@ -698,6 +699,8 @@ func _draw_token(item: Node2D, token: AtlasToken) -> void:
 
 
 func delete_selected_token() -> bool:
+	if not _token_target_registered():
+		return false
 	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
 	if layer == null or not editing_target_is_presented() or not layer.is_editable():
 		return false
@@ -715,14 +718,23 @@ func _clear_token_drag_context() -> void:
 	_token_drag_before = null
 	_token_drag_preview = null
 	_token_scope_at_press = null
+	_token_campaign_at_press = null
 	_token_map_at_press = null
 	_token_floor_at_press = null
 	_token_layer_at_press = null
 	_token_snap_at_press = false
 
 
+## Even a byte-identical Resource with matching IDs cannot inherit the original
+## token gesture when its parent registry has changed.
+func _token_target_registered() -> bool:
+	return campaign != null and map != null and floor != null \
+		and campaign.get_map(map.id) == map and map.floor_by_id(floor.id) == floor
+
+
 func _token_drag_context_matches() -> bool:
-	if _token_scope_at_press == null or _token_drag_before == null or map == null or floor == null:
+	if _token_scope_at_press == null or _token_drag_before == null \
+			or campaign != _token_campaign_at_press or not _token_target_registered():
 		return false
 	if map != _token_map_at_press or floor != _token_floor_at_press \
 			or floor.layer_by_id(active_layer_id) != _token_layer_at_press \
@@ -744,6 +756,9 @@ func _reject_stale_token_drag() -> void:
 
 
 func _begin_token_press(position: Vector2) -> void:
+	if not _token_target_registered():
+		token_rejected.emit("Token source is no longer registered in this campaign.")
+		return
 	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
 	if layer == null or not editing_target_is_presented() or not layer.is_editable():
 		return
@@ -758,6 +773,7 @@ func _begin_token_press(position: Vector2) -> void:
 			_token_drag_preview = candidate.copy()
 			_token_drag_start = position
 			_token_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+			_token_campaign_at_press = campaign
 			_token_map_at_press = map
 			_token_floor_at_press = floor
 			_token_layer_at_press = layer

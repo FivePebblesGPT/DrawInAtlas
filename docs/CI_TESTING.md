@@ -1,3 +1,18 @@
+## T-119 GM Token registry ownership (2026-11-12)
+
+The existing required `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+check additionally runs `tests/t119_token_registered_target_smoke.gd` with
+an independent 120-second watchdog, retained raw log, and strict
+`T119_TOKEN_PASSED` success-marker validation. The new 47-assertion model
+rejects same-ID/byte map/floor replacements, removed registry entries, and
+stale direct edits before any Token request or Undo publication. Original
+T-118 Canvas/Editor fail 19 checks. The 15-check graphical Token framebuffer
+witness is separately available in on-demand
+`godot-native-t119-token.yml`, with strict log validation and artifact
+retention. No new required CI step IDs (**46 unchanged**), no native binary,
+no approval of T-039/T-041 privacy/ownership and no physical latency claim.
+[Evidence](evidence/T-119-2026-11-12-token-registered-source.md).
+
 ## T-118 Wall Path portable Save/Open regression (2026-11-12)
 
 The existing required

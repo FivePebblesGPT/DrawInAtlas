@@ -45,6 +45,9 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Wall paths T-026:** [T-117 registered Wall Path authorization](Tickets/T-117.md)
   **Done** *(stale campaign/map/floor identity denies drafts, vertex drags and
   direct edits; control-vertex UX and path-schema approval remain open)*.
+- **GM Token T-041:** [T-119 registered-source authorization](Tickets/T-119.md)
+  **Done** *(drag, placement and delete cannot use detached campaign/map/floor;
+  T-041 remains Blocked by T-039 privacy approval)*.
 - **Atlas Wall Path portable persistence:** [T-118 Wall Path regression repair](Tickets/T-118.md)
   **Done** *(portable generation Save/Open, explicit selected-path restyle and
   enabled-mask drag authorization; no runtime change or T-026 approval)*.
@@ -54,6 +57,21 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-119 GM Token registered-source authorization (2026-11-12; Done)
+
+GM Token drags now freeze and revalidate campaign registration in addition to
+press-time map, floor, layer, token content and mask. Same-ID/byte replacements
+and detached registry entries cannot emit a token edit or create Undo history;
+new placements, deletion and direct Editor commands also reject detached
+sources. The original code fails **19/47** new assertions; the candidate
+passes **47/47**, with **15/15** graphical pointer/framebuffer checks and
+normal Token/selection regressions green. The new source oracle runs inside
+the existing 46-check CI inventory, and the graphical witness runs on demand.
+T-041 remains **Blocked** on T-039's owner privacy policy. Neither approval
+nor hosted CI/physical-device results are inferred.
+[Ticket](Tickets/T-119.md) ·
+[Evidence](evidence/T-119-2026-11-12-token-registered-source.md).
 
 ## T-118 Wall Path regression correction (2026-11-12; Done)
 
@@ -2663,6 +2681,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-116 · Atlas Text portable Save/Open regression](Tickets/T-116.md) | Done | D0/D1 portable generation and editable text validated; T-027 owner UX open | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
 | [T-117 · Wall Path registered campaign/map/floor authorization](Tickets/T-117.md) | Done | Drafts, vertex drags and direct edits require registered resources; T-026 UX and persistence review open | [T-028](Tickets/T-028.md) |
 | [T-118 · Wall Path portable Save/Open and mask-context regression](Tickets/T-118.md) | Done | 82-check Wall test corrected; T-026 owner interaction and persistence review open | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md), [T-117](Tickets/T-117.md) |
+| [T-119 · GM Token registered source authorization](Tickets/T-119.md) | Done | Drag, placement, delete and direct edits require live campaign/map/floor; T-041 privacy policy gate unchanged | [T-028](Tickets/T-028.md) |
 
 ## Epics
 

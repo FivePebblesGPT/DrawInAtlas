@@ -1,0 +1,26 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T119_TOKEN_FAILED: map_replaced: stale release rejected before an edit request
+T119_TOKEN_FAILED: map_replaced: rejected preview and selection cleared
+T119_TOKEN_FAILED: map_replaced: original pixel-independent token source and history unchanged
+T119_TOKEN_FAILED: map_replaced: registered replacement unchanged
+T119_TOKEN_FAILED: map_removed: stale release rejected before an edit request
+T119_TOKEN_FAILED: map_removed: rejected preview and selection cleared
+T119_TOKEN_FAILED: floor_replaced: stale release rejected before an edit request
+T119_TOKEN_FAILED: floor_replaced: rejected preview and selection cleared
+T119_TOKEN_FAILED: floor_replaced: original pixel-independent token source and history unchanged
+T119_TOKEN_FAILED: floor_replaced: registered replacement unchanged
+T119_TOKEN_FAILED: floor_removed: stale release rejected before an edit request
+T119_TOKEN_FAILED: floor_removed: rejected preview and selection cleared
+T119_TOKEN_FAILED: canvas_campaign_replaced: stale release rejected before an edit request
+T119_TOKEN_FAILED: canvas_campaign_replaced: rejected preview and selection cleared
+T119_TOKEN_FAILED: canvas_campaign_replaced: original pixel-independent token source and history unchanged
+T119_TOKEN_FAILED: canvas_campaign_replaced: registered replacement unchanged
+T119_TOKEN_FAILED: direct: detached source cannot request deletion
+T119_TOKEN_FAILED: direct: detached source cannot request new placement
+T119_TOKEN_FAILED: direct: editor rejects stale command despite equal IDs/bytes
+T119_TOKEN_FAILED: 47 checks

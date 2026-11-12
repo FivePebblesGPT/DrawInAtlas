@@ -124,6 +124,39 @@ func _run() -> void:
 		and editor.edits._cursor == history_before,
 		"stale pointer release leaves token pixels and history unchanged")
 	editor._on_scope_toggled(false)
+	# A same-ID map replacement in the campaign registry must also retire the
+	# currently rendered token preview, even when Canvas still holds the source.
+	var original_map: AtlasMapDocument = canvas.map
+	var registered_before: Dictionary = layer.to_dict().duplicate(true)
+	var history_registered: int = editor.edits._cursor
+	_mouse(canvas, guarded_start_local, true)
+	canvas._gui_input(drag)
+	await _frames()
+	_check(_red(_pixel(canvas, guarded_end)) and layer.token_by_id(guard_id).position == guarded_start,
+		"registry-change control has a visible unpublished token preview")
+	var replacement_map: AtlasMapDocument = AtlasMapDocument.from_dict(original_map.to_dict())
+	_check(replacement_map != null and replacement_map != original_map
+		and replacement_map.to_dict() == original_map.to_dict(),
+		"registered replacement map has identical IDs and saved bytes")
+	editor.campaign.add_map(replacement_map)
+	canvas._gui_input(drag)
+	await _frames()
+	_check(canvas._token_drag_preview == null and _red(_pixel(canvas, guarded_start))
+		and not _red(_pixel(canvas, guarded_end)),
+		"stale registry replacement removes live token preview from framebuffer")
+	_mouse(canvas, guarded_end_local, false)
+	var replacement_layer: AtlasTokenLayer = replacement_map.floor_by_id(canvas.floor.id).layer_by_id(layer.id) as AtlasTokenLayer
+	_check(layer.to_dict() == registered_before and replacement_layer.to_dict() == registered_before
+		and editor.edits._cursor == history_registered,
+		"registry replacement preserves both token sources and Undo history")
+	editor.campaign.add_map(original_map)
+	_mouse(canvas, guarded_start_local, true)
+	canvas._gui_input(drag)
+	_mouse(canvas, guarded_end_local, false)
+	await _frames()
+	_check(layer.token_by_id(guard_id).position == guarded_end and _red(_pixel(canvas, guarded_end))
+		and editor.edits._cursor == history_registered + 1,
+		"fresh token drag commits after restoring registered owner")
 	var path: String = "user://validation/token-gm-native.png"
 	DirAccess.make_dir_recursive_absolute("user://validation")
 	_check(root.get_texture().get_image().save_png(path) == OK, "native proof screenshot saved")
