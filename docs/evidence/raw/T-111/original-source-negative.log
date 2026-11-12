@@ -1,0 +1,27 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T111_LINE_GATE_FAILED: locked: changed authorization invalidates pending draft
+T111_LINE_GATE_FAILED: locked: release rejects without emitting a raster command
+T111_LINE_GATE_FAILED: hidden: changed authorization invalidates pending draft
+T111_LINE_GATE_FAILED: hidden: release rejects without emitting a raster command
+T111_LINE_GATE_FAILED: different_detail: changed authorization invalidates pending draft
+T111_LINE_GATE_FAILED: different_detail: release rejects without emitting a raster command
+T111_LINE_GATE_FAILED: same_id_replacement: changed authorization invalidates pending draft
+T111_LINE_GATE_FAILED: same_id_replacement: release rejects without emitting a raster command
+T111_LINE_GATE_FAILED: same_id_replacement: rejection leaves pixels and undo history untouched
+T111_LINE_GATE_FAILED: same_id_floor_replacement: changed authorization invalidates pending draft
+T111_LINE_GATE_FAILED: same_id_floor_replacement: release rejects without emitting a raster command
+T111_LINE_GATE_FAILED: same_id_floor_replacement: rejection leaves pixels and undo history untouched
+T111_LINE_GATE_FAILED: same_id_floor_replacement: restore original target for another gesture
+T111_LINE_GATE_FAILED: same_id_map_replacement: preview detached before release
+T111_LINE_GATE_FAILED: same_id_map_replacement: changed authorization invalidates pending draft
+T111_LINE_GATE_FAILED: same_id_map_replacement: release rejects without emitting a raster command
+T111_LINE_GATE_FAILED: same_id_map_replacement: rejection leaves pixels and undo history untouched
+T111_LINE_GATE_FAILED: same_id_map_replacement: restore original target for another gesture
+T111_LINE_GATE_FAILED: unchanged source publishes precisely one line command
+T111_LINE_GATE_FAILED: valid line paints canonical pixels and creates one undo
+T111_LINE_GATE_FAILED (49 checks, 20 failures)

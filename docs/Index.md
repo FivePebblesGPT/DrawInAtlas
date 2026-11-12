@@ -27,8 +27,26 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   T-065 → [T-109](Tickets/T-109.md) **Done** *(real-directory safety; not owner UX approval)*,
   [T-110](Tickets/T-110.md) **Done** *(lossless portable UTF-8 index/Import; not owner UX approval)*.
 
+- **Atlas Line T-024:** [T-111 release authorization](Tickets/T-111.md)
+  **Done** *(same-resource map/floor/layer eligibility gate; original
+  T-024 interaction approval remains open)*.
+
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-111 Line target identity and lock/visibility release safety (2026-11-12; Done)
+
+A held Atlas Line previously authorized the release using matching IDs and
+mask even after its raster Resource was replaced, locked, hidden or moved to
+an unpresented detail. Its release guard now requires the exact captured map,
+floor and raster Resources plus current editability/presentation. The
+49-check headless red control fails 20 assertions on the prior source, while
+the changed source passes; the native graphical Line suite passes 20/20. A
+fresh valid Line still creates one Undo/Redo transaction. The existing
+required CI step runs the strict oracle without adding a 47th check. The
+parent T-024's owner interaction approval remains outstanding.
+[Ticket](Tickets/T-111.md) ·
+[Evidence](evidence/T-111-2026-11-12-line-release-target-authorization.md).
 
 ## T-110 byte-exact portable UTF-8 source authorization (2026-11-12; Done)
 
@@ -2506,6 +2524,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | In Progress | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 | [T-110 · Byte-exact UTF-8 authorization for portable Object sources](Tickets/T-110.md) | Done | — | [T-109](Tickets/T-109.md) |
+| [T-111 · Line release target identity and layer eligibility](Tickets/T-111.md) | Done | — | [T-028](Tickets/T-028.md) |
 
 ## Epics
 

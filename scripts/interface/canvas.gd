@@ -213,9 +213,9 @@ var _shape_kind: String = ""
 ## A Line draft is valid only for its original floor, raster and edit-mask
 ## footprint. Release must not silently paint under a different authorization.
 var _line_scope_at_press: AtlasEditScope
-var _line_map_at_press: String = ""
-var _line_floor_at_press: String = ""
-var _line_layer_at_press: String = ""
+var _line_map_at_press: AtlasMapDocument
+var _line_floor_at_press: AtlasFloor
+var _line_layer_at_press: AtlasRasterLayer
 ## The Polygon is a multi-click gesture; its first vertex freezes the exact
 ## editable target and cell mask until a valid close or explicit cancellation.
 var _polygon_scope_at_start: AtlasEditScope
@@ -1012,17 +1012,19 @@ func _clear_ink_masks() -> void:
 ## Clear authorization captured for this unfinished Line on commit or cancel.
 func _clear_line_context() -> void:
 	_line_scope_at_press = null
-	_line_map_at_press = ""
-	_line_floor_at_press = ""
-	_line_layer_at_press = ""
+	_line_map_at_press = null
+	_line_floor_at_press = null
+	_line_layer_at_press = null
 
 
-## Compare the current editable target and effective mask with the press-time
-## copy. An unlocked mask is always an empty polygon, regardless of cell focus.
+## Do not authorize an unfinished Line from IDs alone: its layer may be
+## replaced, hidden, locked or moved to an unpresented detail while held.
+## The mask must also remain identical to the press-time copy.
 func _line_context_matches() -> bool:
-	return _line_scope_at_press != null and map != null and floor != null \
-		and map.id == _line_map_at_press and floor.id == _line_floor_at_press \
-		and active_layer_id == _line_layer_at_press \
+	return _line_scope_at_press != null and map == _line_map_at_press \
+		and floor == _line_floor_at_press and _line_layer_at_press != null \
+		and floor.layer_by_id(active_layer_id) == _line_layer_at_press \
+		and _line_layer_at_press.is_editable() and editing_target_is_presented() \
 		and edit_scope.enabled == _line_scope_at_press.enabled \
 		and edit_scope.polygon == _line_scope_at_press.polygon
 
@@ -1472,9 +1474,9 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_shape_kind = Tool.keys()[tool]
 				if tool == Tool.LINE:
 					_line_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
-					_line_map_at_press = map.id
-					_line_floor_at_press = floor.id
-					_line_layer_at_press = active_layer_id
+					_line_map_at_press = map
+					_line_floor_at_press = floor
+					_line_layer_at_press = layer
 				_gesture_snap = snap_to_grid
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_brush_cursor_local = mouse.position

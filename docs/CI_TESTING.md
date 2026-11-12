@@ -1,3 +1,19 @@
+## T-111 Atlas Line mid-gesture target authorization (2026-11-12)
+
+The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step runs `tests/t111_line_release_authorization_smoke.gd` on the real Atlas
+Editor after its canonical composition check, with an independent raw log,
+120-second watchdog and `tools/check_godot_model_log.py --marker
+T111_LINE_GATE_PASSED`. The test verifies that a held Line **cannot** emit a
+stroke if the original raster Resource is locked, hidden, reassigned to
+another detail or replaced by a different Resource sharing the same ID, or if the map/floor
+Resource is replaced using the same ID.
+It also verifies that a fresh gesture still commits and Undoes/Redoes one
+canonical change. The T-110 source fails 20 assertions; the candidate passes
+49/49. The CI inventory stays at **46 required IDs**; the legacy Atlas Line
+UX/policy owner review remains outstanding. Xvfb/Mesa checks are only
+software-renderer evidence. [Evidence](evidence/T-111-2026-11-12-line-release-target-authorization.md).
+
 ## T-110 byte-exact UTF-8 portable source gate (2026-11-12)
 
 The existing required `ci_t065_asset_browser_model` step runs
