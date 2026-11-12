@@ -97,6 +97,9 @@ jobs:
           # invalidation and conservative over-budget/unknown occupancy fallback.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t102_cold_population_smoke.gd 2>&1 | tee /tmp/godot-t102-cold-population.log
           python3 tools/check_godot_model_log.py /tmp/godot-t102-cold-population.log --marker T102_MODEL_PASSED || ci_fail_marker 'T102 cold population scheduling log rejected'
+          # T-103 software-only over-budget focal preselection and safe fallbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t103_retention_plan_smoke.gd 2>&1 | tee /tmp/godot-t103-retention.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t103-retention.log --marker T103_MODEL_PASSED || ci_fail_marker 'T103 focal retention planner rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cold-model.log --marker T086_COLD_PASSED || ci_fail_marker 'T086 cold renderer parity witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_pixel_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-pixels.log

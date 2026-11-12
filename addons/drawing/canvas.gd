@@ -183,6 +183,10 @@ const MAX_DISPLAY_TILES: int = 144
 const MAX_COLD_TILES_PER_DRAW: int = 4
 const MAX_COLD_COMPOSE_CPU_US: int = 10000
 const MAX_OCCUPANCY_ENTRIES: int = 40000
+## Focal preselection is deliberately limited: an enormous/unknown viewport
+## retains the conservative per-miss eviction path without unbounded sorting.
+const MAX_FOCAL_PLAN_WINDOW: int = 65536
+const MAX_FOCAL_PLAN_CANDIDATES: int = 4096
 var _display_tiles: Dictionary[String, Dictionary] = {}
 ## Keep evicted draw-command RIDs alive through the submitted frame. This is
 ## transient and separate from the bounded retained LRU (see instrumentation).
@@ -648,6 +652,48 @@ func _tile_focus_distance(tile: Vector2i, focus: Vector2) -> float:
 	return delta.length_squared()
 
 
+## A viewport containing more occupied display tiles than the cache can hold
+## must build transient textures for the remainder. Choose its 144 retained
+## keys *once* per frame, rather than rescanning every existing texture on each
+## transient cache miss. This is metadata-only; drawing remains pixel-exact.
+## Unknown occupancy, active previews and huge viewports use the old LRU path.
+func _focal_retention_plan(window: Rect2i, focus: Vector2) -> Dictionary[String, bool]:
+	var selected: Dictionary[String, bool] = {}
+	if _occupancy_unknown or session != null or _move_preview != null \
+			or window.get_area() <= MAX_DISPLAY_TILES \
+			or window.get_area() > MAX_FOCAL_PLAN_WINDOW:
+		return selected
+	var occupied: Array[Dictionary] = []
+	if _occupied_display_tiles.size() * 2 < window.get_area():
+		for key: String in _occupied_display_tiles:
+			var comma: int = key.find(",")
+			if comma < 1:
+				return {}
+			var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
+			if window.has_point(tile):
+				occupied.append({"key": key, "distance": _tile_focus_distance(tile, focus)})
+				if occupied.size() > MAX_FOCAL_PLAN_CANDIDATES:
+					return {}
+	else:
+		for y: int in range(window.position.y, window.end.y):
+			for x: int in range(window.position.x, window.end.x):
+				var key: String = "%d,%d" % [x, y]
+				if _occupied_display_tiles.has(key):
+					occupied.append({"key": key,
+						"distance": _tile_focus_distance(Vector2i(x, y), focus)})
+					if occupied.size() > MAX_FOCAL_PLAN_CANDIDATES:
+						return {}
+	if occupied.size() <= MAX_DISPLAY_TILES:
+		return selected
+	occupied.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		if float(left["distance"]) != float(right["distance"]):
+			return float(left["distance"]) < float(right["distance"])
+		return String(left["key"]) < String(right["key"]))
+	for i: int in range(MAX_DISPLAY_TILES):
+		selected[String(occupied[i]["key"])] = true
+	return selected
+
+
 ## Offscreen textures go first, preserving the old bounded-LRU behavior.
 ## For in-view overflow retain the 144 closest tiles to the current focus;
 ## transient edge textures are still drawn at full precision for this frame.
@@ -864,7 +910,9 @@ func _draw() -> void:
 		"empty_skipped": 0,
 		"transparent_tiles_culled": 0,
 		"cold_tiles_deferred": 0, "cold_budgeted": 0,
-		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
+		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4,
+		"focal_plan_tiles": 0, "focal_evictions": 0,
+		"focal_reused_evicted": 0}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
 		_preview_index_for_draw(null, Rect2i())
@@ -882,6 +930,18 @@ func _draw() -> void:
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
 	var cache_focus: Vector2 = _display_cache_focus()
+	# A batch eviction plan preserves texture hits even when a future near-
+	# focus tile displaces an earlier visible tile. Keep displaced entries alive
+	# locally until their draw command has been submitted this frame.
+	var focal_plan: Dictionary[String, bool] = _focal_retention_plan(visible_tiles, cache_focus)
+	var focal_victims: Array[String] = []
+	var evicted_for_frame: Dictionary[String, Dictionary] = {}
+	if not focal_plan.is_empty():
+		for cached_key: String in _display_tiles:
+			if not focal_plan.has(cached_key):
+				focal_victims.append(cached_key)
+		focal_victims.sort()
+	metrics["focal_plan_tiles"] = focal_plan.size()
 	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus)
 	var cold_budgeted: bool = not cold_targets.is_empty()
 	var cold_rendered: int = 0
@@ -924,7 +984,9 @@ func _draw() -> void:
 				metrics["empty_skipped"] = int(metrics["empty_skipped"]) + 1
 				continue
 			_cache_access += 1
-			var entry: Dictionary = _display_tiles.get(key, {})
+			var entry: Dictionary = _display_tiles.get(key, evicted_for_frame.get(key, {}))
+			if evicted_for_frame.has(key):
+				metrics["focal_reused_evicted"] = int(metrics["focal_reused_evicted"]) + 1
 			var preview_owner: DrawingEditSession = preview_session if preview_stamp > 0 else null
 			if not entry.is_empty() and not bool(entry["dirty"]) \
 					and int(entry["preview_stamp"]) == preview_stamp \
@@ -968,9 +1030,24 @@ func _draw() -> void:
 					metrics["transparent_tiles_culled"] = int(metrics["transparent_tiles_culled"]) + 1
 					continue
 				var start_texture: int = Time.get_ticks_usec()
-				var retain: bool = true
+				var retain: bool = not evicted_for_frame.has(key)
 				if entry.is_empty():
-					retain = _reserve_display_slot(visible_tiles, Vector2i(x, y), cache_focus)
+					if focal_plan.is_empty():
+						retain = _reserve_display_slot(visible_tiles, Vector2i(x, y), cache_focus)
+					else:
+						retain = focal_plan.has(key)
+						if retain and _display_tiles.size() >= MAX_DISPLAY_TILES:
+							# Transparent tiles may retire a planned victim earlier
+							# in this frame. Never read a removed dictionary entry.
+							while not focal_victims.is_empty() and _display_tiles.size() >= MAX_DISPLAY_TILES:
+								var victim: String = focal_victims.pop_back()
+								if not _display_tiles.has(victim):
+									continue
+								evicted_for_frame[victim] = _display_tiles[victim]
+								_display_tiles.erase(victim)
+								metrics["focal_evictions"] = int(metrics["focal_evictions"]) + 1
+							if _display_tiles.size() >= MAX_DISPLAY_TILES:
+								retain = false
 					entry = {"texture": ImageTexture.create_from_image(image)}
 					metrics["textures_created"] = int(metrics["textures_created"]) + 1
 					if not retain:

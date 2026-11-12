@@ -1,3 +1,21 @@
+## T-103 dense over-budget focal retention — 2026-11-12
+
+The existing required `ci_t086_viewport_cache_model` step now also runs the
+13-check `drawing/tests/t103_retention_plan_smoke.gd` with T-094's exact
+`T103_MODEL_PASSED` log gate, unchanged **46 required check IDs**. It
+verifies signed nearest-144 selection, stable ties, sparse/huge/unknown
+occupancy fallback and detached preview bypass. The manually dispatched
+`godot-native-t086-viewport.yml` runs this model and the 150-check
+`drawing/tests/t103_overbudget_viewport_native.gd` after standalone staging
+and import, enforces a strict marker and retained raw logs. The X11 witness
+uses 192 dense lazy chunks plus a translucent layer, real wheel/pan input,
+25/50/100% zoom, masking, hidden RGB, visibility, Undo/Redo and `DrawingFileIO`
+Save/reopen; p50/p95/max frame delays, cache occupancy, persistent/ephemeral
+texture bytes and `/proc` RSS/HWM are diagnostic only. This does **not**
+make transient full-tile uploads partial, assert 16ms frame deadlines, clear
+T-086's reference-device acceptance or establish hosted CI green.
+[Evidence](evidence/T-103-2026-11-12-overbudget-retention.md).
+
 ## T-102 cold dense viewport first-population — 2026-11-12
 
 The existing **required** `ci_t086_viewport_cache_model` step additionally runs

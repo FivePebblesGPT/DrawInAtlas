@@ -47,6 +47,19 @@ jobs:
             2>&1 | tee /tmp/t102-cold-native.log
           grep -Fxq 'T102_NATIVE: 110 checks; 0 failed' /tmp/t102-cold-native.log
           python3 tools/check_godot_model_log.py /tmp/t102-cold-native.log --marker T102_NATIVE_PASSED
+      - name: T-103 large dense over-budget wheel, pan, masks, history and Save
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing \
+            --script res://tests/t103_retention_plan_smoke.gd \
+            2>&1 | tee /tmp/t103-retention.log
+          python3 tools/check_godot_model_log.py /tmp/t103-retention.log --marker T103_MODEL_PASSED
+          timeout --signal=TERM --kill-after=5s 300s xvfb-run -a godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/t103_overbudget_viewport_native.gd \
+            2>&1 | tee /tmp/t103-overbudget-native.log
+          grep -Fxq 'T103_NATIVE: 150 checks; 0 failed' /tmp/t103-overbudget-native.log
+          python3 tools/check_godot_model_log.py /tmp/t103-overbudget-native.log --marker T103_NATIVE_PASSED
       - name: Compare pre-cache and cached software frame timings
         run: |
           set -euo pipefail
@@ -74,6 +87,8 @@ jobs:
             /tmp/t086-native.log
             /tmp/t102-cold-model.log
             /tmp/t102-cold-native.log
+            /tmp/t103-retention.log
+            /tmp/t103-overbudget-native.log
             /tmp/t086-comparison.log
             /tmp/t086-cold-comparison.log
             /tmp/t086-direct-sparse-comparison.log
