@@ -1,0 +1,39 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T117_WALL_FAILED: draft registered_map_replaced: detached registration must invalidate captured authorization
+T117_WALL_FAILED: draft registered_map_replaced: release rejected without a path command
+T117_WALL_FAILED: draft registered_map_replaced: no new history or source mutation
+T117_WALL_FAILED: draft registered_map_removed: detached registration must invalidate captured authorization
+T117_WALL_FAILED: draft registered_map_removed: release rejected without a path command
+T117_WALL_FAILED: draft registered_floor_replaced: detached registration must invalidate captured authorization
+T117_WALL_FAILED: draft registered_floor_replaced: release rejected without a path command
+T117_WALL_FAILED: draft registered_floor_replaced: no new history or source mutation
+T117_WALL_FAILED: draft registered_floor_removed: detached registration must invalidate captured authorization
+T117_WALL_FAILED: draft registered_floor_removed: release rejected without a path command
+T117_WALL_FAILED: draft campaign_owner_replaced: detached registration must invalidate captured authorization
+T117_WALL_FAILED: draft campaign_owner_replaced: release rejected without a path command
+T117_WALL_FAILED: draft campaign_owner_replaced: no new history or source mutation
+T117_WALL_FAILED: drag registered_map_replaced: detached registration must invalidate captured authorization
+T117_WALL_FAILED: drag registered_map_replaced: release rejected without a path command
+T117_WALL_FAILED: drag registered_map_replaced: no new history or source mutation
+T117_WALL_FAILED: drag registered_floor_replaced: detached registration must invalidate captured authorization
+T117_WALL_FAILED: drag registered_floor_replaced: release rejected without a path command
+T117_WALL_FAILED: drag registered_floor_replaced: no new history or source mutation
+T117_WALL_FAILED: drag campaign_owner_replaced: detached registration must invalidate captured authorization
+T117_WALL_FAILED: drag campaign_owner_replaced: release rejected without a path command
+T117_WALL_FAILED: drag campaign_owner_replaced: no new history or source mutation
+SCRIPT ERROR: Invalid call. Nonexistent function '_wall_target_registered' in base 'Control (AtlasCanvas)'.
+          at: _immediate_case (res://tests/t117_wall_registered_target_smoke.gd:174)
+          GDScript backtrace (most recent call first):
+              [0] _immediate_case (res://tests/t117_wall_registered_target_smoke.gd:174)
+              [1] _scene (res://tests/t117_wall_registered_target_smoke.gd:62)
+SCRIPT ERROR: Invalid call. Nonexistent function '_wall_target_registered' in base 'Control (AtlasCanvas)'.
+          at: _immediate_case (res://tests/t117_wall_registered_target_smoke.gd:174)
+          GDScript backtrace (most recent call first):
+              [0] _immediate_case (res://tests/t117_wall_registered_target_smoke.gd:174)
+              [1] _scene (res://tests/t117_wall_registered_target_smoke.gd:62)
+T117_WALL_FAILED: 85 checks

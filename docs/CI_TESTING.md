@@ -1,3 +1,17 @@
+## T-117 Wall Path registered-source authorization (2026-11-12)
+
+The existing required `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step now additionally runs `tests/t117_wall_registered_target_smoke.gd` with
+its own 120-second watchdog, raw log and strict `T117_WALL_PASSED` verifier.
+The 91-assertion witness covers retained campaign/map/floor Resource identity
+through held drafts and vertex drags; rejected stale gestures emit no history
+or path edit, and direct edits cannot modify detached objects. A valid open
+path, vertex movement, unrelated registered map change and exact Undo/Redo
+remain permitted. The original Canvas fails 23 of 85 checks. The existing
+46 required CI check IDs are unchanged; this local check is not hosted CI or
+owner approval of T-026's Wall Path interactions and persistence policy.
+[Evidence](evidence/T-117-2026-11-12-wall-registered-source.md).
+
 ## T-116 Atlas Text portable Save/Open regression (2026-11-12)
 
 Existing required check `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`

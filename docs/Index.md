@@ -42,12 +42,33 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Text T-027:** [T-115 modal registered-owner authorization](Tickets/T-115.md)
   **Done** *(stale campaign/map/floor registry changes cannot inherit a
   Text modal's draft; T-027 control/readability approval remains open)*.
+- **Atlas Wall paths T-026:** [T-117 registered Wall Path authorization](Tickets/T-117.md)
+  **Done** *(stale campaign/map/floor identity denies drafts, vertex drags and
+  direct edits; control-vertex UX and path-schema approval remain open)*.
 - **Atlas Text portable persistence:** [T-116 Text Save/Open regression](Tickets/T-116.md)
   **Done** *(D0/D1 portable generations and editable metadata verified;
   T-027 interaction/readability approval remains open)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-117 Wall Path registry authorization (2026-11-12; Done)
+
+Wall Path construction and vertex drags now require their captured campaign,
+map and floor Resources to remain registered throughout a gesture, including
+same-ID/byte replacements. Direct insert/delete/restyle also requires a live
+registered target; the routine does not prohibit a newly authorized direct
+edit in a different campaign. Pre-T-117 Canvas fails **23/85** new regression
+assertions; the corrected source passes **91/91**, with source/history
+immutability, cancellation, unrelated-map and Undo/Redo checks. The 20-check
+Xvfb Wall witness, Line/Polygon/Bucket and Atlas composition passed. The old
+78-check `wall_paths_smoke.gd` still fails the same **four** assertions before
+and after this change, including obsolete native Save/Open; neither run is
+reported green. The new oracle runs within the existing required T-055 check,
+leaving **46 check IDs**. T-026 remains Ready pending its owner-facing path
+editing/persistence decisions.
+[Ticket](Tickets/T-117.md) ·
+[Evidence](evidence/T-117-2026-11-12-wall-registered-source.md).
 
 ## T-116 Text portable-generation Save/Open regression (2026-11-12; Done)
 
@@ -2621,6 +2642,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-114 · Polygon registered campaign/map/floor authorization](Tickets/T-114.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-115 · Text modal registered campaign/map/floor authorization](Tickets/T-115.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-116 · Atlas Text portable Save/Open regression](Tickets/T-116.md) | Done | D0/D1 portable generation and editable text validated; T-027 owner UX open | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
+| [T-117 · Wall Path registered campaign/map/floor authorization](Tickets/T-117.md) | Done | Drafts, vertex drags and direct edits require registered resources; T-026 UX and persistence review open | [T-028](Tickets/T-028.md) |
 
 ## Epics
 

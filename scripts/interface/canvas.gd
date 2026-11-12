@@ -240,6 +240,7 @@ var _wall_preview: AtlasStroke
 ## mask for the entire path draft or vertex drag. A later mask change cannot
 ## silently authorize a different whole-path edit at finish/release.
 var _wall_scope_at_start: AtlasEditScope
+var _wall_campaign_at_start: AtlasCampaign
 var _wall_map_at_start: AtlasMapDocument
 var _wall_floor_at_start: AtlasFloor
 var _wall_layer_at_start: AtlasObjectsLayer
@@ -442,7 +443,7 @@ func commit_edit() -> void:
 
 
 func restyle_selected_wall() -> void:
-	if floor == null or not editing_target_is_presented() or _wall_selected_index < 0:
+	if not _wall_target_registered() or not editing_target_is_presented() or _wall_selected_index < 0:
 		return
 	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable() or _wall_selected_index >= layer.strokes.size():
@@ -1059,6 +1060,7 @@ func _reject_stale_polygon() -> void:
 
 func _capture_wall_context(layer: AtlasObjectsLayer) -> void:
 	_wall_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+	_wall_campaign_at_start = campaign
 	_wall_map_at_start = map
 	_wall_floor_at_start = floor
 	_wall_layer_at_start = layer
@@ -1066,13 +1068,20 @@ func _capture_wall_context(layer: AtlasObjectsLayer) -> void:
 
 func _clear_wall_context() -> void:
 	_wall_scope_at_start = null
+	_wall_campaign_at_start = null
 	_wall_map_at_start = null
 	_wall_floor_at_start = null
 	_wall_layer_at_start = null
 
 
+func _wall_target_registered() -> bool:
+	return campaign != null and map != null and floor != null \
+		and campaign.get_map(map.id) == map and map.floor_by_id(floor.id) == floor
+
+
 func _wall_context_matches() -> bool:
-	return _wall_scope_at_start != null and map != null and floor != null \
+	return _wall_scope_at_start != null and _wall_target_registered() \
+		and campaign == _wall_campaign_at_start \
 		and map == _wall_map_at_start and floor == _wall_floor_at_start \
 		and floor.layer_by_id(active_layer_id) == _wall_layer_at_start \
 		and _wall_layer_at_start.is_editable() and editing_target_is_presented() \
@@ -1768,7 +1777,7 @@ func _begin_text_edit(position: Vector2) -> void:
 ## Normal click selects an existing edge or drags its vertex. Shift+click
 ## inserts a vertex, Alt+click deletes one; an explicit inspector action restyles.
 func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
-	if not editing_target_is_presented():
+	if not _wall_target_registered() or not editing_target_is_presented():
 		return
 	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable():
