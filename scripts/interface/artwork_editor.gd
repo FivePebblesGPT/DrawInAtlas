@@ -19,6 +19,11 @@ var _pending_fill_layer_id: String = ""
 ## A history change between press and release must not overwrite newer pixels.
 var _pending_fill_map_id: String = ""
 var _pending_fill_floor_id: String = ""
+## Identity is distinct from the portable IDs/serialized pixels. A rebuilt map
+## or floor may reuse both while no longer being the press-time authority.
+var _pending_fill_campaign: AtlasCampaign
+var _pending_fill_map: AtlasMapDocument
+var _pending_fill_floor: AtlasFloor
 var _pending_fill_source: Dictionary = {}
 ## An edit mask is part of a fill candidate's authorization. Selecting a new
 ## cell or changing the grid while the preview is staged must not broaden it.
@@ -280,6 +285,9 @@ func preview_fill(point: Vector2, inverted_global: bool = false) -> void:
 		return
 	_pending_fill_map_id = _canvas.map.id
 	_pending_fill_floor_id = _canvas.floor.id
+	_pending_fill_campaign = _canvas.campaign
+	_pending_fill_map = _canvas.map
+	_pending_fill_floor = _canvas.floor
 	_pending_fill_source = _canvas.floor.layer_by_id(_pending_fill_layer_id).to_dict()
 	var mask: AtlasEditScope = scope()
 	_pending_fill_scope = AtlasEditScope.new(mask.polygon, mask.enabled)
@@ -294,6 +302,9 @@ func cancel_preview_fill() -> void:
 	_pending_fill_layer_id = ""
 	_pending_fill_map_id = ""
 	_pending_fill_floor_id = ""
+	_pending_fill_campaign = null
+	_pending_fill_map = null
+	_pending_fill_floor = null
 	_pending_fill_source.clear()
 	_pending_fill_scope = null
 	_canvas._preview_layer = null
@@ -311,9 +322,14 @@ func commit_preview_fill() -> void:
 	var same_scope: bool = (_pending_fill_scope != null
 		and mask.enabled == _pending_fill_scope.enabled
 		and mask.polygon == _pending_fill_scope.polygon)
-	var same_context: bool = (_canvas.map != null and _canvas.floor != null
+	var same_context: bool = (_canvas.campaign != null
+		and _canvas.campaign == _pending_fill_campaign
+		and _canvas.map != null and _canvas.map == _pending_fill_map
+		and _canvas.floor != null and _canvas.floor == _pending_fill_floor
 		and _canvas.map.id == _pending_fill_map_id
 		and _canvas.floor.id == _pending_fill_floor_id
+		and _canvas.campaign.get_map(_pending_fill_map_id) == _canvas.map
+		and _canvas.map.floor_by_id(_pending_fill_floor_id) == _canvas.floor
 		and _canvas.active_layer_id == id)
 	cancel_preview_fill()
 	if not result.ok:

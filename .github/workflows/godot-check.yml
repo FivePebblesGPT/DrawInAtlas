@@ -450,6 +450,10 @@ jobs:
           # locked, or unpresented raster target even when IDs are unchanged.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t111_line_release_authorization_smoke.gd 2>&1 | tee /tmp/godot-t111-line-gate.log
           python3 tools/check_godot_model_log.py /tmp/godot-t111-line-gate.log --marker T111_LINE_GATE_PASSED
+          # T-113: a held Bucket preview cannot transfer authority to a
+          # same-ID rebuilt map/floor or a different campaign registry.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t113_bucket_resource_identity_smoke.gd 2>&1 | tee /tmp/godot-t113-bucket-context.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t113-bucket-context.log --marker T113_BUCKET_PASSED
           # T-112: the Atlas Editor saves generation-based portable projects,
           # not the retired one-file .scn head. Check both raster authoring tools.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-t112-line-portable.log

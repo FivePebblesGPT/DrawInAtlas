@@ -1,3 +1,17 @@
+## T-113 Bucket staged Resource identity (2026-11-12)
+
+The existing required Atlas composition step
+`ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input` additionally
+runs `tests/t113_bucket_resource_identity_smoke.gd` with an independent
+120-second watchdog, raw log, and T-094 exact success-marker verifier
+`T113_BUCKET_PASSED`. The 29-check oracle rejects a pending fill if its
+original campaign, map or floor Resource was replaced or detached from the
+current registry, even if the replacement has the same IDs and raster bytes.
+A newly authorized fill still commits one Undo/Redo step. The original T-112
+source fails ten checks. The required check inventory remains **46 IDs**.
+The additional runtime test does not approve T-023's human interaction policy
+or count as hosted CI. [Evidence](evidence/T-113-2026-11-12-bucket-resource-identity.md).
+
 ## T-112 Atlas authoring portable-generation regression (2026-11-12)
 
 The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`

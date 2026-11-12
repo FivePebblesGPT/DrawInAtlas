@@ -33,9 +33,28 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Line/Polygon persistence:** [T-112 portable generation Save/Open](Tickets/T-112.md)
   **Done** *(regression test correction for T-066 portable storage;
   owner interaction approvals remain unchanged)*.
+- **Atlas Bucket T-023:** [T-113 staged Resource authorization](Tickets/T-113.md)
+  **Done** *(same-ID map/floor/campaign swaps reject pending fills;
+  original T-023 fill-policy approval remains open)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-113 Bucket staged map/floor ownership gate (2026-11-12; Done)
+
+Bucket's held preview previously matched only portable map/floor IDs, the
+raster source dictionary and edit mask. An unrelated Resource with the same IDs
+and bytes could replace the registered map/floor (or the campaign owner)
+before release; the stale preview then published to the new target. T-113
+pins the exact campaign/map/floor Resources and confirms their live registry
+ownership before publishing. The pre-change test fails **10/29** assertions;
+the candidate passes **29/29** with no unauthorized pixel or Undo mutation,
+followed by a fresh Undo/Redo. The existing 50-check Bucket headless and
+24-check Xvfb visual suites pass. The required Atlas composition CI step
+adds this oracle without adding a check ID. This is a transaction-safety fix,
+**not** approval of T-023's fill style, tolerance, or interaction behavior.
+[Ticket](Tickets/T-113.md) ·
+[Evidence](evidence/T-113-2026-11-12-bucket-resource-identity.md).
 
 ## T-112 Line/Polygon portable Save/Open regression repair (2026-11-12; Done)
 
@@ -2542,6 +2561,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-110 · Byte-exact UTF-8 authorization for portable Object sources](Tickets/T-110.md) | Done | — | [T-109](Tickets/T-109.md) |
 | [T-111 · Line release target identity and layer eligibility](Tickets/T-111.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-112 · Atlas Line/Polygon portable Save/Open regression](Tickets/T-112.md) | Done | — | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
+| [T-113 · Bucket same-ID map/floor release authorization](Tickets/T-113.md) | Done | — | [T-028](Tickets/T-028.md) |
 
 ## Epics
 

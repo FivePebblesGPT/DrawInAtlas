@@ -1,0 +1,14 @@
+FAILURE  ci_fail (0.0s)
+SUCCESS  ci_after (0.0s)
+SUCCESS  ci_one (0.0s)
+TIMEOUT  ci_slow (1.0s)
+SUCCESS  ci_after (0.0s)
+SUCCESS  ci_example (0.0s)
+SUCCESS  ci_example (0.0s)
+SUCCESS  ci_example (0.0s)
+SUCCESS  ci_example (0.0s)
+SUCCESS  ci_example (0.0s)
+----------------------------------------------------------------------
+Ran 14 tests in 2.120s
+
+OK
