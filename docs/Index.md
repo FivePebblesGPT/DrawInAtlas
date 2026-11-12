@@ -24,10 +24,27 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md)
   **In Progress** *(beta3 local repairs; hosted 46/46 pending)*,
   [T-107](Tickets/T-107.md) **In Progress**; T-064 → [T-108](Tickets/T-108.md) **In Progress** *(manual policy decision open)*;
-  T-065 → [T-109](Tickets/T-109.md) **Done** *(real-directory safety; not owner UX approval)*.
+  T-065 → [T-109](Tickets/T-109.md) **Done** *(real-directory safety; not owner UX approval)*,
+  [T-110](Tickets/T-110.md) **Done** *(lossless portable UTF-8 index/Import; not owner UX approval)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-110 byte-exact portable UTF-8 source authorization (2026-11-12; Done)
+
+A canonical `.drawing` source with malformed UTF-8 could previously be
+silently decoded using U+FFFD replacement and indexed, including falsely
+suppression of a valid source with the same stable ID. Incoming malformed
+source bytes could also be imported before the next scan rejected them.
+The portable browser now requires raw UTF-8 roundtrip equality for its
+bounded snapshot and for the captured Import/Export copy buffer before
+publication. A **20-check** real-filesystem oracle passes; the T-109 source
+fails **7** assertions. The original SHA-256 over captured bytes, exact
+multibyte Unicode, 512-source cap and rollback guarantees remain intact.
+Paired 512-source software scans did **not** demonstrate a performance
+improvement. T-065 remains **In Progress** with owner acceptance outstanding.
+[Ticket](Tickets/T-110.md) ·
+[Evidence](evidence/T-110-2026-11-12-lossless-portable-utf8.md).
 
 ## T-109 production-scale Asset Browser hardening (2026-11-12; Done)
 
@@ -2488,6 +2505,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | In Progress | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Done | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
+| [T-110 · Byte-exact UTF-8 authorization for portable Object sources](Tickets/T-110.md) | Done | — | [T-109](Tickets/T-109.md) |
 
 ## Epics
 

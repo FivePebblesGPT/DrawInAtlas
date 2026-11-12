@@ -1,3 +1,17 @@
+## T-110 byte-exact UTF-8 portable source gate (2026-11-12)
+
+The existing required `ci_t065_asset_browser_model` step runs
+`drawing/tests/t110_lossless_source_utf8_smoke.gd` with the shared
+`tools/check_godot_model_log.py --marker T110_UTF8_PASSED` verifier and a
+bounded watchdog. It requires that invalid UTF-8 cannot enter the portable
+Objects/ index, shadow a valid identity, or publish an imported source;
+valid multibyte Unicode still hashes, opens and exports byte-for-byte.
+The original T-109 implementation fails seven assertions; the candidate
+passes 20/20. There is **no 47th required CI ID**. The logged malformed
+input causes Godot to print Unicode replacement diagnostics, retained in raw
+logs; those are not success markers. Neither hosted CI nor physical owner
+acceptance is inferred. [Evidence](evidence/T-110-2026-11-12-lossless-portable-utf8.md).
+
 ## T-109 real-directory Asset Browser scale and transfer safety (2026-11-12)
 
 Existing required `ci_t065_asset_browser_model` additionally runs

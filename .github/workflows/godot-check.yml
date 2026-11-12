@@ -606,6 +606,8 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t065-browser.log --marker T065_ASSET_BROWSER_PASSED
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/t109_asset_browser_scale_smoke.gd 2>&1 | tee /tmp/godot-t109-scale.log
           python3 tools/check_godot_model_log.py /tmp/godot-t109-scale.log --marker T109_SCALE_PASSED
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/t110_lossless_source_utf8_smoke.gd 2>&1 | tee /tmp/godot-t110-utf8.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t110-utf8.log --marker T110_UTF8_PASSED
       - name: Verify T-065 lazily rendered Object source thumbnails
         id: ci_t065_asset_thumbnail_model
         if: ${{ !cancelled() }}

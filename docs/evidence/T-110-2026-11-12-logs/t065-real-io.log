@@ -1,0 +1,6 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T065_REAL_IO_DIAGNOSTIC bytes=351288 old_six_opens_us=190775 single_six_opens_us=136739
+T065_METADATA_LISTING_DIAGNOSTIC bytes=351288 full_six_us=178743 metadata_six_us=46195
+T065_REAL_IO_PASSED 49 checks, failures=0
