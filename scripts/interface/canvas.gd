@@ -219,6 +219,8 @@ var _line_layer_at_press: AtlasRasterLayer
 ## The Polygon is a multi-click gesture; its first vertex freezes the exact
 ## editable target and cell mask until a valid close or explicit cancellation.
 var _polygon_scope_at_start: AtlasEditScope
+## The draft belongs to one live campaign registry, not just matching IDs.
+var _polygon_campaign_at_start: AtlasCampaign
 var _polygon_map_at_start: AtlasMapDocument
 var _polygon_floor_at_start: AtlasFloor
 var _polygon_layer_at_start: AtlasRasterLayer
@@ -1033,14 +1035,17 @@ func _line_context_matches() -> bool:
 ## eligibility mask between the first vertex and closure.
 func _clear_polygon_context() -> void:
 	_polygon_scope_at_start = null
+	_polygon_campaign_at_start = null
 	_polygon_map_at_start = null
 	_polygon_floor_at_start = null
 	_polygon_layer_at_start = null
 
 
 func _polygon_context_matches() -> bool:
-	return _polygon_scope_at_start != null and map != null and floor != null \
+	return _polygon_scope_at_start != null and campaign != null \
+		and campaign == _polygon_campaign_at_start and map != null and floor != null \
 		and map == _polygon_map_at_start and floor == _polygon_floor_at_start \
+		and campaign.get_map(map.id) == map and map.floor_by_id(floor.id) == floor \
 		and floor.layer_by_id(active_layer_id) == _polygon_layer_at_start \
 		and _polygon_layer_at_start.is_editable() and editing_target_is_presented() \
 		and edit_scope.enabled == _polygon_scope_at_start.enabled \
@@ -1932,6 +1937,7 @@ func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> v
 		_erasing = false
 		_gesture_snap = snap_to_grid
 		_polygon_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+		_polygon_campaign_at_start = campaign
 		_polygon_map_at_start = map
 		_polygon_floor_at_start = floor
 		_polygon_layer_at_start = layer

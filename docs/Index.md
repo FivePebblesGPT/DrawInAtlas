@@ -36,9 +36,28 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
 - **Atlas Bucket T-023:** [T-113 staged Resource authorization](Tickets/T-113.md)
   **Done** *(same-ID map/floor/campaign swaps reject pending fills;
   original T-023 fill-policy approval remains open)*.
+- **Atlas Polygon T-025:** [T-114 registered draft ownership](Tickets/T-114.md)
+  **Done** *(detached campaign/map/floor registry entries reject pending
+  Polygon closure; T-025 interaction-policy approval remains open)*.
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-114 Polygon registered source ownership (2026-11-12; Done)
+
+A multi-click Polygon already pinned map, floor, layer and selection-mask
+Resource identities but could still close after its registered map or floor
+was replaced or detached, or after the Canvas campaign owner changed while
+its map/floor pointers remained the same. T-114 also captures the campaign
+Resource and checks live map/floor registry ownership at each subsequent
+vertex, preview refresh and commit. Its unchanged T-113 source fails **14/43**
+independent assertions; the candidate passes **43/43**, including a live
+unrelated-map change and exact valid Undo/Redo. Polygon Save/Open and graphical
+pointer tests remain passing. The existing required Atlas composition CI step
+runs the strict oracle without adding a check ID. The parent T-025's closure,
+style and pixel-editing UX approval remains outstanding.
+[Ticket](Tickets/T-114.md) ·
+[Evidence](evidence/T-114-2026-11-12-polygon-registered-source.md).
 
 ## T-113 Bucket staged map/floor ownership gate (2026-11-12; Done)
 
@@ -2562,6 +2581,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-111 · Line release target identity and layer eligibility](Tickets/T-111.md) | Done | — | [T-028](Tickets/T-028.md) |
 | [T-112 · Atlas Line/Polygon portable Save/Open regression](Tickets/T-112.md) | Done | — | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md) |
 | [T-113 · Bucket same-ID map/floor release authorization](Tickets/T-113.md) | Done | — | [T-028](Tickets/T-028.md) |
+| [T-114 · Polygon registered campaign/map/floor authorization](Tickets/T-114.md) | Done | — | [T-028](Tickets/T-028.md) |
 
 ## Epics
 

@@ -1,3 +1,19 @@
+## T-114 Polygon registered-owner authorization (2026-11-12)
+
+The existing required Atlas composition step
+`ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input` also runs
+`tests/t114_polygon_registered_target_smoke.gd` with a separate 120-second
+watchdog, retained raw log and fail-closed
+`tools/check_godot_model_log.py --marker T114_POLYGON_PASSED`. The 43-check
+oracle rejects a Polygon whose originally captured campaign map/floor is no
+longer registered (including same-ID same-byte replacements), despite Canvas
+still holding the original map/floor references. A change to an unrelated map
+remains harmless; a new valid Polygon still yields one exact Undo/Redo step.
+The original T-113 source fails 14 checks; the candidate passes 43/43. The
+required fast-CI inventory remains **46 checks**. This does not approve
+T-025's unresolved owner interaction policy or establish a hosted run.
+[Evidence](evidence/T-114-2026-11-12-polygon-registered-source.md).
+
 ## T-113 Bucket staged Resource identity (2026-11-12)
 
 The existing required Atlas composition step

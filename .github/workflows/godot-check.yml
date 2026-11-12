@@ -454,6 +454,10 @@ jobs:
           # same-ID rebuilt map/floor or a different campaign registry.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t113_bucket_resource_identity_smoke.gd 2>&1 | tee /tmp/godot-t113-bucket-context.log
           python3 tools/check_godot_model_log.py /tmp/godot-t113-bucket-context.log --marker T113_BUCKET_PASSED
+          # T-114: Polygon may close only against the original registered
+          # campaign/map/floor, not a detached same-ID Resource graph.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t114_polygon_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t114-polygon-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t114-polygon-owner.log --marker T114_POLYGON_PASSED
           # T-112: the Atlas Editor saves generation-based portable projects,
           # not the retired one-file .scn head. Check both raster authoring tools.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-t112-line-portable.log
