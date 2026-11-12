@@ -5,6 +5,7 @@ extends RefCounted
 var document: DrawingDocument
 var source_id: String = ""
 var source_revision: int = -1
+var source_children_revision: int = -1
 var origin_instance_id: String = ""
 var origin_generation: String = ""
 var origin_binding_revision: int = -1

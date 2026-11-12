@@ -23,11 +23,27 @@ checkpoint to a 1,500-line WIP. Existing owner gates remain authoritative.
   *(operation-specific choice/defer/reject; no native default adoption)*,
   [T-105](Tickets/T-105.md) **In Progress**; T-094 → [T-106](Tickets/T-106.md)
   **In Progress** *(beta3 local repairs; hosted 46/46 pending)*,
-  [T-107](Tickets/T-107.md) **In Progress**; T-064 → [T-108](Tickets/T-108.md);
+  [T-107](Tickets/T-107.md) **In Progress**; T-064 → [T-108](Tickets/T-108.md) **In Progress** *(manual policy decision open)*;
   T-065 → [T-109](Tickets/T-109.md).
 
 **No performance fix is claimed by this ticket-store split.** PR #17’s
 required CI and owner reference hardware must be rechecked independently.
+
+## T-108 nested Save As explicit prototypes (2026-11-12; In Progress)
+
+The nested Object Asset library now supports **opt-in internal** `links` and
+`deep_copy` Save As experiments with unique nested placement identities,
+shared-DAG preservation, NULL tombstones, staged atomic index publication,
+and Atlas instance Undo/Redo. One full portable campaign Objects copy
+retains both variant families. A **42-check** real-filesystem oracle passes;
+old source fails the new policy signature, and seven existing Object suites
+pass. **The ordinary Object Editor still refuses nested Save As** until the
+owner approves link versus deep-copy; single-file nested export remains
+blocked (`NESTED_EXPORT`), with existing full portable project copying as the
+safe supported path. T-108 is `In Progress`, `manual_review: true`;
+T-064 remains In Progress and no owner-facing behavior is approved.
+[Ticket](Tickets/T-108.md) ·
+[Evidence](evidence/T-108-2026-11-12-nested-save-as-prototypes.md).
 
 ## T-107 archived CI and 23-finding owner audit (2026-11-12; In Progress)
 
@@ -2453,7 +2469,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Linux native-free export + OS RSS verified; Windows/MSVC/VRAM and editor gesture evidence open | [T-052](Tickets/T-052.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | — | [T-053](Tickets/T-053.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | — | [T-053](Tickets/T-053.md) |
-| [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | Ready | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | In Progress | Owner policy decision | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
 | [T-109 · Production-scale Asset Browser and filesystem hardening](Tickets/T-109.md) | Ready | — | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md) |
 
 ## Epics

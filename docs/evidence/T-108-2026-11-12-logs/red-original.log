@@ -1,0 +1,18 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:106)
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:109)
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:136)
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:213)
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:225)
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:228)
+SCRIPT ERROR: Parse Error: Too many arguments for "save_as()" call. Expected at most 5 but received 6.
+          at: GDScript::reload (res://tests/t108_nested_save_as_policy_smoke.gd:236)
+ERROR: Failed to load script "res://tests/t108_nested_save_as_policy_smoke.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:50)

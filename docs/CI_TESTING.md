@@ -1,3 +1,14 @@
+## T-108 opt-in nested Save As policy regression (2026-11-12)
+
+The existing required `ci_11b_verify_t_064_nested_object_graph` check also
+runs `tests/t108_nested_save_as_policy_smoke.gd` with exact marker
+`T108_POLICY_PASSED`, a 120-second watchdog, and the shared fail-closed
+`check_godot_model_log.py` verifier. The inventory remains **46 required CI
+IDs**; no additional hosted run or owner approval is inferred. This checks
+two explicit *internal* proposals only: the user-facing Object Editor still
+rejects undecided nested Save As, and single-file nested export remains
+blocked. [T-108 evidence](evidence/T-108-2026-11-12-nested-save-as-prototypes.md).
+
 ## T-107 replay-log and owner-evidence integrity (2026-11-12)
 
 `tools/t107_evidence_audit.py` independently verifies all 46 required check

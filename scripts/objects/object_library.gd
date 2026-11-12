@@ -980,6 +980,7 @@ func begin_draft(asset_id: String, origin_instance_id: String = "") -> DrawingRe
 		return copy
 	var draft: AtlasObjectDraft = AtlasObjectDraft.new(copy.value, asset_id,
 		_assets[asset_id]["revision"], _assets[asset_id]["name"])
+	draft.source_children_revision = children_revision(asset_id)
 	var frame: Dictionary = _assets[asset_id]
 	var frame_origin: Array = frame.get("origin", [0, 0])
 	var frame_bounds: Array = frame.get("bounds", [0, 0, 0, 0])
@@ -1025,6 +1026,7 @@ func save_draft(draft: AtlasObjectDraft) -> DrawingResult:
 	_cache[draft.source_id] = detached.value
 	draft.document = ( _clone_document(detached.value, false).value as DrawingDocument)
 	draft.source_revision = version
+	draft.source_children_revision = children_revision(draft.source_id)
 	asset_published.emit(draft.source_id, version)
 	instances_changed.emit(instances_for_asset(draft.source_id))
 	return DrawingResult.success(version)
@@ -1047,14 +1049,156 @@ func _put_binding(instance_id: String, generation: String, original: String,
 	return true
 
 
+## T-108 experimental, *explicit* nested Save As choices. The normal Object
+## Editor still refuses nested Save As until the owner approves a policy.
+## Both choices preserve child-local layout while allocating new placement IDs.
+## "links" retains published child source IDs; "deep_copy" clones each reachable
+## published source exactly once, preserving shared DAG references. NULL
+## tombstones remain tombstones and never resolve by filename.
+func nested_save_as_impact(draft: AtlasObjectDraft) -> DrawingResult:
+	if draft == null or not _assets.has(draft.source_id) or \
+			_assets[draft.source_id]["revision"] != draft.source_revision or \
+			children_revision(draft.source_id) != draft.source_children_revision or \
+			not _index_unchanged():
+		return DrawingResult.failure("STALE_SOURCE", "Reload the source and its child graph")
+	var checked: DrawingResult = CHILD_GRAPH.validate(_assets)
+	if not checked.ok:
+		return checked
+	var queue: Array[String] = [draft.source_id]
+	var seen: Dictionary = {draft.source_id: true}
+	var child_instances: int = 0
+	var null_instances: int = 0
+	var cursor: int = 0
+	while cursor < queue.size():
+		var source_id: String = queue[cursor]
+		cursor += 1
+		if not _asset_available(source_id):
+			return DrawingResult.failure("MISSING_SOURCE", "Nested source is missing or changed")
+		for child: Dictionary in _assets[source_id].get("children", []):
+			child_instances += 1
+			if bool(child["placeholder"]):
+				null_instances += 1
+				continue
+			var dependency: String = String(child["source_id"])
+			if not _asset_available(dependency):
+				return DrawingResult.failure("MISSING_SOURCE", "Repair missing child links before Save As")
+			if not seen.has(dependency):
+				seen[dependency] = true
+				queue.append(dependency)
+	if queue.size() > MAX_TREE_NODES:
+		return DrawingResult.failure("CHILD_GRAPH_LIMIT", "Too many nested sources to copy")
+	return DrawingResult.success({"sources": queue, "links_new_sources": 1,
+		"deep_copy_new_sources": queue.size(), "child_instances": child_instances,
+		"null_instances": null_instances})
+
+
+## Stage every immutable revision before ONE registry publication. No staged
+## source becomes visible after a late error; rollback removes only our files.
+func _publish_nested_variant(draft: AtlasObjectDraft, new_id: String,
+		label: String, policy: String, instance_id: String = "") -> DrawingResult:
+	if policy != "links" and policy != "deep_copy":
+		return DrawingResult.failure("NESTED_POLICY", "Choose explicit links or deep_copy")
+	var impact: DrawingResult = nested_save_as_impact(draft)
+	if not impact.ok:
+		return impact
+	var sources: Array = impact.value["sources"] if policy == "deep_copy" else [draft.source_id]
+	var mapping: Dictionary = {draft.source_id: new_id}
+	for index: int in range(1, sources.size()):
+		mapping[String(sources[index])] = _new_id("asset")
+	var staged_records: Array[Dictionary] = []
+	var staged_documents: Dictionary[String, DrawingDocument] = {}
+	var next_assets: Dictionary[String, Dictionary] = _assets_copy()
+	var failure: DrawingResult = DrawingResult.success()
+	for source_value: Variant in sources:
+		var source_id: String = String(source_value)
+		var copied_id: String = String(mapping[source_id])
+		if not _index_unchanged() or not _asset_available(source_id) or next_assets.has(copied_id):
+			failure = DrawingResult.failure("STALE_SOURCE", "Nested source changed during copying")
+			break
+		var source_document: DrawingResult = DrawingResult.success(draft.document) \
+			if source_id == draft.source_id else _published_document(source_id)
+		if not source_document.ok:
+			failure = source_document
+			break
+		var cloned: DrawingResult = _clone_document(source_document.value, true)
+		if not cloned.ok:
+			failure = cloned
+			break
+		var original: Dictionary = _assets[source_id]
+		var frame_origin: Array = original.get("origin", [0, 0])
+		var frame_bounds: Array = original.get("bounds", [0, 0, 0, 0])
+		var origin: Vector2i = draft.origin if source_id == draft.source_id \
+			else Vector2i(int(frame_origin[0]), int(frame_origin[1]))
+		var bounds: Rect2i = draft.bounds if source_id == draft.source_id \
+			else Rect2i(int(frame_bounds[0]), int(frame_bounds[1]),
+				int(frame_bounds[2]), int(frame_bounds[3]))
+		var saved_label: String = label if source_id == draft.source_id else String(original["name"])
+		var staged: DrawingResult = _stage_asset(cloned.value, copied_id, 1, saved_label,
+			origin, bounds)
+		if not staged.ok:
+			failure = staged
+			break
+		staged_records.append(staged.value)
+		staged_documents[copied_id] = cloned.value
+		var children: Array[Dictionary] = []
+		for row: Dictionary in original.get("children", []):
+			var child: Dictionary = row.duplicate(true)
+			child.erase("status")
+			child["id"] = _new_id("child")
+			child["generation"] = _new_id("generation")
+			child["revision"] = 0
+			if not bool(child["placeholder"]) and mapping.has(String(child["source_id"])):
+				child["source_id"] = mapping[String(child["source_id"])]
+			children.append(child)
+		var record: Dictionary = staged.value
+		record["children"] = children
+		record["children_revision"] = 0
+		next_assets[copied_id] = record
+	if failure.ok:
+		failure = CHILD_GRAPH.validate(next_assets)
+	if failure.ok and (not _index_unchanged() or
+			children_revision(draft.source_id) != draft.source_children_revision):
+		failure = DrawingResult.failure("STALE_SOURCE", "Source child graph changed before publication")
+	if failure.ok:
+		for source_value: Variant in sources:
+			if not _asset_available(String(source_value)):
+				failure = DrawingResult.failure("STALE_SOURCE",
+					"Published child bytes changed before atomic publication")
+				break
+	if failure.ok:
+		var next_instances: Dictionary[String, AtlasObjectInstance] = _instances_copy()
+		if not instance_id.is_empty():
+			if not next_instances.has(instance_id):
+				failure = DrawingResult.failure("STALE_INSTANCE", "Origin instance no longer exists")
+			else:
+				next_instances[instance_id].source_id = new_id
+				next_instances[instance_id].revision += 1
+				next_instances[instance_id].placeholder = false
+		if failure.ok:
+			failure = _commit_index(next_assets, next_instances)
+	if not failure.ok:
+		for staged_record: Dictionary in staged_records:
+			_discard_import_stage(staged_record)
+		return failure
+	for source_value: Variant in sources:
+		var published_id: String = String(mapping[String(source_value)])
+		_cache[published_id] = staged_documents[published_id]
+		asset_published.emit(published_id, 1)
+	if not instance_id.is_empty():
+		instances_changed.emit([instance_id])
+	return DrawingResult.success(new_id)
+
+
 func _publish_variant_and_bind(draft: AtlasObjectDraft, new_id: String,
 		instance_id: String, generation: String, original: String,
-		expected_revision: int, label: String) -> bool:
+		expected_revision: int, label: String, nested_policy: String = "") -> bool:
 	if not _instances.has(instance_id) or _instances[instance_id].generation != generation \
 		or _instances[instance_id].source_id != original \
 		or _instances[instance_id].revision != expected_revision \
 		or not _assets.has(original) or _assets[original]["revision"] != draft.source_revision:
 		return false
+	if not nested_policy.is_empty():
+		return _publish_nested_variant(draft, new_id, label, nested_policy, instance_id).ok
 	var copied: DrawingResult = _clone_document(draft.document, true)
 	if not copied.ok:
 		return false
@@ -1078,18 +1222,38 @@ func _publish_variant_and_bind(draft: AtlasObjectDraft, new_id: String,
 
 func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 		before: DrawingHistoryContext = null,
-		after: DrawingHistoryContext = null, variant_name: String = "") -> DrawingResult:
+		after: DrawingHistoryContext = null, variant_name: String = "",
+		nested_policy: String = "") -> DrawingResult:
 	if draft == null or not _assets.has(draft.source_id) or \
 		_assets[draft.source_id]["revision"] != draft.source_revision:
 		return DrawingResult.failure("STALE_SOURCE", "Source changed since draft opened")
-	# Child-copy ownership policy is still unresolved in T-064/T-051.
-	# Refuse rather than silently drop or duplicate source-linked children.
-	if not _assets[draft.source_id].get("children", []).is_empty():
+	var nested: bool = not _assets[draft.source_id].get("children", []).is_empty()
+	# The normal editor does not select either policy without owner approval.
+	if nested and nested_policy.is_empty():
 		return DrawingResult.failure("NESTED_SAVE_AS", "Nested Save As needs an explicit child-copy policy")
+	if nested and nested_policy != "links" and nested_policy != "deep_copy":
+		return DrawingResult.failure("NESTED_POLICY", "Unsupported nested Save As policy")
+	if not nested and not nested_policy.is_empty():
+		return DrawingResult.failure("NESTED_POLICY", "Only nested sources accept a child-copy policy")
 	var label: String = variant_name.strip_edges() if not variant_name.is_empty() else draft.name + " copy"
 	if label.is_empty() or label.length() > 128 or "\n" in label or "\r" in label:
 		return DrawingResult.failure("NAME", "Invalid new Object Asset name")
 	if draft.origin_instance_id.is_empty():
+		if nested:
+			var selected_variant: String = _new_id("asset")
+			var published: DrawingResult = _publish_nested_variant(draft, selected_variant,
+				label, nested_policy)
+			if not published.ok:
+				return published
+			var opened_nested: DrawingResult = _published_document(selected_variant)
+			if not opened_nested.ok:
+				return opened_nested
+			draft.source_id = selected_variant
+			draft.source_revision = 1
+			draft.source_children_revision = 0
+			draft.name = label
+			draft.document = (_clone_document(opened_nested.value, false).value as DrawingDocument)
+			return published
 		var cloned: DrawingResult = _clone_document(draft.document, true)
 		if not cloned.ok:
 			return cloned
@@ -1134,7 +1298,7 @@ func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 		return asset_exists(asset_id)
 	var publish: Callable = func(instance_id: String, gen: String, src: String, dst: String) -> bool:
 		var ok: bool = _publish_variant_and_bind(draft, dst, instance_id, gen, src,
-			expected["revision"], label)
+			expected["revision"], label, nested_policy)
 		if ok:
 			expected["revision"] = expected["revision"] + 1
 		return ok
@@ -1158,6 +1322,7 @@ func save_as(draft: AtlasObjectDraft, timeline: AtlasEditHistory = null,
 		return opened
 	draft.source_id = variant
 	draft.source_revision = 1
+	draft.source_children_revision = 0
 	draft.name = label
 	draft.document = (_clone_document(opened.value, false).value as DrawingDocument)
 	draft.origin_instance_id = ""

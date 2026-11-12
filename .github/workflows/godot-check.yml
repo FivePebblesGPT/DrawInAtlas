@@ -329,6 +329,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_graph_smoke.gd 2>&1 | tee /tmp/godot-t064-child-graph.log
           grep -q 'T064_CHILD_GRAPH_PASSED' /tmp/godot-t064-child-graph.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_GRAPH_FAILED:' /tmp/godot-t064-child-graph.log; then exit 1; fi
+          # T-108 is opt-in while the owner chooses nested Save As semantics.
+          # This tests both transactional candidates without enabling UI behavior.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t108_nested_save_as_policy_smoke.gd 2>&1 | tee /tmp/godot-t108-policy.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t108-policy.log --marker T108_POLICY_PASSED
       - name: Verify T-064 atomic nested Objects project copying
         id: ci_t064_nested_project_copy
         if: ${{ !cancelled() }}
