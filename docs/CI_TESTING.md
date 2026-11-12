@@ -1,3 +1,18 @@
+## T-118 Wall Path portable Save/Open regression (2026-11-12)
+
+The existing required
+`ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input` check now
+runs `tests/wall_paths_smoke.gd` under an independent 120-second watchdog,
+retains `/tmp/godot-t118-wall-portable.log`, and requires the exact
+`ATLAS_WALL_PATHS_PASSED` marker through T-094's strict verifier. The unchanged
+T-117 test fails four assertions because it attempted Restyle without an active
+wall selection, expected cell-only changes to reject an unmasked gesture, and
+loaded a legacy `.scn` file after portable Save. The 82-check repair verifies
+correct context and portable generation immutability across Undo/Redo. This is
+a test/CI-only repair, not a runtime schema migration, owner approval of T-026,
+physical-device evidence or a hosted CI pass. **46 required check IDs remain.**
+[Evidence](evidence/T-118-2026-11-12-wall-path-portable.md).
+
 ## T-117 Wall Path registered-source authorization (2026-11-12)
 
 The existing required `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`

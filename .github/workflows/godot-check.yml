@@ -458,6 +458,10 @@ jobs:
           # campaign/map/floor, not a detached same-ID Resource graph.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t114_polygon_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t114-polygon-owner.log
           python3 tools/check_godot_model_log.py /tmp/godot-t114-polygon-owner.log --marker T114_POLYGON_PASSED
+          # T-118: the historical Wall Path suite must exercise a real selected
+          # wall, active cell-mask changes and portable generation Save/Open.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/wall_paths_smoke.gd 2>&1 | tee /tmp/godot-t118-wall-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t118-wall-portable.log --marker ATLAS_WALL_PATHS_PASSED
           # T-117: Wall draft/vertex drag must still belong to the original
           # registered campaign/map/floor, and direct edits need live ownership.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t117_wall_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t117-wall-owner.log

@@ -139,6 +139,10 @@ func _run() -> void:
 	_check(live.strokes[0].points.size() == 3, "Alt vertex deletes vertex")
 	_check(editor.edits.undo() and live.strokes[0].points.size() == 4, "delete undo")
 	_check(editor.edits.redo() and live.strokes[0].points.size() == 3, "delete redo")
+	# Restyling is an explicit selection action; deleting a vertex clears the
+	# previous selected-wall handle. Select the remaining path first.
+	_click(canvas, a)
+	_check(canvas._wall_selected_index == 0, "select an existing wall before restyling")
 	canvas.brush_color = Color.RED
 	canvas.brush_width = 11
 	canvas.restyle_selected_wall()
@@ -147,8 +151,19 @@ func _run() -> void:
 	_check(editor.edits.redo() and live.strokes[0].width == 11, "style redo")
 	var stored: Dictionary = editor.campaign.to_dict().duplicate(true)
 	editor._on_save()
-	var restored: AtlasCampaign = AtlasCampaignStore.load_campaign(editor.save_path)
-	_check(restored != null and restored.to_dict() == stored, "native save round-trip retains path edits")
+	var portable: AtlasStoreResult = AtlasCampaignStore.load_portable_result(editor.save_path)
+	var restored: AtlasCampaign = portable.campaign
+	_check(editor.status_label.text.contains("Saved generation") and portable.error == OK
+		and portable.generation != "" and restored != null and restored.to_dict() == stored,
+		"portable Save/Open retains editable wall geometry and style")
+	_check(FileAccess.file_exists(AtlasCampaignBundle.root_path(ProjectSettings.globalize_path(editor.save_path)))
+		and not FileAccess.file_exists(ProjectSettings.globalize_path(editor.save_path)),
+		"wall Save writes the portable generation, not a retired single-file head")
+	_check(editor.edits.undo() and editor.campaign.to_dict() != stored
+		and restored != null and restored.to_dict() == stored,
+		"Undo after wall Save cannot mutate the published generation")
+	_check(editor.edits.redo() and editor.campaign.to_dict() == stored,
+		"Redo restores the saved live wall path")
 	# Cancellation, layer protections and scope denial must not create history.
 	canvas.cancel_edit()
 	_click(canvas, Vector2(-40, -20))
@@ -234,6 +249,9 @@ func _run() -> void:
 	# Vertex drags carry the original mask as well, not just their expected
 	# before/after geometry. A release under a different mask is a no-op.
 	editor._on_select(Vector2i.ZERO)
+	# Cell-focus changes are only an authorization boundary with the scope
+	# mask enabled. The immediately preceding retry leaves it disabled.
+	editor._on_scope_toggled(true)
 	var first_before: Dictionary = live.strokes[0].to_dict().duplicate(true)
 	var drag_cursor: int = editor.edits._cursor
 	_mouse(canvas, a, true)
