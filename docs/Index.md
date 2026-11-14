@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 reject concurrent layer/clipboard mutations during Brush drain (T-129 Done)
+
+[T-129](Tickets/T-129.md) closes a distinct T-095 pending-stroke input-loss path:
+workspace layer/group structure and clipboard edit commands could revise the
+source, cancel detached Brush paint, or invalidate its queued successor. These
+commands now refuse publication while a stroke is pending; selecting another
+Tree layer restores the correct row. Existing T-089 structural behavior is
+retained after deliberate cancellation or normal commit. The
+[35-assertion red/green evidence](evidence/T-129-2026-11-15-pending-content-edits.md)
+includes exact saved Brush pixels, two ordered history transactions, and
+neighboring native/clipboard/layer tests. This does **not** improve T-095
+latency or satisfy owner hardware, hosted CI or manual acceptance.
+
 ## 2026-11-15 guard History-list cursor jumps during Brush drain (T-128 Done)
 
 [T-128](Tickets/T-128.md) closes a distinct bypass of T-127's Undo/Redo
@@ -2790,6 +2803,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-126 · Guard pending Brush edits against document switches](Tickets/T-126.md) | Done | New/Open, TabBar, Object attachment and all tab-close paths refuse unpublished source edits; queued history and post-commit switching verified | [T-124](Tickets/T-124.md), [T-125](Tickets/T-125.md) |
 | [T-127 · Guard Undo/Redo against pending Brush revision conflict](Tickets/T-127.md) | Done | All workspace history entrypoints refuse uncommitted/queued strokes; after commit, chronological RGBA8 Undo/Redo and portable reopen pass | [T-124](Tickets/T-124.md), [T-125](Tickets/T-125.md), [T-126](Tickets/T-126.md) |
 | [T-128 · Guard History list jumps during pending Brush drain](Tickets/T-128.md) | Done | List selection blocks source revision changes and restores the visible cursor until queued paint commits; pixel and portable roundtrip verified | [T-127](Tickets/T-127.md) |
+| [T-129 · Guard concurrent layer and clipboard edits during Brush drain](Tickets/T-129.md) | Done | Source-mutating layer/text/pixel actions refuse pending strokes; Tree selection and ordered RGBA8 publication protected | [T-128](Tickets/T-128.md) |
 
 ## Epics
 

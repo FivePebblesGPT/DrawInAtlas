@@ -2298,6 +2298,20 @@ func _change_layer_page(direction: int) -> void:
 func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 	if active_tab < 0 or not current_document().has_node(node_id):
 		return
+	# Programmatic restoration may emit another Tree selection callback;
+	# do not erase the actionable pending-stroke error for that harmless event.
+	if node_id == selected_layer_node() and canvas.has_pending_stroke():
+		return
+	# Switching source layers invalidates a queued Brush stroke even without
+	# changing document pixels. Restore the Tree selection if a click is refused.
+	if node_id != selected_layer_node() and not _can_persist_or_close("Change Layer"):
+		var item: TreeItem = layers.get_root().get_first_child() if layers.get_root() != null else null
+		while item != null:
+			if String(item.get_metadata(0)) == selected_layer_node():
+				item.select(0)
+				break
+			item = item.get_next()
+		return
 	var before: DrawingHistoryContext = _capture_context() if record_context else null
 	var kind: String = String(current_document().node_metadata(node_id).get("kind", ""))
 	tabs[active_tab]["selected_node"] = node_id
@@ -2370,7 +2384,7 @@ func _insertion_target() -> Dictionary:
 
 
 func _create_selected_layer(kind: String) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Add Layer"):
 		return
 	var target: Dictionary = _insertion_target()
 	var before: DrawingHistoryContext = _capture_context()
@@ -2424,7 +2438,7 @@ func _apply_structure(result: DrawingResult, before: DrawingHistoryContext,
 
 
 func _set_row_visibility(node_id: String) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Change Layer Visibility"):
 		return
 	var info: Dictionary = current_document().node_metadata(node_id)
 	if info.is_empty():
@@ -2434,7 +2448,7 @@ func _set_row_visibility(node_id: String) -> void:
 
 
 func _set_row_lock(node_id: String) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Change Layer Lock"):
 		return
 	var info: Dictionary = current_document().node_metadata(node_id)
 	if info.is_empty():
@@ -2448,7 +2462,7 @@ func _toggle_layer_lock() -> void:
 
 
 func _move_selected_layer(direction: int) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Reorder Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2463,7 +2477,7 @@ func _move_selected_layer(direction: int) -> void:
 
 
 func _indent_selected_layer() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Indent Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2481,7 +2495,7 @@ func _indent_selected_layer() -> void:
 
 
 func _outdent_selected_layer() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Outdent Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2507,7 +2521,7 @@ func _ask_layer_rename() -> void:
 
 
 func _commit_layer_rename() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Rename Layer"):
 		return
 	var name: String = layer_rename_field.text.strip_edges()
 	if name.is_empty():
@@ -2583,7 +2597,7 @@ func _edit_text_at(point: Vector2i) -> void:
 
 
 func _commit_text_dialog() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Commit Text"):
 		return
 	var document: DrawingDocument = current_document()
 	var draft: DrawingTextElement = DrawingTextElement.new()
@@ -2611,7 +2625,7 @@ func _commit_text_dialog() -> void:
 
 
 func _rasterize_text() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Rasterize Text"):
 		return
 	var before: DrawingHistoryContext = _capture_context()
 	var converted: DrawingResult = current_document().rasterize_text(current_layer(), current_document().revision)
@@ -2623,7 +2637,7 @@ func _rasterize_text() -> void:
 
 
 func _remove_layer() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Remove Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2752,6 +2766,8 @@ func _commit_clipboard_edit(edit: DrawingEditSession,
 
 
 func _delete_selection() -> void:
+	if not _can_persist_or_close("Delete Pixels"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	if active_tab < 0 or not canvas.selected.has_area():
@@ -2772,6 +2788,8 @@ func _delete_selection() -> void:
 
 
 func _cut_selection() -> void:
+	if not _can_persist_or_close("Cut Pixels"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	var captured: DrawingResult = _capture_selection_clipboard()
@@ -2796,6 +2814,8 @@ func _cut_selection() -> void:
 
 
 func _paste_selection() -> void:
+	if not _can_persist_or_close("Paste Pixels"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	if drawing_clipboard == null or active_tab < 0:

@@ -162,13 +162,20 @@ func run() -> void:
 	check(edit_result.ok, "start detached stroke before row action")
 	if edit_result.ok:
 		workspace.canvas.session = edit_result.value
+		var protected_revision: int = workspace.current_document().revision
+		workspace._set_row_visibility(new_group)
+		check(workspace.canvas.session != null and
+			workspace.current_document().node_metadata(new_group)["visible"] and
+			workspace.current_document().revision == protected_revision,
+			"row visibility refuses to invalidate unpublished source pixels")
+		workspace.canvas.cancel_gesture() # Deliberate cancellation, not a row-action side effect.
 		workspace._set_row_visibility(new_group)
 		check(workspace.canvas.session == null and
 			not workspace.current_document().node_metadata(new_group)["visible"],
-			"row visibility cancels active detached stroke before redraw")
+			"row visibility resumes after explicit cancellation")
 		workspace._undo()
 		check(workspace.current_document().node_metadata(new_group)["visible"],
-			"undo restores eye after cancellation")
+			"undo restores eye after the authorized row action")
 	var ws_doc: DrawingDocument = workspace.current_document()
 	for index: int in range(205):
 		ws_doc.create_layer(DrawingLayerNode.RASTER, "Test %03d" % index, original_group)

@@ -97,6 +97,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t128-history-list.log --marker T128_HISTORY_LIST_PASSED || ci_fail_marker 'T128 history list pending Brush guard rejected'
           grep -Fqx 'T128_HISTORY_LIST_PASSED checks=37 failures=0' /tmp/godot-t128-history-list.log || ci_fail_marker 'T128 history list assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t128_history_list_pending.py' -v || ci_fail_marker 'T128 history list source/CI contracts rejected'
+          # T-129 rejects non-history layer/text/clipboard revisions while
+          # a detached Brush or queued successor still owns its source.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t129_pending_content_edit_smoke.gd 2>&1 | tee /tmp/godot-t129-pending-edits.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t129-pending-edits.log --marker T129_PENDING_EDIT_PASSED || ci_fail_marker 'T129 pending source edits failed strict log policy'
+          grep -Fqx 'T129_PENDING_EDIT_PASSED checks=35 failures=0' /tmp/godot-t129-pending-edits.log || ci_fail_marker 'T129 assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t129_pending_content_edit.py' -v || ci_fail_marker 'T129 source and CI contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
