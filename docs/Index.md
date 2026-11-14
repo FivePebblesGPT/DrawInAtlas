@@ -4,6 +4,20 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 historical CI replay correction (T-122 Done)
+
+[T-122](Tickets/T-122.md) pins the **original 46-check T-107 local replay
+workflow** alongside its historical scripts, logs and report. The current fast
+CI had diverged after T-120/T-121; GitHub run
+[43639949024](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/43639949024)
+reported **45/46**, failing the owner-matrix audit on this *historical* source
+drift. The recovered source matches its recorded SHA-256 exactly; strict
+script/log/workflow tampering controls and the T-107 untrusted/exploratory
+classification remain intact. [Evidence](evidence/T-122-2026-11-15-historical-ci-replay.md)
+records the failed control and local contract checks. **No new hosted green
+run is claimed; T-106 and T-107 remain In Progress** and all physical/owner
+gates remain unchanged.
+
 ## 2026-11-12 owner File/Open decisions and post-11-11 latency feedback
 
 The owner requested a conventional **File → New / Open… / Save / Save As… / Close Tab** menu without redundant "Drawing" qualifiers. **Open…** must handle `.drawing` and supported raster image files: selecting an image starts a new, unsaved Drawing document, with its pixels/frame, later saved as `.drawing`. Remove the standalone **Import Image as Drawing…** item. Object-source commands belong to a real separate **Object** top-level menu, not literal `Object ›` labels in File. [T-120 is Done for its engineering scope](Tickets/T-120.md): the canonical File/Object menus and unified Open are implemented and locally tested; [T-120 evidence](evidence/T-120-2026-11-14-file-object-open.md) records the 34-check headless and native X11 oracles. Historical T-090/T-093 evidence remains intact; T-056/T-059 hands-on approval and T-095/T-068 latency/backends remain independent.
@@ -2692,6 +2706,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-119 · GM Token registered source authorization](Tickets/T-119.md) | Done | Drag, placement, delete and direct edits require live campaign/map/floor; T-041 privacy policy gate unchanged | [T-028](Tickets/T-028.md) |
 | [T-120 · Conventional File/Object menus and unified Open](Tickets/T-120.md) | Done | — | [T-053](Tickets/T-053.md), [T-093](Tickets/T-093.md) |
 | [T-121 · Single-snapshot bounded raster Open](Tickets/T-121.md) | Done | — | [T-120](Tickets/T-120.md) |
+| [T-122 · Historical T-107 CI replay source integrity](Tickets/T-122.md) | Done | Original workflow pinned; historic 46-check archive passes tamper guards; hosted T-106/T-107 still open | [T-053](Tickets/T-053.md) |
 
 ## Epics
 
