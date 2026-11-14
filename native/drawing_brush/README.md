@@ -5,29 +5,47 @@ and does not constitute T-095 owner acceptance.
 
 ## Offline build and runtime
 
-1. Verify the SHA-256 of the supplied
-   `Godot_v4.8b2_bundle6_rust_hokusai.tar.zst`:
-   `0886d42efe896cd5ba0dc9c82b684a6b68efa9d3537b833dc0efedd00b0b70b1`.
-2. Extract its **contents** to a directory of your choice, using
+1. Verify the SHA-256 of the supplied archive:
+   `f486c8d13fb4005b864e9c6ba3af4fcf83f512deb1b871b794295f5704dcdeaa  Godot_v4.8b3_rust_hokusai_bundle8.tar.zst`.
+   After extraction, run the bundle's `./verify.sh --quick` to validate the
+   exact beta 3 engine pin and the complete file/mode inventory.
+1. Extract its **contents** to a directory of your choice, using
    `zstd -dc bundle.tar.zst | tar -xf - -C /your/tooling/directory`.
-3. Run `tools/build_native_brush.sh /your/tooling/directory` from the
+2. Run `tools/build_native_brush.sh /your/tooling/directory` from the
    DrawInAtlas repository. The script sources the bundled Rust environment,
    pins the `Cargo.lock`, points Cargo at the bundled vendored registry and
-   compiles **offline**. No globally installed Rust or Cargo is required, but
+   compiles **offline**. Bundle 8 also supplies portable Python for staging.
+   No globally installed Rust or Cargo is required, but
    the host still needs a normal C compiler/linker and compatible system libs.
-4. The build copies `addons/drawing/native/drawing_brush.gdextension` and the
+3. The build copies `addons/drawing/native/drawing_brush.gdextension` and the
    Linux shared library to the addon. Neither generated binary nor the large
    tooling archive belongs in Git.
-5. Run `python3 tools/build_drawing_app.py --in-place` for a standalone
+4. Run `python3 tools/build_drawing_app.py --in-place` for a standalone
    Drawing stage, or `--output /empty/external/directory` for a clean build.
    Staging includes native files only when **both** manifest and binary exist.
    Check Godot import and distribution/export artifacts separately.
 
 The Rust workspace pins **Hokusai 0.3.0** and **godot-rust 0.5.5**. The
 GDExtension is compiled against godot-rust's **Godot 4.7 stable API** and
-has been smoke-tested in **Godot 4.8 beta 2** on Linux. This deliberate
+has been smoke-tested in **Godot 4.8 beta 3** on Linux using bundle 8 (historical
+checkpoints below used beta 2). This deliberate
 compatibility choice must be retested with every target engine and export.
 Windows/macOS binaries and release exports are **not** supplied.
+
+Bundle 8's `verify-drawinatlas.sh /path/to/checkout` snapshots the checkout,
+builds the real `DrawingNativeBrush`, and tests native presence/absence,
+transactional/model gates and Linux exports in an external output tree. Its
+`--graphical` mode adds isolated Xvfb/Mesa/XTEST checks; these are software
+evidence, not owner hardware acceptance. Before the first beta 3 editor import,
+preserve the verified early-load workaround:
+
+```bash
+/path/to/tooling/prepare-godot-example.sh /staged/project \
+  res://addons/drawing/native/drawing_brush.gdextension
+```
+
+Choose an executable filesystem for native build/stage
+outputs; a `noexec` temporary mount cannot load the extension.
 
 ## Integration boundary
 
