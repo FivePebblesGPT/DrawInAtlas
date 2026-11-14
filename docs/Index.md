@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 chronological Brush input under release backlog (T-124 Done)
+
+[T-124](Tickets/T-124.md) fixes a dropped-input gap under T-095: a second
+Brush/Eraser pointer-down while its predecessor finished a long release was
+previously rejected. One bounded, frozen **source-space** follow-up gesture
+now captures the delivered points without overlapping edit sessions and
+promotes only after the first atomic commit. Headless red/green, real software
+X11 pointer/framebuffer and signed-mask two-step Undo/Redo evidence are
+recorded [here](evidence/T-124-2026-11-15-queued-brush-backlog.md). This is
+an independent engineering checkpoint, **not** physical input-to-photon
+acceptance. T-095 remains In Progress with its owner manual gate, and T-085,
+T-086, T-106 and T-107 keep their existing acceptance requirements.
+
 ## 2026-11-15 bounded raster predecoder guard (T-123 Done)
 
 [T-123](Tickets/T-123.md) rejects oversized declared PNG, WebP
@@ -2721,6 +2734,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-121 · Single-snapshot bounded raster Open](Tickets/T-121.md) | Done | — | [T-120](Tickets/T-120.md) |
 | [T-122 · Historical T-107 CI replay source integrity](Tickets/T-122.md) | Done | Original workflow pinned; historic 46-check archive passes tamper guards; hosted T-106/T-107 still open | [T-053](Tickets/T-053.md) |
 | [T-123 · Predecode bounded PNG/WebP/JPEG geometry](Tickets/T-123.md) | Done | Header dimensions rejected before codec allocation; owner/device/hosted gates unchanged | [T-121](Tickets/T-121.md) |
+| [T-124 · Ordered queued Brush/Eraser during release drain](Tickets/T-124.md) | Done | 4096-point bounded second gesture, atomic transaction ordering and X11/software evidence; T-095 physical/owner gate remains open | [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md) |
 
 ## Epics
 

@@ -27,6 +27,11 @@ var layer_id: String = "":
 		layer_id = value
 var tool: String = "Brush":
 	set(value):
+		# A second press may be buffered while the previous released stroke
+		# drains; do not splice tool changes into that captured source path.
+		if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]) \
+				and value != tool:
+			_discard_deferred_stroke("Deferred stroke cancelled because the tool changed")
 		# Once released, queued source-space samples and frozen brush settings
 		# outlive a toolbar change (including selecting Pan).
 		if ((session != null and _stroke_phase == StrokePhase.CAPTURING) or dragging \
@@ -96,6 +101,8 @@ var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
 		if value != zoom:
+			if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+				_discard_deferred_stroke("Deferred stroke cancelled because zoom changed during capture")
 			# A released stroke no longer samples screen coordinates: viewport
 			# navigation must never discard its already queued source positions.
 			if (session != null and _stroke_phase == StrokePhase.CAPTURING) \
@@ -108,6 +115,9 @@ var zoom: float = 4.0:
 ## into one gesture. Idle panning and equivalent assignments remain harmless.
 var camera: Vector2 = Vector2.ZERO:
 	set(value):
+		if value != camera and not _deferred_stroke.is_empty() \
+				and bool(_deferred_stroke["capturing"]):
+			_discard_deferred_stroke("Deferred stroke cancelled because the camera moved during capture")
 		if value != camera and ((session != null and _stroke_phase == StrokePhase.CAPTURING) \
 				or (dragging and (selecting or moving))):
 			cancel_gesture()
@@ -271,6 +281,13 @@ var _staged_position: Vector2 = Vector2.ZERO
 ## camera-independent; committing publishes one atomic history entry.
 enum StrokePhase { IDLE, CAPTURING, DRAINING, COMMITTING }
 var _stroke_phase: int = StrokePhase.IDLE
+## One bounded follow-up Brush/Eraser may be captured in source space while a
+## released stroke is still draining. No second DrawingEditSession is opened
+## until the first publishes its full atomic history transaction.
+const MAX_DEFERRED_STROKE_SAMPLES: int = 4096
+var _deferred_stroke: Dictionary = {}
+var _deferred_points: Array[Vector2] = []
+var _deferred_times_us: Array[int] = []
 var _finish_requested: bool = false
 var _stroke_color: int = 0
 var _stroke_width: float = 1.0
@@ -318,6 +335,10 @@ func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> voi
 ## from two unrelated grids. A finished floating Move can still be adjusted
 ## before the next drag, and changing guide visibility is always harmless.
 func _cancel_on_effective_snap_change() -> void:
+	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+		_discard_deferred_stroke("Deferred stroke cancelled because snapping changed")
+	if session != null and _stroke_phase == StrokePhase.DRAINING:
+		return  # The released gesture already owns source-space positions.
 	if session != null or (dragging and (selecting or moving)):
 		cancel_gesture()
 		canvas_error.emit("Gesture cancelled because grid snapping changed")
@@ -1220,7 +1241,7 @@ func _gui_input(event: InputEvent) -> void:
 			last_mouse = motion.position
 			queue_redraw()
 			view_changed.emit()
-		elif dragging:
+		elif dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"])):
 			update_gesture(motion.position)
 		cursor_moved.emit()
 		if tool in ["Brush", "Eraser"]:
@@ -1236,6 +1257,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key: InputEventKey = event
 		if key.pressed and not key.echo and key.keycode == KEY_ESCAPE \
+				and not _deferred_stroke.is_empty():
+			_discard_deferred_stroke()
+			get_viewport().set_input_as_handled()
+		elif key.pressed and not key.echo and key.keycode == KEY_ESCAPE \
 				and (dragging or session != null or has_focus()):
 			cancel_gesture()
 			get_viewport().set_input_as_handled()
@@ -1245,11 +1270,13 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		var motion: InputEventMouseMotion = event
-		if dragging and not get_global_rect().has_point(motion.position):
+		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
+				and not get_global_rect().has_point(motion.position):
 			update_gesture(get_global_transform().affine_inverse() * motion.position)
 	elif event is InputEventMouseButton:
 		var button: InputEventMouseButton = event
-		if dragging and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed \
+		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
+				and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed \
 				and not get_global_rect().has_point(button.position):
 			finish_gesture(get_global_transform().affine_inverse() * button.position)
 
@@ -1271,20 +1298,95 @@ func _process(_delta: float) -> void:
 		cancel_gesture()
 
 
-func start_gesture(position: Vector2) -> void:
+func _discard_deferred_stroke(reason: String = "") -> void:
+	_deferred_stroke.clear()
+	_deferred_points.clear()
+	_deferred_times_us.clear()
+	if not reason.is_empty():
+		canvas_error.emit(reason)
+
+
+func _append_deferred_stroke(position: Vector2) -> void:
+	if _deferred_stroke.is_empty() or not bool(_deferred_stroke["capturing"]):
+		return
+	if _deferred_points.size() >= MAX_DEFERRED_STROKE_SAMPLES:
+		_discard_deferred_stroke("Deferred stroke input limit reached; stroke cancelled")
+		return
+	_deferred_points.append(position)
+	_deferred_times_us.append(Time.get_ticks_usec())
+
+
+func _capture_deferred_stroke(position: Vector2) -> void:
+	if not _deferred_stroke.is_empty():
+		canvas_error.emit("Deferred stroke already queued; finish the pending stroke first")
+		return
+	var first: Vector2 = source_position(position)
+	if clip_strokes_to_image_frame and image_bounds.has_area() \
+			and not image_bounds.has_point(Vector2i(floori(first.x), floori(first.y))):
+		return
+	_deferred_points.clear()
+	_deferred_times_us.clear()
+	_deferred_stroke = {"capturing": true, "document": document, "layer": layer_id,
+		"tool": tool, "color": color_rgba, "width": brush_width,
+		"backend": brush_backend, "preset": brush_preset,
+		"selection": selection_mask.detached_copy(),
+		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i(),
+		"clip_enabled": clip_strokes_to_image_frame}
+	_append_deferred_stroke(first)
+
+
+## Promotion happens only after the previous session has committed and reset.
+## Keep real receipt timestamps so backlog telemetry includes time spent
+## waiting behind its predecessor, without running two edits concurrently.
+func _promote_deferred_stroke() -> void:
+	if _deferred_stroke.is_empty():
+		return
+	var pending: Dictionary = _deferred_stroke
+	var points: Array[Vector2] = _deferred_points
+	var times: Array[int] = _deferred_times_us
+	_deferred_stroke = {}
+	_deferred_points = []
+	_deferred_times_us = []
+	if document != pending["document"] or layer_id != pending["layer"] \
+			or clip_strokes_to_image_frame != bool(pending["clip_enabled"]) \
+			or (clip_strokes_to_image_frame and image_bounds != pending["clip"]) \
+			or not selection_mask.same_as(pending["selection"] as DrawingSelection):
+		canvas_error.emit("Deferred stroke cancelled because its edit source changed")
+		return
+	if points.is_empty():
+		return
+	pending["press_us"] = times[0]
+	start_gesture(Vector2.ZERO, points[0], pending)
+	if session == null:
+		return
+	for i: int in range(1, points.size() if bool(pending["capturing"]) else points.size() - 1):
+		_enqueue_sample_at_time(points[i], times[i])
+	if not bool(pending["capturing"]):
+		finish_gesture(Vector2.ZERO, points[points.size() - 1], times[times.size() - 1])
+
+
+func start_gesture(position: Vector2, source_override: Variant = null,
+		configuration: Dictionary = {}) -> void:
 	if session != null:
-		canvas_error.emit("Previous stroke is still draining; wait for its commit")
+		if _stroke_phase == StrokePhase.DRAINING and tool in ["Brush", "Eraser"]:
+			_capture_deferred_stroke(position)
+		else:
+			canvas_error.emit("Previous stroke is still draining; wait for its commit")
 		return
 	if document == null:
 		return
-	gesture_start = position_to_pixel(position)
+	var effective_tool: String = str(configuration.get("tool", tool))
+	var start_source: Vector2 = (source_override as Vector2) \
+		if source_override != null else source_position(position)
+	gesture_start = Vector2i(floori(start_source.x), floori(start_source.y)) \
+		if source_override != null else position_to_pixel(position)
 	grab_focus()
-	if tool == "Text":
+	if effective_tool == "Text":
 		text_requested.emit(gesture_start)
 		return
 	dragging = true
-	selecting = tool == "Select"
-	moving = tool == "Move"
+	selecting = effective_tool == "Select"
+	moving = effective_tool == "Move"
 	if selecting or moving:
 		if selecting:
 			_marquee_start_screen = position
@@ -1322,7 +1424,7 @@ func start_gesture(position: Vector2) -> void:
 			_move_target = _floating_offset
 			_move_target_received_us = 0
 		return
-	if tool not in ["Brush", "Eraser"]:
+	if effective_tool not in ["Brush", "Eraser"]:
 		dragging = false
 		return
 	# The neutral workspace is not a paint target. An in-frame stroke may
@@ -1343,18 +1445,19 @@ func start_gesture(position: Vector2) -> void:
 	_previous_accumulated_input = Input.use_accumulated_input
 	Input.use_accumulated_input = false
 	_owns_accumulated_input = true
-	_stroke_color = color_rgba
-	_stroke_width = brush_width
-	_stroke_erase = tool == "Eraser"
-	_stroke_clip = image_bounds if clip_strokes_to_image_frame else Rect2i()
-	_stroke_selection = selection_mask.detached_copy()
+	_stroke_color = int(configuration.get("color", color_rgba))
+	_stroke_width = float(configuration.get("width", brush_width))
+	_stroke_erase = effective_tool == "Eraser"
+	_stroke_clip = configuration.get("clip", image_bounds if clip_strokes_to_image_frame else Rect2i()) as Rect2i
+	_stroke_selection = (configuration.get("selection", selection_mask) as DrawingSelection).detached_copy()
 	_native_brush = null
 	_active_brush_backend = "Legacy"
-	if brush_backend in ["NativeHard", "Hokusai"]:
+	var effective_backend: String = str(configuration.get("backend", brush_backend))
+	if effective_backend in ["NativeHard", "Hokusai"]:
 		if ClassDB.class_exists("DrawingNativeBrush"):
 			_native_brush = ClassDB.instantiate("DrawingNativeBrush")
-			if brush_backend == "Hokusai" and not _stroke_erase:
-				var preset_path: String = BUNDLED_PRESETS.get(brush_preset, "")
+			if effective_backend == "Hokusai" and not _stroke_erase:
+				var preset_path: String = BUNDLED_PRESETS.get(str(configuration.get("preset", brush_preset)), "")
 				var settings: String = FileAccess.get_file_as_string(preset_path) if not preset_path.is_empty() else ""
 				# A pre-transaction native binary must fail over to Legacy;
 				# otherwise a lazy-source failure could consume pigment on retry.
@@ -1392,8 +1495,11 @@ func start_gesture(position: Vector2) -> void:
 	_pending_preview_first_us = 0
 	_has_segment_target = false
 	_finish_requested = false
-	_staged_position = source_position(position)
-	_metrics = {"down_us": Time.get_ticks_usec(), "first_stage_us": 0,
+	_staged_position = start_source
+	var source_receipt_us: int = Time.get_ticks_usec()
+	if source_override != null:
+		source_receipt_us = int(configuration["press_us"])
+	_metrics = {"down_us": source_receipt_us, "first_stage_us": 0,
 		"first_preview_submit_us": 0, "first_frame_post_draw_us": 0,
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
@@ -1419,12 +1525,15 @@ func start_gesture(position: Vector2) -> void:
 		"max_frame_selection_outline_cpu_us": 0,
 		"max_frame_pending_input_count": 0, "max_frame_oldest_pending_age_us": 0}
 	gesture_started.emit()
-	_enqueue_sample(_staged_position)
+	_enqueue_sample_at_time(_staged_position, source_receipt_us)
 	# A stationary dab does not wait for the first motion or mouse-up event.
 	_drain_segments(1)
 
 
 func update_gesture(position: Vector2) -> void:
+	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+		_append_deferred_stroke(source_position(position))
+		return
 	if not dragging:
 		return
 	var current: Vector2i = position_to_pixel(position)
@@ -1447,10 +1556,14 @@ func paint_to(point: Vector2i) -> void:
 
 
 func _enqueue_sample(position: Vector2) -> void:
+	_enqueue_sample_at_time(position, Time.get_ticks_usec())
+
+
+func _enqueue_sample_at_time(position: Vector2, received_us: int) -> void:
 	if session == null or _finish_requested:
 		return
 	_samples.append(position)
-	_sample_times_us.append(Time.get_ticks_usec())
+	_sample_times_us.append(received_us)
 	_metrics["samples_received"] = int(_metrics["samples_received"]) + 1
 	_metrics["max_pending"] = maxi(int(_metrics["max_pending"]), _samples.size() - _sample_index)
 	_metrics["max_sample_buffer"] = maxi(int(_metrics["max_sample_buffer"]), _samples.size())
@@ -1863,11 +1976,17 @@ func _commit_stroke() -> void:
 	_finish_requested = false
 	_stroke_phase = StrokePhase.IDLE
 	queue_redraw()
+	if not _deferred_stroke.is_empty():
+		if published_ok:
+			_promote_deferred_stroke()
+		else:
+			_discard_deferred_stroke("Deferred stroke cancelled because its predecessor failed to commit")
 
 
 ## Escape, stale revision and direct host changes discard the entire floating
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
+	_discard_deferred_stroke()
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
 	_pending_preview_drain_calls = 0
@@ -2000,7 +2119,13 @@ func _stage_move_preview(offset: Vector2i) -> void:
 	queue_redraw()
 
 
-func finish_gesture(position: Vector2) -> void:
+func finish_gesture(position: Vector2, source_override: Variant = null,
+		received_us: int = 0) -> void:
+	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+		_append_deferred_stroke(source_position(position))
+		if not _deferred_stroke.is_empty():
+			_deferred_stroke["capturing"] = false
+		return
 	if not dragging:
 		return
 	if selecting:
@@ -2026,8 +2151,10 @@ func finish_gesture(position: Vector2) -> void:
 			_move_capture = null
 			_floating_source_revision = -1
 	else:
-		_enqueue_sample(source_position(position))
-		_metrics["release_us"] = Time.get_ticks_usec()
+		var arrival_us: int = received_us if received_us > 0 else Time.get_ticks_usec()
+		_enqueue_sample_at_time((source_override as Vector2) if source_override != null \
+			else source_position(position), arrival_us)
+		_metrics["release_us"] = arrival_us
 		_stroke_phase = StrokePhase.DRAINING
 		_finish_requested = true
 		# Finish small clicks synchronously; long queued strokes are drained
