@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 prevent document switches from dropping pending Brush pixels (T-126 Done)
+
+[T-126](Tickets/T-126.md) closes a separate context-switch gap after T-125:
+while a Brush release or T-124 queued gesture is still uncommitted, **New,
+Open, Object attachment, TabBar/keyboard switching and inactive Close Tab**
+could replace the Canvas document and discard delivered paint without a dirty
+warning. All those transitions now fail visibly and leave the original Canvas
+and tab selected until normal commit. The [red/green witness](evidence/T-126-2026-11-15-pending-document-switch.md)
+compares actual source pixels, independent Undo/Redo and `.drawing` reopen.
+Idle tab selection and normal switching after commit remain functional. This is
+not a performance speedup or T-095 owner acceptance; T-106/T-107 hosted CI
+and real-device gates remain open.
+
 ## 2026-11-15 prevent Save/Close from dropping pending Brush pixels (T-125 Done)
 
 [T-125](Tickets/T-125.md) guards **Save, Save As, Object publication and active
@@ -2748,6 +2761,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-123 · Predecode bounded PNG/WebP/JPEG geometry](Tickets/T-123.md) | Done | Header dimensions rejected before codec allocation; owner/device/hosted gates unchanged | [T-121](Tickets/T-121.md) |
 | [T-124 · Ordered queued Brush/Eraser during release drain](Tickets/T-124.md) | Done | 4096-point bounded second gesture, atomic transaction ordering and X11/software evidence; T-095 physical/owner gate remains open | [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md) |
 | [T-125 · Block stale Save/Close of pending Brush edits](Tickets/T-125.md) | Done | Fail-closed Save/Save As/Object publish and active-tab closure until detached Brush input commits; physical/hosted/owner gates unchanged | [T-120](Tickets/T-120.md), [T-124](Tickets/T-124.md) |
+| [T-126 · Guard pending Brush edits against document switches](Tickets/T-126.md) | Done | New/Open, TabBar, Object attachment and all tab-close paths refuse unpublished source edits; queued history and post-commit switching verified | [T-124](Tickets/T-124.md), [T-125](Tickets/T-125.md) |
 
 ## Epics
 

@@ -1828,6 +1828,8 @@ func selected_layer_node() -> String:
 
 
 func new_drawing() -> void:
+	if not _can_persist_or_close("New"):
+		return
 	new_counter += 1
 	var document: DrawingDocument = DrawingDocument.new()
 	document.record_selection_history = record_selection_history
@@ -1844,6 +1846,8 @@ func new_drawing() -> void:
 ## Atlas host opens a captured, detached Object Asset draft through this API.
 ## The very same Drawing canvas, text editor and layer panel edit the object.
 func attach_object_session(session: DrawingObjectEditorSession) -> DrawingResult:
+	if not _can_persist_or_close("Open Object"):
+		return DrawingResult.failure("STROKE_PENDING", "Finish the pending stroke before opening another document")
 	if session == null or session.document == null:
 		return DrawingResult.failure("OBJECT", "Missing Object Editor session")
 	session.document.record_selection_history = record_selection_history
@@ -1859,6 +1863,8 @@ func attach_object_session(session: DrawingObjectEditorSession) -> DrawingResult
 ## Standalone authoring uses ordinary portable .drawing assets; no Atlas
 ## instance can be rebound by this local-file publisher.
 func new_object() -> void:
+	if not _can_persist_or_close("New Object"):
+		return
 	new_counter += 1
 	var document: DrawingDocument = DrawingDocument.new()
 	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Group 1")
@@ -1951,10 +1957,13 @@ func show_asset_browser(objects_root: String) -> bool:
 
 
 func _ask_open_object() -> void:
-	object_open_dialog.popup_centered()
+	if _can_persist_or_close("Open Object"):
+		object_open_dialog.popup_centered()
 
 
 func _open_object_file(path: String) -> void:
+	if not _can_persist_or_close("Open Object"):
+		return
 	var opened: DrawingResult = DrawingObjectEditorFile.open(path)
 	if not opened.ok:
 		_show_error(opened.message)
@@ -2094,7 +2103,7 @@ func _request_close_current() -> void:
 func _request_close_tab(index: int) -> void:
 	if index < 0 or index >= tabs.size():
 		return
-	if index == active_tab and not _can_persist_or_close("Close Tab"):
+	if not _can_persist_or_close("Close Tab"):
 		return
 	if index == active_tab and canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
@@ -2118,6 +2127,9 @@ func _cancel_pending_close() -> void:
 func _save_and_close() -> void:
 	if _closing_index < 0:
 		return
+	if _closing_index != active_tab and not _can_persist_or_close("Save and Close"):
+		_cancel_pending_close()
+		return
 	_close_after_save = true
 	_activate(_closing_index)
 	_save()
@@ -2125,6 +2137,8 @@ func _save_and_close() -> void:
 
 func _close_index(index: int) -> void:
 	if index < 0 or index >= tabs.size():
+		return
+	if not _can_persist_or_close("Close Tab"):
 		return
 	var session: DrawingObjectEditorSession = tabs[index].get("object") as DrawingObjectEditorSession
 	if session != null:
@@ -2169,8 +2183,17 @@ func _sync_object_tab() -> void:
 	_after_edit()
 
 
+## TabBar emits tab_changed synchronously, including for programmatic selection.
+## Preserve existing idle same-tab refresh behavior, but never reset the
+## Canvas session while unpublished Brush work belongs to the current tab.
 func _activate(index: int) -> void:
 	if index < 0 or index >= tabs.size():
+		return
+	if index == active_tab and canvas.has_pending_stroke():
+		return
+	if active_tab >= 0 and index != active_tab and not _can_persist_or_close("Switch Tab"):
+		# Restore the UI's selection; the resulting tab_changed is a no-op.
+		tab_bar.current_tab = active_tab
 		return
 	if active_tab >= 0 and active_tab < tabs.size() and active_tab != index:
 		tabs[active_tab]["camera"] = canvas.camera
@@ -3111,6 +3134,8 @@ func _reset_view() -> void:
 
 
 func _open_raster_file(path: String) -> void:
+	if not _can_persist_or_close("Open"):
+		return
 	var opened: DrawingResult = DrawingRasterImport.load_file_image(path)
 	if not opened.ok:
 		_show_error(opened.message)
@@ -3137,7 +3162,8 @@ func _open_raster_file(path: String) -> void:
 
 
 func _ask_open() -> void:
-	open_dialog.popup_centered()
+	if _can_persist_or_close("Open"):
+		open_dialog.popup_centered()
 
 
 func _show_save_dialog() -> void:
@@ -3241,6 +3267,8 @@ func _save_file(path: String) -> void:
 
 
 func _open_file(path: String) -> void:
+	if not _can_persist_or_close("Open"):
+		return
 	match path.get_extension().to_lower():
 		"png", "webp", "jpg", "jpeg":
 			_open_raster_file(path)

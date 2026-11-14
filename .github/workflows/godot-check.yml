@@ -80,6 +80,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t125_pending_persistence_smoke.gd 2>&1 | tee /tmp/godot-t125-persistence.log
           python3 tools/check_godot_model_log.py /tmp/godot-t125-persistence.log --marker T125_PENDING_PASSED || ci_fail_marker 'T125 pending persistence/close rollback rejected'
           python3 -m unittest discover -s tests -p 'test_t125_pending_persistence.py' -v || ci_fail_marker 'T125 persistence contracts rejected'
+          # T-126 preserves the same pending and queued strokes on tab/new/open,
+          # including TabBar reentrancy and inactive-tab closure attempts.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t126_pending_tab_switch_smoke.gd 2>&1 | tee /tmp/godot-t126-tab-switch.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t126-tab-switch.log --marker T126_TAB_SWITCH_PASSED || ci_fail_marker 'T126 pending document switch rejected'
+          python3 -m unittest discover -s tests -p 'test_t126_pending_tab_switch.py' -v || ci_fail_marker 'T126 tab-switch contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log

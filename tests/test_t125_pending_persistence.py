@@ -21,7 +21,9 @@ class T125PendingPersistenceContracts(unittest.TestCase):
             body = source.split(f"func {func}(", 1)[1].split("\nfunc ", 1)[0]
             self.assertIn("_can_persist_or_close(", body, func)
         body = source.split("func _request_close_tab(", 1)[1].split("\nfunc ", 1)[0]
-        self.assertIn('index == active_tab and not _can_persist_or_close("Close Tab")', body)
+        self.assertIn('if not _can_persist_or_close("Close Tab"):', body)
+        close_body = source.split("func _close_index(", 1)[1].split("\nfunc ", 1)[0]
+        self.assertIn('if not _can_persist_or_close("Close Tab"):', close_body)
 
     def test_regression_executes_real_document_and_publishing_workflows(self) -> None:
         test = (ROOT / "drawing/tests/t125_pending_persistence_smoke.gd").read_text()
