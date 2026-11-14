@@ -4,6 +4,18 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 prevent Save/Close from dropping pending Brush pixels (T-125 Done)
+
+[T-125](Tickets/T-125.md) guards **Save, Save As, Object publication and active
+Close Tab** while an already released Brush/Eraser stroke still has detached
+uncommitted input (including T-124's bounded queued successor). Previously,
+Save could serialize a clean pre-stroke snapshot, and Close Tab could discard
+pending paint without a dirty warning. File destinations remain untouched on
+rejection and the user receives an actionable message; normal Save and dirty
+close resume after commit. [Reproduction and tests](evidence/T-125-2026-11-15-pending-persistence.md)
+include actual portable bytes/reopen checks. The guard does not speed up Brush
+or imply T-095 physical/owner acceptance. T-106/T-107 hosted gates remain open.
+
 ## 2026-11-15 chronological Brush input under release backlog (T-124 Done)
 
 [T-124](Tickets/T-124.md) fixes a dropped-input gap under T-095: a second
@@ -2735,6 +2747,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-122 · Historical T-107 CI replay source integrity](Tickets/T-122.md) | Done | Original workflow pinned; historic 46-check archive passes tamper guards; hosted T-106/T-107 still open | [T-053](Tickets/T-053.md) |
 | [T-123 · Predecode bounded PNG/WebP/JPEG geometry](Tickets/T-123.md) | Done | Header dimensions rejected before codec allocation; owner/device/hosted gates unchanged | [T-121](Tickets/T-121.md) |
 | [T-124 · Ordered queued Brush/Eraser during release drain](Tickets/T-124.md) | Done | 4096-point bounded second gesture, atomic transaction ordering and X11/software evidence; T-095 physical/owner gate remains open | [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md) |
+| [T-125 · Block stale Save/Close of pending Brush edits](Tickets/T-125.md) | Done | Fail-closed Save/Save As/Object publish and active-tab closure until detached Brush input commits; physical/hosted/owner gates unchanged | [T-120](Tickets/T-120.md), [T-124](Tickets/T-124.md) |
 
 ## Epics
 

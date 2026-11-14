@@ -2075,12 +2075,26 @@ func _save_as_named_object() -> void:
 	_publish_object(true)
 
 
+## Do not serialize or close a still-unpublished stroke. Rejection is
+## intentional: synchronous draining on Save would stall the input loop.
+## The user can Save or Close again after normal frame-budgeted commit.
+func _can_persist_or_close(action: String) -> bool:
+	if not canvas.has_pending_stroke():
+		return true
+	if _close_after_save:
+		_cancel_pending_close()
+	_show_error("Stroke still processing; %s after the stroke finishes" % action)
+	return false
+
+
 func _request_close_current() -> void:
 	_request_close_tab(active_tab)
 
 
 func _request_close_tab(index: int) -> void:
 	if index < 0 or index >= tabs.size():
+		return
+	if index == active_tab and not _can_persist_or_close("Close Tab"):
 		return
 	if index == active_tab and canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
@@ -3140,6 +3154,8 @@ func _show_save_dialog() -> void:
 func _ask_save() -> void:
 	if active_tab < 0:
 		return
+	if not _can_persist_or_close("Save As"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	var session: DrawingObjectEditorSession = current_object()
@@ -3156,6 +3172,8 @@ func _ask_save() -> void:
 
 func _save() -> void:
 	if active_tab < 0:
+		return
+	if not _can_persist_or_close("Save"):
 		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
@@ -3181,6 +3199,8 @@ func _publish_object(as_variant: bool) -> void:
 	var session: DrawingObjectEditorSession = current_object()
 	if session == null:
 		return
+	if not _can_persist_or_close("Save Object"):
+		return
 	var result: DrawingResult = session.save_as() if as_variant else session.save()
 	if not result.ok:
 		if active_tab >= 0:
@@ -3194,6 +3214,8 @@ func _publish_object(as_variant: bool) -> void:
 
 func _save_file(path: String) -> void:
 	if active_tab < 0:
+		return
+	if not _can_persist_or_close("Save"):
 		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return

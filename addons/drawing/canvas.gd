@@ -2025,6 +2025,12 @@ func cancel_gesture() -> void:
 	queue_redraw()
 
 
+## Persistence and tab closure must not observe an unfinished Brush/Eraser
+## transaction as clean. This includes the bounded follow-up input queue.
+func has_pending_stroke() -> bool:
+	return session != null or not _deferred_stroke.is_empty()
+
+
 func has_floating_move() -> bool:
 	return _floating_active
 
