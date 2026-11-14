@@ -80,8 +80,8 @@ func run() -> void:
 	var names: Array[String] = []
 	for menu: Control in top._menus:
 		names.append((menu as MenuButton).text)
-	check(names == ["File", "Edit", "View", "Image", "Layers", "Select", "Window", "Help"],
-		"exact eight fixed menu names in intended order")
+	check(names == ["File", "Object", "Edit", "View", "Image", "Layers", "Select", "Window", "Help"],
+		"exact nine fixed menu names in intended order")
 	check(top.divider.name == "BarDivider" and top.options_scroll.name == "ToolOptionsRegion",
 		"dedicated boundary and flexible options container")
 	var tool_names: Array[String] = ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]
@@ -98,13 +98,13 @@ func run() -> void:
 		and not app.tool_buttons["Brush"].button_pressed,
 		"icon button selects the active tool and updates pressed state")
 	app._change_tool("Brush")
-	check(not top.more_menu.visible and top._menus[7].visible,
-		"full desktop displays all eight application menus")
+	check(not top.more_menu.visible and top._menus[8].visible,
+		"full desktop displays all nine application menus")
 	await snapshot("drawing-1280")
 	check(top.options_region.get_child_count() == 2 and top.active_options == "Brush",
 		"brush options show width and generic snap")
 	check(not app.record_selection_history and app.selection_history_toggle.get_parent() != app.dock_views["history"]
-		and top._menus[1].get_popup().get_item_text(2).contains("Preferences"),
+		and top._menus[2].get_popup().get_item_text(2).contains("Preferences"),
 		"selection-history preference OFF and moved from History to Edit > Preferences")
 	check(app.dock_split != null and app.inspector.get_parent() == app.dock_split,
 		"right dock is a resizable split sibling")
@@ -122,7 +122,7 @@ func run() -> void:
 	var file_popup: PopupMenu = top._menus[0].get_popup()
 	check(file_popup.get_item_text(3).contains("Ctrl+Shift+S"),
 		"Save As accelerator discoverable in File menu")
-	var edit_popup: PopupMenu = top._menus[1].get_popup()
+	var edit_popup: PopupMenu = top._menus[2].get_popup()
 	check(edit_popup.get_item_text(1).contains("Ctrl+Y"),
 		"one primary redo shortcut visible")
 	await shortcut(KEY_S, true)
@@ -145,7 +145,7 @@ func run() -> void:
 	app._toggle_dock()
 	check(app.inspector.visible and app.dock_panels.visible,
 		"dock restores its expanded grouped controls")
-	var window_popup: PopupMenu = top._menus[6].get_popup()
+	var window_popup: PopupMenu = top._menus[7].get_popup()
 	check(window_popup.is_item_checked(2) and app.tabs_line.visible,
 		"document tab strip is initially visible and Window preference is checked")
 	app._toggle_document_tabs()
@@ -212,8 +212,9 @@ func run() -> void:
 	root.size = Vector2i(560, 600)
 	app.size = Vector2(560, 600)
 	await frames(15)
-	check(top.more_menu.visible and top._menus[0].visible and top._menus[1].visible,
-		"narrow window retains File/Edit and exposes More")
+	check(top.more_menu.visible and top._menus[0].visible and
+		(top._menus[1].visible or top._more_item_ids.has(Vector2i(1, 0))),
+		"narrow window retains File, Object access and More")
 	check(app.get_child(0).size.x <= 560.0 and app.canvas.size.x > 140,
 		"narrow root and drawing canvas fit actual window rather than clipping")
 	var about_index: int = -1
@@ -226,7 +227,7 @@ func run() -> void:
 		top._more_selected(about_index)
 		check(app.get_node("WorkspaceAbout").visible, "More invokes the original Help action")
 		app.get_node("WorkspaceAbout").hide()
-	check(not top._menus[7].visible and top._more_actions.size() > 0,
+	check(not top._menus[8].visible and top._more_actions.size() > 0,
 		"hidden menus remain represented by live More commands")
 	check(menus.get_child(menus.get_child_count() - 1) == top.more_menu,
 		"More trigger follows the visible File/Edit/View menu group")
@@ -293,8 +294,9 @@ func run() -> void:
 	await frames(12)
 	check(app.get_child(0).size.x <= 420 and top.size.y < 52,
 		"420px window keeps one-row workspace within viewport")
-	check(top._menus[0].visible and top._menus[1].visible and top.more_menu.visible,
-		"File/Edit and overflow remain accessible at 420px")
+	check(top._menus[0].visible and top.more_menu.visible and
+		(top._menus[1].visible or top._more_item_ids.has(Vector2i(1, 0))),
+		"File, Object and overflow remain accessible at 420px")
 	app._change_tool("Brush")
 	await frames(4)
 	await snapshot("drawing-420")

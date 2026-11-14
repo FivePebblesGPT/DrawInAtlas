@@ -48,7 +48,7 @@ func run() -> void:
 	var top: Control = app.top_bar
 	top._refresh_layout()
 	var more: PopupMenu = top.more_menu.get_popup()
-	check(top.more_menu.visible and not top._menus[2].visible and not top._menus[6].visible,
+	check(top.more_menu.visible and not top._menus[3].visible and not top._menus[7].visible,
 		"narrow workspace exposes View and Window in the More popup")
 	check_more_item(top, "View › Show grid", app.canvas.show_grid)
 	check_more_item(top, "View › Pixel grid at high zoom", app.canvas.show_pixel_grid)
@@ -66,7 +66,7 @@ func run() -> void:
 	var tabs_id: int = more_id(more, "Window › Show document tabs")
 	if tabs_id >= 0:
 		top._more_selected(tabs_id)
-	check(not app.show_document_tabs and not top._menus[6].get_popup().is_item_checked(2),
+	check(not app.show_document_tabs and not top._menus[7].get_popup().is_item_checked(2),
 		"More dispatch toggles actual tab strip and original Window check state")
 	check_more_item(top, "Window › Show document tabs", false)
 
@@ -75,7 +75,7 @@ func run() -> void:
 	check_more_item(top, "View › Show grid", app.canvas.show_grid)
 	check_more_item(top, "View › Pixel grid at high zoom", app.canvas.show_pixel_grid)
 	check_more_item(top, "Window › Show document tabs", false)
-	var view_popup: PopupMenu = top._menus[2].get_popup()
+	var view_popup: PopupMenu = top._menus[3].get_popup()
 	view_popup.set_item_disabled(0, true)
 	top._refresh_layout()
 	var disabled_id: int = more_id(more, "View › Zoom in")
@@ -87,14 +87,14 @@ func run() -> void:
 	app.size = Vector2(1280, 760)
 	await frames(12)
 	top._refresh_layout()
-	check(top._menus[2].visible and top._menus[6].visible and not top.more_menu.visible,
+	check(top._menus[3].visible and top._menus[7].visible and not top.more_menu.visible,
 		"wide viewport restores original View and Window menus")
 	check(view_popup.is_item_checked(3) == app.canvas.show_grid and
 		view_popup.is_item_checked(5) == app.canvas.show_pixel_grid and
-		not top._menus[6].get_popup().is_item_checked(2),
+		not top._menus[7].get_popup().is_item_checked(2),
 		"real popup states persist when More disappears")
 	app._toggle_document_tabs()
-	check(app.show_document_tabs and top._menus[6].get_popup().is_item_checked(2),
+	check(app.show_document_tabs and top._menus[7].get_popup().is_item_checked(2),
 		"visible menu toggle synchronizes direct popup")
 
 	root.size = Vector2i(300, 600)

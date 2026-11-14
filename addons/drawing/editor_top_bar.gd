@@ -170,13 +170,21 @@ func _refresh_layout() -> void:
 	# Reserve a real viewport for tool options. This uses measured Godot menu
 	# minimum widths rather than a fixed set of guessed window breakpoints;
 	# theme scaling, translation and platform fonts all affect these widths.
-	var space: float = maxf(0.0, size.x - RESERVED_OPTIONS_WIDTH - divider.custom_minimum_size.x - 20.0)
+	# A Container may keep our minimum width larger than its resized parent.
+	# Measure the *available* width so the Object menu actually moves to More.
+	var available_width: float = size.x
+	var ancestor: Node = get_parent()
+	while ancestor is Control:
+		available_width = minf(available_width, (ancestor as Control).size.x)
+		ancestor = ancestor.get_parent()
+	var space: float = maxf(0.0, available_width - RESERVED_OPTIONS_WIDTH -
+		divider.custom_minimum_size.x - 20.0)
 	var menu_width: float = 0.0
 	var visible_count: int = 0
 	for menu: MenuButton in _menus:
 		var required: float = menu.get_combined_minimum_size().x + 5.0
 		var more_reserve: float = more_menu.get_combined_minimum_size().x + 10.0
-		if menu_width + required + more_reserve > space and visible_count >= 2:
+		if menu_width + required + more_reserve > space and visible_count >= 1:
 			break
 		visible_count += 1
 		menu_width += required

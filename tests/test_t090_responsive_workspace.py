@@ -46,12 +46,16 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
 
     def test_file_and_object_commands_are_outside_window(self) -> None:
         file_section = self.workspace.split('top_bar.add_menu_spec("File"', 1)[1].split(
-            'top_bar.add_menu_spec("Edit"', 1)[0]
+            'top_bar.add_menu_spec("Object"', 1)[0]
         window_section = self.workspace.split('top_bar.add_menu_spec("Window"', 1)[1].split(
             'top_bar.set_menu_checked("Window"', 1)[0]
-        for label in ("Close tab  Ctrl+W", "Object › New source", "Object › Open source",
-                      "Object › Rename source", "Object › Save source As"):
+        object_section = self.workspace.split('top_bar.add_menu_spec("Object"', 1)[1].split(
+            'top_bar.add_menu_spec("Edit"', 1)[0]
+        for label in ("Close Tab  Ctrl+W", "Open…  Ctrl+O"):
             self.assertIn(label, file_section)
+        for label in ("New Source", "Open Source…", "Rename Source…", "Save Source As…"):
+            self.assertIn(label, object_section)
+            self.assertNotIn(label, file_section)
             self.assertNotIn(label, window_section)
         for label in ("Reset workspace layout", "Show document tabs", "Asset Browser"):
             self.assertIn(label, window_section)
@@ -122,7 +126,7 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(term, model)
         native = (ROOT / "drawing/tests/responsive_workspace_native.gd").read_text()
-        self.assertIn('await click_at(top.more_menu.get_global_rect().get_center())', native)
+        self.assertIn('await pointer_at(more_target, true)', native)
         workflow = (ROOT / ".github/workflows/godot-check.yml").read_text()
         self.assertIn("res://tests/topbar_overflow_smoke.gd", workflow)
         self.assertIn("--marker T090_OVERFLOW_PASSED", workflow)

@@ -210,6 +210,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_discovery_smoke.gd 2>&1 | tee /tmp/godot-t093-discovery-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t093-discovery-model.log --marker T093_MODEL_PASSED || ci_fail_marker 'T093 Object discovery model log rejected'
           python3 -m unittest discover -s tests -p 'test_t093_object_discovery.py' -v
+          # T-120 refines File/Open/Object UX without adding to the 46-check inventory.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t120_unified_open_smoke.gd 2>&1 | tee /tmp/godot-t120-open-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t120-open-model.log --marker T120_MODEL_PASSED || ci_fail_marker 'T120 unified Open model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t120_unified_open.py' -v
           ci_finish
       - name: Verify T-053 standalone Linux release package
         id: ci_07_verify_t_053_standalone_linux_release_package

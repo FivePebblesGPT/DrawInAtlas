@@ -30,11 +30,11 @@ class T093DiscoveryContracts(unittest.TestCase):
         self.assertIn("_chosen_objects_root", shell)
         self.assertIn("root_display", browser)
         self.assertIn("Choose Objects/ folder", browser)
-        self.assertIn("File → Object › New source", browser)
+        self.assertIn("Object → New Source", browser)
         self.assertIn('path.get_file() == "Objects"', history)
         self.assertNotIn("DrawingFileIO.save", history)
         self.assertIn("DrawingRasterImport.import_image", shell)
-        self.assertIn("Open Drawing", shell)
+        self.assertIn("Open…", shell)
         self.assertIn("Open in Object Editor", browser)
         self.assertIn("Place at view center", browser)
 

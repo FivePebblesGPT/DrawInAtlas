@@ -79,12 +79,12 @@ func run() -> void:
 	await frames(5)
 	check(app.asset_browser == null, "no guessed or automatic Objects root despite a remembered path")
 	var file_menu: PopupMenu = app.top_bar._menus[0].get_popup()
-	check(file_menu.get_item_text(1).contains("Open Drawing") and
-		file_menu.get_item_text(6).contains("Open source") and
-		file_menu.get_item_text(9).contains("Import Image") and
-		file_menu.get_item_text(10).contains("Browse saved sources"),
-		"File menu distinguishes Drawing, Object source, bitmap and browser commands")
-	file_menu.id_pressed.emit(10)
+	var object_menu: PopupMenu = app.top_bar._menus[1].get_popup()
+	check(file_menu.item_count == 5 and file_menu.get_item_text(1).contains("Open…") and
+		object_menu.item_count == 5 and object_menu.get_item_text(1).contains("Open Source") and
+		object_menu.get_item_text(4).contains("Browse Sources"),
+		"File Open unifies documents and images; Object sources use a separate menu")
+	object_menu.id_pressed.emit(4)
 	await frames(3)
 	var panel: DrawingAssetBrowserPanel = app.asset_browser
 	check(panel != null and panel.index.root_path.is_empty() and panel.assets.item_count == 0,
@@ -136,15 +136,15 @@ func run() -> void:
 	app._open_object_file(base.path_join("not-there.drawing"))
 	check(app.tabs.size() == before and app.status.text.contains("Error:"),
 		"missing source fails with actionable status, no false tab")
-	app._import_image_file(ordinary_path)
-	check(app.tabs.size() == before and app.status.text.contains("Unsupported image type"),
-		"wrong import file type gives actionable error")
+	app._open_file(ordinary_path + ".invalid")
+	check(app.tabs.size() == before and app.status.text.contains("Unsupported file type"),
+		"wrong Open file type gives actionable error")
 	var image_path: String = base.path_join("pixels.png")
 	var image: Image = Image.create(3, 2, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
 	image.set_pixel(1, 1, Color8(21, 92, 203, 255))
 	check(image.save_png(image_path) == OK, "create test PNG")
-	app._import_image_file(image_path)
+	app._open_file(image_path)
 	await frames(3)
 	check(app.tabs.size() == before + 1 and app.current_object() == null and
 		app.canvas.image_bounds == Rect2i(0, 0, 3, 2), "PNG imports as separate framed Drawing")
@@ -163,11 +163,11 @@ func run() -> void:
 	var blank: Image = Image.create(3, 3, false, Image.FORMAT_RGBA8)
 	blank.fill(Color.TRANSPARENT)
 	check(blank.save_png(blank_path) == OK, "create completely transparent bitmap")
-	app._import_image_file(blank_path)
+	app._open_file(blank_path)
 	check(app.canvas.image_bounds == Rect2i(0, 0, 3, 3) and
 		app.current_object() == null, "fully transparent bitmap still creates a framed Drawing")
 	var before_fail: int = app.tabs.size()
-	app._import_image_file(corrupt_path)
+	app._open_file(corrupt_path)
 	check(app.tabs.size() == before_fail, "wrong-type corrupt source does not create tab")
 	# The source itself stays portable; relocation requires a deliberate new root.
 	var second_root: String = base.path_join("relocated/Objects")

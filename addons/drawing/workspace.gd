@@ -34,7 +34,6 @@ var asset_browser: DrawingAssetBrowserPanel
 var asset_browser_directory_dialog: FileDialog
 var recent_objects_root_settings_path: String = "user://drawing-recent-objects-root-v1.json"
 var _recent_objects_root: String = ""
-var image_import_dialog: FileDialog
 var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered new ID
 var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
 var preferences_persistence_enabled: bool = true
@@ -177,17 +176,17 @@ func _build_interface() -> void:
 	add_child(root)
 	top_bar = TOP_BAR_SCRIPT.new() as HBoxContainer
 	root.add_child(top_bar)
-	# Object source file commands belong under File, while Window only changes
-	# workspaces and document navigation (no separate command toolbar).
-	top_bar.add_menu_spec("File", ["New Drawing  Ctrl+N", "Open Drawing…  Ctrl+O", "Save  Ctrl+S",
-		"Save As…  Ctrl+Shift+S", "Close tab  Ctrl+W", "Object › New source",
-		"Object › Open source…", "Object › Rename source…", "Object › Save source As…",
-		"Import Image as Drawing…", "Object › Browse saved sources…"],
+	# Ordinary documents and portable Object sources have independent commands.
+	# The same canonical workspace is embedded by standalone Drawing and Atlas.
+	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
+		"Save As…  Ctrl+Shift+S", "Close Tab  Ctrl+W"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "_request_close_current"), Callable(self, "new_object"),
-		Callable(self, "_ask_open_object"), Callable(self, "_ask_rename_object"),
-		Callable(self, "_ask_save"), Callable(self, "_ask_import_image"),
+		Callable(self, "_request_close_current")])
+	top_bar.add_menu_spec("Object", ["New Source", "Open Source…", "Rename Source…",
+		"Save Source As…", "Browse Sources…"],
+		[Callable(self, "new_object"), Callable(self, "_ask_open_object"),
+		Callable(self, "_ask_rename_object"), Callable(self, "_ask_save"),
 		Callable(self, "_show_asset_browser_empty")])
 	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
 		"Preferences…", "Copy  Ctrl+C", "Cut  Ctrl+X",
@@ -456,10 +455,12 @@ func _build_interface() -> void:
 	var about: AcceptDialog = AcceptDialog.new()
 	about.name = "WorkspaceAbout"
 	about.title = "Drawing workspace"
-	about.dialog_text = "Independent Drawing / Object Editor workspace.\nHelp: File, Edit, View, Image, Layers, Select, Window."
+	about.dialog_text = "Independent Drawing / Object Editor workspace.\nHelp: File, Object, Edit, View, Image, Layers, Select, Window."
 	add_child(about)
 	open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
-	open_dialog.title = "Open ordinary .drawing file (no Object source binding)"
+	open_dialog.title = "Open Drawing document or raster image (not an Object source)"
+	open_dialog.filters = PackedStringArray(["*.drawing ; Drawing documents",
+		"*.png ; PNG images", "*.webp ; WebP images", "*.jpg, *.jpeg ; JPEG images"])
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
 	save_dialog.file_selected.connect(_save_file)
@@ -467,13 +468,6 @@ func _build_interface() -> void:
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	object_open_dialog.title = "Open portable Object source in its own editor tab"
 	object_open_dialog.file_selected.connect(_open_object_file)
-	image_import_dialog = FileDialog.new()
-	image_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	image_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	image_import_dialog.filters = PackedStringArray(["*.png ; PNG", "*.webp ; WebP", "*.jpg, *.jpeg ; JPEG"])
-	image_import_dialog.title = "Import bitmap as new Drawing (not an Object source)"
-	image_import_dialog.file_selected.connect(_import_image_file)
-	add_child(image_import_dialog)
 	asset_browser_directory_dialog = FileDialog.new()
 	asset_browser_directory_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
 	asset_browser_directory_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -3102,20 +3096,35 @@ func _reset_view() -> void:
 	_update_status()
 
 
-func _ask_import_image() -> void:
-	image_import_dialog.popup_centered_ratio(0.7)
+func _raster_header_matches(extension: String, bytes: PackedByteArray) -> bool:
+	match extension:
+		"png":
+			return bytes.size() >= 8 and bytes.slice(0, 8) == PackedByteArray(
+				[137, 80, 78, 71, 13, 10, 26, 10])
+		"webp":
+			return bytes.size() >= 12 and bytes.slice(0, 4) == "RIFF".to_ascii_buffer() and \
+				bytes.slice(8, 12) == "WEBP".to_ascii_buffer()
+		"jpg", "jpeg":
+			return bytes.size() >= 3 and bytes[0] == 255 and bytes[1] == 216 and bytes[2] == 255
+	return false
 
 
-func _import_image_file(path: String) -> void:
+func _open_raster_file(path: String) -> void:
 	var extension: String = path.get_extension().to_lower()
 	if extension not in ["png", "webp", "jpg", "jpeg"]:
-		_show_error("Unsupported image type. Import PNG, WebP or JPEG; Open Drawing handles .drawing files.")
+		_show_error("Unsupported file type. Open supports .drawing, PNG, WebP and JPEG.")
 		return
 	var stream: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if stream == null or stream.get_length() > 64 * 1024 * 1024:
-		_show_error("Image missing, unreadable or larger than the 64 MiB import limit")
+		_show_error("Image missing, unreadable or larger than the 64 MiB Open limit")
 		return
+	# Reject obvious type mismatches before the decoder can emit noisy engine
+	# errors; this is a magic-byte check, not a replacement for decoding.
+	var header: PackedByteArray = stream.get_buffer(16)
 	stream.close()
+	if not _raster_header_matches(extension, header):
+		_show_error("Image header is invalid or does not match its PNG/WebP/JPEG extension")
+		return
 	var image: Image = Image.load_from_file(path)
 	if image == null or image.is_empty():
 		_show_error("Cannot decode image. Source file is missing or corrupt; no Drawing was created.")
@@ -3241,6 +3250,15 @@ func _save_file(path: String) -> void:
 
 
 func _open_file(path: String) -> void:
+	match path.get_extension().to_lower():
+		"png", "webp", "jpg", "jpeg":
+			_open_raster_file(path)
+			return
+		"drawing":
+			pass
+		_:
+			_show_error("Unsupported file type. Open supports .drawing, PNG, WebP and JPEG.")
+			return
 	var opened: DrawingResult = DrawingFileIO.open_with_frame(path)
 	if not opened.ok:
 		_show_error(opened.message)

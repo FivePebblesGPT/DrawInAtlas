@@ -313,16 +313,18 @@ selection through `AtlasObjectEditorBridge`; ordinary source Save refreshes
 all linked placements and instance-launched Save As publishes B and rebinds
 only the origin, with one Atlas history command. Undo retains the saved B.
 
-**Object source discovery (T-093):** Use **File → Open Drawing…** for an ordinary
-`.drawing` file and its independent Save/Save As; **File → Object › Open source…**
+**Drawing and Object opening (T-093, T-120):** **File → Open…** opens a
+saved `.drawing` document or a bounded PNG/WebP/JPEG file. A raster image
+starts an independent **unsaved Drawing** tab with the imported pixels and
+image frame; Save selects a new `.drawing` path, never overwrites the input
+image. There is no separate image-import menu action. **Object → Open Source…**
 opens a portable source in its dedicated Object Editor tab, while
-**File → Object › New source** creates a new source with a separate identity.
-**File → Import Image as Drawing…** loads a bounded PNG/WebP/JPEG as a new
-ordinary Drawing tab (never a linked Atlas placement); fully transparent
-images still receive an authoring frame. These actions are deliberately distinct
-from browsing saved sources. Choose **File → Object › Browse saved sources…**
-(or **Window → Asset Browser…**) for an empty-state walkthrough with **Choose
-Objects/ folder…** and the current project/Objects root label. Hover or use **Copy root path**
+**Object → New Source** creates a new Object source identity.
+**Object → Browse Sources…** (or **Window → Asset Browser…**) opens the browser
+without choosing or scanning a project folder. The top-level Object menu
+moves into **More → Object › …** when the menu bar is too narrow. Source commands
+remain separate from ordinary Drawing Open and never bind Atlas placements.
+Use the browser's **Choose Objects/ folder…** and the current project/Objects root label. Hover or use **Copy root path**
 for the exact absolute path. Opening the browser scrolls the right dock to
 its chooser when attached. Select an *existing*
 project's `Objects/` subdirectory; do **not** select the project root or guess
