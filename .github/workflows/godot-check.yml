@@ -109,6 +109,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t130-pending-context.log --marker T130_CONTEXT_PASSED || ci_fail_marker 'T130 pending source context rejected by strict log'
           grep -Fqx 'T130_CONTEXT_PASSED checks=34 failures=0' /tmp/godot-t130-pending-context.log || ci_fail_marker 'T130 source context assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t130_pending_source_context.py' -v || ci_fail_marker 'T130 source and CI contracts rejected'
+          # T-131 keeps Object rename and Save As target metadata transactional
+          # through pending Brush/queued input and rejected publisher results.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t131_object_pending_metadata_smoke.gd 2>&1 | tee /tmp/godot-t131-object-metadata.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t131-object-metadata.log --marker T131_OBJECT_META_PASSED || ci_fail_marker 'T131 Object source metadata guard failed strict log'
+          grep -Fqx 'T131_OBJECT_META_PASSED checks=21 failures=0' /tmp/godot-t131-object-metadata.log || ci_fail_marker 'T131 Object metadata assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t131_object_pending_metadata.py' -v || ci_fail_marker 'T131 source/CI contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log

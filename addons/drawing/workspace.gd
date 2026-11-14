@@ -2048,6 +2048,10 @@ func _rename_object() -> void:
 	var session: DrawingObjectEditorSession = current_object()
 	if session == null:
 		return
+	# A changed source label must not be staged under unpublished paint.
+	# Equivalent text is harmless (e.g. confirming an already-open dialog).
+	if rename_field.text.strip_edges() != session.name and not _can_persist_or_close("Rename Object"):
+		return
 	var changed: DrawingResult = session.set_name(rename_field.text)
 	if changed.ok:
 		_update_status()
@@ -2097,8 +2101,15 @@ func _save_as_named_object() -> void:
 	if title.is_empty() or title.length() > 128 or "\n" in title or "\r" in title:
 		_show_error("Choose a 1–128 character Object Asset name")
 		return
+	# A rejected Save As must not leave its proposed name on a private draft.
+	# Authorize before staging, then restore the prior target on any failed
+	# publication (including a malformed or stale source snapshot).
+	if not _can_persist_or_close("Save Object As"):
+		return
+	var previous_variant_name: String = session.variant_name
 	session.variant_name = title
-	_publish_object(true)
+	if not _publish_object(true):
+		session.variant_name = previous_variant_name
 
 
 ## Do not serialize or close a still-unpublished stroke. Rejection is
@@ -3271,21 +3282,22 @@ func _save() -> void:
 		_save_file(path)
 
 
-func _publish_object(as_variant: bool) -> void:
+func _publish_object(as_variant: bool) -> bool:
 	var session: DrawingObjectEditorSession = current_object()
 	if session == null:
-		return
+		return false
 	if not _can_persist_or_close("Save Object"):
-		return
+		return false
 	var result: DrawingResult = session.save_as() if as_variant else session.save()
 	if not result.ok:
 		if active_tab >= 0:
 			tabs[active_tab].erase("_target_path")
 		_cancel_pending_close()
 		_show_error(result.message)
-		return
+		return false
 	_sync_object_tab()
 	_close_if_saved()
+	return true
 
 
 func _save_file(path: String) -> void:

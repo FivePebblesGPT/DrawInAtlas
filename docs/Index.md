@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 keep Object metadata transactional across rejected Save As (T-131 Done)
+
+[T-131](Tickets/T-131.md) closes a pending-Brush and failed-publisher gap
+in the Object Editor: a named Save Source As could leave its proposed
+`variant_name` on a private draft even when publication was refused, and
+source Rename could change metadata while paint was still unpublished.
+The commands now authorize source changes before staging and restore the
+previous variant target on publisher failure; ordinary successful Save As
+still uses the selected title. The [21-check red/green witness](evidence/T-131-2026-11-15-object-metadata-atomicity.md)
+records 5 failures on the unmodified T-130 tree and 21/21 passing checks,
+with existing Object and Brush suites verified. T-095 latency, hosted CI,
+and manual/hardware review gates remain unchanged.
+
 ## 2026-11-15 guard selection/frame context during Brush drain (T-130 Done)
 
 [T-130](Tickets/T-130.md) prevents an unguarded Ctrl+D/Deselect from clearing
@@ -2816,6 +2829,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-128 · Guard History list jumps during pending Brush drain](Tickets/T-128.md) | Done | List selection blocks source revision changes and restores the visible cursor until queued paint commits; pixel and portable roundtrip verified | [T-127](Tickets/T-127.md) |
 | [T-129 · Guard concurrent layer and clipboard edits during Brush drain](Tickets/T-129.md) | Done | Source-mutating layer/text/pixel actions refuse pending strokes; Tree selection and ordered RGBA8 publication protected | [T-128](Tickets/T-128.md) |
 | [T-130 · Guard selection and frame source context during Brush drain](Tickets/T-130.md) | Done | Clear Selection, image-frame and Object-frame edits cannot invalidate unpublished Brush or queued paint | [T-129](Tickets/T-129.md) |
+| [T-131 · Preserve Object rename and variant metadata on rejected publication](Tickets/T-131.md) | Done | Pending Brush rejects metadata changes; failed Save As restores prior variant target, successful publish unchanged | [T-125](Tickets/T-125.md) |
 
 ## Epics
 
