@@ -1790,6 +1790,19 @@ func _history_item_selected(row: int) -> void:
 		return
 	var target: int = _history_row_positions[row]
 	var document: DrawingDocument = current_document()
+	if target == document.history_position():
+		return
+	# History list rows bypass the Undo/Redo buttons. A jump would revise the
+	# source beneath detached Brush input and silently discard its queued edits.
+	if not _can_persist_or_close("History navigation"):
+		var current_row: int = _history_row_positions.find(document.history_position())
+		_rendering_history = true
+		if current_row >= 0:
+			history_list.select(current_row)
+		else:
+			history_list.deselect_all()
+		_rendering_history = false
+		return
 	while document.history_position() > target:
 		var result: DrawingResult = document.undo()
 		if not result.ok:
