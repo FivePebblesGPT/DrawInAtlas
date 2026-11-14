@@ -2075,6 +2075,10 @@ func _change_object_frame() -> void:
 	var origin: Vector2i = Vector2i(int(frame_fields[0].value), int(frame_fields[1].value))
 	var bounds: Rect2i = Rect2i(int(frame_fields[2].value), int(frame_fields[3].value),
 		int(frame_fields[4].value), int(frame_fields[5].value))
+	# Object source context may not be rewritten while detached Brush input
+	# still targets its captured document and authoring metadata.
+	if (origin != session.origin or bounds != session.bounds) and not _can_persist_or_close("Change Object Frame"):
+		return
 	var changed: DrawingResult = session.set_frame(origin, bounds)
 	if not changed.ok:
 		_show_error(changed.message)
@@ -2721,6 +2725,10 @@ func _cancel_floating_move() -> void:
 
 func _deselect() -> void:
 	if active_tab >= 0:
+		# Clear Selection changes the mask captured by an in-flight stroke.
+		# Refuse instead of letting Canvas cancel the unpublished transaction.
+		if canvas.selection_mask.enabled and not _can_persist_or_close("Clear Selection"):
+			return
 		if canvas.has_floating_move() and not canvas.confirm_floating_move():
 			return
 		canvas.clear_selection()
@@ -3098,6 +3106,10 @@ func _apply_image_frame() -> void:
 		_show_error(checked.message)
 		return
 	if frame == canvas.image_bounds:
+		return
+	# Changing clip/authoring bounds while a stroke drains would cancel
+	# already received paint and its queued successor through Canvas's setter.
+	if not _can_persist_or_close("Change Image Frame"):
 		return
 	tabs[active_tab]["frame"] = frame
 	tabs[active_tab]["frame_dirty"] = frame != tabs[active_tab].get("saved_frame", frame)

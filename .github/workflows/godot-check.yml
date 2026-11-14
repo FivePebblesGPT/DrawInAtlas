@@ -103,6 +103,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t129-pending-edits.log --marker T129_PENDING_EDIT_PASSED || ci_fail_marker 'T129 pending source edits failed strict log policy'
           grep -Fqx 'T129_PENDING_EDIT_PASSED checks=35 failures=0' /tmp/godot-t129-pending-edits.log || ci_fail_marker 'T129 assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t129_pending_content_edit.py' -v || ci_fail_marker 'T129 source and CI contracts rejected'
+          # T-130 refuses selection and authoring-frame context edits while
+          # unpublished Brush/queued input retains its captured source.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t130_pending_source_context_smoke.gd 2>&1 | tee /tmp/godot-t130-pending-context.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t130-pending-context.log --marker T130_CONTEXT_PASSED || ci_fail_marker 'T130 pending source context rejected by strict log'
+          grep -Fqx 'T130_CONTEXT_PASSED checks=34 failures=0' /tmp/godot-t130-pending-context.log || ci_fail_marker 'T130 source context assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t130_pending_source_context.py' -v || ci_fail_marker 'T130 source and CI contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
