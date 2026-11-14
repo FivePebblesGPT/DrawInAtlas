@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://mpo5o6d4uybu"]
+[gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://addons/gdUnit4/src/ui/parts/GdUnitInspectorToolBar.tscn" id="1"]
 [ext_resource type="Script" path="res://addons/gdUnit4/src/ui/GdUnitInspector.gd" id="1_j37cs"]

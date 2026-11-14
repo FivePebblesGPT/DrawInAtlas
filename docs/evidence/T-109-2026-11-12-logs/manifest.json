@@ -1,0 +1,155 @@
+{
+  "schema": "t109-evidence-logs-v1",
+  "remote_base": "79b8959e9eac01b3bb10a144a46407acc6901aed",
+  "godot_version": "4.8.beta3.official.c51ff06e8",
+  "logs": [
+    {
+      "file": "t064-null.log",
+      "sha256": "5d469a5556db409846dd8c097c4529d4bd1927c51c93ce3b040a9b629b11c9b2",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T064_CHILD_REPAIR_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-atlas-native.log",
+      "sha256": "06eceff6086964b27a9160671651ee5824adf8006c69c2c63b95b901129bd45f",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_ATLAS_BROWSER_NATIVE_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-atlas.log",
+      "sha256": "dbea4914f6efeb228f5c770555b5b71cc90ede7134207d6629768da948178d62",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_ATLAS_BROWSER_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-browser.log",
+      "sha256": "f5ecfd3d92df1e4d207f6f9ac6d1a7f199979816f6a2f6492676bdcba551953b",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_ASSET_BROWSER_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-io.log",
+      "sha256": "bf88c7f43c7b8a451c9a1ef74999098caaea07bc8e1a7b75bcbd1b1ba179dac6",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_REAL_IO_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-manager-native.log",
+      "sha256": "7f9bf930a204acdbb0a6fae37d9e39cc9e7ac82834e95cee69f68bd3fb0fed31",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_MANAGER_NATIVE_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-native.log",
+      "sha256": "c230818eb57f805cedd2ba7dc27d68785a8569064028586bcdb549874e4ba2c3",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_NATIVE_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-paging.log",
+      "sha256": "cf634e7e852a208abfeb7c5405df1abd37c7353ecaad2c06711748d0ba1ea91d",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_PAGING_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-repair.log",
+      "sha256": "7fc800d865158ec2a76145960776f8456bf8296604359c8b8441500028dfd4c6",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_ASSET_REPAIR_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-source.log",
+      "sha256": "862c672570fceb3788233dcbed393f710e6cef11577888183ace45f1f24e8843",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_MANAGER_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-thumb.log",
+      "sha256": "66db20b9371bf5ff13346a9689cf475c5c25304f99b87c3da9c0d900a0840e39",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_THUMBNAILS_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-transfer.log",
+      "sha256": "74af768ee389491e2d9e92d63cf7539bf5a6af87a868d82b171347fdd7120157",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_TRANSFERS_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t065-xtest-pointer.log",
+      "sha256": "a1f673fa15a999e46621101d8ae94a8a1386865e36538b64ebe6e264af87dab3",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_POINTER_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t109-benchmark-baseline-1.log",
+      "sha256": "ae3ed943f7d32c2f34185ee4723984167915309145d63d4408990ddbe8c1f841",
+      "kind": "benchmark",
+      "exit_code": 0
+    },
+    {
+      "file": "t109-benchmark-baseline-2.log",
+      "sha256": "abc97940900bf17ae2405cb0b8496eaf0a788f274268e18d785579c5e0369869",
+      "kind": "benchmark",
+      "exit_code": 0
+    },
+    {
+      "file": "t109-benchmark-candidate-1.log",
+      "sha256": "0be425b53ae2b042d6c248bc23a1b1f22811a5b34cf4ed5bd1bcbbab091dab74",
+      "kind": "benchmark",
+      "exit_code": 0
+    },
+    {
+      "file": "t109-benchmark-candidate-2.log",
+      "sha256": "4646cff1d078307e56efd43710225ba0be9768cf845870e56ce33029a87caa0a",
+      "kind": "benchmark",
+      "exit_code": 0
+    },
+    {
+      "file": "t109-red-original.log",
+      "sha256": "7f278752088839f2cd87da2a6650911959e90adaa84d36e1a8a100f60f2e120c",
+      "kind": "negative_control",
+      "exit_code": 124
+    },
+    {
+      "file": "t109-scale.log",
+      "sha256": "ab78e9f2ca01411e326ddeaca6e05fb920815ba21fccfe11367d11910d918f92",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T109_SCALE_PASSED",
+      "strict_checker_exit_code": 0
+    },
+    {
+      "file": "t109-standalone-import.log",
+      "sha256": "dc4f213cb0b1a3ef1e028cf137edcd8f8b64935085a7995cf6082b5e2e1a3fb6",
+      "kind": "model",
+      "exit_code": 0
+    }
+  ]
+}

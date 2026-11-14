@@ -1,0 +1,12 @@
+test_isolated_godot_consumer_exercises_real_package (test_drawing_contract.PackageIsolationTests.test_isolated_godot_consumer_exercises_real_package) ... ok
+test_only_allowlisted_sources_are_staged_byte_identically (test_drawing_contract.PackageIsolationTests.test_only_allowlisted_sources_are_staged_byte_identically) ... ok
+test_source_is_generic_and_contains_no_atlas_reference (test_drawing_contract.PackageIsolationTests.test_source_is_generic_and_contains_no_atlas_reference) ... ok
+test_stage_requires_external_empty_output (test_drawing_contract.PackageIsolationTests.test_stage_requires_external_empty_output) ... ok
+test_blank_detail_is_sparse_with_distinct_density (test_drawing_contract.RegistryContractTests.test_blank_detail_is_sparse_with_distinct_density) ... ok
+test_nonblank_signed_chunk_coordinates_and_unique_layers (test_drawing_contract.RegistryContractTests.test_nonblank_signed_chunk_coordinates_and_unique_layers) ... ok
+test_two_floors_with_two_details_and_no_duplicate_document_id (test_drawing_contract.RegistryContractTests.test_two_floors_with_two_details_and_no_duplicate_document_id) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 5.788s
+
+OK

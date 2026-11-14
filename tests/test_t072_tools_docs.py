@@ -79,8 +79,10 @@ class ToolWorkflowDocsTests(unittest.TestCase):
         for method in ("paint_path", "paint_polygon", "flood_fill", "apply_region", "commit", "cancel"):
             self.assertIn(f"func {method}(", edit)
         self.assertIn("func begin_edit(", doc)
-        self.assertIn("_covered", edit)
-        self.assertIn("if once and _covered.has(key)", edit)
+        self.assertIn("var _covered_rows: Dictionary[int, Dictionary]", edit)
+        self.assertIn("covered_row = _covered_rows.get(global_y, {})", edit)
+        self.assertIn("if covered_row.has(global_x):", edit)
+        self.assertIn("_covered_rows[global_y] = covered_row", edit)
         self.assertIn("if selection != null and not selection.allows(", edit)
         self.assertIn("apply_region(Rect2i, PackedByteArray)", self.pages["BRUSH_WORKFLOW.md"])
         self.assertIn("hidden RGB", self.pages["ERASER_WORKFLOW.md"])

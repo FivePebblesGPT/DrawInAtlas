@@ -1,0 +1,14 @@
+/mnt/data/work/DrawInAtlas.11-12/drawing
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T091_MODEL: 54 checks; 0 failed
+T091_MODEL_PASSED
+test_grip_witness_log_fails_closed (test_t091_dock.T091DockTests.test_grip_witness_log_fails_closed) ... ok
+test_log_recognizes_only_post_success_known_leaks (test_t091_dock.T091DockTests.test_log_recognizes_only_post_success_known_leaks) ... ok
+test_model_is_required_in_fast_ci (test_t091_dock.T091DockTests.test_model_is_required_in_fast_ci) ... ok
+test_native_workflow_imports_before_x11_and_uploads_evidence (test_t091_dock.T091DockTests.test_native_workflow_imports_before_x11_and_uploads_evidence) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.001s
+
+OK

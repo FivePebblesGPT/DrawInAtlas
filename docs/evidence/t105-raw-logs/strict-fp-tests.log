@@ -1,0 +1,7 @@
+test_fast_math_is_rejected_at_compile_time (test_t068_scalar_strict_fp.ScalarStrictFpContracts.test_fast_math_is_rejected_at_compile_time) ... ok
+test_strict_optimization_keeps_all_outputs_unchanged_for_nan (test_t068_scalar_strict_fp.ScalarStrictFpContracts.test_strict_optimization_keeps_all_outputs_unchanged_for_nan) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 4.258s
+
+OK

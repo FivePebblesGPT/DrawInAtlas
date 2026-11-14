@@ -77,7 +77,7 @@ def verify_replay(directory: Path, checks: list[Check], workflow: str, *,
     if report.get("workflow_sha256") != _sha256(workflow.encode("utf-8")):
         problems.append("Workflow digest differs from recorded source")
     if not isinstance(report.get("godot_version"), str) or not ENGINE_VERSION.match(report["godot_version"]):
-        problems.append("Report does not identify pinned Godot 4.8 beta2")
+        problems.append("Report does not identify pinned Godot 4.8 beta3")
     revision = report.get("candidate_commit")
     if (not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision)
             or report.get("base_head_sha") != revision or report.get("working_tree_clean") is not True):

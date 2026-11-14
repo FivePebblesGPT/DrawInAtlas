@@ -1,0 +1,8 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+WALL PATH FAILED: explicit restyle action changes style only
+WALL PATH FAILED: style redo
+WALL PATH FAILED: native save round-trip retains path edits
+WALL PATH FAILED: changed cell rejects vertex drag without modifying the wall or history
+ATLAS_WALL_PATHS_FAILED checks=78 failures=4

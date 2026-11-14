@@ -28,8 +28,8 @@ func same_points(a: Dictionary, b: Dictionary) -> bool:
 func test_rejected_late_point(label: String, bad: Vector2, width: float = 12.0) -> void:
 	var reference: Object = brush()
 	var candidate: Object = brush()
-	var seed := PackedVector2Array([Vector2(-7.5, 2.5)])
-	var after := PackedVector2Array([Vector2(-3.5, 2.5), Vector2(9.5, 4.5)])
+	var seed: PackedVector2Array = PackedVector2Array([Vector2(-7.5, 2.5)])
+	var after: PackedVector2Array = PackedVector2Array([Vector2(-3.5, 2.5), Vector2(9.5, 4.5)])
 	var baseline: Dictionary = output(reference, seed)
 	check(same_points(baseline, output(candidate, seed)), label + " common seed")
 	var failed: Dictionary = output(candidate,
@@ -43,7 +43,7 @@ func test_rejected_late_point(label: String, bad: Vector2, width: float = 12.0) 
 func test_reset_and_clip() -> void:
 	var reference: Object = brush()
 	var candidate: Object = brush()
-	var stroke := PackedVector2Array([Vector2(-10.5, -5.5), Vector2(13.5, 8.5)])
+	var stroke: PackedVector2Array = PackedVector2Array([Vector2(-10.5, -5.5), Vector2(13.5, 8.5)])
 	var first: Dictionary = output(reference, stroke)
 	check(bool(first.get("ok", false)) and
 		(first.get("points", PackedInt32Array()) as PackedInt32Array).size() > 0,
@@ -64,15 +64,15 @@ func test_reset_and_clip() -> void:
 func test_total_candidate_budget() -> void:
 	var reference: Object = brush()
 	var candidate: Object = brush()
-	var initial := PackedVector2Array([Vector2(-2.5, -3.5)])
+	var initial: PackedVector2Array = PackedVector2Array([Vector2(-2.5, -3.5)])
 	check(same_points(output(reference, initial), output(candidate, initial)),
 		"cumulative candidate test starts identical")
-	var many := PackedVector2Array()
+	var many: PackedVector2Array = PackedVector2Array()
 	for i: int in range(96):
 		many.push_back(Vector2(900.5 if i % 2 else -900.5, float(i % 3)))
 	var failed: Dictionary = output(candidate, many, 12.0)
 	check(not bool(failed.get("ok", true)), "cumulative candidate budget rejected")
-	var final_stroke := PackedVector2Array([Vector2(4.5, 1.5)])
+	var final_stroke: PackedVector2Array = PackedVector2Array([Vector2(4.5, 1.5)])
 	check(same_points(output(reference, final_stroke), output(candidate, final_stroke)),
 		"candidate budget rejection retains prior state")
 

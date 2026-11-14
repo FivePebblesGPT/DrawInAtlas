@@ -19,6 +19,7 @@ import t068_blend2d_quad as QUAD  # noqa: E402
 from t068_blend2d_brush import NativeBrush  # noqa: E402
 from t068_blend2d_cpu import verify_archive  # noqa: E402
 from t068_skia_brush import canonical_pixels  # noqa: E402
+from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2  # noqa: E402
 
 EVIDENCE = ROOT / "docs/benchmarks/T068_2026-11-04_blend2d_quad.json"
 
@@ -84,7 +85,7 @@ class QuadEvidenceTests(unittest.TestCase):
             self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
             self.assertIn("T068_QUAD_SCOPE_ORACLE_PASSED: 15 cases", process.stdout)
             self.assertNotIn("SCRIPT ERROR", process.stdout + process.stderr)
-            self.assertEqual(json.loads(output.read_text()), QUAD.load_oracle())
+            require_beta3_matches_pinned_beta2(QUAD.load_oracle(), json.loads(output.read_text()))
 
 
 class NativeQuadTests(unittest.TestCase):

@@ -1,0 +1,37 @@
+name: Godot T-119 Atlas GM Token registered-source witness (on demand, software only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  token-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 3
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+      - name: Install software-display dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Import canonical Atlas project
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path . --import --quit
+      - name: Verify live Token preview, registry invalidation, and exact source history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path . \
+            --script res://tests/token_visual.gd 2>&1 | tee /tmp/t119-token-visual.log
+          python3 tools/check_godot_model_log.py /tmp/t119-token-visual.log --marker ATLAS_TOKEN_VISUAL_PASSED
+      - name: Upload software-only diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t119-xvfb-token-ownership
+          path: /tmp/t119-token-visual.log
+          if-no-files-found: warn

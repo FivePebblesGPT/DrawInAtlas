@@ -1,3 +1,600 @@
+## T-119 GM Token registry ownership (2026-11-12)
+
+The existing required `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+check additionally runs `tests/t119_token_registered_target_smoke.gd` with
+an independent 120-second watchdog, retained raw log, and strict
+`T119_TOKEN_PASSED` success-marker validation. The new 47-assertion model
+rejects same-ID/byte map/floor replacements, removed registry entries, and
+stale direct edits before any Token request or Undo publication. Original
+T-118 Canvas/Editor fail 19 checks. The 15-check graphical Token framebuffer
+witness is separately available in on-demand
+`godot-native-t119-token.yml`, with strict log validation and artifact
+retention. No new required CI step IDs (**46 unchanged**), no native binary,
+no approval of T-039/T-041 privacy/ownership and no physical latency claim.
+[Evidence](evidence/T-119-2026-11-12-token-registered-source.md).
+
+## T-118 Wall Path portable Save/Open regression (2026-11-12)
+
+The existing required
+`ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input` check now
+runs `tests/wall_paths_smoke.gd` under an independent 120-second watchdog,
+retains `/tmp/godot-t118-wall-portable.log`, and requires the exact
+`ATLAS_WALL_PATHS_PASSED` marker through T-094's strict verifier. The unchanged
+T-117 test fails four assertions because it attempted Restyle without an active
+wall selection, expected cell-only changes to reject an unmasked gesture, and
+loaded a legacy `.scn` file after portable Save. The 82-check repair verifies
+correct context and portable generation immutability across Undo/Redo. This is
+a test/CI-only repair, not a runtime schema migration, owner approval of T-026,
+physical-device evidence or a hosted CI pass. **46 required check IDs remain.**
+[Evidence](evidence/T-118-2026-11-12-wall-path-portable.md).
+
+## T-117 Wall Path registered-source authorization (2026-11-12)
+
+The existing required `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step now additionally runs `tests/t117_wall_registered_target_smoke.gd` with
+its own 120-second watchdog, raw log and strict `T117_WALL_PASSED` verifier.
+The 91-assertion witness covers retained campaign/map/floor Resource identity
+through held drafts and vertex drags; rejected stale gestures emit no history
+or path edit, and direct edits cannot modify detached objects. A valid open
+path, vertex movement, unrelated registered map change and exact Undo/Redo
+remain permitted. The original Canvas fails 23 of 85 checks. The existing
+46 required CI check IDs are unchanged; this local check is not hosted CI or
+owner approval of T-026's Wall Path interactions and persistence policy.
+[Evidence](evidence/T-117-2026-11-12-wall-registered-source.md).
+
+## T-116 Atlas Text portable Save/Open regression (2026-11-12)
+
+Existing required check `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+now also runs `tests/text_smoke.gd` with its own 120-second watchdog,
+retained raw log and strict `ATLAS_TEXT_PASSED` T-094 verifier. The old test
+failed 2/69 assertions by calling the retired single-file native loader
+after the real Editor published a portable generation. The corrected
+**73/73** suite checks two portable generations, exact D0/D1 editable text,
+source dictionaries, no legacy head and published-snapshot immutability after
+Undo/Redo. No production persistence format changes, no new required CI step
+(**46 IDs unchanged**), and no owner/hosted acceptance is implied.
+[Evidence](evidence/T-116-2026-11-12-text-portable-save.md).
+
+## T-115 Text modal campaign registry ownership (2026-11-12)
+
+The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step now runs `tests/t115_text_modal_registered_target_smoke.gd` with its own
+120-second watchdog, raw log and strict `T115_TEXT_PASSED` success-marker
+check. It rejects Text Apply after the captured campaign, map or floor is
+replaced/detached in the registry, even when the dialog still points at
+byte-identical same-ID Resources. It also verifies that invalid Apply keeps
+the draft, does not add Undo history, and that an unrelated-map change permits
+a valid text edit with byte-exact Undo/Redo. The original T-114 source fails
+eight new assertions; the candidate passes 42/42. The required fast-CI
+inventory remains **46**. The separate old `text_smoke.gd` still has two
+obsolete native `.scn` persistence assertions failing under beta3 on both
+sources; no such pass or hosted CI success is claimed. T-027 owner UX and
+physical readability approval remain outstanding.
+[Evidence](evidence/T-115-2026-11-12-text-modal-registered-source.md).
+
+## T-114 Polygon registered-owner authorization (2026-11-12)
+
+The existing required Atlas composition step
+`ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input` also runs
+`tests/t114_polygon_registered_target_smoke.gd` with a separate 120-second
+watchdog, retained raw log and fail-closed
+`tools/check_godot_model_log.py --marker T114_POLYGON_PASSED`. The 43-check
+oracle rejects a Polygon whose originally captured campaign map/floor is no
+longer registered (including same-ID same-byte replacements), despite Canvas
+still holding the original map/floor references. A change to an unrelated map
+remains harmless; a new valid Polygon still yields one exact Undo/Redo step.
+The original T-113 source fails 14 checks; the candidate passes 43/43. The
+required fast-CI inventory remains **46 checks**. This does not approve
+T-025's unresolved owner interaction policy or establish a hosted run.
+[Evidence](evidence/T-114-2026-11-12-polygon-registered-source.md).
+
+## T-113 Bucket staged Resource identity (2026-11-12)
+
+The existing required Atlas composition step
+`ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input` additionally
+runs `tests/t113_bucket_resource_identity_smoke.gd` with an independent
+120-second watchdog, raw log, and T-094 exact success-marker verifier
+`T113_BUCKET_PASSED`. The 29-check oracle rejects a pending fill if its
+original campaign, map or floor Resource was replaced or detached from the
+current registry, even if the replacement has the same IDs and raster bytes.
+A newly authorized fill still commits one Undo/Redo step. The original T-112
+source fails ten checks. The required check inventory remains **46 IDs**.
+The additional runtime test does not approve T-023's human interaction policy
+or count as hosted CI. [Evidence](evidence/T-113-2026-11-12-bucket-resource-identity.md).
+
+## T-112 Atlas authoring portable-generation regression (2026-11-12)
+
+The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step additionally runs `tests/line_smoke.gd` and `tests/polygon_smoke.gd`
+with separate 120-second watchdogs and raw logs. Both now load the **current
+portable campaign generation** after the real Editor Save, rather than the
+retired single-file `.scn` codec. The tests verify an actual published root,
+exact preserved raster bytes, and Undo independence; the original suites
+failed 1 and 2 assertions, respectively. `tools/check_godot_model_log.py`
+requires `ATLAS_LINE_PASSED` and `ATLAS_POLYGON_PASSED` with process exit 0.
+The workflow retains **46 required check IDs**; this is regression coverage,
+not a hosted CI pass or owner acceptance. [T-112 evidence](evidence/T-112-2026-11-12-atlas-portable-authoring-roundtrip.md).
+
+## T-111 Atlas Line mid-gesture target authorization (2026-11-12)
+
+The existing `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`
+step runs `tests/t111_line_release_authorization_smoke.gd` on the real Atlas
+Editor after its canonical composition check, with an independent raw log,
+120-second watchdog and `tools/check_godot_model_log.py --marker
+T111_LINE_GATE_PASSED`. The test verifies that a held Line **cannot** emit a
+stroke if the original raster Resource is locked, hidden, reassigned to
+another detail or replaced by a different Resource sharing the same ID, or if the map/floor
+Resource is replaced using the same ID.
+It also verifies that a fresh gesture still commits and Undoes/Redoes one
+canonical change. The T-110 source fails 20 assertions; the candidate passes
+49/49. The CI inventory stays at **46 required IDs**; the legacy Atlas Line
+UX/policy owner review remains outstanding. Xvfb/Mesa checks are only
+software-renderer evidence. [Evidence](evidence/T-111-2026-11-12-line-release-target-authorization.md).
+
+## T-110 byte-exact UTF-8 portable source gate (2026-11-12)
+
+The existing required `ci_t065_asset_browser_model` step runs
+`drawing/tests/t110_lossless_source_utf8_smoke.gd` with the shared
+`tools/check_godot_model_log.py --marker T110_UTF8_PASSED` verifier and a
+bounded watchdog. It requires that invalid UTF-8 cannot enter the portable
+Objects/ index, shadow a valid identity, or publish an imported source;
+valid multibyte Unicode still hashes, opens and exports byte-for-byte.
+The original T-109 implementation fails seven assertions; the candidate
+passes 20/20. There is **no 47th required CI ID**. The logged malformed
+input causes Godot to print Unicode replacement diagnostics, retained in raw
+logs; those are not success markers. Neither hosted CI nor physical owner
+acceptance is inferred. [Evidence](evidence/T-110-2026-11-12-lossless-portable-utf8.md).
+
+## T-109 real-directory Asset Browser scale and transfer safety (2026-11-12)
+
+Existing required `ci_t065_asset_browser_model` additionally runs
+`drawing/tests/t109_asset_browser_scale_smoke.gd` under the same 120-second
+watchdog, verifying `T109_SCALE_PASSED` through
+`tools/check_godot_model_log.py` with raw logs retained by CI. Its 32 checks
+create real portable 512/513-source folders, late duplicates, digest-bound
+Export, stale Import rejection, symlink replacement, relocations, and 24-entry
+thumbnail pressure, then clean the isolated fixtures. The original T-108
+source fails the stale Import and pinned-copy controls. Run the opt-in paired
+`drawing/tests/t109_scan_benchmark.gd` with `T109_SCAN_ROOT` set to the **same
+real 512-source directory** for CPU p50/p95 and engine-tracked memory; capture
+process peak RSS separately (not VRAM). The existing `tools/test_t065_x11_pointer.py`
+uses Dummy audio to keep real XTEST drag logs fail-closed; it is an opt-in
+Xvfb witness, not physical owner input approval.
+
+The **46 required CI check IDs** are unchanged. No hosted run on the local
+candidate, cross-process filesystem lease, Windows device validation or T-065
+owner manual gate completion is implied. [Evidence](evidence/T-109-2026-11-12-asset-scale-and-path-hardening.md).
+
+## T-108 opt-in nested Save As policy regression (2026-11-12)
+
+The existing required `ci_11b_verify_t_064_nested_object_graph` check also
+runs `tests/t108_nested_save_as_policy_smoke.gd` with exact marker
+`T108_POLICY_PASSED`, a 120-second watchdog, and the shared fail-closed
+`check_godot_model_log.py` verifier. The inventory remains **46 required CI
+IDs**; no additional hosted run or owner approval is inferred. This checks
+two explicit *internal* proposals only: the user-facing Object Editor still
+rejects undecided nested Save As, and single-file nested export remains
+blocked. [T-108 evidence](evidence/T-108-2026-11-12-nested-save-as-prototypes.md).
+
+## T-107 replay-log and owner-evidence integrity (2026-11-12)
+
+`tools/t107_evidence_audit.py` independently verifies all 46 required check
+IDs, Bash scripts, original exit status and raw SHA-256 logs against the
+checked-in `.github/workflows/godot-check.yml`. The local T-106 46/46
+capture has a **null commit provenance** and is marked `local-exploratory`;
+it cannot satisfy hosted CI. The same command validates all 23 canonical
+finding-to-ticket mappings and emits explicit physical Linux/Windows `NOT RUN`
+actions, preserving the historical #22 positive Save/Open and #23 monotonic
+revision semantics. Separate fresh beta3 standalone/Atlas raw logs and their
+strict success markers are retained. `tests/test_t107_evidence_audit.py` has
+tamper/omission controls; the existing mandatory T-073 matrix suite checks
+the archived evidence without adding a 47th CI step. This is evidence
+integrity, **not** a fresh hosted run, physical-device measurement or manual
+signoff. [T-107 evidence](evidence/T-107-2026-11-12-hosted-owner-readiness.md).
+
+## T-106 required fast-desktop Godot 4.8-beta3 repair (2026-11-12)
+
+The push/PR workflow `.github/workflows/godot-check.yml` runs pinned
+`4.8.beta3.official.*` with all **46 original required check IDs**. T-106
+repairs previously red strict explicit-type declarations in 25 test scripts,
+the current `_covered_rows` workflow contract, and the local T-094 replay
+fixture's old beta2 identity **without relaxing** the original strict checkers.
+`tools/export_godot_ci_evidence.py` now enforces beta3 for current hosted
+artifacts (the previous beta2 regex could produce a false-red record on a
+successful beta3 run). `tests/test_t094_hosted_ci_evidence.py` includes an
+explicit old-beta2 rejection control.
+
+Four regenerated T-068 masks/Brush fixture sets from beta3 must match the
+original SHA-pinned beta2 arrays, case IDs, ordering, RGBA8 values and hashes;
+**only** the `godot_version` metadata label is allowed to differ, checked
+through `tests/t068_oracle_engine_compat.py` and its negative-control suite.
+Historical beta2 files and their hashes are not rewritten. Live regeneration
+still requires root project import, and the T-068 detached native oracles
+continue in the *existing* CI check (no 47th required check). A local replay
+can establish software parity but **cannot** establish GitHub-hosted green,
+reviewer approval, physical input-to-photon timing or a clean Godot teardown.
+[T-106 evidence](evidence/T-106-2026-11-12-beta3-fast-ci.md) and
+[ticket](Tickets/T-106.md) retain the reproducible commands and outstanding
+hosted gate. Older beta2 historical CI notes below remain dated records, not
+instructions for the current beta3 PR run.
+
+## T-105 Linux standalone RSS and unverified Windows/MSVC portability (2026-11-12)
+
+The opt-in `.github/workflows/godot-native-t105-portability.yml` installs
+pinned Godot 4.8 beta3 and templates. Linux imports and exports an isolated
+`build_drawing_app.py --without-native` consumer, statically inspects the
+ELF/PCK, performs a clean-profile standalone launch and records three fresh
+actual Godot-process RSS/HWM and CPU/wall samples (not detached workers).
+`tools/benchmarks/t105_release_residency.py --verify --output
+ docs/benchmarks/T105_2026-11-12_linux_export_residency.json` fail-closes
+on missing/malformed runs, fake Windows/VRAM completions and changed percentiles.
+`tests/test_t105_portability.py` includes red/green controls for a generated
+Windows-only source shim: historical C++ bytes are unchanged; only the shim
+adds `_M_FP_FAST` rejection and a Windows quad export. Original GCC `-Ofast`
+rejection is preserved. The separate Windows job uses real MSVC `cl`
+for strict `/fp:strict` native quad/scalar builds, rejects `/fp:fast`, checks
+pinned Godot signed-mask and straight-RGBA8 source parity, then exports and
+isolated-launches a native-absent PE/PCK and measures Windows OS process CPU
+and peak working set. **This Windows workflow has not run**; source/wiring
+is not acceptance, and physical VRAM is not measured. On-demand jobs do not
+change the fast desktop's **46 required check IDs** or owner-review gates.
+The T-094 strict raw-log policy and nonzero process-exit rejection remain
+mandatory. [T-105 evidence](evidence/T-105-2026-11-12-portable-native.md).
+
+## T-104 operation-specific backend decision evidence — 2026-11-12
+
+The existing required T-068 hard-dab/source-tile CI step also executes
+`tests/test_t104_backend_decision.py` and replays
+`tools/benchmarks/t104_backend_decision.py --verify` (no new required check ID,
+46 remain). The report binds existing T-068 Godot source oracles, ten matched
+scalar/Blend2D warm-call cohorts, Skia nonparity, and fresh Linux-worker memory
+to pinned evidence digests; it refuses a forged backend choice/p95 or missing
+source case. Optional native libraries are **not needed** to replay the
+research decision. The manually run 96px X11 pointer witness now waits for
+T-102's bounded progressive display completion **after preserving the
+original first post-draw metric** before framebuffer checks. Its actual exit
+code and T-094 fail-closed log marker remain mandatory. Neither software
+frame callback nor the decision report establishes physical input-to-photon,
+Windows builds, native resident memory/VRAM or owner approval. Hosted CI
+remains unverified. [Evidence](evidence/T-104-2026-11-12-operation-backends.md).
+
+## T-103 dense over-budget focal retention — 2026-11-12
+
+The existing required `ci_t086_viewport_cache_model` step now also runs the
+13-check `drawing/tests/t103_retention_plan_smoke.gd` with T-094's exact
+`T103_MODEL_PASSED` log gate, unchanged **46 required check IDs**. It
+verifies signed nearest-144 selection, stable ties, sparse/huge/unknown
+occupancy fallback and detached preview bypass. The manually dispatched
+`godot-native-t086-viewport.yml` runs this model and the 150-check
+`drawing/tests/t103_overbudget_viewport_native.gd` after standalone staging
+and import, enforces a strict marker and retained raw logs. The X11 witness
+uses 192 dense lazy chunks plus a translucent layer, real wheel/pan input,
+25/50/100% zoom, masking, hidden RGB, visibility, Undo/Redo and `DrawingFileIO`
+Save/reopen; p50/p95/max frame delays, cache occupancy, persistent/ephemeral
+texture bytes and `/proc` RSS/HWM are diagnostic only. This does **not**
+make transient full-tile uploads partial, assert 16ms frame deadlines, clear
+T-086's reference-device acceptance or establish hosted CI green.
+[Evidence](evidence/T-103-2026-11-12-overbudget-retention.md).
+
+## T-102 cold dense viewport first-population — 2026-11-12
+
+The existing **required** `ci_t086_viewport_cache_model` step additionally runs
+`drawing/tests/t102_cold_population_smoke.gd` with the exact
+`T102_MODEL_PASSED` marker and T-094 fail-closed `check_godot_model_log.py`.
+It validates signed nearest-tile priority, cache dirty and stale preview
+invalidation, partial index fallback, and the original complete-frame path
+for >144 visible content tiles. The **46 required fast check IDs** are unchanged.
+
+The **non-gating on-demand** `godot-native-t086-viewport.yml` runs this oracle
+and `drawing/tests/t102_cold_dense_viewport_native.gd` after source staging,
+editor import, and an Xvfb/Mesa software framebuffer. The latter requires
+**110/110** native assertions and exact straight-RGBA8 source hashes at
+25/50/100% zoom, real signed framebuffer coverage, hidden RGB, visibility,
+pan, Undo/Redo and bounded retained texture counts. Both logs are retained
+under `if: always()`, with strict success-marker verification and process
+exit-code checks. The cold/warm CPU p50/p95, frame maxima, process HWM and
+texture bytes are **diagnostics**, not CI latency thresholds or physical
+input-to-photon results. Repeated real-software cold frames are much shorter,
+but full settlement is slower; soft-budget outliers and T-086/T-095/T-096
+owner gates remain open. [Paired red/green evidence](evidence/T-102-2026-11-12-cold-viewport.md).
+
+## T-101 optional NativeHard dispatch without requiring native adoption — 2026-11-12
+
+The non-gating, manually dispatched `godot-native-t095-brush.yml` runs
+`drawing/tests/t101_native_hard_dispatch_smoke.gd` after canonical standalone
+staging, checks exactly one `T101_NATIVE_DISPATCH_PASSED` via T-094's strict
+log verifier and retains `/tmp/t101-native-dispatch.log` under `if: always()`.
+The 5,035-check synthetic packed-output oracle uses a transactional native
+stub to verify signed/masked Brush/Eraser, hidden RGB, mixed edit handling,
+late source-read failure, retry, atomic history, Undo/Redo and the direct
+NativeHard tile-local dispatch; the original T-100 source fails four of the
+new dispatch assertions. Real Rust and Hokusai preset regressions in the same
+on-demand workflow remain separate. The `t101_native_hard_dispatch_bench.gd`
+CPU-only diagnostic is **not** a CI speed gate or substitute for real-pointer
+runs; it omits Rust raster, screen composition and input timing. The fast
+46 required CI check IDs, on-demand CI hosting status, native-absent fallback,
+T-095/T-096 owner acceptance and 6ms soft drain budget are unchanged.
+[Evidence](evidence/T-101-2026-11-12-native-dispatch.md).
+
+## T-100 sparse atomic Brush publication and Undo — 2026-11-12
+
+The existing **on-demand** `godot-native-t095-brush.yml` now runs
+`drawing/tests/t100_sparse_publication_smoke.gd` headlessly after standalone
+staging and editor import, requires a single `T100_SPARSE_PUBLICATION_PASSED`
+marker through T-094's fail-closed verifier and retains
+`/tmp/t100-sparse-publication.log` even if later checks fail. Its 197
+source/history assertions include full 512×512 red RGBA8 SHA-256, independent
+canonical pixel map parity, signed/masked Brush/Eraser, hidden RGB, Undo/Redo,
+multi-layer isolation, cancellation, invalid late-tile rollback and retry.
+The optional `T100_MAX_COMMIT_MS` is reserved for **paired diagnostic red/green
+controls** (the original publisher fails an 1850ms local control); it is not
+set in CI or interpreted as hardware responsiveness. The real 96px pointer
+suite also logs Godot static/peak memory by stroke. Its 6ms soft drain budget,
+T-095/T-096 owner gates, unchanged **46 required fast-CI check IDs**, and
+T-094 log policy remain authoritative. [Evidence](evidence/T-100-2026-11-12-sparse-publication.md).
+
+## T-099 held-preview scheduling and exact input parity — 2026-11-12
+
+The existing non-gating `godot-native-t095-brush.yml` now applies
+`T099_MAX_PREVIEW_FRAMES=110` to the already required 100-event, 96px full-red
+real-mouse Xvfb witness; the T-098 Canvas source fails that independent
+structural redraw oracle (160), while the T-099 scheduler passes (79–81).
+This checks batching of **display submissions, not rasterization**: the
+6ms soft raster budget and all 296 source fragments remain unchanged, and
+all SHA-256/framebuffer/Undo/Redo assertions still run. The same on-demand
+workflow also runs `drawing/tests/t099_preview_schedule_native.gd` with the
+strict `T099_PREVIEW_SCHEDULE_PASSED` marker and uploads its raw
+`/tmp/t099-preview-schedule.log` even after failure. This 46-check graphical
+witness covers held changing-preview frames, signed/masked Brush/Eraser RGBA8,
+post-release Pan/Zoom, one-step history and capture cancellation.
+
+Only the on-demand workflow changes; the **46 required fast-CI check IDs**, its
+T-094 fail-closed policy, pending hosted runs and T-095/T-096 owner/manual
+review gates remain unaffected. No synthetic Godot post-draw measurement is
+physical input-to-photon proof, and a 6ms soft deadline does not bound one
+atomic `paint_path` call. The paired CPU numbers and a 76.6ms one-off
+candidate drain outlier are reported, not silently promoted to a hardware
+frame-time pass. [T-099 evidence](evidence/T-099-2026-11-12-held-preview-scheduling.md).
+
+## T-098 exact 128px detached preview invalidation — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` runs
+`drawing/tests/t098_preview_display_cache_smoke.gd` on graphical Xvfb,
+requires exactly one `T098_PREVIEW_DISPLAY_PASSED` via the existing
+T-094 fail-closed log checker, and uploads its raw `/tmp/t098-preview-display.log`
+even if a later check fails. The 29-check graphical test compares actual
+Canvas GPU textures and framebuffer pixels across two 128px display quadrants
+sharing a 256px source tile. A staged-only old Canvas lookup fails three
+new assertions; the optimized lookup preserves exact RGBA8 preview/commit,
+alpha/layers, signed Eraser, rollback, cancellation, bounded memory and Undo.
+The 96px graphical pointer witness now also reports per-frame compositor p95,
+maximum frame CPU and retained display texture bytes. Two paired cold/warm
+Xvfb/Mesa runs measured 4.393–4.429s prior versus 1.699–1.770s updated
+compositor CPU; no claim is made of meeting the 100ms whole-gesture target.
+The 6ms soft drain deadline, all 46 required fast CI check IDs and T-095
+manual approval remain unchanged. Hosted CI and owner-device responsiveness
+are not accepted by these local results.
+[Evidence](evidence/T-098-2026-11-11-exact-preview-display-tiles.md).
+
+## T-095 built-in Godot script profiler and 96px stage attribution — 2026-11-11
+
+`godot --profiling --debug` captures real GDScript function-level cost on
+an Xvfb graphical 96px full-canvas pointer test. Its output is a subset of
+per-frame measurements with significant profiler overhead, **not** a complete
+wall-clock latency trace. The on-demand T-095 witness still requires its exact
+`T095_FULL_CANVAS_PASSED` marker and now emits cumulative preview/compositor,
+commit and drain phase CPU totals. One staged-only 30ms drain-budget test
+cut wall time while increasing frame-blocking CPU; the production 6ms value
+was restored and no acceptance or timing budget is added to hosted CI.
+The existing required 46 fast desktop check IDs, T-094 fail-closed log rules,
+manual review and owner-device gates are unchanged.
+[Evidence](evidence/T-095-2026-11-11-96px-godot-profiler.md).
+
+## T-095 owner trace overlapping-commit epoch isolation — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` now labels its existing analyzer
+check as covering overlapping completed-stroke timestamps. The strict
+`T095_TRACE_ANALYZER_PASSED` marker and saved raw log remain mandatory. The
+**10/10** stdlib Python contracts include a red/green appended-file case
+where a later `down_us` exceeds the previous `down_us` but precedes the
+previous `commit_us`; the old analyzer pooled unrelated 80 ms and 5 ms
+release→commit observations. The corrected analyzer partitions these cohorts
+without changing its output schema v3 or the Godot schema-1 exporter. Five
+pinned-engine neighbors pass with strict log checks. This identifies an
+observable timestamp-order discontinuity, not a verified process/device
+boundary or physical GPU responsiveness result. The required fast-CI matrix,
+T-094 fail-closed policy and T-095/T-096 review gates are unchanged; hosted
+Actions remain unverified.
+[Evidence](evidence/T-095-2026-11-11-trace-commit-overlap.md).
+
+## T-095 appended owner trace timestamp-epoch isolation — 2026-11-11
+
+The **non-gating** `godot-native-t095-brush.yml` retains the strict
+`T095_TRACE_ANALYZER_PASSED` marker and raw analyzer log, now with **nine**
+stdlib Python contracts. The analysis output schema v3 adds
+`timestamp_epoch_index` (one-based per input file) and partitions matching
+Brush-setting groups when `down_us` moves backward in an appended JSONL file.
+A red old-analyzer control pools the 80 ms and 5 ms example into one group;
+the updated version keeps both cohorts distinct. A timestamp regression is
+only an observable clock boundary, not a verified hardware or session ID;
+restarts without a regression remain undetectable. The Godot schema-1
+exporter and canonical Brush path are unchanged. The required fast-CI matrix,
+T-094 fail-closed log policy and T-095/T-096 review gates remain intact.
+Hosted CI and owner-device acceptance were not verified.
+[Evidence](evidence/T-095-2026-11-11-trace-epoch-isolation.md).
+
+## T-095 offline trace cohort isolation — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` continues to run
+`tests/test_t095_trace_analyzer.py` with the strict
+`T095_TRACE_ANALYZER_PASSED` marker and retained raw log; the suite now has
+**eight** Python contracts. It fails closed if separate input JSONL files
+with identical Brush settings are pooled, or if strokes within the same file
+are incorrectly split. The new **analysis output schema v2** adds
+`source_file_index` (1-based argument position) to per-stroke/group output
+and declares `cohort_boundary`; the application-exported `schema: 1` format
+is unchanged. No filename or device identity is included in generated
+reports. Even a single appended file may mix sessions, so these groups do
+**not** prove hardware equivalence. The required fast-CI matrix, T-094
+log checker and T-095/T-096 manual-review gates are unchanged.
+Hosted CI and reference-device responsiveness remain unverified.
+[Evidence](evidence/T-095-2026-11-11-trace-cohort-isolation.md).
+
+## T-095 offline owner-device trace analysis — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` workflow now executes
+`tests/test_t095_trace_analyzer.py` (eight stdlib Python contracts), preserving
+`/tmp/t095-trace-analyzer.log` and requiring one exact
+`T095_TRACE_ANALYZER_PASSED` marker through T-094's fail-closed log checker.
+The tool `tools/analyze_t095_trace.py` validates and summarizes existing
+schema-1 opt-in `user://` Brush JSONL records. It clearly separates retained
+percentiles, lifetime maxima, absent Godot callbacks and physical display
+latency; malformed or incompatible records fail without a partial report.
+The canonical Drawing Brush and exporter are unchanged, and this **does not**
+introduce a new required fast-CI check, physical hardware acceptance or a
+hosted Actions pass. T-095 remains In Progress with an owner review gate;
+T-096 remains in Manual Review.
+[Detailed verification](evidence/T-095-2026-11-11-owner-trace-analysis.md).
+
+## T-095 opt-in local Brush profile trace — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` now checks
+`drawing/tests/t095_owner_trace_smoke.gd` with the strict exact
+`T095_OWNER_TRACE_PASSED` marker and retains
+`/tmp/t095-owner-trace.log` under `if: always()`. The local independent
+**17/17** regression covers default-disabled logging, two appended successful
+gestures, a bounded numeric JSONL schema, no document/pixel identifiers,
+cancelled gesture suppression, traversal rejection, 4 MiB file ceiling and
+RGBA8/Undo/Redo parity. The original Canvas and staged disabled-writer control
+fail one test each. Twelve adjacent strict-marker headless tests, real Xvfb
+navigation/integration/pointer runs, and a clean native-absent import passed.
+The feature is a local, explicit opt-in **owner hardware diagnostic**, not
+telemetry by default and not evidence of physical input-to-photon latency.
+The 46 fast-CI check IDs, T-094 fail-closed log policy, T-095 owner gate and
+T-096 Manual Review are unchanged. Hosted CI remains unverified.
+[Evidence](evidence/T-095-2026-11-11-owner-trace-jsonl.md).
+
+## T-095 preview input-receipt to Canvas/post-draw correlation — 2026-11-11
+
+The **non-gating** on-demand `godot-native-t095-brush.yml` stages canonical
+Drawing and runs `drawing/tests/t095_preview_input_postdraw_smoke.gd`, requiring
+exactly one `T095_PREVIEW_INPUT_POSTDRAW_PASSED` marker through T-094's
+fail-closed `check_godot_model_log.py` checker. The raw
+`/tmp/t095-preview-input-postdraw.log` is retained under `if: always()`.
+The local **22/22** independent oracle verifies earliest batch-receipt
+correlation, no-op and coalesced callbacks, cancellation, bounded history,
+real 60px Brush pixels and Undo/Redo; deliberately discarding receipt stamps
+fails **8** assertions. The actual native five-stroke witness reports retained
+receipt→draw/callback p50/p95 and unmatched callback counts. These are engine
+input-receipt/render-callback intervals, **not** device-to-photon measurements.
+The 46 required fast-CI check IDs and T-094 strict logging policy remain
+unchanged; hosted CI and owner physical-device acceptance are unverified.
+[Evidence](evidence/T-095-2026-11-11-preview-input-postdraw.md).
+
+## T-095 bounded duplicate-target input drain — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_duplicate_drain_batch_smoke.gd` with the strict
+`T095_DUPLICATE_DRAIN_PASSED` marker via the existing T-094 fail-closed
+log checker and uploads its raw log regardless of later job failures.
+The **195/195** local Canvas witness compares 162 chronological source
+samples, individual timestamp accounting, exact RGBA8 preview/commit,
+Undo/Redo and bounded Legacy same-position staging against a full-raster
+reference. The original Canvas fails three new grouping assertions. No
+input is dropped, no Hokusai/NativeHard staging semantics change, and the
+required fast desktop CI check IDs are unchanged. Isolated batch/CPU metrics
+and Xvfb/Mesa tests do **not** establish owner physical responsiveness or
+hosted CI acceptance.
+[Detailed evidence](evidence/T-095-2026-11-11-duplicate-drain.md).
+
+## T-095 cross-batch stationary Legacy dab regression — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` workflow stages the
+canonical Drawing source and runs `drawing/tests/t095_cross_batch_dab_smoke.gd`,
+requiring exactly one `T095_CROSS_BATCH_DAB_PASSED` marker through the existing
+fail-closed `check_godot_model_log.py` verifier. The raw
+`/tmp/t095-cross-batch-dab.log` is uploaded under `if: always()`. The
+**663/663** local oracle compares 121 separate Brush/Eraser 60px one-point
+batches against independent full-raster controls and validates signed bytes,
+RGBA8, preview/history, moved endpoints, changed width/color/mode/selection,
+clip/budget, transform/anchor, late source-tile failure and exact retry/Undo.
+Disabling reuse in a staged copy triggers four intentional failures. The
+isolated six-run alternated `t095_cross_batch_dab_bench.gd` is opt-in and has
+**no CI timing budget**. The native absence fallback remains safe; the 46
+required fast-CI check IDs and T-094 strict log policy remain unchanged.
+Hosted CI and owner physical-device responsiveness/approval are unverified.
+[Evidence](evidence/T-095-2026-11-11-cross-batch-dab.md).
+
+## T-095 same-batch duplicate waypoint oracle — 2026-11-11
+
+The on-demand `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_duplicate_waypoints_smoke.gd` using the same fail-closed
+`check_godot_model_log.py` and its exact `T095_DUPLICATE_WAYPOINT_PASSED`
+marker, retaining `/tmp/t095-duplicate-waypoints.log` even when later steps
+fail. The independent 276-check test validates signed RGBA8 preview/commit,
+Brush/Eraser history, clipping and mask changes *across* batches, and
+failure/retry. The skip applies only to consecutive identical points **inside**
+one Legacy `paint_path()` call, not to native Hokusai pigment or changed
+settings at the same position across calls. A disabled-shortcut control fails
+ten checks. The isolated seven-run 60px batch CPU witness has no CI timing
+budget. Neither the 46 required fast-CI checks nor T-094's fail-closed logging
+policy changes. Hosted CI, whole-pointer latency and owner hardware approval
+remain unverified. [Evidence](evidence/T-095-2026-11-11-duplicate-waypoints.md).
+
+## T-095 stationary/axis scanline bounds independent oracle — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` checks
+`drawing/tests/t095_axis_scanline_bounds_smoke.gd` with the strict exact
+`T095_AXIS_SCANLINE_PASSED` marker and preserves its log. The **278/278**
+headless oracle computes every candidate using original full-rectangle
+Geometry2D/Vector2 distances, independently of the conservative optimized
+stationary/axis scanline bounds. It covers 60px and narrow/fractional widths,
+signed anchors, irregular storage tiles, masks, clipping/splitting, exact
+preview, commit delta and Undo/Redo, including three ~10-million-coordinate
+float32 axis-fallback cases that fail four checks on the original source.
+A staged-only wrong-bound control fails 22 checks. No required fast-CI step or owner acceptance status changes;
+local Xvfb measured no credible full-pointer-gesture speedup. Hosted Actions
+and physical input-to-photon acceptance remain unverified.
+[Evidence](evidence/T-095-2026-11-11-axis-scanline-bounds.md).
+
+## T-095 native/GDScript Hokusai pigment rollback witness — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` builds the pinned
+GDExtension, then runs `drawing/tests/t095_native_pigment_atomic.gd` with the
+strict `T095_NATIVE_PIGMENT_ATOMIC_PASSED` log marker and retains the raw log.
+The test requires the actual native class and bundled `.myb`, not a simulated
+pixel list. It injects a *late* GDScript source-chunk read failure after one
+successful native pigment batch, compares failed-batch preview and history,
+then verifies exact same-object retry, subsequent pigment deltas, no-retry
+commit, signed >32-bit anchors, selection holes, RGBA8 source bytes and
+Undo/Redo against an uninterrupted native reference. Original 2026-11-11
+binary: **4 of 56 assertions failed**; transactional fix: **57/57** locally.
+Four Rust unit tests, Clippy and format pass. The existing fallback oracle
+now checks Hokusai transaction negotiation: 7/7 with current native,
+7/7 using the actual previous native binary (Legacy fallback), and
+7/7 on a fresh native-absent import. The GDScript stub-only
+126-check bulk-delta oracle remains independent and works without a native
+library. No change to the **46 required fast-CI check IDs**; hosted Actions
+and owner-hardware 60px responsiveness/approval remain unverified.
+
+## T-095 NativeHard/GDScript source-read rollback witness — 2026-11-11
+
+The **on-demand** native workflow builds the pinned Rust extension and then
+runs `drawing/tests/t095_native_hard_source_atomic.gd` with the strict
+`T095_NATIVE_HARD_SOURCE_ATOMIC_PASSED` marker. The test does not skip if
+no native class is installed. It injects a late Drawing source-tile failure
+after native coverage has advanced, and verifies reject/retry and reject/skip
+parity on the **actual GDExtension** for both Brush and Eraser, with
+independent document/native pairs, 64-bit signed anchors, selection holes,
+RGBA8 preview, commit and Undo/Redo. The previous addon/native binary fails
+**7/53** Brush assertions; the expanded fix passes **113/113**, plus Rust
+**5/5**, Clippy and release build. The workflow uploads the raw log even if
+later steps fail, and the 46 fast required GDScript check IDs are unchanged.
+An old installed real binary without the NativeHard transaction handshake
+selects Legacy at the start of a stroke. Neither local software assertions
+nor the on-demand CI declaration prove hosted CI or owner hardware latency
+acceptance. [Evidence](evidence/T-095-2026-11-11-native-hard-source-rollback.md).
+
 ## T-095 optional NativeHard batch-atomicity witness — 2026-11-09
 
 The on-demand `godot-native-t095-brush.yml` workflow additionally builds the
@@ -23,13 +620,135 @@ signed coordinates, source replacement, stale revisions and atomic history
 make optional native packaging or physical owner responsiveness an approved
 gate. The selected local tests pass; hosted Actions was not run.
 
+## T-095 NativeHard packed output transfer oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` runs the real
+GDExtension `drawing/tests/t095_native_hard_packed_output.gd`, validates its
+exact `T095_NATIVE_HARD_PACKED_OUTPUT_PASSED` marker using the fail-closed
+model-log checker and uploads its raw log even if a later step fails. The
+**20/20 local assertions** compare tens of thousands of ordered signed
+coordinates with a separate full-rectangle f32 reference, including crossing
+sweeps and the native source-read transaction rollback/retry handshake; the
+previous binary also passes the control oracle. Only output transport changed,
+not candidate geometry or document ownership. The local isolated native-call
+benchmarks are **not** pointer-to-photon or owner-hardware acceptance. The
+46 required fast-CI check IDs are unchanged; hosted Actions is unverified.
+[Evidence](evidence/T-095-2026-11-11-native-hard-packed-output.md).
+
 # Godot CI policy: fast desktop core and deferred compatibility coverage
+
+## T-095 aligned input-backlog/Canvas-frame diagnostics — 2026-11-11
+
+The non-gating, manually dispatched `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_frame_input_backlog_smoke.gd` after staging the canonical
+addon. The strict T-094 fail-closed checker requires exactly one
+`T095_FRAME_BACKLOG_PASSED` marker, and `if: always()` uploads the raw
+`/tmp/t095-frame-backlog.log`. The **24/24** local oracle verifies pending
+sample age/count across interpolation and queue compaction, the latest-1024
+frame ring with lifetime maxima, actual 60px Brush draw samples, independent
+RGBA8 source parity and Undo/Redo. The previous Canvas fails four checks.
+The graphical `brush_latency_native.gd` witness additionally prints bounded
+frame-pending-age/depth p50/p95/max statistics alongside draw CPU p50/p95;
+these are engine CPU/receipt times, not physical GPU or input-to-photon
+measurements. The 46 required fast-CI IDs remain unchanged. Hosted CI and
+owner-device acceptance are unverified.
+[Evidence](evidence/T-095-2026-11-11-frame-backlog-correlation.md).
+
+## T-095 Canvas preview projection reuse — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` stages the canonical
+Drawing addon and runs `drawing/tests/t095_preview_index_reuse_smoke.gd`,
+requiring the exact `T095_PREVIEW_REUSE_PASSED` marker through the existing
+fail-closed `check_godot_model_log.py` verifier. The raw log is uploaded even
+if later workflow steps fail. This model/SceneTree oracle checks exact signed
+storage-to-display stamp parity, live paint invalidation, unchanged cursor
+redraw reuse, view changes, session swaps, cancellation, external document
+revisions and the over-budget fallback. A staged-only disabled-cache control
+failed 5 expectations. The isolated repeated index build timing is not a
+real-frame or hardware latency measurement. Neither the required fast-CI IDs
+nor T-094's strict crash and leak log policy changes; hosted CI and owner
+physical acceptance remain unverified.
+[Evidence](evidence/T-095-2026-11-11-preview-index-reuse.md).
+
+## T-095 unchanged-preview Canvas redraw oracle — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_noop_redraw_smoke.gd` in the headless Drawing package,
+requires the exact `T095_NOOP_REDRAW_PASSED` marker through the T-094
+fail-closed log verifier, and uploads the raw log under `if: always()`.
+The **24/24** local SceneTree test counts real Canvas `draw` callbacks
+across consecutive consumed samples, compares source/history with an
+independent edit, and exercises a fully selection-masked stroke. Against the
+original staged Canvas it fails three checks (**55** callbacks); with the
+preview-generation check it passes (**7** callbacks). This is a software
+redraw-scheduling witness, **not** owner-device 60px Brush acceptance, a
+whole-gesture latency benchmark, or hosted CI verification. No required
+fast-CI check ID, ticket status, or manual-review gate changes.
+[Evidence](evidence/T-095-2026-11-11-noop-preview-redraw.md).
+
+## T-095 Hokusai buffered native pigment delta oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` builds the real
+Rust extension and runs `drawing/tests/t095_native_preset_packed_output.gd`.
+The fail-closed model-log checker requires the exact
+`T095_NATIVE_PRESET_PACKED_PASSED` marker; the raw log is uploaded even if a
+subsequent step fails. Four SHA-256 digests were recorded from the **old native
+binary**, not regenerated from the optimized path. The 69/69 pass spans four
+bundled presets, ordered 32-bit signed (x,y,RGBA8) triples, 242,651 exported
+pixels, real batch rollback and exact same-object retry. A temporary
+coordinate-order reversal fails four golden checks. Optional native-call
+CPU timings exhibit warmup variation; no hardware input-to-photon or owner
+review approval is inferred. No required fast-CI check IDs change; hosted CI
+is still unverified.
+
 
 **Policy (2026-11-03):** Required push/PR GDScript CI now verifies the implemented **Drawing package and shared Atlas composition foundation**. The approved complete Drawing Essential baseline remains unfinished under T-059. Windows/Linux desktop are the release-first targets. **Web export, broad native framebuffer sweeps, and historical Atlas pointer/shape tests are intentionally excluded from push CI.** They remain in source and are not claimed green.
 
 ## Owner-facing Drawing quality gates — 2026-11-05
 
 [Owner's 23-finding hands-on review](DRAWING_USABILITY_REVIEW_2026-11-05.md) documents failures not captured by earlier green core/standalone smoke tests. [[T-094]] owns the reproducible failing CI groups (`T-068` strict native ABI stress and `T-073` stale T-064 status assertion) and the actionable desktop witness matrix. Do not interpret green T-053/T-063 tests, headless assertions or standalone export as proof of live paint/selection/dock usability. Add targeted native pointer/framebuffer/performance tests under [[T-085]]–[[T-093]], with real hardware checks where necessary; keep `.drawing` roundtrip as a positive regression. No owner manual gate is completed by CI.
+
+## T-095 conservative oblique Brush scanline oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_oblique_scanline_bounds_smoke.gd`, requiring the exact
+`T095_OBLIQUE_SCANLINE_PASSED` marker via the fail-closed model-log verifier
+and preserving its raw log. Local pinned-beta3 results **513/513** compare
+oblique optimized candidate pruning against the original full-rectangle
+Geometry2D and `_stage()` oracle across 22 signed, masked, clipped, split,
+high-coordinate, fractional-width/60px Brush/Eraser cases. A deliberately
+undersized staged-only bound fails **55** of the initial 466 checks. The
+optional long-diagonal CPU benchmark reports local stage-only gains, **not**
+a controlled physical pointer/compositor result; full mixed-workload results
+are noisy. No required fast-CI check ID or manual-review approval changed.
+Hosted CI and owner-hardware latency remain unverified.
+
+## T-095 per-session source/preview tile-reference cache oracle — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` runs the
+`drawing/tests/t095_brush_tile_reference_cache_smoke.gd` oracle and requires
+exact `T095_BRUSH_TILE_REFERENCE_PASSED` using the fail-closed model-log
+checker; it uploads the raw log even on subsequent CI failure. Locally the
+**626/626** independent canonical-publisher checks cover signed coordinates,
+irregular strides, Brush/Eraser, transparent pixels, selections, tile revisit,
+late source-read rejection, rollback, exact preview, before/after history,
+Undo and Redo. A deliberately invalid patch-reference control failed **95**
+checks. The test does not depend on native availability. Neither this local
+verification nor the on-demand workflow declaration constitutes hosted CI or
+physical owner-device acceptance. The **46 required fast-CI IDs** are unchanged;
+T-095 remains `In Progress` with manual review outstanding.
+
+## T-095 source-tile-key reuse oracle — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` runs
+`drawing/tests/t095_brush_tile_key_cache_smoke.gd` and requires the strict
+`T095_BRUSH_TILE_KEY_CACHE_PASSED` marker, preserving the raw test log. The
+33,037-assertion source/history oracle covers signed >32-bit coordinates,
+eight power-of-two and irregular strides, transparent/partial-alpha source,
+Brush and Eraser, selection holes, tile revisits, exact preview/commit and
+Undo/Redo, plus source-load failure/retry. Local beta3 results pass; hosted
+CI is unverified. The required fast-CI 46-step matrix and owner device
+approval are unchanged.
 
 ## T-095 bounded latest stage-batch profiler witness — 2026-11-09
 
@@ -1516,3 +2235,147 @@ check ID is added. Native-present and fresh native-absent local runs passed.
 This is transaction correctness evidence, not full hosted CI or real hardware
 60px latency acceptance. T-095 remains In Progress and manual review stays
 open.
+
+
+### T-095 NativeHard conservative scanline oracle — 2026-11-11
+
+The **on-demand** `godot-native-t095-brush.yml` compiles the actual Rust
+GDExtension, then strictly checks `drawing/tests/t095_native_hard_scanline_smoke.gd`
+with marker `T095_NATIVE_HARD_SCANLINE_PASSED` and retains its raw log.
+The **42/42** native oracle checks byte-exact ordered output against the original
+full-candidate rectangle for twelve signed/fractional/60px and clipped sweeps;
+the high-coordinate case retains its original native witness because independent
+GDScript arithmetic rounds two edge pixels differently at ~10M positions.
+Rust's test suite independently compares the *exact native f32 predicate* on
+these 11 fixed and 96 deterministic sampled segments (6/6 Rust tests pass).
+A deliberately undersized row-bound control fails the GDExtension oracle.
+An opt-in `t095_native_hard_scanline_bench.gd` times **only native coverage
+and output**, not Godot staging, compositor, pointer motion or real display.
+It is not included in the required 46-step fast-GDScript CI. Hosted workflow
+and owner hardware acceptance remain unverified; T-095 stays In Progress.
+
+### T-095 bounded render-frame phase instrumentation — 2026-11-11
+
+The non-gating, on-demand `godot-native-t095-brush.yml` now runs
+`drawing/tests/t095_frame_phase_window_smoke.gd` after staging the canonical
+Drawing app. It requires the exact `T095_FRAME_PHASE_PASSED` marker through
+the existing fail-closed `check_godot_model_log.py` tool and retains
+`/tmp/t095-frame-phase.log` under `if: always()`.
+
+The local **19/19** test covers a 1024-frame bounded ring, three wraps plus
+late samples, a retained lifetime maximum for an evicted compositor outlier,
+chronologically aligned five-phase CPU samples, real Canvas preview callbacks,
+independent pixel/history parity, and Undo/Redo. Disabling live recording in a
+temporary staged copy fails two checks. A fresh native-absent standalone import
+passes. Required fast desktop check IDs and the T-094 strict log policy are
+unchanged. CPU callback times **cannot prove physical input-to-photon latency**;
+reference-device owner acceptance, hosted CI and T-095 manual review remain
+outstanding. [Evidence](evidence/T-095-2026-11-11-frame-phase-window.md).
+
+
+## T-095 Canvas post-draw callback pairing — 2026-11-11
+
+The optional, non-gating `godot-native-t095-brush.yml` workflow now invokes
+`drawing/tests/t095_frame_post_draw_pairing_smoke.gd` with the strict
+`T095_POSTDRAW_PAIR_PASSED` marker and keeps
+`/tmp/t095-postdraw-pairing.log` on every outcome. The **23/23** local oracle
+checks matching one Godot `frame_post_draw` callback to the latest active
+Canvas frame, rejecting duplicate/stale callbacks, ring-wrap corruption and
+RGB/history divergence. Previous-source control fails five checks. The
+five-stroke Xvfb witness emits a *matched-frame-only* callback p50/p95 and
+exact retained/total count. No physical input-to-photon or owner approval is
+inferred; hosted Actions were not run. The required fast-CI check IDs and
+T-094 fail-closed log policy are unchanged.
+[Detailed evidence](evidence/T-095-2026-11-11-postdraw-callback-pairing.md).
+
+## T-095 changed-preview staging to Godot callback — 2026-11-11
+
+The **on-demand**, non-gating `godot-native-t095-brush.yml` additionally runs
+`drawing/tests/t095_preview_stage_postdraw_smoke.gd` and strictly requires
+`T095_PREVIEW_STAGE_POSTDRAW_PASSED` through
+`tools/check_godot_model_log.py`. Its raw log
+`/tmp/t095-preview-stage-postdraw.log` is retained when a job fails.
+The **22/22** local oracle tests only pixel-changing batch stage timestamps
+correlated to Canvas `_draw` and matched `frame_post_draw` callbacks, including
+no-op/unmatched frame exclusion, cancelled sessions, bounded ring rollover,
+RGBA8 and Undo/Redo parity. The previous staged Canvas fails four assertions.
+The pointer witness emits a changed-preview-only p50/p95 summary; unmatched
+frames never masquerade as zero-delay callbacks. These observations are engine
+intervals, **not physical input-to-photon**. Required fast-CI check IDs and
+T-094 strict logging are unchanged; hosted Actions and owner acceptance remain
+unverified. [Evidence](evidence/T-095-2026-11-11-preview-stage-postdraw.md).
+
+## T-095 offline owner trace retained-history consistency — 2026-11-11
+
+The existing non-gating `godot-native-t095-brush.yml` Python analyzer step now
+checks **11 contracts** (previously 10) under the same fail-closed
+`T095_TRACE_ANALYZER_PASSED` marker. New negative controls assert that the
+schema-1 Godot exporter cannot be misrepresented by retained samples greater
+than lifetime timing maxima, callback observations greater than matched
+counts, changed-preview callbacks greater than submissions, or callbacks
+without their source draw. A previous-analyzer control fails five subcases;
+corrected analyzer passes all eight corruptions and 11/11 contracts.
+
+The unchanged real Godot exporter passes 17/17 and its graphical 60px
+five-stroke trace parses with real callback samples. The adjacent Brush
+coverage, input-to-preview timing, NativeHard and Hokusai rollback smoke
+checks also pass. Analysis remains schema `t095_trace_analysis_v3`, input
+remains Godot schema 1, and existing fast CI check IDs and the T-094 strict
+log guard are unchanged. Neither Xvfb renderer callbacks nor an offline
+analyzer establish physical responsiveness or owner approval.
+[Evidence](evidence/T-095-2026-11-11-trace-retained-consistency.md).
+
+
+## T-095 owner trace frame-clock arithmetic — 2026-11-11
+
+The non-gating on-demand `godot-native-t095-brush.yml` analyzer step now runs
+**12** stdlib contracts behind the existing strict
+`T095_TRACE_ANALYZER_PASSED` marker. The new red control shows eight
+contradictory frame timestamp/interval variants previously accepted, while
+the corrected analyzer checks nonnegative exported phase fields and available
+stage/input→draw→callback interval arithmetic without inventing absent
+callbacks. A real five-stroke 60px/786% Godot beta3 Xvfb trace with 274
+Canvas frames and 150 matched callbacks parses; schema-1 exporter 17/17,
+Brush pixels 32/32, NativeHard rollback 113/113, Hokusai rollback 57/57,
+preview-input correlation 22/22 pass individually with strict logs.
+The analyzer's report remains v3 and no runtime or fast-CI changes were
+made. T-094's fail-closed policy, unverified hosted CI, and owner-device
+manual review requirements are unchanged.
+[Evidence](evidence/T-095-2026-11-11-trace-frame-arithmetic.md).
+
+
+## T-095 anonymous runtime trace cohorts — 2026-11-11
+
+The non-gating `godot-native-t095-brush.yml` now checks the optional schema-1
+Godot `trace_session_id` and offline analysis schema
+`t095_trace_analysis_v4`. A 16-byte cryptographically random token, created
+only while opt-in local JSONL export is enabled, separates Canvas runtimes
+without storing verified hardware/device identity. Older traces without tokens
+remain supported; same-clock appends with different tokens no longer pollute
+cohort p95. The raw token never appears in analyzer human/JSON reports.
+The **13/13** analyzer contracts and **21/21** real Godot exporter checks
+retain their exact strict `T095_TRACE_ANALYZER_PASSED` and
+`T095_OWNER_TRACE_PASSED` markers and raw logs. The old analyzer pools the
+80ms/5ms negative-control records, and the previous Canvas fails two token
+assertions. Brush, preview, frame and native rollback oracles remain green.
+The 46 required fast-CI check IDs, T-094 fail-closed log policy and
+T-095/T-096 manual-review gates are unchanged. Hosted Actions and owner
+physical-device acceptance remain unverified.
+[Evidence](evidence/T-095-2026-11-11-trace-runtime-token.md).
+
+
+## T-095 96px red 512×512 full-canvas graphical Brush witness — 2026-11-11
+
+The on-demand, non-gating `godot-native-t095-brush.yml` executes
+`drawing/tests/t095_full_canvas_brush_native.gd` under Xvfb with actual
+Godot pointer down/motion/up (100 events; one Brush stroke), one history edit,
+byte-exact four-tile RGBA8 red hashes (all 262,144 pixels), framebuffer
+samples and Undo/Redo. The T-094 strict log checker requires the exact
+`T095_FULL_CANVAS_PASSED` marker and `if: always()` retains the raw log at
+`/tmp/t095-full-canvas.log`. Godot's engine post-draw measurement and the
+`target_met` field are diagnostic only; a proposed 100ms p95 threshold is
+activated solely by explicitly setting `T095_FULL_CANVAS_P95_BUDGET_MS=100`
+on reference hardware. A failure must not be mislabeled as success. On local
+llvmpipe, three independently started Legacy runs were 8.94–11.38 seconds,
+far above that target. This does not modify 46 required fast CI check IDs or
+satisfy physical owner approval. [Evidence](evidence/T-095-2026-11-11-full-canvas-96px-red-brush.md).

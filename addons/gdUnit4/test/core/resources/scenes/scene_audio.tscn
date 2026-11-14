@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://bi4lvq6pg2w81"]
+[gd_scene format=3]
 
 [node name="SceneAudio" type="Node2D"]
 

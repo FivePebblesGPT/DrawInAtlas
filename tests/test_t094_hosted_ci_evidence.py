@@ -18,7 +18,7 @@ from report_godot_ci import WORKFLOW, expected_check_ids  # noqa: E402
 
 COMMIT = "a" * 40
 RUN_ID = "42140327784"
-ENGINE = "4.8.beta2.official.cafc17a19"
+ENGINE = "4.8.beta3.official.c51ff06e8"
 WORKFLOW_TEXT = WORKFLOW.read_text(encoding="utf-8")
 IDS = expected_check_ids(WORKFLOW_TEXT)
 
@@ -82,6 +82,7 @@ class HostedCIEvidenceTests(unittest.TestCase):
             ({"candidate_commit": "b" * 40}, "Candidate commit"),
             ({"github_run_id": "10"}, "GitHub run ID"),
             ({"godot_version": "4.9.beta1.official.test"}, "Godot"),
+            ({"godot_version": "4.8.beta2.official.cafc17a19"}, "Godot"),
             ({"checks": list(reversed(valid["checks"]))}, "check IDs"),
             ({"recorded_check_count": 45}, "counts"),
             ({"all_required_checks_succeeded": False}, "overall verdict"),

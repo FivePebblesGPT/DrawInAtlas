@@ -1,0 +1,142 @@
+/mnt/data/work/DrawInAtlas.11-12/drawing
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Started Scanning actions... (18 steps)[39m[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Lato-Bold.ttf[39m[0m
+[   5% ] [90m[1m_update_scan_actions[22m | Lato-Italic.ttf[39m[0m
+[  10% ] [90m[1m_update_scan_actions[22m | Lato-Regular.ttf[39m[0m
+[  15% ] [90m[1m_update_scan_actions[22m | brush.svg[39m[0m
+[  21% ] [90m[1m_update_scan_actions[22m | dock_colors.svg[39m[0m
+[  26% ] [90m[1m_update_scan_actions[22m | dock_history.svg[39m[0m
+[  31% ] [90m[1m_update_scan_actions[22m | dock_layers.svg[39m[0m
+[  36% ] [90m[1m_update_scan_actions[22m | dock_panel.svg[39m[0m
+[  42% ] [90m[1m_update_scan_actions[22m | dock_swatches.svg[39m[0m
+[  47% ] [90m[1m_update_scan_actions[22m | eraser.svg[39m[0m
+[  52% ] [90m[1m_update_scan_actions[22m | layer_hidden.svg[39m[0m
+[  57% ] [90m[1m_update_scan_actions[22m | layer_locked.svg[39m[0m
+[  63% ] [90m[1m_update_scan_actions[22m | layer_unlocked.svg[39m[0m
+[  68% ] [90m[1m_update_scan_actions[22m | layer_visible.svg[39m[0m
+[  73% ] [90m[1m_update_scan_actions[22m | move.svg[39m[0m
+[  78% ] [90m[1m_update_scan_actions[22m | pan.svg[39m[0m
+[  84% ] [90m[1m_update_scan_actions[22m | select.svg[39m[0m
+[  89% ] [90m[1m_update_scan_actions[22m | text.svg[39m[0m
+[92m[ DONE ][39m [1m_update_scan_actions[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (18 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   5% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  10% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  15% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  21% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  26% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  31% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  36% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  42% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  47% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  52% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  57% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  63% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  68% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  73% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  78% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  84% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  89% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[   5% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  10% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  15% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[  21% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  26% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  31% ] [90m[1mreimport[22m | text.svg[39m[0m
+[  36% ] [90m[1mreimport[22m | select.svg[39m[0m
+[  42% ] [90m[1mreimport[22m | pan.svg[39m[0m
+[  47% ] [90m[1mreimport[22m | move.svg[39m[0m
+[  52% ] [90m[1mreimport[22m | layer_visible.svg[39m[0m
+[  57% ] [90m[1mreimport[22m | layer_unlocked.svg[39m[0m
+[  63% ] [90m[1mreimport[22m | layer_locked.svg[39m[0m
+[  68% ] [90m[1mreimport[22m | layer_hidden.svg[39m[0m
+[  73% ] [90m[1mreimport[22m | eraser.svg[39m[0m
+[  78% ] [90m[1mreimport[22m | dock_swatches.svg[39m[0m
+[  84% ] [90m[1mreimport[22m | dock_panel.svg[39m[0m
+[  89% ] [90m[1mreimport[22m | dock_layers.svg[39m[0m
+[  94% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (18 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_MODEL: 27 checks; 0 failed
+T086_MODEL_PASSED
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_FOCUS: 15 checks; 0 failed
+T086_FOCUS_PASSED
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2609)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T102_MODEL: 13 checks; 0 failed
+T102_MODEL_PASSED
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2609)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T103_MODEL: 13 checks; 0 failed
+T103_MODEL_PASSED
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2609)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_COLD_PASSED 45/45
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_SPARSE_PIXEL: 590 checks; 0 failed
+T086_SPARSE_PIXEL_PASSED
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_PLAN_BENCH_JSON {"display":"headless","engine":"4.8-beta3 (official)","planned_us_median":1933,"planned_us_p95":8643,"samples":9,"source_layers":23,"tile_count":16,"tile_size":8,"unplanned_us_median":9227,"unplanned_us_p95":11480}
+T086_PLAN_PASSED 82/82
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_SHARED_PASSED 31/31
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_SPARSE_BENCH_JSON {"baseline_us_median":1737,"baseline_us_p95":1834,"culled_us_median":364,"culled_us_p95":409,"engine":"4.8-beta3 (official)","samples":9,"view":"16x16","visible_layers":24}
+T086_SPARSE_PASSED 74/74
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T086_PREVIEW_INDEX_TIMING median_index_us=1167 median_legacy_us=97943 runs=5 visible_tiles=768 changed_storage_tiles=240
+T086_PREVIEW_INDEX: 2146 checks; 0 failed
+T086_PREVIEW_INDEX_PASSED
+test_both_fixtures_match_exact_sha256 (test_t086_benchmark_fixtures.ColdRendererFixtureContracts.test_both_fixtures_match_exact_sha256) ... ok
+test_controls_precede_direct_sparse_map_access (test_t086_benchmark_fixtures.ColdRendererFixtureContracts.test_controls_precede_direct_sparse_map_access) ... ok
+test_mutated_fixture_rejected_before_spawning_godot (test_t086_benchmark_fixtures.ColdRendererFixtureContracts.test_mutated_fixture_rejected_before_spawning_godot) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.003s
+
+OK

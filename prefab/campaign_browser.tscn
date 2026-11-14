@@ -1,6 +1,6 @@
-[gd_scene format=3 uid="uid://d0b86milgawn2"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://ccfcy5b7oj6rc" path="res://scripts/interface/campaign_browser.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/interface/campaign_browser.gd" id="1"]
 [ext_resource type="PackedScene" path="res://prefab/preview_panel.tscn" id="2"]
 
 [node name="CampaignBrowser" type="VBoxContainer" unique_id=107710191]

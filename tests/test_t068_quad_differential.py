@@ -7,6 +7,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+
+from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2
 import subprocess
 import tempfile
 import unittest
@@ -92,7 +94,8 @@ class DifferentialContracts(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("T068_QUAD_DIFFERENTIAL_ORACLE_PASSED: 48 cases", result.stdout)
             self.assertNotIn("SCRIPT ERROR:", result.stdout + result.stderr)
-            self.assertEqual(hashlib.sha256(output.read_bytes()).hexdigest(), quad.ORACLE_SHA256)
+            require_beta3_matches_pinned_beta2(
+                json.loads(quad.ORACLE.read_text()), json.loads(output.read_text()))
 
     def test_failure_atomicity_for_detached_kernel(self) -> None:
         with tempfile.TemporaryDirectory(prefix="t068-quad-kernel-guards-") as directory:

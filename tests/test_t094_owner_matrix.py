@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
@@ -59,6 +60,19 @@ class OwnerAcceptanceMatrixContracts(unittest.TestCase):
                 self.assertIn("manual_review: true", (DOCS / f"Tickets/{ticket}.md").read_text())
                 self.assertIn(ticket, MATRIX)
         self.assertIn("owner explicitly accepts", MATRIX)
+
+    def test_t107_retained_raw_ci_evidence_and_all_23_owner_actions(self) -> None:
+        # This is a historical local-capture integrity check, not hosted CI.
+        sys.path.insert(0, str(ROOT / "tools"))
+        from t107_evidence_audit import owner_actions, replay_inventory, runtime_inventory
+
+        replay = replay_inventory(DOCS / "evidence/T-107-2026-11-12-replay-capture")
+        self.assertEqual(replay["kind"], "local-exploratory")
+        self.assertTrue(replay["not_github_hosted"])
+        self.assertEqual(replay["checks_total"], 46)
+        self.assertEqual(replay["checks_passed"], 46)
+        self.assertEqual(len(owner_actions()), 23)
+        self.assertEqual(len(runtime_inventory()["checks"]), 9)
 
     def test_positive_roundtrip_is_a_real_regression_not_an_invented_bug(self) -> None:
         smoke = (ROOT / "drawing/tests/standalone_smoke.gd").read_text(encoding="utf-8")

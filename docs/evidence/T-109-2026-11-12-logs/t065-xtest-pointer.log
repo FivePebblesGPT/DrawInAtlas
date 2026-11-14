@@ -1,0 +1,10 @@
+Actual XTEST drag: (122, 384) -> (726, 420)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T065_POINTER_READY {"invalid":[202.0,504.0],"source":[122.0,384.0],"target":[725.700012207031,420.439971923828],"window":[0,0]}
+T065_POINTER_PASSED 19 checks, failures=0
+

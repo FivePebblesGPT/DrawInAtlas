@@ -1,7 +1,7 @@
-[gd_scene format=3 uid="uid://cntshtbkys12e"]
+[gd_scene format=3]
 
-[ext_resource type="PackedScene" uid="uid://cw75acw1phmtx" path="res://prefab/ui.tscn" id="1"]
-[ext_resource type="Script" uid="uid://ca3itfk8xbn4v" path="res://util/global_shortcuts.gd" id="2"]
+[ext_resource type="PackedScene" path="res://prefab/ui.tscn" id="1"]
+[ext_resource type="Script" path="res://util/global_shortcuts.gd" id="2"]
 
 [node name="Main" type="Node2D" unique_id=1232000292]
 

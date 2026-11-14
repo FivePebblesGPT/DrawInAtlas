@@ -1,11 +1,11 @@
-[gd_scene format=3 uid="uid://7iviiwjvbk8r"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://kcbd8bdl7p5j" path="res://prefab/sidebar.gd" id="1"]
-[ext_resource type="Theme" uid="uid://bjcw3mx4yfw3r" path="res://prefab/editor_theme.tres" id="2"]
-[ext_resource type="Texture2D" uid="uid://broha2a4tmqc7" path="res://img/sidebar/maps.svg" id="3"]
-[ext_resource type="Texture2D" uid="uid://dnrg664tb23pq" path="res://img/sidebar/search.svg" id="4"]
-[ext_resource type="Texture2D" uid="uid://chnsm0ck5kkdr" path="res://img/sidebar/layers.svg" id="5"]
-[ext_resource type="Texture2D" uid="uid://c2ca8t5oy2ch2" path="res://img/sidebar/panel.svg" id="6"]
+[ext_resource type="Script" path="res://prefab/sidebar.gd" id="1"]
+[ext_resource type="Theme" path="res://prefab/editor_theme.tres" id="2"]
+[ext_resource type="Texture2D" path="res://img/sidebar/maps.svg" id="3"]
+[ext_resource type="Texture2D" path="res://img/sidebar/search.svg" id="4"]
+[ext_resource type="Texture2D" path="res://img/sidebar/layers.svg" id="5"]
+[ext_resource type="Texture2D" path="res://img/sidebar/panel.svg" id="6"]
 [ext_resource type="Texture2D" path="res://img/sidebar/tools.svg" id="7"]
 
 [sub_resource type="InputEventKey" id="ToggleKey"]

@@ -1,0 +1,10 @@
+test_isolated_launch_accepts_only_named_post_exit_rids (test_t068_release_gate.PortableReleaseGateTests.test_isolated_launch_accepts_only_named_post_exit_rids) ... ok
+test_linux_runtime_isolated_and_must_identify_godot (test_t068_release_gate.PortableReleaseGateTests.test_linux_runtime_isolated_and_must_identify_godot) ... ok
+test_nonportable_or_corrupt_artifacts_fail_closed (test_t068_release_gate.PortableReleaseGateTests.test_nonportable_or_corrupt_artifacts_fail_closed) ... ok
+test_stage_rejects_native_extensions_and_bad_identity (test_t068_release_gate.PortableReleaseGateTests.test_stage_rejects_native_extensions_and_bad_identity) ... ok
+test_standalone_staging_and_static_artifact_fingerprints (test_t068_release_gate.PortableReleaseGateTests.test_standalone_staging_and_static_artifact_fingerprints) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.540s
+
+OK

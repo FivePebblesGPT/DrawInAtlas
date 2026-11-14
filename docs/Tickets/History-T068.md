@@ -1,0 +1,2022 @@
+---
+status: "In Progress"
+manual_review: false
+id: T-068
+type: ticket
+kind: research
+priority: P1
+epics: ["[[E-009]]", "[[E-004]]"]
+depends_on: ["[[T-052]]"]
+---
+# Benchmark native CPU rasterization and compositing for interactive Drawing
+
+**Status: IN PROGRESS — measured bounded CPU prototypes and deployed safe renderer optimization (2026-11-02); not a native backend selection.** The owner chose **fast drawing/editing** as the first native-acceleration priority. This ticket evaluates technology before making a dependency decision.
+
+## 2026-11-05 priority correction — the user-visible editor is still slow
+
+The owner reports about one-second invisible strokes and severe zoom-out lag in the **standalone** Drawing application. These findings are logged in [the hands-on review](../DRAWING_USABILITY_REVIEW_2026-11-05.md). Continue to preserve existing native correctness research, but **do not treat a faster isolated C++ brush kernel as a fix for missing in-progress preview, synchronous pointer stalls or full-viewport recompositing**. Parallel follow-ups: [[T-084]] PhotoCraft source scout, [[T-085]] pending stroke/input, [[T-086]] cached viewport/display. T-068 remains **In Progress**, without a selected or shipping native backend. New research should be justified by an end-to-end measured bottleneck after the architecture fixes; do not add it as a hard dependency for core editor use.
+
+## Why this is a different problem from T-057 and T-067
+- [[T-057]] studies GPU display of huge maps / derived display LOD. [[T-067]] studies compressed sparse **storage** chunk dimensions and packing.
+- This ticket studies the **edit-to-visible critical path**: stroke coverage, dabs, masks, source-over and erase, fill and compositing, undo copy/delta costs, changed-region publication and Godot texture updates.
+- Current `scripts/editing/raster_brush.gd` scans pixels in GDScript, tracks visited pixels through a `Dictionary[Vector2i,bool]`, stages changed pixel colors in a dictionary and blends per pixel. `AtlasLayerCodec.clone()` deep-copies decoded raster images for an entire layer; `AtlasFill._write_pixel_colors()` applies changed pixels after cloning. **This broad copy work can dominate**, regardless of how fast a raster library draws.
+- Current brush semantics: **each covered pixel blends once per gesture, including self-overlapping paths and batched pointer samples**; masks require the whole transformed pixel quad to be inside scope; rejected edits leave source unchanged. Benchmark parity before any intentional brush-model change.
+
+## Initial candidate shortlist (not performance results)
+1. **Optimized GDScript/Godot and small custom C++ GDExtension kernel** for hard brushes, pixel-space fill, masks, region copy-on-write and compact undo. This is a meaningful baseline before adopting a third-party engine.
+2. **Blend2D CPU rasterizer:** candidate for antialiased paths/shapes and numerous Porter–Duff/blend modes. Fast JIT pipelines are its design goal; multi-thread mode warrants separate tests. Uses premultiplied 32-bit image formats, so direct conversion from canonical straight RGBA8 may alter hidden RGB and rounding. Demonstrate byte-preserving unchanged pixels and defined changed-pixel semantics.
+3. **Skia CPU raster backend:** candidate if substantial text/path/filter/compositing features justify its wider API. More extensive build/dependency burden than a narrow kernel; use only CPU surfaces for like-for-like comparison, not its GPU renderer.
+4. **libmypaint:** candidate for a future natural-media brush engine, pressure/velocity/tilt/smudge; it emits brush dabs through a host surface API and is **not a complete replacement** for flood fill, canvas storage or the compositor. No assumption that adopting it accelerates hard-pixel editing.
+5. **Cairo:** optional comparator, not initial integration priority.
+
+Verify dependencies' licensing and pinned versions before adoption; current public docs list Blend2D zlib, Skia BSD and libmypaint ISC. Maintain Windows/Linux reproducible builds and a clean independent Drawing consumer.
+
+## Architecture to prototype
+- The canonical DrawingDocument owns **straight RGBA8** exact-pixel source and signed sparse geometry. Native code receives **bounded batches/dirty regions** through an interface with explicit pixel format, stride, transform, source revision, mask and operation, not one GDExtension call per pixel.
+- **Begin stroke → append batched samples → preview changed rectangles → commit/abort**. Keep in-progress pixels/deltas detached; one gesture = one undo transaction. Only changed touched chunk regions are copied/modified; unmodified buffers should be shared immutable snapshots until write.
+- Strokes with overlapping samples must retain the approved once-per-pixel semantics for the existing hard brush. If adding accumulating pressure-based paint later, treat it as a separate brush mode, not an accidental behavior change.
+- An alpha-only or premultiplied *working buffer* may be used internally, but conversion must not silently erase hidden RGB of unchanged canonical transparent pixels. Test boundary alpha rounding and exact source persistence. Blend mode names alone are not a guarantee of equivalent color math.
+- Keep worker threads restricted to native-owned independent CPU buffers. Marshal completed changed regions to Godot's main thread for texture updates. **Godot ImageTexture.update() replaces texture contents**, so measure full tile upload vs smaller display tiles; don't claim subrectangle updates without a specific API implementation.
+- Local Drawing draft edits remain private in Object Editor until **Save**; Atlas global history receives canonical committed transactions through the agreed adapter.
+
+## Benchmark matrix and acceptance
+- Compare (A) existing GDScript unoptimized, (B) optimized copy-on-write baseline, (C) custom C++ SIMD/scanline kernel, (D) Blend2D CPU, (E) Skia CPU for supported operations, and optionally (F) libmypaint for natural brushes.
+- Workloads: short 4px hard brush, 64–256px soft/round brush, fast long stroke, self-crossing stroke, erase, transformed grid/selection-mask clipping, large flood fill, mixed-opacity overlay compositing, path/shape antialiasing, multiple layers, repeated undo/redo and quick stroke cancellation.
+- Compare at logical storage tile sizes 512/1024/2048 and **independent dirty display/update regions** (such as 128/256px), without assuming same geometries for saving vs editing vs GPU display. Hold input paths and visible results constant.
+- Measure median/p95 **input-to-visible** and CPU raster time separately, bytes copied per gesture, native boundary/conversion overhead, upload time, RAM/VRAM peaks, undo memory, regressions at chunk seams and far signed positions, and multithread jitter.
+- Correctness gates: byte-exact unchanged pixels and persisted lossless RGBA8/hidden RGB, specified changed-pixel rounding, non-destructive cancellation, source revision conflicts, transforms/snap/mask semantics, deterministic undo and overlap coverage.
+- Produce a recommendation *by operation*; there is no requirement to pick one library for all tools. Consider dependency/binary size, licensing, update burden and Godot version compatibility.
+- **No library adoption until benchmarks justify it.** Keep a usable Godot implementation; if a native extension is selected, implement it as an optional component in the same canonical Drawing package, without coupling Drawing to Atlas maps or Web.
+
+## Primary documentation inspected
+Blend2D: https://blend2d.com/doc/getting-started.html and https://blend2d.com/doc/group__bl__imaging.html
+Skia: https://skia.org/docs/user/api/ and https://skia.org/docs/user/build/
+libmypaint: https://github.com/mypaint/libmypaint and https://github.com/mypaint/libmypaint/blob/master/mypaint-surface.h
+Godot: https://docs.godotengine.org/en/stable/classes/class_imagetexture.html and https://docs.godotengine.org/en/stable/tutorials/performance/thread_safe_apis.html
+
+
+## 2026-11-04 follow-up — standalone portable-release gate (not closure)
+
+- Added [`t068_release_gate.py`](../../tools/benchmarks/t068_release_gate.py)
+  to check independent `tools/build_drawing_app.py` staging and actual exported
+  **x86_64 ELF/PE + separate Godot PCK** artifacts. It rejects malformed or
+  missing artifacts, native extension/shared-library sidecars, symlinks, wrong
+  project identity, and missing bundled font license. Linux additionally
+  launches the *exported executable*, not the editor, from a disposable working
+  directory and isolated user HOME/XDG directories; nonzero exits, script
+  errors, and missing Godot identity fail closed.
+- The existing fast desktop CI Linux release step now runs this checker on its
+  real Godot 4.8b2 export. The new four-test offline contract covers Linux and
+  Windows headers, fingerprinting, isolation, tampered artifacts, and runtime
+  failures. A real detached Drawing staging audit passed locally; this sandbox
+  lacks export templates, so no fresh portable Linux/Windows run is claimed.
+  Windows PE inspection is **not** Windows runtime verification. This is a
+  release-gate capability, not a native renderer shipping decision, VRAM test,
+  or physical input-to-photon measurement. **T-068 stays In Progress.**
+
+## 2026-11-04 follow-up — counterbalanced software-rendered contention (not closure)
+
+- Added a **separate**, opt-in ABBA (`idle → background_cpu → background_cpu → idle`)
+  Linux X11 witness instead of retroactively editing the earlier fixed-order capture.
+  Four fresh Godot 4.8b2 processes passed **81/81 assertions each (324/324 total)**
+  over 100 synthetic brush gestures. Separate CPU workers consumed **222 and 199 ticks**
+  during loaded phases; the idle phases have no spawned worker.
+- Raw [source-pinned evidence](../benchmarks/T068_2026-11-04_visual_counterbalanced_software.json)
+  retains per-phase process RSS/HWM, renderer identity, CPU and frame samples,
+  and two independently computed loaded-minus-idle contrasts per workload.
+  Counterbalanced average differences range **+2.768–+10.553 ms** here, whereas
+  the previous idle-first run showed *lower* loaded-phase medians. These are
+  **not causal effects**: runs are still nonrandomized, each workload has five
+  trials per session, workers need not share Godot's core, and the benchmark
+  is Mesa llvmpipe, not real event-to-screen latency. The [fail-closed replay](../../tests/test_t068_visual_counterbalanced.py)
+  rejects altered phase order, GPU identity, worker activity, RSS/HWM, raw
+  samples and derived contrasts. Fast CI runs offline; Xvfb remains opt-in.
+- No raster backend or persisted bytes changed; this does not meet Windows,
+  physical input-to-photon, VRAM, release, or owner-review criteria.
+  **Status remains In Progress.**
+
+## 2026-11-04 follow-up — synthetic software-rendered CPU-contention jitter (not closure)
+
+- Added [`t068_visual_contention.py`](../../tools/benchmarks/t068_visual_contention.py), an opt-in Linux X11 diagnostic which executes two **fresh** real Godot 4.8b2 `drawing_latency_stress_visual.gd` witnesses, first idle, then with a separate CPU-busy subprocess. Both runs pass **81/81 framebuffer-pixel, revision and history checks** over five samples for each of five brush workloads. Worker `/proc` CPU ticks increased **94→279** while the second run executed, proving activity, not that it competed for Godot's exact CPU core.
+- Idle vs loaded `frame_post_draw` medians in milliseconds were **14.210→13.150** (4px dab), **27.879→23.582** (32px dab), **84.411→54.548** (64px dab), **28.549→20.684** (long 4px), and **28.882→20.503** (crossing 4px). All loaded-phase medians are lower, but the fixed order and likely warm-cache/renderer effects make this **non-causal**, not proof that loading accelerates brush rendering. One attempted measurement was rejected for inconsistent RSS/HWM samples and was not retained as evidence. Small five-sample p95 values are single-sample order statistics, not robust tail-latency or thread-jitter acceptance.
+- Source-pinned [raw evidence](../benchmarks/T068_2026-11-04_visual_contention_software.json) retains all 50 paired CPU/frame trials (100 timing values) and per-process RSS/HWM series; [contracts](../../tests/test_t068_visual_contention.py) reject forged statistics, source, GPU profile, memory data, phase order, worker activity or comparisons. The normal CI replays JSON offline; only workflow-dispatch launches Xvfb. This is **llvmpipe software rendering**, synthetic Godot input and `frame_post_draw`, not physical device event-to-photon, real GPU/VRAM, Windows, or a reliable load-induced performance difference. No native runtime backend was selected. **Status remains In Progress.**
+
+## 2026-11-04 follow-up — sampled Linux visual-frame and Godot-process RSS witness (not closure)
+
+- Added an opt-in `tools/benchmarks/t068_visual_device.py` Linux X11 runner around the existing **real Godot 4.8 beta 2** `drawing_latency_stress_visual.gd` script. The test now saves all **25 paired raw trials** (CPU dispatch and `RenderingServer.frame_post_draw`), retaining exact framebuffer pixel/revision checks. The wrapper samples `/proc/<pid>/status` at 20 ms intervals, records process `VmRSS` and `VmHWM`, and validates derived medians/p95 and sample maxima independently. Tamper tests reject altered phase order, statistics, source, memory, or engine metadata.
+- One **Xvfb / Mesa llvmpipe** run passed 81/81 Godot checks. Its process-memory sample and per-workload timings are stored in [raw software evidence](../benchmarks/T068_2026-11-04_visual_process_software.json). This measures the **whole Godot process**, including renderer/scene/image allocations, not isolated native brush RAM. The visual event path injects synthetic Godot events and only waits for `frame_post_draw`; it does **not** time physical pointer delivery, display scan-out, VRAM, or Windows.
+- The runner's `--profile hardware` mode requires a separately probed non-software `glxinfo -B` renderer and a non-software Godot adapter; it rejects `llvmpipe`, absent GPU identity, `LIBGL_ALWAYS_SOFTWARE=1`, and software Gallium drivers. Even a successful hardware-GL run would remain a *synthetic* Godot-event-to-render-frame witness, not physical event-to-photon acceptance. Push CI replays the committed software evidence only; the actual Xvfb launch is opt-in in the native bridge workflow.
+- **Still In Progress:** No physical Windows/Linux latency, VRAM, device-wide multi-thread jitter, portable release acceptance, or native production backend choice. No manual approval was assumed or required for this diagnostic.
+
+## 2026-11-02 implementation and measurement checkpoint (not closure)
+
+- [Full CPU raster/equivalence/operation screening report](../DRAWING_CPU_RASTER_BENCHMARK.md) and [raw Godot](../benchmarks/T068_2026-11-02_godot.json), [C++](../benchmarks/T068_2026-11-02_native.json), and [Mesa software-upload](../benchmarks/T068_2026-11-02_upload.json) evidence. Directly comparable original-vs-optimized Godot raster views show ~15.7–16× lower median CPU composition time at 512/1024/2048 saved strides, producing byte-identical pixels.
+- `DrawingRenderer` now uses signed tile-run lookups; no new native runtime dependency and no Atlas code in Drawing. `tests/drawing_raster_backend_benchmark.gd` preserves an independent original reference function for exact output verification. **691 headless Godot checks** pass in the latest rerun, including real gestures, cancellation, revision races, history, masks and exact hidden RGB across signed world anchors.
+- `tools/benchmarks/t068_raster_kernel.cpp` and the Python `ctypes` runner are an isolated, **unintegrated** scalar C++ bounded batch prototype. The **6 native unit tests** pass, including 3,000 extra randomized blend vectors, error atomicity, once-coverage, erase and hidden RGB. C++ output matches 128 Godot-specific blend vectors and a 24-pixel self-overlapping/masked Godot gesture exactly. **15 measured C++ workload/dirty-region cases** are reported; neither Python FFI nor compiled raster timings claim Godot/GDExtension input latency.
+- Actual `ImageTexture.update()` software OpenGL measurements cover 128/256/512/1024 display tiles: the complete texture is uploaded each time. **No subrectangle upload API was invented.** Source/document storage strides remain unchanged.
+- **Regression checkpoint:** 89 composition, 125 world-mapping, 101 history, 95 Object Assets, 45 Object Editor, 60 Drawing text, 84 bundle save, 23 editor save/load, 171 artwork, and 77 storage checks passed. A fresh standalone Drawing build passed 38 checks and exported on Linux. `tests/text_smoke.gd` still has two legacy `.scn`-save assertions that also fail on the unmodified `9c64138` baseline; their migration belongs to a separate compatibility ticket. **Closure not justified yet**: Blend2D/Skia native CPU executables are not available to time; there is no native Godot extension, Windows test, true event-to-present p95, GPU VRAM or multi-thread-jitter measurement. Exact unchanged RGBA8 pixel parity remains an acceptance gate for third-party compositing. Owner review was neither requested nor fabricated; this ticket has no manual-review gate. Keep `status: In Progress` until those evaluation obligations are satisfied or formally superseded by a documented ticket-scope decision.
+
+
+## 2026-11-02 follow-on checkpoint — sparse native deltas and software input witness
+
+- Implemented **versioned C ABI 1** `draw_batch_deltas()` in the *unintegrated*
+  `tools/benchmarks/t068_raster_kernel.cpp` prototype. Atomic sparse deltas
+  match full-result RGBA8 bytes, with an 8× smaller visited-bitset allocation;
+  2048×2048 two-pixel edits avoid a 16 MiB native output buffer. No Godot/native
+  backend integration was claimed or shipped.
+- Expanded native unit coverage **6 → 10 tests**: all edit operations, mask,
+  hidden alpha RGB, cross-API identity, insufficient delta capacity, stale
+  application and unchanged error-sentinel outputs. Godot's 128 blend vectors
+  and signed-world masked fixture still match.
+- Captured [15-case delta-only microbenchmark](../benchmarks/T068_2026-11-02_native_delta.json)
+  showing a sparse 512×512 hard brush at 0.0058 ms versus full-region 0.0279 ms (11 alternating-order samples)
+  (kernel-only medians; not frame latency). A large fill shows almost no gain.
+- Added a [real X11 software-frame latency witness](../benchmarks/T068_2026-11-02_frame.json):
+  **68 checks / 21 distinct real canvas input gestures**, visible pixel confirmation,
+  median/p95 of 0.445/0.597 ms CPU dispatch and 10.358/12.960 ms injected
+  event to `frame_post_draw`. This is **not physical present / hardware latency**.
+  CI covers native framebuffer and checks the exact completion marker.
+- [Full methodology and scope limitations](../DRAWING_CPU_RASTER_BENCHMARK.md).
+  The external Blend2D/Skia executable comparisons, optional Godot GDExtension,
+  Windows/hardware GPU presentation, peak memory and multithread jitter remain
+  unverified because needed dependencies/hardware are unavailable. **Status stays
+  In Progress**; there is no authorization to waive mandatory acceptance.
+
+
+## 2026-11-03 follow-up — exact round-dab path and native 64px stress (not closure)
+
+- Kept the ordinary Godot hard-brush implementation, but avoided a native closest-point-to-segment calculation for each candidate of a stationary dab. Swept strokes and the once-covered semantics are unchanged; no format or external dependency changes.
+- New **125/125** Godot headless original-geometry/hidden-RGB/undo parity witness, now required by fast push CI. The existing **693/693** mixed raster benchmark also passed, with the same signed parity fixture, blend vectors, changed pixel counts and undo sizes. The observed 64px edit/commit/undo medians improved at two storage strides and were nearly unchanged at the third; these **single-pass exploratory timings** do not establish a reliable large speedup.
+- New targeted, non-push **81/81** actual Control input → native software-framebuffer witness, passed in two independent 25-gesture runs. The sample D0 density is asserted to be 1 canonical pixel/world unit, for real 4, 32 and 64px brushes plus long and crossing paths. The 64px dab CPU median/p95 varied **116.110/220.834 ms** to **151.746/190.818 ms** between runs; software frame submission medians were 161.146 and 176.075 ms (five samples per case). Both timing jitter and large-gesture cost warrant deeper instrumentation; this is not physical screen presentation or a stable p95 distribution. See the raw run A/B evidence and methodology in [`DRAWING_CPU_RASTER_BENCHMARK.md`](../DRAWING_CPU_RASTER_BENCHMARK.md).
+- **Remaining:** timed executable Blend2D/Skia comparators, real Godot native boundary and optional binary, Windows/Linux hardware GPU/VRAM and thread-jitter measurements, reproducible native exports and a complete operation-by-operation decision. Native backend selection remains unapproved; this checkpoint does not finish the ticket or any other owner-gated ticket.
+
+
+## 2026-11-03 follow-up — session-local resolved-tile reads (not closure)
+
+- Removed a per-covered-pixel `DrawingResult`/lazy-source tile lookup from
+  canonical `DrawingEditSession._stage` by caching successfully resolved
+  immutable source tiles in the detached edit session. Missing and corrupt
+  lazy chunks are **not** cached; null source tiles are cached; the cache is
+  freed on successful, rejected or cancelled completion. Existing revision
+  and pre-publication original-pixel checks remain mandatory.
+- Added `tests/drawing_edit_tile_cache_smoke.gd` to **fast push CI** with 29
+  passing atomicity, signed-seam, hidden-RGB, lazy recovery, no-op, cancellation
+  and stale-writer checks. Existing dab geometry (125), mixed raster baseline
+  (693), Drawing history (101), Atlas composition (89), world mapping (125),
+  Drawing text (60), Object Assets (95), Object Editor (45), and campaign bundle
+  (86) all pass. Godot 4.8 beta2 import and explicit-type audit passed.
+- Recorded two independent, non-randomized baseline/cached **693-check**
+  Godot benchmark pairs (512/1024/2048 storage strides) with matching blend
+  vectors, native parity fixture, changed-pixel counts and undo sizes. Most
+  timing medians are lower, but several regress; there is **no guaranteed
+  speedup claim**. A matched native Xvfb/Mesa 25-gesture run passed 81/81
+  before and after; its 64px dab CPU-dispatch median moved from 117.367 to
+  83.709 ms, but crossing-path timing regressed. See raw JSON and caveats in
+  [the T-068 report](../DRAWING_CPU_RASTER_BENCHMARK.md).
+- Existing unresolved closure items remain: pinned third-party CPU comparators,
+  optional real Godot/GDExtension boundary, Windows/Linux real-hardware
+  latency, memory/VRAM/jitter measurements and an operation-level conclusion.
+  No dependency, manual gate, or runtime native backend was changed.
+  **Status remains In Progress**.
+
+## 2026-11-03 follow-up: resolve source tiles once per atomic publication
+
+`DrawingDocument._publish_edit()` previously invoked `read_pixel()` for every
+changed coordinate during before/after validation. Even after T-068's
+session-local staging cache, each committed pixel created a `DrawingResult`
+and resolved its tile again. The checked, synchronous publication pass now
+retains a **temporary per-tile source lookup** (including null for an absent
+tile). Every original is still verified before any detached tile is installed;
+noncanonical coordinates, stale revisions/pixels, invalid layers and missing
+blob providers still fail atomically. Cache references never outlive the call.
+The canonical straight-RGBA8 format, signed layout, undo/event contract and
+`DrawingDocument.read_pixel()` API are unchanged.
+
+- New fast-CI `tests/drawing_publication_tile_cache_smoke.gd` passes **30/30**
+  assertions, checking 144 pixels in one tile, four exact signed-64-bit tile
+  boundaries, hidden-RGB undo/redo, stale originals, invalid coordinates,
+  a missing lazy tile followed by retry, and a reentrant provider that
+  changes revision mid-commit, without partial installation.
+- `tests/drawing_publication_tile_cache_benchmark.gd` performs **six**
+  matched headless CPU-only scenarios, three samples each, on fresh empty
+  documents; it excludes dictionary construction, pointer delivery, staging,
+  rendering and GPU upload. All six scenarios pass pixel and delta checks
+  both before and after the code change. Raw source:
+  [baseline](../benchmarks/T068_2026-11-03_publication_baseline.json) and
+  [cached](../benchmarks/T068_2026-11-03_publication_cached.json).
+- Median times for 64×64 and 128×128 changed-pixel commits, respectively:
+  stride 512 **59.225→16.441 ms / 224.672→83.902 ms**; stride 1024
+  **53.453→19.705 / 216.894→76.303 ms**; stride 2048
+  **51.222→16.830 / 210.705→69.773 ms**. Three samples per cell
+  do **not** establish confidence intervals, actual edit+commit speedups or
+  an input-to-visible p95.
+- Fresh Godot 4.8 beta 2 headless regressions pass: publication 30/30,
+  session cache 31/31, hard dab 125/125, original raster benchmark
+  **691/691** (without its optional output-file checks), Drawing history
+  101/101, Atlas composition 89/89, and world mapping 125/125.
+
+- The post-change **native** `drawing_latency_stress_visual.gd` Xvfb/Mesa run
+  passed **81/81**, including framebuffer-visible pixels and five gestures
+  each for 4/32/64px dabs, long strokes and self-crossing strokes. Its raw
+  [post-change result](../benchmarks/T068_2026-11-03_publication_native.json)
+  has **no matched fresh baseline**, so its timings are regression evidence,
+  not attributable speedup evidence.
+
+**T-068 remains In Progress:** no native-backend or third-party library
+selection, Windows/GPU measurements, integrated optional GDExtension, or
+physical end-to-end latency validation has been completed by this change.
+
+
+## 2026-11-03 follow-up — bounded axis-aligned swept hard brush
+
+**Status remains In Progress.** Avoided per-candidate native closest-segment
+calls for exactly horizontal or vertical nonstationary brush sweeps, using
+scalar squared-distance clipping and the original row-major pixel traversal.
+All oblique strokes and stationary dabs keep their prior geometry branch.
+This is a safe, modest GDScript baseline change; it does not alter brush
+semantics, canonical RGBA8, selection/mask authorization, undo, publication or
+serialization. No new external runtime dependency was introduced.
+
+- `tests/drawing_axis_sweep_smoke.gd` passes **239/239** fast-CI checks
+  against the **independent original Godot `Geometry2D` oracle**, including
+  >2^53 signed tile anchors, reversed/fractional endpoints, masks, exact delta
+  pixels, nonaccumulating coverage and Undo/Redo. Its seeded randomized check
+  covers 320 horizontal/vertical segments and more than 20,000 candidates.
+- `tests/drawing_axis_sweep_benchmark.gd` captures seven CPU-only
+  `paint_path`+`commit` samples per horizontal, vertical and unchanged
+  diagonal test. Original vs modified medians were **33.803→33.041 ms**
+  horizontal and **32.442→34.126 ms** vertical, with the diagonal control
+  **31.407→31.964 ms**. These mixed, sequential microbenchmarks establish
+  neither a reliable speedup nor real input-to-display responsiveness.
+  See [`DRAWING_CPU_RASTER_BENCHMARK.md`](../DRAWING_CPU_RASTER_BENCHMARK.md)
+  and the linked raw sample data.
+- The focused witness is appended to the existing T-068 push-CI step without
+  enabling native framebuffer tests in fast CI. No manual-review gate,
+  provisional native-technology selection or other ticket status changed.
+
+**Still open:** runnable pinned Blend2D/Skia comparisons, a real optional
+GDExtension/native boundary, Windows/Linux physical and memory/VRAM/jitter
+measurement, and an operation-level recommendation. No owner approval or
+closure is claimed.
+
+- The targeted Xvfb/Mesa `drawing_latency_stress_visual.gd` witness passed
+  **80/80** checks over 25 synthetic gestures with a dummy audio driver.
+  This is a post-change regression, not a measured before/after gain or
+  physical input-to-screen evidence; raw cases are linked from the report.
+
+
+## 2026-11-03 follow-up — lazy-safe cached flood-fill reads
+
+**Status remains In Progress.** The bounded four-connected raster flood fill
+previously used `has_stored_pixel()` before `read_pixel()` at each visited
+coordinate. That preflight only looks at resident tiles, so an otherwise-valid
+saved/lazy tile could produce `BLANK_SEED` or an incomplete fill without ever
+loading its verified source bytes. Each visited pixel also repeated a tile
+lookup and result allocation. The edit session now resolves each source tile
+**once per gesture** through its existing snapshot cache (including verified
+lazy chunks), then reads canonical straight RGBA8 directly from that tile.
+An absent tile is still unallocated space, even when adjacent to a fill; a
+nonzero hidden RGB pixel with alpha=0 remains fillable. All staged changes
+remain detached until the original atomic publication check; missing or
+corrupt provider bytes, edit budgets, and concurrent-revision conflicts must
+not publish a partial fill. No storage format or native runtime was changed.
+
+- `tests/drawing_fill_tile_cache_smoke.gd` passes **30/30** headless checks:
+  unread lazy seeds, cross-tile hidden-RGB continuation, a missing and then
+  corrupt adjacent provider followed by successful retry, single successful
+  resolution per tile, exact atomic delta/undo/redo, selection boundaries,
+  budget rollback and retry, and signed 64-bit anchor coordinates beyond 2^53.
+  It is a fast push-CI witness in the existing T-068 step (no native UI test
+  added to fast CI).
+- `tests/drawing_fill_tile_benchmark.gd` runs **five** isolated
+  `flood_fill`+`commit` samples per size on fresh, identical seeded documents.
+  Two ordered before/after pairs were captured without GPU or pointer events;
+  median of the two *per-run* medians for 32²/64²/96² filled pixels was
+  **17.686→14.526 / 73.714→50.586 / 167.943→123.499 ms**, respectively.
+  See [the raw data](../benchmarks/T068_2026-11-03_fill_cache_before_after.json)
+  and [the benchmark report](../DRAWING_CPU_RASTER_BENCHMARK.md). These are
+  small CPU diagnostics with temporal and environment variation, **not**
+  physical-device input-to-present or statistically reliable speedup claims.
+- Final Godot 4.8 beta 2 local run: **13/13** related headless suites,
+  **1,747/1,747** assertions, including the **691**-check original raster
+  benchmark, history, text, Object Assets/Editor, Atlas composition,
+  world mapping and campaign storage. The native Xvfb/Mesa
+  `drawing_latency_stress_visual.gd` witness passed **80/80** assertions
+  over 25 synthetic brush gestures; this is unrelated UI regression coverage,
+  **not** a physical flood-fill event-to-photon measurement. The initial
+  fresh-worktree font/icon import errors were resolved by a full Godot editor
+  import before repeating all suites. Seven CI contract tests and the
+  83-ticket manual-review/dependency validator also passed.
+
+**Still open:** executable third-party Blend2D/Skia comparisons, an optional
+GDExtension boundary, Windows/Linux physical latency/memory/jitter and a
+complete operation-level recommendation. The ticket was **not closed** and no
+owner/manual gate was changed.
+
+
+## 2026-11-03 follow-up — unique-candidate flood-fill frontier
+
+**Status remains In Progress.** `DrawingEditSession.flood_fill()` now marks
+four-connected neighbors when they are enqueued instead of repeatedly
+appending candidates that are already waiting. The explicit candidate budget
+counts each *unique examined coordinate*, including selection-denied or
+nonmatching boundary pixels. Existing detached edit staging, verified lazy
+source reads, mask/hidden-RGB semantics, finite stored-pixel fill policy,
+atomic failure rollback, and Undo/Redo are unchanged.
+
+- A new independent `tests/drawing_fill_frontier_smoke.gd` **56/56** fixture
+  covers a 2×2 exact 12-candidate budget and smaller-budget retry, transparent
+  hidden RGB/Undo/Redo, plus ten bounded independent-grid oracle cases with
+  barriers, holes, partial masks and negative coordinates. The unchanged
+  original implementation also passed the oracle, providing a baseline;
+  the code change reduces redundant queue entries, not intended pixels.
+- Added it to the **existing** T-068 fast-CI step without adding a job or
+  native framebuffer requirement. Existing lazy-source and publication
+  correctness checks remain independently required.
+- Two ordered before and after runs of the identical `drawing_fill_tile_benchmark.gd`
+  suite, five samples per 32²/64²/96² region, returned mixed fill+commit CPU
+  medians: **12.766/13.601→13.225/19.539 ms** (32²),
+  **53.491/57.204→56.587/55.861 ms** (64²), and
+  **140.005/142.046→134.218/130.686 ms** (96²).
+  [Raw evidence](../benchmarks/T068_2026-11-03_unique_frontier.json) and
+  [methodology](../DRAWING_CPU_RASTER_BENCHMARK.md). No stable speedup or
+  production frame latency claim follows from these few headless runs.
+
+Local verification (Godot `4.8.beta2.official.cafc17a19`): **14/14**
+headless suites, **1,803/1,803** assertions, including original mixed raster
+benchmark 691, source lazy-fill 30, axis parity 239, signed publication 30,
+history 101, Object Assets 95, Object Editor 45 and campaign bundle 86.
+The separate targeted Xvfb/Mesa framebuffer stress passed **81/81** with
+25 synthetic brush gestures and [raw native diagnostics](../benchmarks/T068_2026-11-03_frontier_native.json);
+these gestures do not exercise Bucket and cannot prove a fill performance gain.
+The three font-dependent headless suites initially failed because the new
+worktree contained Git LFS pointer text instead of TTF bytes; restoring the
+verified LFS assets and regenerating Godot import metadata made all three
+pass with zero errors. No font or imported resource is part of this change.
+The explicit-type audit, six CI contracts, YAML parse, and 83-ticket
+validator also passed.
+
+**Still open:** executable pinned Blend2D/Skia comparator results, an actual
+optional native/GDExtension boundary and cross-platform distribution,
+physical Windows/Linux input-to-present and peak RAM/VRAM/jitter work, and
+a complete operation-level native-backend recommendation. No manual-review
+or Kanban closure was self-approved.
+
+
+## 2026-11-03 follow-up — reuse verified fill-source pixels while staging
+
+**Status remains In Progress.** Once flood fill verifies an original pixel
+through its source-tile snapshot, `DrawingEditSession._stage()` can accept
+that exact immutable RGBA8 value instead of recreating a tile address and
+reading the same source pixel again. The shortcut is private and used only by
+four-connected `flood_fill()`; the normal staging path still resolves source
+bytes and applies the same coordinate, selection, alpha, before/after,
+revision and atomic-publication checks. It does not reuse the detached preview
+as a subsequent operation's original data, convert canonical RGBA8, change
+saved content or add an external runtime dependency.
+
+- `tests/drawing_fill_verified_stage_smoke.gd` passes **29/29** headless
+  checks for a brush-independent mixed session (ordinary edit → budget-rejected
+  fill → successful fill → later edit), exact delta before/after and hidden RGB,
+  flood-fill masks and two consecutive fills across signed 64-bit tile anchors,
+  one-gesture Undo/Redo, source immutability, and an intervening revision
+  rejected at commit. This runs in the existing T-068 fast-CI step.
+- 15 related headless regressions passed **1,832/1,832** checks, including the
+  original 691-check raster benchmark, the 56-check fill oracle, the
+  30-check lazy-source fill, history, text, Object Assets, Object Editor,
+  campaign bundle, world mapping and composition.
+- Three ordered baseline/changed pairs of the existing five-trial,
+  headless CPU-only `flood_fill` + `commit` benchmark returned median-of-run
+  medians of **11.922→11.048 ms (32²)**, **50.868→44.961 ms (64²)** and
+  **121.659→115.892 ms (96²)**. Results vary by run, and this small
+  nonrandomized diagnostic does **not** establish a reliable event-to-visible
+  speedup, confidence interval, or memory reduction. See
+  [raw paired measurements](../benchmarks/T068_2026-11-03_verified_stage_ab.json)
+  and [benchmark report](../DRAWING_CPU_RASTER_BENCHMARK.md).
+- The separate targeted Xvfb/Mesa brush framebuffer witness passes **81/81**
+  [native checks](../benchmarks/T068_2026-11-03_verified_stage_native.json).
+  It does **not** exercise Bucket gestures or physical scan-out.
+  First clean-worktree checks failed to load imported fonts/SVG icons; after
+  Godot 4.8 beta 2 editor import, all affected suites reran without errors.
+  No import files or binary assets were changed by this commit.
+
+**Remaining T-068 requirements unchanged:** executable native Blend2D/Skia
+comparisons, optional Godot/GDExtension integration and platform packaging,
+physical Windows/Linux edit-to-display latency, RAM/VRAM/multithread jitter
+measurements, and an operation-level dependency recommendation. Neither
+owner approval nor ticket closure is claimed.
+
+
+## 2026-11-03 follow-up — canonical Bucket software frame and sampled memory witness
+
+**Status remains In Progress.** The targeted native `tests/drawing_fill_frame_native.gd`
+creates actual bounded Drawing raster documents, uses a *test-only* `gui_input`
+release adapter to call canonical `DrawingEditSession.flood_fill()` and commit,
+and renders each resulting document via the existing `DrawingCanvas` and its
+Godot/Mesa textures. This is **not** proof that a production standalone
+Bucket button currently routes through that adapter. Each trial checks that
+the source was visible before input, exactly `size²` pixel deltas and one
+revision were published after input, and framebuffer RGB visibly changed
+after `RenderingServer.frame_post_draw`. A deliberately too-small candidate
+budget is rejected without changing the source or screen. The test runs only
+on a native X11/Mesa framebuffer, not in headless fast push CI.
+
+- Two independent local runs with **5 new documents each** at 32², 64² and 96²
+  pixels passed **96/96** (including screenshot and JSON) and **95/95** native
+  checks. The software-frame screenshot was inspected.
+- Median CPU dispatch / frame-post-draw in run 1 (ms): **12.903 / 35.126**
+  (32²), **57.530 / 85.673** (64²), **134.877 / 168.214** (96²). Run 2:
+  **14.754 / 36.934**, **56.060 / 84.385**, **141.533 / 176.683**.
+  Both raw runs, frame timings, sampled Godot static/renderer memory monitors
+  and environment are in
+  [the native evidence](../benchmarks/T068_2026-11-03_bucket_frame_native.json),
+  and [the methodology](../DRAWING_CPU_RASTER_BENCHMARK.md).
+- Added a `workflow_dispatch`-only native Linux/Mesa workflow to recreate
+  framebuffer and JSON artifacts. The fast push/PR workflow remains unchanged
+  and still excludes native framebuffer sweeps. No production renderer,
+  canonical file format, or dependency version changed.
+
+**Important limits:** software `frame_post_draw` is not scan-out/photon latency;
+the synthetic test adapter is not an end-user UI acceptance witness. Five
+trials per size provide no stable p95 distribution. Godot memory monitors
+are sampled after frames, not process high-water RSS or physical VRAM.
+Blend2D/Skia executables, an optional GDExtension, actual Windows/Linux
+hardware latency and memory/jitter measurements, and the operation-level
+backend decision remain unverified. The ticket cannot be marked Done and
+no manual approval was assumed.
+
+
+## 2026-11-03 follow-up — bounded Linux process RSS and longer native fill-to-frame distributions
+
+**Status remains In Progress.** The existing canonical `drawing_fill_frame_native.gd`
+GUI test adapter now accepts a bounded `--trials` count (5–40) and an optional
+readiness marker. Its default remains five trials to preserve prior witnesses.
+A separate Linux-only `tools/benchmarks/t068_fill_process_profile.py` runs
+multiple fresh Xvfb/Mesa Godot processes and samples **the engine executable**
+from `/proc/PID/status` at a requested 10 ms interval. The monitor deliberately
+checks the executable path: `xvfb-run` is a shell wrapper that receives all
+Godot command-line arguments and must **not** be mistaken for the engine's RSS.
+
+- Two independent pinned Godot 4.8 beta 2 software-frame runs, **21 trials at
+  each of 32², 64², and 96²**, passed **385/385 checks per run** (including
+  JSON, visible pixels, rollback, and screenshot), **770/770 total**. Five
+  Python contract tests pass, including rejection of the wrapper-process
+  identification error and malformed/missing frame samples. The profiler
+  runs on demand; only its fast Python contract tests join push CI.
+- Median CPU dispatch / frame-submission (ms) in run A: **13.671 / 34.158**,
+  **53.826 / 79.671**, **134.427 / 168.487**. Run B: **13.549 / 34.614**,
+  **56.037 / 83.642**, **129.480 / 164.342**, in ascending fill size.
+  Corresponding empirical frame-submission p95s were **44.510/98.488/196.921**
+  and **40.051/109.090/190.817 ms**. These are *within-run order statistics*
+  from 21 trials, not confidence intervals or production service guarantees.
+- The Linux kernel reported Godot **VmHWM 251,288 KiB / 251,420 KiB** across
+  the two complete process lifetimes, with **8,988 KiB / 8,284 KiB** peak
+  sampled post-ready RSS increase. The observed VmHWM includes Godot startup,
+  rendering and each fresh document; neither number isolates a flood-fill
+  allocation, measures GPU VRAM, or replaces physical-hardware profiling.
+  Samples can miss short spikes, and the post-ready delta is affected by
+  renderer caching and allocated documents.
+- Evidence: [raw host/process and framebuffer trial records](../benchmarks/T068_2026-11-03_fill_linux_rss.json)
+  and the [CPU report methodology](../DRAWING_CPU_RASTER_BENCHMARK.md).
+  The on-demand `godot-native-t068-fill.yml` workflow now collects two 21-trial
+  runs, kernel RSS, software frame screenshots and full logs without adding
+  native framebuffer tests to fast push CI. No production source behavior,
+  native dependency or project format changed.
+
+**Still open:** physical input/display latency, Windows/Linux hardware RSS and
+GPU memory, repeatable multithread jitter, externally built Blend2D/Skia CPU
+comparators, an optional pinned GDExtension, and the operation-level native
+backend decision. No owner/manual acceptance was assumed or ticket closed.
+
+
+## 2026-11-03 follow-up — native-kernel thread contention and pixel parity
+
+**Status remains In Progress.** A new isolated C++ `std::thread` witness runs
+against the existing `tools/benchmarks/t068_raster_kernel.cpp` prototype.
+It compares one, two and four simultaneous workers for source-over with
+self-overlap, masked erasing and exact replacement (including zero-alpha
+hidden RGB). Each worker has separate immutable-source copies and private
+mask, output and delta buffers. Tests assert equal changed-pixel counts,
+byte-identical ordered deltas, unchanged input and exact full-region output
+against a serial reference. This verifies independent simultaneous kernel
+calls; **it does not demonstrate safe shared mutable edit-session state**.
+
+- Native loops and timing use C++ threads entirely, avoiding the Python
+  interpreter's GIL or large Python result validation between timed calls.
+  The measurement records median, nearest-rank empirical p95 and maxima for
+  101 calls per worker, after three warmups. Two independent local runs cover
+  **18 workload/mode/worker cells each**. Full and sparse-delta modes are
+  measured separately. The 2/4-worker contention data vary across runs,
+  especially in p95 tails; this is *diagnostic jitter evidence*, not a
+  reproducible speedup, a confidence interval, or a multithreaded Godot
+  integration. Per-worker buffers and allocations are excluded from the
+  timed loop; operating-system scheduling and thermal state are uncontrolled.
+- The new native verification/parser tests pass **2/2**, including genuine
+  1/2/4-thread kernel calls across both APIs and all three edit operations,
+  invalid region/worker parameters and rejection of incomplete or malformed
+  evidence. Those short tests run in the existing fast T-068 CI step (no
+  native framebuffer runner added to push CI). The longer benchmark is an
+  explicit developer/on-demand diagnostic:
+
+  ```sh
+  python3 tools/benchmarks/t068_native_thread_jitter.py \
+    --trials 101 --region 256 --workers 1 2 4 \
+    --output /tmp/t068-native-thread-jitter.json
+  ```
+
+- Both independent results are preserved as
+  [raw native-thread evidence](../benchmarks/T068_2026-11-03_native_thread_jitter.json)
+  and interpreted in the [CPU raster report](../DRAWING_CPU_RASTER_BENCHMARK.md).
+  The original single-thread `draw_batch` and `draw_batch_deltas` interfaces
+  and runtime Drawing implementation are **unchanged**.
+
+**Still open:** real Godot/GDExtension threading boundary and integration,
+Windows/Linux hardware/performance, Blend2D/Skia comparators, end-to-end
+input-to-photon latency, true VRAM/memory peaks and an operation-level
+backend adoption decision. T-068 is **not Done** and no manual approval
+is claimed.
+
+
+## 2026-11-03 follow-up — opt-in bounded native C ABI (no runtime adoption)
+
+**Status remains In Progress.** The isolated `t068_raster_kernel.cpp` now
+exposes `draw_batch_deltas_checked` and `draw_batch_checked`, with a separate
+`draw_kernel_checked_api_version()` identifier. Legacy `draw_kernel_abi_version()`
+remains **1**, and its original entry points retain their existing signatures.
+The new calls require caller-declared source, coordinate, optional mask, delta
+and (for the full-buffer API) output byte capacities. They reject undersized
+or null buffers **before reading them**, reject partial and complete overlap
+between writable buffers and input slices, and retain the existing atomic
+failure behavior on invalid coordinates or insufficient delta capacity. Unexpected C++ exceptions map
+to `-4` rather than escaping through this new C boundary. Explicit checked-call errors are
+`-5` (missing/short/invalid declared buffer) and `-6` (unsafe alias).
+
+`tests/test_t068_checked_abi.py` passes **6/6 Python contract tests**. The
+byte-parity test runs **160 seeded source/mask/operation cases** through both
+legacy and checked sparse/full entry points and compares the exact output
+bytes and ordered delta triplets. Additional cases cover zero-work and zero-
+alpha operations, output/delta canaries, stale/bad coordinates, full and
+partial aliases, short lengths, and unchanged buffers after failures. This
+contract suite joins the *existing* fast push-CI T-068 step, not a new native
+framebuffer job. The low-level kernel is still an unintegrated prototype.
+
+**Important limitations:** caller-supplied capacities are trusted descriptions
+of actual allocations; a C ABI cannot prove arbitrary foreign pointers are
+valid. This is not a memory-safe sandbox, GDExtension, or thread-safe shared
+edit session. There are no measured Godot boundary costs, Blender/Skia
+comparators or physical-device results. No production GDScript edit path,
+project data format, license or pinned dependency changed. Native integration,
+physical Windows/Linux timings and final backend selection remain open.
+
+
+## 2026-11-03 follow-up — isolated opt-in Godot GDExtension boundary
+
+**Status remains In Progress.** `tools/benchmarks/t068_bridge/` now contains a
+minimal **Linux-only experimental GDExtension bridge**, built from source in a
+temporary Godot project using `--dump-gdextension-interface` from the pinned
+`4.8.beta2.official.cafc17a19` engine. It calls the existing checked C++ batch
+API, copies Godot `PackedByteArray` input into independent native storage, and
+returns a new byte array. **No `.gdextension`, `.so`, runtime loading hook, or
+native dependency is installed in the Atlas or standalone Drawing projects.**
+
+- The `T068RasterBench.apply_checked` boundary accepts bounded source RGBA8,
+  coordinate pairs, optional mask, dimensions, operation, and color. Both
+  Godot's typed ptrcall and generic `Variant` call paths are exercised.
+  Source input is immutable, duplicate coordinates only apply once, and
+  invalid dimensions, buffer lengths, colors, operations or out-of-range
+  coordinates return an empty byte array without publishing edits.
+- The isolated Godot script passes **443/443 checks in each of two runs**:
+  160 seeded cases with exact pixel parity against an independent GDScript
+  source-over/erase/replace oracle, immutable source checks, generic-call
+  checks, invalid-input tests, and 102 bounded output checks. Four separate
+  Python harness contracts pass in fast CI; the native Godot/GDExtension run
+  is **manual-only** via `godot-native-t068-bridge.yml` or:
+
+  ```sh
+  python3 tools/benchmarks/t068_bridge/run_bridge.py \
+    --godot /path/to/Godot_v4.8-beta2_linux.x86_64 \
+    --runs 2 --output /tmp/t068-bridge.json
+  ```
+
+- Diagnostic **median bridge-call times**, with array conversion and copy
+  included, are **8–9 μs** for a 32×32 buffer, **13 μs** for 64×64, and
+  **16 μs** for 128×128 across two runs (31 post-warmup samples per size).
+  The empirical p95 varied; these do not imply lower end-to-end edit latency.
+  [Raw runs](../benchmarks/T068_2026-11-03_gdextension_bridge.json) are preserved.
+- Godot's editor `--import` can abort when scanning this hand-authored
+  extension on the pinned beta; the harness instead bootstraps a descriptor-free
+  temporary project, then explicitly loads the extension only in the runtime
+  smoke script. A working test bridge is **not** an adopted production module
+  or evidence of editor-load reliability. No native release binary is shipped.
+
+**Still outstanding:** native source revision contracts and dirty-region
+publication into actual `DrawingDocument`/main-thread texture updates;
+Blend2D/Skia executable parity and cost; physical Windows/Linux CPU/GPU,
+RSS/VRAM, pointer-to-frame p95, and operation-level adoption decisions. The
+independent Drawing startup remains pure Godot. No owner/manual gate was closed.
+
+
+## 2026-11-03 follow-up — revision-guarded native output publication witness
+
+**Status remains In Progress.** The opt-in T-068 temporary-project bridge now
+includes `t068_revision_adapter.gd` and a separate `t068_revision_smoke.gd`.
+The adapter takes a detached canonical straight-RGBA8 source snapshot, calls
+the length-checked C++ bridge, computes a bounded pixel-change rectangle,
+and checks **both source bytes and the expected revision again** before
+installing the result. No-op edits do not advance the revision. Successful
+edits increment exactly once and update an `ImageTexture` from the whole
+changed tile on the Godot main thread. `ImageTexture.update()` is a **whole-
+texture upload**, not a subrectangle update; the dirty rectangle is only
+metadata for a hypothetical later uploader. This is an isolated prototype,
+not an integration with `DrawingDocument` or Atlas history.
+
+- Two independent optional Godot 4.8 beta 2 executions pass **443/443**
+  original GDExtension pixel-parity checks and **370/370** new publication
+  checks **per run**. The publication witness uses native Xvfb/Mesa GL for
+  `ImageTexture.get_image()` readback; the headless display driver does not
+  provide reliable GPU texture readback. Native checks cover duplicate and
+  masked coordinates, transparent hidden RGB, precise dirty rectangles,
+  no-op revisions, malformed inputs, stale revisions, reentrant source
+  replacement between computation and publication, and 70 seeded
+  independent-pixel oracles. The caller's source array remains unchanged.
+- Five fast Python runner-contract checks verify temporary project isolation,
+  fail-closed markers, the required native Xvfb path, and the absence of
+  extension descriptors in production projects. The on-demand workflow
+  installs Xvfb/Mesa explicitly; **native framebuffer testing is not added to
+  fast push/PR CI**. [Raw two-run evidence](../benchmarks/T068_2026-11-03_gdextension_revision.json)
+  records the check counts and existing bridge timings (not new speed claims).
+- This test does not call actual `DrawingDocument._publish_edit`, tile dirty
+  cache updates, Atlas global history or its real Tool UI. The adapter is
+  single-threaded and intentionally computes dirty bounds by scanning its
+  bounded source buffer; it has no backend concurrency or performance
+  justification. Godot editor auto-import instability, physical Windows/Linux
+  validation, Skia/Blend2D comparisons, GDExtension packaging and the
+  operation-level decision **remain open**. No owner/manual gate changed.
+
+
+## 2026-11-03 follow-up — real DrawingDocument transaction integration witness
+
+**Status remains In Progress.** The opt-in temporary Godot project now copies
+only 12 canonical `addons/drawing/*.gd` dependencies and loads the checked
+C++ bridge explicitly at runtime. The new `t068_document_adapter.gd` snapshots
+one digest-verified source tile, obtains a detached native RGBA8 result, then
+stages it through **real** `DrawingDocument.begin_edit()` →
+`DrawingEditSession.apply_region()` → `commit()`. This uses the existing
+atomic per-tile publication, dirty-region calculation, local history and
+revision checks; it does **not** install native code in Atlas or Drawing,
+replace `_publish_edit()`, or write to the source file. Native full-tile
+results require a GDScript whole-tile comparison and region staging; this is
+an interoperability witness, **not** a tuned native rendering pipeline.
+
+- Two independent pinned Godot 4.8 beta 2 runs passed **443/443** checked
+  GDExtension pixel/argument checks, **370/370** Xvfb/Mesa texture-publication
+  checks and **219/219** real Document checks **per run**. The new checks
+  include 48 deterministic independent-mask/alpha oracles, real Undo/Redo and
+  history, exact signed-64-bit tile positions, no-op/stale revisions,
+  mid-computation competing commits, invalid coordinates/masks and lock
+  enforcement. Missing or corrupt lazy source files are rejected without
+  treating unhydrated pixels as transparent; retry with verified bytes works.
+- Seven fast Python runner-contract tests verify the isolated dependency
+  subset, fail-closed native markers, and that only the temporary project
+  contains a GDExtension descriptor. The long native run remains **manual-
+  only** in `godot-native-t068-bridge.yml` and still is not part of push/PR
+  framebuffer CI.
+- [Raw two-run evidence](../benchmarks/T068_2026-11-03_gdextension_document.json)
+  retains the 443/370/219 check counts and previous bridge-only timings.
+  Those timings are **not** timings for the new Document adapter and cannot
+  justify replacing Godot editing. Physical Windows/Linux tests, external
+  library comparators, editor-load reliability, performance/copy budgets,
+  a backend choice and production integration remain open. No manual gate or
+  owner acceptance was changed.
+
+
+### One atomic multi-tile native batch into DrawingDocument (2026-11-03)
+
+The opt-in temporary Godot/GDExtension bridge now also stages **up to 16
+independent raster tiles as one canonical `DrawingEditSession` commit**.
+`tools/benchmarks/t068_bridge/t068_document_batch_adapter.gd` verifies each
+source tile (including lazy SHA-checked sources), computes detached native
+outputs, and only then stages changed tiles into one session. It applies a
+1,048,576-pixel aggregate full-tile scan budget, refuses duplicate tile
+targets and widely separated tile anchors, and never installs partial results
+on a bad second tile, invalid native output, concurrent document commit or
+locked layer. The returned dirty rectangles are **per-tile, local integer
+bounds** derived from the real publication's 64-bit dirty regions; they do
+not imply a GPU subrectangle upload.
+
+`tools/benchmarks/t068_bridge/t068_document_batch_smoke.gd` passes **128/128**
+checks in the isolated Godot 4.8 beta 2 project, including 32 deterministic
+three-tile randomized gestures, true one-step Undo/Redo, mask/hidden-RGB
+exactness, invalid-second-tile rollback, missing/corrupt lazy-source retry,
+far signed 64-bit tile origins, budget limits, stale/locked data and a
+competing writer. The existing 443-check native parity, 370-check GL readback
+and 219-check single-tile Document witnesses continue to run separately. The
+Python runner contracts validate that the native witness is **manual-only**,
+with no `.gdextension` installed in either shipping project.
+
+[Raw evidence](../benchmarks/T068_2026-11-03_gdextension_multitile.json)
+records two independent runs. This is an intentionally unoptimized
+**whole-tile** GDScript staging prototype; no multi-tile latency benefit,
+production integration, editor-load fix, physical hardware results,
+third-party library comparison or backend decision is claimed.
+**T-068 remains In Progress**; pending owner and cross-platform gates are
+unchanged.
+
+
+### 2026-11-04 follow-up — checked sparse-delta GDExtension publication
+
+**Status remains In Progress.** The isolated Godot 4.8 beta 2 GDExtension now
+exposes `apply_sparse_checked()` alongside the unchanged full-output
+`apply_checked()` path. Native `draw_batch_deltas_checked()` returns a little-
+endian `u32` record count and bounded `(index, before_rgba, after_rgba)` triples;
+valid no-op is an explicit four-byte zero count, not an indistinguishable
+error. The bridge neither mutates Godot source arrays nor allocates a full
+output tile to return. It is still compiled **only** in a temporary test
+project, never loaded by the production Drawing/Atlas workspace.
+
+`tools/benchmarks/t068_bridge/t068_document_sparse_adapter.gd` verifies each
+returned record against the digest-verified source, requested point set,
+selection mask, declared operation and uniqueness **before any edit is
+published**. Every accepted changed pixel is staged with its verified
+original into the existing `DrawingEditSession` and committed in one atomic
+history event. Failed second tiles, malformed/native-forged payloads, locked
+layers, competing revisions and missing/corrupt lazy tiles leave no partial
+publication. The existing 16-tile / 1,048,576-source-pixel and safe signed
+coordinate limits remain; dirty regions are per-tile integer bounds, **not**
+partial `ImageTexture` uploads. The adapter also recomputes the complete expected changed-pixel set from
+unique eligible requested points. An empty or partial native response is
+rejected whenever the canonical operation would change pixels, even if every
+returned record is otherwise valid. This makes the sparse bridge a defensive
+interoperability witness rather than trusting native completeness; the O(N)
+GDScript verification cost is explicitly retained and may limit speedups.
+
+`tools/benchmarks/t068_bridge/t068_document_sparse_smoke.gd` checks exact
+whole-output parity, history and dirty-boundary parity, randomized three-tile
+edits, malformed/duplicate/out-of-mask records, hidden transparent RGB,
+atomic rollback, lazy recovery, and signed 64-bit tile anchors. The isolated
+runner now fails closed without its success and timing markers, and the new
+Python contracts remain part of the existing fast-CI T-068 step. The
+manual-only bridge workflow generates the native program and JSON timing
+samples. The diagnostic 32/64/128 tile one-pixel benchmarks measure
+GDScript staging plus native call/commit cost on synthetic new documents;
+they do **not** show production brush/fill speed, end-to-end presentation,
+physical Windows/Linux performance, peak memory, or portable editor loading.
+No backend decision, owner gate or other ticket status changed.
+
+
+### 2026-11-04 follow-up — reject incomplete native sparse responses
+
+The opt-in `t068_document_sparse_adapter.gd` now independently derives **all**
+expected changed pixel indices and values from the verified source, allowed
+unique points, selection mask, and canonical `DrawingEditSession._blend()`.
+A native sparse response must contain that exact set, not merely a subset of
+individually valid records. The four-byte zero-change marker is accepted only
+for an actual canonical no-op. It refuses forged empty outputs, valid-looking
+truncated multi-point output, and a missing second tile without publishing any
+partial document state. Valid no-ops and duplicate requested coordinates still
+work. No production native runtime was enabled.
+
+The targeted isolated Godot 4.8 beta 2 bridge witness now has **173 checks per
+run** (up from 169), including forged-response rollback tests; the Python
+runner requires that stronger evidence. The native GDExtension and C++ checked
+ABI are unchanged. Full-transaction parity, exact pixel and Undo/Redo behavior
+remain verified; checking every requested unique pixel in GDScript adds O(N)
+verification work and may reduce sparse-path benefit. The two-run measurements
+are retained in [raw evidence](../benchmarks/T068_2026-11-04_sparse_completeness.json).
+They are synthetic stage-and-commit diagnostics, **not** measured physical
+input-to-visible latency or a production native-backend speedup. T-068 remains
+In Progress: native release loading, external CPU-library comparators,
+Windows/Linux hardware validation and final backend choice are still open.
+
+
+### 2026-11-04 follow-up — optional Cairo CPU compositor comparison
+
+**Status: In Progress; no third-party adoption.** We added the executable,
+self-contained Linux optional comparator
+`tools/benchmarks/t068_cairo_cpu.py`, loading the installed Cairo runtime
+(1.18.4 in this test environment) via `ctypes` without vendoring or changing
+the shipped application. The runtime version and platform endianness are
+recorded in [raw 2-run evidence](../benchmarks/T068_2026-11-04_cairo_cpu.json).
+The trial builds the existing *checked* C++ raster kernel in a temporary
+folder and verifies every native result against an independent Python
+straight-RGBA8 oracle, then paints the matching hard-edged half-tile rectangle
+through Cairo `CAIRO_FORMAT_ARGB32`. Nine samples per run and 32/64/128²
+regions cover opaque source-over, exact replacement, transparent-source no-op,
+translucent source-over/replacement and clear: **36 scenario observations**.
+The benchmark checks all pixels and reports mismatch counts separately for
+painted/unpainted areas and for hidden RGB loss.
+
+Opaque input + opaque paint yields **zero Cairo pixel disagreements** in both
+runs. For translucent input, Cairo's native-endian **premultiplied ARGB32**
+format discards transparent hidden RGB and quantizes partially transparent
+channels before and after painting. Every translucent case measured
+non-canonical pixels, including **untouched** regions. For example at 64²,
+translucent source-over disagrees on 970 painted and 2,025 unpainted pixels;
+704 source pixels with hidden transparent RGB also differ. This naive
+whole-image Cairo route therefore **fails T-068's exact canonical-pixel
+acceptance**; any future use must operate on detached working data, preserve
+untouched canonical bytes, specify changed-pixel rounding, and retest. It is
+*not* evidence that Cairo cannot be used for vector path previews.
+
+The diagnostic script reports C++ kernel-call median, Cairo draw-only median,
+and Cairo full Python conversion+draw+readback median **separately**.
+Their boundaries differ, so do not rank backends by the headline timings.
+`tests/test_t068_cairo_cpu.py` covers 10 format/oracle/contract tests and
+joins the existing fast T-068 CI step; a separate manual-only workflow
+`godot-native-t068-cairo.yml` installs Cairo and captures two complete runs.
+The isolated benchmark never loads native code into Drawing/Atlas, leaves
+production startup intact, and makes no physical Windows/Linux GPU, memory,
+vector-path parity, or input-to-display claims. **Required Blend2D/Skia
+executable comparisons, production-safe GDExtension loading, hardware
+measurements, and the operation-level recommendation remain outstanding.**
+
+Official image format documentation:
+https://cairographics.org/manual/cairo-Image-Surfaces.html
+
+## 2026-11-04 Blend2D 0.21.2 CPU conversion/parity checkpoint
+
+The official source archive supplied by the owner (SHA-256:
+`234ba57a64153c96885a6271f15fdcf6c594ac8cb03adaad19abb8d3b2b533fa`)
+was compiled outside the repository, with its bundled AsmJit and JIT-enabled
+CPU raster pipeline. The small optional benchmark-only C++ shim accepts
+length-checked premultiplied BGRA32 images; it is **not** a GDExtension and
+has no link to the Drawing or Atlas runtime. The reproducible
+[CPU parity screen](../DRAWING_CPU_RASTER_BENCHMARK.md) and
+[raw two-run evidence](../benchmarks/T068_2026-11-04_blend2d_cpu.json)
+compare full-tile and bounded-region conversions against the independent
+canonical RGBA8 oracle plus existing checked scalar C++ kernel: 72 verified
+scenarios, 42 recorded non-parity cases. Only opaque painting and region-only
+erase achieved exact bytes. Region-scoped painting preserves **every** outside
+pixel but does not solve translucent rounding or transparent no-op conversion.
+All 12 contracts passed with the locally built library; optional live tests
+skip without an explicit external build. Manual workflow and fast-CI test
+contracts do not ship Blend2D.
+
+**Open:** Skia CPU and shape/AA comparison, matched native conversion/marshal
+cost, Windows/Linux physical-device median/p95, memory and standalone Drawing
+optional binary acceptance. Keep T-068 In Progress; do not ship Blend2D on
+this evidence.
+
+
+## 2026-11-04 follow-up — pinned Skia 144.1 CPU rectangle and shape screen
+
+**Status remains In Progress; no native renderer shipped or selected.** The
+owner uploaded the `skia-python==144.1` CPython 3.13 Linux x86-64 wheel,
+verified by SHA-256 `a008767c16671f3704ea5e1a8cee99854047044632c0d71a37105d6b632b816a`.
+It is installed **outside** the repository only for the on-demand research
+harness `tools/benchmarks/t068_skia_cpu.py`. The code constructs CPU-only
+`SkSurface.MakeRasterDirect` buffers with three explicitly distinguished
+routes: direct **unpremultiplied RGBA8**, full-image **premultiplied BGRA8**
+roundtrip, and region-only BGRA8 roundtrip/paste. It also exercises an actual
+fractional-vertex quadratic path with and without antialiasing. No GPU backend
+or shipping Godot/Atlas code uses the wheel.
+
+Two separate nine-trial runs covered 3 sizes (32²/64²/128²) × 7 fixed
+operations × 3 scopes = **126** checked cases. The canonical independent
+Python oracle and checked C++ kernel agreed in every case. **60 Skia paths
+were non-parity cases**, including all full-image premultiplied translucent
+and no-op routes. Direct unpremultiplied RGBA8 matched all six previously
+screened fixed operations in both runs and preserved untouched hidden RGB,
+but **transparent-color source replacement** could not preserve the explicit
+straight-RGBA8 color at alpha zero (3 non-parity cases/run). Moreover,
+16 seeded random source vectors × 3 operations revealed **two changed-pixel
+compositing rounding mismatches per run** for direct RGBA; no unchanged pixels
+were modified in those vectors. Thus even direct RGBA mode is **not approved**
+as an exact general-purpose Drawing compositor. Bounded premultiplied
+conversion preserved untouched bytes but did not solve touched pixel loss.
+
+The extra 64² Skia CPU path screen produced **634** changed hard-edge pixels
+and **737** changed AA pixels (83 partial-alpha fringe pixels), reproduced
+identically across runs. These shape footprints prove the API executed and
+stayed within conservative bounds; they **do not** establish once-covered
+hard-brush parity, mask coverage or revision-safe undo semantics.
+
+The new nine-test optional harness (three fast-CI contracts, six live tests)
+validates pinned provenance, fail-closed arguments, byte-exact untouched
+pixels, known exceptions, random vectors, actual CPU path/AA and the checked
+C++ oracle. A separate manual-only
+`.github/workflows/godot-native-t068-skia.yml` fetches the pinned wheel,
+verifies its checksum, runs both live and reference tests, and emits timing
+JSON; the existing fast push CI runs only contracts unless an external wheel
+is explicitly enabled. [Raw complete two-run evidence](../benchmarks/T068_2026-11-04_skia_cpu.json)
+and [operation-level caveats](../DRAWING_CPU_RASTER_BENCHMARK.md) retain the
+results. No artifact is adopted or vendored; native Skia C++ overhead,
+real Godot publication, mask/path parity, Windows/Linux physical display,
+RAM/VRAM and portable release acceptance remain unfinished. **T-068 remains
+In Progress**, with unchanged dependencies and no fabricated approval.
+
+Final local checks for this checkpoint: **9/9 Skia tests** with the pinned
+wheel, **12/12 Blend2D**, **10/10 Cairo**, **6/6 checked ABI** and **10/10
+bridge runner**. Godot 4.8 beta 2 headless checks passed: 125 hard dabs, 239
+axis sweeps, 30 publication, 30 fill-cache, 691 original raster benchmark,
+101 Drawing history and 89 Atlas composition (**1,305 assertions**). The
+first composition run logged missing imported SVG icons despite passing its
+89 assertions; a fresh `--editor --import` resolved the asset-cache issue and
+the clean rerun passed without errors. All 83 ticket and review gates validate.
+No native-renderer application code or persistence format changed.
+
+
+## 2026-11-04 follow-up — Godot-authored hard-brush vs Skia path/mask parity
+
+**Still In Progress; no native backend selected or shipped.** Previous Skia
+path output was only an independent antialiasing capability smoke with **no
+Drawing brush oracle**. This checkpoint generates 11 reproducible cases by
+running the actual `addons/drawing/edit_session.gd` on Godot 4.8 beta 2 with
+signed 64-bit anchors `9007199254740993` and `-9007199254740993` (strictly
+beyond the exact double-precision integer range). Each case records the
+coverage indices (including a zero-alpha gesture that changes no bytes), the
+committed changed indices and the SHA-256 of **canonical straight-RGBA8**
+output. The Python reader independently rebuilds each byte via the canonical
+source-over rule and rejects any mismatched digest, malformed coverage,
+ineligible selection, missing case or changed-pixel set. A Godot test can
+regenerate the committed oracle byte-for-byte, not just compare an approximation.
+
+- `tests/drawing_t068_skia_brush_oracle.gd` creates fresh seeded raster
+  documents and records stationary, fractional horizontal/vertical, oblique,
+  self-crossing, split-batch, rectangular/sparse/inverted selection, erased
+  hidden RGB and alpha-zero no-op gestures. It confirms authored coverage
+  and actual commit deltas; no application code is modified.
+- `tools/benchmarks/t068_skia_brush.py` renders a single **non-AA Skia CPU
+  path** to an A8 coverage stencil and separately renders straight-RGBA8
+  directly. Selection is applied **after** Skia drawing using a Python
+  pixel predicate; there is **no native Skia clipping or Godot bridge** in
+  this experiment. It also composites the Skia stencil with independent
+  canonical math to distinguish geometry differences from blend differences.
+- Two independent 7-trial runs across all 11 cases: **22 deterministic
+  comparisons**. Three shape variants per run differ in coverage, always by
+  **one omitted pixel**: self-crossing continuous, self-crossing batched, and
+  the same self-crossing gesture with alpha zero. The two painted crosses
+  consequently have one direct-RGBA pixel mismatch each (four in two runs).
+  For zero-alpha, the coverage mismatch is real but final pixels remain
+  unchanged, as intended. All eight other cases match the tested Godot
+  covered-pixel sets and direct composite bytes exactly. The canonical
+  software postblend over Skia's mask **cannot repair the missing pixel**.
+- Ordinary CI runs the seven no-wheel contract/reproduction tests
+  (`T068_GODOT=godot` verifies actual fixture regeneration). The optional
+  pinned-wheel workflow adds two live Skia tests and two full benchmark
+  reports. The local **9/9 live tests** pass; independent repeat fixture
+  reproduction passes. See [the experiment report](../DRAWING_CPU_RASTER_BENCHMARK.md)
+  and [raw two-run evidence](../benchmarks/T068_2026-11-04_skia_brush.json).
+
+This is bounded **32²/11-case** hard-brush evidence, not exhaustive
+transformed shape/mask proof; Skia CPU's internal geometry and rounding are
+not identical to Godot's in all cases. Previous seeded random compositing
+losses and transparent replacement remain unresolved too. There is still no
+matched native C++ Skia interface, native selection clipping, Godot marshaling,
+real frame/pointer measurement, Windows executable validation, portable
+release, RAM/VRAM peak or physical-hardware p95. **Do not mark T-068 Done**
+until those acceptance gates are genuinely satisfied; the existing dependency
+and owner gate status are unchanged.
+
+
+## 2026-11-04 follow-up — transform-aware Skia hard brush oracle
+
+**T-068 stays In Progress, with no native backend adopted.** The Godot fixture
+now includes five non-identity frozen view transforms (zoom/pan, 90° rotation,
+mirroring, nonuniform scaling, shear) in addition to the original 11 cases.
+All five submit **view-space** points to the actual `DrawingEditSession` while
+checking its raster-local selection, brush width, committed deltas and exact
+hidden-RGB-preserving source bytes at signed world anchors beyond 2^53.
+A schema-2 fixture records both the local path and actual submitted view path
+plus affine coefficients. The independent Skia runner inverse-maps these
+samples; malformed, singular and misleading view/local pairs reject before
+using a native library. Godot reproduces the fixture exactly, including
+matching local strokes and output digests for all identity/transformed pairs.
+
+Pinned Skia 144.1 recheck: **16 cases/run × two seven-trial runs = 32
+comparisons**, with **8 coverage** and **6 final-RGBA8** non-parity cases.
+The mirrored cross retains the previously found one-pixel Skia stencil miss;
+the other four new transform cases match the tested canonical coverage and
+pixels after the **Python** inverse transformation and postmask. The existing
+Skia translucent rounding and transparent replacement failures remain.
+Two-run [raw evidence](../benchmarks/T068_2026-11-04_skia_brush.json),
+[operation-level report](../DRAWING_CPU_RASTER_BENCHMARK.md), regenerated
+`tools/benchmarks/t068_skia_brush_oracle.json`, live and no-wheel contract
+unit tests and optional pinned workflow document this checkpoint.
+
+**Limitations:** this is not native Skia view transformation or selection
+clipping, and does not benchmark real GDExtension conversions/publication,
+physical Windows/Linux display p95, peak RAM/VRAM, or release packaging.
+None of these acceptance gates may be represented as passed by the fixture;
+no manual approval was presumed. Keep the ticket's dependency and status
+unchanged until full operation-level/hardware/backend evidence is available.
+
+**Local verification:** the pinned Skia wheel ran all 11 focused brush tests,
+including exact real-Godot fixture regeneration, corrupt-transform rejection
+and live deterministic stencil checks. The wider T-068 Python collection ran
+68 tests (67 passed, one optional group skipped). Seven targeted headless
+Godot suites passed 1,235 assertions across axis sweeps, raster benchmark,
+history, composition, bounded fill/frontier and verified-stage checks. The
+first composition run reported missing SVG imports despite passing 89/89;
+a fresh Godot editor import eliminated those errors and its rerun was clean.
+The 83-ticket review/dependency validator and diff whitespace checks pass.
+No physical-device, Windows, native C++ Skia ABI or runtime integration test
+was run for this follow-up.
+
+
+## 2026-11-04 follow-up — real Godot↔native transfer density screen
+
+**Status: In Progress, no backend adoption.** Added
+`tools/benchmarks/t068_bridge/t068_marshal_profile.gd` to the isolated
+manual-only GDExtension project. The pinned Godot 4.8b2 engine calls the same
+checked C++ scalar batch through direct typed and generic `Variant` dispatch,
+and the sparse-delta entrypoint, with **identical precomputed signed local
+points, duplicates, nonzero hidden RGB, alpha and selection masks**. It also
+measures `PackedByteArray.duplicate()` as a crude copy diagnostic. A separate
+canonical GDScript blend oracle and a strict sparse wire decoder check **exact
+changed and unchanged RGBA8 bytes before sampling times**; an intentionally
+corrupted before-value is rejected. All native output remains detached.
+
+- Two independent Linux/sandbox runs passed **731/731** new checks per run;
+  previously established **443 bridge / 370 framebuffer / 219 document /
+  128 multi-tile / 173 sparse** checks also pass per run in the same harness.
+  Every result is schema-checked and the JSON is kept at
+  [T068_2026-11-04_gdextension_marshal.json](../benchmarks/T068_2026-11-04_gdextension_marshal.json).
+- Each of the nine combinations (32², 128², 256² × single/sparse/dense)
+  has **16 measured calls per mode**, following three warmups, per run. The
+  medians for one changed pixel in a 256² tile were **15–16 µs whole-tile
+  direct vs 1 µs sparse direct**; payload size was **262,144 vs 16 bytes**.
+  For 256² dense (13,106 changed pixels), direct whole-tile medians were
+  **412–456 µs**, sparse direct **434–502 µs**; sparse payload is 157,276
+  bytes. Hence a small output does **not** make sparse universally faster.
+- For 128² sparse (102 changed pixels) the direct whole-tile medians were
+  **7–8 µs** and sparse **4 µs**; for 128² dense (3,277 changed pixels) the
+  whole-tile medians were **99 µs** and sparse **103 µs** in both runs.
+- Benchmark times cover native ABI invocation, Godot↔native packed-array
+  marshaling, the checked C++ kernel and the result creation. They **do not**
+  include precomputing brush geometry, source snapshots, detached delta
+  validation/transaction staging, save, UI input, texture upload or displayed
+  frame. The integer-microsecond timer rounds copy-only results to zero in
+  some cells; such readings are **below useful measurement resolution** and
+  are not a zero-copy or throughput claim. Only two short runs under one
+  Linux software environment exist; p95 and repeatability cannot justify
+  a production speedup claim or physical device acceptance.
+- The fast Python runner-contract suite checks marker failure, nine-case
+  completeness, timing distributions, wire-size parity and evidence tampering.
+  `godot-native-t068-bridge.yml` remains **workflow_dispatch only**. No
+  application binary, `.gdextension`, persistence representation or source
+  pixel API was changed.
+
+**Open:** fair native third-party C++ Skia/Blend2D shape/brush comparisons;
+real brush geometry, native selection clipping and main-thread publication
+cost comparisons; Windows/Linux physical pointer-to-display median/p95,
+RAM/VRAM and thread jitter; independent portable release verification; and
+an operation-specific adoption decision. Nothing here waives T-068 closure.
+
+
+## 2026-11-04 follow-up — native Blend2D path rasterization with canonical selection and compositing
+
+**T-068 remains In Progress; no production backend changed.** The pinned
+Blend2D 0.21.2 source and bundled AsmJit are used exclusively outside the
+application by `t068_blend2d_brush_bridge.cpp`. Its versioned *research-only*
+C ABI consumes bounded, raster-local double-precision path samples,
+immutable straight-RGBA8 tiles, binary pixel eligibility, a brush width and
+paint/erase settings. Unlike the earlier rectangle experiment, it renders
+**actual native stroked paths** (rounded caps and joins, circles for dabs) to
+an A8 stencil, explicitly thresholds that antialiased mask, applies selection
+in C++ and computes the canonical per-pixel source-over formula **once per
+selected pixel**. It never converts source RGBA8 to premultiplied storage.
+All validation failures return without modifying detached output, mask or
+reported timings; overlapping output/input spans are rejected. It does not
+write to a DrawingDocument or acquire a Godot-owned surface.
+
+- The Godot-authored 16-case schema-2 oracle checks signed world anchors
+  beyond 2^53, five view transforms and rect/sparse/inverted masks. The
+  Python runner independently inverts view samples, verifies each real Godot
+  RGBA8 digest, and checks native coverage, *all* result bytes, changed-pixel
+  count and untouched hidden RGB against its own compositing oracle.
+- **Two independent 7-trial runs, 32 cases/run = 64 comparisons.** A8
+  `threshold=128` matches **14/16** Godot coverage and output cases; both
+  inverted-selection cases miss exactly one canonical pixel. A8
+  `threshold=1` (all nonzero antialias coverage) yields **16/16** coverage
+  overpaint cases and **15/16** differing final pixels (the alpha-zero no-op
+  retains exact RGBA8). Results are deterministic between runs; a harder
+  threshold is therefore not a general substitute for Drawing's geometry.
+- `tests/test_t068_blend2d_brush.py` asserts source provenance, byte-exact
+  native composition, selection containment, transparent no-op, malformed
+  call failure atomicity and deterministic two-threshold outcomes. Ordinary
+  push CI validates the pinned raw evidence and fails on missing/corrupt
+  runs; optional pinned-source CI builds the native shim and reruns 64
+  comparisons. The evidence validator **reconstructs the complete native
+  output from recorded coverage and canonical source** rather than trusting
+  its own totals or digest claims.
+- CPU-only native stencil time, canonical-compositor time, ctypes input
+  preparation, API-call and output extraction are recorded **separately**
+  per case in [two-run raw evidence](../benchmarks/T068_2026-11-04_blend2d_brush.json)
+  and the [operation-level report](../DRAWING_CPU_RASTER_BENCHMARK.md).
+  These are **32² microbenchmarks**, not matched direct GDScript/Skia speed
+  comparisons, native Godot binding, RAM/VRAM peaks, or input-to-visible p95.
+
+**Still required for T-068 acceptance:** broader 512/1024/2048 tile and
+large-brush workloads, exact transformed four-corner clipping, matched
+native C++ Skia/Blend2D conversion and real Godot publication benchmarks,
+physical Windows/Linux input-to-frame latency/jitter/memory and optional
+standalone release compatibility. Neither a backend decision nor a manual
+review result was manufactured; frontmatter, dependencies and status stay as-is.
+
+**Local verification for this follow-up:** pinned-source native comparator tests
+**9/9 passed** and the two-run seven-trial benchmark passed **64/64**
+case comparisons with fail-closed evidence validation. Regular no-Blend2D
+Python contract checks, original Cairo/Blend2D rectangle/Skia screens,
+checked native bridge runner and the 83-ticket dependency/manual-review
+validator all passed. Godot 4.8 beta 2 reran hard dab **125**, axis sweep
+**239**, original raster benchmark **691**, Drawing history **101**, and
+Atlas composition **89** checks (**1,245/1,245**), with a fresh editor import
+and no reported errors. All 16 Godot brush fixtures were regenerated and
+compared byte-for-byte to the pinned JSON. No physical-device or Windows
+validation was available.
+
+
+## 2026-11-04 follow-up — bounded full-size native Blend2D brush scaling
+
+**Status stays In Progress; no backend selection.** Extended the isolated
+Blend2D 0.21.2 hard-brush C++ ABI to safely accept 512²/1024²/2048² tiles
+(16 MiB straight-RGBA8 output at 2048²). Capacity checks, 2049 rejection,
+`std::bad_alloc` fail-closed handling and timing-pointer alias rejection
+preserve detached output/source/timing atomicity. This library is never
+registered in Drawing/Atlas and introduces no new runtime dependency.
+
+- `tools/benchmarks/t068_blend2d_scale.py` pins four reproducible workloads
+  per size: a 4px long stroke in a 128px eligible rectangle, a 256px round
+  dab in a 256px rectangle, a 64px self-crossing stroke with sparse selection
+  and erasure, and an alpha-zero no-op retaining hidden RGB. Source pixels
+  include transparent hidden RGB, half-transparent and fully opaque colors.
+  The bridge draws only an A8 stencil, then applies its selected pixels once
+  using canonical source-over/erase. An independent Python oracle reconstructs
+  **every output byte** from the recorded bounded compressed coverage, checks
+  selection containment, changed counts and untouched bytes, rejects
+  corrupted evidence, and compares both runs' output signatures.
+- Two independent runs × three trials of **12 workloads per run** completed:
+  **24 verified final-image comparisons / 72 native calls**. Selected native
+  call medians per run, in µs (4px / 256px dab / sparse erase / no-op):
+  512²: **706–900 / 1,571–1,720 / 556–725 / 491–552**;
+  1024²: **3,180–3,322 / 3,129–3,370 / 2,334–2,921 / 2,183–2,647**;
+  2048²: **13,502–15,483 / 10,622–11,914 / 11,153–13,061 /
+  11,146–11,294**. These are sandbox ctypes+native *CPU call* measurements
+  with only three samples per cell; they are not latency p95, physical GPU
+  results, representative conversion cost or a fair baseline speedup.
+- The 2048² whole-tile output always returns **16 MiB**, while the small
+  stroke changes **460 pixels**; for that same changed set, four independent
+  128² hypothetical full-display updates total **256 KiB** and four 256²
+  updates total **1 MiB**. Those are *bookkeeping/byte-count projections*,
+  not real Godot region uploads. The alpha-zero no-op changed zero bytes.
+  The test does not reproduce the real Godot hard-brush rasterizer at large
+  sizes and cannot assert geometry parity: this is a native scaling and
+  pixel-compositing check **conditional on Blend2D's own coverage**.
+- Reproducible source, 24-case raw evidence and malformed-evidence regression:
+  [T068_2026-11-04_blend2d_scale.json](../benchmarks/T068_2026-11-04_blend2d_scale.json).
+  New no-native tests join fast push CI; the pinned-source native tests and
+  24-case scaling rerun are opt-in workflow-dispatch only. The older 32²
+  Godot-authored coverage fixture and native failure-atomic tests still pass.
+
+**Remaining T-068 gates** include exact large/transformed four-corner
+Godot brush/selection geometry, matched native Skia/C++ and Godot publication
+comparisons, real Windows/Linux input-to-visible median/p95, RAM/VRAM and
+jitter, and portable standalone release checks. No manual approval was
+presumed and no other ticket/dependency was altered.
+
+
+## 2026-11-04 follow-up — actual 512/1024/2048 Godot hard-brush geometry vs Blend2D
+
+**Status: In Progress; no native backend adoption.** The previous Blend2D
+large-tile benchmark checked canonical RGBA8 *conditional on native stencil
+coverage*, not its geometric equivalence to the Drawing hard brush. A new
+Godot 4.8 beta 2 fixture invokes the actual `DrawingEditSession.paint_path()`
+on detached blank documents at signed x/y anchors beyond 2^53 for the same
+four gestures at **512², 1024² and 2048²**. Raster-local paths are obtained
+through zoom/pan, 90° rotation and shear; 128/256 rectangular and 256 sparse
+selection predicates are applied inside the Godot edit session. Empty-source
+erase and transparent no-op still record once-per-gesture coverage, even
+though neither publishes a pixel. Bounded DEFLATE-compressed bitmaps avoid
+storing millions of raw indices. The oracle is regenerated byte-for-byte
+against the pinned Godot build, and its inverse view paths, mask containment,
+coverage counts, changed counts and field schemas are checked independently.
+
+- `tools/benchmarks/t068_blend2d_large_parity.py` replays the existing,
+  **independently verified** two-run native scaling output against all 12
+  Godot-authored bitmaps. The compositor/mismatch oracle applies exact
+  canonical source-over/erase to each differing pixel against the same
+  mixed-opacity straight-RGBA8 source, distinguishing invisible alpha-zero
+  coverage from visible changes. Native evidence is validated in full before
+  comparison; missing, truncated, trailing, nonbinary or oversized fixture
+  streams, altered paths/transform/selection, and tampered summary/evidence
+  fields fail closed. Optional workflow-dispatch also compares *fresh* native
+  scaling runs with the pinned Godot fixture.
+- **24 comparisons (12 per run): 18 coverage mismatches and 12 final-pixel
+  mismatches; 454 missing and zero extra native-covered pixels in total.**
+  All three 4px long strokes match Godot exactly (both runs). Each 256px dab
+  misses **36** Godot-covered pixels; sparse crossing erases miss 15/23/15
+  pixels for 512/1024/2048 respectively; transparent no-op misses **22**
+  coverage pixels per size but makes no RGBA8 differences. Two independent
+  runs reproduce these counts. The small differences reflect AA thresholded
+  native geometry, not a premultiplied pixel-conversion error.
+- The ordinary CI path now checks the comparison contract without downloading
+  Blend2D; a manual local `T068_LARGE_GODOT=...` check reruns all 12 real Godot
+  gestures. Source, compressed oracle and evidence are pinned at
+  [the large parity comparison](../benchmarks/T068_2026-11-04_blend2d_large_parity.json)
+  and `tools/benchmarks/t068_blend2d_large_oracle.json`.
+  The local fresh full-size native two-run attempt exceeded the command
+  timeout and was **not** counted as new benchmark evidence; representative
+  512² and 2048² direct native calls succeeded. This checkpoint replays the
+  previously verified complete native scale runs, not that timed-out attempt.
+
+**Still open:** this tests inverse-mapped view-space pointers and pixel-local
+mask predicates, **not** native transformed four-corner selection clipping or
+identical source images inside Godot; the full canonical output is recomposed
+from the separately verified native source. It does **not** add new CPU
+speed measurements, native Godot publication, physical Windows/Linux
+input-to-display p95, RAM/VRAM jitter or portable standalone release checks.
+The ticket cannot be closed; no manual review or other ticket changed.
+
+## 2026-11-04 follow-up — native transformed convex pixel-quad mask parity
+
+**Status remains In Progress; the existing brush/selection geometry contract is
+unchanged.** The detached Blend2D C++ bridge now exposes a fail-closed
+`t068_blend2d_quad_selection` builder. It accepts a bounded local tile,
+finite/invertible layer `Transform2D` coefficients, a positive raster density,
+and a validated convex board-space scope polygon (or disabled/empty scope).
+It returns **one binary eligibility byte per pixel only when all four of its
+transformed corners are contained**, matching `AtlasFill._allows_pixel()` rather
+than clipping the brush to an AA stencil's pixel centers. The new mask feeds
+the existing native brush experiment unchanged; no Atlas runtime dependency
+was linked into Drawing or a production GDExtension.
+
+- `tests/drawing_t068_quad_scope_oracle.gd` writes the actual Godot 4.8b2
+  mask for **eight 64×64 cases**: rectangular scope, 90° rotation, shear,
+  reflection, nonuniform scale plus 2× density, convex diamond, disabled
+  scope, and enabled empty scope. The pinned output has complete binary masks,
+  counts and transform definitions, not merely summary statistics.
+- Two independent native passes across all cases give **16/16 exact 0/1
+  eligibility matches** (zero differing pixels). Native masked source-over
+  results are separately reconstructed from exact canonical straight-RGBA8,
+  including untouched transparent hidden RGB; empty scopes are true no-ops.
+  Native tests reject nonfinite/singular transforms, truncated or aliased
+  output, invalid/nonconvex boundaries, and preserve outputs on rejection.
+- The fixture deliberately avoids *exact corner-on-polygon-edge ties*: Godot's
+  geometry predicate has boundary inclusion behavior that the prototype C++
+  ray test has **not** proved identical. One initial aligned nonuniform edge
+  probe yielded 43 discrepancies before boundary ties were removed. Therefore
+  this is interior/exterior transformed-mask parity evidence, **not full
+  boundary equivalence**, nor Blend2D AA brush geometry equivalence.
+- Reproduction: run the Godot fixture script then
+  `T068_QUAD_GODOT=/path/to/godot python3 -m unittest discover -s tests -p test_t068_blend2d_quad.py`;
+  for the optional native run set `T068_BLEND2D_ARCHIVE`, `T068_BLEND2D_SOURCE`,
+  `T068_BLEND2D_BUILD`, or run `tools/benchmarks/t068_blend2d_quad.py` with
+  `--archive`, `--source`, `--library-dir`, `--output`. Ordinary CI checks the
+  pinned evidence; the workflow-dispatch Blend2D job rebuilds the native shim.
+  [Two-run evidence](../benchmarks/T068_2026-11-04_blend2d_quad.json).
+
+**Still open:** exact boundary-tie semantics, exact Blend2D brush geometry on
+full transformed scopes, matched native/Skia edit and publication performance,
+physical Windows/Linux pointer-to-present median/p95, RAM/VRAM peaks and
+multithread jitter, and standalone binary/release checks. No manual approval
+was inferred, and T-068 is not closed.
+
+## 2026-11-04 follow-up — exact polygon-edge inclusion in native scope research
+
+**Still In Progress; no native backend selection or manual approval.** The
+isolated `t068_blend2d_quad_selection` previously applied a strict ray-crossing
+predicate, excluding an edge-tied point even though Godot's
+`Geometry2D.is_point_in_polygon()` includes boundaries. The C++ helper now
+recognizes points lying exactly on a finite segment before evaluating the
+crossing parity; it retains its original convexity, bounded-buffer, and
+failure-atomic guards. No Drawing or Atlas runtime implementation changed.
+
+- Expanded the real Godot 4.8b2 `AtlasFill._allows_pixel()` oracle from eight to
+  **15 64² cases**. The seven added fixtures pin exact polygon vertices/edges
+  with axis-aligned and reversed winding, 90° rotation, shear, nonuniform
+  scale/density, a diamond, and a one-pixel strip. Independent expected
+  rectangle/strip bytes guard against treating an unchanged fixture alone as
+  proof. In two native passes, **30/30 complete binary masks** match the
+  Godot oracle (zero missing or extra pixels); the strip has 64 eligible
+  pixels, all on the selection boundary.
+- Evidence replay rejects missing, duplicated or reordered cases, corrupt
+  mask hashes, bad counts and inconsistent discrepancy lists. Pinned source
+  and oracle digests are checked; CI verifies the optional rebuilt native
+  comparator, with the native dependency absent from normal application CI.
+- These controlled, exactly representable coordinates do **not** prove
+  general near-edge floating tolerance equivalence (e.g. Godot's approximate
+  intersection predicate), nonconvex polygons, native brush geometry parity,
+  Godot publication throughput, or physical input-to-display latency.
+
+[Updated pinned evidence](../benchmarks/T068_2026-11-04_blend2d_quad.json)
+remains a deterministic research artifact. The original T-068 acceptance
+matrix—including physical Windows/Linux GPU performance, memory/p95 jitter,
+optional native adoption review and release testing—remains open.
+
+
+## 2026-11-04 follow-up — dependency-free scalar C++ hard-brush geometry parity
+
+**Status: In Progress. No runtime backend selection or owner-review inference.**
+Added `tools/benchmarks/t068_scalar_hard_brush.cpp`, a detached C++17 library
+without Blend2D/Skia/Atlas linkage. It computes hard round dab and swept-path
+coverage at local raster-pixel centers, unions all gesture segments once,
+then applies a validated 0/1 selection mask. The call returns a detached
+0/255 coverage bitmap; it does not write canonical pixels or publish changes.
+Input counts, capacities, point finiteness, masks and pointer aliases are
+validated before the output is written; failures leave it unchanged.
+
+- The reproducible Python harness checks the two pinned **Godot 4.8b2**
+  `DrawingEditSession` coverage oracles (signed anchors beyond 2⁵³; inverse
+  view transforms, dabs, crossing and batched samples, rectangular/inverted/
+  sparse masks, eraser, alpha-zero no-op, and 512/1024/2048 full-size strokes).
+  Two native passes × **28 distinct cases = 56 exact binary coverage matches**,
+  with zero omitted or extra pixels. The 16 small source images independently
+  reconstruct the oracle's canonical straight-RGBA8 result; the **12 large
+  source images were not natively composited**, and coverage was compared
+  against Godot's empty-source oracle only.
+- Five unit tests cover the pinned output/evidence, randomized independent
+  segment distance away from boundary ties, failure-atomic malformed and
+  overlapping buffers, tamper detection, and re-running the entire two-run
+  comparator. CI compiles the native scalar comparator in the existing T-068
+  step without downloading any third-party binaries.
+- The scalar result is evidence that a narrow custom geometry kernel can
+  preserve the **tested** hard-brush footprint while Blend2D's binary AA
+  cutoff does not. It is not proof of arbitrary transformed board geometry,
+  exact float32 behavior at all ties, source revision/undo/cancel integration,
+  per-gesture GDExtension performance, SIMD, or physical frame latency.
+  No production code or persistent format was changed.
+
+[Two-run complete coverage evidence](../benchmarks/T068_2026-11-04_scalar_hard_brush.json)
+remains an offline reproducible research artifact. T-068's native integration,
+matched end-to-end benchmarking, Windows/Linux physical-device RAM/VRAM/p95
+jitter, and standalone release acceptance requirements remain open.
+
+## 2026-11-04 follow-up — detached scalar native hard brush with canonical RGBA8
+
+**Status: In Progress. No production backend selection or manual-review inference.**
+Extended the existing isolated dependency-free C++17 hard-brush comparator with
+`t068_scalar_hard_brush_rgba8`: a checked ABI that returns both complete binary
+once-per-gesture coverage and detached, straight-RGBA8 source-over/erase pixels.
+The caller provides an immutable source, 0/1 selection, local path, width and
+paint. Native code stages *both* outputs before publication to the supplied
+buffers, rejects all overlapping writable/input ranges, malformed dimensions,
+nonfinite samples, nonbinary selection, and invalid operation flags, and leaves
+both output buffers unchanged on any failure. Alpha-zero source-over preserves
+hidden RGB; erase explicitly zeroes all four channels. No library dependency,
+GDExtension export, `DrawingDocument` transaction or persistence change is made.
+
+- Two independent native passes × **28 canonical hard-brush shapes = 56/56
+  exact coverage-and-RGBA8 comparisons**, including selection masks,
+  self-crossing, batched samples, transformed input, erasure, alpha-zero no-op,
+  and 512/1024/2048 raster sizes. The **16 small cases** compare full output
+  to the real Godot `DrawingEditSession` `after_sha256` and independent Python
+  straight-RGBA8 output. For the **12 large cases**, the pinned Godot fixture
+  contains **coverage only** on blank source; native pixels are independently
+  recomputed on the preexisting patterned RGBA8 scaling source, not compared to
+  an unavailable Godot full-pixel witness. Neither set demonstrates a speedup.
+- The five new compositor tests cover complete buffer equivalence, the exact
+  native arithmetic and hidden-RGB/erase/no-op contract, byte-preserving error
+  atomicity and output/input alias refusal, tampered-evidence rejection, and
+  deterministic two-run regeneration. Existing five scalar coverage tests and
+  pinned evidence remain valid (their native-source hash was refreshed).
+  The new tests are included in the existing T-068 fast CI step.
+- This establishes a tested **native scalar pixel contract**, not a selected
+  runtime backend. True Godot marshaling and publication, matched native/C++
+  performance, physical Windows/Linux p95 latency/RAM/VRAM, real display
+  uploads, and portable binary/release testing remain unverified acceptance
+  requirements. T-068 stays **In Progress**.
+
+[Reproducible native RGBA8 evidence](../benchmarks/T068_2026-11-04_scalar_rgba8.json)
+· [detached scalar source](../../tools/benchmarks/t068_scalar_hard_brush.cpp)
+· [compositor regression tests](../../tests/test_t068_scalar_rgba8.py).
+
+## 2026-11-04 follow-up — bounded native sparse hard-brush deltas
+
+**Status: In Progress. No production native backend or manual approval.** The
+previous scalar brush prototype returned a complete `side² × 4` byte RGBA8
+output, including when the gesture altered only a handful of pixels. The new
+research-only `t068_scalar_hard_brush_deltas` C++17 entrypoint directly
+composites the same canonical hard-brush footprint into **only actual changes**
+and returns the existing isolated bridge's ordered little-endian wire format:
+4-byte changed count + 12 bytes per `{pixel index, before RGBA8, after RGBA8}`.
+It does not allocate or copy a complete output RGBA tile or coverage bitmap;
+its working records scale with the number of changed pixels. It still scans
+candidate pixel centers and receives an entire source tile and selection mask.
+Its bounded caller capacity rejects dense/underprovisioned output with `-5`
+without modifying the payload. Zero-alpha no-op paint returns the four-byte
+zero count, preserving transparent hidden RGB; erase, selection, and each
+pixel's once-per-gesture blend behavior remain unchanged.
+
+- Two independent complete passes over the existing **28 pinned Godot geometry
+  fixtures** returned **56/56 byte-exact, canonically reconstructed sparse
+  outputs**, including 16 small cases with *actual Godot output* and 12
+  full-size 512²/1024²/2048² cases with Godot coverage and independently
+  composited patterned sources. The decoder enforces sorted unique indices,
+  verified before values, real changes, exact wire length and complete output
+  equality. No actual Godot output oracle exists for the large patterned cases.
+- The 2048² 4px stroke changed **460 pixels**: sparse payload **5,524 bytes**
+  versus **16,777,216 bytes** for full-tile RGBA8. The 2048² 256px dab
+  changed 51,468 pixels and used 617,620 bytes; alpha-zero no-op used four
+  bytes. These are **wire sizes, not observed transfer time, RSS or VRAM**.
+  The detached Python test caller preallocates room for up to 65,536 changes
+  and must explicitly choose a larger capacity or fall back to a full buffer
+  for denser workloads. An oversized or aliased buffer, bad selection, bad
+  point or malformed count cannot publish partial native records.
+- Six new unit tests check complete pinned fixture parity, capacity-failure
+  atomicity, output/input alias rejection, error sentinels, invalid and stale
+  payload reconstruction, tamper detection and exact two-run regeneration.
+  The ordinary fast-CI T-068 step runs them alongside the existing scalar
+  coverage and RGBA8 tests. The two older scalar evidence files have only
+  their native-source digests refreshed; their fixture/result rows are
+  unchanged.
+
+[Two-run sparse output evidence](../benchmarks/T068_2026-11-04_scalar_deltas.json)
+· [native scalar ABI](../../tools/benchmarks/t068_scalar_hard_brush.cpp)
+· [sparse replay tests](../../tests/test_t068_scalar_deltas.py).
+
+**Still open:** a Godot PackedByteArray/GDExtension boundary for *this* brush
+kernel, revision-checked document publication, source-version/undo integration,
+matched time-to-publish and CPU backend performance, real Windows/Linux
+physical input-to-present p95/VRAM/RSS and portable binary/release validation.
+No native backend was selected or shipped; T-068 remains In Progress.
+
+## 2026-11-04 follow-up — opt-in Godot GDExtension scalar brush sparse boundary
+
+**Status: In Progress. No production native adoption, owner approval, or
+other ticket state change.** The previous C++17 scalar hard-brush sparse kernel
+was exercised only through a Python `ctypes` caller. The existing isolated
+Godot 4.8 beta 2 bridge now compiles that kernel from source and registers
+`T068RasterBench.apply_scalar_brush_sparse(source, selection, path_f64le,
+side, width, paint_rgba8, erase, max_changes)`. It receives immutable
+canonical RGBA8 and binary mask bytes, pretransformed raster-local float64
+sample pairs, and an explicitly limited change capacity (at most 65,536).
+The callback rejects malformed lengths, flags, masks, sample values and
+insufficient capacity, returning an empty array on error; valid empty edits
+have a four-byte count header. Native bytes are staged before the Godot
+PackedByteArray return and never directly publish into `DrawingDocument`.
+The extension descriptor, generated Godot header, and compiled `.so` exist
+**only within a disposable test project**. No application startup, native
+packaging or persistence contract changes.
+
+- Two independent pinned-Godot runs each pass **31 scalar integration
+  assertions** and the preexisting 443 bridge / 370 revision / 219 document /
+  128 batch / 173 sparse / 731 marshaling checks. The new witness compares
+  the complete 63-record native crossing brush against actual
+  `DrawingEditSession.paint_path()` straight-RGBA8 output from a source
+  containing alpha-zero hidden RGB, then independently checks the delta wire
+  before staging one native-derived `DrawingDocument` transaction. One
+  transaction advances the source revision; Undo restores original bytes and
+  Redo restores the exact published gesture. No native response is trusted
+  solely because its wire lengths look plausible.
+- A 16² brush returns **760 sparse bytes** for **63 changed pixels**, against
+  1,024 source bytes. A one-pixel selection returns 16 bytes; alpha-zero
+  source-over returns four bytes; erasing removes hidden RGB. Short or
+  misaligned inputs, nonbinary masks, NAN coordinates, negative width,
+  invalid operation and impossible/insufficient capacities all reject.
+  These are **bytes and correctness assertions, not latency samples**.
+- The on-demand Linux workflow now runs the new full-native witness after the
+  legacy bridge tests. Fast CI validates evidence invariants, source digest,
+  temporary-project isolation, callback registration and tamper rejection in
+  `tests/test_t068_scalar_gdextension.py`. It does not load Godot's native
+  extension in push/PR CI. [Two-run evidence](../benchmarks/T068_2026-11-04_scalar_gdextension.json).
+
+**Still open:** a production-safe optional module decision, independent
+geometry-completeness validation (the test deliberately uses a Godot oracle
+before publication), matched CPU stage-to-publication timing, 512/1024/2048
+Godot boundary throughput, full transformed four-corner masks, real
+Windows/Linux GPU input-to-present p95 and peak memory/VRAM, standalone
+portable export and owner acceptance. The observed parity does not license
+silent native backend adoption.
+
+
+## 2026-11-04 follow-up — counterbalanced Godot/native brush publication
+
+**Status: In Progress; optional temporary GDExtension only.** The isolated
+Godot 4.8b2 comparison of canonical `DrawingEditSession.paint_path()` +
+`commit()` against scalar C++17 sparse brush call + independent wire decode +
+revision-checked `_stage()` + `commit()` now **alternates which path executes
+first** for each *fresh, identically seeded document pair*. Each of the six
+32²/128²/256² short/crossing 4px source-over workloads has two warmups (one
+per order), then six timed trials (three per order) in **each of two full
+native bridge runs**. The hidden-RGB source, actual Godot full-tile result,
+exact sparse originals and updates, one published revision, Undo and Redo
+are checked outside the timed phases in every trial. A separate Godot
+reference image is also computed once per workload **before any timed pair**;
+the native wire must match it before a native document may be staged.
+
+- Both independent runs pass **536/536 publication correctness assertions**,
+  alongside the existing native bridge, revision, document, batch, sparse,
+  scalar, and marshaling suites. The 1,908-changed-pixel 256² crossing stroke
+  returned the same **22,900 sparse bytes** in both runs; its observed median
+  stage-to-commit total was **18.955–21.991 ms canonical versus
+  13.371–13.631 ms native path**. These are paired in input, not a causal
+  performance result; the internal algorithms and memory lifetimes differ.
+- The pinned schema-v2 evidence retains all **six raw ordered trial records**
+  per workload and run, six individual CPU phase durations, and exact paired
+  total durations. Fail-closed Python validation recomputes min/upper median/
+  max from those samples, checks alternating order, missing or duplicate
+  trial IDs, source/payload dimensions, and every paired total. The old
+  sequential-order five-sample results remain available in the preceding Git
+  commit but **are superseded** for current timing claims.
+- Benchmark timings exclude input sampling, path/mask packing, fresh source
+  construction, full canonical completeness verification, Undo/Redo, UI,
+  texture publication, real display and GPU work. Only six timed samples per
+  case and two runs remain insufficient for meaningful confidence intervals,
+  physical Windows/Linux p95, RSS/VRAM or guaranteed production improvement.
+  No `.gdextension` is committed or loaded by Drawing/Atlas, and no manual
+  selection or release approval is implied.
+
+[Source-pinned paired evidence](../benchmarks/T068_2026-11-04_scalar_publication.json)
+· [fail-closed trial contracts](../../tests/test_t068_scalar_publication.py)
+· [temporary bridge](../../tools/benchmarks/t068_bridge/run_bridge.py).
+
+**Remaining T-068 gates:** larger 512/1024/2048 production-like publication,
+transformed four-corner native masks, matched other CPU backend profiles,
+Windows/Linux physical input-to-visible latency/p95 and peak RAM/VRAM,
+standalone portable release proof, and an operation-level native technology
+recommendation. **Ticket remains In Progress.**
+
+
+## 2026-11-04 follow-up — transformed client paths and binary selection through GDExtension
+
+**Status remains In Progress; no native adoption.** The temporary Godot 4.8
+beta 2 bridge now verifies transformed view coordinates and caller-supplied
+`DrawingSelection` masks through the actual C++17 sparse hard-brush entrypoint,
+using the complete canonical `DrawingEditSession.paint_path()` result as a
+required pre-publication oracle. Six independent **32²/64²** cases exercise
+an identity rectangular selection, 90° rotated inverted mask, sheared sparse
+selection with erase, mirrored self-crossing path, nonuniform-scale inverted
+sparse erase, and zoom/pan dab. Both test documents start with the same
+hidden-RGB transparent pixel plus an opaque block so erasure genuinely changes
+pixels. The client constructs the full 0/1 mask from `DrawingSelection.allows`
+and applies the exact inverse view transform before passing local float64
+samples to native code.
+
+- **Two complete isolated bridge runs pass 110/110 new checks per run**; all
+  six cases have identical source-pinned canonical pixel SHA-256 hashes,
+  selected counts, and sparse byte counts. Native wire records must be
+  ordered, within bounds and match original bytes; reconstructed full-tile
+  pixels must exactly equal the Godot oracle **before** any native transaction
+  begins. The committed transaction then matches Godot bytes, increases
+  revision once and survives exact Undo/Redo. Insufficient sparse capacity
+  fails closed without publishing.
+- Source-hash-pinned two-run data is in
+  [T068_2026-11-04_scalar_transform.json](../benchmarks/T068_2026-11-04_scalar_transform.json).
+  The fast-CI Python contract checks the fixture, ABI isolation and tamper
+  rejection; the real GDExtension runs only in the on-demand workflow.
+- **Limitations:** This validates *client-inverted view paths and supplied
+  binary masks*, not native construction of Atlas's transformed four-corner
+  polygon scope. The native bridge remains detached from runtime Drawing
+  and Atlas; there are no timings, production application changes, Windows
+  measurements, input-to-visible/GPU figures, or portable-release approval.
+
+Remaining T-068 gates include native four-corner mask integration, larger
+512/1024/2048 publication, matched candidate timing, hardware RAM/VRAM/p95,
+portable release validation and an operation-specific backend recommendation.
+
+
+## 2026-11-04 follow-up — native four-corner Atlas scope through temporary Godot bridge
+
+**Status stays In Progress; no native backend selected or deployed.** The
+isolated GDExtension now exposes `build_quad_selection()` with detached,
+fail-closed PackedByteArray inputs for the affine transform and convex polygon,
+explicit raster density, tile side and scope flag. The scalar brush's existing
+`apply_scalar_brush_sparse()` then consumes this **native-generated** whole-pixel
+mask. The C++17 kernel remains independent of Blend2D and is compiled only into
+the temporary test project; no `.gdextension` or library is shipped with the
+normal Drawing/Atlas application.
+
+- Two complete Godot 4.8b2 extension runs each pass **55 new checks** for 15
+  independently authored `AtlasFill._allows_pixel()` oracle cases on 64² tiles.
+  All **30 full bitmap comparisons** are byte-exact, including aligned edges,
+  vertices, reversed polygon winding, rotation, shear, mirroring, nonuniform
+  density, disabled selection and the valid empty selection. Returned mask
+  bytes are passed to the scalar sparse brush, with no out-of-mask writes.
+  The reference source contains one transparent hidden-RGB pixel and is never
+  modified; the Python validator independently reconstructs all 15 complete
+  RGBA8 outputs, changed counts and sparse wire sizes.
+- The tests reject truncated transforms, malformed polygon wire lengths,
+  singular transforms, invalid density/sizes/flags, concave or self-intersecting
+  polygons and insufficient capacities, without partial output; the native
+  unit tests also verify failure atomicity. Both runs produce identical
+  evidence. [Source-pinned record](../benchmarks/T068_2026-11-04_quad_gdextension.json)
+  · [fail-closed tests](../../tests/test_t068_quad_gdextension.py)
+  · [manual-only runner](../../tools/benchmarks/t068_bridge/run_bridge.py).
+- **Limitations:** Unlike the earlier transformed Drawing brush comparison,
+  this new screen checks Atlas polygonal scope specifically; it does not
+  connect native scope to the production DrawingSelection contract or
+  automatically inverse-transform view-space pointer coordinates. It does not
+  test near-boundary floating-point tolerance outside the 15 pinned cases,
+  full-size 512/1024/2048 publication, GPU drawing, physical
+  Windows/Linux p95/RAM/VRAM, or portable release validation. No timing or
+  native-adoption approval is inferred.
+
+Remaining T-068 gates are matched full-scale native publication and alternate
+backend benchmarks, actual application-level selection and transformed
+geometry, physical hardware latency/memory/jitter, release checks, and an
+operation-specific recommendation. **The ticket remains In Progress.**
+
+
+## 2026-11-04 follow-up — full-size sparse native publication screen (not closure)
+
+**T-068 remains In Progress.** A separate `--large-only` mode in the temporary
+Godot 4.8 beta 2 GDExtension runner tests actual `DrawingDocument` publication
+for one matched **4px horizontal stroke** on 512², 1024² and 2048² storage
+tiles. The previously pinned six-case 32²/128²/256² comparison is unchanged.
+Two independent full-size runs pass **146/146 checks each**, including
+independent complete Godot pixel oracles, byte-exact canonical and native
+commits, hidden RGB in an untouched transparent pixel, one revision,
+Undo/Redo, bounded sparse records and capacity rejection. Only the native
+call/checked decode/stage/commit and canonical paint/commit are timed.
+
+- Four counterbalanced measured pairs per workload (two Godot-first, two
+  native-first), plus one warmup, retain *raw* six-phase timings and derived
+  phase totals/min/median/max. A separate Python reference independently
+  reconstructs complete RGBA8 and verifies each reported hash, changed count,
+  wire size, trial order and every summary. Tampered evidence fails closed.
+- The research bridge caps `max_changes` at 65,536 even for larger tiles.
+  Passing `side²` fails for all three sizes; a checked 65,536 capacity fits
+  these specific strokes. Oversized and undersized capacities are rejected,
+  without modifying original source pixels.
+- Per-run CPU medians (canonical vs complete native path): **512²:
+  21.962–25.631 vs 21.648–22.177 ms**; **1024²: 44.980–46.033 vs
+  49.698–51.239 ms**; **2048²: 99.977–116.247 vs 126.292–145.914 ms**.
+  The native approach is *not faster* for the larger two scenarios here.
+
+[Full raw two-run evidence](../benchmarks/T068_2026-11-04_scalar_large_publication.json)
+· [opt-in runner](../../tools/benchmarks/t068_bridge/run_bridge.py)
+· [source-pinned tests](../../tests/test_t068_scalar_large_publication.py).
+
+**Limitations:** one horizontal geometry per size, four CPU pairs per case,
+headless synthetic timing, software-only Linux test sandbox, and unrelated
+source construction/whole-tile validation/Undo/Redo excluded from measured
+phases. This cannot measure input-to-visible latency, GPU/VRAM, memory peaks,
+Windows packaging, cancellation safety for a deployed backend, or whole
+application operations. No native backend was adopted and no owner/manual gate
+was assumed satisfied. Full operation-level evaluation remains open.
+
+
+## 2026-11-04 follow-up — isolated native sparse publication atomicity and cancellation
+
+**Status remains In Progress; the backend stays experimental.** An opt-in
+Godot 4.8 beta 2 GDExtension witness now uses the actual scalar C++ hard-brush
+sparse bytes (63 ordered changed pixels, 760-byte wire payload) against an
+independently generated `DrawingEditSession.paint_path()` straight-RGBA8
+oracle. Every scenario starts from a freshly seeded 16² tile containing a
+transparent, nonzero-RGB pixel. The native API itself owns no document
+state; the canonical `DrawingDocument` continues to arbitrate publication.
+
+- **Cancel:** Stage every decoded native record, cancel the edit, and verify
+  no revision, pixel or history change. A retry against unchanged source
+  publishes exactly one undoable, redoable gesture.
+- **Stale before begin:** Let a competing writer modify a brush-covered pixel,
+  then reject the old revision; even an incorrectly retried native payload at
+  the new revision must fail `STALE_PIXEL` atomically.
+- **Stale after staging:** Let an unrelated successful edit change the revision
+  after native records have been staged. The losing commit fails
+  `STALE_REVISION`, leaving only the winner's independently undoable pixels.
+- **Forged original:** Stage one incorrect source-before byte in an otherwise
+  valid native result. The canonical publication check refuses all changes
+  even with an unchanged revision.
+
+Two separate native bridge runs pass **37/37 checks each**, returning identical
+four-case source/output SHA-256 values and assertion checkpoints. The
+[raw record](../benchmarks/T068_2026-11-04_scalar_atomicity.json) is pinned
+by the bridge and scalar C++ source hashes; the
+[Python contract](../../tests/test_t068_scalar_atomicity.py) independently
+reconstructs complete RGBA8 and rejects missing, reordered or forged cases.
+The mode `tools/benchmarks/t068_bridge/run_bridge.py --atomic-only --runs 2`
+is only an explicit-load temporary Linux test project; it cannot be loaded by
+the ordinary Drawing/Atlas UI. Fast CI runs contracts without the extension,
+while the existing on-demand native workflow runs the real integration.
+
+**Not closure evidence:** these are deterministic single-process interleavings,
+not true parallel native threads, cancellation during native computation,
+application-level producer races, measured event-to-present latency, Windows,
+RAM/VRAM peaks, or portable release validation. No runtime backend, other
+ticket, approval state or dependency changed. The remaining T-068 performance,
+hardware and operation-level recommendation gates stay open.
+
+
+## 2026-11-04 follow-up — native four-corner Atlas scope through canonical document publication
+
+**Status remains In Progress; no runtime backend adoption.** The opt-in
+`--quad-publication-only` mode in the temporary Linux Godot 4.8 beta 2
+GDExtension now composes `build_quad_selection()` and
+`apply_scalar_brush_sparse()` with the real canonical `DrawingDocument`.
+Unlike the prior detached 15-mask fixture, this new witness checks each ordered
+native delta's source-before pixel, bounds, mask, and byte alignment **before**
+revision-checked `DrawingEditSession._stage()` and `commit()`. No native
+operation writes directly into a document or a persistent texture.
+
+- All **15 Godot-authored AtlasFill whole-quad masks** match byte-for-byte,
+  including exact polygon edges, mirroring, shear, rotation, nonuniform
+  density, disabled scope and empty scope. The source starts with a nonzero
+  hidden-RGB transparent pixel at (22,22). The independent Python oracle
+  reconstructs every 64² RGBA8 result from the Godot mask and the fixed
+  scalar brush path, rather than trusting counts or hashes emitted by Godot.
+- Two complete native runs pass **153/153 assertions each**. Nonempty edits
+  publish one document revision/history transaction and roundtrip through
+  Undo/Redo with exact RGBA8. `edge_thin` and `empty_enabled` produce valid
+  four-byte zero-delta wires; the canonical document properly rejects their
+  empty commits with `NO_CHANGE`, leaving revision, history and pixels intact.
+  The native caller's source remains immutable in every case.
+- `tests/test_t068_quad_publication.py` pins native C++ sources, bridge,
+  oracle and Godot witness SHA-256, independently replays all 15 canonical
+  masks and output bytes, validates publication state, and rejects tampered
+  evidence. Fast CI runs this contract without requiring a GDExtension. The
+  existing manual-only bridge workflow runs the full native script in its
+  own ephemeral Godot project. The original `--atomic-only` and full bridge
+  modes are unaffected.
+
+[Complete two-run evidence](../benchmarks/T068_2026-11-04_quad_publication.json)
+· [isolated Godot witness](../../tools/benchmarks/t068_bridge/t068_quad_publication_smoke.gd)
+· [replay tests](../../tests/test_t068_quad_publication.py).
+
+**Not closure:** the mask fixtures are authored by `AtlasFill._allows_pixel()`
+but this is **not a real Atlas UI event or native production selection
+adapter**. No physical Windows/Linux input-to-display p95, GPU/VRAM, memory
+peaks, throughput or jitter, full-size transformed scope benchmarks, portable
+native export, or final operation-level technology recommendation is proven.
+The approved Godot raster path, dependencies, Kanban status and manual-review
+gates remain unchanged.
+
+
+## 2026-11-04 follow-up — seeded transformed scope differential exposes near-edge non-parity
+
+**Status remains In Progress; native scope selection is not approved for use
+in Drawing or Atlas.** The earlier 15-case fixed oracle verified exact
+polygon-edge ties but not nearby floating-point decisions. Added
+`tests/drawing_t068_quad_differential_oracle.gd`, a deterministic Godot 4.8b2
+`AtlasFill._allows_pixel()` source of truth covering **48 independent 32²
+scopes**, with reversed winding, mirroring, rotation, shear, nonuniform density,
+translated axes, disabled/empty scopes and polygon boundaries offset by
+±0.00001, ±0.125 or 0.5 board units. The pinned fixture stores **complete
+0/1 masks**, not only counts; inputs are serialized from the actual Godot
+float32 `Vector2` values.
+
+The existing, unmodified standalone C++17 four-corner mask kernel was compiled
+with `-Wall -Wextra -Werror` and compared twice with those bytes. **32/48
+cases agree exactly; 16/48 do not.** Each native run omits 247 Godot-authorized
+pixels, with no native-extra pixels. All 16 differences are the ±0.00001
+near-boundary mirrored/sheared cases; no production code was changed to
+artificially fit those inputs. The C++ kernel uses double-precision
+intermediates while the Godot reference goes through engine `Vector2` and
+`Geometry2D.is_point_in_polygon()`: the precise numerical cause is not yet
+proven, and widening edges by a guessed epsilon risks authorizing unintended
+pixels. The original 15 fixed exact-edge comparisons remain a separate green
+regression, **not** evidence that arbitrary near-boundary scopes are safe.
+
+New `tools/benchmarks/t068_quad_differential.py` builds and executes the
+kernel in a disposable directory, records the complete sorted discrepancy
+indices and native SHA-256 per case, and requires two identical runs. The
+ordinary Python test suite regenerates the Godot oracle when the pinned binary
+is available, recompiles the actual C++ source, tests rejected calls for
+failure atomicity, and rejects forged/missing evidence, invalid counts,
+misordered runs, hashes and indices. It is included in fast push CI; no runtime
+GDExtension or third-party library is needed.
+
+[Two-run evidence](../benchmarks/T068_2026-11-04_quad_differential.json) ·
+[Godot oracle](../../tools/benchmarks/t068_quad_differential_oracle.json) ·
+[regression tests](../../tests/test_t068_quad_differential.py).
+
+**Open gate:** achieve or explicitly constrain safe near-boundary parity,
+then validate a real selection-to-publication path on large transformed
+regions, physical Windows/Linux device input-to-present p95, memory/VRAM and
+portable releases. This diagnostic does not imply a native performance gain,
+owner acceptance or any other ticket status change.
+
+
+## 2026-11-04 follow-up — match Godot 4.8b2 approximate selection-edge semantics
+
+**Status remains In Progress; no production native selection or manual approval.**
+The 48-case differential (previously 16 non-parity cases and 247 missing
+pixels/run) exposed a **semantic** difference in boundary handling, not simply
+insufficient double precision. The detached C++ scope mask used a strict
+zero-crossing test; `Geometry2D.is_point_in_polygon()` in the pinned Godot
+engine uses a floating-point ray/segment intersection and an **approximate
+endpoint match**, after float32 `Vector2` arithmetic. The revised checked
+kernel reproduces that decision path, including `is_equal_approx` tolerance,
+without expanding the polygon by a guessed epsilon. Both inputs and output
+remain detached, and prevalidation/failure atomicity are unchanged.
+
+- Replayed the original Godot-authored **48 × 32²** transform/mirroring/shear/
+  near-edge masks twice: **48/48 exact cases, 0 missing and 0 extra pixels
+  per run**. The old source-pinned 16-case non-parity record remains available
+  at [historical strict-double evidence](../benchmarks/T068_2026-11-04_quad_differential_strict_double.json),
+  with a fixed checksum and prior source digest; it is not overwritten or
+  misrepresented as new evidence. New source-pinned [differential result](../benchmarks/T068_2026-11-04_quad_differential.json).
+- All 15 independently generated 64² exact-edge/reversed/transformed scopes
+  remain byte-for-byte equivalent, including empty and disabled masks.
+  Two **live Godot 4.8b2 temporary GDExtension runs** passed **55/55 scope
+  checks** and **153/153 revision-checked publication checks** per run;
+  the published RGBA8 and Undo/Redo records did not change. Current source
+  digests have been recorded in both fixed-case evidence files.
+- Fast CI runs the current differential contract and its independent Godot
+  oracle regeneration; it guards non-parity regression, source digests,
+  invalid buffers, tampered evidence and preservation of the historical
+  counterexample. The separate opt-in native bridge still runs full end-to-end
+  detached selection/publication.
+
+**Scope of this result:** only these Godot 4.8 beta 2 single-precision inputs
+and pinned convex cases; using the engine's approximate boundary inclusion is
+intentional. Arbitrary large world coordinates, a double-precision Godot build,
+platform/compiler rounding differences, concurrent native UI integration,
+physical Windows/Linux input-to-present p95, RAM/VRAM and portable exports
+are **not proven**. No technology was approved or application raster path
+changed. T-068 remains In Progress; later acceptance gates are unchanged.
+
+## 2026-11-04 follow-up — strict floating-point compiler/ABI safety (not closure)
+
+**Status remains In Progress.** An additional portability check exposed a
+**real failure-atomicity hazard** in the detached four-corner mask kernel:
+compiling with GCC `-Ofast` can optimize away nonfinite-input rejection.
+A NaN transform/density that returns an error under `-O2` could instead
+return a completed mask and modify the caller's output. The kernel now has
+an explicit preprocessor guard that **rejects `__FAST_MATH__` builds**;
+Clang `-O3 -ffast-math` and GCC `-Ofast` builds both fail on this guard.
+This does not change any valid canonical operation or enable a native runtime.
+
+- The [GCC/Clang source-pinned compiler matrix](../benchmarks/T068_2026-11-04_quad_compiler_matrix.json)
+  compiles **six strict Linux C++17 profiles**: GCC and Clang, each at
+  `-O0`, `-O2` and `-O3`. Two runs of all **48** pinned Godot 32² masks
+  per profile produce **576/576 exact masks**, without widening the near-edge
+  acceptance criteria. Across the profiles, **42/42 invalid ABI calls**
+  reject atomically (NaN/Inf inputs, singular transforms and short buffers).
+  Both unsafe compiler configurations are deliberately rejected at build time.
+- The revised source checksum is pinned in the rerun
+  [48-case differential](../benchmarks/T068_2026-11-04_quad_differential.json),
+  [15-case native scope](../benchmarks/T068_2026-11-04_quad_gdextension.json) and
+  [15-case Godot document publication](../benchmarks/T068_2026-11-04_quad_publication.json)
+  evidence. Real isolated Godot 4.8 beta 2 bridge checks retained
+  **55** scope and **153** publication assertions *per run*, in two runs.
+  The original strict-double mismatch record remains untouched.
+- Both normal CI and the opt-in native bridge workflow now test this compiler
+  safety/parity matrix, including source drift, missing profiles, altered
+  byte hashes, rejected inputs and fast-math compile failures. The native
+  implementation is still **not loaded by either app**.
+
+**Unresolved:** this is Linux x86-64 GCC/Clang evidence, not Windows/MSVC,
+ARM, double-precision Godot, physical display input latency, hardware memory
+or portable native release validation. SIMD/fast-math/native backend selection
+must still be reviewed under T-068's performance/correctness criteria.
+
+
+## 2026-11-04 follow-up — varied-convex native selection stress (not closure)
+
+**T-068 stays In Progress.** The prior 48-case native near-boundary corpus
+concentrated on transformed rectangles. A new deterministic Godot-authored
+`AtlasFill._allows_pixel()` corpus covers **96 additional 24² cases** with
+convex 3–8-vertex polygons, reversed winding, exact and near-edge rectangles,
+rotations, reflections, shears, nonuniform scaling, disabled/empty scopes and
+four raster densities. The fixture is authored by
+[`drawing_t068_quad_stress_oracle.gd`](../../tests/drawing_t068_quad_stress_oracle.gd),
+not reconstructed from the native predicate.
+
+- [`T068_2026-11-04_quad_stress.json`](../benchmarks/T068_2026-11-04_quad_stress.json)
+  records **384/384 exact masks** across two passes of GCC `-O2` and Clang
+  `-O3` with **zero missing and zero extra pixels**. The runner pins the
+  Godot oracle SHA-256 and native source SHA-256; evidence validation
+  independently reconstructs every native mask, profile order and summary.
+- Five new Python contracts check pinned evidence, source/case diversity,
+  forged records, raw ABI failure atomicity and byte-for-byte live Godot
+  regeneration. The normal push-CI path runs the contract; no extension
+  is loaded by Drawing or Atlas.
+- This finite, seeded Linux x86-64 screen is **not** proof of arbitrary
+  polygons or transforms, Windows/MSVC/ARM parity, double-precision Godot,
+  hardware input-to-present, RAM/VRAM, publication speed or native adoption.
+  The existing manual-review and broader performance gates remain unchanged.
+
+
+## 2026-11-04 follow-up — sanitized detached native scope/brush ABI (not closure)
+
+**T-068 stays In Progress.** Compiler/mask parity and the isolated
+Godot bridge were previously exercised without a memory/undefined-behavior
+instrumented call path. Added a standalone C++17 test harness linking
+the **actual detached** `t068_quad_scope_mask`, `t068_scalar_hard_brush`,
+`t068_scalar_hard_brush_rgba8` and `t068_scalar_hard_brush_deltas`
+symbols, built with GCC and Clang using both ASan and UBSan. No Drawing
+or Atlas application code was modified or linked to these kernels.
+
+- Two independent processes per compiler run **256 deterministic small-tile
+  cases** each (**1,024 cases** total). A separately checked, axis-aligned
+  four-corner geometry reference matches the native mask; both full
+  straight-RGBA8 output and sparse sorted before/after records reconstruct
+  the same output byte-for-byte. Row-major and canary/redzone checks
+  cover the computed buffers. All four runs retain identical totals and
+  deterministic digests.
+- **17 invalid calls per process** (**68** total), including nonfinite
+  inputs, invalid lengths, overlapping input/output rejection, malformed
+  selections and insufficient sparse capacity, reject without modifying
+  the destination. Both sanitizer builds report no detected errors.
+- [`T068_2026-11-04_native_sanitizer.json`](../benchmarks/T068_2026-11-04_native_sanitizer.json)
+  pins the exact three C++ source digests, compiler flags, per-compiler
+  versions and two identical output records.
+  [`tests/test_t068_native_sanitizer.py`](../../tests/test_t068_native_sanitizer.py)
+  rejects incomplete or forged records, and reruns the two sanitizers
+  under the normal fast-CI T-068 step and the opt-in bridge workflow.
+
+**Still open:** bounded deterministic tests cannot establish absence
+of memory errors elsewhere, native worker/thread safety, Windows/MSVC
+or ARM support, real-world input-to-visible p95, RAM/VRAM peaks, or
+portable standalone-release compatibility. No performance or backend
+selection claims are made; earlier acceptance criteria remain active.
+
+
+## 2026-11-04 follow-up — scalar brush strict floating-point build safety (not closure)
+
+**Status remains In Progress; no native backend is approved.** The detached
+scalar hard-brush C++ ABI validates finite brush widths and path samples before
+writing output. Directly compiling the prior scalar source with GCC `-Ofast`
+reproduced an **atomicity violation**: a NaN width returned `0` rather than
+`-1`, overwriting a 16-byte canary coverage buffer with zeroes. The already
+protected four-corner kernel was not enough because the scalar source is also
+built on its own. Added a matching `__FAST_MATH__` compile-time guard in
+`t068_scalar_hard_brush.cpp` so standalone builds of *all three* scalar
+entrypoints reject unsafe compiler settings. Neither runtime app links this
+experimental kernel.
+
+- `tests/test_t068_scalar_strict_fp.py` checks rejection of GCC `-Ofast` and
+  Clang `-O3 -ffast-math`; GCC/Clang `-O0/-O2/-O3` each check NaN/Inf widths and
+  path samples across **coverage, full RGBA8 and sparse-delta output**, with
+  output and coverage canaries unchanged. This is a strict compiler safety
+  contract, not a claim about arbitrary optimizing toolchains.
+- Regenerated source-pinned scalar coverage, RGBA8, sparse-delta, ASan/UBSan,
+  and temporary Godot bridge evidence against the changed scalar source.
+  The two-run 31-check scalar bridge, 110-check transformed bridge,
+  37-check atomicity, 153-check native quad publication and 146-check
+  large-tile publication paths retain their correctness results; timing
+  evidence was **remeasured**, not relabeled or reused.
+- The fast desktop T-068 CI step and opt-in native bridge workflow now reject
+  unsafe scalar build modes; the guarded sources still ship only as test
+  fixtures. Reproducing `-Ofast`'s bad behavior with the *old* revision is
+  historical evidence and not a runtime acceptance test.
+
+**Still open:** physical Windows/Linux input-to-visible latency, RAM/VRAM and
+thread-jitter metrics, independent Windows/MSVC native ABI validation, viable
+operation-specific backend decision, and portable release verification.
+
+
+## 2026-11-04 follow-up — matched native scalar/Blend2D hard-brush calls
+
+**Status remains In Progress; no backend selected.** Earlier native scalar and
+Blend2D brush timing experiments used different measurement scopes. The
+new [`t068_matched_brush.py`](../../tools/benchmarks/t068_matched_brush.py)
+preallocates **identical source, binary selection, pointer samples, paint and
+output buffers** before timing either ABI. Both libraries use strict `-O2`
+builds; Blend2D 0.21.2 uses the previously tested 50%-A8 threshold. It
+counterbalances invocation order (five paired trials × two runs) and records
+raw calls plus replay-checked medians. These timings **include Python ctypes
+entry/return overhead**, and exclude output unpack, Godot document staging,
+main-thread publication, GPU uploads and input-to-visible latency.
+
+- Six Godot-authored **32² cases** and four **512²** cases use pinned oracles.
+  Full canonical straight-RGBA8 outputs and selection masks are checked after
+  every native call; transparent hidden RGB is retained. The scalar kernel
+  exactly matches **20/20 Godot masks and pixel buffers** across two runs.
+- Blend2D exactly matches **14/20 cases**; its 512² round dab misses 36 Godot
+  pixels, sparse crossing erase misses 15, and transparent no-op has 22
+  coverage differences but **zero final-pixel differences**, on each run.
+  Therefore lower raw Blend2D call times in these cases cannot qualify it as
+  a parity-preserving hard-brush replacement.
+- The [two-run JSON](../benchmarks/T068_2026-11-04_matched_brush.json)
+  records all 200 native calls, raw timings, backend orders, hash-checked
+  outputs, source digests, and missing/extra counts; the
+  [contracts](../../tests/test_t068_matched_brush.py) reject tampering and
+  optionally rebuild both libraries. Fast CI replays the evidence; the
+  opt-in Blend2D workflow performs live comparisons and uploads diagnostics.
+
+**Still open:** physical Windows/Linux event-to-frame and RAM/VRAM evidence,
+full-size native publication performance, Windows/MSVC reproducibility,
+portable releases and an operation-specific production backend decision. This
+checkpoint changes **no application implementation or storage format**.
+
+
+## 2026-11-04 follow-up — isolated Linux native-process RAM high-water screen
+
+**Status remains In Progress; no native backend selected.** The matched
+scalar/Blend2D timing experiment had no RAM evidence for its native call
+boundary. The new
+[`t068_native_memory.py`](../../tools/benchmarks/t068_native_memory.py)
+starts a **fresh Linux worker process for every backend/size/repetition**,
+loads only the selected native library and allocates matched source,
+selection, path and both candidate output buffers (for identical
+  caller preparation). It records `/proc/self/status` `VmRSS`
+and `VmHWM` **before** preparation, **immediately before** the native call,
+and **immediately after** it. Independent Godot-oracle reconstruction and
+pixel comparison occur only *after* the sampled call. Both backends must
+match all 460 hard4-long covered pixels and exact full-tile straight-RGBA8
+at 512²/1024²/2048² before any memory result is accepted.
+
+- Two runs (12 worker processes) matched all Godot coverage and RGBA8 cases.
+  Native-call `VmHWM` growth in KiB (run 1/run 2) was **scalar 1308/1308,
+  6048/6052, 24364/24376** for 512²/1024²/2048² and **Blend2D
+  2340/2084, 6752/6708, 24988/25112**, respectively. These are observed
+  Linux process peaks relative to the already-prepared state, not isolated
+  native heap allocations or trustworthy production memory savings.
+- The prepared buffers and Python/ctypes runtime belong to each worker,
+  so this does **not** measure editor residency, GPU VRAM, Windows process
+  usage, a multithreaded production application, or output upload cost.
+  Repetition counts are too small for population conclusions or p95 metrics.
+- [Two-run evidence](../benchmarks/T068_2026-11-04_native_process_memory.json)
+  pins source and Godot fixture digests and rejects forged memory values,
+  missing/reordered workers, changed pixels and changed buffer specifications.
+  [Contracts](../../tests/test_t068_native_memory.py) run offline in fast CI;
+  the opt-in Blend2D workflow rebuilds dependencies and captures live workers.
+  No C++ source, application backend, ABI, persistence contract, or manual
+  gate was changed.
+
+**Still open:** physical Windows/Linux application RAM/VRAM, event-to-visible
+latency/p95 and jitter, matched publication cost, release portability and
+an operation-specific production decision. This sample does not close T-068.

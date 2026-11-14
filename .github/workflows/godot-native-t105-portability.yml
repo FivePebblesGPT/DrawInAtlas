@@ -1,0 +1,116 @@
+name: T-105 portable native ABI and exported-process screen (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+          include-templates: true
+      - name: Portable source and fail-closed report tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t105_portability.py -v
+          python3 -m unittest discover -s tests -p test_t068_release_gate.py -v
+          python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py -v
+          python3 tools/benchmarks/t105_release_residency.py \
+            --verify --output docs/benchmarks/T105_2026-11-12_linux_export_residency.json
+      - name: Build native-absent Drawing export from canonical sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/t105-dist"
+          python3 tools/build_drawing_app.py --output "$RUNNER_TEMP/t105-stage" --without-native
+          godot --headless --path "$RUNNER_TEMP/t105-stage" --editor --import \
+            > "$RUNNER_TEMP/t105-import.log" 2>&1
+          godot --headless --path "$RUNNER_TEMP/t105-stage" --export-release Linux \
+            "$RUNNER_TEMP/t105-dist/Drawing.x86_64" > "$RUNNER_TEMP/t105-export.log" 2>&1
+          python3 tools/benchmarks/t068_release_gate.py \
+            --stage "$RUNNER_TEMP/t105-stage" --linux "$RUNNER_TEMP/t105-dist" \
+            --launch-linux --output "$RUNNER_TEMP/t105-release-gate.json"
+      - name: Observe actual exported-process CPU and RSS/HWM
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/benchmarks/t105_release_residency.py \
+            --stage "$RUNNER_TEMP/t105-stage" --distribution "$RUNNER_TEMP/t105-dist" \
+            --output "$RUNNER_TEMP/t105-live-linux.json"
+          python3 tools/benchmarks/t105_release_residency.py \
+            --verify --output "$RUNNER_TEMP/t105-live-linux.json"
+      - name: Preserve Linux diagnostic records, including failing-run logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t105-linux-export-diagnostics
+          path: |
+            ${{ runner.temp }}/t105-import.log
+            ${{ runner.temp }}/t105-export.log
+            ${{ runner.temp }}/t105-release-gate.json
+            ${{ runner.temp }}/t105-live-linux.json
+          if-no-files-found: warn
+
+  windows-msvc-export:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+          include-templates: true
+      - name: Windows MSVC strict-FP and Godot canonical native-ABI parity
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cl
+          python tools/benchmarks/t105_windows_msvc.py --output "$env:RUNNER_TEMP/t105-msvc.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build independent Windows release with no optional DLL
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $env:RUNNER_TEMP 't105-stage'
+          $dist = Join-Path $env:RUNNER_TEMP 't105-dist'
+          New-Item -ItemType Directory -Force $dist | Out-Null
+          python tools/build_drawing_app.py --output "$stage" --without-native
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          godot --headless --path "$stage" --editor --import 2>&1 | Out-File "$env:RUNNER_TEMP/t105-import.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          godot --headless --path "$stage" --export-release 'Windows Desktop' (Join-Path $dist 'Drawing.exe') 2>&1 | Out-File "$env:RUNNER_TEMP/t105-export.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/benchmarks/t068_release_gate.py --stage "$stage" --windows "$dist" --output "$env:RUNNER_TEMP/t105-release-gate.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Launch independent Windows PE/PCK and measure OS working set
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/benchmarks/t105_windows_release.py --distribution "$env:RUNNER_TEMP/t105-dist" --output "$env:RUNNER_TEMP/t105-live-windows.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve Windows diagnostic records, including failing-run logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t105-windows-msvc-export-diagnostics
+          path: |
+            ${{ runner.temp }}/t105-msvc.json
+            ${{ runner.temp }}/t105-import.log
+            ${{ runner.temp }}/t105-export.log
+            ${{ runner.temp }}/t105-release-gate.json
+            ${{ runner.temp }}/t105-live-windows.json
+          if-no-files-found: warn

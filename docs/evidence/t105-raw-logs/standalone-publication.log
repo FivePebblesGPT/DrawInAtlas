@@ -1,0 +1,4 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T100_SPARSE_PUBLICATION_RUN commit_cpu_ms=1520.238 pixels=262144 canonical_delta_entries=524288 source_clone_rgba8_bytes=0 static_before=69347992 static_after=151362040 peak_before=69347992 peak_after=151365232
+T100_SPARSE_PUBLICATION_PASSED checks=197 failures=0

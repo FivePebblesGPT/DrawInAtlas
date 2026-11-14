@@ -32,3 +32,22 @@ A ticket that **requires later owner acceptance** may be `Blocked` or `In Progre
 
 ## Scope snapshot
 The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **approved**: 47 Essential, 34 Later, 18 Skip. This does not make the complete baseline Done. `T-053` still first proves the standalone minimum witness; `T-059` later gates manual UX acceptance.
+
+## Keep engineering checkpoints independently reviewable
+
+- When an active ticket has multiple independently testable remaining problems,
+  split them into consecutively numbered child tickets with one measurable
+  deliverable and explicit hard dependencies. Use `related` for collaboration
+  without artificially blocking parallel work. Keep the original ticket as the
+  integration/owner-acceptance gate; do not mark it Done merely because a
+  child milestone passes.
+- Prefer concise active tickets (roughly 50–150 lines). Move completed long
+  checkpoint narratives to `docs/Tickets/History-TNNN.md` **without deleting
+  evidence or changing its historical claims**. The history is not canonical
+  frontmatter and should not receive new implementation diaries.
+- A milestone can be Done for a **narrow, already verified artifact** (such as
+  a diagnostic regression harness) while its overall performance/UX parent
+  remains In Progress. State exactly which gate is not satisfied.
+- Update the Kanban table and run `tools/validate_ticket_store.py` on every
+  split. Recheck CI and manual gates on the actual remote SHA; do not manufacture
+  approvals or count a documentation split as a performance improvement.

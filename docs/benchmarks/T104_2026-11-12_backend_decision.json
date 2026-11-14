@@ -1,0 +1,384 @@
+{
+  "decisions": [
+    {
+      "blend2d": "reject_drop_in_nonparity",
+      "default": "choose_optimized_gdscript",
+      "hokusai": "not_comparable_preset_model",
+      "nativehard": "defer_default_keep_optional",
+      "operation": "hard_brush_and_eraser",
+      "skia": "reject_drop_in_nonparity"
+    },
+    {
+      "blend2d": "not_comparable",
+      "default": "choose_optional_hokusai_with_fallback",
+      "hokusai": "choose_optional_existing",
+      "nativehard": "not_comparable_hard_model",
+      "operation": "natural_media_myb_preset",
+      "skia": "not_comparable"
+    },
+    {
+      "blend2d": "not_comparable",
+      "default": "defer_native_keep_gdscript",
+      "hokusai": "not_comparable",
+      "nativehard": "not_comparable",
+      "operation": "flood_fill",
+      "skia": "not_comparable"
+    },
+    {
+      "blend2d": "defer_possible_future",
+      "default": "defer_no_matched_editor_feature",
+      "hokusai": "not_comparable",
+      "nativehard": "not_comparable",
+      "operation": "paths_shapes_text_antialiasing",
+      "skia": "defer_possible_future"
+    },
+    {
+      "blend2d": "not_comparable",
+      "default": "choose_godot_cache",
+      "hokusai": "not_comparable",
+      "nativehard": "not_comparable",
+      "operation": "preview_compositing_texture_upload",
+      "skia": "not_comparable"
+    },
+    {
+      "blend2d": "not_comparable",
+      "default": "choose_sparse_gdscript",
+      "hokusai": "not_comparable",
+      "nativehard": "not_comparable",
+      "operation": "tile_publication_history_undo",
+      "skia": "not_comparable"
+    }
+  ],
+  "editor_boundary": {
+    "comparable_fixture": "T-095 real-Godot 96px opaque red 512x512, 100 synthetic pointer events, full source SHA, framebuffer and undo",
+    "nativehard_warm_full_editor": "not established: 3-stroke run stalled after success marker; process exit unverified",
+    "physical_input_to_photon": "not measured",
+    "record": "docs/evidence/T-104-2026-11-12-operation-backends.md"
+  },
+  "limitations": [
+    "No equivalent end-to-end Godot+storage+display runs for Blend2D or Skia",
+    "Godot fixed-color hard brush is not equivalent to .myb natural-media dabs",
+    "Kernel warm-call CPU does not include input, preview, publication, image texture, or GPU presentation",
+    "Native worker memory is not Godot RSS/VRAM; no Windows/MSVC/export evidence (T-105)",
+    "All frame callbacks are software timing; no physical input-to-photon or owner acceptance"
+  ],
+  "matching_corpus": {
+    "blend2d_exact_cases": 7,
+    "blend2d_noncomparable_cases": [
+      "large/round256",
+      "large/cross64_sparse_erase",
+      "large/transparent_noop"
+    ],
+    "boundary": "warm preallocated Python-to-native ABI calls only; not full editor",
+    "cases": [
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "a3b6a50cd3cd625b4123ba2e0937ff7050c41e194bbc0652f39d4a5d0eb507ed",
+        "case": "small/stationary_dab",
+        "side": 32,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 22,
+            "n": 10,
+            "p50": 11,
+            "p95": 22
+          },
+          "scalar": {
+            "max": 25,
+            "n": 10,
+            "p50": 10,
+            "p95": 25
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "3056e20038d0dc0fae53606a36b7c98510f37c7bb67b707afc3851c90435f646",
+        "case": "small/horizontal_fractional",
+        "side": 32,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 22,
+            "n": 10,
+            "p50": 13,
+            "p95": 22
+          },
+          "scalar": {
+            "max": 19,
+            "n": 10,
+            "p50": 18,
+            "p95": 19
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "5a9b25aee73bf2faf14bc2831439a96bdc2642ad50f5d03e989cebeb7f0ba624",
+        "case": "small/diagonal",
+        "side": 32,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 17,
+            "n": 10,
+            "p50": 13,
+            "p95": 17
+          },
+          "scalar": {
+            "max": 38,
+            "n": 10,
+            "p50": 19,
+            "p95": 38
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "8021c0e6bf7510ffd5309b6ff4dd9bd3ad11b6ce1eeb00bacb27de8fed86d6d4",
+        "case": "small/self_crossing",
+        "side": 32,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 34,
+            "n": 10,
+            "p50": 28,
+            "p95": 34
+          },
+          "scalar": {
+            "max": 72,
+            "n": 10,
+            "p50": 37,
+            "p95": 72
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "1af831f76cc2eafd4406400341d5f5ca155cd0765f8e84d5cdd9904637d866df",
+        "case": "small/erase_hidden_rgb",
+        "side": 32,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 16,
+            "n": 10,
+            "p50": 10,
+            "p95": 16
+          },
+          "scalar": {
+            "max": 43,
+            "n": 10,
+            "p50": 16,
+            "p95": 43
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "904fd932f2de71c5ec802b55881a988c68ba351c60b77d003054633fad7c6790",
+        "case": "small/zero_alpha_noop",
+        "side": 32,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 15,
+            "n": 10,
+            "p50": 10,
+            "p95": 15
+          },
+          "scalar": {
+            "max": 28,
+            "n": 10,
+            "p50": 26,
+            "p95": 28
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": true,
+        "blend2d_extra": 0,
+        "blend2d_missing": 0,
+        "canonical_pixels_sha256": "e7c90a4db72af761f690e6a648f97eaf7aeb5503b518e77ace7be00a55ce15a7",
+        "case": "large/hard4_long",
+        "side": 512,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 798,
+            "n": 10,
+            "p50": 607,
+            "p95": 798
+          },
+          "scalar": {
+            "max": 976,
+            "n": 10,
+            "p50": 782,
+            "p95": 976
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 36,
+        "blend2d_exact": false,
+        "blend2d_extra": 0,
+        "blend2d_missing": 36,
+        "canonical_pixels_sha256": "ca474d005897b175d67d896c4979e2d9e7396103ef5e2a6995f543968bb0d079",
+        "case": "large/round256",
+        "side": 512,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 3562,
+            "n": 10,
+            "p50": 1990,
+            "p95": 3562
+          },
+          "scalar": {
+            "max": 7864,
+            "n": 10,
+            "p50": 2365,
+            "p95": 7864
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 15,
+        "blend2d_exact": false,
+        "blend2d_extra": 0,
+        "blend2d_missing": 15,
+        "canonical_pixels_sha256": "b3bcd8a2f071be3493a0420d125826bf6781ef1b578a9f5568fa6693d650f140",
+        "case": "large/cross64_sparse_erase",
+        "side": 512,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 1215,
+            "n": 10,
+            "p50": 738,
+            "p95": 1215
+          },
+          "scalar": {
+            "max": 3435,
+            "n": 10,
+            "p50": 1465,
+            "p95": 3435
+          }
+        }
+      },
+      {
+        "blend2d_changed_pixels_different": 0,
+        "blend2d_exact": false,
+        "blend2d_extra": 0,
+        "blend2d_missing": 22,
+        "canonical_pixels_sha256": "dfa71c660ce116360b883868b50d2ab38fbe192ed77653d8e56c1fd8abba5fcc",
+        "case": "large/transparent_noop",
+        "side": 512,
+        "warm_native_only_us": {
+          "blend2d": {
+            "max": 679,
+            "n": 10,
+            "p50": 600,
+            "p95": 679
+          },
+          "scalar": {
+            "max": 1053,
+            "n": 10,
+            "p50": 772,
+            "p95": 1053
+          }
+        }
+      }
+    ],
+    "scalar_exact": true
+  },
+  "memory": {
+    "boundary": "fresh Linux /proc Python worker HWM incl ctypes buffers, not Godot RSS or VRAM",
+    "native_workers": [
+      {
+        "backend": "scalar",
+        "linux_python_process_hwm_kib": {
+          "p50": 103780,
+          "p95": 103796
+        },
+        "side": 512,
+        "workers": 2
+      },
+      {
+        "backend": "blend2d",
+        "linux_python_process_hwm_kib": {
+          "p50": 105852,
+          "p95": 106140
+        },
+        "side": 512,
+        "workers": 2
+      },
+      {
+        "backend": "scalar",
+        "linux_python_process_hwm_kib": {
+          "p50": 123908,
+          "p95": 123936
+        },
+        "side": 1024,
+        "workers": 2
+      },
+      {
+        "backend": "blend2d",
+        "linux_python_process_hwm_kib": {
+          "p50": 125956,
+          "p95": 126076
+        },
+        "side": 1024,
+        "workers": 2
+      },
+      {
+        "backend": "scalar",
+        "linux_python_process_hwm_kib": {
+          "p50": 203700,
+          "p95": 203708
+        },
+        "side": 2048,
+        "workers": 2
+      },
+      {
+        "backend": "blend2d",
+        "linux_python_process_hwm_kib": {
+          "p50": 205584,
+          "p95": 205796
+        },
+        "side": 2048,
+        "workers": 2
+      }
+    ]
+  },
+  "schema": "t104-operation-decision-v1",
+  "skia": {
+    "boundary": "Python Skia raster-local mask/direct draws; excludes Godot and native C++ integration",
+    "cases": 16,
+    "noncomparable_cases": [
+      "mirrored_crossing",
+      "self_crossing",
+      "self_crossing_batched",
+      "zero_alpha_noop"
+    ],
+    "version": "144.1"
+  },
+  "source_artifacts_sha256": {
+    "matched": "dafefde39ed0e16ef4c111c540b8e29387aca0b7638c32e9113045fd10392e34",
+    "memory": "77246a21c96148caf21f533f54611dd0ce7d8ac1232e7d9b7b42185da5045d56",
+    "skia": "f1df8bef7828046e7b0fff4ed16f0f37d3a194830a96f76b50da57c9483ab37f",
+    "visual": "d4a23ae81b524552957cf2fc66ff345b27d5bbb677b651b9920700369f7da80f"
+  }
+}

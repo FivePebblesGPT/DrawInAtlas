@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://cn8ucy2rheu0f"]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://addons/gdUnit4/test/core/resources/scenes/simple_scene.gd" id="2"]
 [ext_resource type="Texture2D" path="res://addons/gdUnit4/test/core/resources/scenes/icon.png" id="2_jtr47"]

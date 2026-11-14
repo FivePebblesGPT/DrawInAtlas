@@ -1,0 +1,839 @@
+{
+  "schema_version": 1,
+  "candidate_head_before_t107": "0ecfc1fa996b4c5fcfee04b8dfae793bc5b4043a",
+  "last_confirmed_pr_head": "79b8959e9eac01b3bb10a144a46407acc6901aed",
+  "hosted_ci": {
+    "status": "NOT VERIFIED FOR CANDIDATE",
+    "reason": "Local HEAD differs from last confirmed PR head",
+    "result_cannot_be_inferred_from_local_replay": true
+  },
+  "required_fast_ci": {
+    "kind": "local-exploratory",
+    "not_github_hosted": true,
+    "checks_total": 46,
+    "checks_passed": 46,
+    "engine": "4.8.beta3.official.c51ff06e8",
+    "report_sha256": "f5c858d194cb2b2fbd47a922921d193a743d6e92f1a4a43da3abf47d557b4261",
+    "summary_sha256": "45c02409f69315268423f55cdb7a69d55b74d327364096797225d61de38a525d",
+    "workflow_sha256": "835f044bf57224999dea386959bbc14b4f60e3d5b4a4bf798db8ff2da79a411f",
+    "checks": [
+      {
+        "id": "ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "5044e1052c4e791b873da2bc3ef275e03ca482bc145208a2ef3072fcd9d75899",
+        "log_sha256": "fabc9dd0b2bb17a330ad1506b3ffb4b371e59f2e36f1c307350f2c536fdd0f92",
+        "log_bytes": 70
+      },
+      {
+        "id": "ci_03_verify_ci_initializes_main_project_before_gdscript_smokes",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "6b70242747cb5c403f5e9e5a6bea8cb2d6f3820153a3a9f212f6003bc33d6d41",
+        "log_sha256": "48e59303758da4efaae5cc5fc097e37504c0ff08150b5af64cf59d0261aafa2f",
+        "log_bytes": 246
+      },
+      {
+        "id": "ci_04_fail_late_contract",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "936e5df0880812e8dd5075a37b37925ac4ec748d36783bfad738c40ac756aaff",
+        "log_sha256": "561234dd0ba7868530fdee35fa83aa85e30147c183c25aea675c0e9e17a6b2bd",
+        "log_bytes": 1412
+      },
+      {
+        "id": "ci_04_verify_t_051_isolated_drawing_contract_consumer",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "5317770af0565ea79128ca04767228bc8fd5459a16bfe876e070a4bd1e367e05",
+        "log_sha256": "5f363ea508119cb14b02dd0f264b35209d85ea4ce5120eaa09639490e8701439",
+        "log_bytes": 1221
+      },
+      {
+        "id": "ci_05_verify_t_052_extracted_independent_drawing_core",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "be7e8de28da29986146c2f07b689d90cf95f31f52e19a8d040afda59abecc747",
+        "log_sha256": "be151534f5c8016f91534867afd2835be238c2067344672b5f5d7841bae0609f",
+        "log_bytes": 374
+      },
+      {
+        "id": "ci_06_verify_t_053_isolated_standalone_drawing_and_third_package_cons",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "4ae55ce2f86ef1d843576164307da4af7b7bfdc275279b376eb4242214ab2c66",
+        "log_sha256": "9a9d475cd01bfe01a66326521418a8c2c9eb4dd97498d5d286c46f7cead4bfe4",
+        "log_bytes": 502
+      },
+      {
+        "id": "ci_t085_live_stroke_preview",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "4224717f61b832f891f48eb185ce7d361a7c65bc5346f1a710b2906b3858dcfd",
+        "log_sha256": "f707eeb685f86f6b51e3a290fa79a7ad81cad7603189e1ffad56043fdffdd44d",
+        "log_bytes": 5711
+      },
+      {
+        "id": "ci_t086_viewport_cache_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "9d493d69ad7e3ca055afeddf385a119ca932347c5c58389ded82c0dd054c0a7f",
+        "log_sha256": "c5c25b5bd04a408866767e9c636022f76fa18b186d49c8af3a20cccaca1c4771",
+        "log_bytes": 8296
+      },
+      {
+        "id": "ci_t087_image_frame_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "72e03c23b24e833506c3b31f711730c99ca225b27f9727142fba5b8c64f4cab3",
+        "log_sha256": "f81e9d2119128efb1602d29a340236f5a5fd5deeaa8adc01fa0d9d07a4860606",
+        "log_bytes": 8328
+      },
+      {
+        "id": "ci_t088_selection_clipboard_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "9031e6a8b20cf4ebc8b29db884b39bb81f8d566e23a41c6f078abba022d4f41e",
+        "log_sha256": "7733d37b84186045722790e029ee86e430c816e7217ee7a5c05d945973fa7971",
+        "log_bytes": 6275
+      },
+      {
+        "id": "ci_t089_layer_structure_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "46579972c43f2a96aba9137cabd32ea46dccaf4d866dd42339fd8f967cf553d9",
+        "log_sha256": "360b92c7f6c2c776f5ad6646dfc79a0b4ffe23cf5f0f93a10bfb476fc5b8823e",
+        "log_bytes": 6260
+      },
+      {
+        "id": "ci_t090_responsive_workspace_contracts",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "d2b70785b9406e212c0a58d627c681e688766c8aa6254878c61af89bfeab1666",
+        "log_sha256": "ebb7e459a0c8b52ba5c545d7700c2596468e7debe637d5fe1ab108ccbbfe778c",
+        "log_bytes": 8179
+      },
+      {
+        "id": "ci_t091_single_group_docking_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "4b151b2d62a571382d883b1eb029df0fc44207c4f45d7867a93cf594afe9973e",
+        "log_sha256": "c47570411db6f37c25a846c2c276ab7d5b90398fcbaa3d1a4dcb7332be160309",
+        "log_bytes": 771
+      },
+      {
+        "id": "ci_t092_compact_color_history_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "cee4c2b918cb40192f65dfbfaf565dec2cec325a5732df4407a01b0d150c83c4",
+        "log_sha256": "a6df33bc29a8dd26fbedeb7fcb343b6f660bc7c2337cc770ad9f81c355c40cac",
+        "log_bytes": 7176
+      },
+      {
+        "id": "ci_t093_object_discovery_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "b2bcbae3c261c0046bdcfe09d7a931dbcbc074f2ccf030b19bdb0019001c5eaf",
+        "log_sha256": "f4dcd37f9a4c9689ee86c474821c814288becfa1949b2cedeb68659f4fdfff3e",
+        "log_bytes": 9174
+      },
+      {
+        "id": "ci_07_verify_t_053_standalone_linux_release_package",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "c31e39945be4faa0fde3d6bde90d21ca09f80a8455ee958227d0aec228023c33",
+        "log_sha256": "36759d18fdfa47a8dc1140cf4d11b3b2a3578bd4a4138119a916c597ca7fbe6a",
+        "log_bytes": 51026
+      },
+      {
+        "id": "ci_08_import_resources_and_parse_scripts",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "391a3132bbf47b16a187788a0c73d0029eda9381e1718a71ffbb81c3bb8d0e77",
+        "log_sha256": "1a92e68d529749acf8fe38b33aa5c50daeb4f1a0e4029daa0e24c78c9ac33036",
+        "log_bytes": 1358
+      },
+      {
+        "id": "ci_t015_retired_battlemat_authoring",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "acbd6e2d9b1634c5c7585fc84841a0bd2a1c13169bab88dd7d6fe89269912fe5",
+        "log_sha256": "12f38c734bf2210572ecbbae9a261229757a3c041b1d44145fd1b59e6b2e5110",
+        "log_bytes": 1801
+      },
+      {
+        "id": "ci_09_verify_t_054_drawing_atlas_chronological_history",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "4445a282f7ad9cf107138528aed630c289728e074fcefe817f91395451ae47f7",
+        "log_sha256": "a413700040c092b4abca96213057fa64a4b9505a40262392597170576e7a09dd",
+        "log_bytes": 404
+      },
+      {
+        "id": "ci_10_verify_t_058_editable_text_font_integrity_and_undoable_rasteriz",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "5a58dd96160531c9d778b2daa8a822de201842b2db214f7037506463521d5727",
+        "log_sha256": "fcfe2d51960506b6048fb53f01f9ac34a5e40837f24c4c3b08b78cdbaf320132",
+        "log_bytes": 6469
+      },
+      {
+        "id": "ci_11_verify_t_060_reusable_object_assets_and_atomic_save_as",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "51ef2211581f3c42773ef9e82660128733eb9d38b6a3a3e644aa56937382d971",
+        "log_sha256": "ba5cb71fd9be2738407dc0137705a9263de55f1739149757613963d10585af26",
+        "log_bytes": 196
+      },
+      {
+        "id": "ci_11b_verify_t_064_nested_object_graph",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "ec23f02a41fc9780b1df35bf43b30112fb0ad2ff9cd3ef5f1de35e02b6b42ecd",
+        "log_sha256": "4730d4ac0a3516dc1cf886fdc04559733fc6169c073e19ef053488fd907ce469",
+        "log_bytes": 199
+      },
+      {
+        "id": "ci_t064_nested_project_copy",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "e7cfccbaa1e5b03c08259234a59e00b03567c0f3009ae59e9e4ea8af944ca8e4",
+        "log_sha256": "e9aaf7bccfdce42b73cb15eb40a5c31244d9026dc4599df7e744be230a211503",
+        "log_bytes": 1456
+      },
+      {
+        "id": "ci_t064_nested_source_render",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "9a3aeb009128de5961818d7eac9e40f478738ee3e2f5bc277b07fb5c812ad097",
+        "log_sha256": "7317f48832ba8c698dedcdeb7c89500984d816f0ea6144d8394cd6ad6d229689",
+        "log_bytes": 200
+      },
+      {
+        "id": "ci_t064_nested_child_edit",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "1057f2d9dae4de9401f1575d7e4ac6188cc905ce3b1209522d26934cd085699a",
+        "log_sha256": "37d0ccfb5f44ea5c5e671911ed84542ffa2c67b85d75381c9c741372a8031bb1",
+        "log_bytes": 2006
+      },
+      {
+        "id": "ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "766658b61a1dae84da98858f5bac5cf23d66ba7381890f7811e0eca1d3292d2c",
+        "log_sha256": "1cef70f53eb11372d3fdcbdf11291f3511c305b7166540412995ac3c61c0b038",
+        "log_bytes": 7330
+      },
+      {
+        "id": "ci_13_verify_t_061_signed_floor_detail_world_mapping_and_blank_d_leve",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "4bd199e5a1a6941a2592027cf4fb4a808d151ae0d68f0dd0da306aaacda3fa04",
+        "log_sha256": "57b4b79a5f6d18fe10403a01cdec613ae8f212f59f1d808b535c3ebf726e8fdc",
+        "log_bytes": 201
+      },
+      {
+        "id": "ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "8b1fdc4684f0c7b923f210081fd10c8e5ec0b124ec8c06460522a11d441bd923",
+        "log_sha256": "7453b6e888a887c8019cf3f04398ad3af71306a8fcf9e9c8ff5aebf3fad7d3b5",
+        "log_bytes": 1060
+      },
+      {
+        "id": "ci_t068_stationary_dab_parity",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "96ed6843f8e7154ce0a84508e0f4194bfd358a5759977208ad6169ae903dfb62",
+        "log_sha256": "6fe3714c2c145578411c7476997c91ccc1b269cc6d9770ff3a924ea90b3f4710",
+        "log_bytes": 5157
+      },
+      {
+        "id": "ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "6b753d9eadbdb7b9722a41c813fd1078b9c310c6079e58933bdbb0d9dbb15fa5",
+        "log_sha256": "b9501e6bac9d97d623086cfee9cd15c8b745a49530d69b362c293355596ffd19",
+        "log_bytes": 548
+      },
+      {
+        "id": "ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "2e3036b6f399c9976c38c3e49be63d8cdba92dafe6ecad78b03524cca287bb6d",
+        "log_sha256": "b950bf15e1996d79bef931059418402bd6110e2614bdf4e4cfec7b084c043e9d",
+        "log_bytes": 15804
+      },
+      {
+        "id": "ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "eae0529e0a79a7f5f94e7a448c7bb47243bb710728f1652da61617100ccddbf6",
+        "log_sha256": "89296cfde9dabe3ab7feea50f5e3af96809225f9aa3cdb663fec6af7e01398b6",
+        "log_bytes": 1517
+      },
+      {
+        "id": "ci_dock_layout_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "dbcb062772e395f5b78cad84625f68a000ce0121691652f5fbe69f66d88a849f",
+        "log_sha256": "45e2e359392d7fac9d5a3e91467921b76e8b50521506c9d38540b1598860fae9",
+        "log_bytes": 1058
+      },
+      {
+        "id": "ci_dock_drag_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "202bc0c3bf9eb557697279783bdc970b3f2af42d7f6e961a2d3d49055e23ffb5",
+        "log_sha256": "4636c486ae75d99b5d50b57cb8813878b94f1e35434eb72c7a485a8f608fea56",
+        "log_bytes": 223
+      },
+      {
+        "id": "ci_dock_floating_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "0260ac0f386fd09a5891f6fc60358136d27a68c95e750abe36315bd47fa53c16",
+        "log_sha256": "0fccd544ec572d3c0a9c6f010c080f9aece23ffba530257e99b4e2edeb467768",
+        "log_bytes": 215
+      },
+      {
+        "id": "ci_dock_cross_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "39788e7c5d69a50a1113c4ffd896e0d70389ef3e96dd38ff50bdd8e4339de379",
+        "log_sha256": "04c496f81e8caaab7b0d75b0e434e8a5dca9a444bb181fc792eb42cd68d64f9a",
+        "log_bytes": 215
+      },
+      {
+        "id": "ci_dock_persistence_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "6568d85f70aa4780281db749c7ec6933814fa81b745b333baa2acc6fea998106",
+        "log_sha256": "0bb3fa4faaa35a57e6a2ad6bd8a3f497a330bad7edc1b6ec9906f6f28cd673e3",
+        "log_bytes": 205
+      },
+      {
+        "id": "ci_t065_asset_browser_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "8322e34ac2a789c0e5a93beea150a4e5ea634014d9dac844006f7221977d390a",
+        "log_sha256": "aa4b4db04c69a4a5b5dbd40a5c3da9014f7635732884eabb3987a56c4cfa056d",
+        "log_bytes": 1075
+      },
+      {
+        "id": "ci_t065_asset_thumbnail_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "67f484fec5c163b5dfb56978efc16c41c9417a1110a19c1d47c2cb273b12412f",
+        "log_sha256": "3b99a515412d47a393c7ba40e63036afadf93242fc276159f0f7fa58c79b2751",
+        "log_bytes": 1072
+      },
+      {
+        "id": "ci_t065_real_source_io",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "e1c8fe4edd724fa5a62da1a53e2be68014a45999c14b35fd42c8e23838505dd8",
+        "log_sha256": "43ea7fca8d6db23d93155c83cbd61004c3ee31afebaad19b07b6ff68527c355f",
+        "log_bytes": 370
+      },
+      {
+        "id": "ci_t065_asset_transfer_model",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "51597d7a8bd786ab37911b20d20e50010a271630c1b30b0ce11a0bf82e5effc3",
+        "log_sha256": "74af768ee389491e2d9e92d63cf7539bf5a6af87a868d82b171347fdd7120157",
+        "log_bytes": 211
+      },
+      {
+        "id": "ci_t065_atlas_null_transactions",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "68dae3814304629d5bee4377196c5ac6b286dd35d126a989a39c7d414ea4f89d",
+        "log_sha256": "7fc800d865158ec2a76145960776f8456bf8296604359c8b8441500028dfd4c6",
+        "log_bytes": 200
+      },
+      {
+        "id": "ci_t065_atlas_source_manager",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "52b809bb436f25725d67907427c5b60b58b389feec69b124f4733e2cb2030442",
+        "log_sha256": "862c672570fceb3788233dcbed393f710e6cef11577888183ace45f1f24e8843",
+        "log_bytes": 195
+      },
+      {
+        "id": "ci_t065_atlas_portable_registry",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "fe888c7639be794ca6851a0de288b971fa9d671316ea305ac7639fe43d3619a3",
+        "log_sha256": "991d6c21e5811ebdadabdf62a7d924ada0a0794ecb58adfd96a9e9bed6d2fd9e",
+        "log_bytes": 196
+      },
+      {
+        "id": "ci_t065_atlas_browser_bridge",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "682675ef94a72e1a7933f3a1aef715664a5188e71991b96c345b7a79fe036e53",
+        "log_sha256": "75d154a3a964be81a24ca018972c645e2bc7fd47b633266e9ca8e98782fc3eca",
+        "log_bytes": 1065
+      },
+      {
+        "id": "ci_t065_atlas_browser_paging",
+        "outcome": "success",
+        "exit_code": 0,
+        "script_sha256": "440dd4f52fa19352ed024ad39ebd8958de249cbe8013ea656fb3a8c30063fd66",
+        "log_sha256": "abdf69d6d24dcffcac4a49f7d37e819b3ca2ff77908aa422612cf0f0c62c9bee",
+        "log_bytes": 228
+      }
+    ]
+  },
+  "standalone_atlas_runtime": {
+    "kind": "local-isolated-regression-not-physical-acceptance",
+    "checks": [
+      {
+        "name": "godot-version.log",
+        "sha256": "fa82a745ca07355773995ced5a69250d09db89898c6985ced979f47cac45116b",
+        "bytes": 29,
+        "known_post_exit_leak_diagnostics": 0
+      },
+      {
+        "name": "standalone-build.log",
+        "sha256": "39998f3b03fafb5a6b47244c459bcb7ce9e4ef0407299a23c32ba09ccd7bbe45",
+        "bytes": 46,
+        "known_post_exit_leak_diagnostics": 0
+      },
+      {
+        "name": "standalone-import.log",
+        "sha256": "f9913cc0f57aeb22eec7fcf9f9814dd7123d6ab4be2c6db45b9106c54bac8e8f",
+        "bytes": 15043,
+        "known_post_exit_leak_diagnostics": 0
+      },
+      {
+        "name": "standalone-roundtrip.log",
+        "sha256": "c5764b85826b4e4089b3b63e6106c1545c85a9d3adb3a1184ce0688a75791d3b",
+        "bytes": 1138,
+        "known_post_exit_leak_diagnostics": 4
+      },
+      {
+        "name": "standalone-verify.log",
+        "sha256": "9248042a13dc1ff488550b9a3d01436bff449c50c4c889b8a6ae5ffebf943daa",
+        "bytes": 129,
+        "known_post_exit_leak_diagnostics": 0
+      },
+      {
+        "name": "atlas-composition.log",
+        "sha256": "fe1f9bc3ab98816d73b5b9ad629082f6831e268b769e425fff4a8b21924e404c",
+        "bytes": 1202,
+        "known_post_exit_leak_diagnostics": 4
+      },
+      {
+        "name": "atlas-composition-verify.log",
+        "sha256": "8f512b16efc9b849772fdb665c08f72033528d256c62e79a46e278d07bcd784b",
+        "bytes": 126,
+        "known_post_exit_leak_diagnostics": 0
+      },
+      {
+        "name": "atlas-bundle.log",
+        "sha256": "168fd23a3a5c2938f5c2833c4e5e01f89580e6958514c07a30e371f8b4b048f8",
+        "bytes": 593,
+        "known_post_exit_leak_diagnostics": 0
+      },
+      {
+        "name": "atlas-bundle-verify.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "known_post_exit_leak_diagnostics": 0
+      }
+    ],
+    "source_scope": "canonical standalone Drawing and Atlas integration"
+  },
+  "owner_findings": [
+    {
+      "finding": 1,
+      "tickets": [
+        "T-085",
+        "T-086"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-085 Xvfb/Mesa held-button frame and layer-aware model pass; physical OS/GPU input-to-photon still untested",
+      "finding_state": "PENDING",
+      "physical_action": "On middle layer, hold 4px Brush still, then drag before release; test eraser too",
+      "expected": "First dab and motion visible **while held** without committing source/history; native framebuffer and timing 100/50/25%",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 2,
+      "tickets": [
+        "T-087"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-087: 47/47 imported standalone model, 36/36 Xvfb/Mesa native checker/frame/pointer checks at 25/50/100/200%; physical OS/GPU owner result still NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "New transparent 256² frame over neutral workspace; pan to every corner",
+      "expected": "Distinct image edge and checkerboard, signed sparse pixels still valid; native framebuffer corners",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 3,
+      "tickets": [
+        "T-090"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-090: 800×600/1280×760/1920×1080 software framebuffer edges and 1.5/2.0-scale screenshots pass; physical Linux/Windows NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Resize physical window 1920×1080→1280×720, 100/150% scale",
+      "expected": "No letterbox/black side bars, usable tools and canvas; native window screenshots",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 4,
+      "tickets": [
+        "T-090"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-090: Xvfb real hovered wheel increment/decrement plus Shift+wheel and [/] keyboard checks pass; physical Linux/Windows NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Hover brush-size field and wheel both directions, then paint",
+      "expected": "Value changes predictably or clearly routes to document zoom by documented design; native wheel/input readback",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 5,
+      "tickets": [
+        "T-088"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-088 model 131/131 and Xvfb/Mesa native 51/51 verify marquee/hole/keyboard plus persistent floating Move; physical hardware+owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Select painted shape in two nonempty layers and drag boundary",
+      "expected": "Selection visibly limits edits and shows usable controls; native selection mask/pixel witness",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 6,
+      "tickets": [
+        "T-090"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-090 2026-11-07: 42px rail/34×34 controls, centered original MIT SVGs; Xvfb framebuffer centroids verified at 100/150/200% and six direct tool clicks (72/72 without captures, 78/78 with captures); physical/owner visuals NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Inspect toolbar SVG icons at 100/150% and active/disabled states",
+      "expected": "Cohesive size/stroke/contrast and recorded licensing; screenshots + resource review",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 7,
+      "tickets": [
+        "T-091",
+        "T-083"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-091 Xvfb/Mesa 36/36 dispatches a splitter drag, checks the saved width before shutdown and cold-relaunch recovery, including narrow-window persistence; physical hardware NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Resize a dock, close app gracefully, reopen same profile",
+      "expected": "Exact persisted usable dock width; native cold-relaunch layout snapshot",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 8,
+      "tickets": [
+        "T-090"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-090: native popup item grouping, Ctrl+N and menu actions pass on Xvfb; owner physical interaction NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Open File, Window and Object operations via menus and shortcuts",
+      "expected": "Discoverable commands grouped correctly and functioning; native menu dispatch screenshot",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 9,
+      "tickets": [
+        "T-090"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-090: 24 native pointer/framebuffer checks (+5 PNG captures) include nonactive tab ×, dirty cancellation and saved close; owner physical NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Open two files; inspect tab strip, close via tab ×",
+      "expected": "No detached far-right × or extraneous +; correct unsaved-close prompt",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 10,
+      "tickets": [
+        "T-091"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-091 model 42/42, Xvfb/Mesa 36/36 and 2026-11-07 native multitab/redock 55/55 with two PNG readbacks verify one tab strip across same-frame redraw and unique views; owner physical review NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Float dock groups via drag and inspect nested tabs",
+      "expected": "Exactly one tabbed group per floating host; move between hosts safely",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 11,
+      "tickets": [
+        "T-092"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-092 2026-11-07: 55/55 model + 43/43 Xvfb/Mesa native (47/47 with four PNGs); separate selectable FG/BG pigment chips, explicit Swap/Default, hex/RGBA incl. zero-alpha hidden RGB, selected-role label, 190px dock + 150% and floating Colors. PhotoCraft 0.20.2 toolbar source cross-checked, executable Colors visuals NOT verified; physical hardware owner review NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Open Colors swatch on 1280×720 and 150% UI scale",
+      "expected": "Compact usable popup that does not occlude editor; native screenshot",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 12,
+      "tickets": [
+        "T-091"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-091 Xvfb/Mesa 36/36 checks grip+tabs+×, all eight resize edges/corners, hide/recover and 1.5×; added 55/55 tall-host normal-grip redock/Escape and PNG evidence, physical Windows/Linux pointer discovery NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Float dock; grip drag, × close, resize each edge and corner",
+      "expected": "Minimal grip+tabs+× header, edge/corner resizing, subtle corner hint; native pointer/screenshot",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 13,
+      "tickets": [
+        "T-088"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-088 Xvfb native click-empty/deselect assertions pass; physical owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Select nonempty mask, click truly blank canvas with Select",
+      "expected": "Deselects without selecting single pixel; inspect native selection state",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 14,
+      "tickets": [
+        "T-088"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-088 mask now wired to live brush/eraser; model hole/alpha and Xvfb held-stroke witnesses pass; physical owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Create mask, paint/erase across mask edge on non-top layer",
+      "expected": "Independent selection channel constrains exact RGBA8 edits; compare framebuffer and layer bytes",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 15,
+      "tickets": [
+        "T-085",
+        "T-086"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-085 software 100/50/25% sample and p50/p95 recorded; hardware rapid strokes pending, T-086 68/68 Xvfb tile/alpha/text/overflow checks and 12-trial 25% software frames pass; hardware dense-window latency remains untested",
+      "finding_state": "PENDING",
+      "physical_action": "Draw fast loops/self-crossing curve at 100/50/25%",
+      "expected": "All delivered samples/endpoints preserved, continuous visual motion, per-stage p50/p95 recorded",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 16,
+      "tickets": [
+        "T-087"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-087 Xvfb grid-line deltas after pan/zoom and native snapped mouse click pass; physical Windows/Linux UX result still NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Toggle Show Grid and Snap independently while zooming/panning",
+      "expected": "Grid visibility independent from snap, 8px snap observable and named; native pixel/coordinate check",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 17,
+      "tickets": [
+        "T-088"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-088 2026-11-07 Xvfb 51/51 demonstrates after-release floating framebuffer, second drag, Enter drop, Escape cancel, one Undo/Redo; physical owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Select a painted region, choose Move, drag to empty area",
+      "expected": "Drag preview, exact translation, one Undo and Redo; native pointer + before/after pixels",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 18,
+      "tickets": [
+        "T-088"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-088 131/131 model preserves hidden RGB/seams/holes across repeated Move and Xvfb 51/51 keeps Ctrl+C/X/V/Delete roundtrip; physical owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "With mask, Delete/Cut/Copy/Paste/Move then Undo/Redo",
+      "expected": "Correct clipboard pixels/alpha/mask constraint and edit history; native model + GUI witness",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 19,
+      "tickets": [
+        "T-089"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-089 2026-11-07: 62/62 model and 36/36 Xvfb/Mesa native checks; repaired witness scrolls the real outer dock with paired wheel press/release before actual per-row eye/lock pointer clicks (earlier 9 failures were off-window clicks). Composition, edit denial and save/open still checked; physical Windows/Linux owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "With 3 overlapping layers, toggle each row eye and lock",
+      "expected": "Inline eye/lock work and alter composite/edit eligibility predictably; screenshots/pixels",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 20,
+      "tickets": [
+        "T-089"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-089 model/native cover group vs paint target, consistent insertion, keyboard reorder, 205-row paging, structural undo/redo, stable IDs after file reopen and Object Editor; physical owner NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Select nested group/layer, use +Layer/+Group and reorder",
+      "expected": "Correct parent and sibling position, structural Undo/Redo, stable IDs; native hierarchy smoke",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 21,
+      "tickets": [
+        "T-093",
+        "T-065"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-093: 56/56 model, 27/27 Xvfb/Mesa browser/root/pointer/framebuffer checks; T-065 portable and Atlas browser smokes pass. Separate OS FileDialog click, physical Windows/Linux source browsing, missing/NULL placement and explicit owner response NOT RUN",
+      "finding_state": "PENDING",
+      "physical_action": "Locate reusable object by folder/browser, open source in editor",
+      "expected": "Discoverable source, safe empty/NULL handling, editable source identity; native browser + Atlas integration",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 22,
+      "tickets": [
+        "T-094"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "Owner reported one successful flow, not every file",
+      "finding_state": "OWNER PASS / REGRESSION",
+      "physical_action": "Paint then Save `.drawing`, close/open, check hidden RGB, IDs and undo",
+      "expected": "Byte-exact RGBA8 including transparent hidden RGB, stable IDs, clean savepoint, corruption rejected; `drawing/tests/standalone_smoke.gd`",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    },
+    {
+      "finding": 23,
+      "tickets": [
+        "T-092"
+      ],
+      "matrix_source": "docs/DRAWING_OWNER_ACCEPTANCE_MATRIX.md",
+      "review_source": "docs/DRAWING_USABILITY_REVIEW_2026-11-05.md",
+      "engineering_observation": "T-092: public history labels and cursor/total replace raw document revision in status; Xvfb 34/34 Undo/Redo readback confirms cursor decrements while internal revision increases; physical/owner re-review NOT RUN",
+      "finding_state": "MODEL EXPECTED / UI PENDING",
+      "physical_action": "Paint, Undo, compare displayed history cursor and internal revision",
+      "expected": "History cursor moves backward while internal revision remains monotonic; native History dock screenshot",
+      "physical_linux": "NOT RUN",
+      "physical_windows": "NOT RUN",
+      "owner_acceptance": "NOT GRANTED"
+    }
+  ],
+  "unapproved_manual_gates": [
+    {
+      "ticket": "T-056",
+      "status": "Ready",
+      "required_action": "explicit owner review; no agent approval",
+      "source": "docs/Tickets/T-056.md"
+    },
+    {
+      "ticket": "T-059",
+      "status": "Ready",
+      "required_action": "explicit owner review; no agent approval",
+      "source": "docs/Tickets/T-059.md"
+    },
+    {
+      "ticket": "T-065",
+      "status": "In Progress",
+      "required_action": "explicit owner review; no agent approval",
+      "source": "docs/Tickets/T-065.md"
+    },
+    {
+      "ticket": "T-083",
+      "status": "In Progress",
+      "required_action": "explicit owner review; no agent approval",
+      "source": "docs/Tickets/T-083.md"
+    },
+    {
+      "ticket": "T-095",
+      "status": "In Progress",
+      "required_action": "explicit owner review; no agent approval",
+      "source": "docs/Tickets/T-095.md"
+    },
+    {
+      "ticket": "T-096",
+      "status": "Manual Review",
+      "required_action": "explicit owner review; no agent approval",
+      "source": "docs/Tickets/T-096.md"
+    }
+  ]
+}

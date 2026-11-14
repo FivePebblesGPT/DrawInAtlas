@@ -1,0 +1,1530 @@
+---
+status: "In Progress"
+manual_review: true
+id: T-095
+type: ticket
+kind: implementation
+priority: P0
+epics: ["[[E-009]]", "[[E-004]]"]
+depends_on: ["[[T-053]]"]
+related: ["[[T-085]]", "[[T-086]]", "[[T-068]]", "[[T-094]]"]
+---
+# Profile and eliminate severe 60px Brush latency
+
+**State: In Progress (owner recheck failed, 2026-11-08).** The measured software-renderer staging optimization and independent pixel oracles remain valid, but the owner reports that **60px Brush strokes still take too long to catch up** on the real application. The manual-review gate is not accepted; do not mark Done. A second reproducible UX defect is that pan/zoom during a post-release stroke backlog discards the pending gesture. The earlier visual tile-seam fix in PR #14 remains separately owner-verified.
+
+## User reproduction
+
+On a new approximately 512×512 Drawing image, zoom to about **786%**, choose a **60px Brush**, and attempt to cover the visible canvas without a bucket/fill tool. The owner reported a roughly **three-second pointer stroke taking approximately one minute to render**. Subsequent Undo/Redo is much faster. This must be reproduced through the **actual Brush tool and pointer events**; direct `DrawingEditSession.fill_rect()` is not representative.
+
+The 2026-11-07 Godot 4.8 beta 2 software-renderer diagnostics did *not* reproduce the minute-long UI stall: two 60px mouse strokes covered the displayed area with ~0.47s release-to-commit per stroke in that setup. An isolated nine-sweep, 259,290-pixel `paint_path` benchmark measured ~3.04s staging plus ~1.19s commit on one software-run sample. Neither constitutes a physical GPU/pointer acceptance result or disproves the owner's report.
+
+## Engineering tasks
+
+1. Reproduce on the owner's display/driver and record OS, GPU, scaling, window dimensions, zoom, layers, stroke length, brush width, canvas frame and build SHA. Do not silently replace Brush with fill APIs.
+2. Attribute wall time by **input receipt → queue → staging → detached preview compositor → texture allocation/upload → frame draw/post-draw → release/commit**. Record per-phase p50/p95 with repeated strokes and distinguish physical input-to-photon latency from Godot frame callbacks.
+3. Profile `DrawingEditSession._paint_segment/_stage`, repeated per-pixel dictionary/key/geometry work, `DrawingCanvas._drain_segments` budget/backlog, renderer invalidation and 128px preview tile recomposition at large brush footprints. Optimize measured hotspots rather than guessing.
+4. Preserve exact swept hard-brush geometry, RGBA8 blend/eraser behavior, signed chunk boundaries, selection masking, layer compositing, cancellation and one Undo/Redo step per stroke.
+5. Add a native interactive 60px benchmark/regression at 786% plus a headless byte-exact independent stroke oracle. Record cold and warm cases; test hardware separately from Xvfb/Mesa.
+
+## Acceptance
+
+- [ ] Real pointer-driven large Brush strokes remain visually responsive while held and drain after release within an explicit, documented latency budget on reference hardware; no minute-long stall.
+- [x] Repeated **software-renderer** measures report median/p95, backlog, stage/compose/upload/commit times and before/after logs. Physical reference-hardware results remain pending.
+- [x] Brush and Eraser output are byte-exact against the independent signed-edge/layer/mask oracle and Undo/Redo; native pointer delivery and preview/commit invariants pass in software.
+- [ ] Owner reproduces the original scenario after the fix and records the observed result. Do not infer acceptance from headless software or a direct fill benchmark.
+
+## Boundaries
+
+Keep T-085/T-086 existing checks and T-094 hardware evidence gates intact. The PR #14 tile filtering fix and owner's successful seam recheck are separate from this unresolved latency issue.
+
+## 2026-11-07 implementation and reproducible software evidence
+
+**Fix:** `DrawingEditSession` replaces its per-pixel string-keyed `_covered` set with integer-keyed `_covered_rows` scanlines (absolute coordinates, including signed anchors). Hard Brush/Eraser candidates already painted in the current gesture are skipped **before** `Geometry2D`/distance evaluation and pixel-key formatting. The once-only source-over blend, initial document snapshot, journal rollback of failed batches, detached preview generations, cancellation and one history publication remain unchanged. An independent analytic swept-disc oracle checks pixels the implementation never uses as an input shortcut. This is the measured staging bottleneck; no renderer texture-filtering or UI layout changes were made.
+
+`DrawingCanvas` now retains per-gesture bounded stage-batch samples and aggregates compositor CPU, preview index CPU, upload CPU/bytes, frame count, and commit CPU alongside existing pointer receipt, queue, sample-to-stage, release and frame-post-draw timestamps. **These are engine CPU/frame-callback timings, not physical input-to-photon measurements.** Batch sample retention is capped at 4096; total phase CPU and every delivered timestamp remain counted.
+
+**Controlled witness:** Linux Xvfb 1280×900×24, Mesa llvmpipe 25.0.7, Godot `4.8.beta2.official.cafc17a19`, viewport 980×700, new 512×512 image, 786% zoom, 60px Brush, five consecutive strokes with 120 real `InputEventMouseMotion` events plus down/up each, four motions per engine-frame burst; first stroke cold, four warm on the same document. No bucket/fill substitution. Original `edit_session.gd` from GitHub branch baseline `998af6a803ffb95f7cdc2e6968cf3ac713f54555` was temporarily staged **only** into the standalone package for the negative control, with the identical instrumented canvas and test runner; canonical source and staged optimized code were restored before final tests. Paired raw run summaries: [T-095 Xvfb log](../evidence/T-095-2026-11-07-xvfb.md).
+
+| Metric | Original p50 / p95 | Optimized p50 / p95 |
+| --- | --- | --- |
+| Total gesture staging CPU (ms) | 903.994 / 950.108 | **159.684 / 164.604** |
+| Atomic stage batch CPU (ms) | 6.915 / 10.065 | **0.535 / 3.987** |
+| Input receipt → completed staging (ms) | 1188.937 / 1830.859 | **3.526 / 93.379** |
+| Release → commit (ms) | 1834.909 / 2060.884 | **57.634 / 68.246** |
+| Commit/publish CPU (ms) | 57.573 / 73.311 | 57.156 / 67.810 |
+| Visible tile compositor CPU per recorded frame (ms) | 7.197 / 16.350 | 8.027 / 23.360 |
+| Texture allocation/upload CPU per recorded frame (ms) | 0.164 / 0.311 | 0.213 / 0.347 |
+| First pointer-down → engine frame-post-draw p95 (ms) | 104.978 | 107.224 |
+| Peak queue depth / frame drains (max per stroke / typical) | 91 / ~116 | **20 / 32** |
+
+Cold first stroke: original stage **881.836 ms**, release→commit **1834.909 ms**; optimized **150.528 ms** and **51.295 ms**. The renderer compose p95 *did not improve* and remains a potential physical-machine bottleneck; upload and first post-draw similarly show no demonstrated gain. What changed materially is redundant overlapping-brush candidate work and its release backlog. Software release p95 fell by approximately **30×** in this paired run, but the user's ~one-minute report has not been reproduced or invalidated on the actual GPU/driver.
+
+**Regression evidence (all pass under pinned engine):** `brush_coverage_smoke.gd` (32 assertions; exact 150×150 independent analytic 60px swept-Brush and Eraser oracle over signed tiles, subtracted selection hole, frame clipping, two layers, alpha RGBA8, preview/commit bytes, rollback after a failed second batch, cancel, Undo/Redo and 64-bit anchors); `brush_latency_native.gd` (five complete mouse-driven captures; native held-button framebuffer differs from pre-press image, committed source reads match stroke presence, all 122 samples per gesture staged, single revision per stroke; optional budget gate passed); T-085 `live_stroke_smoke` and `live_stroke_native`, T-086 `viewport_preview_index_smoke`, `viewport_cache_smoke`, `viewport_cache_native`, `renderer_visible_plan_smoke`, `renderer_sparse_layer_smoke`, T-087 `image_frame_smoke`, T-088 `selection_clipboard_smoke`, `selection_clipboard_native`, and PR #14 `pixel_boundary_native` (17 framebuffer/source checks). The **negative-control** run with the old session and optional 500ms p95 gates exits nonzero and reports both release and input-to-stage budget failures; re-staging optimized code passes. Headless native display cannot satisfy the physical gate. Existing scripts' expected renderer/audio shutdown diagnostics are not physical acceptance evidence.
+
+**Run again:** Stage from canonical source using `python3 tools/build_drawing_app.py --in-place`, then `godot --headless --editor --path drawing --import --quit`. With Godot on `PATH`, run `godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd` and `xvfb-run -a -s '-screen 0 1280x900x24' env T095_RELEASE_P95_BUDGET_MS=500 T095_INPUT_STAGE_P95_BUDGET_MS=500 godot --display-driver x11 --rendering-method gl_compatibility --path drawing --script res://tests/brush_latency_native.gd`. The two optional **500ms p95 software diagnostic ceilings** catch the old ~2s backlog on this machine without hard-coding llvmpipe timings into unrelated CI hosts; the native witness itself still checks correctness unconditionally. The new on-demand `godot-native-t095-brush.yml` workflow stages canonical source, runs both witnesses and uploads logs **without** certifying physical GPU results. Timing should be recollected on reference hardware rather than extrapolated.
+
+**Required focused owner review (not approved):** On the owner's actual device record OS, GPU/driver, display scaling, app/window dimensions, canvas size/layers, build SHA, 786% zoom and 60px Brush width. Repeat ~3s physical pointer strokes on a new ~512×512 image, hold button long enough to inspect continuously visible preview, release and record p50/p95 release→commit plus worst stall/backlog and real video/high-speed input-to-photon if available. Provisional targets for acceptance discussion: visible feedback no later than **250ms p95** and release→commit no later than **500ms p95** without dropped geometry; these are not hardware-passed budgets and require owner agreement. Recheck 60px Eraser, Undo/Redo and the previously fixed signed display-tile edge. Report whether the minute-long stall is gone and any machine-specific compositor bottleneck. Do **not** set `manual_review_approved` or mark Done until that evidence and explicit owner acceptance exist.
+
+## 2026-11-08 owner recheck — performance still unacceptable; post-release navigation loses strokes
+
+**Observed by owner (failure, not approval):** 60px solid Brush strokes still take too long to catch up despite the previous software p95 gains. The user specifically notes that custom/textured brushes are not implemented yet and future brush complexity needs greater performance headroom. Zooming or panning while waiting for an already released stroke to finish **cancels the stroke**. The owner's remark is qualitative; there is no fresh hardware timing number or measured attribution to a specific CPU/GPU subsystem. Keep the successful prior model/software benchmarks, but do **not** treat them as owner acceptance.
+
+**Confirmed code path:** `DrawingCanvas.finish_gesture()` queues the last sample, sets `_finish_requested = true` and may leave `session != null` until `_drain_segments()` completes on subsequent frames. The `zoom` setter cancels whenever `session != null`; the `camera` setter also cancels on `session != null`; middle-button pan initiation cancels `session`. This conflates **button held (active input)** and **button released (raster backlog awaiting publication)**. Deferred samples are already source-space coordinates. After mouse release, viewport-only pan/zoom **must not discard** the still-valid stroke. During a held stroke, pan/zoom needs a defined source-coordinate transition; cancellation should not be the routine editor experience, but preserving correct geometry is mandatory. Escape remains an explicit cancellation. Document/layer/revision changes must avoid silent loss and maintain transaction ownership.
+
+**Additional engineering required before returning to Manual Review:**
+1. Add failing **native mouse-release → pending backlog → wheel zoom / middle-pan / camera setter** regressions. Verify all original source-space samples and one Undo transaction survive navigation, before/after byte-for-byte, at 60px and fractional zoom. Include negative tests for explicit Escape/stale document revision; switching to Pan via toolbar should not accidentally destroy post-release work.
+2. Separate gesture states (**capturing**, **draining**, **committing**, **completed/cancelled**) instead of treating `session != null` as "button down". Keep durable source-space samples and frozen brush parameters until completion. Allow viewport-only navigation during the **draining** state; define what happens if a second stroke begins before the first finishes and avoid silently dropping that input.
+3. Profile **sustained hand-drawn strokes on the owner's hardware** as well as synthetic InputEvent bursts, including worst-case queue age, CPU staging, draw/preview compositor, texture churn, actual input responsiveness, p50/p95 and maximum wall-clock catch-up after release. The previous synthetic Xvfb results are insufficient; verify with dense canvases/layers and repeated large/overlapping paths.
+4. Design a **brush-footprint/stamp abstraction** (solid, custom/texture masks, opacity, spacing, pressure in future scope) with tile-local incremental edits and a latency budget that does not assume a constant 60px hard circle. Preserve exact current source RGBA8, once-per-stroke semantics, eraser, preview correctness and cancellation. Do not claim textured brushes shipped in this ticket.
+5. Improve architectural throughput as measured (candidate batching, cached stamp masks, dirty-tile updates, decoupled input/preview from expensive canonical rasterization), not just another small loop optimization. Preserve Godot main-thread rendering constraints and atomic publication.
+6. Record **explicit owner re-acceptance** of 60px Brush catch-up, survival of navigation after mouse-up, and behavior during held navigation before changing ticket status to Done.
+
+**Decision boundary:** The owner has not dictated exact mid-button-held pan/zoom semantics. Safest minimal fix is to preserve a released, draining stroke while navigation changes only the viewport; active-stroke navigation requires a deliberate interaction policy and correct source-coordinate mapping. Do not silently cancel post-release work.
+
+## 2026-11-08 optional Rust/Hokusai implementation checkpoint — not accepted
+
+The offline tooling bundle SHA-256 was independently verified; its full native
+verifier and the DrawInAtlas Rust extension build pass in pinned Godot 4.8b2.
+An opt-in native hard brush is pixel-identical to the legacy 60px source
+oracle, and four actual Hokusai 0.3.0 `.myb` presets now render through a
+detached DrawingEditSession preview and atomic DrawingDocument commit. A
+missing binary/preset falls back to the legacy Brush; native binaries are
+not tracked and no document format is rewritten.
+
+**Post-release navigation defect addressed locally:** explicit capture,
+drain and commit phases preserve queued source-space samples across wheel zoom,
+middle pan, Pan toolbar and camera setters after mouse-up. The regression
+contains 262 queued samples, exact source bytes, a single Undo history
+transaction and moved-viewport rendering. Held-button navigation deliberately
+cancels to avoid mixed source transforms. A second stroke is blocked with
+explicit feedback until prior commit.
+
+**Verification:** 48/48 navigation, 30/30 native integration/preset/mask,
+6/6 no-binary and present-binary fallback, 32/32 existing Brush source
+oracles, plus 17/17 PR #14 pixel-boundary, 125/125 live-stroke native,
+and 153/153 native viewport-cache checks. The five-stroke/120-motion Xvfb llvmpipe measurements found
+Legacy stage p95 **159.339ms**, NativeHard **139.976ms**, and Hokusai
+`.myb` hard **934.532ms**; post-release Hokusai release-to-commit p95
+**63.062ms**, but **this does not include the much larger ongoing held-input
+stage time**. Hokusai's integration remains too slow and requires further
+engineering. Native hard wins a modest software-stage margin only; it has
+not been physically user-accepted.
+
+[Detailed 2026-11-08 engineering evidence](../evidence/T-095-2026-11-08-hokusai.md)
+and [optional native build notes](../../native/drawing_brush/README.md).
+
+## 2026-11-08 follow-up: Hokusai tile-batch staging checkpoint
+
+**Still In Progress; manual review remains required.** The opt-in Hokusai
+prototype now prevalidates every native pixel delta and touched source tile
+before mutating the detached edit, then batches preview tile generations and
+avoids per-pixel rollback journal/Result allocations. It preserves signed
+64-bit anchors, selection holes, original-source compositing, one history
+transaction, explicit cancellation, and atomic rollback after a failed
+lazy source-tile read with a successful retry. The 57-check old-vs-new per-pixel
+RGBA8 oracle passes; native preset integration (30/30), released-stroke
+navigation (48/48), independent hard-brush coverage (32/32) and neighboring
+model/native regressions pass locally.
+
+A five-stroke *same-environment* Xvfb/Mesa comparison with 120 actual Brush
+motions per stroke reduced Hokusai staging p95 from **1271.973 ms** to
+**691.732 ms**, with batch staging p95 from **56.994 ms** to **26.211 ms**.
+However, the optimized Hokusai stage p95 is still about **3.1×** the same-run
+Legacy p95 (225.456 ms); the 60px responsiveness issue is not resolved.
+Native FFI transfer/raster/export accounted for only 24–27 ms per stroke
+in the optimized test, while GDScript staging still dominated. Release-to-
+commit p95 did not materially change. These are local software-rendered CPU
+measurements, **not owner hardware/input-to-photon acceptance**. The owner
+recheck still stands; no status or `manual_review` gate change is authorized.
+
+[Measured control, updated tests and known limitations](../evidence/T-095-2026-11-08-hokusai.md).
+
+**Status is still `In Progress`, `manual_review: true`; no owner approval.**
+Do not merge PR #16 or infer hardware UI acceptance. Continue profiling
+the native tile/pixel boundary, compositor and pressure/export behavior before
+returning this ticket for review.
+
+## 2026-11-08 follow-up: deferred tile-local Hokusai staging (not closure)
+
+The preceding batch-preflight implementation still rebuilt and hashed global
+`"x,y"` pixel keys on every native pigment delta, even for repeat dabs.
+T-095 now groups validated pixels by storage tile and integer local offset,
+staging only detached preview bytes and materializing canonical `_before`/
+`_after` string-keyed history **once at commit**. Mixed edits materialize
+before their rollback snapshots, and exact source-RGBA8/selection/Undo
+semantics remain unchanged. The expanded **101/101** independent oracle
+covers 64-bit anchors, repeated/no-op batches, preview parity, original
+pixel values, failed mixed source reads, one atomic commit and Undo/Redo.
+Native/preset (30/30), navigation (48/48), fallback (6/6 present/absent),
+hard-brush (32/32), live-stroke (125/125), seam (17/17) and viewport (153/153
+after fresh import) checks pass locally. The ticket store validates all 96.
+
+In a controlled 5×120-motion, 60px, 786% Xvfb actual Brush-input comparison,
+Hokusai **stage p95 improved 580.815→369.368ms (~36%)**, and diagnostic
+stage+commit p95 648.649→449.041ms (~31%). However, p95 release→commit
+increased from 68.824ms to 79.739ms on the confirming run, and Legacy
+still stages at 168.023ms p95 under the same conditions. These are CPU and
+software-rendered diagnostics, not a physical responsiveness pass. Further
+renderer profiling and owner-machine testing are necessary.
+
+[Method, paired rows, regression details and limitations](../evidence/T-095-2026-11-08-hokusai-tile-local.md).
+**Remain `In Progress`, `manual_review: true`, owner acceptance absent.**
+
+## 2026-11-09 follow-up: allocation-free RGBA8 blend / direct tile-map reads
+
+**Ticket stays `In Progress`, `manual_review: true`; owner rejection and
+physical-device acceptance gate remain in force.** The hot source-over
+blend no longer creates a typed three-item Array for every painted pixel;
+its scalar channels retain the original arithmetic/rounding. The Hokusai
+deferred tile-local path now reads verified local offsets from the immutable
+source `_pixels` map rather than repeatedly crossing a GDScript getter. No
+new brush features or document format changes. The new independent oracle
+checks all 65,536 source/destination alpha pairs plus 32,768 additional
+RGBA combinations **byte-for-byte** against the old array implementation,
+and the on-demand T-095 workflow runs it fail-closed.
+
+Paired 60px/786% mouse-input Xvfb/Mesa Hokusai measurements show stage
+p95 **347.704 → 281.002 ms (~19% less)** and display compositor frame CPU
+p95 **29.247 → 21.833 ms (~25% less)**; release→commit p95 is essentially
+unchanged (**76.566 → 76.348 ms**). Hokusai is still **1.7×** the same-run
+Legacy stage p95 (**164.146 ms**) and lacks owner-device responsiveness
+evidence. Local headless/native exact-pixel, preset, selection, navigation,
+seam and viewport regressions passed; hosted CI and physical acceptance are
+not claimed. Preserve T-096's independent manual gate.
+
+[Method, raw per-stroke data and test matrix](../evidence/T-095-2026-11-09-blend.md).
+
+## 2026-11-09 follow-up: cached native storage tile keys / exact alpha endpoints
+
+**Still `In Progress`, `manual_review: true`.** Hokusai native delta
+preflight now caches the most recent signed-64-bit storage tile key and
+computes local offsets by integer tile origin; rectangular clipping avoids
+per-delta `Vector2i` allocation. It preserves full preflight/atomic source
+resolution, selection holes, original-source blending, preview/commit, and
+Undo/Redo. Shared RGBA8 blending now handles opaque sources and transparent
+destinations without float division (including hidden RGB and signed native
+pigments). The independent 114,688-pair old-formula oracle and expanded
+119/119 native-delta oracle pass; native preset, navigation, boundary,
+viewport and fallback regressions pass locally.
+
+A controlled five-stroke, 120-motion 60px/786% Xvfb native-pointer comparison
+reduced Hokusai staging p95 **275.158→239.448ms (~13%)** and frame
+compositor CPU p95 **21.848→16.808ms (~23%)**. Release→commit changed
+97.831→75.785ms in this tiny sample, **not a demonstrated release-latency
+improvement**. Legacy still stages at 162.737ms p95 on this machine; owner
+hardware input-to-photon and sustained-custom-brush headroom remain unverified.
+No owner approval is claimed and T-096's independent gate is unchanged.
+
+[Controlled logs, source and test evidence](../evidence/T-095-2026-11-09-cached-tile-preflight.md).
+
+## 2026-11-09 follow-up: tile-run buffered native deltas (not closure)
+
+**Still `In Progress`, `manual_review: true`; no owner re-acceptance.**
+The earlier preflight grouped Hokusai deltas by signed Drawing storage tile,
+but fetched, extended, and assigned a `PackedInt32Array` in a Dictionary
+**for every pixel**. Packed-array copy-on-write and Dictionary access made
+that inner loop an avoidable overhead. It now accumulates each contiguous
+storage-tile run in a local packed buffer and writes it to the Dictionary
+only when the native stream changes tiles (and once at the end). Returning
+to a previously seen tile reloads its existing deltas, preserving native
+pixel order, last-pigment-wins behavior, signed 64-bit anchors and the
+all-source-tiles-before-mutation transaction preflight. The usual native
+stream is spatially clustered; the optimization does not assume every tile
+appears in only one run.
+
+The independent pixel oracle is now **126/126**: it adds a full 4,096-pixel
+64px tile stream, out-of-order cross-tile revisits, byte-exact preview,
+commit and Undo/Redo versus the old per-pixel `_stage()` implementation.
+The 32/32 Brush source oracle, 114,688-pair RGBA8 blend parity, 30/30 native
+preset, 48/48 navigation, 6/6 native/absent fallback, 125/125 live-stroke,
+17/17 signed boundary and 153/153 viewport-cache regressions pass locally
+(after a clean asset reimport for the viewport's font). The T-094 model-log
+checker and ticket validator still pass; hosted CI was not run.
+
+Same-machine 60px/786% **5 strokes × 120 actual pointer motions** under
+Godot 4.8b2 Xvfb/Mesa llvmpipe: preceding source staged p95 **235.533ms**,
+tile-run cache staged p95 **215.324ms**, about **8.6% less**; observed
+Hokusai Native→GDScript stage p95 improved from **~240.1ms** to
+**~208.6ms** in an initial run. The same final Legacy workload staged at
+**172.477ms p95**, so Hokusai still trails it. Five strokes under software
+rendering cannot prove physical input-to-photon latency or owner
+responsiveness. The remaining release/commit and compositor costs require
+separate profiling; **do not close the ticket or change the default backend**.
+
+[Reproduction, complete paired runs, regression caveats](../evidence/T-095-2026-11-09-tile-run-buffer.md).
+
+
+## 2026-11-09 follow-up: sparse detached-preview composition (not closure)
+
+**Still `In Progress`, `manual_review: true`; the owner's performance
+rejection remains controlling.** The renderer previously scanned every pixel
+of a display tile when the detached preview patch was nonempty, even with a
+handful of sparse source/preview pixels. It now composes from a capped sparse
+union with preview precedence (including zero-alpha erasure), using the
+existing dense loop for larger patches or narrow runs. Dense preview reads
+also avoid an unnecessary canonical source lookup for overridden pixels.
+The independent **133/133** RGBA8 oracle covers signed 64-bit anchors,
+source/preview layer order, selection holes, sparse additions, transparent
+erasures, 100-pixel dense fallback, planned frames, commit, Undo/Redo and
+cancellation. Neighboring Hokusai (126/126), coverage, blend, native preset,
+navigation and viewport checks passed locally.
+
+In a 25-sample headless **128×128 sparse detached-preview** render, median
+CPU time improved **2611→608/589µs (~4.3×)** on two confirmation runs. This
+is a *targeted sparse render*, not a 60px input-latency claim. The paired
+5×120 actual-pointer 60px Hokusai witness shows near-unchanged per-frame
+compositor p95 **16.710→16.562ms**, total stage p95 **219.122→207.569ms**
+and release p95 **72.715→71.527ms** under Xvfb/Mesa. The difference in the
+full gesture is not enough to claim a hardware responsiveness gain; Legacy
+still stages at **175.927ms p95** with the new renderer. The CI workflow
+includes the new fail-closed oracle, but hosted CI and reference-device
+input-to-photon tests have not run. Fresh external staging without a native manifest now imports without errors
+and passes sparse-preview (133/133) and Legacy fallback (6/6); manually
+removing an extension from an *already imported* project still reports a
+cached registry warning. Known Godot shutdown leaks remain separate caveats.
+
+[Method, paired numbers, oracle coverage and unresolved gates](../evidence/T-095-2026-11-09-sparse-preview-compositor.md).
+**No owner approval; do not mark Done or merge PR #16.**
+
+## 2026-11-09 follow-up: native fixed-point export cache and atomic input preflight
+
+**Remain `In Progress`, `manual_review: true`; no owner approval.** The
+Hokusai Rust exporter now remembers each changed 64×64 native tile's raw
+fixed-point channels as well as its last quantized RGBA8 output. Identical
+native pixels bypass expensive per-pixel linear→sRGB8 conversion while a
+change within one RGBA8 bucket does **not** emit a spurious GDScript edit.
+This adds 32 KiB of raw-cache memory per visited native tile. All input
+positions and finite pressure are also preflight-validated before mutating
+a stateful native stroke, preventing invalid trailing points from leaking
+latent dabs into a subsequent batch.
+
+Two offline Rust unit tests, Clippy, and a new **81/81 native export oracle**
+pass. The oracle compares complete SHA-256 delta streams from the *previous*
+native binary across hard, soft, ink and airbrush MyPaint presets, plus
+post-invalid-batch continuation. Neighboring 126/126 Hokusai staging,
+133/133 preview, 30/30 preset, 48/48 navigation, 125/125 native live stroke,
+153/153 viewport after fresh font import, and fallback regressions pass
+locally. In the paired Xvfb/Mesa 5×120 actual-pointer run, native export
+CPU p50 changed **28.522→21.127ms**, p95 **35.184→25.035ms**. However
+full-stroke staging p95 **237.346→253.152ms** and release p95
+**80.022→85.269ms** did not improve; a Legacy control staged in
+**170.117ms p95**. This does **not** resolve the owner complaint.
+
+[Raw hashes, controlled measurements, tests, memory tradeoff and caveats](../evidence/T-095-2026-11-09-native-raw-pixel-export.md).
+Hosted CI, device input-to-photon, long-stroke memory overhead, OS export
+packaging and explicit owner acceptance remain unverified. Do not change
+ticket status, Hokusai's opt-in default, or T-096's separate manual gate.
+
+
+## 2026-11-09 follow-up: direct native tile publication (not closure)
+
+**Remain `In Progress`, `manual_review: true`; owner rejection still
+controls.** The Hokusai-only commit no longer materializes thousands of
+global pixel string keys merely for `DrawingDocument._publish_edit()` to
+parse them back to tile indices. `DrawingDocument._publish_tile_edit()`
+validates detached tile-local previews and original source identity, constructs
+canonical exact before/after history once and shares the existing atomic
+installation routine with the global-key path. Mixing native and ordinary
+region/fill APIs still uses the old publication path; no storage or brush
+format changes. A late invalid tile, stale revision or source replacement
+rejects without partial publication.
+
+The new **56/56** independent tile-commit oracle compares source/preview
+bytes, dirty regions, canonical history dictionaries and Undo/Redo with the
+original `_stage`/`_publish_edit` path across signed >32-bit anchors, alpha,
+selection holes and repeated pixels. Hokusai staging (126/126), sparse
+preview (133/133), native preset (30/30), navigation (48/48), live stroke
+(125/125), viewport (153/153 after fresh font import), signed boundary
+(17/17) and both native-present and fresh native-absent fallback tests pass.
+The new on-demand CI step uses fail-closed log validation, but hosted CI
+remains unrun.
+
+In a paired five-stroke, 60px/786% actual-pointer Xvfb/Mesa test,
+**release→commit p95 fell from 75.081ms to 43.258ms** (42.107ms
+in a confirmation run); **full-stroke staging p95 remained essentially
+unchanged** (204.169→209.405/206.029ms). Legacy still staged at
+155.529ms p95, versus 206.029ms for Hokusai in the confirmation. These
+are software-rendered CPU diagnostics, not physical input-to-photon or
+owner responsiveness evidence. Legacy remains default; do not close
+T-095 or merge PR #16 without the owner's explicit re-acceptance.
+
+[Code boundary, benchmark, atomic-failure and missing-binary evidence](../evidence/T-095-2026-11-09-direct-tile-commit.md).
+
+## 2026-11-09 follow-up: signed power-of-two Hokusai tile arithmetic (not closure)
+
+**Still `In Progress`, `manual_review: true`; owner acceptance absent.**
+The native-delta GDScript preflight now maps signed global pixels to the
+common power-of-two Drawing storage tile with arithmetic shift and mask,
+instead of invoking signed floor division and multiplication/subtraction
+per pixel. For arbitrary non-power-of-two tile strides, the exact old
+signed-divide path remains. No change to canonical pixels, selection, alpha,
+preview/commit parity, or history. The new independent **422/422** test
+compares integer tile math around signed >32-bit edges, then verifies
+three native delta batches against the original `_stage()` path for ten
+strides (including 1, 3, 30, 255, 256 and 2048), selection holes,
+clipping, preview, source-over blending, canonical history and Undo/Redo.
+
+In paired 60px/786% five-stroke Xvfb/Mesa mouse-input runs, Hokusai staging
+p95 changed **201.491→183.443ms** and **204.460→186.535ms** in two
+controls (~9% reduction). Legacy stages at **167.412ms p95** in the
+same software environment, so Hokusai still trails it. Native integration,
+held-stroke navigation, viewport and fresh no-native fallback tests pass locally. These CPU diagnostics are **not**
+physical input-to-photon or owner acceptance; Hokusai remains opt-in and
+T-096's independent Manual Review status is unchanged. Hosted CI and
+platform exports are not verified.
+
+[Exact oracle, reproducible measurements and remaining gates](../evidence/T-095-2026-11-09-signed-tile-shift.md).
+
+## 2026-11-09 follow-up: default Legacy Brush signed tile/source lookup (not closure)
+
+**Remain `In Progress`, `manual_review: true`; the owner's rejected 60px
+responsiveness result is still controlling.** The ordinary GDScript
+`DrawingEditSession._stage()` previously computed storage tile keys and
+modulo offsets once to read a source pixel, then repeated them for detached
+preview bookkeeping. It now resolves the tile/offset only once per accepted
+pixel and reads the verified resident sparse tile's integer-offset map without
+another GDScript `get_rgba` call. Power-of-two strides precompute a session-local
+signed shift/mask, while non-power-of-two strides retain the original
+`floor_div` and `posmod` semantics. This does not alter Brush geometry,
+source-over arithmetic, hidden RGB, history format or Undo/Redo.
+
+A new **4,193/4,193** independent oracle compares source pixels through
+`DrawingDocument.read_pixel()`, preview, history, Undo/Redo, once-per-stroke
+coverage and selection holes at seven tile strides, with negative and >32-bit
+world anchors. A separate **86/86** oracle uses the original
+`Geometry2D.get_closest_point_to_segment()` predicate to compare oblique
+swept-disc Brush/Eraser pixels and history. The earlier proposed scalar
+oblique-distance fast path was **reverted after its matched control showed
+no useful improvement**; it is not shipped. Adjacent Hokusai staging
+(126/126), native presets (30/30), post-release navigation (48/48),
+viewport (153/153 after clean Godot font reimport), live stroke, signed
+boundaries and native-present/fresh-native-absent fallback regressions pass
+locally. The CI workflow includes both new fail-closed oracles; hosted CI
+has not run.
+
+In a paired five-stroke Xvfb/Mesa **60px Legacy actual-pointer** run at 786%
+zoom with 120 mouse motions per stroke, staging p95 changed
+**168.123→148.419ms (~11.7% reduction)**. Release→commit p95 changed
+63.098→57.178ms in only five strokes; this is not strong evidence for
+release latency and is **not physical input-to-photon timing**. No device
+owner review or new acceptance was obtained. Preserve the legacy default,
+optional native backends, independent T-096 Manual Review, and PR #16 unmerged.
+
+[Methods, raw controls, tests, caveats and remaining gates](../evidence/T-095-2026-11-09-legacy-stage-lookup.md).
+
+
+## 2026-11-09 follow-up: bounded sustained-pointer queue retention (not closure)
+
+**Still `In Progress`, `manual_review: true`; the owner's 60px latency
+rejection stands.** A stroke with continuous OS input could keep retaining
+*already drained* entries in `_samples` and `_sample_times_us` indefinitely
+unless a frame consumed the whole queue. The canvas now compacts only a
+sufficiently large consumed prefix (at least 256 records and at least half the
+buffer), while preserving the queued source-space points, arrival timestamps,
+partly interpolated target, release/zoom/pan behavior and one history step.
+Per-gesture `max_sample_buffer` and `sample_compactions` expose the pressure.
+
+A new independent **31/31** headless model exercises a 6,000-event sustained
+producer/consumer backlog, unfinished target, a 1,600-point live Brush
+session and exact unsliced RGBA8/Undo/Redo oracle. Original-code negative
+controls fail, and the strict log checker accepts the fixed run. Adjacent
+hard-brush (32/32), oblique geometry (86/86), signed source (4,193/4,193),
+native preset (30/30), post-release navigation (48/48), live-stroke and
+viewport-cache (153/153) regressions pass locally. The on-demand T-095
+workflow includes the new test; hosted CI is **not** claimed.
+
+This is a **sustained-stroke memory bound**, not faster 60px painting. The
+standard 5×120-pointer software workload measured 146.880ms staging p95 and
+69.274ms release-to-commit p95, near a prior 145.801/63.267ms control; no
+speed gain or physical input-to-photon acceptance is inferred. Real hardware,
+full CI and explicit owner review remain required. T-096 stays independently
+in Manual Review.
+
+[Methodology, negative control, precise limits and test results](../evidence/T-095-2026-11-09-input-queue-compaction.md).
+
+
+## 2026-11-09 follow-up: bounded sample-to-stage latency telemetry (not closure)
+
+**Remain `In Progress`, `manual_review: true`; the owner's rejected 60px Brush
+responsiveness result is still controlling.** After sustained input queue
+compaction, the per-gesture `sample_to_stage_us` debug array still grew by one
+entry per completed sample, and final `last_gesture_metrics` deep-copy retained
+the whole stroke. It now retains exact short-stroke histories (up to 4,096)
+and a chronological latest-4,096 window for longer strokes, plus exact lifetime
+`sample_to_stage_total` and `max_sample_to_stage_us`. Long-stroke p50/p95 from
+the bounded array describe **only its latest window**, not the entire stroke.
+
+The new strict-log **22/22** oracle includes an actual 4,602-sample Brush
+capture, post-release zoom/pan/tool navigation, one canonical RGBA8 commit and
+independent Undo/Redo parity, plus 15,000 synthetic sample completions and
+ring-wrap/worst-age checks. The previous source fails two assertions in the
+isolated negative control (4,602 retained samples instead of 4,096). The
+on-demand T-095 workflow includes the oracle. Adjacent queue, Brush, Hokusai,
+post-release navigation, native preview and viewport checks pass locally.
+
+In two order-swapped 60px/786% five-stroke Xvfb pointer comparisons, current
+staging p95 was **144.872 / 162.502ms**, versus prior **134.327 / 141.887ms**.
+**No speed improvement is claimed**; the recorded benefit is bounded telemetry
+memory and bounded final metrics-copy work on sustained strokes. These are
+software CPU diagnostics, not physical input-to-photon or hardware acceptance.
+Hosted CI, owner-device responsiveness, export packaging and explicit review
+remain open; Hokusai stays opt-in and T-096's independent Manual Review is
+unchanged.
+
+[Reproduction, negative control and exact metrics](../evidence/T-095-2026-11-09-bounded-latency-telemetry.md).
+
+
+## 2026-11-09 follow-up: allocation-free Brush stage success (not closure)
+
+**Remain `In Progress`, `manual_review: true`; no owner re-acceptance.**
+A normal 60px Legacy Brush stroke reaches `DrawingEditSession._stage()` for
+thousands of covered pixels. Each successful pixel used to allocate a fresh
+`DrawingResult` despite the caller only inspecting `.ok`; this adds garbage
+collection pressure and staging CPU time. The internal swept-Brush and
+NativeHard loops now share one **session-owned success-only result**, including
+no-op selection and covered-pixel successes. Error returns still allocate a
+distinct failure result so the shared success cannot be poisoned. Ordinary
+`_stage()` callers (fill, paste, selection, tests) still obtain independent
+mutable success objects, and public `paint_path()` responses remain fresh.
+Neither pixel data, geometry, alpha, clipping, once-only coverage, preview,
+history nor document format changed.
+
+The new fail-closed **30/30** ownership and exact-history oracle verifies
+public-result independence, private same-session sharing, selection/covered
+no-ops, invalid RGBA rejection followed by retry, preview/commit parity,
+60px oblique paint, and Undo/Redo. It passes with native extension loaded
+and on a fresh standalone import **without** the extension. Neighboring
+32/32 source coverage, 86/86 original Geometry2D, 4,193/4,193 signed
+source-tile, 126/126 Hokusai delta, 56/56 native tile commit, 30/30 native
+preset, 48/48 navigation, 153/153 viewport (after clean font import) and
+6/6 fallback checks pass locally. The new oracle runs in on-demand T-095 CI
+with strict log validation, not in the 46-step required fast CI inventory.
+
+Two paired 5×120 actual-pointer, 60px, 786% Xvfb/Mesa Legacy comparisons
+reduced staging p95 **138.769→123.404ms** (11.1%) and
+**150.340→128.852ms** (14.3%). Release-to-commit p95 changed
+**62.105→64.150ms** and **63.673→62.059ms**, respectively; there is **no
+robust commit-latency gain**. These are small-sample software-rendered CPU
+timings, not physical input-to-photon or owner hardware acceptance. Further
+responsiveness profiling, hosted CI, and explicit owner review are required.
+T-096 retains its independent Manual Review gate; PR #16 must not be merged
+based on this checkpoint.
+
+[Code, controls, exact oracle and limitations](../evidence/T-095-2026-11-09-brush-result-reuse.md).
+
+## 2026-11-09 follow-up: latest-batch profiling window, not closure
+
+**T-095 remains `In Progress`, `manual_review: true`; no owner re-acceptance.**
+The existing `stage_batches_us` 4,096-entry cap preserved only the *first*
+batches of a sustained stroke. This hid late rasterization overloads from
+reported batch p50/p95. It now retains the chronologically latest 4,096
+batch durations, with exact lifetime `stage_batch_total`,
+`max_stage_batch_us`, and the existing full-stroke `stage_cpu_us` total.
+Short-stroke sample order and values are unchanged, and the batch recorder
+resets for each gesture. Long-stroke p50/p95 are **latest-window** summaries,
+not exact lifetime percentiles; lifetime count and maximum remain exact.
+
+The new strict-log **29/29** oracle covers 13,001 synthetic batches with an
+evicted early worst timing, exact and partial ring wraps, full short-stroke
+accounting, real Brush pointer input, post-release pan/zoom, canonical pixel
+parity and Undo/Redo. The previous canvas fails the negative control; the
+updated version passes with and without the optional native GDExtension.
+Adjacent hard-brush, Hokusai, viewport, navigation, live-stroke and signed
+pixel-boundary regressions pass locally. The on-demand T-095 workflow captures
+the new log; required fast-CI IDs are unchanged. In the matched 5×120-motion
+software-run control, stage p95 was **131.499ms** before and **129.490ms**
+after, and release-to-commit p95 varied **63.199→80.129ms**. **No speed
+improvement or regression is inferred from that small sample.** The fix
+improves sustained-stroke profiling completeness, not native CPU throughput
+or physical responsiveness. Hosted CI, owner hardware input-to-photon,
+further performance headroom and explicit owner approval are still pending.
+T-096 remains independently in Manual Review; do not merge PR #16 on this
+evidence alone.
+
+[Exact test methodology, negative control, metrics and limitations](../evidence/T-095-2026-11-09-stage-batch-window.md).
+
+
+## 2026-11-09 follow-up: validated direct tile publication for Legacy Brush (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** Default swept
+Brush/Eraser sessions already stage exact tile-local detached preview pixels
+and cache verified source tiles. They previously converted those pixels into
+canonical global string keys during staging and then parsed the keys back
+into tiles at commit. Brush-only sessions now reuse the existing
+`DrawingDocument._publish_tile_edit()` preflight, retaining the **same**
+`_install_prepared_edit()` history and dirty-region publication. Ordinary
+`_stage()`, Fill, Paste and mixed edits continue through `_publish_edit()`;
+Hokusai's existing native-only path remains unchanged. The more conservative
+direct preflight also rejects replaced source-tile objects without a revision
+change. No native dependency, document format or brush geometry changed.
+
+A new independent **507/507** oracle runs the **original pixel-key** publisher
+alongside the direct publisher for Brush and Eraser, four tile strides (16,
+30, 64, 256), signed >32-bit anchors, hidden RGB, selection holes, clipping,
+overlapping paint batches and mixed public edits. It compares full canonical
+before/after dictionaries, all dirty regions, detached preview pixels,
+committed bytes, one Undo/Redo history entry, invalid late-tile rejection,
+stale revision, and same-byte source-object replacement. The existing
+32/32 hard-brush coverage, 86/86 original oblique Geometry2D, 30/30 native
+preset, 48/48 post-release navigation, 125/125 live-stroke, 17/17 signed
+framebuffer and 153/153 viewport checks pass locally. Fresh no-native import
+passes both the 507-check oracle and 6/6 fallback checks. The on-demand
+T-095 workflow now runs the new oracle fail-closed; hosted CI was not run.
+
+Two paired 5×120-motion 60px/786% actual-pointer Xvfb/Mesa comparisons
+reduced **release-to-commit p95 from 66.306 to 49.133ms**, then from
+**62.757 to 53.489ms** when benchmark order was reversed. Commit CPU p95
+fell **65.883→48.705ms** and **62.338→53.090ms**, respectively. Staging
+was not consistently faster (127.095→121.522ms and 118.575→126.792ms).
+This is a software-rendered local commit-path improvement, **not** an
+owner-device input-to-photon pass or a resolution of the owner's 60px
+catch-up rejection. A separate convex scanline geometry experiment was
+reverted after measuring slower staging; it is not part of this commit.
+T-096 retains its independent Manual Review status. Do not merge PR #16
+or mark T-095 Done without explicit owner re-acceptance.
+
+[Reproduction, paired control and regression evidence](../evidence/T-095-2026-11-09-legacy-direct-tile-publication.md).
+
+
+## 2026-11-09 follow-up: deferred tile-local Legacy Brush staging (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`; no owner approval.**
+The direct tile-only publisher implemented in the previous checkpoint still
+paid to build canonical global pixel-string maps for every newly covered
+Brush/Eraser pixel during live staging, then rebuilt canonical maps from the
+same preview tiles when committing. A Brush-only session now accumulates
+changed RGBA8 values and counts in detached **storage-tile/local-offset**
+patches, with a batch-local rollback journal for original coverage and patch
+contents. `DrawingDocument._publish_tile_edit()` still produces canonical
+history and atomic tile publication. Ordinary `_stage()`/Fill/Paste and other
+mixed edits explicitly materialize the deferred keys and use the previous
+`_publish_edit()` path. Native Hokusai remains separate. Signed anchors,
+source-tile object validation and exact original source-over semantics are
+preserved. No document format or brush behavior change is intended.
+
+A new independently exercised **492/492** old-path oracle compares three
+60px strokes per scenario, four storage strides (16, 30, 64, 256), Brush and
+Eraser, hidden RGB/partial alpha, selection holes, overlapping footprints,
+full preview/commit parity, canonical before/after history, Undo/Redo and mixed
+Fill plus later Brush. It injects an invalid lazy source tile *after* earlier
+pixels have staged, verifies that the failing batch leaves the prior valid
+preview untouched, then retries and matches the original publisher. It also
+checks preverified pixels retain the source object identity needed for
+fail-closed publication. The existing Legacy publisher oracle passes
+**519/519** with an explicit deferred-vs-materialized state check. A fresh
+standalone project imported without the optional native extension passed the
+new oracle and **6/6** fallback checks. The on-demand T-095 workflow now runs
+this oracle with strict log verification; hosted CI was **not** run.
+
+Two same-machine 5×120 actual-pointer 60px/786% Xvfb/Mesa comparisons
+measured stage p95 **125.782→103.677ms** and (reversed order)
+**123.056→103.476ms**. A further optimized confirmation measured
+**109.536ms**. Release→commit p95 in the paired runs was **53.721→46.110ms**
+and **56.174→44.901ms**, but those few samples do not establish a stable
+physical-UI latency guarantee. The device, renderer and methodology are
+recorded in [the local evidence](../evidence/T-095-2026-11-09-deferred-legacy-staging.md).
+The owner's earlier negative hardware verdict still controls. Further
+sustained owner-device profiling, hosted CI and explicit re-acceptance remain
+required before a status change or PR #16 merge. T-096 is independently in
+Manual Review.
+
+
+## 2026-11-09 follow-up: failed mixed-edit rollback after deferred Brush (not closure)
+
+**T-095 remains `In Progress` with `manual_review: true`; the owner’s 60px
+latency rejection still controls.** The deferred Legacy Brush checkpoint
+introduced a transaction regression: `apply_region()`, `fill_rect()`,
+`paint_polygon()` and `flood_fill()` captured their `_before`/`_after`
+rollback snapshots *before* converting earlier Brush-only tile-local patches
+into canonical pixel deltas. If a later source tile failed to load, the mixed
+operation restored the empty snapshots, wiping the earlier valid Brush preview
+and losing its history, even though the Brush transaction had not been
+cancelled. The original implementation's negative control fails **96** exact
+checks across eight retry and commit-only cases.
+
+The four mixed-edit APIs now materialize any deferred Brush patches **before**
+taking rollback snapshots, just as they already did for deferred Hokusai
+patches. This leaves the first valid Brush intact when a later mixed operation
+fails, preserves the exact original-source RGBA8 snapshot for subsequent
+edits, and restores canonical history on retry or immediate commit. No
+rasterizer geometry, document format, selection policy or native ABI changes.
+
+The independent **504/504** headless oracle runs all four operations at tile
+strides 16 and 32 with a late missing lazy tile, against a separate original
+pixel-key reference session. Both failure-then-retry and failure-then-commit
+paths compare detached preview bytes, before/after history, atomic publication,
+Undo and Redo, including signed 64-bit source anchors. The test succeeds with
+the optional native binary present and after a fresh standalone import with
+that binary **absent**, and the 6/6 fallback check also passes. Neighboring
+492/492 deferred Brush, 519/519 Legacy tile publication, 32/32 hard Brush,
+86/86 original geometry, 126/126 native-delta, 56/56 tile-commit, 133/133
+sparse-preview and 31/31 input-queue model checks pass. Xvfb/Mesa native
+30/30 preset, 48/48 released navigation, live-stroke and 153/153 viewport
+checks pass. The signed-boundary framebuffer assertions report **17/17** but
+its Godot process exits nonzero after emitting known graphics resource-leak
+shutdown diagnostics; it is not recorded as a clean process pass. The new
+oracle is in the *on-demand* T-095 workflow with strict log validation;
+hosted CI was not run.
+
+This checkpoint repairs **transaction correctness**, not Brush throughput.
+No speedup, real device input-to-photon measurement or owner re-acceptance is
+claimed. Keep T-095 In Progress, preserve T-096's separate Manual Review and
+do not merge PR #16 on this evidence alone.
+
+[Exact negative control, test method and limitations](../evidence/T-095-2026-11-09-mixed-edit-rollback.md).
+
+
+## 2026-11-09 follow-up: NativeHard whole-batch failure atomicity (not closure)
+
+**T-095 stays `In Progress`, `manual_review: true`; there is no owner acceptance.**
+The optional Rust `NativeHard` engine previously recorded earlier covered
+pixels and advanced its cursor before detecting a malformed or too-large
+**later** point in the same batch, making a valid retry skip paint. It now
+prevalidates all source-space points and clipped swept-candidate bounds
+before any state mutation. Checked integer area/batch arithmetic enforces a
+1,048,576-candidate per-call budget without partial output; ordinary accepted
+brush geometry and the Legacy fallback are unchanged.
+
+The new Godot test fails **6/28** checks against the previous native binary
+and passes **28/28** after rebuilding. Rust unit tests pass **3/3**, with
+Clippy and rustfmt clean. Existing native integration **30/30**, released
+navigation **48/48**, Brush coverage **32/32**, native export cache **81/81**,
+and native-present/fresh native-absent fallback **7/7** each pass locally. The
+post-change 5×120-motion 60px/786% Xvfb/llvmpipe pointer witness reports
+NativeHard staging p95 **166.331 ms** and release-to-commit p95 **43.125 ms**;
+this is not a before/after speed claim or physical input-to-photon evidence.
+An on-demand Linux workflow builds the pinned extension and runs the new
+fail-closed native oracle; hosted execution remains unverified. The fix does
+not solve cross-boundary Hokusai pigment rollback after a GDScript source
+failure. T-096 stays independently in Manual Review.
+
+[Exact reproduction, checks, measurements and limitations](../evidence/T-095-2026-11-09-native-hard-preflight.md).
+
+
+
+## 2026-11-11 checkpoint: cross-boundary native pigment rollback (not closure)
+
+**T-095 remains `In Progress` with `manual_review: true`; original owner
+responsiveness rejection is still open.** A Hokusai sample batch changed the
+Rust pigment surface, brush state and quantized export cache *before* GDScript
+resolved its source tiles. An injected failure on a later tile correctly left
+the GDScript detached preview untouched, but retrying the identical path used
+already-advanced native state. The independent new real-GDExtension negative
+control failed **4/56** checks (retry, subsequent native paint, committed
+image and Redo parity).
+
+Native Hokusai now supports a begin/commit/rollback handshake per GDScript
+sample batch. It saves the brush state and only first-touched source/export
+tiles, restoring pigment, quantized output cache and brush state on source
+read or invalid-delta failure. A sparse native tile owner can also *remove*
+newly allocated tiles on rollback; repeated failures do not retain blank
+surface allocations. A successfully staged batch is acknowledged and remains
+native, without full-surface copying. Older installed native binaries lacking
+the transaction methods fall back to Legacy at Canvas gesture start rather
+than silently painting with non-atomic native state. Scripted delta-oracle
+stubs retain their earlier behavior.
+
+The real Hokusai/hidden-RGB/signed-anchor source-read oracle now passes
+**57/57** locally, including both rejected-then-retried and rejected-then-
+committed flows, selection holes, untouched previous preview, subsequent
+pigment, canonical history and Undo/Redo. Rust unit tests **4/4** with
+Clippy and rustfmt clean; existing 126-check Hokusai bulk, 81-check
+export cache, 30-check native integration, 28-check NativeHard preflight,
+48-check released-navigation, 519-check Legacy publisher, 492-check
+deferred stage, 504-check mixed rollback, 133-check sparse preview and
+fresh native-absent fallback **7/7** each pass locally. The on-demand
+workflow now requires the real-native transaction test and fail-closed marker;
+hosted Actions has not run for this checkpoint. Xvfb/Mesa measurements
+are software-only, not paired performance comparisons or real owner-device
+input-to-photon evidence. **T-096 remains in independent Manual Review**,
+and neither review gate is self-approved.
+
+[Reproducer, controls and verification scope](../evidence/T-095-2026-11-11-native-pigment-rollback.md).
+
+
+## 2026-11-11 follow-up: NativeHard source-read rollback across the Rust/GDScript boundary
+
+**Still `In Progress`, `manual_review: true`; owner 60px responsiveness
+re-acceptance remains outstanding.** The earlier native whole-batch preflight
+rejected invalid Rust geometry before mutating coverage, but it could not
+rewind native once-per-stroke coverage or the last endpoint after a later
+GDScript lazy source tile failed. The new real-native negative control fails
+**7/53** Brush checks against the previous source, across retry, later swept
+coverage, source bytes, commit and Redo.
+
+NativeHard now uses a begin/commit/rollback handshake with a **newly covered
+pixel journal** and saved previous point, avoiding a full per-event clone of
+an accumulated stroke. GDScript acknowledges only successful staged batches
+and restores both detached preview and native coverage on failure. A native
+binary lacking the handshake falls back to Legacy at gesture start; direct
+session calls fail closed. The Hokusai transaction remains independent.
+
+The expanded **113/113** actual-extension Brush/Eraser test checks both retry
+and skip-failed-batch paths, large signed anchors, transparent hidden RGB,
+partial alpha, selection holes, clipping, original preview, one commit and
+Undo/Redo. Rust **5/5**, Clippy/format, native preflight **28/28**, Hokusai
+rollback **57/57**, native integration **30/30**, export cache **81/81**,
+other headless source/history checks and Xvfb navigation **48/48** pass locally.
+A five-stroke 60px/786% Xvfb software run had stage p95 **188.052 ms** and
+release-to-commit p95 **68.327 ms**, **not** a paired speedup or hardware
+acceptance result. Hosted Actions and owner input-to-photon validation are
+unverified; **T-096 remains independently in Manual Review**.
+
+[Source-read control, scope, test matrix and limitations](../evidence/T-095-2026-11-11-native-hard-source-rollback.md).
+
+
+## 2026-11-11 follow-up: reuse spatial Brush source-tile keys (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The Brush/Eraser
+pixel staging fast path still formatted a new signed `"tile_x,tile_y"` String
+for every accepted pixel, even while processing long scanline runs within a
+single storage tile. `_stage_brush_tile()` now caches the last tile indices
+and key **per edit session**. For power-of-two strides it computes the indices
+with signed shifts; irregular strides use nonnegative local remainders and
+integer division to preserve floor semantics for negative world positions.
+Moving to another tile, including returning to an earlier tile, rekeys before
+source resolution. Source-tile identity, RGBA8 blending, selection, preview,
+rollback and history contracts remain unchanged. The canonical general-purpose
+`_stage()` path and Rust/GDExtension API are not altered.
+
+A new native-independent `t095_brush_tile_key_cache_smoke.gd` check passes
+**33,037/33,037** assertions over eight strides (1, 3, 16, 30, 64, 255,
+256 and 2048), Brush and Eraser, signed >32-bit world anchors, a subtracted
+selection hole, transparent hidden RGB, partial alpha, back-and-forth tile
+revisits, independent `read_pixel`/`tile_key64` history, preview/commit,
+Undo/Redo, and a failed lazy source-tile read followed by retry. Adjacent
+4,193-check signed lookup and 492-check deferred Brush oracles remain green.
+All 21 headless T-095 checks pass across separately executed groups; Xvfb
+navigation passes **48/48**, and a clean native-absent import passes both
+the new oracle and fallback **7/7**.
+The optional **on-demand** T-095 workflow requires a strict success marker;
+no new required fast-CI check IDs were added and hosted CI was not executed.
+
+A controlled same-process-family Godot 4.8.beta3 Xvfb/Mesa 60px/786% real
+mouse-event workload (5 strokes × 120 motions per run) measured Legacy total
+staging CPU p95 **191.922→171.555ms**, then in reverse control/optimized
+order **203.621→189.425ms**. These are two short order-varied software comparisons,
+not a physical latency guarantee. An opt/control/opt NativeHard sequence
+measured **117.474 / 127.209 / 130.279ms**, insufficient to infer a
+NativeHard speedup. Post-release commit and renderer timings vary. The
+original owner hardware rejection, actual input-to-photon measurement and
+owner acceptance remain outstanding; T-096 remains in separate Manual Review.
+
+[Reproduction, raw metric summaries, oracle scope and limitations](../evidence/T-095-2026-11-11-brush-tile-key-cache.md).
+
+## 2026-11-11 follow-up: conservative stationary/axis Brush scanline bounds (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The stationary and
+exact horizontal/vertical hard Brush/Eraser candidate scans now prune columns
+outside conservative circular row spans. They keep the original per-pixel
+squared-distance gate (and unmodified oblique Geometry2D path) to preserve
+pixel-edge behavior. High-magnitude view coordinates fall back to the
+original Geometry2D/Vector2 scan, **correcting** an earlier axis-shortcut
+float32 mismatch (four original-code oracle failures). Clipping, candidate splitting, signed
+tiles, source reads, selection masks, RGBA8, detached preview, failure rollback
+and Undo/Redo behavior remain unchanged.
+
+The new independent full-rectangle Geometry2D oracle passes **278/278**
+checks for 12 half-pixel/fractional axis/dab cases plus three large
+~10-million-coordinate reference cases, 1–61px widths, 30/64px strides, signed anchors, selection holes, split candidate windows, preview,
+history and Undo/Redo. A deliberate wrong-bound staged-only control fails
+**22** checks. Four-trial headless repeated-60px dab and horizontal medians
+improved in two optimized/control comparisons; vertical results were noisy.
+On an actual Xvfb mouse-event workload (five 60px/786% strokes), Legacy
+staging p95 in an optimized/control/optimized sequence was
+**171.916 / 170.275 / 175.490ms**, so **no whole-gesture speedup is claimed**.
+Adjacent model/native rollback and history tests pass, plus Xvfb navigation
+**48/48**, native integration **30/30**, and a fresh native-absent standalone
+import with **278/278** geometry and **7/7** fallback checks. The on-demand workflow gains a
+strict-marker oracle and log artifact; hosted CI and owner device acceptance
+remain unverified. T-096 stays independently in Manual Review.
+
+[Reproduction, negative control, exact checks and timing limitations](../evidence/T-095-2026-11-11-axis-scanline-bounds.md).
+
+## 2026-11-11 follow-up: cached source/preview tile references (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** While the current
+signed storage-tile key was already cached, each Brush/Eraser candidate
+repeatedly fetched `_source_tiles[tile_key]` and `_preview_tiles.get(tile_key, {})`.
+Within a single edit session the source snapshot is immutable and the detached
+patch dictionary is updated in-place. The Brush tile-local staging path now
+reuses these two references until the tile changes. An unresolved source read
+is *never* cached as a successful empty/null tile; on a failed paint batch the
+rollback clears both cached references and the tile key so retries resolve the
+authoritative source and published preview. Mixed edit methods still use the
+canonical-key fallback.
+
+The independent cached-vs-canonical publisher oracle passes **626/626** checks
+across signed 64-bit anchors, irregular storage-tile strides, Brush/Eraser,
+transparent and partly transparent source, selection holes, tile revisits,
+failed lazy source loads and same/different batch retry, exact RGBA8 previews,
+commit deltas and Undo/Redo. A deliberately corrupted patch-cache control
+failed **95/603** assertions before the correct source was restored. Local
+neighboring Brush geometry, staging, rollback, Hokusai/NativeHard transaction
+and fallback checks pass with strict markers. The on-demand T-095 workflow
+adds the oracle and retains its log without changing the required 46-step
+fast-GDScript CI. Hosted GitHub Actions is not verified.
+
+Two 60px Godot beta3 headless optimized/control comparisons show isolated
+staging median CPU reductions (axis ~311.5 to 302.3/300.9ms; dabs ~321.9
+to 278.8/281.6ms; oblique ~521.5 to 462.9/481.2ms). The 786% zoom
+five-stroke native pointer opt/control/opt staging p95 sequence was
+**179.878 / 174.234 / 159.175ms**, so **no whole-gesture speedup** or
+physical input-to-photon result is inferred. Owner hardware recheck, real
+perceived responsiveness, hosted CI and explicit manual approval remain open.
+T-096 remains in independent Manual Review.
+
+[Reproduction, negative control, full verification and timing evidence](../evidence/T-095-2026-11-11-brush-tile-reference-cache.md).
+
+
+## 2026-11-11 follow-up: prune long oblique Brush candidate rows (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The long-diagonal
+Legacy hard Brush/Eraser scan now rejects impossible per-row X candidates
+before the original exact `Geometry2D` nearest-segment check. A conservative
+4px numerical margin, a high-view-coordinate fallback, and a nearly
+horizontal fallback avoid changing pixel-edge semantics. Existing rectangle
+candidate limits, selection masks, signed storage tiles, failure rollback,
+RGBA8 previews/commit and Undo/Redo remain unchanged. The independent
+full-rectangle reference oracle passes **513/513** checks (22 cases, including
+60px, fractional widths, split strokes and >10-million view coordinates);
+a deliberately undersized-window control fails **55** of the original
+466 checks. Existing 32-check coverage, 86-check oblique, 278-check axis,
+tile-reference/key cache and native transaction oracles pass locally.
+
+An order-varied local headless 60px long-diagonal CPU benchmark gave
+**156.566 / 184.701 / 158.213ms** optimized/control/optimized medians,
+with 36,438 identical changed pixels per pass. A mixed-waypoint benchmark
+did not improve, and the unpaired 786% Xvfb pointer witness passed without
+proving a whole-gesture speedup. Hosted CI and physical input-to-photon
+performance were not verified. Owner-rejected 60px responsiveness, exact
+owner hardware profile and explicit review remain outstanding; T-096 keeps
+its independent Manual Review gate. The on-demand workflow now requires the
+new strict success marker without changing fast required-CI IDs.
+
+[Reproduction, negative control, measurements and limits](../evidence/T-095-2026-11-11-oblique-scanline-bounds.md).
+
+
+## 2026-11-11 follow-up: native hard-brush oblique scanline pruning (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The opt-in Rust
+`NativeHard` path previously scanned every candidate in each swept rectangle,
+including rows with a long region outside the 60px capsule. Each prevalidated
+window now applies a conservative per-row X interval for oblique segments,
+retaining the original f32 projection/distance predicate, signed pixel order,
+coverage set, batch journal, rollback and the **original 1,048,576 total
+rectangular-candidate preflight**. Near-horizontal segments and source-space
+coordinates ≥1M use the unpruned reference path. Legacy/Hokusai pixels and
+GDScript history paths are unchanged.
+
+The independent actual-GDExtension oracle passes **42/42** checks, including
+12 exact ordered-pixel full-rectangle reference cases and a prior-native
+large-coordinate witness. At ~10M, GDScript's full-rectangle arithmetic
+rounds two edge pixels differently from Rust f32; the Rust unit oracle uses
+native f32 directly and compares **11 fixed plus 96 deterministic segment
+cases**. All **6/6 Rust unit tests**, Clippy/format, native source rollback
+**113/113**, NativeHard preflight **28/28**, Hokusai rollback **57/57**, native
+integration **30/30**, native export **81/81**, signed tile-key **33,037/33,037**,
+other Brush/publisher oracles and Xvfb navigation **48/48** pass locally. A
+staged-only undersized-bound control fails the new Godot oracle; the correct
+source passes again. The on-demand workflow includes a fail-closed marker
+and log upload, without changing required fast-CI check IDs.
+
+The isolated 60px long-diagonal native-call benchmark (Godot 4.8b3, three
+short runs, 10 timed trials each, 29,175 identical pixels) measured median
+**3.530 / 5.909 / 3.474 ms** in optimized/control/optimized order. This
+measures only Rust coverage and delta output, **not** GDScript staging or
+physical input-to-photon performance. The NativeHard Xvfb five-stroke
+mouse-input witness passed with staging p95 **105.258 ms**, release-to-commit
+p95 **64.648 ms**; it is not a paired overall speedup. The original owner
+hardware lag report, reference-device profiling, hosted CI and explicit owner
+acceptance all remain outstanding. T-096 is independently in Manual Review.
+
+[Full reproduction, negative control and measurement limitations](../evidence/T-095-2026-11-11-native-hard-scanlines.md).
+
+## 2026-11-11 follow-up: packed native hard-brush output transfer (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** NativeHard already
+avoids impossible diagonal candidates, but for every accepted pixel it
+previously invoked two Godot packed-array `push` operations from Rust. It now
+collects `(x, y)` values in a contiguous Rust vector and transfers the final
+`PackedInt32Array` in one conversion, keeping the exact signed y/x sequence,
+original f32 distance predicate, 1,048,576-candidate preflight, covered-set
+state and transactional rollback unchanged. No default-backend or Hokusai
+semantic change was made.
+
+The new independent real-extension 60px full-rectangle oracle passed **20/20**
+checks against both pre-change and optimized binaries (29,175 initial ordered
+pixels, 39,152 new pixels from a crossing path), including rollback/retry and
+post-commit once-only coverage. Rust unit tests **6/6**, Clippy, native
+scanline **42/42**, preflight **28/28**, source rollback **113/113**, pigment
+rollback **57/57**, export cache **81/81**, source coverage **32/32**, and
+Xvfb pointer/navigation/integration witnesses passed locally. In a repeated
+native-only benchmark, medians were **3.529/3.221 ms** on the original binary,
+**2.642/2.774 ms** on the optimized build, and **3.358/3.189 ms** on a
+reverse-order original control. All runs emitted exactly 29,175 pixels. This
+is neither a controlled hardware input-to-photon result nor closure of the
+owner's original lag report. Hosted CI and owner physical acceptance remain
+unverified; T-096 stays independently in Manual Review. The new witness is
+registered only in the on-demand workflow, without changing fast required CI.
+
+[Detailed verification, limits and replay](../evidence/T-095-2026-11-11-native-hard-packed-output.md).
+
+## 2026-11-11 follow-up: Hokusai native pigment delta transfer (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The real Hokusai
+`preset_segments` path still pushed each quantized `(x, y, RGBA8)` element
+individually into a Godot `PackedInt32Array`. Like NativeHard's earlier output
+optimization, it now appends triples in a contiguous Rust `Vec<i32>` and
+converts once per call. This changes only native-to-Godot output construction:
+quantization, tile iteration order, pigment brush state, source-read rollback,
+preview staging, selection, and Undo/Redo are unchanged. Legacy remains the
+default backend.
+
+Four fixed pre-change **ordered full-output SHA-256** witnesses (hard, soft,
+ink, airbrush; **242,651 changed pixels**) and actual native transaction
+rollback/retry pass **69/69**. Intentionally exchanging x/y in a temporary
+native build fails all four golden checks; the restored build passes.
+Existing export cache **81/81**, pigment rollback **57/57**, NativeHard source
+rollback **113/113**, preflight **28/28**, native integration **30/30**,
+released-stroke navigation **48/48**, and 60px pointer witness pass locally;
+Rust tests **6/6**, Clippy and format are clean. An opt-in eight-trial
+native-call benchmark showed lower **warmed** medians after optimization,
+but its first optimized run was slower than control; warmup effects prohibit
+a general latency claim. The on-demand CI workflow checks exact output marker
+and retains logs; the required fast-CI matrix is unchanged. Hosted CI and
+owner physical device acceptance remain **unverified**. T-096 retains its
+separate Manual Review gate. [Full details](../evidence/T-095-2026-11-11-native-preset-packed-output.md).
+
+## 2026-11-11 follow-up: suppress redraws for unchanged detached Brush previews (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The shared
+`DrawingCanvas._drain_segments()` previously queued a display redraw for every
+successfully staged batch, even when all pixels were already covered or
+selection-masked. It now queues a redraw only if the detached session's
+monotonic `_preview_epoch` changed during that drain. A real pixel mutation
+(including a restoration that leaves `change_count()` unchanged), completion,
+cancellation and pointer-motion cursor drawing still follow their existing
+redraw paths. Input samples, frame CPU budgets, native transactions, output
+pixels and Undo/Redo are not changed.
+
+The new SceneTree oracle observes actual Canvas draw callbacks across
+consecutive event frames. The pre-change negative control failed **3/24**
+checks and produced **55** draws; the corrected source passed **24/24** with
+**7** draws, covering duplicate 12px dabs, new paint, masked-only input,
+exact document bytes and single-step history. This is a controlled **draw
+scheduling** result, not a physically measured 60px responsiveness speedup.
+Nearby Legacy, NativeHard, Hokusai and Xvfb pointer/navigation tests pass;
+a clean native-absent standalone import passes as well. The on-demand CI
+workflow checks the exact new marker and retains the log. The required fast-CI
+matrix, hosted CI (unverified), T-096 review gate and owner's physical-device
+acceptance remain unchanged.
+
+[Reproduction and full evidence](../evidence/T-095-2026-11-11-noop-preview-redraw.md).
+
+## 2026-11-11 follow-up: reuse stable Canvas preview index (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** Cursor and overlay
+redraws still called `preview_stamps_for_display_tiles()` even when the
+underlying detached preview had not changed, repeatedly parsing every touched
+source-tile key and allocating the same bounded display-stamp map. The Canvas
+now privately retains the most recent projection, keyed by session identity,
+`_preview_epoch`, source document revision and visible 128px tile rectangle.
+A new paint generation or viewport pan recomputes it; a closed/stale session
+returns no old preview and idle/no-document redraws release the reference.
+The original 40,000-attempt bounded fallback and all existing per-tile stamp,
+texture dirtying and history behavior remain unchanged. The frame metrics add
+`preview_index_cache_hit` for attribution without changing existing keys.
+
+The independent **529/529** oracle compares every signed visible display-tile
+stamp to the uncached per-area result across live Brush changes, scene draws,
+window changes, session replacement, cancellation, external revision changes
+and overflow-budget fallback. A staged-only disabled-cache negative control
+failed **5/526** prior to adding three bounded-fallback checks. Related
+preview-index model **2146/2146**, viewport-cache model **27/27**,
+no-op redraw **24/24**, sparse-preview **133/133**, Brush coverage **32/32**,
+source-reference **626/626**, mixed-edit rollback **504/504**, real Xvfb
+viewport cache **153/153**, native integration **30/30**, NativeHard/Hokusai
+rollback **113/113** and **57/57**, and pointer/navigation witnesses passed
+locally. A separate standalone import without the native extension passed the
+new **529/529** oracle and fallback **7/7**.
+An initial viewport-native test failed font assertions before regenerating
+font `.ttf.import` metadata with a clean editor import; the rerun passed.
+
+A synthetic 240-changed-storage-key benchmark (80 repeated index calls) took
+~59–62 ms for repeated full rebuilds versus ~0.04 ms for cached calls. This
+measures only GDScript projection cost: there is **no** demonstrated whole
+frame, GPU or physical input-to-photon improvement. The 60px Xvfb pointer
+witness remains software-only. Hosted CI and owner-device acceptance remain
+**unverified**, and **T-096 retains its own Manual Review**. The added
+on-demand CI step uses a fail-closed marker and preserves its raw log; the
+required fast-CI matrix and T-094 failure policy are unchanged.
+
+[Reproduction and limitations](../evidence/T-095-2026-11-11-preview-index-reuse.md).
+
+
+## 2026-11-11 follow-up: duplicate stationary Legacy batch waypoints (not closure)
+
+**T-095 stays `In Progress`, `manual_review: true`.** The once-only hard Brush/Eraser `paint_path()` loop now skips identical **consecutive waypoints inside one call** after the first dab has been rasterized. Previously each zero-length duplicate retested a full 60px swept candidate window. The first waypoint of every **new** call still executes: changed width, clip or selection may reveal new pixels at the same position. NativeHard and accumulating Hokusai pigment remain unchanged. A per-session integer diagnostic counts skipped same-batch dabs.
+
+An independent **276/276** signed-anchor, mask-hole, clip, Brush/Eraser, source/preview/history and failure/retry oracle passes. A staged-only disabled-shortcut control fails **10** checks. Seven-run stationary 60px 360-waypoint CPU benchmark medians: **127.162 ms** with the shortcut disabled vs **11.837 ms** with it enabled. This is a batched source-space CPU path only, not a controlled whole-pointer, compositor or physical-device speedup. Neighboring Brush, native rollback and Xvfb pointer tests pass locally; a combined regression runner timed out and is not counted as complete. The on-demand CI test and raw log are added without changing fast-CI requirements.
+
+Owner reference-hardware testing and explicit approval remain outstanding, as do hosted CI verification; **T-096 remains independently in Manual Review**. [Detailed evidence](../evidence/T-095-2026-11-11-duplicate-waypoints.md).
+
+
+## 2026-11-11 follow-up: cross-batch stationary Legacy dabs (not closure)
+
+**T-095 stays `In Progress`, `manual_review: true`.** Extend the exact
+same-batch duplicate-waypoint optimization only to **successfully completed
+stationary Legacy Brush/Eraser dabs delivered in consecutive `paint_path()`
+calls**, as commonly happens with repeated one-point pointer samples. The
+once-only covered-pixel set means a repeated dab with an unchanged source,
+color, width, eraser mode, null selection, clip, candidate budget, view
+transform, signed anchor, preview generation and document revision cannot
+paint additional pixels. Any changed context or intervening edit invalidates
+that witness; native Hokusai pigment and NativeHard paths are explicitly
+excluded. The per-session diagnostic counts cross-call skips separately.
+
+The independent **663/663** RGBA8/preview/history oracle passes for Brush and
+Eraser over signed world coordinates and irregular tile strides, 121 distinct
+one-point calls, clipping, mask holes, failed low-budget batches, moved
+endpoints, mixed edits, changed anchors/transforms, injected late source-read
+failure and retry, one-step Undo/Redo. A staged-only disabled-shortcut control
+fails **4** checks and exits 1; the restored implementation exits 0. Both
+new scripts run under pinned Godot 4.8 beta 3 with strict log validation.
+Six alternating-order isolated 60px/120-call CPU trials measured
+**47.487 ms** median for full rasterization versus **11.910 ms** with reuse
+(~75% reduction for this deliberately duplicate-heavy workload); timing is
+*not* a required CI gate or a whole-pointer/owner-hardware result. The
+on-demand CI workflow runs the correctness oracle and retains its raw log;
+the benchmark remains opt-in. Adjacent Brush, rollback, render, native output,
+real-extension and Xvfb pointer/navigation tests pass locally. Fresh native-
+absent standalone editor import and the 663-check oracle plus 7-check fallback
+also pass.
+
+This does **not** reproduce or resolve the owner's original ~one-minute
+physical 60px lag. Hosted GitHub Actions, reference-device input-to-photon
+latency and owner approval are still unverified. **T-096 remains separately
+in Manual Review.** [Detailed evidence](../evidence/T-095-2026-11-11-cross-batch-dab.md).
+
+
+## 2026-11-11 follow-up: bounded Legacy duplicate-target drain (not closure)
+
+**T-095 stays `In Progress`, `manual_review: true`.** A 60px Brush typically
+has an atomic one-segment-per-batch staging budget. Many repeated source
+positions arriving as distinct mouse events therefore still paid one
+`paint_path()` call each despite the earlier once-only cross-batch dab fix.
+The Canvas now extends *only a Legacy batch* with identical consecutive
+source positions, to a maximum of 16 points; the first moving candidate is
+held intact for the next batch with its arrival timestamp. Input samples,
+latency counts, source geometry and one Undo/Redo history operation are
+preserved. No Hokusai pigment accumulation or NativeHard behavior changes.
+The independent **195/195** actual Canvas backlog oracle compares preview,
+commit, Undo and Redo bytes with individual full-raster reference calls and
+checks exact timestamps/segment counts. The previous source fails **3/195**
+new batching assertions. In that 162-sample 60px witness, dispatch count
+falls **162 → 12** and 150 identical candidates are grouped; paired isolated
+stage CPU measurements were control **20.742 ms** and optimized **18.076 / 16.341 ms**,
+which is not whole-pointer or hardware acceptance evidence. Queue, timing,
+Brush, rollback, Xvfb navigation and real held-button pointer checks pass;
+clean native-absent standalone import and fallback pass. On-demand CI gets
+an exact-marker oracle and raw log without changing required fast CI.
+
+**Still open:** reference-device reproduction, actual input-to-photon
+responsiveness and owner acceptance of the original minute-long lag;
+hosted CI. **T-096 remains independently in Manual Review.**
+[Detailed tests and limitations](../evidence/T-095-2026-11-11-duplicate-drain.md).
+
+## 2026-11-11 follow-up: bounded per-preview-frame CPU phase history (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The existing 4096-entry
+stage and input-latency histories did not capture the distribution of renderer
+work: compositor, texture upload and preview-index costs were available mainly
+as sums. The Canvas now retains a 1024-sample chronological **render-frame**
+window, with full draw (including overlays), compositor, texture, preview
+index and selection-outline CPU in microseconds on every active-stroke frame.
+Lifetime frame count and each phase's maximum remain exact after eviction;
+short strokes keep all frames. Completed metrics are deep-copied with the
+existing gesture statistics. Pixel, Undo/Redo, timing-field and CI failure
+semantics are unchanged.
+
+An independently failing **19/19** model/actual-Canvas oracle checks bounded
+ring wraps, late frames, evicted early stalls, real draw callbacks, source
+RGBA8 parity against a direct stroke reference and Undo/Redo. A temporary
+no-recording control fails **2** checks, and the restored implementation passes.
+Adjacent rendering, Brush, native integration (30/30), released-stroke
+navigation (48/48) and five-stroke Xvfb pointer suites pass locally; a clean
+native-absent standalone import passes as well. The on-demand CI workflow
+uses the exact `T095_FRAME_PHASE_PASSED` marker and retains its raw log.
+
+This adds **diagnostic observability**, not an established physical
+input-to-photon speedup or owner acceptance. Physical GPU/driver profiling,
+hosted CI, and the manual owner recheck remain open; T-096 is independently
+in Manual Review. [Full test evidence](../evidence/T-095-2026-11-11-frame-phase-window.md).
+
+## 2026-11-11 follow-up: correlate pending pointer age with each Canvas draw (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The prior frame-phase
+history lacked the corresponding unprocessed pointer timestamp and queue
+depth. Each real active-stroke Canvas draw now records `frame_end_us`,
+`pending_input_count`, and `oldest_pending_age_us` next to its existing CPU
+phases, including a dequeued but still interpolating target. The latest
+1,024 frames remain bounded, while lifetime peak pending age/depth survive
+eviction. Consumed sample prefixes and queue compaction do not inflate age;
+zero pending input yields zero age. The five-stroke pointer-event witness now
+prints p50/p95/max pending ages, depths and draw timings from the completed
+gesture frames, with retained-vs-total counts stated explicitly.
+
+The new independent **24/24** 60px live-Canvas/synthetic-ring oracle passes;
+the previous-source control fails **4/5** checks. All eleven focused
+headless Brush/rendering/rollback neighbors pass, along with graphical
+navigation **48/48**, native integration **30/30**, the five-stroke
+mouse-event witness and clean native-absent import/fallback **7/7**. This is
+queue/render-phase **instrumentation**, not a demonstrated software or owner
+hardware latency speedup. The on-demand workflow retains the strict test log;
+required fast CI and T-094 failure policy are unchanged. Reference GPU/input
+to-photon acceptance, owner approval and hosted CI remain unverified; T-096
+is still independently in Manual Review.
+[Detailed evidence](../evidence/T-095-2026-11-11-frame-backlog-correlation.md).
+
+
+## 2026-11-11 follow-up: pair per-Canvas-frame engine post-draw callbacks (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The earlier 1,024-frame
+CPU/queue record did not retain the corresponding Godot `frame_post_draw`
+callback: it lived only in `last_frame_metrics`. The Canvas now pairs at most
+one callback to its latest active-stroke draw, records exact callback time and
+nonnegative `frame_end_to_post_draw_us`, and keeps lifetime match count/worst
+delay across bounded ring evictions. Unmatched draws remain unmatched; late,
+duplicate or stale post-commit/cancel callbacks cannot be attributed to a new
+stroke. This is **engine-side render-callback timing, not GPU scanout or
+physical input-to-photon latency**. The five-stroke graphical witness reports
+matched-frame p50/p95 and matched/total counts.
+
+The independent red/green oracle fails **5/14** checks on the previous Canvas
+and passes **23/23** on this implementation. Eleven adjacent headless checks,
+graphical release navigation **48/48**, real native integration **30/30**, and
+mouse-event 60px/786% pointer witness pass. Fresh native-absent import and
+fallback **7/7** pass. The on-demand workflow runs the new strict-marker oracle
+and retains its raw log; required fast CI remains unchanged. The owner hardware
+reproduction, real perceptual responsiveness, hosted CI, and explicit owner
+acceptance remain open; T-096 stays independently in Manual Review.
+[Detailed evidence](../evidence/T-095-2026-11-11-postdraw-callback-pairing.md).
+
+## 2026-11-11 follow-up: correlate newly staged previews with Canvas draw and callbacks (not closure)
+
+**T-095 stays `In Progress`, `manual_review: true`.** The frame CPU/backlog
+recorder and `frame_post_draw` pairing did not measure the waiting time between
+successful **pixel-changing** Brush batch staging and the subsequent Canvas
+submission. The Canvas now retains the earliest changed batch completion
+until the next active-stroke draw, tags that frame with a nonnegative
+`preview_stage_to_frame_end_us`, and (only when the same frame receives a real
+Godot callback) records `preview_stage_to_post_draw_us`. No-op cursor frames
+and unmatched callbacks remain absent, never zero-delay successes. Per-gesture
+lifetime counts and worst intervals survive the bounded 1,024-frame ring.
+Cancellation, commit, and session replacement cannot leak unsubmitted stamps.
+
+The independent old-source control fails **4/13** checks; the new **22/22**
+real-Canvas, synthetic callback/ring, signed 60px RGBA8 and history oracle
+passes cleanly. Eleven targeted headless regressions, Xvfb navigation **48/48**,
+native integration **30/30**, the complete five-stroke mouse-event witness and
+fresh native-absent standalone import/fallback **7/7** pass locally. The
+software witness recorded **129** changed-preview submissions and **124**
+matched callbacks, stage→draw p95 **26.483 ms** and stage→callback p95
+**41.884 ms**. These are Godot engine intervals, **not physical input-to-photon**
+latency or measured speedups. The on-demand CI has a strict-marker oracle and
+raw log; required fast CI and T-094's fail-closed policy are unchanged.
+Owner reference-device responsiveness, hosted CI and explicit approval remain
+unverified. **T-096 stays separately in Manual Review**.
+[Full evidence](../evidence/T-095-2026-11-11-preview-stage-postdraw.md).
+
+## 2026-11-11 follow-up: correlate input receipt with changed-preview render (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The existing stage→draw
+/callback recorder did not preserve the original Godot pointer receipt for the
+first pixel-changing batch queued for that frame. It now captures the earliest
+input receipt within the first changed batch, records receipt→Canvas draw on
+the matching frame and receipt→`frame_post_draw` only for a real matching
+callback. No-op draws, unmatched callbacks, cancellation and new sessions do
+not manufacture intervals; lifetime maxima and counts survive the bounded
+1,024-frame window. The earliest input in a changed batch is a conservative
+**batch-age** witness, not necessarily the precise pixel-causing sample.
+
+The independent **22/22** source/Canvas/Undo oracle passes, while a disabled-
+recorder negative control fails **8** checks. Fourteen local headless suites
+pass individually, as do five full Xvfb pointer strokes, native integration
+**30/30**, released navigation **48/48**, fresh native-absent import and
+fallback **7/7**. Software receipt→draw p95 **111.903 ms** and receipt→engine
+callback p95 **125.007 ms** do **not** measure GPU scanout or photons, nor
+demonstrate a performance speedup. The on-demand CI gains one strict-marker
+oracle, not a new required fast-CI check. Reference GPU/owner recheck, hosted
+Actions and explicit manual acceptance remain pending; T-096 is independently
+in Manual Review. [Full evidence](../evidence/T-095-2026-11-11-preview-input-postdraw.md).
+
+
+## 2026-11-11 follow-up: opt-in bounded owner-device JSONL capture (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The measured input
+receipt/stage/draw/post-draw history is now exportable from the **actual running
+app**, not just synthetic Xvfb pointer tests: explicitly set
+`DRAWING_T095_TRACE_JSONL=user://t095-owner-recheck.jsonl` at launch to write
+one bounded, schema-versioned JSONL record after each successfully completed
+Brush/Eraser gesture. Disabled by default, no pixel/document identity or
+coordinates are exported, and cancelled/failed strokes produce no record.
+Only `user://` paths without traversal are allowed; the file caps at 4 MiB.
+The trace distinguishes engine CPU/post-draw callbacks from physical
+input-to-photon measurements and contains selected stage, backlog and
+renderer samples from the existing bounded histories. The owner must record
+OS/GPU/driver, scaling, build SHA and observed visual lag separately.
+
+The independent **17/17** export/size/privacy/cancellation/Undo oracle passes
+under pinned Godot beta3, with a previous-source and disabled-writer red
+control (**1** failure each). Twelve strict-marker headless neighbors, native
+Xvfb navigation **48/48**, integration **30/30**, five pointer strokes, and
+fresh native-absent import/fallback **7/7** pass. Software staging p95
+**194.046 ms** is not an owner hardware result. The on-demand workflow runs
+the new test and saves its log without changing required fast CI or T-094's
+fail-closed rule. Owner acceptance, actual physical responsiveness and hosted
+Actions remain unverified; T-096 stays independently in Manual Review.
+[Detailed evidence](../evidence/T-095-2026-11-11-owner-trace-jsonl.md).
+
+## 2026-11-11 follow-up: offline owner trace analyzer (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The previously
+introduced owner-device JSONL export now has a read-only offline analyzer
+(`tools/analyze_t095_trace.py`) for reproducible inspection of real captured
+strokes. It produces text or JSON summaries grouped by matching backend,
+brush width, zoom, viewport and image bounds. Nearest-rank p50/p95 values are
+explicitly computed from **retained windows**, while lifetime counts/maxima
+are reported separately; absent renderer callbacks remain unavailable rather
+than zero. It rejects malformed, incompatible, inconsistent and oversized
+trace records without emitting a misleading partial report. The original
+`DrawingCanvas` code, brush behavior and trace schema are unchanged.
+
+Six Python contracts and a two-stroke real Godot trace/CLI integration check
+pass locally. The on-demand native workflow gains a strict-marker Python
+analyzer check with saved raw logs, without altering required fast CI or the
+T-094 failure policy. This tooling enables owner hardware diagnosis but is
+**not evidence that real 60px Brush responsiveness or physical input-to-photon
+latency has passed**. Actual device timing, visible catch-up judgment, hosted
+Actions and explicit owner acceptance are outstanding; T-096 stays
+independently in Manual Review.
+[Evidence and operator steps](../evidence/T-095-2026-11-11-owner-trace-analysis.md).
+
+## 2026-11-11 follow-up: keep owner trace files in separate cohorts (not closure)
+
+**T-095 stays `In Progress`, `manual_review: true`.** The first offline
+analyzer grouped strokes from distinct JSONL files solely by matching Brush
+reproduction geometry. Two different GPUs/driver sessions can have identical
+backend, 60px width, zoom, viewport and canvas bounds; silently pooling their
+release-to-commit distributions would make an owner-device comparison
+misleading. The analyzer now assigns a stable **1-based input-file index** to
+each stroke, partitions group percentiles by this index **and** the prior
+Brush settings, and labels cohorts in text/JSON without printing filenames.
+The analysis output schema is now `t095_trace_analysis_v2`; the Godot-exported
+trace `schema: 1` is unchanged. A single file may still contain appended
+sessions from different machines—device identity is neither recorded nor
+inferred. Cold/warm comparison, physical input-to-photon and manual owner
+approval still require separate metadata and human review.
+
+A new test reproduces the old false group (two separate JSONL files with
+matching Brush settings but 80ms versus 5ms release-to-commit); it fails on
+the old analyzer and passes with two distinct cohorts. Same-file multi-stroke
+grouping remains intact. The eight Python contract tests, existing Godot
+trace-export oracle, and neighboring Brush/native checks pass locally.
+The non-gating on-demand CI analyzer step retains its fail-closed marker and
+raw log. Required fast CI and T-094's log policy are unchanged; hosted CI is
+not verified. T-096 remains independently in Manual Review.
+[Details and verification](../evidence/T-095-2026-11-11-trace-cohort-isolation.md).
+
+## 2026-11-11 follow-up: isolate observable clock resets in appended owner traces (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The offline trace
+analyzer already separated different input files, but an opt-in `user://`
+JSONL file may be **appended across application restarts**. Godot's
+`Time.get_ticks_usec()` values are monotonic within a process, not a verified
+cross-launch identity. When a later stroke in the same file reports a lower
+`down_us` value, the analyzer now starts a distinct **observed timestamp
+epoch** (1-based, per file). It keeps each epoch's release-to-commit percentiles
+separate, even if the Brush backend, width, zoom, viewport and image bounds
+match. Text/JSON labels contain only numeric file and epoch indices—no
+filename, document content, coordinates or supposed device ID. This is a
+**detectable boundary**, not proof that all strokes within an epoch share
+hardware; restarts without a timestamp decrease and session/device changes
+within a running process remain undetectable. Physical owner details and
+visible responsiveness must still be reviewed independently.
+
+The Python analysis schema changes from v2 to
+`t095_trace_analysis_v3`, introducing `timestamp_epoch_index` and an updated
+`cohort_boundary` description; the **Godot exporter remains schema 1** and is
+unchanged. A red control on the preceding analyzer wrongly combines two
+80 ms and two 5 ms release-to-commit strokes into **one** group (p95 80 ms).
+The corrected report has two groups (p95 **80 ms** and **5 ms**); all **nine**
+Python contracts pass, including same-file no-reset aggregation, separate
+file cohorts and strict malformed-input rejection. The local Godot owner
+trace oracle **17/17**, Brush coverage **32/32**, NativeHard rollback
+**113/113**, Hokusai rollback **57/57**, and preview-input correlation
+**22/22** pass with exit code zero and strict success markers. The
+non-gating on-demand workflow preserves the same fail-closed analyzer marker
+and log, with an updated check label; the 46 required fast-CI checks are
+unchanged. The ticket-store validator reports **96** valid records. Hosted
+Actions, reference-device responsiveness and owner acceptance have not been
+verified. T-096 remains independently in Manual Review.
+[Evidence](../evidence/T-095-2026-11-11-trace-epoch-isolation.md).
+
+## 2026-11-11 follow-up: isolate overlapping completed-stroke timestamps in owner traces (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The offline JSONL
+analyzer now detects another observable epoch boundary: a subsequent stroke
+starting before the preceding **committed** stroke ended, even when its
+`down_us` exceeds the previous `down_us`. Sequential completed Brush gestures
+from one Canvas cannot overlap; appended traces from separate Godot launches
+or out-of-order records can. The previous analyzer mistakenly merged a slow
+80 ms and two fast 5 ms strokes; the new test fails on the previous source
+and passes with independent cohorts. All **10/10** Python contracts, the
+Godot trace exporter **17/17**, independent Brush pixels **32/32**, NativeHard
+rollback **113/113**, Hokusai rollback **57/57**, and preview input/post-draw
+**22/22** pass with exit 0 and strict log markers. Required fast CI and
+T-094 fail-closed checking are unchanged; the on-demand analyzer step gains
+this regression without changing the schema-1 exporter. No source images,
+Brush behavior, hardware identity or supposed photon measurements are added.
+This is neither hardware acceptance nor a speedup. Hosted CI, owner-device
+responsiveness and explicit owner approval remain outstanding; T-096 remains
+in Manual Review. [Evidence](../evidence/T-095-2026-11-11-trace-commit-overlap.md).
+
+## 2026-11-11 follow-up: fail-closed retained trace counts and maxima (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The offline analyzer
+now rejects schema-1 records whose observed recent timing samples exceed
+the claimed lifetime maxima or whose retained callbacks/submissions exceed
+reported lifetime counts. Preview-to-callback timings must be attached to
+the same frame's draw and matched callback; the report cannot silently
+understate worst-case engine lag using inconsistent input. This does not
+change the Godot exporter, drawing runtime, pixel data or analysis schema v3.
+
+The prior analyzer accepted five contradictory fixture variants (negative
+control); the expanded Python contracts now pass **11/11** with all eight
+corruptions rejected. Actual Godot owner-trace export passes **17/17**. A
+five-stroke 60px, 786% graphical Xvfb trace with **150 matched callbacks**
+parses without error (five stroke records). Pixel oracle **32/32**, NativeHard
+rollback **113/113**, Hokusai rollback **57/57** and input-to-preview
+correlation **22/22** pass with exit code zero and strict markers. On-demand
+workflow validation and the 96-ticket validator pass; hosted CI, owner
+physical-device lag and manual acceptance are still unverified. T-096 remains
+in Manual Review. [Evidence](../evidence/T-095-2026-11-11-trace-retained-consistency.md).
+
+## 2026-11-11 follow-up: reject contradictory frame-timing arithmetic (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The offline owner
+trace analyzer previously checked retained callback counts and field presence
+but could accept a frame where the elapsed stage→draw, draw→post-draw, and
+stage→post-draw intervals disagreed, or where timestamp fields were malformed.
+It now validates all schema-1 exported frame fields as nonnegative integers and,
+when the corresponding timestamps and intervals are available, checks exact
+monotonic-clock differences and their callback sums. This avoids using an
+internally contradictory frame to assess the owner's responsiveness issue;
+missing optional callback samples are still missing, never synthesized as zero.
+
+The new Python test fails **8** distinct controls against the previous
+analyzer and the corrected suite passes **12/12**. Godot beta3's existing
+owner exporter passes **17/17**; a fresh five-stroke 60px/786% Xvfb pointer
+trace containing **274 frames and 150 matched callbacks** is accepted by the
+updated analyzer. The independent Brush pixel/history **32/32**,
+NativeHard rollback **113/113**, Hokusai rollback **57/57**, and preview
+input/callback **22/22** checks pass with exit zero and strict markers.
+This is offline diagnostic validation only: the Drawing runtime, schema-1
+exporter, analyzer report schema v3, required fast CI and T-094 fail-closed
+policy are unchanged. Real owner hardware, hosted CI and explicit owner
+approval remain unverified; T-096 stays independently in Manual Review.
+[Evidence](../evidence/T-095-2026-11-11-trace-frame-arithmetic.md).
+
+## 2026-11-11 follow-up: anonymous per-runtime owner trace identity (not closure)
+
+**T-095 remains `In Progress`, `manual_review: true`.** The schema-1
+opt-in `DRAWING_T095_TRACE_JSONL` exporter now adds one **optional**
+`trace_session_id` (16 cryptographic random bytes, lowercase hex) generated
+lazily per Canvas instance. It is stable for successive successful strokes
+in that Canvas and changes for a new Canvas. It contains no OS, GPU, document,
+username, file path, pointer coordinates, device ID or persistent identifier.
+This is an observation boundary, **not** verified same-hardware identity.
+
+The offline analyzer now partitions appended-file cohorts on explicit token
+transitions as well as observed clock regressions/overlapping completed
+strokes. Previous schema-1 files with no token remain supported; a transition
+between legacy and token-bearing records also starts a new cohort. The
+**v4 analysis report excludes raw token values**, retains independent
+source-file grouping and never substitutes Godot post-draw callbacks for
+physical input-to-photon timestamps. An old-analyzer control incorrectly
+pooled four consecutive same-clock records (80ms vs 5ms p95); updated
+13/13 contracts split them. Old Canvas negative control fails two new token
+assertions; current real-export oracle passes 21/21. Brush pixel, preview
+input, frame-phase and both native transaction regressions passed with
+strict markers; native-absent clean import/export also passed.
+
+This checkpoint changes only the **opt-in trace**, offline analyzer, CI
+checks, and documentation. No Brush rendering/latency speedup, owner-device
+responsiveness, hosted CI success, or owner acceptance is claimed. T-096
+remains independently in Manual Review.
+[Evidence](../evidence/T-095-2026-11-11-trace-runtime-token.md).
+
+
+## 2026-11-11 follow-up: 96px full-canvas virtual pointer comparison (not closure)
+
+**Status remains In Progress with `manual_review: true`.** A new 96px opaque
+red Brush integration witness uses the actual graphical Godot pointer path,
+99 source positions / 100 delivered events, and one continuous nine-pass
+serpentine gesture over a fresh 512×512 layer. It checks full opaque-red
+RGBA8 tile hashes (262,144 pixels), rendered framebuffer samples, exact
+sample receipt, one commit and Undo/Redo. No fill API substitutes for Brush.
+
+Three separate Godot 4.8.beta3 Xvfb/Mesa llvmpipe Legacy runs took
+11,378/9,772/8,943ms virtual pointer-start→engine post-draw (p95 11,378ms),
+with 99 pending samples and 158–165 drain frames. **The proposed 100ms
+performance target fails**, despite 3/3 correctness passes. An opt-in
+`T095_FULL_CANVAS_P95_BUDGET_MS=100` run correctly exited 1, so this gap is
+not hidden behind a green software marker. Existing 60px independent pixel
+oracle remains 32/32 green.
+
+On the same Xvfb/llvmpipe host, user-supplied PhotoCraft 0.21.0 under its
+local GUI/MCP bridge filled the same 512×512 with 96px solid red using one
+100-event pointer call. Exported PNG had all 262,144 pixels opaque red;
+PhotoCraft's internal brush trace took 78.62/88.78/79.05ms, while its MCP
+round trips took 125–158ms. These are **not comparable latency boundaries**:
+Godot includes input queue and post-draw, PhotoCraft internal CPU trace does
+not, and neither measures physical input-to-photon. The discrepancy motivates
+profiling/optimizing queue drain and staging before additional trace-schema
+work, but makes no owner acceptance claim.
+
+The new correctness test runs only in on-demand `godot-native-t095-brush.yml`
+with T-094's fail-closed marker checker and raw-log retention. The 100ms
+ceiling is an explicitly opt-in reference-hardware diagnostic, not a generic
+llvmpipe CI limit. Owner-device responsiveness, physical held-stroke behavior,
+post-release navigation UX, explicit manual approval and hosted CI remain
+outstanding. T-096 remains independently in Manual Review.
+[Evidence](../evidence/T-095-2026-11-11-full-canvas-96px-red-brush.md).
+
+
+## 2026-11-11 follow-up: Godot built-in function profiler and drain attribution (not closure)
+
+**Still `In Progress`, `manual_review: true`.** The 96px red/full-canvas
+pointer regression now reports cumulative compositor, commit, texture and
+staging CPU time, preview frames, and drain calls. The actual pinned Godot
+4.8.beta3 GDScript profiler (`--profiling --debug`) identifies compositor,
+Brush tile staging, and document publication as hotspots; profiling itself
+adds overhead. One unprofiled llvmpipe Legacy run took **9,222ms** wall,
+including **4,875ms** compositor CPU, **1,578ms** commit CPU and **1,423ms**
+staging CPU, with **161** preview frames. A **temporary staged-copy-only**
+30ms drain deadline reduced wall to **4,719ms** and compositor to **1,364ms**,
+but worst drain-call CPU rose to **38ms** versus **20ms** at the original
+6ms soft deadline; all correctness assertions passed. The stage-only change
+was restored, not committed. NativeHard also needed **8,456ms** on llvmpipe,
+so simply switching backends is insufficient. Target 100ms is **not met**.
+
+Prioritize truly incremental preview, tile-local atomic publication and
+per-pixel staging cost, then remeasure without profiler overhead and on owner
+hardware. Keep held-preview/pan-zoom correctness and the original CPU
+budget until a separately validated algorithmic fix. No ticket closure,
+owner hardware approval, hosted CI pass or physical input-to-photon result is
+asserted; T-096 remains independently Manual Review.
+[Evidence](../evidence/T-095-2026-11-11-96px-godot-profiler.md).

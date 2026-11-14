@@ -4,10 +4,20 @@
 
 ## Reproducible environments and evidence form
 
-1. Use `main` and record `git rev-parse HEAD`, clean/unmodified canonical `addons/drawing/`, `godot --version` (target **4.8.beta2**), OS/build, CPU, GPU/renderer/driver, monitor scale/DPI, physical pointer model, window size, and display refresh rate. Build with `python3 tools/build_drawing_app.py --in-place`, then `godot --headless --editor --path drawing --import --quit`, then `godot --path drawing`. Run separately on **physical Linux and Windows**; an Xvfb/Mesa llvmpipe result must be labeled *software-only*, never as a physical GPU witness.
+1. Use the exact candidate PR commit (not an earlier `main` or local archive) and record `git rev-parse HEAD`, clean/unmodified canonical `addons/drawing/`, `godot --version` (target **4.8.beta3**), OS/build, CPU, GPU/renderer/driver, monitor scale/DPI, physical pointer model, window size, and display refresh rate. Build with `python3 tools/build_drawing_app.py --in-place`, then `godot --headless --editor --path drawing --import --quit`, then `godot --path drawing`. Run separately on **physical Linux and Windows**; an Xvfb/Mesa llvmpipe result must be labeled *software-only*, never as a physical GPU witness.
 2. Use a fresh disposable workspace/profiles, with a known 256×256 transparent RGBA8 test document, a second opaque background, and three overlapping raster layers (top/middle/bottom) so eraser and non-top-layer compositing are visible. Also verify negative coordinates and a second file with a published reusable Object source. Record the exact `.drawing` SHA-256 before/after Save/Open; do not include private campaign files in public evidence. For viewport tests run 1280×720, 1366×768 and 1920×1080 at 100% and 150% UI scale; for stroke/zoom run 100%, 50%, 25% even if a safe test-only zoom path must enable the current 25% clamp.
 3. For each row collect **before and after** screen recording with visible pointer/button state, before-release framebuffer readback when relevant, an exact pixel comparison or command result, a failure/repro log, and a named native test path. Record observations as `PASS`, `FAIL`, or `NOT RUN` separately for Linux and Windows, with the test commit/OS/GPU/size/DPI/zoom. For pointer/paint performance record per-phase samples and **median/p95** for down→first-uncommitted-visible-pixel, motion→visible-pixel, release→commit and frame submission; do not call frame submission physical input-to-photon latency.
 4. The existing `drawing/tests/standalone_smoke.gd` is a headless model/GUI dispatch witness (including an exact `.drawing` roundtrip), and `drawing/tests/native_pointer.gd` is an earlier native pointer witness. Neither establishes continuous uncommitted paint, Windows presentation latency, or all 23 outcomes. Re-run the full standalone and Atlas regression when the dependent implementation milestones land. Keep every outstanding review gate unapproved until the owner explicitly accepts the demonstrated result.
+
+## T-107 evidence readiness (not an owner result)
+
+The [T-107 readiness ledger](evidence/T-107-2026-11-12-readiness.json) verifies
+all 23 ticket/action links and records every current Linux/Windows physical
+outcome as **NOT RUN**. Its archived 46/46 replay is a prior **local,
+unattributed** diagnostic, not a successful GitHub Actions run on the new
+candidate. Source and model tests do not change the owner states in this
+runbook; the historical Save/Open pass (#22) and internal revision explanation
+(#23) remain separate from physical interactive re-review.
 
 ## Recording physical results without implied signoff
 

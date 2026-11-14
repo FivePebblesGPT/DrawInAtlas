@@ -260,3 +260,6 @@ Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# T-107 archived raw CI logs retain original output bytes, including whitespace.
+docs/evidence/T-107-2026-11-12-replay-capture/logs/*.log whitespace=-trailing-space

@@ -312,3 +312,25 @@ and original selection; a missing/NULL reference must be repaired before it
 can be duplicated. This does **not** implement nested Object Asset Save As,
 graph duplication, or any unapproved source-copy policy. The safe graph
 capacity and owner physical-hardware review remain separate.
+
+### T-108 provisional nested Save As decision prototype (2026-11-12)
+
+The Object registry accepts an explicit internal `nested_policy="links"` or
+`"deep_copy"` on `save_as()` **only for a source with children**. The
+read-only `nested_save_as_impact(draft)` estimates new sources and child
+placements. Both policies allocate fresh child instance IDs/generations;
+`links` retains existing published descendant source identities, while
+`deep_copy` duplicates reachable published descendants once per shared DAG
+node. NULL remains NULL. Stale child graph/source/index, cycles, corrupted
+files and late index commit failures cannot publish partial graphs; staged
+files are removed on rejection. Existing Atlas-origin Save As history retains
+independently saved variants after undo and reuses their IDs on redo.
+
+**This is not the approved Object Editor behavior.** UI Save As passes no
+policy, so nested sources continue to return `NESTED_SAVE_AS`; single-file
+nested export continues to return `NESTED_EXPORT`. For now, the safe portable
+option is the complete saved campaign `Objects/` copy, not implicit
+transitive duplication. The exact semantics and user-visible choice need
+explicit owner approval under T-108 before release. Run
+`godot --headless --path . --script res://tests/t108_nested_save_as_policy_smoke.gd`
+for the 42-check source/history, NULL, rollback and portable project oracle.

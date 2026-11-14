@@ -1,0 +1,130 @@
+{
+  "schema": "t110-evidence-v1",
+  "baseline_commit": "e490355d02abb17ebc5adfbe499aa0ec39785141",
+  "engine_version": "4.8.beta3.official.c51ff06e8",
+  "platform": "Linux Godot headless and Xvfb/Mesa",
+  "hosted_ci": false,
+  "owner_approval": false,
+  "entries": [
+    {
+      "path": "red-final.log",
+      "kind": "red_control",
+      "exit_code": 1,
+      "marker": null,
+      "sha256": "3f315188f0fbcad47d8866c72a72353ca710d258b76c912540b3c2a038108a5f",
+      "bytes": 1175
+    },
+    {
+      "path": "t110-final.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T110_UTF8_PASSED",
+      "sha256": "448ee055b5079ac573f9ec4d1c5852545f7b7913c60afed0c142b29a5c74ad13",
+      "bytes": 818
+    },
+    {
+      "path": "t109-neighbor.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T109_SCALE_PASSED",
+      "sha256": "f9d44867947fa64dd4b68a4e0ea0af62d4187560cffda939426a5f627299133d",
+      "bytes": 525
+    },
+    {
+      "path": "t065-browser.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_ASSET_BROWSER_PASSED",
+      "sha256": "f5ecfd3d92df1e4d207f6f9ac6d1a7f199979816f6a2f6492676bdcba551953b",
+      "bytes": 972
+    },
+    {
+      "path": "t065-transfers.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_TRANSFERS_PASSED",
+      "sha256": "74af768ee389491e2d9e92d63cf7539bf5a6af87a868d82b171347fdd7120157",
+      "bytes": 211
+    },
+    {
+      "path": "t065-real-io.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_REAL_IO_PASSED",
+      "sha256": "884a1d87f3697118db4d15e307c27b48b36c07ae812272417d49c1c3da0c4b13",
+      "bytes": 370
+    },
+    {
+      "path": "t065-thumbnails.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_THUMBNAILS_PASSED",
+      "sha256": "66db20b9371bf5ff13346a9689cf475c5c25304f99b87c3da9c0d900a0840e39",
+      "bytes": 966
+    },
+    {
+      "path": "t065-atlas.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_ATLAS_BROWSER_PASSED",
+      "sha256": "dbea4914f6efeb228f5c770555b5b71cc90ede7134207d6629768da948178d62",
+      "bytes": 956
+    },
+    {
+      "path": "t065-portable.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_PORTABLE_PASSED",
+      "sha256": "991d6c21e5811ebdadabdf62a7d924ada0a0794ecb58adfd96a9e9bed6d2fd9e",
+      "bytes": 196
+    },
+    {
+      "path": "t065-manager-retry.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_MANAGER_PASSED",
+      "sha256": "862c672570fceb3788233dcbed393f710e6cef11577888183ace45f1f24e8843",
+      "bytes": 195
+    },
+    {
+      "path": "native-browser.log",
+      "kind": "model",
+      "exit_code": 0,
+      "marker": "T065_NATIVE_PASSED",
+      "sha256": "c230818eb57f805cedd2ba7dc27d68785a8569064028586bcdb549874e4ba2c3",
+      "bytes": 2079
+    },
+    {
+      "path": "baseline-1.log",
+      "kind": "benchmark",
+      "exit_code": 0,
+      "marker": "T109_SCAN_BENCH_PASSED",
+      "sha256": "900b50a7a214ea8fc004a69c3a6c46339cc42cb922f399239bbabb0efd71c68e",
+      "bytes": 581
+    },
+    {
+      "path": "candidate-2.log",
+      "kind": "benchmark",
+      "exit_code": 0,
+      "marker": "T109_SCAN_BENCH_PASSED",
+      "sha256": "53b6971aa04c52b20cb0448c235ef99ca46f64bd989e3785b7a5743f6fd6a30b",
+      "bytes": 581
+    },
+    {
+      "path": "baseline-3.log",
+      "kind": "benchmark",
+      "exit_code": 0,
+      "marker": "T109_SCAN_BENCH_PASSED",
+      "sha256": "9ff17c72aca15195771d64b686d3a0da12e67cca8af5b6a14849d094f1a16169",
+      "bytes": 581
+    },
+    {
+      "path": "candidate-4.log",
+      "kind": "benchmark",
+      "exit_code": 0,
+      "marker": "T109_SCAN_BENCH_PASSED",
+      "sha256": "40afcc26b4fad5bf5c16ce9ec8a238549ab52a5ea99f1043efa733745f7469cf",
+      "bytes": 581
+    }
+  ]
+}

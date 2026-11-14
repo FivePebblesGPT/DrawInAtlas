@@ -1,0 +1,8 @@
+test_clean_standalone_project_and_witness (test_drawing_app.StandaloneDrawingTests.test_clean_standalone_project_and_witness) ... ok
+test_safe_staging_with_one_canonical_package (test_drawing_app.StandaloneDrawingTests.test_safe_staging_with_one_canonical_package) ... ok
+test_third_project_uses_complete_package (test_drawing_app.StandaloneDrawingTests.test_third_project_uses_complete_package) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 13.780s
+
+OK

@@ -1,0 +1,23 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T095_FULL_CANVAS_RUN index=0 backend=Legacy source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=4889.509 release_to_commit_ms=4841.101 stage_cpu_ms=1492.519 drain_frames=160 max_pending=99 commit_cpu_ms=1312.842 compose_cpu_ms=853.637 texture_cpu_ms=27.710 preview_frames=80 segments_staged=296 drain_calls=162 max_batch_ms=17.049 max_drain_ms=17.065 frame_compose_p95_ms=20.170 max_frame_compose_ms=22.974 max_frame_draw_ms=24.020 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=0 static_before_bytes=57346056 static_after_bytes=145457800 peak_before_bytes=75708976 peak_after_bytes=183055360
+T099_FRAME_METRICS index=0 input_draw_p50_ms=1671.684 input_draw_p95_ms=3343.674 input_draw_max_ms=3503.416 input_callback_p50_ms=1677.024 input_callback_p95_ms=3350.338 input_callback_max_ms=3510.859 pending_depth_p95=93 pending_depth_max=99 pending_age_p95_ms=3343.670 pending_age_max_ms=3503.403 preview_draws=80 drain_calls=162 max_drain_ms=17.065
+T104_DISPLAY_SETTLE index=0 backend=Legacy extra_frames=6
+T095_FULL_CANVAS_RUN index=1 backend=Legacy source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=4026.180 release_to_commit_ms=3976.095 stage_cpu_ms=1275.913 drain_frames=160 max_pending=99 commit_cpu_ms=763.169 compose_cpu_ms=804.770 texture_cpu_ms=26.810 preview_frames=80 segments_staged=296 drain_calls=162 max_batch_ms=11.521 max_drain_ms=12.949 frame_compose_p95_ms=18.840 max_frame_compose_ms=19.813 max_frame_draw_ms=20.762 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=1 static_before_bytes=63929816 static_after_bytes=151362608 peak_before_bytes=193692952 peak_after_bytes=193692952
+T099_FRAME_METRICS index=1 input_draw_p50_ms=1577.576 input_draw_p95_ms=3023.835 input_draw_max_ms=3193.404 input_callback_p50_ms=1582.604 input_callback_p95_ms=3032.526 input_callback_max_ms=3199.660 pending_depth_p95=93 pending_depth_max=99 pending_age_p95_ms=3023.832 pending_age_max_ms=3193.390 preview_draws=80 drain_calls=162 max_drain_ms=12.949
+T104_DISPLAY_SETTLE index=1 backend=Legacy extra_frames=7
+T095_FULL_CANVAS_RUN index=2 backend=Legacy source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=4259.148 release_to_commit_ms=4211.093 stage_cpu_ms=1367.092 drain_frames=161 max_pending=99 commit_cpu_ms=823.546 compose_cpu_ms=889.598 texture_cpu_ms=39.244 preview_frames=81 segments_staged=296 drain_calls=163 max_batch_ms=21.669 max_drain_ms=23.745 frame_compose_p95_ms=20.290 max_frame_compose_ms=25.867 max_frame_draw_ms=34.862 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=2 static_before_bytes=63929816 static_after_bytes=151365560 peak_before_bytes=193692952 peak_after_bytes=193692952
+T099_FRAME_METRICS index=2 input_draw_p50_ms=1700.531 input_draw_p95_ms=3225.492 input_draw_max_ms=3377.543 input_callback_p50_ms=1714.809 input_callback_p95_ms=3231.308 input_callback_max_ms=3384.126 pending_depth_p95=94 pending_depth_max=99 pending_age_p95_ms=3225.488 pending_age_max_ms=3377.527 preview_draws=81 drain_calls=163 max_drain_ms=23.745
+T104_DISPLAY_SETTLE index=2 backend=Legacy extra_frames=5
+T095_FULL_CANVAS_SUMMARY backend=Legacy runs=3 total_p50_ms=4259.148 total_p95_ms=4889.509 release_p95_ms=4841.101 stage_p95_ms=1492.519 proposed_target_ms=100 target_met=false failures=0
+T095_FULL_CANVAS_PASSED

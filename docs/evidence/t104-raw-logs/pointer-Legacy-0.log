@@ -1,0 +1,17 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T095_FULL_CANVAS_RUN index=0 backend=Legacy source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=4622.810 release_to_commit_ms=4573.144 stage_cpu_ms=1398.970 drain_frames=160 max_pending=99 commit_cpu_ms=1109.322 compose_cpu_ms=847.435 texture_cpu_ms=30.292 preview_frames=80 segments_staged=296 drain_calls=162 max_batch_ms=12.660 max_drain_ms=16.045 frame_compose_p95_ms=20.285 max_frame_compose_ms=25.163 max_frame_draw_ms=26.193 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=0 static_before_bytes=57337336 static_after_bytes=145453916 peak_before_bytes=75705116 peak_after_bytes=183051476
+T099_FRAME_METRICS index=0 input_draw_p50_ms=1645.261 input_draw_p95_ms=3288.690 input_draw_max_ms=3438.385 input_callback_p50_ms=1655.640 input_callback_p95_ms=3294.679 input_callback_max_ms=3444.966 pending_depth_p95=92 pending_depth_max=99 pending_age_p95_ms=3288.686 pending_age_max_ms=3438.375 preview_draws=80 drain_calls=162 max_drain_ms=16.045
+T095_FULL_CANVAS_FAILED: stroke 0 framebuffer corner (4.5, 4.5) is red
+T095_FULL_CANVAS_FAILED: stroke 0 framebuffer corner (507.5, 4.5) is red
+T095_FULL_CANVAS_FAILED: stroke 0 framebuffer corner (4.5, 507.5) is red
+T095_FULL_CANVAS_FAILED: stroke 0 framebuffer corner (507.5, 507.5) is red
+T095_FULL_CANVAS_SUMMARY backend=Legacy runs=1 total_p50_ms=4622.810 total_p95_ms=4622.810 release_p95_ms=4573.144 stage_p95_ms=1398.970 proposed_target_ms=100 target_met=false failures=4

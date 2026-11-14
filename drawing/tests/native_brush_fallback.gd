@@ -28,8 +28,21 @@ func run() -> void:
     await process_frame
     canvas.start_gesture(canvas.pixel_to_position(Vector2(-10.5, -10.5)))
     check(canvas.session != null, "editing session begins regardless of native availability")
-    check(canvas._active_brush_backend == ("NativeHard" if native_available else "Legacy"),
-        "native mode or safe legacy fallback is selected")
+    var hard_native: Object = ClassDB.instantiate("DrawingNativeBrush") if native_available else null
+    var hard_transaction_native: bool = hard_native != null and \
+        hard_native.has_method("begin_hard_batch") and hard_native.has_method("commit_hard_batch") and \
+        hard_native.has_method("rollback_hard_batch")
+    check(canvas._active_brush_backend == ("NativeHard" if hard_transaction_native else "Legacy"),
+        "NativeHard only starts when source-read rollback is available")
+    if native_available and not hard_transaction_native:
+        var incompatible: DrawingEditSession = doc.begin_edit(layer, doc.revision).value
+        var rejected: DrawingResult = incompatible.paint_path_native_hard(
+            PackedVector2Array([Vector2(5.5, 5.5)]), 0xff547aa5, 60.0, false,
+            null, hard_native)
+        check(not rejected.ok and rejected.code == "NATIVE_BRUSH_TRANSACTION" and \
+            incompatible.change_count() == 0,
+            "old native binary rejects unsafe direct NativeHard edit without staging")
+        incompatible.cancel()
     canvas.finish_gesture(canvas.pixel_to_position(Vector2(15.5, 18.5)))
     for frame: int in range(400):
         if canvas.session == null:
@@ -56,6 +69,15 @@ func run() -> void:
     check(canvas._active_brush_backend == "Legacy" or
         (not native_available and canvas._native_brush == null),
         "invalid Hokusai preset falls back explicitly")
+    canvas.cancel_gesture()
+    # An old GDExtension may support Hokusai paint yet lack rollback.
+    # Such a binary must choose Legacy *before* source-pigment sampling.
+    canvas.brush_preset = "hard"
+    var transactional_native: bool = native_available and ClassDB.instantiate(
+        "DrawingNativeBrush").has_method("begin_preset_batch")
+    canvas.start_gesture(canvas.pixel_to_position(Vector2(-3.5, 4.5)))
+    check(canvas._active_brush_backend == ("Hokusai" if transactional_native else "Legacy"),
+        "Hokusai selects native only when real cross-boundary rollback is supported")
     canvas.cancel_gesture()
     print("T095_NATIVE_FALLBACK_RESULT checks=%d failures=%d native=%s" %
         [checks, failures, str(native_available)])

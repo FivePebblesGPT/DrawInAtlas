@@ -5,7 +5,7 @@ set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 bundle="${1:-${DRAWING_RUST_TOOLING:-}}"
 if [[ -z "$bundle" ]]; then
-  echo "usage: $0 /path/to/extracted/Godot_v4.8b2_bundle6_rust_hokusai" >&2
+  echo "usage: $0 /path/to/extracted/Godot_v4.8b3_rust_hokusai_bundle8" >&2
   exit 2
 fi
 bundle="$(cd -- "$bundle" && pwd -P)"

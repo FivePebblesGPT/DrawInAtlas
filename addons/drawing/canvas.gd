@@ -175,11 +175,23 @@ var pointer_known: bool = false
 ## The bounded LRU owns every retained texture; a draw call need not create any.
 const DISPLAY_TILE_SIZE: int = 128
 const MAX_DISPLAY_TILES: int = 144
+## Cold *committed* content with a wholly retainable visible footprint can be
+## populated over multiple draw callbacks. Each synchronous raster composite
+## is atomic, so this is a soft CPU budget, never a hard real-time deadline.
+## Over-budget dense views use the original complete-frame transient path:
+## they cannot retain a correct full framebuffer between incremental draws.
+const MAX_COLD_TILES_PER_DRAW: int = 4
+const MAX_COLD_COMPOSE_CPU_US: int = 10000
 const MAX_OCCUPANCY_ENTRIES: int = 40000
+## Focal preselection is deliberately limited: an enormous/unknown viewport
+## retains the conservative per-miss eviction path without unbounded sorting.
+const MAX_FOCAL_PLAN_WINDOW: int = 65536
+const MAX_FOCAL_PLAN_CANDIDATES: int = 4096
 var _display_tiles: Dictionary[String, Dictionary] = {}
 ## Keep evicted draw-command RIDs alive through the submitted frame. This is
 ## transient and separate from the bounded retained LRU (see instrumentation).
 var _frame_references: Array[ImageTexture] = []
+var _cold_population_pending: bool = false
 var _cache_document: DrawingDocument
 var _cache_revision: int = -1
 var _cache_source_epoch: int = -1
@@ -187,6 +199,16 @@ var _cache_access: int = 0
 var _occupied_display_tiles: Dictionary[String, bool] = {}
 var _occupancy_unknown: bool = false
 var last_frame_metrics: Dictionary[String, Variant] = {}
+## Cursor/overlay redraws can happen without a detached pixel changing. Retain
+## only the last bounded visible preview index; it is owned by this Canvas and
+## never returned to external callers for mutation. Source edits advance the
+## session epoch, and navigation changes the visible tile rectangle.
+var _preview_index_owner: DrawingEditSession
+var _preview_index_epoch: int = -1
+var _preview_index_revision: int = -1
+var _preview_index_window: Rect2i = Rect2i()
+var _preview_index_result: Dictionary = {}
+var _preview_index_reused: bool = false
 var _last_frame_submit_us: int = 0
 var _reported_render_errors: Dictionary[String, bool] = {}
 ## Motion handlers append raw canvas-source positions only. Bounded pieces are
@@ -198,6 +220,11 @@ const MAX_SEGMENTS_PER_FRAME: int = 256
 const MAX_SEGMENTS_PER_BATCH: int = 16
 const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
 const MAX_DRAIN_CPU_US: int = 6000
+# Preview draw scheduling never changes the 6ms soft raster-stage deadline.
+# During a sustained input backlog a display frame may represent two bounded
+# drain calls; first/last isolated changes remain immediate.
+const MAX_PENDING_PREVIEW_DRAINS: int = 2
+const MAX_PENDING_PREVIEW_US: int = 20000
 const MAX_SEGMENT_LENGTH: float = 24.0
 # Discard only an already-consumed prefix of a sustained stroke. A paint
 # backlog may never become entirely empty while fresh OS samples arrive.
@@ -206,11 +233,36 @@ const MIN_CONSUMED_SAMPLE_COMPACTION: int = 256
 ## long ones. All-time count and worst age remain exact, including evicted ages.
 const MAX_SAMPLE_STAGE_LATENCIES: int = 4096
 const MAX_STAGE_BATCH_LATENCIES: int = 4096
+# Preserve the latest real Canvas frames for per-phase p50/p95 on owner
+# hardware without retaining an unbounded history on long pointer strokes.
+const MAX_FRAME_PHASE_SAMPLES: int = 1024
+## Owner-device diagnostics are disabled unless this environment variable
+## explicitly names a user:// JSONL file. Never record document content,
+## source coordinates, layer names, brush color, or OS pointer identifiers.
+const T095_TRACE_ENV: String = "DRAWING_T095_TRACE_JSONL"
+const MAX_T095_TRACE_BYTES: int = 4 * 1024 * 1024
+# Generated only when tracing is enabled. Random per Canvas lifetime, never an OS
+# or hardware identifier; prevents silently pooling appended launch sessions.
+var _t095_trace_session_id: String = ""
 var _samples: Array[Vector2] = []
 var _sample_times_us: Array[int] = []
 var _sample_index: int = 0
 var _sample_latency_write_index: int = 0
 var _batch_latency_write_index: int = 0
+var _frame_phase_write_index: int = 0
+## A frame_post_draw signal is not guaranteed for every Canvas draw. Associate
+## only the latest actually submitted stroke frame with the next callback;
+## never attach a callback from a completed/cancelled session to a new stroke.
+var _pending_frame_phase_sample: Dictionary = {}
+var _pending_frame_phase_session: DrawingEditSession
+## First successful pixel-changing stage not yet represented by a Canvas draw.
+## Monotonic Godot CPU time only; never interpret as device receipt or photons.
+var _unsubmitted_preview_stage_us: int = 0
+## Receipt time of the oldest input in the first pixel-changing batch pending
+## Canvas submission. This is engine receipt, not an OS hardware timestamp.
+var _unsubmitted_preview_input_us: int = 0
+var _pending_preview_drain_calls: int = 0
+var _pending_preview_first_us: int = 0
 var _target_arrival_us: int = 0
 var _segment_target: Vector2 = Vector2.ZERO
 var _has_segment_target: bool = false
@@ -307,10 +359,81 @@ func _restore_input_accumulation() -> void:
 
 
 func _on_frame_post_draw() -> void:
-	last_frame_metrics["post_draw_us"] = Time.get_ticks_usec()
+	var callback_us: int = Time.get_ticks_usec()
+	last_frame_metrics["post_draw_us"] = callback_us
+	_finish_pending_frame_post_draw(callback_us)
 	if session != null and int(_metrics.get("first_preview_submit_us", 0)) > 0 \
 			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0:
 		_metrics["first_frame_post_draw_us"] = Time.get_ticks_usec()
+
+
+## Godot's frame_post_draw callback is a renderer-side timing witness, NOT a
+## display-scanout or input-to-photon timestamp. A callback can be missing,
+## repeated, or delivered after a stroke was cancelled/published. Never
+## synthesize a completed callback for those frames.
+func _finish_pending_frame_post_draw(callback_us: int) -> void:
+	if _pending_frame_phase_sample.is_empty():
+		return
+	var sample: Dictionary = _pending_frame_phase_sample
+	var owner: DrawingEditSession = _pending_frame_phase_session
+	_pending_frame_phase_sample = {}
+	_pending_frame_phase_session = null
+	if owner == null or owner != session:
+		return
+	var end_us: int = int(sample.get("frame_end_us", 0))
+	if end_us <= 0:
+		return
+	var recorded_us: int = maxi(end_us, callback_us)
+	var delay_us: int = recorded_us - end_us
+	sample["frame_post_draw_callback_us"] = recorded_us
+	sample["frame_end_to_post_draw_us"] = delay_us
+	_metrics["frame_post_draw_matches"] = int(_metrics.get("frame_post_draw_matches", 0)) + 1
+	_metrics["max_frame_end_to_post_draw_us"] = maxi(
+		int(_metrics.get("max_frame_end_to_post_draw_us", 0)), delay_us)
+	if sample.has("preview_input_received_us"):
+		var input_to_callback_us: int = maxi(0,
+			recorded_us - int(sample["preview_input_received_us"]))
+		sample["preview_input_to_post_draw_us"] = input_to_callback_us
+		_metrics["preview_input_post_draw_matches"] = int(
+			_metrics.get("preview_input_post_draw_matches", 0)) + 1
+		_metrics["max_preview_input_to_post_draw_us"] = maxi(
+			int(_metrics.get("max_preview_input_to_post_draw_us", 0)),
+			input_to_callback_us)
+	if sample.has("preview_stage_completed_us"):
+		var stage_to_callback_us: int = maxi(0,
+			recorded_us - int(sample["preview_stage_completed_us"]))
+		sample["preview_stage_to_post_draw_us"] = stage_to_callback_us
+		_metrics["preview_stage_post_draw_matches"] = int(
+			_metrics.get("preview_stage_post_draw_matches", 0)) + 1
+		_metrics["max_preview_stage_to_post_draw_us"] = maxi(
+			int(_metrics.get("max_preview_stage_to_post_draw_us", 0)),
+			stage_to_callback_us)
+
+
+## A single Canvas draw may represent multiple completed edit batches. Retain
+## the *earliest* pixel-changing stage until its first Canvas submission.
+func _mark_unsubmitted_preview_stage(stage_completed_us: int,
+		input_received_us: int = 0) -> void:
+	if _unsubmitted_preview_stage_us == 0:
+		_unsubmitted_preview_stage_us = maxi(1, stage_completed_us)
+		# Never substitute a later batch receipt for a missing first one.
+		_unsubmitted_preview_input_us = maxi(0, input_received_us)
+
+
+func _tag_frame_preview_stage(frame: Dictionary, frame_end_us: int) -> void:
+	if _unsubmitted_preview_stage_us <= 0:
+		return
+	frame["preview_stage_completed_us"] = _unsubmitted_preview_stage_us
+	frame["preview_stage_to_frame_end_us"] = maxi(0,
+		frame_end_us - _unsubmitted_preview_stage_us)
+	if _unsubmitted_preview_input_us > 0:
+		frame["preview_input_received_us"] = _unsubmitted_preview_input_us
+		frame["preview_input_to_frame_end_us"] = maxi(0,
+			frame_end_us - _unsubmitted_preview_input_us)
+	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 
 
 func source_position(position: Vector2) -> Vector2:
@@ -529,6 +652,48 @@ func _tile_focus_distance(tile: Vector2i, focus: Vector2) -> float:
 	return delta.length_squared()
 
 
+## A viewport containing more occupied display tiles than the cache can hold
+## must build transient textures for the remainder. Choose its 144 retained
+## keys *once* per frame, rather than rescanning every existing texture on each
+## transient cache miss. This is metadata-only; drawing remains pixel-exact.
+## Unknown occupancy, active previews and huge viewports use the old LRU path.
+func _focal_retention_plan(window: Rect2i, focus: Vector2) -> Dictionary[String, bool]:
+	var selected: Dictionary[String, bool] = {}
+	if _occupancy_unknown or session != null or _move_preview != null \
+			or window.get_area() <= MAX_DISPLAY_TILES \
+			or window.get_area() > MAX_FOCAL_PLAN_WINDOW:
+		return selected
+	var occupied: Array[Dictionary] = []
+	if _occupied_display_tiles.size() * 2 < window.get_area():
+		for key: String in _occupied_display_tiles:
+			var comma: int = key.find(",")
+			if comma < 1:
+				return {}
+			var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
+			if window.has_point(tile):
+				occupied.append({"key": key, "distance": _tile_focus_distance(tile, focus)})
+				if occupied.size() > MAX_FOCAL_PLAN_CANDIDATES:
+					return {}
+	else:
+		for y: int in range(window.position.y, window.end.y):
+			for x: int in range(window.position.x, window.end.x):
+				var key: String = "%d,%d" % [x, y]
+				if _occupied_display_tiles.has(key):
+					occupied.append({"key": key,
+						"distance": _tile_focus_distance(Vector2i(x, y), focus)})
+					if occupied.size() > MAX_FOCAL_PLAN_CANDIDATES:
+						return {}
+	if occupied.size() <= MAX_DISPLAY_TILES:
+		return selected
+	occupied.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		if float(left["distance"]) != float(right["distance"]):
+			return float(left["distance"]) < float(right["distance"])
+		return String(left["key"]) < String(right["key"]))
+	for i: int in range(MAX_DISPLAY_TILES):
+		selected[String(occupied[i]["key"])] = true
+	return selected
+
+
 ## Offscreen textures go first, preserving the old bounded-LRU behavior.
 ## For in-view overflow retain the 144 closest tiles to the current focus;
 ## transient edge textures are still drawn at full precision for this frame.
@@ -653,6 +818,84 @@ func _raster_screen_rect(area: Rect2i) -> Rect2:
 	return Rect2(first, last - first)
 
 
+## Cache the expensive storage-to-display stamp projection only while its
+## inputs are identical. The result is private to this Canvas: neither the
+## edit session nor another consumer can mutate the cached stamp dictionary.
+## A closed or revision-invalidated session always recomputes (and returns
+## blank stamps), even if its last paint epoch happens to match.
+func _preview_index_for_draw(edit: DrawingEditSession, window: Rect2i) -> Dictionary:
+	_preview_index_reused = false
+	if edit == null:
+		_preview_index_owner = null
+		_preview_index_result = {}
+		return {}
+	var revision: int = edit.document.revision
+	if not edit._closed and _preview_index_owner == edit \
+			and _preview_index_epoch == edit._preview_epoch \
+			and _preview_index_revision == revision and _preview_index_window == window:
+		_preview_index_reused = true
+		return _preview_index_result
+	var result: Dictionary = edit.preview_display_stamps_for_canvas(window, DISPLAY_TILE_SIZE)
+	_preview_index_owner = edit
+	_preview_index_epoch = edit._preview_epoch
+	_preview_index_revision = revision
+	_preview_index_window = window
+	_preview_index_result = result
+	return result
+
+
+## Choose the nearest missing cold tiles before traversing the draw list.
+## Scans only the bounded *display occupancy* index, never canonical pixels.
+## All tiles must fit the persistent cache; otherwise the old full-frame path
+## is necessary to display transient overflow tiles without holes.
+func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
+	if _occupancy_unknown or session != null or _move_preview != null:
+		return {}
+	var occupied_tiles: Dictionary[String, Vector2i] = {}
+	# A large sparse zoom-out can expose thousands of empty *display* cells;
+	# enumerate the much smaller existing occupancy index instead. For dense
+	# documents, keep iteration bounded by the viewport rather than the entire
+	# (up to 40,000-entry) document occupancy map.
+	if _occupied_display_tiles.size() * 2 < window.get_area():
+		for key: String in _occupied_display_tiles:
+			var comma: int = key.find(",")
+			if comma < 1:
+				return {} # Invalid hint: use the conservative full-frame path.
+			var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
+			if window.has_point(tile):
+				occupied_tiles[key] = tile
+				if occupied_tiles.size() > MAX_DISPLAY_TILES:
+					return {}
+	else:
+		for y: int in range(window.position.y, window.end.y):
+			for x: int in range(window.position.x, window.end.x):
+				var key: String = "%d,%d" % [x, y]
+				if _occupied_display_tiles.has(key):
+					occupied_tiles[key] = Vector2i(x, y)
+					if occupied_tiles.size() > MAX_DISPLAY_TILES:
+						return {}
+	var occupied: int = occupied_tiles.size()
+	var missing: Array[Dictionary] = []
+	for key: String in occupied_tiles:
+		var entry: Dictionary = _display_tiles.get(key, {})
+		if entry.is_empty() or bool(entry.get("dirty", true)) \
+				or int(entry.get("preview_stamp", 0)) != 0 \
+				or entry.get("preview_owner") != null:
+			missing.append({"key": key,
+				"distance": _tile_focus_distance(occupied_tiles[key], focus)})
+	# Do not spread a small or sparsely occupied viewport over multiple frames.
+	if occupied <= MAX_COLD_TILES_PER_DRAW or missing.size() <= 1:
+		return {}
+	missing.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		if float(left["distance"]) != float(right["distance"]):
+			return float(left["distance"]) < float(right["distance"])
+		return String(left["key"]) < String(right["key"]))
+	var selected: Dictionary[String, bool] = {}
+	for i: int in range(mini(missing.size(), MAX_COLD_TILES_PER_DRAW)):
+		selected[missing[i]["key"]] = true
+	return selected
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -660,14 +903,19 @@ func _draw() -> void:
 		"cache_hits": 0, "tiles_composited": 0, "source_pixels_rendered": 0,
 		"visible_layer_plan_builds": 0, "source_chunks_shared": 0,
 		"preview_index_built": 0, "preview_index_keys": 0, "preview_index_fallback": 0,
+		"preview_index_cache_hit": 0,
 		"textures_created": 0, "textures_updated": 0, "textures_transient": 0,
 		"bytes_uploaded": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0, "preview_index_cpu_us": 0,
 		"empty_skipped": 0,
 		"transparent_tiles_culled": 0,
-		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4}
+		"cold_tiles_deferred": 0, "cold_budgeted": 0,
+		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4,
+		"focal_plan_tiles": 0, "focal_evictions": 0,
+		"focal_reused_evicted": 0}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
+		_preview_index_for_draw(null, Rect2i())
 		last_frame_metrics = metrics
 		return
 	_draw_image_backdrop()
@@ -682,6 +930,23 @@ func _draw() -> void:
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
 	var cache_focus: Vector2 = _display_cache_focus()
+	# A batch eviction plan preserves texture hits even when a future near-
+	# focus tile displaces an earlier visible tile. Keep displaced entries alive
+	# locally until their draw command has been submitted this frame.
+	var focal_plan: Dictionary[String, bool] = _focal_retention_plan(visible_tiles, cache_focus)
+	var focal_victims: Array[String] = []
+	var evicted_for_frame: Dictionary[String, Dictionary] = {}
+	if not focal_plan.is_empty():
+		for cached_key: String in _display_tiles:
+			if not focal_plan.has(cached_key):
+				focal_victims.append(cached_key)
+		focal_victims.sort()
+	metrics["focal_plan_tiles"] = focal_plan.size()
+	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus)
+	var cold_budgeted: bool = not cold_targets.is_empty()
+	var cold_rendered: int = 0
+	var cold_failed: bool = false
+	metrics["cold_budgeted"] = 1 if cold_budgeted else 0
 	# Resolve visible layers lazily: an idle redraw consisting entirely of
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
@@ -691,9 +956,9 @@ func _draw() -> void:
 	var use_preview_index: bool = false
 	if preview_session != null:
 		var index_start_us: int = Time.get_ticks_usec()
-		preview_index = preview_session.preview_stamps_for_display_tiles(visible_tiles,
-			DISPLAY_TILE_SIZE)
+		preview_index = _preview_index_for_draw(preview_session, visible_tiles)
 		metrics["preview_index_cpu_us"] = Time.get_ticks_usec() - index_start_us
+		metrics["preview_index_cache_hit"] = 1 if _preview_index_reused else 0
 		use_preview_index = bool(preview_index["indexed"])
 		if use_preview_index:
 			indexed_stamps = preview_index["stamps"] as Dictionary
@@ -701,6 +966,10 @@ func _draw() -> void:
 			metrics["preview_index_keys"] = indexed_stamps.size()
 		else:
 			metrics["preview_index_fallback"] = 1
+	else:
+		# Release the last detached index after commit/cancel, and avoid
+		# retaining an otherwise completed edit session from an idle Canvas.
+		_preview_index_for_draw(null, visible_tiles)
 	for y: int in range(start_y, end_y + 1):
 		for x: int in range(start_x, end_x + 1):
 			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1
@@ -715,13 +984,19 @@ func _draw() -> void:
 				metrics["empty_skipped"] = int(metrics["empty_skipped"]) + 1
 				continue
 			_cache_access += 1
-			var entry: Dictionary = _display_tiles.get(key, {})
+			var entry: Dictionary = _display_tiles.get(key, evicted_for_frame.get(key, {}))
+			if evicted_for_frame.has(key):
+				metrics["focal_reused_evicted"] = int(metrics["focal_reused_evicted"]) + 1
 			var preview_owner: DrawingEditSession = preview_session if preview_stamp > 0 else null
 			if not entry.is_empty() and not bool(entry["dirty"]) \
 					and int(entry["preview_stamp"]) == preview_stamp \
 					and entry["preview_owner"] == preview_owner:
 				metrics["cache_hits"] = int(metrics["cache_hits"]) + 1
 			else:
+				if cold_budgeted and (not cold_targets.has(key) \
+						or (cold_rendered > 0 and Time.get_ticks_usec() - draw_start >= MAX_COLD_COMPOSE_CPU_US)):
+					metrics["cold_tiles_deferred"] = int(metrics["cold_tiles_deferred"]) + 1
+					continue
 				if visible_plan.is_empty():
 					visible_plan = DrawingRenderer.prepare_visible_layers(document)
 					metrics["visible_layer_plan_builds"] = int(metrics["visible_layer_plan_builds"]) + 1
@@ -734,7 +1009,10 @@ func _draw() -> void:
 						_reported_render_errors[composite.code] = true
 						canvas_error.emit(composite.message)
 					if not composite.ok:
+						cold_failed = true
 						continue
+				if cold_budgeted:
+					cold_rendered += 1
 				var image: Image = composite.value as Image
 				metrics["tiles_composited"] = int(metrics["tiles_composited"]) + 1
 				metrics["source_pixels_rendered"] = int(metrics["source_pixels_rendered"]) + DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE
@@ -752,9 +1030,24 @@ func _draw() -> void:
 					metrics["transparent_tiles_culled"] = int(metrics["transparent_tiles_culled"]) + 1
 					continue
 				var start_texture: int = Time.get_ticks_usec()
-				var retain: bool = true
+				var retain: bool = not evicted_for_frame.has(key)
 				if entry.is_empty():
-					retain = _reserve_display_slot(visible_tiles, Vector2i(x, y), cache_focus)
+					if focal_plan.is_empty():
+						retain = _reserve_display_slot(visible_tiles, Vector2i(x, y), cache_focus)
+					else:
+						retain = focal_plan.has(key)
+						if retain and _display_tiles.size() >= MAX_DISPLAY_TILES:
+							# Transparent tiles may retire a planned victim earlier
+							# in this frame. Never read a removed dictionary entry.
+							while not focal_victims.is_empty() and _display_tiles.size() >= MAX_DISPLAY_TILES:
+								var victim: String = focal_victims.pop_back()
+								if not _display_tiles.has(victim):
+									continue
+								evicted_for_frame[victim] = _display_tiles[victim]
+								_display_tiles.erase(victim)
+								metrics["focal_evictions"] = int(metrics["focal_evictions"]) + 1
+							if _display_tiles.size() >= MAX_DISPLAY_TILES:
+								retain = false
 					entry = {"texture": ImageTexture.create_from_image(image)}
 					metrics["textures_created"] = int(metrics["textures_created"]) + 1
 					if not retain:
@@ -783,6 +1076,9 @@ func _draw() -> void:
 	metrics["submit_us"] = Time.get_ticks_usec()
 	last_frame_metrics = metrics
 	_last_frame_submit_us = int(metrics["submit_us"])
+	# The next callback revalidates document, epoch, revision, viewport and
+	# preview state afresh. Never spin forever on a failed render.
+	_cold_population_pending = int(metrics["cold_tiles_deferred"]) > 0 and not cold_failed
 	if session != null:
 		# Capture per-gesture compositor/upload work before the next _draw
 		# replaces last_frame_metrics. This is CPU submission, not photon time.
@@ -814,6 +1110,19 @@ func _draw() -> void:
 		draw_arc(last_pointer_position, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.9), 1.0)
 	if session != null and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
+	# Unlike the earlier draw_cpu_us field, this includes grid, selection and
+	# cursor overlays. Capture actual rendered preview frames only, not the
+	# post-commit idle redraw. Frame callbacks do not measure photons.
+	var frame_end_us: int = Time.get_ticks_usec()
+	last_frame_metrics["full_draw_cpu_us"] = frame_end_us - draw_start
+	if session != null:
+		# Capture pending pointer age at the same instant as the draw phases.
+		# A queued waypoint and a partly interpolated target are distinct input
+		# samples; both count even when one was already dequeued for staging.
+		last_frame_metrics["frame_end_us"] = frame_end_us
+		last_frame_metrics.merge(_frame_input_backlog(frame_end_us), true)
+		_tag_frame_preview_stage(last_frame_metrics, frame_end_us)
+		_record_frame_phase(last_frame_metrics)
 
 
 ## The persistent selection always traces mask truth, never the conservative
@@ -946,6 +1255,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _process(_delta: float) -> void:
+	if _cold_population_pending:
+		_cold_population_pending = false
+		queue_redraw()
 	if session != null:
 		if document == null or document.revision != session.expected_revision:
 			cancel_gesture()
@@ -1044,14 +1356,26 @@ func start_gesture(position: Vector2) -> void:
 			if brush_backend == "Hokusai" and not _stroke_erase:
 				var preset_path: String = BUNDLED_PRESETS.get(brush_preset, "")
 				var settings: String = FileAccess.get_file_as_string(preset_path) if not preset_path.is_empty() else ""
-				if not settings.is_empty() and _native_brush.call("configure_preset",
-						settings, _stroke_width, _stroke_color):
+				# A pre-transaction native binary must fail over to Legacy;
+				# otherwise a lazy-source failure could consume pigment on retry.
+				var supports_transactions: bool = _native_brush.has_method("begin_preset_batch") and \
+					_native_brush.has_method("commit_preset_batch") and \
+					_native_brush.has_method("rollback_preset_batch")
+				if supports_transactions and not settings.is_empty() and _native_brush.call(
+						"configure_preset", settings, _stroke_width, _stroke_color):
 					_active_brush_backend = "Hokusai"
 				else:
-					canvas_error.emit("Hokusai preset unavailable; using the legacy Brush")
+					canvas_error.emit("Hokusai preset or batch rollback unavailable; using the legacy Brush")
 			else:
-				_native_brush.call("reset_hard")
-				_active_brush_backend = "NativeHard"
+				# Reject a pre-transaction binary at gesture start rather than
+				# letting a failed source read consume native hard coverage.
+				if _native_brush.has_method("begin_hard_batch") and \
+						_native_brush.has_method("commit_hard_batch") and \
+						_native_brush.has_method("rollback_hard_batch"):
+					_native_brush.call("reset_hard")
+					_active_brush_backend = "NativeHard"
+				else:
+					canvas_error.emit("Native hard rollback unavailable; using the legacy Brush")
 		else:
 			canvas_error.emit("Native brush unavailable; using the legacy Brush")
 	_samples.clear()
@@ -1059,6 +1383,13 @@ func start_gesture(position: Vector2) -> void:
 	_sample_index = 0
 	_sample_latency_write_index = 0
 	_batch_latency_write_index = 0
+	_frame_phase_write_index = 0
+	_pending_frame_phase_sample = {}
+	_pending_frame_phase_session = null
+	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 	_has_segment_target = false
 	_finish_requested = false
 	_staged_position = source_position(position)
@@ -1067,13 +1398,26 @@ func start_gesture(position: Vector2) -> void:
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"max_sample_buffer": 0, "sample_compactions": 0,
-		"drain_calls": 0, "max_drain_cpu_us": 0,
+		"duplicate_drain_batched": 0, "drain_calls": 0, "max_drain_cpu_us": 0,
 		"sample_to_stage_us": [], "sample_to_stage_total": 0,
 		"max_sample_to_stage_us": 0, "stage_batches_us": [],
 		"stage_batch_total": 0, "max_stage_batch_us": 0,
 		"commit_cpu_us": 0, "preview_frames": 0,
 		"compose_cpu_us": 0, "texture_cpu_us": 0,
-		"preview_index_cpu_us": 0, "bytes_uploaded": 0}
+		"preview_index_cpu_us": 0, "bytes_uploaded": 0,
+		"frame_phase_total": 0, "frame_phases_us": [],
+		"frame_post_draw_matches": 0, "max_frame_end_to_post_draw_us": 0,
+		"frame_preview_stage_submissions": 0,
+		"max_frame_preview_stage_to_frame_end_us": 0,
+		"preview_stage_post_draw_matches": 0,
+		"max_preview_stage_to_post_draw_us": 0,
+		"preview_input_post_draw_matches": 0,
+		"max_preview_input_to_post_draw_us": 0,
+		"max_preview_input_to_frame_end_us": 0,
+		"max_frame_full_draw_cpu_us": 0, "max_frame_compose_cpu_us": 0,
+		"max_frame_texture_cpu_us": 0, "max_frame_preview_index_cpu_us": 0,
+		"max_frame_selection_outline_cpu_us": 0,
+		"max_frame_pending_input_count": 0, "max_frame_oldest_pending_age_us": 0}
 	gesture_started.emit()
 	_enqueue_sample(_staged_position)
 	# A stationary dab does not wait for the first motion or mouse-up event.
@@ -1117,7 +1461,11 @@ func _drain_segments(budget: int) -> void:
 		return
 	var drain_start_us: int = Time.get_ticks_usec()
 	var segments: int = 0
-	var changed: bool = false
+	# Staging an already covered or selection-masked sample does not change
+	# the detached preview. Avoid forcing an expensive canvas draw just
+	# because an input sample was consumed; actual pixel mutations increment
+	# the session preview generation (including edits that restore old bytes).
+	var preview_before: int = session._preview_epoch
 	# A wide brush can rasterize more candidates in one segment than a
 	# narrow one does in 16. Limit the atomic batch by swept footprint so
 	# the soft deadline is not defeated by one oversized paint_path call.
@@ -1133,8 +1481,16 @@ func _drain_segments(budget: int) -> void:
 	while segments < budget:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
+		var batch_first_receipt_us: int = 0
 		var next_position: Vector2 = _staged_position
-		while batch.size() < batch_limit and segments < budget:
+		# A 60px stroke normally gets a one-segment atomic budget. Allow a
+		# *consecutive identical* Legacy source position to extend that batch:
+		# it adds no new candidate footprint, and paint_path already skips
+		# duplicate waypoints exactly. Never collapse Hokusai pigment input or
+		# enlarge a batch with a moving segment beyond the original budget.
+		var batch_capacity: int = MAX_SEGMENTS_PER_BATCH \
+			if _active_brush_backend == "Legacy" else batch_limit
+		while batch.size() < batch_capacity and segments < budget:
 			if not _has_segment_target:
 				if _sample_index == _samples.size():
 					break
@@ -1142,7 +1498,20 @@ func _drain_segments(budget: int) -> void:
 				_target_arrival_us = _sample_times_us[_sample_index]
 				_sample_index += 1
 				_has_segment_target = true
-			next_position = next_position.move_toward(_segment_target, MAX_SEGMENT_LENGTH)
+			var candidate: Vector2 = next_position.move_toward(
+				_segment_target, MAX_SEGMENT_LENGTH)
+			if batch.size() >= batch_limit:
+				if candidate != next_position:
+					# Target is already dequeued, but remains pending. Do not
+					# consume its timestamp or advance the staged position.
+					break
+				_metrics["duplicate_drain_batched"] = int(
+					_metrics["duplicate_drain_batched"]) + 1
+			next_position = candidate
+			if batch_first_receipt_us == 0:
+				batch_first_receipt_us = _target_arrival_us
+			else:
+				batch_first_receipt_us = mini(batch_first_receipt_us, _target_arrival_us)
 			batch.append(next_position)
 			segments += 1
 			if next_position == _segment_target:
@@ -1151,6 +1520,7 @@ func _drain_segments(budget: int) -> void:
 		if batch.is_empty():
 			break
 		var start_us: int = Time.get_ticks_usec()
+		var preview_epoch_before_batch: int = session._preview_epoch
 		var stage: DrawingResult
 		if _active_brush_backend == "NativeHard":
 			stage = session.paint_path_native_hard(batch, _stroke_color, _stroke_width,
@@ -1176,8 +1546,9 @@ func _drain_segments(budget: int) -> void:
 		if int(_metrics["first_stage_us"]) == 0:
 			_metrics["first_stage_us"] = staged_at_us
 		_metrics["segments_staged"] = int(_metrics["segments_staged"]) + batch.size()
+		if session._preview_epoch != preview_epoch_before_batch:
+			_mark_unsubmitted_preview_stage(staged_at_us, batch_first_receipt_us)
 		_staged_position = next_position
-		changed = true
 		for arrival_us: int in completed_arrivals:
 			_record_stage_latency(maxi(0, staged_at_us - arrival_us))
 		# The deadline is checked between atomic batches, never during a
@@ -1188,10 +1559,102 @@ func _drain_segments(budget: int) -> void:
 	_metrics["max_drain_cpu_us"] = maxi(int(_metrics["max_drain_cpu_us"]),
 		Time.get_ticks_usec() - drain_start_us)
 	_compact_sample_queue()
-	if changed:
-		queue_redraw()
+	# The detached preview may aggregate two *separate*, deadline-limited
+	# drain calls into one display submission while the input queue is busy.
+	# Never enlarge an atomic paint_path call, defer an isolated edit, or
+	# starve a held pointer when the producer pauses.
+	if session != null:
+		if session._preview_epoch != preview_before:
+			if _pending_preview_drain_calls == 0:
+				_pending_preview_first_us = Time.get_ticks_usec()
+			_pending_preview_drain_calls += 1
+		var more_input: bool = _has_segment_target or _sample_index < _samples.size()
+		if _pending_preview_drain_calls > 0 and (
+				_pending_preview_drain_calls >= MAX_PENDING_PREVIEW_DRAINS or
+				Time.get_ticks_usec() - _pending_preview_first_us >= MAX_PENDING_PREVIEW_US or
+				not more_input):
+			queue_redraw()
+			_pending_preview_drain_calls = 0
+			_pending_preview_first_us = 0
 	if _finish_requested and _samples.is_empty() and not _has_segment_target:
 		_commit_stroke()
+
+
+## Sample the oldest *outstanding* pointer timestamp, including the current
+## interpolation target that has already been dequeued. Ignore consumed array
+## prefixes, so queue compaction and long source-space segments do not skew
+## frame age/depth. These are engine-receipt timestamps, not OS device times.
+func _frame_input_backlog(now_us: int) -> Dictionary:
+	var queued: int = maxi(0, _sample_times_us.size() - _sample_index)
+	var oldest_us: int = now_us
+	if queued > 0:
+		oldest_us = mini(oldest_us, _sample_times_us[_sample_index])
+	if _has_segment_target:
+		queued += 1
+		oldest_us = mini(oldest_us, _target_arrival_us)
+	return {"pending_input_count": queued,
+		"oldest_pending_age_us": maxi(0, now_us - oldest_us) if queued > 0 else 0}
+
+
+## Keep an ordered, bounded per-frame profile instead of just cumulative
+## compose/texture/index time. Total frame count and worst samples remain exact
+## even when the oldest observations are evicted. Never infer physical
+## input-to-photon latency from a Godot CPU draw callback.
+func _record_frame_phase(frame: Dictionary) -> void:
+	var sample: Dictionary = {}
+	for key: String in ["full_draw_cpu_us", "compose_cpu_us", "texture_cpu_us",
+			"preview_index_cpu_us", "selection_outline_cpu_us",
+			"pending_input_count", "oldest_pending_age_us"]:
+		var value: int = maxi(0, int(frame.get(key, 0)))
+		sample[key] = value
+		var max_key: String = "max_frame_" + key
+		_metrics[max_key] = maxi(int(_metrics.get(max_key, 0)), value)
+	if frame.has("preview_input_received_us"):
+		var receipt_us: int = maxi(0, int(frame["preview_input_received_us"]))
+		var receipt_to_draw_us: int = maxi(0, int(frame.get(
+			"preview_input_to_frame_end_us", 0)))
+		sample["preview_input_received_us"] = receipt_us
+		sample["preview_input_to_frame_end_us"] = receipt_to_draw_us
+		_metrics["max_preview_input_to_frame_end_us"] = maxi(
+			int(_metrics.get("max_preview_input_to_frame_end_us", 0)),
+			receipt_to_draw_us)
+	if frame.has("preview_stage_completed_us"):
+		var stage_us: int = maxi(0, int(frame["preview_stage_completed_us"]))
+		var submit_delay_us: int = maxi(0, int(frame.get(
+			"preview_stage_to_frame_end_us", 0)))
+		sample["preview_stage_completed_us"] = stage_us
+		sample["preview_stage_to_frame_end_us"] = submit_delay_us
+		_metrics["frame_preview_stage_submissions"] = int(
+			_metrics.get("frame_preview_stage_submissions", 0)) + 1
+		_metrics["max_frame_preview_stage_to_frame_end_us"] = maxi(
+			int(_metrics.get("max_frame_preview_stage_to_frame_end_us", 0)),
+			submit_delay_us)
+	# Monotonic engine time allows phase and backlog spikes to be correlated
+	# without pretending to measure physical input-to-photon latency.
+	sample["frame_end_us"] = maxi(0, int(frame.get("frame_end_us", 0)))
+	_metrics["frame_phase_total"] = int(_metrics["frame_phase_total"]) + 1
+	var records: Array = _metrics["frame_phases_us"] as Array
+	if records.size() < MAX_FRAME_PHASE_SAMPLES:
+		records.append(sample)
+	else:
+		# An evicted unmatched frame cannot be completed retroactively.
+		_pending_frame_phase_sample = {}
+		_pending_frame_phase_session = null
+		records[_frame_phase_write_index] = sample
+		_frame_phase_write_index = (_frame_phase_write_index + 1) % MAX_FRAME_PHASE_SAMPLES
+	if session != null:
+		_pending_frame_phase_sample = sample
+		_pending_frame_phase_session = session
+
+
+func _finalize_frame_phase_window() -> void:
+	if int(_metrics["frame_phase_total"]) <= MAX_FRAME_PHASE_SAMPLES \
+			or _frame_phase_write_index == 0:
+		return
+	var records: Array = _metrics["frame_phases_us"] as Array
+	var ordered: Array = records.slice(_frame_phase_write_index)
+	ordered.append_array(records.slice(0, _frame_phase_write_index))
+	_metrics["frame_phases_us"] = ordered
 
 
 ## A long stroke must not freeze its batch latency profile at the first
@@ -1264,6 +1727,96 @@ func _compact_sample_queue() -> void:
 		_metrics["sample_compactions"] = int(_metrics["sample_compactions"]) + 1
 
 
+## Optional bounded, local-only stroke capture for the owner's physical-device
+## recheck. This runs after a successful commit, never on the input/draw path.
+## All observations are Godot CPU / renderer callbacks, NOT input-to-photon.
+func _write_t095_trace(profile: Dictionary, backend: String) -> void:
+	var path: String = OS.get_environment(T095_TRACE_ENV)
+	# Never let a diagnostic environment variable redirect writes into the
+	# project or escape the app's local user-data directory via traversal.
+	if path.is_empty() or not path.begins_with("user://") \
+			or path.contains("..") or path.contains("\\") \
+			or path == "user://":
+		return
+	if _t095_trace_session_id.is_empty():
+		var token: PackedByteArray = Crypto.new().generate_random_bytes(16)
+		if token.size() != 16:
+			return
+		_t095_trace_session_id = token.hex_encode()
+	var record: Dictionary = {
+		"schema": 1, "capture_kind": "engine_timing_only",
+		"trace_session_id": _t095_trace_session_id,
+		"backend": backend, "zoom": zoom, "brush_width_px": _stroke_width,
+		"viewport_px": [roundi(size.x), roundi(size.y)],
+		"image_size_px": [image_bounds.size.x, image_bounds.size.y],
+		"frame_phases_us": [], "sample_to_stage_us": [],
+		"stage_batches_us": []}
+	for key: String in ["down_us", "release_us", "commit_us", "first_stage_us",
+			"first_preview_submit_us", "first_frame_post_draw_us",
+			"samples_received", "segments_staged", "stage_cpu_us",
+			"max_pending", "max_sample_buffer", "sample_compactions",
+			"duplicate_drain_batched", "drain_calls", "max_drain_cpu_us",
+			"sample_to_stage_total", "max_sample_to_stage_us",
+			"stage_batch_total", "max_stage_batch_us", "commit_cpu_us",
+			"preview_frames", "compose_cpu_us", "texture_cpu_us",
+			"preview_index_cpu_us", "bytes_uploaded", "frame_phase_total",
+			"frame_post_draw_matches", "max_frame_end_to_post_draw_us",
+			"frame_preview_stage_submissions",
+			"max_frame_preview_stage_to_frame_end_us",
+			"preview_stage_post_draw_matches", "max_preview_stage_to_post_draw_us",
+			"preview_input_post_draw_matches", "max_preview_input_to_post_draw_us",
+			"max_preview_input_to_frame_end_us", "max_frame_full_draw_cpu_us",
+			"max_frame_compose_cpu_us", "max_frame_texture_cpu_us",
+			"max_frame_preview_index_cpu_us", "max_frame_selection_outline_cpu_us",
+			"max_frame_pending_input_count", "max_frame_oldest_pending_age_us"]:
+		record[key] = maxi(0, int(profile.get(key, 0)))
+	for key: String in ["sample_to_stage_us", "stage_batches_us"]:
+		var values: Array = profile.get(key, []) as Array
+		var limit: int = MAX_SAMPLE_STAGE_LATENCIES if key == "sample_to_stage_us" \
+			else MAX_STAGE_BATCH_LATENCIES
+		var safe: Array = []
+		for value: Variant in values.slice(maxi(0, values.size() - limit)):
+			safe.append(maxi(0, int(value)))
+		record[key] = safe
+	var phase_keys: Array[String] = ["frame_end_us", "full_draw_cpu_us",
+		"compose_cpu_us", "texture_cpu_us", "preview_index_cpu_us",
+		"selection_outline_cpu_us", "pending_input_count",
+		"oldest_pending_age_us", "frame_post_draw_callback_us",
+		"frame_end_to_post_draw_us", "preview_stage_completed_us",
+		"preview_stage_to_frame_end_us", "preview_stage_to_post_draw_us",
+		"preview_input_received_us", "preview_input_to_frame_end_us",
+		"preview_input_to_post_draw_us"]
+	var phases: Array = profile.get("frame_phases_us", []) as Array
+	var safe_phases: Array = []
+	for phase_variant: Variant in phases.slice(maxi(0,
+			phases.size() - MAX_FRAME_PHASE_SAMPLES)):
+		if not phase_variant is Dictionary:
+			continue
+		var phase: Dictionary = phase_variant as Dictionary
+		var safe_phase: Dictionary = {}
+		for key: String in phase_keys:
+			if phase.has(key):
+				safe_phase[key] = maxi(0, int(phase[key]))
+		safe_phases.append(safe_phase)
+	record["frame_phases_us"] = safe_phases
+	var encoded: String = JSON.stringify(record) + "\n"
+	var additional_bytes: int = encoded.to_utf8_buffer().size()
+	if additional_bytes > MAX_T095_TRACE_BYTES:
+		return
+	var existed: bool = FileAccess.file_exists(path)
+	var stream: FileAccess = FileAccess.open(path,
+		FileAccess.READ_WRITE if existed else FileAccess.WRITE)
+	if stream == null:
+		return
+	if existed:
+		if stream.get_length() + additional_bytes > MAX_T095_TRACE_BYTES:
+			stream.close()
+			return
+		stream.seek_end()
+	stream.store_string(encoded)
+	stream.close()
+
+
 func _commit_stroke() -> void:
 	if session == null:
 		return
@@ -1276,21 +1829,32 @@ func _commit_stroke() -> void:
 		canvas_error.emit("Stroke cancelled because the selection changed")
 		return
 	var active: DrawingEditSession = session
+	var trace_backend: String = _active_brush_backend
 	_metrics["hokusai_perf"] = active.hokusai_perf.duplicate()
+	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 	session = null
 	_stroke_selection = null
 	_native_brush = null
 	_active_brush_backend = "Legacy"
 	var commit_start_us: int = Time.get_ticks_usec()
+	var published_ok: bool = true
 	if active.change_count() > 0:
-		_publish(active.commit())
+		var result: DrawingResult = active.commit()
+		published_ok = result.ok
+		_publish(result)
 	else:
 		active.cancel()
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	_finalize_stage_latency_window()
 	_finalize_stage_batch_window()
+	_finalize_frame_phase_window()
 	last_gesture_metrics = _metrics.duplicate(true)
+	if published_ok:
+		_write_t095_trace(last_gesture_metrics, trace_backend)
 	_restore_input_accumulation()
 	_samples.clear()
 	_sample_times_us.clear()
@@ -1304,6 +1868,10 @@ func _commit_stroke() -> void:
 ## Escape, stale revision and direct host changes discard the entire floating
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
+	_unsubmitted_preview_stage_us = 0
+	_unsubmitted_preview_input_us = 0
+	_pending_preview_drain_calls = 0
+	_pending_preview_first_us = 0
 	if session != null:
 		session.cancel()
 		session = null

@@ -1,0 +1,6 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T109_SCAN_PROFILE: {"count":512,"memory_bytes":[85325524,85327800,85327824,85327896,85327944,85328016,85328088,85328088,85328184],"memory_kind":"engine-tracked allocations, not RSS or GPU VRAM","memory_p50_bytes":85327944,"memory_p95_bytes":85328184,"scan_p50_us":99849,"scan_p95_us":129560,"scan_us":[94338,99849,129560,102733,97059,99539,112231,103996,97644],"trials":9}
+T109_SCAN_BENCH_PASSED
+PEAK_RSS_KB=150052 WALL_SECONDS=1.70 EXIT=0

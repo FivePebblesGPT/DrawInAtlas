@@ -26,12 +26,91 @@ var _covered_rows: Dictionary[int, Dictionary] = {}
 var _source_tiles: Dictionary[String, Variant] = {}
 ## Immutable session storage stride. -1 selects the general signed-divide path.
 var _stage_tile_shift: int = -1
+## Hard Brush pixels arrive in spatial runs. A stable per-session tile-key
+## cache avoids allocating the same "x,y" String for every covered pixel.
+## Cache the *tile indices*, not the pixel offsets, so signed/irregular
+## strides and transitions back to an earlier tile remain exact.
+var _brush_cached_tile_x: int = 0
+var _brush_cached_tile_y: int = 0
+var _brush_cached_tile_key: String = ""
+## The current storage tile's immutable source and detached patch can be reused
+## across a scanline. A failed lazy read is never cached as a successful null
+## tile, and the preview reference is reset after transaction rollback.
+var _brush_cached_source: DrawingRasterTile = null
+var _brush_cached_source_ready: bool = false
+var _brush_cached_patch: Dictionary = {}
 ## Detached preview indexed by storage tile + pixel offset; never stored on the document.
 var _preview_tiles: Dictionary[String, Dictionary] = {}
 ## Per-storage-tile monotonic content versions. A display tile only needs
 ## recomposition when a storage tile touching its source footprint changes.
 var _preview_epoch: int = 0
 var _preview_tile_versions: Dictionary[String, int] = {}
+## The renderer's display tiles are 128px, but storage chunks may cover many
+## such tiles. Keep a bounded *exact* touched-display index for ordinary
+## Brush/Eraser pixel updates. Any path that cannot prove the index complete
+## falls back to the existing conservative storage-tile stamps.
+const PREVIEW_DISPLAY_STRIDE: int = 128
+const MAX_PREVIEW_DISPLAY_KEYS: int = 4096
+var _preview_display_versions: Dictionary[String, int] = {}
+var _preview_display_exact: bool = true
+var _preview_display_last_epoch: int = 0
+var _preview_display_cached_x: int = 0
+var _preview_display_cached_y: int = 0
+var _preview_display_cached_key: String = ""
+
+
+func _invalidate_exact_preview_display_index() -> void:
+	_preview_display_exact = false
+	_preview_display_versions.clear()
+
+
+func _mark_preview_display_pixel(global_x: int, global_y: int) -> void:
+	if not _preview_display_exact:
+		return
+	# Arithmetic shifts are floor division by 128 even for signed world pixels.
+	var tile_x: int = global_x >> 7
+	var tile_y: int = global_y >> 7
+	if (_preview_display_cached_key.is_empty()
+			or tile_x != _preview_display_cached_x
+			or tile_y != _preview_display_cached_y):
+		_preview_display_cached_x = tile_x
+		_preview_display_cached_y = tile_y
+		_preview_display_cached_key = "%d,%d" % [tile_x, tile_y]
+	var key: String = _preview_display_cached_key
+	if (not _preview_display_versions.has(key)
+			and _preview_display_versions.size() >= MAX_PREVIEW_DISPLAY_KEYS):
+		_invalidate_exact_preview_display_index()
+		return
+	_preview_display_versions[key] = _preview_epoch
+	_preview_display_last_epoch = _preview_epoch
+
+
+## Canvas-only refinement: pixels in one 256px storage tile should not dirty
+## all four 128px display tiles. Preserve the existing public conservative
+## stamp API and fail back to it for bulk edits, rollbacks, oversized
+## gestures, nonstandard display strides, or synthetic legacy mutation tests.
+func preview_display_stamps_for_canvas(visible_tiles: Rect2i, display_stride: int,
+		max_entries: int = 40000) -> Dictionary:
+	if (not _preview_display_exact
+			or _preview_display_last_epoch != _preview_epoch
+			or (_preview_display_versions.is_empty() and not _preview_tile_versions.is_empty())
+			or display_stride != PREVIEW_DISPLAY_STRIDE):
+		return preview_stamps_for_display_tiles(visible_tiles, display_stride, max_entries)
+	var stamps: Dictionary[String, int] = {}
+	if _closed or document.revision != expected_revision:
+		return {"indexed": true, "stamps": stamps}
+	if not visible_tiles.has_area() or max_entries <= 0:
+		return {"indexed": false, "stamps": stamps}
+	for key: String in _preview_display_versions:
+		var parts: PackedStringArray = key.split(",")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		if (x >= visible_tiles.position.x and x < visible_tiles.end.x
+				and y >= visible_tiles.position.y and y < visible_tiles.end.y):
+			if stamps.size() >= max_entries:
+				return {"indexed": false, "stamps": {}}
+			stamps[key] = _preview_display_versions[key]
+	return {"indexed": true, "stamps": stamps}
 ## Only touched pixels need rollback. A full triple-dictionary duplicate per motion
 ## event grew quadratically over long strokes.
 var _paint_journal: Dictionary[String, Array] = {}
@@ -55,6 +134,25 @@ var _brush_tile_journal: Dictionary[String, Dictionary] = {}
 var _brush_change_count_before_batch: int = 0
 var _closed: bool = false
 var hokusai_perf: Dictionary = {"native_us": 0, "stage_us": 0, "pixels": 0}
+## Count stationary waypoints elided by the once-only Legacy hard-brush path.
+## Native pigment presets intentionally retain every pressure/dab sample.
+var _duplicate_waypoints_skipped: int = 0
+## A stationary hard Brush/Eraser dab may repeat in the *next* one-point
+## pointer batch. Reuse it only after a successful identical prior dab; a
+## different selection, clip, width, color, budget or coordinate mapping must
+## revalidate all candidates. Never apply this to accumulating Hokusai pigment.
+var _cross_batch_dabs_skipped: int = 0
+var _stationary_dab_valid: bool = false
+var _stationary_dab_width: float = 0.0
+var _stationary_dab_rgba: int = 0
+var _stationary_dab_erase: bool = false
+var _stationary_dab_clip: Rect2i = Rect2i()
+var _stationary_dab_budget: int = 0
+var _stationary_dab_transform: Transform2D = Transform2D.IDENTITY
+var _stationary_dab_anchor_x: int = 0
+var _stationary_dab_anchor_y: int = 0
+var _stationary_dab_revision: int = -1
+var _stationary_dab_preview_epoch: int = -1
 var _has_last: bool = false
 var _last: Vector2 = Vector2.ZERO
 
@@ -221,6 +319,9 @@ func preview_stamps_for_display_tiles(visible_tiles: Rect2i, display_stride: int
 func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) -> void:
 	_preview_epoch += 1
 	_preview_tile_versions[tile_key] = _preview_epoch
+	if _preview_display_exact:
+		var point: PackedStringArray = pixel_key.split(",")
+		_mark_preview_display_pixel(int(point[0]), int(point[1]))
 	var tile_patch: Dictionary = _preview_tiles.get(tile_key, {})
 	if _after.has(pixel_key):
 		tile_patch[local_index] = _after[pixel_key]
@@ -234,6 +335,7 @@ func _sync_preview_pixel(tile_key: String, local_index: int, pixel_key: String) 
 ## Rare failure path for the other edit APIs which still use full snapshots.
 ## Their preview index must never outlive a rolled-back staging dictionary.
 func _rebuild_preview_tiles() -> void:
+	_invalidate_exact_preview_display_index()
 	_preview_tiles.clear()
 	for key: String in _after:
 		var parts: PackedStringArray = key.split(",")
@@ -245,6 +347,8 @@ func _rebuild_preview_tiles() -> void:
 
 
 func _rollback_paint() -> void:
+	_invalidate_exact_preview_display_index()
+	_stationary_dab_valid = false
 	for key: String in _paint_journal:
 		var snapshot: Array = _paint_journal[key]
 		if snapshot[0]:
@@ -281,16 +385,24 @@ func _rollback_paint() -> void:
 					_covered_rows.erase(int(snapshot[3]))
 		_preview_epoch += 1
 		_preview_tile_versions[tile_key] = _preview_epoch
+		_invalidate_exact_preview_display_index()
 		if patch.is_empty():
 			_preview_tiles.erase(tile_key)
 		else:
 			_preview_tiles[tile_key] = patch
 	_brush_change_count = _brush_change_count_before_batch
 	_brush_tile_journal.clear()
+	# Rollback may detach/rebuild the current preview tile's dictionary. Never
+	# reuse a reference which no longer corresponds to the published preview.
+	_brush_cached_tile_key = ""
+	_brush_cached_source_ready = false
+	_brush_cached_source = null
+	_brush_cached_patch = {}
 	_journaling = false
 
 
 func cancel() -> void:
+	_stationary_dab_valid = false
 	_brush_deferred = false
 	_brush_change_count = 0
 	_brush_tile_journal.clear()
@@ -302,12 +414,15 @@ func cancel() -> void:
 	_source_tiles.clear()
 	_preview_tiles.clear()
 	_preview_tile_versions.clear()
+	_preview_display_versions.clear()
+	_preview_display_cached_key = ""
 	_paint_journal.clear()
 	_journaling = false
 	_closed = true
 
 
 func commit() -> DrawingResult:
+	_stationary_dab_valid = false
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	# Native Hokusai and ordinary Brush-only sessions already own verified
@@ -336,6 +451,8 @@ func commit() -> DrawingResult:
 	_source_tiles.clear()
 	_preview_tiles.clear()
 	_preview_tile_versions.clear()
+	_preview_display_versions.clear()
+	_preview_display_cached_key = ""
 	_paint_journal.clear()
 	return result
 
@@ -343,6 +460,8 @@ func commit() -> DrawingResult:
 func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		once: bool = false, blend: bool = false, verified_source: int = -1,
 		internal_brush: bool = false) -> DrawingResult:
+	if not internal_brush:
+		_stationary_dab_valid = false
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if internal_brush and _brush_tile_publish and not _hokusai_deferred:
@@ -435,32 +554,48 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 		if covered_row.has(global_x):
 			return _brush_stage_ok
 	var stride: int = document.tile_stride
-	var tile_key: String
 	var local_x: int
 	var local_y: int
+	var tile_x: int
+	var tile_y: int
 	if _stage_tile_shift >= 0:
-		tile_key = "%d,%d" % [global_x >> _stage_tile_shift,
-			global_y >> _stage_tile_shift]
+		tile_x = global_x >> _stage_tile_shift
+		tile_y = global_y >> _stage_tile_shift
 		local_x = global_x & (stride - 1)
 		local_y = global_y & (stride - 1)
 	else:
-		tile_key = DrawingDocument.TILES.tile_key64(global_x, global_y, stride)
 		local_x = posmod(global_x, stride)
 		local_y = posmod(global_y, stride)
+		# Dividing after subtracting the nonnegative local remainder avoids
+		# truncation toward zero on negative signed world coordinates.
+		tile_x = (global_x - local_x) / stride
+		tile_y = (global_y - local_y) / stride
+	if _brush_cached_tile_key.is_empty() or tile_x != _brush_cached_tile_x \
+			or tile_y != _brush_cached_tile_y:
+		_brush_cached_tile_key = "%d,%d" % [tile_x, tile_y]
+		_brush_cached_tile_x = tile_x
+		_brush_cached_tile_y = tile_y
+		_brush_cached_source = null
+		_brush_cached_source_ready = false
+		_brush_cached_patch = _preview_tiles.get(_brush_cached_tile_key, {})
+	var tile_key: String = _brush_cached_tile_key
 	var local_index: int = local_y * stride + local_x
 	# A preverified old pixel skips its individual source read, but the tile
 	# identity must still be captured for fail-closed publication.
-	if not _source_tiles.has(tile_key):
-		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
-		if not resolved.ok:
-			return resolved
-		_source_tiles[tile_key] = resolved.value
+	if not _brush_cached_source_ready:
+		if not _source_tiles.has(tile_key):
+			var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+			if not resolved.ok:
+				return resolved
+			_source_tiles[tile_key] = resolved.value
+		_brush_cached_source = _source_tiles[tile_key] as DrawingRasterTile
+		_brush_cached_source_ready = true
 	var old: int = verified_source
 	if old == -1:
-		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
-		old = int(tile._pixels.get(local_index, 0)) if tile != null else 0
+		old = int(_brush_cached_source._pixels.get(local_index, 0)) \
+			if _brush_cached_source != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
-	var patch: Dictionary = _preview_tiles.get(tile_key, {})
+	var patch: Dictionary = _brush_cached_patch
 	var previous: int = int(patch.get(local_index, old))
 	if _journaling:
 		var entries: Dictionary = _brush_tile_journal.get(tile_key, {})
@@ -482,6 +617,7 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 			patch[local_index] = replacement
 		_preview_epoch += 1
 		_preview_tile_versions[tile_key] = _preview_epoch
+		_mark_preview_display_pixel(global_x, global_y)
 		if patch.is_empty():
 			_preview_tiles.erase(tile_key)
 		else:
@@ -552,31 +688,69 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 		erase: bool, selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i()) -> DrawingResult:
+	_stationary_dab_valid = false
 	if _closed or path.is_empty() or width <= 0.0 or not is_finite(width) or native == null:
 		return DrawingResult.failure("NATIVE_BRUSH", "Invalid native hard-brush stroke")
 	var inverse: Transform2D = view_transform.affine_inverse()
 	var relative: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in path:
 		relative.append(inverse * point)
+	# NativeHard's coverage/cursor must be rolled back on a failed *GDScript*
+	# source read too. Scripted deterministic oracles without native state keep
+	# their original contract; an incompatible installed binary fails closed.
+	var transactional: bool = native.has_method("begin_hard_batch") and \
+		native.has_method("commit_hard_batch") and native.has_method("rollback_hard_batch")
+	if native.get_class() == "DrawingNativeBrush" and not transactional:
+		return DrawingResult.failure("NATIVE_BRUSH_TRANSACTION",
+			"Native hard brush binary lacks source-read rollback")
+	if transactional and not native.call("begin_hard_batch"):
+		return DrawingResult.failure("NATIVE_BRUSH_TRANSACTION", "Native hard batch is already pending")
 	var result: Dictionary = native.call("hard_segments", relative, width, clip_bounds)
 	if not result.get("ok", false):
+		if transactional:
+			native.call("rollback_hard_batch")
 		return DrawingResult.failure("NATIVE_BRUSH", str(result.get("error", "Native coverage failed")))
 	var coordinates: PackedInt32Array = result.get("points", PackedInt32Array())
 	if coordinates.size() % 2 != 0:
+		if transactional:
+			native.call("rollback_hard_batch")
 		return DrawingResult.failure("NATIVE_BRUSH", "Native coverage returned invalid coordinates")
 	_journaling = true
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_brush_change_count_before_batch = _brush_change_count
-	for index: int in range(0, coordinates.size(), 2):
-		var staged: DrawingResult = _stage(coordinates[index], coordinates[index + 1],
-			0 if erase else rgba, selection, true, not erase, -1, true)
-		if not staged.ok:
-			_rollback_paint()
-			return staged
+	# Native coverage is already prevalidated by Rust. Avoid routing every
+	# returned pixel through _stage's generic/mixed-edit dispatch; preserve that
+	# dispatch when an earlier public operation has disabled tile-only staging.
+	var tile_staging: bool = _brush_tile_publish and not _hokusai_deferred
+	var ink: int = 0 if erase else rgba
+	if tile_staging:
+		# Keep the dispatch outside the pixel loop: a 96px full-canvas
+		# NativeHard gesture can contain more than 262,000 covered pixels.
+		for index: int in range(0, coordinates.size(), 2):
+			var staged: DrawingResult = _stage_brush_tile(coordinates[index],
+				coordinates[index + 1], ink, selection, true, not erase, -1)
+			if not staged.ok:
+				_rollback_paint()
+				if transactional:
+					native.call("rollback_hard_batch")
+				return staged
+	else:
+		# Public edits or Hokusai staging in the same session require the
+		# original global-key bookkeeping and atomic rollback semantics.
+		for index: int in range(0, coordinates.size(), 2):
+			var staged: DrawingResult = _stage(coordinates[index],
+				coordinates[index + 1], ink, selection, true, not erase, -1, true)
+			if not staged.ok:
+				_rollback_paint()
+				if transactional:
+					native.call("rollback_hard_batch")
+				return staged
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_journaling = false
+	if transactional:
+		native.call("commit_hard_batch")
 	return DrawingResult.success(change_count())
 
 
@@ -588,8 +762,18 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		selection: DrawingSelection, native: Object,
 		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
+	_stationary_dab_valid = false
 	if _closed or path.is_empty() or native == null:
 		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
+	# The real GDExtension must support acknowledgement/rollback. Scripted
+	# deterministic delta stubs have no native pigment surface to rewind.
+	var transactional: bool = native.has_method("begin_preset_batch") and \
+		native.has_method("commit_preset_batch") and native.has_method("rollback_preset_batch")
+	if native.get_class() == "DrawingNativeBrush" and not transactional:
+		return DrawingResult.failure("HOKUSAI_TRANSACTION",
+			"Native brush binary lacks rollback support")
+	if transactional and not native.call("begin_preset_batch"):
+		return DrawingResult.failure("HOKUSAI_TRANSACTION", "Native batch is already pending")
 	_brush_tile_publish = false
 	_materialize_brush_preview()
 	var inverse: Transform2D = view_transform.affine_inverse()
@@ -601,6 +785,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 	hokusai_perf["native_us"] = int(hokusai_perf["native_us"]) + Time.get_ticks_usec() - native_start_us
 	hokusai_perf["pixels"] = int(hokusai_perf["pixels"]) + changed.size() / 3
 	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
+		if transactional:
+			native.call("rollback_preset_batch")
 		return DrawingResult.failure("HOKUSAI_LIMIT", "Invalid or excessive native pixel delta")
 	var stage_start_us: int = Time.get_ticks_usec()
 	var opacity: int = (rgba >> 24) & 255
@@ -641,6 +827,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		var x: int = changed[index]
 		var y: int = changed[index + 1]
 		if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
+			if transactional:
+				native.call("rollback_preset_batch")
 			return DrawingResult.failure("COORD_RANGE", "Hokusai pixel exceeds safe edit coordinates")
 		if clipping and (x < clip_left or y < clip_top or x >= clip_right or y >= clip_bottom):
 			continue
@@ -673,6 +861,8 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		if not _source_tiles.has(source_key):
 			var resolved: DrawingResult = document._resolve_chunk(layer_id, source_key)
 			if not resolved.ok:
+				if transactional:
+					native.call("rollback_preset_batch")
 				return resolved
 			_source_tiles[source_key] = resolved.value
 	# Sessions using another edit API already have canonical global keys; the
@@ -729,11 +919,14 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 			continue
 		_preview_epoch += 1
 		_preview_tile_versions[tile_key] = _preview_epoch
+		_invalidate_exact_preview_display_index()
 		if patch.is_empty():
 			_preview_tiles.erase(tile_key)
 		else:
 			_preview_tiles[tile_key] = patch
 
+	if transactional:
+		native.call("commit_preset_batch")
 	hokusai_perf["stage_us"] = int(hokusai_perf["stage_us"]) + Time.get_ticks_usec() - stage_start_us
 	return DrawingResult.success(change_count())
 
@@ -753,20 +946,62 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 	_brush_tile_journal.clear()
 	_brush_change_count_before_batch = _brush_change_count
 	var previous: Vector2 = _last
+	var reusable_stationary_dab: bool = _stationary_dab_valid and _has_last \
+		and selection == null and _stationary_dab_width == width \
+		and _stationary_dab_rgba == rgba and _stationary_dab_erase == erase \
+		and _stationary_dab_clip == clip_bounds \
+		and _stationary_dab_budget == max_candidates \
+		and _stationary_dab_transform == view_transform \
+		and _stationary_dab_anchor_x == anchor_x \
+		and _stationary_dab_anchor_y == anchor_y \
+		and _stationary_dab_revision == document.revision \
+		and _stationary_dab_preview_epoch == _preview_epoch
+	var last_rasterized_was_dab: bool = false
 	for index: int in range(path.size()):
 		var position: Vector2 = inverse * path[index]
 		if not position.is_finite() or absf(position.x) > 1000000000.0 or absf(position.y) > 1000000000.0:
 			_rollback_paint()
 			return DrawingResult.failure("COORD_RANGE", "Brush point is outside the view-relative range")
 		var start: Vector2 = previous if index > 0 or _has_last else position
+		# One-point batches from actual mouse events commonly repeat an
+		# already accepted stationary dab. Only an unchanged, unmasked brush
+		# context can reuse that result across calls. A different candidate
+		# budget must still fail when the original dab would fail.
+		if index == 0 and position == start and reusable_stationary_dab:
+			_cross_batch_dabs_skipped += 1
+			last_rasterized_was_dab = true
+			previous = position
+			continue
+		# A repeated source position adds no coverage to the once-only hard
+		# Brush/Eraser *within the same batch*. Repaint the first point of
+		# every call: public callers may change width, selection or clip
+		# between calls, exposing previously uncovered pixels at that point.
+		# Hokusai uses a separate accumulating-pigment API and is untouched.
+		if index > 0 and position == start:
+			_duplicate_waypoints_skipped += 1
+			previous = position
+			continue
 		var touched: DrawingResult = _paint_segment(start, position, width * 0.5, rgba,
 			erase, selection, max_candidates, clip_bounds)
 		if not touched.ok:
 			_rollback_paint()
 			return touched
+		last_rasterized_was_dab = (start == position)
 		previous = position
 	_has_last = true
 	_last = previous
+	_stationary_dab_valid = last_rasterized_was_dab and selection == null
+	if _stationary_dab_valid:
+		_stationary_dab_width = width
+		_stationary_dab_rgba = rgba
+		_stationary_dab_erase = erase
+		_stationary_dab_clip = clip_bounds
+		_stationary_dab_budget = max_candidates
+		_stationary_dab_transform = view_transform
+		_stationary_dab_anchor_x = anchor_x
+		_stationary_dab_anchor_y = anchor_y
+		_stationary_dab_revision = document.revision
+		_stationary_dab_preview_epoch = _preview_epoch
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_journaling = false
@@ -801,12 +1036,23 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			return first
 		return _paint_segment(middle, finish, radius, rgba, erase,
 			selection, max_candidates, clip_bounds, depth + 1)
-	# A stationary dab has no segment projection. Axis-aligned segments can
-	# compute squared distance without a Geometry2D call per candidate. Keep
-	# the original native geometry oracle for all oblique sweeps.
-	if start != finish and (start.x == finish.x or start.y == finish.y):
+	# Scanline bounds discard only candidates that cannot touch a dab/capsule.
+	# Keep the original per-pixel squared-distance predicate at the edge. For
+	# very large view coordinates, float32 Vector2 rounding could exceed our
+	# two-pixel conservative margin; use the unbounded reference loop instead.
+	var span_safe: bool = absf(start.x) < 1000000.0 and absf(start.y) < 1000000.0 \
+		and absf(finish.x) < 1000000.0 and absf(finish.y) < 1000000.0
+	if span_safe and start == finish:
+		return _paint_dab_scanlines(start, radius, left, top, right, bottom,
+			rgba, erase, selection)
+	if span_safe and start != finish and (start.x == finish.x or start.y == finish.y):
 		return _paint_axis_segment(start, finish, left, top, right, bottom,
 			radius * radius, rgba, erase, selection)
+	# Near-horizontal float32 deltas can underflow the Y-to-parameter
+	# division. The original full-bounds Geometry2D path remains exact.
+	if span_safe and start != finish and absf(finish.y - start.y) >= 0.001:
+		return _paint_oblique_scanlines(start, finish, radius, left, top,
+			right, bottom, rgba, erase, selection)
 	var stationary: bool = start == finish
 	var radius_squared: float = radius * radius
 	for y: int in range(top, bottom):
@@ -817,6 +1063,75 @@ func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 			var center: Vector2 = Vector2(x + 0.5, y + 0.5)
 			var nearest: Vector2 = start if stationary else Geometry2D.get_closest_point_to_segment(center, start, finish)
 			if center.distance_squared_to(nearest) > radius_squared:
+				continue
+			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+				selection, true, not erase, -1, true)
+			if not result.ok:
+				return result
+	return DrawingResult.success()
+
+
+## Bound an oblique capsule one row at a time. If a pixel center can be
+## within radius of the segment, some point on the segment must be within
+## radius in Y *and* X. The Y interval gives a conservative range of segment
+## parameters; expanding its X range by the radius cannot discard a hit.
+## Four extra pixels accommodate float32 arithmetic at supported view scales.
+## Retain Geometry2D for final inclusion, and use the original full rectangle
+## above 1M view coordinates where float32 rounding can be coarser.
+func _paint_oblique_scanlines(start: Vector2, finish: Vector2, radius: float,
+		left: int, top: int, right: int, bottom: int, rgba: int, erase: bool,
+		selection: DrawingSelection) -> DrawingResult:
+	var vertical_span: float = finish.y - start.y
+	var broad_radius: float = radius + 4.0
+	var radius_squared: float = radius * radius
+	for y: int in range(top, bottom):
+		var center_y: float = y + 0.5
+		var t_a: float = (center_y - broad_radius - start.y) / vertical_span
+		var t_b: float = (center_y + broad_radius - start.y) / vertical_span
+		var t_low: float = maxf(0.0, minf(t_a, t_b))
+		var t_high: float = minf(1.0, maxf(t_a, t_b))
+		if t_low > t_high:
+			continue
+		var x_a: float = lerpf(start.x, finish.x, t_low)
+		var x_b: float = lerpf(start.x, finish.x, t_high)
+		var first_x: int = maxi(left, floori(minf(x_a, x_b) - broad_radius))
+		var last_x: int = mini(right, ceili(maxf(x_a, x_b) + broad_radius + 1.0))
+		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
+		for x: int in range(first_x, last_x):
+			if covered_row.has(anchor_x + x):
+				continue
+			var center: Vector2 = Vector2(x + 0.5, center_y)
+			var nearest: Vector2 = Geometry2D.get_closest_point_to_segment(center, start, finish)
+			if center.distance_squared_to(nearest) > radius_squared:
+				continue
+			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
+				selection, true, not erase, -1, true)
+			if not result.ok:
+				return result
+	return DrawingResult.success()
+
+
+## Conservative scanline windows are deliberately wider than the exact
+## footprint; final acceptance uses the original Vector2 distance operation.
+func _paint_dab_scanlines(center: Vector2, radius: float, left: int, top: int,
+		right: int, bottom: int, rgba: int, erase: bool,
+		selection: DrawingSelection) -> DrawingResult:
+	var radius_squared: float = radius * radius
+	var broad_radius: float = radius + 2.0
+	var broad_squared: float = broad_radius * broad_radius
+	for y: int in range(top, bottom):
+		var dy: float = (y + 0.5) - center.y
+		if dy * dy > broad_squared:
+			continue
+		var reach: float = sqrt(maxf(0.0, broad_squared - dy * dy))
+		var first_x: int = maxi(left, floori(center.x - reach - 2.5))
+		var last_x: int = mini(right, ceili(center.x + reach + 1.5))
+		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
+		for x: int in range(first_x, last_x):
+			if covered_row.has(anchor_x + x):
+				continue
+			var pixel_center: Vector2 = Vector2(x + 0.5, y + 0.5)
+			if pixel_center.distance_squared_to(center) > radius_squared:
 				continue
 			var result: DrawingResult = _stage(x, y, 0 if erase else rgba,
 				selection, true, not erase, -1, true)
@@ -836,8 +1151,11 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			var dy_squared: float = dy * dy
 			if dy_squared > radius_squared:
 				continue
+			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
+			var first_x: int = maxi(left, floori(min_x - reach - 2.5))
+			var last_x: int = mini(right, ceili(max_x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
-			for x: int in range(left, right):
+			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
 					continue
 				var center_x: float = x + 0.5
@@ -855,8 +1173,13 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			var center_y: float = y + 0.5
 			var dy: float = center_y - clampf(center_y, min_y, max_y)
 			var dy_squared: float = dy * dy
+			if dy_squared > radius_squared:
+				continue
+			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
+			var first_x: int = maxi(left, floori(start.x - reach - 2.5))
+			var last_x: int = mini(right, ceili(start.x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
-			for x: int in range(left, right):
+			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
 					continue
 				var dx: float = (x + 0.5) - start.x

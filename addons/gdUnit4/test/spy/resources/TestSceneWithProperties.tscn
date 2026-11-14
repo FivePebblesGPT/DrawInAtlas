@@ -1,4 +1,4 @@
-[gd_scene load_steps=2 format=3 uid="uid://bm5kdwn5suu1t"]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://addons/gdUnit4/test/spy/resources/test_scene_with_parmeters.gd" id="1_0ll7j"]
 

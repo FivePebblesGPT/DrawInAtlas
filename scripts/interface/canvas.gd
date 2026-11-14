@@ -167,6 +167,7 @@ var _token_drag_start: Vector2 = Vector2.ZERO
 ## A token's pointer drag is authorized by its press-time layer instance,
 ## source revision and effective cell mask, not whatever is selected at release.
 var _token_scope_at_press: AtlasEditScope
+var _token_campaign_at_press: AtlasCampaign
 var _token_map_at_press: AtlasMapDocument
 var _token_floor_at_press: AtlasFloor
 var _token_layer_at_press: AtlasTokenLayer
@@ -213,12 +214,14 @@ var _shape_kind: String = ""
 ## A Line draft is valid only for its original floor, raster and edit-mask
 ## footprint. Release must not silently paint under a different authorization.
 var _line_scope_at_press: AtlasEditScope
-var _line_map_at_press: String = ""
-var _line_floor_at_press: String = ""
-var _line_layer_at_press: String = ""
+var _line_map_at_press: AtlasMapDocument
+var _line_floor_at_press: AtlasFloor
+var _line_layer_at_press: AtlasRasterLayer
 ## The Polygon is a multi-click gesture; its first vertex freezes the exact
 ## editable target and cell mask until a valid close or explicit cancellation.
 var _polygon_scope_at_start: AtlasEditScope
+## The draft belongs to one live campaign registry, not just matching IDs.
+var _polygon_campaign_at_start: AtlasCampaign
 var _polygon_map_at_start: AtlasMapDocument
 var _polygon_floor_at_start: AtlasFloor
 var _polygon_layer_at_start: AtlasRasterLayer
@@ -238,6 +241,7 @@ var _wall_preview: AtlasStroke
 ## mask for the entire path draft or vertex drag. A later mask change cannot
 ## silently authorize a different whole-path edit at finish/release.
 var _wall_scope_at_start: AtlasEditScope
+var _wall_campaign_at_start: AtlasCampaign
 var _wall_map_at_start: AtlasMapDocument
 var _wall_floor_at_start: AtlasFloor
 var _wall_layer_at_start: AtlasObjectsLayer
@@ -440,7 +444,7 @@ func commit_edit() -> void:
 
 
 func restyle_selected_wall() -> void:
-	if floor == null or not editing_target_is_presented() or _wall_selected_index < 0:
+	if not _wall_target_registered() or not editing_target_is_presented() or _wall_selected_index < 0:
 		return
 	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable() or _wall_selected_index >= layer.strokes.size():
@@ -695,6 +699,8 @@ func _draw_token(item: Node2D, token: AtlasToken) -> void:
 
 
 func delete_selected_token() -> bool:
+	if not _token_target_registered():
+		return false
 	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
 	if layer == null or not editing_target_is_presented() or not layer.is_editable():
 		return false
@@ -712,14 +718,23 @@ func _clear_token_drag_context() -> void:
 	_token_drag_before = null
 	_token_drag_preview = null
 	_token_scope_at_press = null
+	_token_campaign_at_press = null
 	_token_map_at_press = null
 	_token_floor_at_press = null
 	_token_layer_at_press = null
 	_token_snap_at_press = false
 
 
+## Even a byte-identical Resource with matching IDs cannot inherit the original
+## token gesture when its parent registry has changed.
+func _token_target_registered() -> bool:
+	return campaign != null and map != null and floor != null \
+		and campaign.get_map(map.id) == map and map.floor_by_id(floor.id) == floor
+
+
 func _token_drag_context_matches() -> bool:
-	if _token_scope_at_press == null or _token_drag_before == null or map == null or floor == null:
+	if _token_scope_at_press == null or _token_drag_before == null \
+			or campaign != _token_campaign_at_press or not _token_target_registered():
 		return false
 	if map != _token_map_at_press or floor != _token_floor_at_press \
 			or floor.layer_by_id(active_layer_id) != _token_layer_at_press \
@@ -741,6 +756,9 @@ func _reject_stale_token_drag() -> void:
 
 
 func _begin_token_press(position: Vector2) -> void:
+	if not _token_target_registered():
+		token_rejected.emit("Token source is no longer registered in this campaign.")
+		return
 	var layer: AtlasTokenLayer = floor.layer_by_id(active_layer_id) as AtlasTokenLayer if floor != null else null
 	if layer == null or not editing_target_is_presented() or not layer.is_editable():
 		return
@@ -755,6 +773,7 @@ func _begin_token_press(position: Vector2) -> void:
 			_token_drag_preview = candidate.copy()
 			_token_drag_start = position
 			_token_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+			_token_campaign_at_press = campaign
 			_token_map_at_press = map
 			_token_floor_at_press = floor
 			_token_layer_at_press = layer
@@ -1012,17 +1031,19 @@ func _clear_ink_masks() -> void:
 ## Clear authorization captured for this unfinished Line on commit or cancel.
 func _clear_line_context() -> void:
 	_line_scope_at_press = null
-	_line_map_at_press = ""
-	_line_floor_at_press = ""
-	_line_layer_at_press = ""
+	_line_map_at_press = null
+	_line_floor_at_press = null
+	_line_layer_at_press = null
 
 
-## Compare the current editable target and effective mask with the press-time
-## copy. An unlocked mask is always an empty polygon, regardless of cell focus.
+## Do not authorize an unfinished Line from IDs alone: its layer may be
+## replaced, hidden, locked or moved to an unpresented detail while held.
+## The mask must also remain identical to the press-time copy.
 func _line_context_matches() -> bool:
-	return _line_scope_at_press != null and map != null and floor != null \
-		and map.id == _line_map_at_press and floor.id == _line_floor_at_press \
-		and active_layer_id == _line_layer_at_press \
+	return _line_scope_at_press != null and map == _line_map_at_press \
+		and floor == _line_floor_at_press and _line_layer_at_press != null \
+		and floor.layer_by_id(active_layer_id) == _line_layer_at_press \
+		and _line_layer_at_press.is_editable() and editing_target_is_presented() \
 		and edit_scope.enabled == _line_scope_at_press.enabled \
 		and edit_scope.polygon == _line_scope_at_press.polygon
 
@@ -1031,14 +1052,17 @@ func _line_context_matches() -> bool:
 ## eligibility mask between the first vertex and closure.
 func _clear_polygon_context() -> void:
 	_polygon_scope_at_start = null
+	_polygon_campaign_at_start = null
 	_polygon_map_at_start = null
 	_polygon_floor_at_start = null
 	_polygon_layer_at_start = null
 
 
 func _polygon_context_matches() -> bool:
-	return _polygon_scope_at_start != null and map != null and floor != null \
+	return _polygon_scope_at_start != null and campaign != null \
+		and campaign == _polygon_campaign_at_start and map != null and floor != null \
 		and map == _polygon_map_at_start and floor == _polygon_floor_at_start \
+		and campaign.get_map(map.id) == map and map.floor_by_id(floor.id) == floor \
 		and floor.layer_by_id(active_layer_id) == _polygon_layer_at_start \
 		and _polygon_layer_at_start.is_editable() and editing_target_is_presented() \
 		and edit_scope.enabled == _polygon_scope_at_start.enabled \
@@ -1052,6 +1076,7 @@ func _reject_stale_polygon() -> void:
 
 func _capture_wall_context(layer: AtlasObjectsLayer) -> void:
 	_wall_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+	_wall_campaign_at_start = campaign
 	_wall_map_at_start = map
 	_wall_floor_at_start = floor
 	_wall_layer_at_start = layer
@@ -1059,13 +1084,20 @@ func _capture_wall_context(layer: AtlasObjectsLayer) -> void:
 
 func _clear_wall_context() -> void:
 	_wall_scope_at_start = null
+	_wall_campaign_at_start = null
 	_wall_map_at_start = null
 	_wall_floor_at_start = null
 	_wall_layer_at_start = null
 
 
+func _wall_target_registered() -> bool:
+	return campaign != null and map != null and floor != null \
+		and campaign.get_map(map.id) == map and map.floor_by_id(floor.id) == floor
+
+
 func _wall_context_matches() -> bool:
-	return _wall_scope_at_start != null and map != null and floor != null \
+	return _wall_scope_at_start != null and _wall_target_registered() \
+		and campaign == _wall_campaign_at_start \
 		and map == _wall_map_at_start and floor == _wall_floor_at_start \
 		and floor.layer_by_id(active_layer_id) == _wall_layer_at_start \
 		and _wall_layer_at_start.is_editable() and editing_target_is_presented() \
@@ -1472,9 +1504,9 @@ func _begin_left_press(mouse: InputEventMouseButton) -> void:
 				_shape_kind = Tool.keys()[tool]
 				if tool == Tool.LINE:
 					_line_scope_at_press = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
-					_line_map_at_press = map.id
-					_line_floor_at_press = floor.id
-					_line_layer_at_press = active_layer_id
+					_line_map_at_press = map
+					_line_floor_at_press = floor
+					_line_layer_at_press = layer
 				_gesture_snap = snap_to_grid
 				_gesture_start = AtlasGridSnap.point(map.grid, position) if snap_to_grid else position
 				_brush_cursor_local = mouse.position
@@ -1761,7 +1793,7 @@ func _begin_text_edit(position: Vector2) -> void:
 ## Normal click selects an existing edge or drags its vertex. Shift+click
 ## inserts a vertex, Alt+click deletes one; an explicit inspector action restyles.
 func _begin_wall_point(mouse: InputEventMouseButton, position: Vector2) -> void:
-	if not editing_target_is_presented():
+	if not _wall_target_registered() or not editing_target_is_presented():
 		return
 	var layer: AtlasObjectsLayer = floor.layer_by_id(active_layer_id) as AtlasObjectsLayer
 	if layer == null or not layer.is_editable():
@@ -1930,6 +1962,7 @@ func _begin_polygon_vertex(mouse: InputEventMouseButton, position: Vector2) -> v
 		_erasing = false
 		_gesture_snap = snap_to_grid
 		_polygon_scope_at_start = AtlasEditScope.new(edit_scope.polygon, edit_scope.enabled)
+		_polygon_campaign_at_start = campaign
 		_polygon_map_at_start = map
 		_polygon_floor_at_start = floor
 		_polygon_layer_at_start = layer

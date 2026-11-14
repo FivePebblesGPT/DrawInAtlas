@@ -12,15 +12,15 @@ jobs:
         with:
           # Godot cannot import LFS pointer text as textures.
           lfs: true
-      - name: Install Godot 4.8-beta2 (standard, non-.NET)
+      - name: Install Godot 4.8-beta3 (standard, non-.NET)
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta2
+          version: 4.8.0-beta3
           use-dotnet: false
           include-templates: true
       - name: Verify the exact beta engine
         shell: bash
-        run: godot --version | grep -E '^4\.8\.beta2\.official\.'
+        run: godot --version | grep -E '^4\.8\.beta3\.official\.'
       - name: Enforce explicit types in owned GDScript and skill examples
         id: ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples
         if: ${{ !cancelled() }}
@@ -93,6 +93,13 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-model.log --marker T086_MODEL_PASSED || ci_fail_marker 'T086 viewport model log rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_focus_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-focus.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-focus.log --marker T086_FOCUS_PASSED || ci_fail_marker 'T086 dense viewport retention priority witness error'
+          # T-102 bounded cold scheduling: signed focal priority, dirty/preview
+          # invalidation and conservative over-budget/unknown occupancy fallback.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t102_cold_population_smoke.gd 2>&1 | tee /tmp/godot-t102-cold-population.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t102-cold-population.log --marker T102_MODEL_PASSED || ci_fail_marker 'T102 cold population scheduling log rejected'
+          # T-103 software-only over-budget focal preselection and safe fallbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t103_retention_plan_smoke.gd 2>&1 | tee /tmp/godot-t103-retention.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t103-retention.log --marker T103_MODEL_PASSED || ci_fail_marker 'T103 focal retention planner rejected'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t086-cold-model.log --marker T086_COLD_PASSED || ci_fail_marker 'T086 cold renderer parity witness error'
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_pixel_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-pixels.log
@@ -322,6 +329,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_graph_smoke.gd 2>&1 | tee /tmp/godot-t064-child-graph.log
           grep -q 'T064_CHILD_GRAPH_PASSED' /tmp/godot-t064-child-graph.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_GRAPH_FAILED:' /tmp/godot-t064-child-graph.log; then exit 1; fi
+          # T-108 is opt-in while the owner chooses nested Save As semantics.
+          # This tests both transactional candidates without enabling UI behavior.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t108_nested_save_as_policy_smoke.gd 2>&1 | tee /tmp/godot-t108-policy.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t108-policy.log --marker T108_POLICY_PASSED
       - name: Verify T-064 atomic nested Objects project copying
         id: ci_t064_nested_project_copy
         if: ${{ !cancelled() }}
@@ -435,6 +446,44 @@ jobs:
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
           python3 tools/check_godot_model_log.py /tmp/godot-t055-composition.log --marker T055_COMPOSITION_PASSED
+          # T-111: a pending Line may not publish onto a replaced, hidden,
+          # locked, or unpresented raster target even when IDs are unchanged.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t111_line_release_authorization_smoke.gd 2>&1 | tee /tmp/godot-t111-line-gate.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t111-line-gate.log --marker T111_LINE_GATE_PASSED
+          # T-119: GM Token operations require the captured registered
+          # campaign/map/floor; same-ID replacements cannot inherit gestures.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t119_token_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t119-token-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t119-token-owner.log --marker T119_TOKEN_PASSED
+          # T-113: a held Bucket preview cannot transfer authority to a
+          # same-ID rebuilt map/floor or a different campaign registry.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t113_bucket_resource_identity_smoke.gd 2>&1 | tee /tmp/godot-t113-bucket-context.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t113-bucket-context.log --marker T113_BUCKET_PASSED
+          # T-114: Polygon may close only against the original registered
+          # campaign/map/floor, not a detached same-ID Resource graph.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t114_polygon_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t114-polygon-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t114-polygon-owner.log --marker T114_POLYGON_PASSED
+          # T-118: the historical Wall Path suite must exercise a real selected
+          # wall, active cell-mask changes and portable generation Save/Open.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/wall_paths_smoke.gd 2>&1 | tee /tmp/godot-t118-wall-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t118-wall-portable.log --marker ATLAS_WALL_PATHS_PASSED
+          # T-117: Wall draft/vertex drag must still belong to the original
+          # registered campaign/map/floor, and direct edits need live ownership.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t117_wall_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t117-wall-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t117-wall-owner.log --marker T117_WALL_PASSED
+          # T-115: a Text modal cannot publish after its original map/floor is
+          # detached from the current campaign registry, even with equal IDs.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t115_text_modal_registered_target_smoke.gd 2>&1 | tee /tmp/godot-t115-text-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t115-text-owner.log --marker T115_TEXT_PASSED
+          # T-116: editable Text Save/Open uses the current portable
+          # campaign generation, not a retired single-file .scn head.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/text_smoke.gd 2>&1 | tee /tmp/godot-t116-text-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t116-text-portable.log --marker ATLAS_TEXT_PASSED
+          # T-112: the Atlas Editor saves generation-based portable projects,
+          # not the retired one-file .scn head. Check both raster authoring tools.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/line_smoke.gd 2>&1 | tee /tmp/godot-t112-line-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t112-line-portable.log --marker ATLAS_LINE_PASSED
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/polygon_smoke.gd 2>&1 | tee /tmp/godot-t112-polygon-portable.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t112-polygon-portable.log --marker ATLAS_POLYGON_PASSED
       - name: Verify T-068 hard-dab parity and source-tile cache transactions
         id: ci_t068_stationary_dab_parity
         if: ${{ !cancelled() }}
@@ -457,6 +506,8 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py
           python3 -m unittest discover -s tests -p test_t068_matched_brush.py
+          python3 -m unittest discover -s tests -p test_t104_backend_decision.py
+          python3 tools/benchmarks/t104_backend_decision.py --verify
           python3 -m unittest discover -s tests -p test_t068_native_memory.py
           python3 -m unittest discover -s tests -p test_t068_visual_device.py
           python3 -m unittest discover -s tests -p test_t068_visual_contention.py
@@ -471,6 +522,7 @@ jobs:
           T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_quad_differential.py
           T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_quad_stress.py
           python3 -m unittest discover -s tests -p test_t068_quad_compiler_matrix.py
+          python3 -m unittest discover -s tests -p test_t106_oracle_engine_compat.py
           python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py
           python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py
           python3 -m unittest discover -s tests -p test_t068_skia_cpu.py
@@ -590,6 +642,10 @@ jobs:
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_smoke.gd 2>&1 | tee /tmp/godot-t065-browser.log
           python3 tools/check_godot_model_log.py /tmp/godot-t065-browser.log --marker T065_ASSET_BROWSER_PASSED
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/t109_asset_browser_scale_smoke.gd 2>&1 | tee /tmp/godot-t109-scale.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t109-scale.log --marker T109_SCALE_PASSED
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/t110_lossless_source_utf8_smoke.gd 2>&1 | tee /tmp/godot-t110-utf8.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t110-utf8.log --marker T110_UTF8_PASSED
       - name: Verify T-065 lazily rendered Object source thumbnails
         id: ci_t065_asset_thumbnail_model
         if: ${{ !cancelled() }}

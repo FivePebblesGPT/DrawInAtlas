@@ -1,0 +1,102 @@
+/mnt/data/work/DrawInAtlas.11-12/drawing
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Started Scanning actions... (18 steps)[39m[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Lato-Bold.ttf[39m[0m
+[   5% ] [90m[1m_update_scan_actions[22m | Lato-Italic.ttf[39m[0m
+[  10% ] [90m[1m_update_scan_actions[22m | Lato-Regular.ttf[39m[0m
+[  15% ] [90m[1m_update_scan_actions[22m | brush.svg[39m[0m
+[  21% ] [90m[1m_update_scan_actions[22m | dock_colors.svg[39m[0m
+[  26% ] [90m[1m_update_scan_actions[22m | dock_history.svg[39m[0m
+[  31% ] [90m[1m_update_scan_actions[22m | dock_layers.svg[39m[0m
+[  36% ] [90m[1m_update_scan_actions[22m | dock_panel.svg[39m[0m
+[  42% ] [90m[1m_update_scan_actions[22m | dock_swatches.svg[39m[0m
+[  47% ] [90m[1m_update_scan_actions[22m | eraser.svg[39m[0m
+[  52% ] [90m[1m_update_scan_actions[22m | layer_hidden.svg[39m[0m
+[  57% ] [90m[1m_update_scan_actions[22m | layer_locked.svg[39m[0m
+[  63% ] [90m[1m_update_scan_actions[22m | layer_unlocked.svg[39m[0m
+[  68% ] [90m[1m_update_scan_actions[22m | layer_visible.svg[39m[0m
+[  73% ] [90m[1m_update_scan_actions[22m | move.svg[39m[0m
+[  78% ] [90m[1m_update_scan_actions[22m | pan.svg[39m[0m
+[  84% ] [90m[1m_update_scan_actions[22m | select.svg[39m[0m
+[  89% ] [90m[1m_update_scan_actions[22m | text.svg[39m[0m
+[92m[ DONE ][39m [1m_update_scan_actions[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (18 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   5% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  10% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  15% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  21% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  26% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  31% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  36% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  42% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  47% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  52% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  57% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  63% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  68% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  73% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  78% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  84% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  89% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[   5% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  10% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  15% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[  21% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  26% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  31% ] [90m[1mreimport[22m | text.svg[39m[0m
+[  36% ] [90m[1mreimport[22m | select.svg[39m[0m
+[  42% ] [90m[1mreimport[22m | pan.svg[39m[0m
+[  47% ] [90m[1mreimport[22m | move.svg[39m[0m
+[  52% ] [90m[1mreimport[22m | layer_visible.svg[39m[0m
+[  57% ] [90m[1mreimport[22m | layer_unlocked.svg[39m[0m
+[  63% ] [90m[1mreimport[22m | layer_locked.svg[39m[0m
+[  68% ] [90m[1mreimport[22m | layer_hidden.svg[39m[0m
+[  73% ] [90m[1mreimport[22m | eraser.svg[39m[0m
+[  78% ] [90m[1mreimport[22m | dock_swatches.svg[39m[0m
+[  84% ] [90m[1mreimport[22m | dock_panel.svg[39m[0m
+[  89% ] [90m[1mreimport[22m | dock_layers.svg[39m[0m
+[  94% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (18 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_MODEL: 131 checks; 0 failed
+T088_MODEL_PASSED
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_SPARSE_PASTE_BENCH: 512x512, 6 nonzero, 7 trials, CPU stage median 65 us, samples=[76, 67, 65, 69, 62, 63, 61]
+T088_SPARSE_PASTE: 56 checks; 0 failed
+T088_SPARSE_PASTE_PASSED (56 checks; 0 failed)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_SPARSE_CAPTURE_BENCH: 512x512, 8 stored, seven CPU-only samples, median 802 us, samples=[730, 751, 719, 878, 813, 818, 802]
+T088_SPARSE_CAPTURE: 54 checks; 0 failed
+T088_SPARSE_CAPTURE_PASSED (54 checks; 0 failed)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T096_PROFILE: legacy_capture_p50/p95_ms=2.402/2.744 legacy_clear_p50/p95_ms=54.700/145.330 legacy_paste_p50/p95_ms=11.636/25.896 optimized_stage_p50/p95_ms=19.216/23.801
+T096_MODEL: 13847 checks; 0 failed
+T096_MODEL_PASSED
