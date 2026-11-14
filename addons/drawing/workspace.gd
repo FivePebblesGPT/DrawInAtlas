@@ -3096,43 +3096,12 @@ func _reset_view() -> void:
 	_update_status()
 
 
-func _raster_header_matches(extension: String, bytes: PackedByteArray) -> bool:
-	match extension:
-		"png":
-			return bytes.size() >= 8 and bytes.slice(0, 8) == PackedByteArray(
-				[137, 80, 78, 71, 13, 10, 26, 10])
-		"webp":
-			return bytes.size() >= 12 and bytes.slice(0, 4) == "RIFF".to_ascii_buffer() and \
-				bytes.slice(8, 12) == "WEBP".to_ascii_buffer()
-		"jpg", "jpeg":
-			return bytes.size() >= 3 and bytes[0] == 255 and bytes[1] == 216 and bytes[2] == 255
-	return false
-
-
 func _open_raster_file(path: String) -> void:
-	var extension: String = path.get_extension().to_lower()
-	if extension not in ["png", "webp", "jpg", "jpeg"]:
-		_show_error("Unsupported file type. Open supports .drawing, PNG, WebP and JPEG.")
+	var opened: DrawingResult = DrawingRasterImport.load_file_image(path)
+	if not opened.ok:
+		_show_error(opened.message)
 		return
-	var stream: FileAccess = FileAccess.open(path, FileAccess.READ)
-	if stream == null or stream.get_length() > 64 * 1024 * 1024:
-		_show_error("Image missing, unreadable or larger than the 64 MiB Open limit")
-		return
-	# Reject obvious type mismatches before the decoder can emit noisy engine
-	# errors; this is a magic-byte check, not a replacement for decoding.
-	var header: PackedByteArray = stream.get_buffer(16)
-	stream.close()
-	if not _raster_header_matches(extension, header):
-		_show_error("Image header is invalid or does not match its PNG/WebP/JPEG extension")
-		return
-	var image: Image = Image.load_from_file(path)
-	if image == null or image.is_empty():
-		_show_error("Cannot decode image. Source file is missing or corrupt; no Drawing was created.")
-		return
-	if image.get_width() > 4096 or image.get_height() > 4096 or \
-			image.get_width() * image.get_height() > 16777216:
-		_show_error("Image exceeds the 4096px-per-side / 16.8M-pixel import limit")
-		return
+	var image: Image = opened.value as Image
 	var document: DrawingDocument = DrawingDocument.new()
 	document.record_selection_history = record_selection_history
 	var created: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Imported image")

@@ -8,6 +8,8 @@
 
 The owner requested a conventional **File → New / Open… / Save / Save As… / Close Tab** menu without redundant "Drawing" qualifiers. **Open…** must handle `.drawing` and supported raster image files: selecting an image starts a new, unsaved Drawing document, with its pixels/frame, later saved as `.drawing`. Remove the standalone **Import Image as Drawing…** item. Object-source commands belong to a real separate **Object** top-level menu, not literal `Object ›` labels in File. [T-120 is Done for its engineering scope](Tickets/T-120.md): the canonical File/Object menus and unified Open are implemented and locally tested; [T-120 evidence](evidence/T-120-2026-11-14-file-object-open.md) records the 34-check headless and native X11 oracles. Historical T-090/T-093 evidence remains intact; T-056/T-059 hands-on approval and T-095/T-068 latency/backends remain independent.
 
+[T-121](Tickets/T-121.md) completes the independent **bounded raster Open snapshot** hardening: length/header validation and PNG/WebP/JPEG decoding consume the same 64-MiB-capped input buffer, rather than re-opening the source path after preflight. [Evidence](evidence/T-121-2026-11-14-raster-snapshot.md) includes 24/24 new headless, 34/34 T-120 headless, 24/24 Xvfb and neighboring tests; no hosted/device acceptance or speed claim is implied.
+
 The owner also reports that the 11-11 Drawing sprint improved responsiveness markedly but remaining delay is still significant, and asked to consider native GDExtension. This is qualitative owner feedback, not an input-to-photon timing or approval. [T-095](Tickets/T-095.md) stays **In Progress** with `manual_review: true`; [T-068](Tickets/T-068.md) stays **In Progress** for operation-specific native evaluation, with [T-104](Tickets/T-104.md)'s current optimized-Godot default intact pending better end-to-end evidence. No native rewrite is authorized solely by this observation.
 
 ## Active delivery slices — 2026-11-11
@@ -2689,6 +2691,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-118 · Wall Path portable Save/Open and mask-context regression](Tickets/T-118.md) | Done | 82-check Wall test corrected; T-026 owner interaction and persistence review open | [T-028](Tickets/T-028.md), [T-066](Tickets/T-066.md), [T-117](Tickets/T-117.md) |
 | [T-119 · GM Token registered source authorization](Tickets/T-119.md) | Done | Drag, placement, delete and direct edits require live campaign/map/floor; T-041 privacy policy gate unchanged | [T-028](Tickets/T-028.md) |
 | [T-120 · Conventional File/Object menus and unified Open](Tickets/T-120.md) | Done | — | [T-053](Tickets/T-053.md), [T-093](Tickets/T-093.md) |
+| [T-121 · Single-snapshot bounded raster Open](Tickets/T-121.md) | Done | — | [T-120](Tickets/T-120.md) |
 
 ## Epics
 
