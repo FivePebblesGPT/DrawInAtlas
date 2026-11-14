@@ -3092,6 +3092,9 @@ func _fit_image_frame() -> void:
 func _undo() -> void:
 	if active_tab < 0:
 		return
+	# History changes the document revision and would cancel unpublished Brush input.
+	if not _can_persist_or_close("Undo"):
+		return
 	if canvas.has_floating_move():
 		_cancel_floating_move()
 		return
@@ -3105,6 +3108,8 @@ func _undo() -> void:
 
 func _redo() -> void:
 	if active_tab < 0:
+		return
+	if not _can_persist_or_close("Redo"):
 		return
 	if canvas.has_floating_move():
 		_cancel_floating_move()

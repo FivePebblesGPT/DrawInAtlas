@@ -85,6 +85,12 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t126_pending_tab_switch_smoke.gd 2>&1 | tee /tmp/godot-t126-tab-switch.log
           python3 tools/check_godot_model_log.py /tmp/godot-t126-tab-switch.log --marker T126_TAB_SWITCH_PASSED || ci_fail_marker 'T126 pending document switch rejected'
           python3 -m unittest discover -s tests -p 'test_t126_pending_tab_switch.py' -v || ci_fail_marker 'T126 tab-switch contracts rejected'
+          # T-127 protects released and queued input from Undo/Redo revision
+          # changes; test keyboard, History buttons and chronological pixels.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t127_pending_history_smoke.gd 2>&1 | tee /tmp/godot-t127-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t127-history.log --marker T127_HISTORY_PASSED || ci_fail_marker 'T127 pending Brush history rejected'
+          grep -Fqx 'T127_HISTORY_PASSED checks=40 failures=0' /tmp/godot-t127-history.log || ci_fail_marker 'T127 history assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t127_pending_history.py' -v || ci_fail_marker 'T127 pending Brush source/CI contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
