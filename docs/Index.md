@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 bounded raster predecoder guard (T-123 Done)
+
+[T-123](Tickets/T-123.md) rejects oversized declared PNG, WebP
+(VP8/VP8L/VP8X), and JPEG SOF dimensions **before** invoking the decoder.
+The existing single-snapshot/64-MiB byte cap could still admit small,
+highly compressed files declaring huge decoded dimensions. Bounded marker
+parsing now enforces the existing 4096px-side/16.8M-pixel limit before
+allocation, preserves valid image Open/Save, and fails closed on truncated
+metadata. [Evidence](evidence/T-123-2026-11-15-raster-predecode-bounds.md)
+records pre-change failing controls, post-change Godot tests, and known
+software-test limitations. T-121 remains Done for its original scope; no
+hosted CI, physical hardware, or owner UX approval is claimed.
+
 ## 2026-11-15 historical CI replay correction (T-122 Done)
 
 [T-122](Tickets/T-122.md) pins the **original 46-check T-107 local replay
@@ -2707,6 +2720,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-120 · Conventional File/Object menus and unified Open](Tickets/T-120.md) | Done | — | [T-053](Tickets/T-053.md), [T-093](Tickets/T-093.md) |
 | [T-121 · Single-snapshot bounded raster Open](Tickets/T-121.md) | Done | — | [T-120](Tickets/T-120.md) |
 | [T-122 · Historical T-107 CI replay source integrity](Tickets/T-122.md) | Done | Original workflow pinned; historic 46-check archive passes tamper guards; hosted T-106/T-107 still open | [T-053](Tickets/T-053.md) |
+| [T-123 · Predecode bounded PNG/WebP/JPEG geometry](Tickets/T-123.md) | Done | Header dimensions rejected before codec allocation; owner/device/hosted gates unchanged | [T-121](Tickets/T-121.md) |
 
 ## Epics
 

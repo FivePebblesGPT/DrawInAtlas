@@ -218,6 +218,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t121_raster_snapshot_smoke.gd 2>&1 | tee /tmp/godot-t121-snapshot-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t121-snapshot-model.log --marker T121_MODEL_PASSED || ci_fail_marker 'T121 single-snapshot raster Open rejected'
           python3 -m unittest discover -s tests -p 'test_t121_raster_snapshot.py' -v
+          # T-123 rejects decompression bombs from the same captured header bytes.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t123_raster_predecode_bounds_smoke.gd 2>&1 | tee /tmp/godot-t123-bounds-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t123-bounds-model.log --marker T123_MODEL_PASSED || ci_fail_marker 'T123 predecode dimensions model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t123_raster_predecode_bounds.py' -v
           ci_finish
       - name: Verify T-053 standalone Linux release package
         id: ci_07_verify_t_053_standalone_linux_release_package
