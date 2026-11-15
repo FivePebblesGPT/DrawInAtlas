@@ -35,6 +35,43 @@ var _next_content_state: int = 0
 var _saved_content_state: int = 0
 var _untracked_revision: int = 0
 var _saved_untracked_revision: int = 0
+## Per-document native authority survives gestures. The GDScript tiles are
+## published consumer snapshots for display/save and legacy non-brush edits.
+## External document revisions invalidate native source authorization and
+## history in one checked rebase before the next native brush transaction.
+var _native_raster_store: Object
+var _native_source_identities: Dictionary[String, Variant] = {}
+
+
+func _native_store_for_edit(expected: int) -> Object:
+	if revision != expected or not ClassDB.class_exists("DrawingNativeTiles"):
+		return null
+	if _native_raster_store == null:
+		_native_raster_store = ClassDB.instantiate("DrawingNativeTiles")
+		if int(_native_raster_store.call("tile_abi_version")) != 1 \
+				or not _native_raster_store.call("configure", tile_stride, revision):
+			_native_raster_store = null
+			return null
+	else:
+		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
+		if native_revision > revision:
+			return null
+		if native_revision < revision:
+			if not _native_raster_store.call("rebase_external_revision", native_revision, revision):
+				return null
+			_native_source_identities.clear()
+	return _native_raster_store
+
+
+func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
+	var identity: String = layer_id + ":" + key
+	return _native_source_identities.has(identity) \
+		and is_same(_native_source_identities[identity], tile)
+
+
+func _remember_native_source(layer_id: String, key: String, tile: Variant) -> void:
+	_native_source_identities[layer_id + ":" + key] = tile
+
 
 
 func _init(document_id: String = "", stride: int = 256,
@@ -511,7 +548,8 @@ func _publish_tile_edit(layer_id: String, expected: int,
 func _publish_native_tile_edit(layer_id: String, expected: int,
 		native_revision: int, images: Dictionary[String, PackedByteArray],
 		sources: Dictionary[String, Variant], bounds: Dictionary[String, Rect2i],
-		record_history: bool = true) -> DrawingResult:
+		record_history: bool = true, dry_run: bool = false,
+		history_token: int = 0) -> DrawingResult:
 	if revision != expected or native_revision != expected + 1:
 		return DrawingResult.failure("STALE_REVISION", "Native and document revisions disagree")
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER \
@@ -559,10 +597,49 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 		regions.append(DrawingDirtyRegion.new(layer_id,
 			cx * tile_stride + dirty.position.x, cy * tile_stride + dirty.position.y,
 			dirty.size.x, dirty.size.y))
+	# A lazy provider may reenter *during* the preflight loop. Revalidate all
+	# sources and the authority stamp without invoking another provider: this
+	# is the last point at which a full rejection can leave Rust untouched.
+	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id):
+		return DrawingResult.failure("STALE_REVISION", "Preflight source changed document authority")
+	for key: String in prepared:
+		if _pending_tiles.has(layer_id + ":" + key) \
+				or _nodes[layer_id].tiles.get(key) != sources[key]:
+			return DrawingResult.failure("STALE_PIXEL", "Preflight source identity changed")
 	var result: DrawingResult = DrawingResult.success(null, native_revision)
 	result.regions = regions
 	result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
 		before_bytes, after_bytes)
+	# Preflight constructs every future raster tile without mutating source.
+	# The paired Rust commit must not be followed by another lazy provider
+	# callback: reentrant source/permission changes could otherwise reject the
+	# *document* half after the native history has already been committed.
+	result.value = {"prepared": prepared, "document_id": id,
+		"layer_id": layer_id, "expected": expected, "native_revision": native_revision}
+	if dry_run:
+		return result
+	return _install_prepared_native_tile_edit(layer_id, expected, native_revision,
+		result, record_history, history_token)
+
+
+## This only installs a previously verified, detached preflight result; it
+## invokes no providers and makes no further Godot-to-Rust painting calls.
+func _install_prepared_native_tile_edit(layer_id: String, expected: int,
+		native_revision: int, checked: DrawingResult,
+		record_history: bool = true, history_token: int = 0) -> DrawingResult:
+	if checked == null or not checked.ok or checked.delta == null \
+			or revision != expected or native_revision != expected + 1 \
+			or not _nodes.has(layer_id) or not _editable(layer_id):
+		return DrawingResult.failure("STALE_REVISION", "Preflighted native edit lost its authority")
+	var bundle: Dictionary = checked.value as Dictionary
+	if bundle.is_empty() or bundle.get("document_id", "") != id \
+			or bundle.get("layer_id", "") != layer_id \
+			or int(bundle.get("expected", -1)) != expected \
+			or int(bundle.get("native_revision", -1)) != native_revision:
+		return DrawingResult.failure("NATIVE_TILES", "Native preflight result belongs to another edit")
+	var prepared: Dictionary = bundle["prepared"]
+	if prepared.is_empty():
+		return DrawingResult.failure("NATIVE_TILES", "Native preflight has no changed tiles")
 	for key: String in prepared:
 		var candidate: DrawingRasterTile = prepared[key]
 		if candidate.is_empty():
@@ -571,17 +648,22 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 			_nodes[layer_id].tiles[key] = candidate
 		_dirty_tiles[layer_id + ":" + key] = true
 		_known_refs.erase(layer_id + ":" + key)
+		if _native_raster_store != null \
+				and int(_native_raster_store.call("stats").get("revision", -1)) == native_revision:
+			_remember_native_source(layer_id, key, _nodes[layer_id].tiles.get(key))
 	revision = native_revision
 	_content_committed = true
+	checked.delta.native_history_token = history_token
 	if record_history:
 		if external_history:
 			_mark_untracked_change()
 		else:
-			_append_event({"kind": "content", "delta": result.delta}, true)
-	_display_changes.append({"revision": revision, "regions": regions.duplicate()})
+			_append_event({"kind": "content", "delta": checked.delta}, true)
+	_display_changes.append({"revision": revision, "regions": checked.regions.duplicate()})
 	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
 		_display_changes.pop_front()
-	return result
+	checked.value = null
+	return checked
 
 
 ## Replay a native tile delta as one atomic history operation. No sparse
@@ -621,6 +703,18 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		regions.append(DrawingDirtyRegion.new(delta.layer_id,
 			int(coordinates[0]) * tile_stride, int(coordinates[1]) * tile_stride,
 			tile_stride, tile_stride))
+	# If this event still names the top of the persistent native history,
+	# execute the byte-identical Rust replay before installing consumer tiles.
+	# Mixed non-native edits or a bounded-history eviction fall back to the
+	# detached document delta; their next brush gesture must rebase Rust.
+	if delta.native_history_token > 0 and _native_raster_store != null \
+			and _native_raster_store.call("has_history_token", delta.native_history_token,
+				revision, undo_action):
+		var native_replay: Dictionary = _native_raster_store.call("replay_history_token",
+			delta.native_history_token, revision, undo_action)
+		if not bool(native_replay.get("ok", false)) \
+				or int(native_replay.get("revision", -1)) != revision + 1:
+			return DrawingResult.failure("NATIVE_HISTORY", "Persistent native replay rejected")
 	for key: String in replacement:
 		if detached.has(key) and not detached[key].is_empty():
 			_nodes[delta.layer_id].tiles[key] = detached[key]
@@ -628,6 +722,8 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 			_nodes[delta.layer_id].tiles.erase(key)
 		_dirty_tiles[delta.layer_id + ":" + key] = true
 		_known_refs.erase(delta.layer_id + ":" + key)
+		if _native_raster_store != null and int(_native_raster_store.call("stats").get("revision", -1)) == revision + 1:
+			_remember_native_source(delta.layer_id, key, _nodes[delta.layer_id].tiles.get(key))
 	revision += 1
 	_content_committed = true
 	_display_changes.append({"revision": revision, "regions": regions.duplicate()})

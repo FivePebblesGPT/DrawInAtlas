@@ -8,6 +8,9 @@ var after: Dictionary[String, int] = {}
 ## A native raster gesture carries full reversible RGBA8 storage tiles instead
 ## of one global String key per changed pixel. Empty bytes mean absent/blank.
 var tile_stride: int = 0
+## Persistent Rust history identity. Zero means a legacy or detached
+## tile snapshot that must be replayed through the document projection.
+var native_history_token: int = 0
 var before_tiles: Dictionary[String, PackedByteArray] = {}
 var after_tiles: Dictionary[String, PackedByteArray] = {}
 

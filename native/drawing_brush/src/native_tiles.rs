@@ -57,6 +57,7 @@ struct Edit {
 }
 
 struct History {
+    token: i64,
     layer: String,
     before: HashMap<TileId, Tile>,
     after: HashMap<TileId, Tile>,
@@ -427,6 +428,7 @@ impl TileStore {
         }
         let count = after.len();
         self.undo.push(History {
+            token: edit.id,
             layer: edit.layer,
             before: edit.before,
             after,
@@ -438,6 +440,34 @@ impl TileStore {
         self.revision += 1;
         Ok(count)
     }
+    /// External (non-brush) edits retain the document revision as the sole
+    /// serialized source of truth. Rebase *only* at a quiescent boundary:
+    /// all previously imported tiles/history become invalid and must be
+    /// reauthorized from the current document before another native stroke.
+    fn rebase_external(&mut self, expected: u64, next: u64) -> Result<(), &'static str> {
+        if self.active.is_some()
+            || self.revision != expected
+            || next <= expected
+            || next > i64::MAX as u64
+        {
+            return Err("Active transaction, stale or non-increasing external revision");
+        }
+        self.tiles.clear();
+        self.authorized.clear();
+        self.undo.clear();
+        self.redo.clear();
+        self.revision = next;
+        Ok(())
+    }
+
+    fn history_matches(&self, token: i64, undo: bool) -> bool {
+        if token <= 0 || self.active.is_some() {
+            return false;
+        }
+        let stack = if undo { &self.undo } else { &self.redo };
+        stack.last().is_some_and(|event| event.token == token)
+    }
+
     fn undo_or_redo(&mut self, undo: bool) -> Result<usize, &'static str> {
         if self.active.is_some() {
             return Err("Cannot replay while a tile transaction is open");
@@ -543,6 +573,70 @@ impl DrawingNativeTiles {
         self.store.stride = stride as usize;
         self.store.revision = revision as u64;
         true
+    }
+
+    /// This is a checked bridge for changes made by *other* document APIs.
+    /// Native tiles remain canonical between native gestures; an external
+    /// mutation invalidates imports rather than silently reusing old pixels.
+    #[func]
+    fn rebase_external_revision(&mut self, expected: i64, next: i64) -> bool {
+        self.store.ffi_calls += 1;
+        expected >= 0
+            && next >= 0
+            && self
+                .store
+                .rebase_external(expected as u64, next as u64)
+                .is_ok()
+    }
+
+    #[func]
+    fn has_source(&self, layer: GString, x: i64, y: i64, revision: i64) -> bool {
+        revision >= 0
+            && revision as u64 == self.store.revision
+            && self.store.authorized.contains(&TileId {
+                layer: layer.to_string(),
+                x,
+                y,
+            })
+    }
+
+    /// Cheap, side-effect-free history identity probe. The document may have
+    /// older detached history events after a non-raster revision rebase;
+    /// those can safely replay through their saved tile snapshots instead.
+    #[func]
+    fn has_history_token(&self, transaction: i64, expected_revision: i64, undo: bool) -> bool {
+        expected_revision >= 0
+            && self.store.revision == expected_revision as u64
+            && self.store.history_matches(transaction, undo)
+    }
+
+    /// Tokenized native replay protects mixed document timelines from
+    /// accidentally undoing a different stroke in the persistent Rust stack.
+    #[func]
+    fn replay_history_token(
+        &mut self,
+        transaction: i64,
+        expected_revision: i64,
+        undo: bool,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        if expected_revision < 0
+            || self.store.revision != expected_revision as u64
+            || !self.store.history_matches(transaction, undo)
+        {
+            return err("Stale native history token or document revision");
+        }
+        match self.store.undo_or_redo(undo) {
+            Ok(count) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("token", transaction);
+                result.set("tiles", count as i64);
+                result.set("revision", self.store.revision as i64);
+                result
+            }
+            Err(message) => err(message),
+        }
     }
 
     #[func]
@@ -839,6 +933,58 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn persistent_transactions_rebase_and_history_tokens() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let original = TileId {
+            layer: "ink".to_owned(),
+            x: 0,
+            y: 0,
+        };
+        for revision in 0..2 {
+            let transaction = store.begin("ink", revision, false).unwrap();
+            store
+                .stage(
+                    transaction,
+                    revision,
+                    0,
+                    0,
+                    &[revision as i32, 0],
+                    false,
+                    0xff002233,
+                    false,
+                    Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                )
+                .unwrap();
+            assert_eq!(store.commit(transaction, revision).unwrap(), 1);
+            assert!(store.history_matches(transaction, true));
+            assert!(store.authorized.contains(&original));
+        }
+        let last = store.undo.last().unwrap().token;
+        assert!(!store.history_matches(last + 42, true));
+        assert_eq!(store.undo_or_redo(true).unwrap(), 1);
+        assert!(store.history_matches(last, false));
+        assert_eq!(store.undo_or_redo(false).unwrap(), 1);
+        assert_eq!(store.revision, 4);
+        let _active = store.begin("ink", 4, false).unwrap();
+        assert!(store.rebase_external(4, 5).is_err());
+        assert!(!store.history_matches(last, true)); // active edit
+        store.active = None;
+        assert!(store.rebase_external(3, 5).is_err());
+        assert!(store.rebase_external(4, 4).is_err());
+        assert_eq!(
+            store.read(&original, false).unwrap().rgba[0..4],
+            [0x33, 0x22, 0, 255]
+        );
+        store.rebase_external(4, 5).unwrap();
+        assert!(store.tiles.is_empty() && store.authorized.is_empty());
+        assert!(store.undo.is_empty() && store.redo.is_empty());
+        assert_eq!(store.revision, 5);
+        assert!(store.begin("ink", 4, false).is_err());
+        assert!(store.import(original, 5, &vec![0x5a; 16 * 16 * 4]).is_ok());
+    }
+
     #[test]
     fn signed_seams_mask_hidden_rgb_and_cancel() {
         let mut s = initialized(16);

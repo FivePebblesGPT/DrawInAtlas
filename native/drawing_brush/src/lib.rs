@@ -899,6 +899,7 @@ impl DrawingNativeBrush {
                 let mut result = Dictionary::new();
                 result.set("ok", true);
                 result.set("dirty_tiles", changed as i64);
+                result.set("history_token", transaction);
                 result.set("revision", revision + 1);
                 result
             }

@@ -752,9 +752,8 @@ func begin_native_stroke(native: Object, mode: String, preset_text: String,
 		if not ClassDB.class_exists("DrawingNativeTiles"):
 			_finish_native_stroke(false)
 			return DrawingResult.failure("NATIVE_ABI", "Native tile store unavailable")
-		_native_tiles = ClassDB.instantiate("DrawingNativeTiles")
-		if int(_native_tiles.call("tile_abi_version")) != 1 \
-				or not _native_tiles.call("configure", document.tile_stride, expected_revision) \
+		_native_tiles = document._native_store_for_edit(expected_revision)
+		if _native_tiles == null \
 				or not _native_tiles.call("set_layer_editable", layer_id, true):
 			_native_tiles = null
 			_finish_native_stroke(false)
@@ -808,10 +807,16 @@ func _authorize_native_tiles(selection: DrawingSelection) -> DrawingResult:
 			return DrawingResult.failure("STALE_REVISION",
 				"Native source authorization changed during lazy load")
 		var tile: DrawingRasterTile = resolved.value as DrawingRasterTile
-		var bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
-		if not bool(_native_tiles.call("import_source", layer_id, tile_x, tile_y,
-				expected_revision, bytes)):
-			return DrawingResult.failure("NATIVE_SOURCE", "Native source import rejected " + key)
+		if bool(_native_tiles.call("has_source", layer_id, tile_x, tile_y,
+				expected_revision)):
+			if not document._native_source_matches(layer_id, key, tile):
+				return DrawingResult.failure("STALE_PIXEL", "Native resident source was replaced " + key)
+		else:
+			var bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
+			if not bool(_native_tiles.call("import_source", layer_id, tile_x, tile_y,
+					expected_revision, bytes)):
+				return DrawingResult.failure("NATIVE_SOURCE", "Native source import rejected " + key)
+			document._remember_native_source(layer_id, key, tile)
 		if selection != null and selection.enabled:
 			var mask: PackedByteArray = PackedByteArray()
 			mask.resize(stride * stride)
@@ -885,6 +890,13 @@ func _commit_native_tile_stroke() -> DrawingResult:
 		images[key] = exported.get("bytes", PackedByteArray())
 		sources[key] = _source_tiles[key]
 		bounds[key] = entry["dirty"]
+	# The projection must be preflighted while Rust still owns the reversible
+	# draft. A rejected source cannot leave a committed native transaction.
+	var checked: DrawingResult = document._publish_native_tile_edit(layer_id,
+		expected_revision, expected_revision + 1, images, sources, bounds, true, true)
+	if not checked.ok:
+		cancel()
+		return checked
 	native_ffi_stats = _native_stroke.call("stroke_stats", _native_handle,
 		expected_revision)
 	var native_commit: Dictionary = _native_stroke.call("commit_tiles", _native_tiles,
@@ -897,8 +909,8 @@ func _commit_native_tile_stroke() -> DrawingResult:
 	if bool(native_commit.get("no_change", false)):
 		output = DrawingResult.success(null, expected_revision)
 	else:
-		output = document._publish_native_tile_edit(layer_id, expected_revision,
-			new_revision, images, sources, bounds)
+		output = document._install_prepared_native_tile_edit(layer_id, expected_revision,
+			new_revision, checked, true, int(native_commit.get("history_token", 0)))
 	var tile_stats: Dictionary = _native_tiles.call("stats")
 	native_ffi_stats["tile_ffi_calls"] = int(tile_stats.get("ffi_calls", 0))
 	native_ffi_stats["tile_bytes_imported"] = int(tile_stats.get("bytes_imported", 0))

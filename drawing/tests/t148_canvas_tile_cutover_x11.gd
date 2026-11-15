@@ -108,6 +108,9 @@ func run() -> void:
 	canvas.finish_gesture(end)
 	await drain(canvas)
 	check(doc.revision == previous_revision + 1, "single native Canvas revision")
+	var persistent: Object = doc._native_raster_store
+	check(persistent != null and int(persistent.call("stats").get("undo", 0)) == 1,
+		"live Canvas retains one native history owner after gesture")
 	var metrics: Dictionary = canvas.last_gesture_metrics
 	var ffi: Dictionary = metrics.get("native_ffi_stats", {})
 	check(int(ffi.get("tile_ffi_calls", 0)) > 0 and
@@ -146,6 +149,10 @@ func run() -> void:
 		"Undo restores prior exact source")
 	check(doc.redo().ok and pixel_bytes(doc) == committed,
 		"Redo restores the exact native committed framebuffer")
+	check(doc._native_raster_store == persistent and
+		int(persistent.call("stats").get("undo", -1)) == 1 and
+		int(persistent.call("stats").get("redo", -1)) == 0,
+		"live Undo/Redo uses the retained native history")
 	canvas.set_selection_mask(DrawingSelection.new())
 	canvas.tool = "Eraser"
 	canvas.start_gesture(start)
@@ -154,6 +161,9 @@ func run() -> void:
 	var erased: PackedByteArray = pixel_bytes(doc)
 	check(erased != committed and doc.revision == previous_revision + 4,
 		"native eraser publishes one changed tile revision")
+	check(doc._native_raster_store == persistent and
+		int(persistent.call("stats").get("undo", 0)) == 2,
+		"NativeHard and Eraser share one persistent tile/history store")
 	check(doc.undo().ok and pixel_bytes(doc) == committed,
 		"native Eraser Undo restores original RGBA8")
 	# A cancelled brush must not publish new tile content or history.
