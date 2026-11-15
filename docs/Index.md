@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 focal-first overflow selection outlines (T-140 Done)
+
+[T-140](Tickets/T-140.md) preserves T-139's exact small sparse-mask indexing,
+while visiting over-budget/compound/inverted 64px contour tiles in bounded
+square rings around the camera rather than spending all 4096 cached entries
+at the viewport's top-left. A focal change within the same selection tile
+window also resets a saturated cache. Unchanged T-139 source fails 8/17
+model and 5/9 native checks; the candidate passes 17/17 and 9/9, with an
+actual center-framebuffer difference and unchanged pixels/history. [Evidence](evidence/T-140-2026-11-15-focal-outline-overflow.md)
+records strict native/model logs. This is a **focal prioritization**, not
+complete over-budget coverage or hardware latency acceptance. T-088 remains
+In Progress, T-096 Manual Review, and fast CI retains 46 check IDs.
+
 ## 2026-11-15 sparse explicit selection outline traversal (T-139 Done)
 
 [T-139](Tickets/T-139.md) traces only occupied 64px contour tiles for simple
@@ -2945,6 +2958,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-137 · Bounded cold detached-preview population](Tickets/T-137.md) | Done | Complete retainable detached preview indexes use the four-tile soft cold budget; progressive 50% software framebuffer keeps fallback, source, and history intact | [T-053](Tickets/T-053.md), [T-102](Tickets/T-102.md), [T-136](Tickets/T-136.md) |
 | [T-138 · Over-budget detached-preview focal retention](Tickets/T-138.md) | Done | Complete validated preview/source union selects nearest 144 retained textures; incomplete/unknown fallback, signed pixels and history intact | [T-053](Tickets/T-053.md), [T-103](Tickets/T-103.md), [T-136](Tickets/T-136.md) |
 | [T-139 · Bounded sparse explicit-mask selection outlines](Tickets/T-139.md) | Done | Sparse positive masks trace only selected 64px contour tiles, including far signed islands; conservative inverted/compound fallback and physical UX review remain | [T-053](Tickets/T-053.md) |
+| [T-140 · Focal-first over-budget selection outlines](Tickets/T-140.md) | Done | Center-out 4096-tile contour fallback and focal cache invalidation; signed/compound masks, framebuffer and source history protected | [T-053](Tickets/T-053.md), [T-139](Tickets/T-139.md) |
 
 ## Epics
 

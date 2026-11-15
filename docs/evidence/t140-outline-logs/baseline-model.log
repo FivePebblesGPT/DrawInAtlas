@@ -1,0 +1,15 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T140_OUTLINE_FAILED: first fallback tile is the camera focal cell
+T140_OUTLINE_FAILED: large sparse mask retains central outline
+T140_OUTLINE_FAILED: top-left scan no longer preempts focal outline
+T140_OUTLINE_FAILED: camera move changes the prioritized focal cell
+T140_OUTLINE_FAILED: outside camera is clamped to footprint
+T140_OUTLINE_FAILED: narrow footprint clamps the focus horizontally
+T140_OUTLINE_FAILED: compound fallback prioritizes the camera without assuming sparse truth
+T140_OUTLINE_FAILED: inverted fallback prioritizes the camera without changing authorization
+T140_OUTLINE_PASSED checks=17 failures=8
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2609)

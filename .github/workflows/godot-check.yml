@@ -235,6 +235,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t139-outline-model.log --marker T139_OUTLINE_PASSED || ci_fail_marker 'T139 sparse outline model log rejected'
           grep -Fxq 'T139_OUTLINE_PASSED checks=14 failures=0' /tmp/godot-t139-outline-model.log || ci_fail_marker 'T139 outline assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t139_sparse_selection_outline.py' -v || ci_fail_marker 'T139 selection outline source/CI contract rejected'
+          # T-140 capped irregular outlines must prioritize the camera and
+          # invalidate a saturated contour cache when that focus changes.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t140_focal_mask_overflow_model.gd 2>&1 | tee /tmp/godot-t140-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t140-outline-model.log --marker T140_OUTLINE_PASSED || ci_fail_marker 'T140 focal outline model log rejected'
+          grep -Fxq 'T140_OUTLINE_PASSED checks=17 failures=0' /tmp/godot-t140-outline-model.log || ci_fail_marker 'T140 focal outline assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t140_focal_selection_outline.py' -v || ci_fail_marker 'T140 selection outline source/CI contract rejected'
           # T-096 exact large-mask contours/Move source oracle is mandatory;
           # real pointer/display and owner acceptance remain separate.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log

@@ -156,6 +156,7 @@ const MASK_OUTLINE_TILES_PER_FRAME: int = 4
 const MAX_MASK_OUTLINE_CACHE: int = 4096
 var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
 var _mask_outline_window: Rect2i = Rect2i()
+var _mask_outline_focus: Vector2i = Vector2i.ZERO
 var _move_target: Vector2i = Vector2i.ZERO
 var _move_target_received_us: int = 0
 var _move_preview_offset: Vector2i = Vector2i.ZERO
@@ -1274,6 +1275,12 @@ func _draw() -> void:
 ## Derive only tiles holding selected pixels; rectangle operations/inversion
 ## require the general contour walker and retain its conservative behavior.
 ## Both paths bound work to the retained 4096-tile outline budget.
+func _mask_outline_focal_cell(left: int, top: int, right: int, bottom: int) -> Vector2i:
+	return Vector2i(
+		clampi(DrawingDocument.TILES.floor_div(floori(camera.x), MASK_OUTLINE_TILE), left, right),
+		clampi(DrawingDocument.TILES.floor_div(floori(camera.y), MASK_OUTLINE_TILE), top, bottom))
+
+
 func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 	var candidates: Array[Vector2i] = []
 	if not footprint.has_area():
@@ -1304,11 +1311,41 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 	var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
 	var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
 	var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
-	for tile_y: int in range(top, bottom + 1):
-		for tile_x: int in range(left, right + 1):
-			candidates.append(Vector2i(tile_x, tile_y))
-			if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
-				return candidates
+	# A large or compound mask cannot be indexed cheaply. The old row-major
+	# 4096-tile fallback could consume its entire budget at the top-left of
+	# a wide viewport, never reaching an outline at the user's focal point.
+	# Walk bounded square rings from the camera instead. Clip each ring to
+	# the visible tile window so skinny, enormous views also stay O(budget).
+	var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
+	var radius_limit: int = maxi(maxi(focus.x - left, right - focus.x),
+		maxi(focus.y - top, bottom - focus.y))
+	for radius: int in range(radius_limit + 1):
+		var x_min: int = maxi(left, focus.x - radius)
+		var x_max: int = mini(right, focus.x + radius)
+		var y_min: int = maxi(top, focus.y - radius)
+		var y_max: int = mini(bottom, focus.y + radius)
+		# Top and bottom edges, then sides without overlapping the corners.
+		if focus.y - radius >= top:
+			for x: int in range(x_min, x_max + 1):
+				candidates.append(Vector2i(x, focus.y - radius))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return candidates
+		if radius > 0 and focus.y + radius <= bottom:
+			for x: int in range(x_min, x_max + 1):
+				candidates.append(Vector2i(x, focus.y + radius))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return candidates
+		for y: int in range(y_min, y_max + 1):
+			if absi(y - focus.y) == radius:
+				continue  # Already visited on the top/bottom edges.
+			if focus.x - radius >= left:
+				candidates.append(Vector2i(focus.x - radius, y))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return candidates
+			if radius > 0 and focus.x + radius <= right:
+				candidates.append(Vector2i(focus.x + radius, y))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return candidates
 	return candidates
 
 
@@ -1334,12 +1371,19 @@ func _draw_selection_outline() -> void:
 		var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
 		var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
 		var tile_window: Rect2i = Rect2i(left, top, right - left + 1, bottom - top + 1)
-		if tile_window != _mask_outline_window:
+		var candidates: Array[Vector2i] = _mask_outline_tile_candidates(footprint)
+		var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
+		# Capped candidates depend on focus, even if the clipped selection
+		# window remains fixed while the camera pans inside it. Do not let
+		# an old full cache starve newly focal contour tiles.
+		if tile_window != _mask_outline_window or (candidates.size() >= MAX_MASK_OUTLINE_CACHE \
+				and focus != _mask_outline_focus):
 			_mask_outline_cache.clear()
 			_mask_outline_window = tile_window
+		_mask_outline_focus = focus
 		var created: int = 0
 		var pending: bool = false
-		for tile: Vector2i in _mask_outline_tile_candidates(footprint):
+		for tile: Vector2i in candidates:
 			if not _mask_outline_cache.has(tile):
 				if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
 					continue
