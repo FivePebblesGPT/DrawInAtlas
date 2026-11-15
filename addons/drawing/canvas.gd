@@ -917,6 +917,47 @@ func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
 	return selected
 
 
+## A far zoom-out may expose millions of transparent display cells while a
+## sparse document owns only a handful of source tiles. The conservative
+## occupancy index already proves those cells empty; visit only its in-window
+## entries on committed redraws. Preview and unknown/invalid indexes retain
+## the full raster scan, so detached edits and lazy sources cannot disappear.
+## Rows and columns stay in signed row-major order (the original draw order).
+func _sparse_visible_draw_rows(window: Rect2i, has_preview: bool) -> Dictionary:
+	var fallback: Dictionary = {"indexed": false, "rows": {}, "ys": [], "count": 0}
+	if has_preview or _occupancy_unknown or not window.has_area() \
+			or _occupied_display_tiles.size() > MAX_OCCUPANCY_ENTRIES \
+			or window.get_area() <= 2 * _occupied_display_tiles.size():
+		return fallback
+	var rows: Dictionary[int, Array] = {}
+	var count: int = 0
+	for key: String in _occupied_display_tiles:
+		var comma: int = key.find(",")
+		if comma < 1 or comma == key.length() - 1:
+			return fallback
+		var x_text: String = key.left(comma)
+		var y_text: String = key.substr(comma + 1)
+		if not x_text.is_valid_int() or not y_text.is_valid_int():
+			return fallback
+		var tile: Vector2i = Vector2i(int(x_text), int(y_text))
+		# Duplicate/noncanonical textual coordinates may alias one display cell.
+		# Fall back rather than submitting the same cached texture twice.
+		if "%d,%d" % [tile.x, tile.y] != key:
+			return fallback
+		if not window.has_point(tile):
+			continue
+		if not rows.has(tile.y):
+			rows[tile.y] = []
+		(rows[tile.y] as Array).append(tile.x)
+		count += 1
+	var ys: Array[int] = []
+	for y: int in rows:
+		(rows[y] as Array).sort()
+		ys.append(y)
+	ys.sort()
+	return {"indexed": true, "rows": rows, "ys": ys, "count": count}
+
+
 func _draw() -> void:
 	_frame_references.clear()
 	var draw_start: int = Time.get_ticks_usec()
@@ -933,7 +974,7 @@ func _draw() -> void:
 		"cold_tiles_deferred": 0, "cold_budgeted": 0,
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4,
 		"focal_plan_tiles": 0, "focal_evictions": 0,
-		"focal_reused_evicted": 0}
+		"focal_reused_evicted": 0, "tiles_examined": 0, "sparse_draw": 0}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
 		_preview_index_for_draw(null, Rect2i())
@@ -991,9 +1032,19 @@ func _draw() -> void:
 		# Release the last detached index after commit/cancel, and avoid
 		# retaining an otherwise completed edit session from an idle Canvas.
 		_preview_index_for_draw(null, visible_tiles)
-	for y: int in range(start_y, end_y + 1):
-		for x: int in range(start_x, end_x + 1):
-			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1
+	var sparse: Dictionary = _sparse_visible_draw_rows(visible_tiles, preview_session != null)
+	var use_sparse: bool = bool(sparse["indexed"])
+	metrics["sparse_draw"] = 1 if use_sparse else 0
+	metrics["tiles_visible"] = visible_tiles.get_area()
+	if use_sparse:
+		metrics["empty_skipped"] = visible_tiles.get_area() - int(sparse["count"])
+	var draw_ys: Array = sparse["ys"] as Array if use_sparse \
+		else range(start_y, end_y + 1)
+	for y: int in draw_ys:
+		var draw_xs: Array = (sparse["rows"] as Dictionary).get(y, []) if use_sparse \
+			else range(start_x, end_x + 1)
+		for x: int in draw_xs:
+			metrics["tiles_examined"] = int(metrics["tiles_examined"]) + 1
 			var key: String = "%d,%d" % [x, y]
 			var area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE, y * DISPLAY_TILE_SIZE,
 				DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
