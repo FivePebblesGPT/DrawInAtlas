@@ -1,0 +1,17 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T148_HISTORY_REENTRANT_RESULT checks=25 failures=12
+T148_HISTORY_REENTRANT_FAILED: reentrant layer lock rejects Undo before native history replay
+T148_HISTORY_REENTRANT_FAILED: lazy callback advanced the shared revision exactly once
+T148_HISTORY_REENTRANT_FAILED: rejected replay preserves local cursor and Rust token
+T148_HISTORY_REENTRANT_FAILED: preflight does not replace or erase committed RGBA8 bytes
+T148_HISTORY_REENTRANT_FAILED: same native history token undoes on a later permitted attempt
+T148_HISTORY_REENTRANT_FAILED: native Redo restores exactly the same signed RGBA8 tile
+T148_HISTORY_REENTRANT_FAILED: Rust and document stay synchronized after retry/Redo
+T148_HISTORY_REENTRANT_FAILED: malformed replay leaves source and revision intact
+T148_HISTORY_REENTRANT_FAILED: later lazy callback cannot substitute an earlier history source
+T148_HISTORY_REENTRANT_FAILED: rejected detached replay installs no history replacement tiles
+T148_HISTORY_REENTRANT_FAILED: detached snapshot replays atomically once lazy sources are stable
+T148_HISTORY_REENTRANT_FAILED: successful detached replay publishes both complete signed RGBA8 tiles
