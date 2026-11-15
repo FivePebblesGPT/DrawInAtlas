@@ -154,6 +154,11 @@ var variant_dialog: ConfirmationDialog
 var variant_name: LineEdit
 var _closing_index: int = -1
 var _close_after_save: bool = false
+## Only the standalone top-level Drawing window owns the process quit policy.
+## Embedded Atlas workspaces must leave their host's window handling intact.
+var _window_quit_guard_enabled: bool = false
+var _old_auto_accept_quit: bool = true
+var _window_quit_requested: bool = false
 var _local_save_as: bool = false
 ## FileDialog and the hosted Object-variant dialog complete asynchronously.
 ## Freeze the initiating tab/document/session so a later callback cannot
@@ -173,6 +178,12 @@ func _ready() -> void:
 	_restore_workspace_layout()
 	if start_blank_document:
 		new_drawing()
+	# The OS close button bypasses File > Close Tab. Only the standalone root
+	# installs this gate; the Atlas host owns its own application lifecycle.
+	if get_parent() == get_tree().root:
+		_old_auto_accept_quit = get_tree().auto_accept_quit
+		get_tree().auto_accept_quit = false
+		_window_quit_guard_enabled = true
 
 
 func _build_interface() -> void:
@@ -483,7 +494,10 @@ func _build_interface() -> void:
 	close_dialog.title = "Unsaved Object/Drawing changes"
 	close_dialog.dialog_text = "Save changes before closing this tab?"
 	add_child(close_dialog)
-	close_dialog.confirmed.connect(_save_and_close)
+	close_dialog.confirmed.connect(func() -> void:
+		close_dialog.hide()
+		call_deferred("_save_and_close"))
+	close_dialog.canceled.connect(_cancel_pending_close)
 	close_dialog.add_button("Discard", false, "discard")
 	close_dialog.custom_action.connect(func(action: String) -> void:
 		if action == "discard":
@@ -1062,6 +1076,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and _window_quit_guard_enabled:
+		_request_window_quit()
+		return
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if dock_drag != null and (dock_drag.is_dragging() or not _drag_candidate_id.is_empty()):
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
@@ -2130,6 +2147,32 @@ func _can_persist_or_close(action: String) -> bool:
 	return false
 
 
+## Close the standalone window through the same per-tab Save/Discard/Cancel
+## decisions as File > Close Tab. Never silently discard unpublished strokes.
+func _request_window_quit() -> void:
+	if _window_quit_requested:
+		return
+	if not _can_persist_or_close("Close Window"):
+		return
+	_window_quit_requested = true
+	_advance_window_quit()
+
+
+func _advance_window_quit() -> void:
+	if not _window_quit_requested:
+		return
+	if not _can_persist_or_close("Close Window"):
+		return
+	if tabs.is_empty():
+		_window_quit_requested = false
+		if _window_quit_guard_enabled:
+			get_tree().quit()
+		return
+	# Closing the last tab preserves the current selection until each previous
+	# dirty tab receives its own explicit Save/Discard/Cancel decision.
+	_request_close_tab(tabs.size() - 1)
+
+
 func _request_close_current() -> void:
 	_request_close_tab(active_tab)
 
@@ -2147,7 +2190,10 @@ func _request_close_tab(index: int) -> void:
 	if session != null and session.is_dirty() or (session == null and
 		((tabs[index]["document"] as DrawingDocument).is_dirty() or
 		bool(tabs[index].get("frame_dirty", false)))):
-		close_dialog.popup_centered()
+		if DisplayServer.get_name() == "headless":
+			close_dialog.show()
+		else:
+			close_dialog.popup_centered()
 	else:
 		_close_index(index)
 
@@ -2156,6 +2202,7 @@ func _cancel_pending_close() -> void:
 	_closing_index = -1
 	_close_after_save = false
 	_local_save_as = false
+	_window_quit_requested = false
 
 
 func _save_and_close() -> void:
@@ -2189,6 +2236,10 @@ func _close_index(index: int) -> void:
 		status.text = "No document open"
 	else:
 		_activate(mini(index, tabs.size() - 1))
+	if _window_quit_requested:
+		# Let dialog signals and tab changes settle before advancing to the
+		# next tab; a cancelled prompt revokes the quit request immediately.
+		call_deferred("_advance_window_quit")
 
 
 func _close_if_saved() -> void:
@@ -3595,5 +3646,8 @@ func register_workspace_panel(panel_id: String, view: Control) -> bool:
 
 
 func _exit_tree() -> void:
+	if _window_quit_guard_enabled:
+		get_tree().auto_accept_quit = _old_auto_accept_quit
+		_window_quit_guard_enabled = false
 	if _layout_booted and layout_persistence_enabled:
 		_save_workspace_layout()

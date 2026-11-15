@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 standalone window-close protects pending edits and dirty tabs (T-133 Done)
+
+[T-133](Tickets/T-133.md) closes the operating-system quit path that bypassed
+T-125's pending-stroke and dirty Close Tab guards. The standalone Drawing
+window now refuses quit while detached/queued Brush input is unpublished,
+then reuses explicit per-tab Save/Discard/Cancel decisions after commit.
+Cancelling or declining Save As aborts the quit sequence; the existing dialog
+is dismissed before a new Save As chooser opens. Embedded Atlas workspaces do
+**not** claim the host's quit policy. The
+[31-assertion headless/native witness](evidence/T-133-2026-11-15-window-quit-safety.md)
+records a failing T-132 baseline and passing software tests; all physical
+owner UX and hosted CI gates remain open, with 46 required check IDs unchanged.
+
 ## 2026-11-15 bind Save As callbacks to their originating tab (T-132 Done)
 
 [T-132](Tickets/T-132.md) prevents an asynchronous FileDialog or hosted Object
@@ -1026,7 +1039,7 @@ large dense reference-window acceptance is claimed. [Ticket and evidence](Ticket
 **T-086 cold-source compositor optimization (2026-11-06; In Progress):**
 A bounded per-storage-row tile/preview lookup (maximum 256 references) and
 opaque-RGBA8 overwrite fast path reduce repeated cold raster composition
-while retaining byte-for-byte alpha parity. New 25/25 headless model checks
+while retaining byte-for-byte alpha parity. New 31/31 headless model checks
 and the existing native framebuffer witness pass. Two isolated, checksum-
 matched nine-sample paired runs improve the 256x256 two-layer opaque CPU
 median from 95.95→54.58ms and 88.39→59.79ms; fractional alpha also
@@ -1242,7 +1255,7 @@ structural history and stable save/reopen identities are implemented in the
 canonical shared package. **62/62** headless model checks and **32/32**
 X11/Xvfb/Mesa software pointer/framebuffer checks pass (1120×800/880×550,
 400% zoom). The 200-row paging/filter path remains bounded; Xvfb
-compact-workspace (420px, 150% scale), Object Editor UI (25/25), and
+compact-workspace (420px, 150% scale), Object Editor UI (31/31), and
 workspace-keyboard regressions also pass. Atlas callers retain external chronology. Physical Windows/Linux owner acceptance for
 findings #19/#20 remains **PENDING**, not inferred from CI or software rendering.
 [Ticket](Tickets/T-089.md) · [runbook](DRAWING_OWNER_ACCEPTANCE_MATRIX.md).
@@ -2842,6 +2855,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-130 · Guard selection and frame source context during Brush drain](Tickets/T-130.md) | Done | Clear Selection, image-frame and Object-frame edits cannot invalidate unpublished Brush or queued paint | [T-129](Tickets/T-129.md) |
 | [T-131 · Preserve Object rename and variant metadata on rejected publication](Tickets/T-131.md) | Done | Pending Brush rejects metadata changes; failed Save As restores prior variant target, successful publish unchanged | [T-125](Tickets/T-125.md) |
 | [T-132 · Bind asynchronous Save As to its originating document](Tickets/T-132.md) | Done | File and named Object variant choosers reject stale cross-tab/reused-index confirmations before writing; ordinary Save preserved | [T-120](Tickets/T-120.md), [T-131](Tickets/T-131.md) |
+| [T-133 · Guard standalone OS window-close against unsaved state](Tickets/T-133.md) | Done | Pending Brush blocks OS quit; per-tab Save/Discard/Cancel and Save As sequencing preserve files; Atlas host policy unchanged | [T-125](Tickets/T-125.md), [T-132](Tickets/T-132.md) |
 
 ## Epics
 
