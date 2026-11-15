@@ -4,6 +4,17 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 bind Save As callbacks to their originating tab (T-132 Done)
+
+[T-132](Tickets/T-132.md) prevents an asynchronous FileDialog or hosted Object
+variant confirmation from acting on a different tab after navigation, closure
+or index reuse. Confirmations now require the original tab, document and Object
+session identities; an expired selection fails before any file overwrite or
+asset publication. Ordinary Save As, direct Save and Object variant publishing
+are preserved. The [34-assertion red/green evidence](evidence/T-132-2026-11-15-save-dialog-source-identity.md)
+records 14 failures on the unmodified T-131 tree and a 34/34 passing result;
+CI keeps 46 required check IDs. Hosted CI and owner/device UX gates remain open.
+
 ## 2026-11-15 keep Object metadata transactional across rejected Save As (T-131 Done)
 
 [T-131](Tickets/T-131.md) closes a pending-Brush and failed-publisher gap
@@ -2830,6 +2841,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-129 · Guard concurrent layer and clipboard edits during Brush drain](Tickets/T-129.md) | Done | Source-mutating layer/text/pixel actions refuse pending strokes; Tree selection and ordered RGBA8 publication protected | [T-128](Tickets/T-128.md) |
 | [T-130 · Guard selection and frame source context during Brush drain](Tickets/T-130.md) | Done | Clear Selection, image-frame and Object-frame edits cannot invalidate unpublished Brush or queued paint | [T-129](Tickets/T-129.md) |
 | [T-131 · Preserve Object rename and variant metadata on rejected publication](Tickets/T-131.md) | Done | Pending Brush rejects metadata changes; failed Save As restores prior variant target, successful publish unchanged | [T-125](Tickets/T-125.md) |
+| [T-132 · Bind asynchronous Save As to its originating document](Tickets/T-132.md) | Done | File and named Object variant choosers reject stale cross-tab/reused-index confirmations before writing; ordinary Save preserved | [T-120](Tickets/T-120.md), [T-131](Tickets/T-131.md) |
 
 ## Epics
 

@@ -115,6 +115,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t131-object-metadata.log --marker T131_OBJECT_META_PASSED || ci_fail_marker 'T131 Object source metadata guard failed strict log'
           grep -Fqx 'T131_OBJECT_META_PASSED checks=21 failures=0' /tmp/godot-t131-object-metadata.log || ci_fail_marker 'T131 Object metadata assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t131_object_pending_metadata.py' -v || ci_fail_marker 'T131 source/CI contracts rejected'
+          # T-132 binds asynchronous file and Object Save As completion to
+          # the tab/document/session that opened the chooser, never the next tab.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t132_dialog_document_identity_smoke.gd 2>&1 | tee /tmp/godot-t132-dialog-target.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t132-dialog-target.log --marker T132_DIALOG_PASSED || ci_fail_marker 'T132 dialog source identity rejected by strict log'
+          grep -Fqx 'T132_DIALOG_PASSED checks=34 failures=0' /tmp/godot-t132-dialog-target.log || ci_fail_marker 'T132 dialog source identity assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t132_dialog_document_identity.py' -v || ci_fail_marker 'T132 source/CI contract rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log

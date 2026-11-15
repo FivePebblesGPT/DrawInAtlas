@@ -155,6 +155,11 @@ var variant_name: LineEdit
 var _closing_index: int = -1
 var _close_after_save: bool = false
 var _local_save_as: bool = false
+## FileDialog and the hosted Object-variant dialog complete asynchronously.
+## Freeze the initiating tab/document/session so a later callback cannot
+## write the currently selected *different* tab to the chosen destination.
+var _save_dialog_target: Dictionary = {}
+var _variant_dialog_target: Dictionary = {}
 const ROW_PAGE: int = 200
 
 
@@ -463,8 +468,8 @@ func _build_interface() -> void:
 		"*.png ; PNG images", "*.webp ; WebP images", "*.jpg, *.jpeg ; JPEG images"])
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
-	save_dialog.file_selected.connect(_save_file)
-	save_dialog.canceled.connect(_cancel_pending_close)
+	save_dialog.file_selected.connect(_save_dialog_selected)
+	save_dialog.canceled.connect(_save_dialog_cancelled)
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	object_open_dialog.title = "Open portable Object source in its own editor tab"
 	object_open_dialog.file_selected.connect(_open_object_file)
@@ -565,7 +570,8 @@ func _build_interface() -> void:
 	variant_name.placeholder_text = "New Object name"
 	variant_name.custom_minimum_size.x = 400
 	variant_form.add_child(variant_name)
-	variant_dialog.confirmed.connect(_save_as_named_object)
+	variant_dialog.confirmed.connect(_variant_dialog_confirmed)
+	variant_dialog.canceled.connect(_variant_dialog_cancelled)
 	_build_text_dialog()
 
 
@@ -3227,7 +3233,56 @@ func _ask_open() -> void:
 		open_dialog.popup_centered()
 
 
+## A dialog may outlive its original tab or even its original index.
+## Identity is checked after the signal, before any path or metadata mutation.
+func _capture_save_target() -> Dictionary:
+	if active_tab < 0 or active_tab >= tabs.size():
+		return {}
+	return {"tab": active_tab, "document": current_document(), "object": current_object()}
+
+
+func _save_target_is_current(target: Dictionary) -> bool:
+	return (not target.is_empty() and active_tab >= 0 and active_tab < tabs.size()
+		and active_tab == int(target["tab"])
+		and current_document() == target["document"]
+		and current_object() == target["object"])
+
+
+func _save_dialog_cancelled() -> void:
+	_save_dialog_target.clear()
+	_local_save_as = false
+	_cancel_pending_close()
+
+
+func _save_dialog_selected(path: String) -> void:
+	var target: Dictionary = _save_dialog_target
+	_save_dialog_target = {}
+	if not _save_target_is_current(target):
+		_local_save_as = false
+		_cancel_pending_close()
+		_show_error("Save As belongs to another document or tab; reopen the dialog")
+		return
+	_save_file(path)
+	_local_save_as = false
+
+
+func _variant_dialog_cancelled() -> void:
+	_variant_dialog_target.clear()
+	_cancel_pending_close()
+
+
+func _variant_dialog_confirmed() -> void:
+	var target: Dictionary = _variant_dialog_target
+	_variant_dialog_target = {}
+	if not _save_target_is_current(target):
+		_cancel_pending_close()
+		_show_error("Object Save As belongs to another document or tab; reopen the dialog")
+		return
+	_save_as_named_object()
+
+
 func _show_save_dialog() -> void:
+	_save_dialog_target = _capture_save_target()
 	# Godot headless reports a 0x0 screen: centering the native FileDialog
 	# spawns its window at a negative position and emits a runtime ERROR.
 	# Preserve the real dialog and Save/Close routing in headless CI without
@@ -3251,6 +3306,7 @@ func _ask_save() -> void:
 		return
 	if session != null and not bool(tabs[active_tab].get("local_object", false)):
 		variant_name.text = session.name + " copy"
+		_variant_dialog_target = _capture_save_target()
 		variant_dialog.popup_centered()
 	else:
 		_local_save_as = session != null
