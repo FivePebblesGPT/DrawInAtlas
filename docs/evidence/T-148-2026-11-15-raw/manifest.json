@@ -1,0 +1,103 @@
+{
+  "source_remote_sha": "a83e50550bb0c114a41b5c4af25fe2a2061bb1aa",
+  "godot": "4.8.beta3.official.c51ff06e8",
+  "rust": "1.99.1",
+  "native_ffi": "godot-rust 0.5.5 api-4-7",
+  "files": [
+    {
+      "name": "bridge.log",
+      "size_bytes": 783,
+      "sha256": "45bda328cd7a229e05d40a742c889955448bb31f18ae2179e8fe76c9c8cbcf4a"
+    },
+    {
+      "name": "clippy.log",
+      "size_bytes": 157,
+      "sha256": "900fb44cdf8dab8dd3b3c7af132d1196fcd144b4badff3fca2d0c395399f8c04"
+    },
+    {
+      "name": "godot-canvas-x11.log",
+      "size_bytes": 1691,
+      "sha256": "740d22a20471e809dd7aca9c0a8fa2c9701dc3b8f5d6ff919e2adb7f1fb144c4"
+    },
+    {
+      "name": "godot-fallback.log",
+      "size_bytes": 229,
+      "sha256": "ac20a66219c021004ecd68b9daee280bfc8430ce72199461ba87a3cb8bc1bb64"
+    },
+    {
+      "name": "godot-hard-atomic.log",
+      "size_bytes": 267,
+      "sha256": "8dc61cb686fff3470fdbcd8def6fd8c75b41c8b8894e2d2fc85f7a31e4fe6ae6"
+    },
+    {
+      "name": "godot-hokusai-96px-x11.log",
+      "size_bytes": 5836,
+      "sha256": "84f419b57b6063bf4309a4420f9e6d4dcab429d4c14a46c79105a5d2f824a925"
+    },
+    {
+      "name": "godot-native-tiles.log",
+      "size_bytes": 783,
+      "sha256": "45bda328cd7a229e05d40a742c889955448bb31f18ae2179e8fe76c9c8cbcf4a"
+    },
+    {
+      "name": "godot-pigment-atomic.log",
+      "size_bytes": 258,
+      "sha256": "0974c48d2eea929e08d83c8029aa449283cd5807cd2b68ffdf058fd28edc0276"
+    },
+    {
+      "name": "godot-stroke-contract.log",
+      "size_bytes": 273,
+      "sha256": "26b3ab74772f55c3a4c1dae52a2f754771f02210b27ef437dd7b081f5ce21ba9"
+    },
+    {
+      "name": "native_brush_fallback.log",
+      "size_bytes": 478,
+      "sha256": "0ec4679733ebf6bfa00bbb986bc2b3b030b64e76af836d5db2e529e595fa2bed"
+    },
+    {
+      "name": "release.log",
+      "size_bytes": 278,
+      "sha256": "ba94c3af36f9f59435534fdb71c6548fc45baae0b56b9eac0aad82251b00bc13"
+    },
+    {
+      "name": "rust-clippy.log",
+      "size_bytes": 157,
+      "sha256": "900fb44cdf8dab8dd3b3c7af132d1196fcd144b4badff3fca2d0c395399f8c04"
+    },
+    {
+      "name": "rust-release.log",
+      "size_bytes": 278,
+      "sha256": "ba94c3af36f9f59435534fdb71c6548fc45baae0b56b9eac0aad82251b00bc13"
+    },
+    {
+      "name": "rust-test.log",
+      "size_bytes": 1663,
+      "sha256": "5119b9b6b3c0a24f4691314bdaebf6cdc1862d7916b0fffce31c8d49a0f33acd"
+    },
+    {
+      "name": "t095_native_hard_source_atomic.log",
+      "size_bytes": 516,
+      "sha256": "95a781b63a346c36c645eed41d7d096d704bd8f2ebe54dd7b0e3c26dfc7e98b3"
+    },
+    {
+      "name": "t095_native_pigment_atomic.log",
+      "size_bytes": 507,
+      "sha256": "2d78d31c2af4d4e422d97776e752dac4036ff78fbdc563f179de3b32909a5ef4"
+    },
+    {
+      "name": "t147_native_stroke_contract.log",
+      "size_bytes": 522,
+      "sha256": "328d8cd8eaf0c427634a07dd115f91762c9d3e3e61d21c94a52c47eff1869280"
+    },
+    {
+      "name": "x11-native_brush_integration.log",
+      "size_bytes": 1013,
+      "sha256": "15321313a116d1725cb22545d65c4fe31388f02574a7e5913822f8712535128d"
+    },
+    {
+      "name": "x11-t146_hokusai_full_canvas_native.log",
+      "size_bytes": 5160,
+      "sha256": "4c58105e09256585e673c92bb346304bbd57bb5ee7979ac86a40f0b2144a6a9c"
+    }
+  ]
+}

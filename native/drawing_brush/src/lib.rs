@@ -1,5 +1,7 @@
-//! Versioned stroke transactions for NativeHard and Hokusai. GDScript owns
-//! canonical source/history until the native tile-store migration (T-148).
+//! Versioned NativeHard/Hokusai stroke transactions and native tile editing.
+//! The T-148 tile store is implemented independently; production Canvas still
+//! uses its transitional GDScript source adapter pending the T-149 cutover.
+mod native_tiles;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -728,6 +730,180 @@ impl DrawingNativeBrush {
         }
         stroke.ffi_calls += 1;
         stroke.acknowledge(accepted)
+    }
+
+    /// Obtain signed storage-tile IDs needed by a pending batch. A Godot
+    /// consumer can authorize and bulk-import *only* these source tiles before
+    /// calling apply_tile_batch; no per-pixel coordinates leave Rust.
+    #[allow(clippy::too_many_arguments)] // Source stamp, tile geometry, world transform.
+    #[func]
+    fn required_tiles(
+        &mut self,
+        handle: i64,
+        revision: i64,
+        stride: i64,
+        anchor_x: i64,
+        anchor_y: i64,
+    ) -> Dictionary<Variant, Variant> {
+        let Some(stroke) = self.stroke.as_mut().filter(|stroke| {
+            stroke.handle == handle
+                && stroke.source_revision == revision
+                && stroke.pending.is_some()
+        }) else {
+            return error_result("Missing pending native brush batch or stale revision");
+        };
+        if !(16..=2048).contains(&stride) {
+            return error_result("Invalid native storage tile stride");
+        }
+        stroke.ffi_calls += 1;
+        let step = if stroke.format() == "xy_rgba" { 3 } else { 2 };
+        let mut coords = HashSet::new();
+        for delta in stroke.preview.chunks_exact(step) {
+            if stroke.clip.size.x > 0
+                && stroke.clip.size.y > 0
+                && !stroke
+                    .clip
+                    .contains_point(Vector2i::new(delta[0], delta[1]))
+            {
+                continue;
+            }
+            let Some((x, y)) = anchor_x
+                .checked_add(i64::from(delta[0]))
+                .zip(anchor_y.checked_add(i64::from(delta[1])))
+            else {
+                return error_result("Signed native tile coordinate overflow");
+            };
+            if x.unsigned_abs() > (1_u64 << 60) || y.unsigned_abs() > (1_u64 << 60) {
+                return error_result("Signed native tile coordinate outside safe bounds");
+            }
+            coords.insert((x.div_euclid(stride), y.div_euclid(stride)));
+            if coords.len() > 128 {
+                return error_result("Native sample batch exceeds touched-tile budget");
+            }
+        }
+        let mut sorted: Vec<_> = coords.into_iter().collect();
+        sorted.sort_by_key(|&(x, y)| (y, x));
+        let mut tiles = Array::<Dictionary<Variant, Variant>>::new();
+        for (x, y) in sorted {
+            let mut tile = Dictionary::new();
+            tile.set("tile_x", x);
+            tile.set("tile_y", y);
+            tiles.push(&tile);
+        }
+        let mut result = Dictionary::new();
+        result.set("ok", true);
+        result.set("tiles", &tiles);
+        result
+    }
+
+    /// Atomically stage AND acknowledge a pending raster batch. The source
+    /// buffer, hard coverage/pigment state and tile draft must never diverge:
+    /// on failure both roll back, so the caller may reappend the same samples
+    /// after authorizing the missing source tile or mask. No per-pixel values
+    /// cross the Godot boundary.
+    #[allow(clippy::too_many_arguments)] // Explicit Godot edit token and anchor.
+    #[func]
+    fn apply_tile_batch(
+        &mut self,
+        mut store: Gd<native_tiles::DrawingNativeTiles>,
+        handle: i64,
+        revision: i64,
+        transaction: i64,
+        anchor_x: i64,
+        anchor_y: i64,
+        erase: bool,
+    ) -> Dictionary<Variant, Variant> {
+        let Some(stroke) = self
+            .stroke
+            .as_mut()
+            .filter(|s| s.handle == handle && s.source_revision == revision && s.pending.is_some())
+        else {
+            return error_result("Missing pending native brush batch or stale revision");
+        };
+        stroke.ffi_calls += 1;
+        let mut tile_store = store.bind_mut();
+        tile_store.store.ffi_calls += 1;
+        if !tile_store
+            .store
+            .transaction_matches(transaction, revision, &stroke.layer)
+        {
+            stroke.acknowledge(false);
+            return error_result("Brush layer/revision differs from native tile transaction");
+        }
+        let outcome = tile_store.store.stage(
+            transaction,
+            revision as u64,
+            anchor_x,
+            anchor_y,
+            &stroke.preview,
+            stroke.format() == "xy_rgba",
+            stroke.rgba as u32,
+            erase,
+            stroke.clip,
+        );
+        // A rejected source/mask read must rewind the brush's coverage,
+        // pigment RNG and cursor before another batch may be appended.
+        // TileStore::stage has already rolled back all tile writes on Err.
+        stroke.acknowledge(outcome.is_ok());
+        match outcome {
+            Ok(changed) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("dirty_tiles", changed as i64);
+                result
+            }
+            Err(message) => error_result(message),
+        }
+    }
+
+    /// Atomically publish an entire accepted brush gesture into canonical
+    /// raster tiles and their one reversible native history entry. The brush
+    /// handle is consumed only *after* publication succeeds. An unauthorized
+    /// layer, changed revision, or exhausted memory budget leaves the handle
+    /// and tile draft intact and retryable.
+    #[func]
+    fn commit_tiles(
+        &mut self,
+        mut store: Gd<native_tiles::DrawingNativeTiles>,
+        handle: i64,
+        revision: i64,
+        transaction: i64,
+    ) -> Dictionary<Variant, Variant> {
+        let Some(stroke) = self.stroke.as_ref().filter(|stroke| {
+            stroke.handle == handle
+                && stroke.source_revision == revision
+                && stroke.pending.is_none()
+        }) else {
+            return error_result("Invalid brush handle, revision or unacknowledged batch");
+        };
+        let mut tile_store = store.bind_mut();
+        tile_store.store.ffi_calls += 1;
+        if !tile_store
+            .store
+            .transaction_matches(transaction, revision, &stroke.layer)
+        {
+            return error_result("Brush layer/revision differs from native tile transaction");
+        }
+        if tile_store.store.finish_noop(transaction, revision as u64) {
+            self.stroke = None;
+            let mut result = Dictionary::new();
+            result.set("ok", true);
+            result.set("dirty_tiles", 0);
+            result.set("no_change", true);
+            result.set("revision", revision);
+            return result;
+        }
+        match tile_store.store.commit(transaction, revision as u64) {
+            Ok(changed) => {
+                self.stroke = None;
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("dirty_tiles", changed as i64);
+                result.set("revision", revision + 1);
+                result
+            }
+            Err(message) => error_result(message),
+        }
     }
 
     /// Stable metrics report boundary call count and packed payload volumes;

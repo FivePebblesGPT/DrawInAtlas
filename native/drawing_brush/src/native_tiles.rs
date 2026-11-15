@@ -1,0 +1,1163 @@
+//! T-148 native canonical RGBA8 tile store. Godot may import authorized source
+//! tiles and read immutable byte copies, but painting and history live in Rust.
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use godot::classes::IRefCounted;
+use godot::prelude::*;
+
+static NEXT_EDIT: AtomicU64 = AtomicU64::new(1);
+const MAX_ACTIVE_TILES: usize = 128;
+const MAX_TILE_BYTES: usize = 2048 * 2048 * 4;
+const MAX_STORED_BYTES: usize = 256 * 1024 * 1024;
+const MAX_HISTORY: usize = 64;
+const SAFE_COORD: i64 = 1 << 60;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct TileId {
+    layer: String,
+    x: i64,
+    y: i64,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct Tile {
+    rgba: Vec<u8>,
+    generation: u64,
+}
+
+type PackedTileChanges = HashMap<(i64, i64), Vec<(usize, usize, u32)>>;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct Dirty {
+    left: usize,
+    top: usize,
+    right: usize,
+    bottom: usize,
+}
+impl Dirty {
+    fn include(&mut self, x: usize, y: usize) {
+        self.left = self.left.min(x);
+        self.top = self.top.min(y);
+        self.right = self.right.max(x + 1);
+        self.bottom = self.bottom.max(y + 1);
+    }
+}
+
+struct Edit {
+    id: i64,
+    layer: String,
+    base_revision: u64,
+    selection_required: bool,
+    masks: HashMap<TileId, Vec<u8>>,
+    before: HashMap<TileId, Tile>,
+    draft: HashMap<TileId, Tile>,
+    dirty: HashMap<TileId, Dirty>,
+    batches: u64,
+}
+
+struct History {
+    layer: String,
+    before: HashMap<TileId, Tile>,
+    after: HashMap<TileId, Tile>,
+}
+
+/// A separate source authorization set prevents an omitted/lazy/corrupt tile
+/// from silently becoming transparent black. Blank tiles must be authorized.
+#[derive(Default)]
+pub(super) struct TileStore {
+    stride: usize,
+    revision: u64,
+    tiles: HashMap<TileId, Tile>,
+    authorized: HashSet<TileId>,
+    editable_layers: HashMap<String, bool>,
+    active: Option<Edit>,
+    undo: Vec<History>,
+    redo: Vec<History>,
+    pub(super) ffi_calls: u64,
+    bytes_imported: u64,
+    bytes_exported: u64,
+    pixel_stream_calls: u64,
+}
+
+impl TileStore {
+    pub(super) fn transaction_matches(&self, transaction: i64, revision: i64, layer: &str) -> bool {
+        revision >= 0
+            && self.active.as_ref().is_some_and(|edit| {
+                edit.id == transaction
+                    && edit.layer == layer
+                    && edit.base_revision == revision as u64
+                    && self.revision == revision as u64
+            })
+    }
+    fn stride_bytes(&self) -> Result<usize, &'static str> {
+        self.stride
+            .checked_mul(self.stride)
+            .and_then(|pixels| pixels.checked_mul(4))
+            .filter(|len| *len > 0 && *len <= MAX_TILE_BYTES)
+            .ok_or("Invalid or unconfigured tile stride")
+    }
+    fn allowed(&self, layer: &str) -> bool {
+        self.editable_layers.get(layer).copied().unwrap_or(false)
+    }
+    fn bytes_used(&self) -> usize {
+        let resident = self.tiles.values().map(|t| t.rgba.len()).sum::<usize>();
+        let current = self.active.as_ref().map_or(0, |a| {
+            a.draft.values().map(|t| t.rgba.len()).sum::<usize>()
+                + a.before.values().map(|t| t.rgba.len()).sum::<usize>()
+                + a.masks.values().map(Vec::len).sum::<usize>()
+        });
+        let history = self
+            .undo
+            .iter()
+            .chain(self.redo.iter())
+            .map(|h| {
+                h.before
+                    .values()
+                    .chain(h.after.values())
+                    .map(|t| t.rgba.len())
+                    .sum::<usize>()
+            })
+            .sum::<usize>();
+        resident.saturating_add(current).saturating_add(history)
+    }
+    fn import(&mut self, id: TileId, revision: u64, rgba: &[u8]) -> Result<(), &'static str> {
+        let len = self.stride_bytes()?;
+        if revision != self.revision
+            || (!rgba.is_empty() && rgba.len() != len)
+            || id.layer.is_empty()
+            || id.x.unsigned_abs() > SAFE_COORD as u64
+            || id.y.unsigned_abs() > SAFE_COORD as u64
+            || self.authorized.contains(&id)
+            || self
+                .active
+                .as_ref()
+                .is_some_and(|a| a.draft.contains_key(&id))
+        {
+            return Err("Source revision, identity or RGBA8 tile buffer rejected");
+        }
+        if self.bytes_used().saturating_add(len) > MAX_STORED_BYTES {
+            return Err("Source tile memory budget exceeded");
+        }
+        let data = if rgba.is_empty() {
+            vec![0; len]
+        } else {
+            rgba.to_vec()
+        };
+        self.tiles.insert(
+            id.clone(),
+            Tile {
+                rgba: data,
+                generation: 0,
+            },
+        );
+        self.authorized.insert(id);
+        self.bytes_imported += rgba.len() as u64;
+        Ok(())
+    }
+    fn begin(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        selection_required: bool,
+    ) -> Result<i64, &'static str> {
+        if revision != self.revision || !self.allowed(layer) || self.active.is_some() {
+            return Err("Stale revision, locked/hidden layer or active edit");
+        }
+        let id = NEXT_EDIT.fetch_add(1, Ordering::Relaxed) as i64;
+        self.active = Some(Edit {
+            id,
+            layer: layer.to_owned(),
+            base_revision: revision,
+            selection_required,
+            masks: HashMap::new(),
+            before: HashMap::new(),
+            draft: HashMap::new(),
+            dirty: HashMap::new(),
+            batches: 0,
+        });
+        Ok(id)
+    }
+    fn mask(&mut self, transaction: i64, id: TileId, mask: &[u8]) -> Result<(), &'static str> {
+        let len = self.stride_bytes()? / 4;
+        let active = self.active.as_ref().ok_or("No active tile transaction")?;
+        if active.id != transaction
+            || active.layer != id.layer
+            || !active.selection_required
+            || mask.len() != len
+            || active.draft.contains_key(&id)
+            || active.masks.contains_key(&id)
+            || !self.authorized.contains(&id)
+            || active.masks.len() >= MAX_ACTIVE_TILES
+            || self.bytes_used().saturating_add(len) > MAX_STORED_BYTES
+        {
+            return Err("Invalid, unauthorized or over-budget selection tile mask");
+        }
+        self.active
+            .as_mut()
+            .expect("active preflight")
+            .masks
+            .insert(id, mask.to_vec());
+        Ok(())
+    }
+    /// Called *inside Rust* with NativeStroke's pending output, never across
+    /// Godot as pixel coordinates. The whole batch is preflighted and cloned
+    /// into a detached working set before modifying the active transaction.
+    #[allow(clippy::too_many_arguments)] // Native ABI context is explicit.
+    pub(super) fn stage(
+        &mut self,
+        transaction: i64,
+        revision: u64,
+        anchor_x: i64,
+        anchor_y: i64,
+        deltas: &[i32],
+        pigment: bool,
+        brush_rgba: u32,
+        erase: bool,
+        clip: Rect2i,
+    ) -> Result<usize, &'static str> {
+        let step = if pigment { 3 } else { 2 };
+        if !deltas.len().is_multiple_of(step) || deltas.len() > 3 * 1_048_576 {
+            return Err("Invalid native sample output");
+        }
+        let active = self.active.as_ref().ok_or("No tile transaction")?;
+        if active.id != transaction
+            || active.base_revision != revision
+            || self.revision != revision
+            || !self.allowed(&active.layer)
+        {
+            return Err("Stale revision or unavailable tile layer");
+        }
+        let mut grouped: PackedTileChanges = HashMap::new();
+        let stride = self.stride as i64;
+        for delta in deltas.chunks_exact(step) {
+            if clip.size.x > 0
+                && clip.size.y > 0
+                && !clip.contains_point(Vector2i::new(delta[0], delta[1]))
+            {
+                continue;
+            }
+            let x = anchor_x
+                .checked_add(i64::from(delta[0]))
+                .ok_or("Signed X overflow")?;
+            let y = anchor_y
+                .checked_add(i64::from(delta[1]))
+                .ok_or("Signed Y overflow")?;
+            if x.unsigned_abs() > SAFE_COORD as u64 || y.unsigned_abs() > SAFE_COORD as u64 {
+                return Err("Signed native sample outside tile bounds");
+            }
+            let coords = (x.div_euclid(stride), y.div_euclid(stride));
+            let ix = x.rem_euclid(stride) as usize;
+            let iy = y.rem_euclid(stride) as usize;
+            let pigment_rgba = if pigment { delta[2] as u32 } else { brush_rgba };
+            let rgba = if pigment {
+                let alpha = ((pigment_rgba >> 24) & 255) * ((brush_rgba >> 24) & 255);
+                (pigment_rgba & 0xffffff) | (((alpha + 127) / 255) << 24)
+            } else {
+                pigment_rgba
+            };
+            grouped.entry(coords).or_default().push((ix, iy, rgba));
+        }
+        let active = self.active.as_ref().expect("checked above");
+        let new_count = grouped
+            .keys()
+            .filter(|&&(x, y)| {
+                !active.draft.contains_key(&TileId {
+                    layer: active.layer.clone(),
+                    x,
+                    y,
+                })
+            })
+            .count();
+        if active.draft.len() + new_count > MAX_ACTIVE_TILES {
+            return Err("Native edit exceeds touched-tile budget");
+        }
+        let bytes = self.stride_bytes()?;
+        if self
+            .bytes_used()
+            .saturating_add(new_count * bytes * 2 + grouped.len() * bytes)
+            > MAX_STORED_BYTES
+        {
+            return Err("Native edit exceeds memory budget");
+        }
+        let mut updated: HashMap<TileId, Tile> = HashMap::new();
+        let mut dirty: HashMap<TileId, Dirty> = HashMap::new();
+        for ((tx, ty), changes) in grouped {
+            let id = TileId {
+                layer: active.layer.clone(),
+                x: tx,
+                y: ty,
+            };
+            if !self.authorized.contains(&id) {
+                return Err("Source tile not authorized or read failed");
+            }
+            let mask = if active.selection_required {
+                Some(active.masks.get(&id).ok_or("Selection mask not loaded")?)
+            } else {
+                None
+            };
+            let mut tile = active
+                .draft
+                .get(&id)
+                .or_else(|| self.tiles.get(&id))
+                .ok_or("Source tile not resident")?
+                .clone();
+            let mut tile_dirty: Option<Dirty> = None;
+            for (x, y, rgba) in changes {
+                if mask.is_some_and(|selection| selection[y * self.stride + x] == 0) {
+                    continue;
+                }
+                let offset = (y * self.stride + x) * 4;
+                let dest = u32::from_le_bytes(
+                    tile.rgba[offset..offset + 4]
+                        .try_into()
+                        .expect("RGBA8 offset"),
+                );
+                let next = if erase {
+                    0
+                } else if pigment {
+                    // Hokusai's pigment is rebased against immutable source,
+                    // not repeatedly blended over the previous preview.
+                    let source = &self.tiles.get(&id).expect("authorized source").rgba;
+                    let original = u32::from_le_bytes(
+                        source[offset..offset + 4].try_into().expect("source RGBA8"),
+                    );
+                    blend(rgba, original)
+                } else {
+                    blend(rgba, dest)
+                };
+                if next != dest {
+                    tile.rgba[offset..offset + 4].copy_from_slice(&next.to_le_bytes());
+                    if let Some(area) = &mut tile_dirty {
+                        area.include(x, y);
+                    } else {
+                        tile_dirty = Some(Dirty {
+                            left: x,
+                            top: y,
+                            right: x + 1,
+                            bottom: y + 1,
+                        });
+                    }
+                }
+            }
+            if let Some(area) = tile_dirty {
+                dirty.insert(id.clone(), area);
+                updated.insert(id, tile);
+            }
+        }
+        let touched = dirty.len();
+        let active = self.active.as_mut().expect("checked above");
+        for (id, tile) in updated {
+            active
+                .before
+                .entry(id.clone())
+                .or_insert_with(|| self.tiles.get(&id).expect("authorized").clone());
+            active.draft.insert(id, tile);
+        }
+        for (id, area) in dirty {
+            active
+                .dirty
+                .entry(id)
+                .and_modify(|b| {
+                    b.include(area.left, area.top);
+                    b.include(area.right - 1, area.bottom - 1);
+                })
+                .or_insert(area);
+        }
+        active.batches += 1;
+        Ok(touched)
+    }
+    /// A no-op gesture does not advance the canonical revision or create
+    /// history. Only the paired native brush commit path consumes it.
+    pub(super) fn finish_noop(&mut self, transaction: i64, revision: u64) -> bool {
+        let Some(edit) = self.active.as_ref() else {
+            return false;
+        };
+        if edit.id != transaction
+            || edit.base_revision != revision
+            || self.revision != revision
+            || !self.allowed(&edit.layer)
+        {
+            return false;
+        }
+        if edit
+            .draft
+            .iter()
+            .any(|(id, draft)| self.tiles.get(id).is_none_or(|src| src.rgba != draft.rgba))
+        {
+            return false;
+        }
+        self.active = None;
+        true
+    }
+    pub(super) fn commit(
+        &mut self,
+        transaction: i64,
+        revision: u64,
+    ) -> Result<usize, &'static str> {
+        let edit = self.active.as_ref().ok_or("No native edit")?;
+        if edit.id != transaction
+            || edit.base_revision != revision
+            || self.revision != revision
+            || !self.allowed(&edit.layer)
+        {
+            return Err("Stale, inaccessible or mismatched edit");
+        }
+        if edit.draft.is_empty()
+            || edit
+                .draft
+                .iter()
+                .all(|(id, draft)| self.tiles.get(id).is_some_and(|t| t.rgba == draft.rgba))
+        {
+            return Err("Edit has no changed tiles");
+        }
+        if self.bytes_used() > MAX_STORED_BYTES {
+            return Err("History memory budget exceeded");
+        }
+        let mut edit = self.active.take().expect("checked above");
+        let mut after = HashMap::new();
+        for (id, mut tile) in edit.draft.drain() {
+            if self.tiles.get(&id).is_some_and(|old| old.rgba == tile.rgba) {
+                edit.before.remove(&id);
+                continue;
+            }
+            tile.generation = self.tiles.get(&id).map_or(1, |old| old.generation + 1);
+            after.insert(id.clone(), tile.clone());
+            self.tiles.insert(id, tile);
+        }
+        let count = after.len();
+        self.undo.push(History {
+            layer: edit.layer,
+            before: edit.before,
+            after,
+        });
+        self.redo.clear();
+        if self.undo.len() > MAX_HISTORY {
+            self.undo.remove(0);
+        }
+        self.revision += 1;
+        Ok(count)
+    }
+    fn undo_or_redo(&mut self, undo: bool) -> Result<usize, &'static str> {
+        if self.active.is_some() {
+            return Err("Cannot replay while a tile transaction is open");
+        }
+        let (from, to) = if undo {
+            (&mut self.undo, &mut self.redo)
+        } else {
+            (&mut self.redo, &mut self.undo)
+        };
+        let entry = from.last().ok_or("No native history entry")?;
+        if !self
+            .editable_layers
+            .get(&entry.layer)
+            .copied()
+            .unwrap_or(false)
+        {
+            return Err("History layer is locked/hidden");
+        }
+        let entry = from.pop().expect("checked above");
+        let (replacements, count) = if undo {
+            (&entry.before, entry.before.len())
+        } else {
+            (&entry.after, entry.after.len())
+        };
+        for (id, tile) in replacements {
+            let mut copy = tile.clone();
+            copy.generation = self.tiles.get(id).map_or(1, |old| old.generation + 1);
+            self.tiles.insert(id.clone(), copy);
+        }
+        to.push(entry);
+        self.revision += 1;
+        Ok(count)
+    }
+    fn read(&self, id: &TileId, pending: bool) -> Option<&Tile> {
+        if pending
+            && let Some(edit) = self.active.as_ref()
+            && let Some(tile) = edit.draft.get(id)
+        {
+            return Some(tile);
+        }
+        self.tiles.get(id)
+    }
+}
+
+fn blend(source: u32, dest: u32) -> u32 {
+    let a = ((source >> 24) & 255) as f64;
+    if a == 0.0 {
+        return dest;
+    }
+    if a == 255.0 || (dest >> 24) == 0 {
+        return source;
+    }
+    let da = ((dest >> 24) & 255) as f64 / 255.0;
+    let sa = a / 255.0;
+    let out_a = sa + da * (1.0 - sa);
+    let mut out = ((out_a * 255.0).round() as u32).min(255) << 24;
+    for channel in 0..3 {
+        let shift = channel * 8;
+        let s = ((source >> shift) & 255) as f64;
+        let d = ((dest >> shift) & 255) as f64;
+        let c = ((s * sa + d * da * (1.0 - sa)) / out_a).round() as u32;
+        out |= c.min(255) << shift;
+    }
+    out
+}
+
+fn err(message: &str) -> Dictionary<Variant, Variant> {
+    let mut result = Dictionary::new();
+    result.set("ok", false);
+    result.set("error", message);
+    result
+}
+
+#[derive(GodotClass)]
+#[class(base=RefCounted)]
+pub(super) struct DrawingNativeTiles {
+    base: Base<RefCounted>,
+    pub(super) store: TileStore,
+}
+
+#[godot_api]
+impl IRefCounted for DrawingNativeTiles {
+    fn init(base: Base<RefCounted>) -> Self {
+        Self {
+            base,
+            store: TileStore::default(),
+        }
+    }
+}
+
+#[godot_api]
+impl DrawingNativeTiles {
+    #[func]
+    fn tile_abi_version(&self) -> i32 {
+        1
+    }
+
+    #[func]
+    fn configure(&mut self, stride: i64, revision: i64) -> bool {
+        if self.store.stride != 0 || !(16..=2048).contains(&stride) || revision < 0 {
+            return false;
+        }
+        self.store.stride = stride as usize;
+        self.store.revision = revision as u64;
+        true
+    }
+
+    #[func]
+    fn set_layer_editable(&mut self, layer: GString, editable: bool) -> bool {
+        let layer = layer.to_string();
+        if layer.is_empty() {
+            return false;
+        }
+        self.store.editable_layers.insert(layer, editable);
+        true
+    }
+
+    #[func]
+    fn import_source(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        source_revision: i64,
+        bytes: PackedByteArray,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if source_revision < 0
+            || x.unsigned_abs() > SAFE_COORD as u64
+            || y.unsigned_abs() > SAFE_COORD as u64
+        {
+            return false;
+        }
+        self.store
+            .import(
+                TileId {
+                    layer: layer.to_string(),
+                    x,
+                    y,
+                },
+                source_revision as u64,
+                bytes.as_slice(),
+            )
+            .is_ok()
+    }
+
+    #[func]
+    fn begin_edit(
+        &mut self,
+        layer: GString,
+        source_revision: i64,
+        selection_required: bool,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        if source_revision < 0 {
+            return err("Negative revision");
+        }
+        match self.store.begin(
+            &layer.to_string(),
+            source_revision as u64,
+            selection_required,
+        ) {
+            Ok(id) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("transaction", id);
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+
+    #[func]
+    fn import_mask(
+        &mut self,
+        transaction: i64,
+        layer: GString,
+        tile_x: i64,
+        tile_y: i64,
+        mask: PackedByteArray,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        self.store
+            .mask(
+                transaction,
+                TileId {
+                    layer: layer.to_string(),
+                    x: tile_x,
+                    y: tile_y,
+                },
+                mask.as_slice(),
+            )
+            .is_ok()
+    }
+
+    #[func]
+    fn discard_edit(&mut self, transaction: i64) -> bool {
+        self.store.ffi_calls += 1;
+        if self
+            .store
+            .active
+            .as_ref()
+            .is_some_and(|e| e.id == transaction)
+        {
+            self.store.active = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    #[func]
+    fn commit_edit(
+        &mut self,
+        transaction: i64,
+        source_revision: i64,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        if source_revision < 0 {
+            return err("Negative revision");
+        }
+        match self.store.commit(transaction, source_revision as u64) {
+            Ok(count) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("dirty_tiles", count as i64);
+                result.set("revision", self.store.revision as i64);
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+
+    #[func]
+    fn undo_edit(&mut self) -> Dictionary<Variant, Variant> {
+        self.replay(true)
+    }
+    #[func]
+    fn redo_edit(&mut self) -> Dictionary<Variant, Variant> {
+        self.replay(false)
+    }
+
+    #[func]
+    fn read_tile(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        let id = TileId {
+            layer: layer.to_string(),
+            x,
+            y,
+        };
+        let Some(tile) = self.store.read(&id, preview) else {
+            return err("Tile not imported or not resident");
+        };
+        let mut result = Dictionary::new();
+        result.set("ok", true);
+        result.set("format", "straight_rgba8");
+        result.set("stride_bytes", (self.store.stride * 4) as i64);
+        let drafted = preview
+            && self
+                .store
+                .active
+                .as_ref()
+                .is_some_and(|edit| edit.draft.contains_key(&id));
+        result.set("generation", (tile.generation + u64::from(drafted)) as i64);
+        result.set("bytes", &PackedByteArray::from(tile.rgba.as_slice()));
+        self.store.bytes_exported += tile.rgba.len() as u64;
+        result
+    }
+
+    /// Page over canonical layer/tile identities for bulk persistence. The
+    /// result omits pixel bytes; read_tile copies exactly one RGBA8 span.
+    /// A bounded page size avoids unbounded Godot Array allocations even with
+    /// extremely sparse 16px storage tiles.
+    #[func]
+    fn list_tiles(&mut self, offset: i64, limit: i64) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        if offset < 0 || !(1..=128).contains(&limit) {
+            return err("Invalid tile list page bounds");
+        }
+        let mut keys = self.store.tiles.keys().collect::<Vec<_>>();
+        keys.sort_by_key(|id| (&id.layer, id.y, id.x));
+        let total = keys.len();
+        let start = (offset as usize).min(total);
+        let end = start.saturating_add(limit as usize).min(total);
+        let mut items = Array::<Dictionary<Variant, Variant>>::new();
+        for id in &keys[start..end] {
+            let mut item = Dictionary::new();
+            item.set("layer", id.layer.as_str());
+            item.set("tile_x", id.x);
+            item.set("tile_y", id.y);
+            item.set(
+                "generation",
+                self.store.tiles.get(*id).expect("resident tile").generation as i64,
+            );
+            items.push(&item);
+        }
+        let mut result = Dictionary::new();
+        result.set("ok", true);
+        result.set("tiles", &items);
+        result.set("total", total as i64);
+        result.set("next_offset", if end == total { -1 } else { end as i64 });
+        result.set("revision", self.store.revision as i64);
+        result
+    }
+
+    #[func]
+    fn dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+        let mut result = Array::new();
+        let Some(edit) = self
+            .store
+            .active
+            .as_ref()
+            .filter(|edit| edit.id == transaction)
+        else {
+            return result;
+        };
+        let mut items = edit.dirty.iter().collect::<Vec<_>>();
+        items.sort_by_key(|(id, _)| (&id.layer, id.y, id.x));
+        for (id, rect) in items {
+            let mut item = Dictionary::new();
+            item.set("layer", id.layer.as_str());
+            item.set("tile_x", id.x);
+            item.set("tile_y", id.y);
+            item.set(
+                "dirty",
+                Rect2i::new(
+                    Vector2i::new(rect.left as i32, rect.top as i32),
+                    Vector2i::new(
+                        (rect.right - rect.left) as i32,
+                        (rect.bottom - rect.top) as i32,
+                    ),
+                ),
+            );
+            item.set("base_revision", edit.base_revision as i64);
+            item.set(
+                "generation",
+                self.store.tiles.get(id).map_or(0, |t| t.generation as i64) + 1,
+            );
+            result.push(&item);
+        }
+        result
+    }
+
+    #[func]
+    fn stats(&self) -> Dictionary<Variant, Variant> {
+        let mut result = Dictionary::new();
+        result.set("revision", self.store.revision as i64);
+        result.set("stride", self.store.stride as i64);
+        result.set("tiles", self.store.tiles.len() as i64);
+        result.set("bytes_used", self.store.bytes_used() as i64);
+        result.set("ffi_calls", self.store.ffi_calls as i64);
+        result.set("bytes_imported", self.store.bytes_imported as i64);
+        result.set("bytes_exported", self.store.bytes_exported as i64);
+        result.set("pixel_stream_calls", self.store.pixel_stream_calls as i64);
+        result.set("undo", self.store.undo.len() as i64);
+        result.set("redo", self.store.redo.len() as i64);
+        result
+    }
+}
+
+impl DrawingNativeTiles {
+    fn replay(&mut self, undo: bool) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        match self.store.undo_or_redo(undo) {
+            Ok(count) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("tiles", count as i64);
+                result.set("revision", self.store.revision as i64);
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn initialized(stride: usize) -> TileStore {
+        let mut store = TileStore {
+            stride,
+            ..TileStore::default()
+        };
+        store.editable_layers.insert("ink".to_owned(), true);
+        store
+    }
+    fn blank(store: &mut TileStore, x: i64, y: i64) {
+        let id = TileId {
+            layer: "ink".to_owned(),
+            x,
+            y,
+        };
+        store.import(id, store.revision, &[]).unwrap();
+    }
+    #[test]
+    fn signed_seams_mask_hidden_rgb_and_cancel() {
+        let mut s = initialized(16);
+        blank(&mut s, -1, -1);
+        blank(&mut s, 0, 0);
+        let mask_id = TileId {
+            layer: "ink".to_owned(),
+            x: -1,
+            y: -1,
+        };
+        let tx = s.begin("ink", 0, true).unwrap();
+        let mut mask = vec![0; 256];
+        mask[15 * 16 + 15] = 255;
+        s.mask(tx, mask_id.clone(), &mask).unwrap();
+        // Rejected missing mask/source does not alter even the earlier pixel.
+        assert!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[-1, -1, 0, 0],
+                false,
+                0xff4837a1,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .is_err()
+        );
+        assert!(s.active.as_ref().unwrap().draft.is_empty());
+        let id0 = TileId {
+            layer: "ink".to_owned(),
+            x: 0,
+            y: 0,
+        };
+        s.mask(tx, id0.clone(), &vec![255; 256]).unwrap();
+        assert_eq!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[-1, -1, 0, 0],
+                false,
+                0xff4837a1,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .unwrap(),
+            2
+        );
+        assert_eq!(
+            s.read(&mask_id, true).unwrap().rgba[(255 * 4)..(255 * 4 + 4)],
+            [0xa1, 0x37, 0x48, 0xff]
+        );
+        assert_eq!(s.read(&id0, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
+        s.active = None;
+        assert_eq!(
+            s.read(&mask_id, false).unwrap().rgba[255 * 4..255 * 4 + 4],
+            [0, 0, 0, 0]
+        );
+    }
+    #[test]
+    fn atomic_undo_redo_and_locked_rejection() {
+        let mut s = initialized(16);
+        blank(&mut s, -1, 0);
+        blank(&mut s, 0, 0);
+        let tx = s.begin("ink", 0, false).unwrap();
+        assert!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[-1, 0, 0, 0],
+                false,
+                0xff030201,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .is_ok()
+        );
+        s.editable_layers.insert("ink".into(), false);
+        assert!(s.commit(tx, 0).is_err());
+        assert_eq!(s.revision, 0);
+        assert_eq!(
+            s.tiles
+                .values()
+                .flat_map(|t| t.rgba.iter())
+                .filter(|&&b| b != 0)
+                .count(),
+            0
+        );
+        s.editable_layers.insert("ink".into(), true);
+        assert_eq!(s.commit(tx, 0).unwrap(), 2);
+        assert_eq!(s.revision, 1);
+        assert_eq!(s.undo_or_redo(true).unwrap(), 2);
+        assert_eq!(s.revision, 2);
+        assert_eq!(s.undo_or_redo(false).unwrap(), 2);
+        assert_eq!(s.revision, 3);
+        assert_eq!(
+            s.tiles
+                .values()
+                .flat_map(|t| t.rgba.iter())
+                .filter(|&&b| b != 0)
+                .count(),
+            8
+        );
+    }
+    #[test]
+    fn hidden_rgb_and_alpha_roundtrip() {
+        let mut s = initialized(16);
+        let id = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut bytes = vec![0; 16 * 16 * 4];
+        bytes[0..4].copy_from_slice(&[0x11, 0x22, 0x33, 0]);
+        s.import(id.clone(), 0, &bytes).unwrap();
+        let tx = s.begin("ink", 0, false).unwrap();
+        assert_eq!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[1, 0],
+                false,
+                0x80443322,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(s.read(&id, true).unwrap().rgba[0..4], bytes[0..4]);
+        assert_eq!(
+            s.read(&id, true).unwrap().rgba[4..8],
+            [0x22, 0x33, 0x44, 0x80]
+        );
+        s.commit(tx, 0).unwrap();
+        s.undo_or_redo(true).unwrap();
+        assert_eq!(
+            s.read(&id, false).unwrap().rgba[0..4],
+            [0x11, 0x22, 0x33, 0]
+        );
+        s.undo_or_redo(false).unwrap();
+        assert_eq!(
+            s.read(&id, false).unwrap().rgba[4..8],
+            [0x22, 0x33, 0x44, 0x80]
+        );
+    }
+    #[test]
+    fn large_signed_tile_identity_and_layer_isolation() {
+        let mut s = initialized(16);
+        let world_x = 1_i64 << 42;
+        let world_y = -(1_i64 << 42);
+        blank(&mut s, world_x.div_euclid(16), world_y.div_euclid(16));
+        let id = TileId {
+            layer: "ink".into(),
+            x: world_x.div_euclid(16),
+            y: world_y.div_euclid(16),
+        };
+        let tx = s.begin("ink", 0, false).unwrap();
+        assert_eq!(
+            s.stage(
+                tx,
+                0,
+                world_x,
+                world_y,
+                &[0, 0],
+                false,
+                0xff112233,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(s.read(&id, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
+        assert_eq!(
+            s.read(&id, true).unwrap().rgba[0..4],
+            [0x33, 0x22, 0x11, 0xff]
+        );
+        assert!(s.begin("ink", 0, false).is_err());
+        s.commit(tx, 0).unwrap();
+        s.editable_layers.insert("other".into(), true);
+        let other = TileId {
+            layer: "other".into(),
+            x: id.x,
+            y: id.y,
+        };
+        s.import(other.clone(), 1, &[]).unwrap();
+        assert_eq!(s.read(&other, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
+        assert_eq!(
+            s.read(&id, false).unwrap().rgba[0..4],
+            [0x33, 0x22, 0x11, 0xff]
+        );
+        s.undo_or_redo(true).unwrap();
+        assert_eq!(s.read(&id, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
+        assert_eq!(s.read(&other, false).unwrap().rgba[0..4], [0, 0, 0, 0]);
+    }
+    #[test]
+    fn missing_source_masks_and_budget_fail_closed() {
+        let mut s = initialized(16);
+        let tx = s.begin("ink", 0, true).unwrap();
+        let id = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        assert!(s.mask(tx, id.clone(), &vec![255; 256]).is_err());
+        blank(&mut s, 0, 0);
+        assert!(s.mask(tx, id.clone(), &vec![255; 256]).is_ok());
+        assert!(s.mask(tx, id.clone(), &vec![255; 256]).is_err());
+        assert_eq!(s.bytes_used(), 16 * 16 * 4 + 16 * 16);
+        s.editable_layers.insert("ink".into(), false);
+        assert!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[0, 0],
+                false,
+                0xff0000ff,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .is_err()
+        );
+        assert!(s.active.as_ref().unwrap().draft.is_empty());
+    }
+    #[test]
+    fn no_op_paint_does_not_create_revision_or_history() {
+        let mut s = initialized(16);
+        blank(&mut s, 0, 0);
+        let tx = s.begin("ink", 0, false).unwrap();
+        assert_eq!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[0, 0],
+                false,
+                0x00000000,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .unwrap(),
+            0
+        );
+        assert!(s.finish_noop(tx, 0));
+        assert_eq!(s.revision, 0);
+        assert!(s.undo.is_empty());
+        assert!(s.active.is_none());
+    }
+    #[test]
+    fn stale_unauthorized_oversized_and_zero_change_fail_closed() {
+        let mut s = initialized(16);
+        blank(&mut s, 0, 0);
+        assert!(
+            s.import(
+                TileId {
+                    layer: "ink".into(),
+                    x: 0,
+                    y: 0
+                },
+                0,
+                &[]
+            )
+            .is_err()
+        );
+        assert!(s.begin("ink", 1, false).is_err());
+        let tx = s.begin("ink", 0, false).unwrap();
+        assert!(
+            s.stage(
+                tx,
+                0,
+                0,
+                0,
+                &[16, 0],
+                false,
+                0xff010203,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .is_err()
+        );
+        assert!(
+            s.stage(
+                tx,
+                0,
+                i64::MAX,
+                0,
+                &[0, 0],
+                false,
+                0xff010203,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .is_err()
+        );
+        assert!(s.commit(tx, 0).is_err());
+        assert!(
+            s.stage(
+                tx,
+                1,
+                0,
+                0,
+                &[0, 0],
+                false,
+                0xff010203,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)
+            )
+            .is_err()
+        );
+    }
+}
