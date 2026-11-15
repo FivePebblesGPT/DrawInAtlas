@@ -458,6 +458,31 @@ impl TileStore {
         revision: u64,
         changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
     ) -> Result<(i64, usize), &'static str> {
+        self.apply_external_tiles(layer, revision, changes, true)
+    }
+
+    /// Check a detached snapshot against resident or explicitly supplied source
+    /// without inventing a Rust undo token outside the document timeline.
+    /// The current native source must match every expected tile. On success,
+    /// all older Rust tokens are invalidated, but unrelated canonical tiles
+    /// remain resident and the shared revision advances exactly once.
+    fn replay_detached(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
+    ) -> Result<usize, &'static str> {
+        self.apply_external_tiles(layer, revision, changes, false)
+            .map(|(_, count)| count)
+    }
+
+    fn apply_external_tiles(
+        &mut self,
+        layer: &str,
+        revision: u64,
+        changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
+        record_history: bool,
+    ) -> Result<(i64, usize), &'static str> {
         let len = self.stride_bytes()?;
         if self.revision != revision
             || self.active.is_some()
@@ -479,7 +504,7 @@ impl TileStore {
                 || id.y.unsigned_abs() > SAFE_COORD as u64
                 || !seen.insert(id.clone())
                 || !(original.is_empty() || original.len() == len)
-                || replacement.len() != len
+                || !(replacement.len() == len || (!record_history && replacement.is_empty()))
             {
                 return Err("Invalid, repeated or malformed external tile");
             }
@@ -488,7 +513,12 @@ impl TileStore {
             } else {
                 original
             };
-            if before_bytes == replacement {
+            let after_bytes = if replacement.is_empty() {
+                vec![0; len]
+            } else {
+                replacement
+            };
+            if before_bytes == after_bytes {
                 return Err("External tile did not change");
             }
             let existing = self.tiles.get(&id);
@@ -511,39 +541,54 @@ impl TileStore {
                     generation,
                 },
                 Tile {
-                    rgba: replacement,
+                    rgba: after_bytes,
                     generation: next,
                 },
             ));
         }
-        // Conservatively account for new resident tiles and both reversible
-        // history images. This check precedes *all* mutations.
-        let extra_tiles = new_tiles.saturating_add(count.saturating_mul(2));
+        // Check resident growth and (for a normal edit) both history images
+        // before touching canonical source, revision or either history stack.
+        let extra_tiles = new_tiles.saturating_add(if record_history {
+            count.saturating_mul(2)
+        } else {
+            0
+        });
         if self
             .bytes_used()
             .saturating_add(extra_tiles.saturating_mul(len))
             > MAX_STORED_BYTES
         {
-            return Err("External edit exceeds native raster history memory budget");
+            return Err("External edit exceeds native raster memory budget");
         }
-        let token = NEXT_EDIT.fetch_add(1, Ordering::Relaxed) as i64;
-        let mut before = HashMap::with_capacity(count);
-        let mut after = HashMap::with_capacity(count);
+        let token = if record_history {
+            NEXT_EDIT.fetch_add(1, Ordering::Relaxed) as i64
+        } else {
+            0
+        };
+        let mut before = HashMap::with_capacity(if record_history { count } else { 0 });
+        let mut after = HashMap::with_capacity(if record_history { count } else { 0 });
         for (id, original, replacement) in prepared {
             self.authorized.insert(id.clone());
-            before.insert(id.clone(), original);
-            after.insert(id.clone(), replacement.clone());
+            if record_history {
+                before.insert(id.clone(), original);
+                after.insert(id.clone(), replacement.clone());
+            }
             self.tiles.insert(id, replacement);
         }
-        self.undo.push(History {
-            token,
-            layer: layer.to_owned(),
-            before,
-            after,
-        });
-        self.redo.clear();
-        if self.undo.len() > MAX_HISTORY {
-            self.undo.remove(0);
+        if record_history {
+            self.undo.push(History {
+                token,
+                layer: layer.to_owned(),
+                before,
+                after,
+            });
+            self.redo.clear();
+            if self.undo.len() > MAX_HISTORY {
+                self.undo.remove(0);
+            }
+        } else {
+            self.undo.clear();
+            self.redo.clear();
         }
         self.revision += 1;
         Ok((token, count))
@@ -1094,6 +1139,63 @@ impl DrawingNativeTiles {
             && self.store.history_matches(transaction, undo)
     }
 
+    /// Checked detached-history replay when the original Rust token has been
+    /// evicted or detached. Unlike adopt_external_edit this does not invent a
+    /// token absent from the document's chronological timeline. Any older
+    /// native history is invalidated after the atomic canonical tile update.
+    #[func]
+    fn replay_detached_history(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
+            return err("Invalid detached history revision or tile count");
+        }
+        let layer = layer.to_string();
+        let mut changes = Vec::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let Some((x, y, before, after)) = (|| {
+                Some((
+                    entry.get("tile_x")?.try_to::<i64>().ok()?,
+                    entry.get("tile_y")?.try_to::<i64>().ok()?,
+                    entry.get("expected")?.try_to::<PackedByteArray>().ok()?,
+                    entry.get("replacement")?.try_to::<PackedByteArray>().ok()?,
+                ))
+            })() else {
+                return err("Malformed detached history tile descriptor");
+            };
+            self.store.external_bytes_received = self
+                .store
+                .external_bytes_received
+                .saturating_add(before.len().saturating_add(after.len()) as u64);
+            changes.push((
+                TileId {
+                    layer: layer.clone(),
+                    x,
+                    y,
+                },
+                before.as_slice().to_vec(),
+                after.as_slice().to_vec(),
+            ));
+        }
+        match self
+            .store
+            .replay_detached(&layer, expected_revision as u64, changes)
+        {
+            Ok(count) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("tiles", count as i64);
+                result.set("revision", self.store.revision as i64);
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+
     /// Tokenized replay validates the entire detached RGBA8 payload in the
     /// same call that consumes the native history event. A valid token alone
     /// cannot authorize a caller-mutated replacement tile or stale source.
@@ -1531,6 +1633,76 @@ mod tests {
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.undo_or_redo(false).unwrap(), 2);
         assert_eq!(store.read(&id, false).unwrap().rgba, changed);
+    }
+
+    #[test]
+    fn detached_replay_checks_all_tiles_then_retires_old_tokens() {
+        let mut store = initialized(16);
+        let signed = TileId {
+            layer: "ink".into(),
+            x: -(1 << 42),
+            y: 1 << 42,
+        };
+        let other = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let blank = vec![0; 16 * 16 * 4];
+        let mut hidden = blank.clone();
+        hidden[..4].copy_from_slice(&0x00123456_u32.to_le_bytes());
+        store.import(signed.clone(), 0, &hidden).unwrap();
+        store.import(other.clone(), 0, &blank).unwrap();
+        let mut painted = hidden.clone();
+        painted[4..8].copy_from_slice(&0xff445566_u32.to_le_bytes());
+        let (original_token, _) = store
+            .adopt_external(
+                "ink",
+                0,
+                vec![(signed.clone(), hidden.clone(), painted.clone())],
+            )
+            .unwrap();
+        let mut next = blank.clone();
+        next[8..12].copy_from_slice(&0xf0887766_u32.to_le_bytes());
+        let good = vec![
+            (signed.clone(), painted.clone(), hidden.clone()),
+            (other.clone(), blank.clone(), next.clone()),
+        ];
+        for rejected in [
+            vec![
+                (signed.clone(), vec![7; hidden.len()], hidden.clone()),
+                (other.clone(), blank.clone(), next.clone()),
+            ],
+            vec![
+                (signed.clone(), painted.clone(), hidden.clone()),
+                (other.clone(), blank.clone(), vec![0; 17]),
+            ],
+            vec![
+                (signed.clone(), painted.clone(), hidden.clone()),
+                (signed.clone(), painted.clone(), hidden.clone()),
+            ],
+        ] {
+            assert!(store.replay_detached("ink", 1, rejected).is_err());
+            assert_eq!(store.revision, 1);
+            assert_eq!(store.read(&signed, false).unwrap().rgba, painted);
+            assert_eq!(store.read(&other, false).unwrap().rgba, blank);
+            assert!(store.history_matches(original_token, true));
+        }
+        assert!(store.replay_detached("ink", 0, good.clone()).is_err());
+        assert_eq!(store.replay_detached("ink", 1, good).unwrap(), 2);
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&signed, false).unwrap().rgba, hidden);
+        assert_eq!(store.read(&other, false).unwrap().rgba, next);
+        assert!(store.undo.is_empty() && store.redo.is_empty());
+        assert!(!store.history_matches(original_token, true));
+        assert!(store.authorized.contains(&signed) && store.authorized.contains(&other));
+        assert!(
+            store
+                .replay_detached("ink", 2, vec![(other.clone(), next, Vec::new())])
+                .is_ok()
+        );
+        assert_eq!(store.read(&other, false).unwrap().rgba, blank);
+        assert_eq!(store.revision, 3);
     }
 
     #[test]

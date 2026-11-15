@@ -932,26 +932,37 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if current != before and not (current.is_empty() and \
 				before.count(0) == before.size()):
 			return DrawingResult.failure("STALE_PIXEL", "History source bytes changed during preflight")
-	# A token is replayed only when Rust confirms it is the top of its
-	# chronological history. Older/evicted events retain detached RGBA8 for
-	# safe replay; their next Brush gesture uses checked native reauthorization.
-	if delta.native_history_token > 0 and _native_raster_store != null \
-			and _native_raster_store.call("has_history_token", delta.native_history_token,
-				base_revision, undo_action):
-		# A history token alone is not permission to publish caller-owned tiles.
-		# Give Rust the full detached before/after pair for an atomic parity
-		# check against its history event and currently resident source.
+	# A live token must agree with Rust's exact before/after snapshots.
+	# When that token has expired but the native store is still at this
+	# revision, replay the detached change *inside Rust* instead of leaving
+	# canonical native tiles stale behind a Godot-only source projection.
+	# Detached replay clears Rust tokens because the host timeline, not a
+	# fabricated native event, owns the older Undo/Redo record.
+	var native_current: bool = _native_raster_store != null and \
+		int(_native_raster_store.call("stats").get("revision", -1)) == base_revision
+	if native_current:
 		var native_tiles: Array[Dictionary] = []
 		for key: String in original_bytes:
 			var coords: PackedStringArray = key.split(",")
 			native_tiles.append({"tile_x": int(coords[0]), "tile_y": int(coords[1]),
 				"expected": original_bytes[key], "replacement": replacement_bytes[key]})
-		var native_replay: Dictionary = _native_raster_store.call("replay_history_token",
-			delta.native_history_token, base_revision, undo_action,
-			delta.layer_id, native_tiles)
+		var live_token: bool = delta.native_history_token > 0 and \
+			_native_raster_store.call("has_history_token", delta.native_history_token,
+				base_revision, undo_action)
+		var native_replay: Dictionary
+		if live_token:
+			native_replay = _native_raster_store.call("replay_history_token",
+				delta.native_history_token, base_revision, undo_action,
+				delta.layer_id, native_tiles)
+		else:
+			if not _native_raster_store.call("set_layer_editable", delta.layer_id, true):
+				return DrawingResult.failure("NATIVE_HISTORY", "Detached replay layer rejected")
+			native_replay = _native_raster_store.call("replay_detached_history",
+				delta.layer_id, base_revision, native_tiles)
 		if not bool(native_replay.get("ok", false)) \
 				or int(native_replay.get("revision", -1)) != base_revision + 1:
-			return DrawingResult.failure("NATIVE_HISTORY", "Persistent native replay rejected")
+			return DrawingResult.failure("NATIVE_HISTORY",
+				str(native_replay.get("error", "Persistent native replay rejected")))
 	for key: String in replacement_bytes:
 		if detached.has(key) and not detached[key].is_empty():
 			_nodes[delta.layer_id].tiles[key] = detached[key]
