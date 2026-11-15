@@ -1,0 +1,8 @@
+Fontconfig error: Cannot load default config file: No such file: (null)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T136_UNION_PASSED checks=18 failures=0
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2609)

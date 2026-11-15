@@ -1,0 +1,5 @@
+Fontconfig error: Cannot load default config file: No such file: (null)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T098_PREVIEW_DISPLAY_RESULT checks=27 failures=0
+T098_PREVIEW_DISPLAY_PASSED

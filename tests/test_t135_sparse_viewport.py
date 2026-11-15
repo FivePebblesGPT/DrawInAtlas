@@ -26,7 +26,8 @@ class SparseViewportContracts(unittest.TestCase):
     def test_fails_closed_without_exact_committed_occupancy(self) -> None:
         helper = self.method(self.canvas, "_sparse_visible_draw_rows")
         for term in (
-            "has_preview or _occupancy_unknown",
+            "or (has_preview and not preview_complete)",
+            "_occupancy_unknown",
             "MAX_OCCUPANCY_ENTRIES",
             "_occupied_display_tiles",
             "window.has_point(tile)",

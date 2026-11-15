@@ -1,0 +1,8 @@
+Fontconfig error: Cannot load default config file: No such file: (null)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T135_NATIVE_TIMING {"engine":"4.8-beta3 (official)","p50_ms":0.075,"p95_ms":0.793,"tiles_examined":2,"visible_tiles":120701,"warm_draw_ms":[0.068,0.071,0.072,0.075,0.077,0.113,0.793],"zoom":0.01}
+T135_NATIVE_PASSED checks=23 failures=0

@@ -159,13 +159,18 @@ jobs:
           # invalidation and conservative over-budget/unknown occupancy fallback.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t102_cold_population_smoke.gd 2>&1 | tee /tmp/godot-t102-cold-population.log
           python3 tools/check_godot_model_log.py /tmp/godot-t102-cold-population.log --marker T102_MODEL_PASSED || ci_fail_marker 'T102 cold population scheduling log rejected'
-          # T-135 visit occupied display tiles only when the committed
-          # occupancy index is trustworthy; previews and uncertain sources
-          # retain the full scan. Native framebuffer witness runs on demand.
+          # T-135 visits committed occupied tiles; T-136 extends it to a
+          # trustworthy complete preview index. Unknown/partial stays full scan.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t135_sparse_draw_model.gd 2>&1 | tee /tmp/godot-t135-sparse-draw.log
           python3 tools/check_godot_model_log.py /tmp/godot-t135-sparse-draw.log --marker T135_SPARSE_PASSED || ci_fail_marker 'T135 sparse viewport traversal log rejected'
           grep -Fxq 'T135_SPARSE_PASSED checks=16 failures=0' /tmp/godot-t135-sparse-draw.log || ci_fail_marker 'T135 sparse viewport assertion count mismatch'
           python3 -m unittest discover -s tests -p 'test_t135_sparse_viewport.py' -v || ci_fail_marker 'T135 sparse viewport source/CI contract failed'
+          # T-136 can enumerate indexed detached preview changes with committed
+          # occupancy, falling back when a stamp source is incomplete/unsafe.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t136_preview_sparse_union_model.gd 2>&1 | tee /tmp/godot-t136-preview-sparse.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t136-preview-sparse.log --marker T136_UNION_PASSED || ci_fail_marker 'T136 sparse preview union log rejected'
+          grep -Fxq 'T136_UNION_PASSED checks=18 failures=0' /tmp/godot-t136-preview-sparse.log || ci_fail_marker 'T136 preview union assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t136_preview_sparse_union.py' -v || ci_fail_marker 'T136 preview union source/CI contract failed'
           # T-103 software-only over-budget focal preselection and safe fallbacks.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t103_retention_plan_smoke.gd 2>&1 | tee /tmp/godot-t103-retention.log
           python3 tools/check_godot_model_log.py /tmp/godot-t103-retention.log --marker T103_MODEL_PASSED || ci_fail_marker 'T103 focal retention planner rejected'

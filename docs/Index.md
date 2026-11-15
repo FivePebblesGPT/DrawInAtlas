@@ -4,6 +4,20 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 indexed detached-preview traversal (T-136 Done)
+
+[T-136](Tickets/T-136.md) extends the T-135 sparse renderer to a **complete
+bounded** detached Brush/Move preview index: it unions preview-only tiles with
+committed occupancy in signed draw order. Unknown/partial indexes, invalid
+keys, excessive work and dense views retain the conservative full scan. A
+26-check real X11 framebuffer witness fails four assertions on the unchanged
+T-135 source and passes 26/26 on the candidate; three paired seven-frame
+synthetic 1% zoom medians fall from 107.244–109.163 ms to 0.076–0.084 ms per
+CPU draw. The [18-check model and raw evidence](evidence/T-136-2026-11-15-preview-sparse-viewport.md)
+include cancellation, draft/committed framebuffer parity and Undo/Redo. This
+is not a normal-zoom/hardware Brush latency claim. T-086/T-095 remain open,
+manual gates are untouched and the fast CI inventory stays at 46 check IDs.
+
 ## 2026-11-15 bounded sparse viewport enumeration (T-135 Done)
 
 [T-135](Tickets/T-135.md) removes a redundant full-viewport empty-cell scan
@@ -2885,6 +2899,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-133 · Guard standalone OS window-close against unsaved state](Tickets/T-133.md) | Done | Pending Brush blocks OS quit; per-tab Save/Discard/Cancel and Save As sequencing preserve files; Atlas host policy unchanged | [T-125](Tickets/T-125.md), [T-132](Tickets/T-132.md) |
 | [T-134 · Bind authoring dialogs to originating document and layer](Tickets/T-134.md) | Done | Six authoring dialogs refuse stale tab/document/Object or selected-layer confirmations; cancellation consumes authority; original edit methods retained | [T-132](Tickets/T-132.md) |
 | [T-135 · Sparse indexed committed viewport traversal](Tickets/T-135.md) | Done | Signed occupied-only display enumeration removes empty-cell work on wide sparse views, with full-scan fallback for previews/uncertainty; hardware acceptance still open | [T-053](Tickets/T-053.md), [T-102](Tickets/T-102.md), [T-103](Tickets/T-103.md) |
+| [T-136 · Indexed detached-preview plus committed sparse traversal](Tickets/T-136.md) | Done | Complete bounded preview stamp union skips empty cells on synthetic 1% sparse draws; uncertain, dense or malformed source keeps full scan; owner hardware gate stays open | [T-053](Tickets/T-053.md), [T-135](Tickets/T-135.md) |
 
 ## Epics
 

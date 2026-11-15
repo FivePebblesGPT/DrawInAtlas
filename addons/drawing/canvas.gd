@@ -917,21 +917,41 @@ func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
 	return selected
 
 
-## A far zoom-out may expose millions of transparent display cells while a
-## sparse document owns only a handful of source tiles. The conservative
-## occupancy index already proves those cells empty; visit only its in-window
-## entries on committed redraws. Preview and unknown/invalid indexes retain
-## the full raster scan, so detached edits and lazy sources cannot disappear.
-## Rows and columns stay in signed row-major order (the original draw order).
-func _sparse_visible_draw_rows(window: Rect2i, has_preview: bool) -> Dictionary:
+## At extreme zoom-out, a known-complete detached preview also has an
+## occupancy index. Union its exact touched display cells with committed
+## occupancy before culling; never use a partial index to hide staged paint.
+## This keeps signed row-major drawing and the original conservative fallback.
+func _sparse_visible_draw_rows(window: Rect2i, has_preview: bool,
+		preview_stamps: Dictionary = {}, preview_complete: bool = false) -> Dictionary:
 	var fallback: Dictionary = {"indexed": false, "rows": {}, "ys": [], "count": 0}
-	if has_preview or _occupancy_unknown or not window.has_area() \
+	if _occupancy_unknown or not window.has_area() \
 			or _occupied_display_tiles.size() > MAX_OCCUPANCY_ENTRIES \
-			or window.get_area() <= 2 * _occupied_display_tiles.size():
+			or (has_preview and not preview_complete):
+		return fallback
+	# Do not duplicate a large committed index on ordinary dense/normal-zoom
+	# preview frames: the union cannot be smaller than either input set.
+	if window.get_area() <= 2 * maxi(_occupied_display_tiles.size(),
+			preview_stamps.size() if has_preview else 0):
+		return fallback
+	var keys: Dictionary = _occupied_display_tiles
+	if has_preview:
+		# The index is complete only when the session's bounded per-display
+		# generation table was constructed successfully. Never infer pixels
+		# from an empty *partial* table or accept invalid generation values.
+		if preview_stamps.size() > MAX_OCCUPANCY_ENTRIES:
+			return fallback
+		keys = _occupied_display_tiles.duplicate()
+		for key: String in preview_stamps:
+			if not (preview_stamps[key] is int) or int(preview_stamps[key]) <= 0:
+				return fallback
+			keys[key] = true
+			if keys.size() > MAX_OCCUPANCY_ENTRIES:
+				return fallback
+	if window.get_area() <= 2 * keys.size():
 		return fallback
 	var rows: Dictionary[int, Array] = {}
 	var count: int = 0
-	for key: String in _occupied_display_tiles:
+	for key: String in keys:
 		var comma: int = key.find(",")
 		if comma < 1 or comma == key.length() - 1:
 			return fallback
@@ -940,8 +960,7 @@ func _sparse_visible_draw_rows(window: Rect2i, has_preview: bool) -> Dictionary:
 		if not x_text.is_valid_int() or not y_text.is_valid_int():
 			return fallback
 		var tile: Vector2i = Vector2i(int(x_text), int(y_text))
-		# Duplicate/noncanonical textual coordinates may alias one display cell.
-		# Fall back rather than submitting the same cached texture twice.
+		# Reject text aliases so a cached tile is submitted at most once.
 		if "%d,%d" % [tile.x, tile.y] != key:
 			return fallback
 		if not window.has_point(tile):
@@ -1032,7 +1051,8 @@ func _draw() -> void:
 		# Release the last detached index after commit/cancel, and avoid
 		# retaining an otherwise completed edit session from an idle Canvas.
 		_preview_index_for_draw(null, visible_tiles)
-	var sparse: Dictionary = _sparse_visible_draw_rows(visible_tiles, preview_session != null)
+	var sparse: Dictionary = _sparse_visible_draw_rows(visible_tiles,
+		preview_session != null, indexed_stamps, use_preview_index)
 	var use_sparse: bool = bool(sparse["indexed"])
 	metrics["sparse_draw"] = 1 if use_sparse else 0
 	metrics["tiles_visible"] = visible_tiles.get_area()

@@ -69,6 +69,15 @@ jobs:
             2>&1 | tee /tmp/t135-sparse-native.log
           grep -Fxq 'T135_NATIVE_PASSED checks=23 failures=0' /tmp/t135-sparse-native.log
           python3 tools/check_godot_model_log.py /tmp/t135-sparse-native.log --marker T135_NATIVE_PASSED
+      - name: T-136 detached sparse preview union and framebuffer
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/t136_preview_sparse_union_native.gd \
+            2>&1 | tee /tmp/t136-preview-sparse-native.log
+          grep -Fxq 'T136_NATIVE_PASSED checks=26 failures=0' /tmp/t136-preview-sparse-native.log
+          python3 tools/check_godot_model_log.py /tmp/t136-preview-sparse-native.log --marker T136_NATIVE_PASSED
       - name: Compare pre-cache and cached software frame timings
         run: |
           set -euo pipefail
@@ -99,6 +108,7 @@ jobs:
             /tmp/t103-retention.log
             /tmp/t103-overbudget-native.log
             /tmp/t135-sparse-native.log
+            /tmp/t136-preview-sparse-native.log
             /tmp/t086-comparison.log
             /tmp/t086-cold-comparison.log
             /tmp/t086-direct-sparse-comparison.log
