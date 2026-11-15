@@ -557,6 +557,21 @@ impl TileStore {
         Ok(())
     }
 
+    /// Mirror a document-only metadata/tree revision without touching canonical
+    /// raster bytes or their reversible native history. New edits invalidate
+    /// native redo; history replay only advances the shared revision stamp.
+    /// Source-changing tree operations must use the conservative rebase path.
+    fn advance_metadata(&mut self, expected: u64, discard_redo: bool) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active transaction, stale or overflowing metadata revision");
+        }
+        if discard_redo {
+            self.redo.clear();
+        }
+        self.revision = expected + 1;
+        Ok(())
+    }
+
     fn history_matches(&self, token: i64, undo: bool) -> bool {
         if token <= 0 || self.active.is_some() {
             return false;
@@ -683,6 +698,19 @@ impl DrawingNativeTiles {
             && self
                 .store
                 .rebase_external(expected as u64, next as u64)
+                .is_ok()
+    }
+
+    /// Quiescent, single-step non-raster revision bridge. The document must
+    /// call this only for mutations that leave canonical RGBA8 source unchanged.
+    /// A rejection cannot mutate native revision, tiles or history.
+    #[func]
+    fn advance_metadata_revision(&mut self, expected: i64, discard_redo: bool) -> bool {
+        self.store.ffi_calls += 1;
+        expected >= 0
+            && self
+                .store
+                .advance_metadata(expected as u64, discard_redo)
                 .is_ok()
     }
 
@@ -1165,6 +1193,63 @@ mod tests {
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.undo_or_redo(false).unwrap(), 2);
         assert_eq!(store.read(&id, false).unwrap().rgba, changed);
+    }
+
+    #[test]
+    fn metadata_revisions_keep_native_history_and_reject_stale_or_active_advances() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let tile_id = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let stroke = store.begin("ink", 0, false).unwrap();
+        store
+            .stage(
+                stroke,
+                0,
+                0,
+                0,
+                &[1, 1],
+                false,
+                0xff663322,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(stroke, 0).unwrap();
+        let painted = store.read(&tile_id, false).unwrap().rgba.clone();
+        let allocated = store.bytes_used();
+        assert!(store.advance_metadata(0, true).is_err());
+        assert_eq!(store.revision, 1);
+        store.advance_metadata(1, true).unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&tile_id, false).unwrap().rgba, painted);
+        assert_eq!(store.bytes_used(), allocated);
+        assert!(store.history_matches(stroke, true));
+        let active = store.begin("ink", 2, false).unwrap();
+        assert!(store.advance_metadata(2, true).is_err());
+        assert_eq!(store.revision, 2);
+        store.active = None;
+        let mut at_limit = initialized(16);
+        at_limit.revision = i64::MAX as u64;
+        assert!(at_limit.advance_metadata(i64::MAX as u64, true).is_err());
+        assert_eq!(at_limit.revision, i64::MAX as u64);
+        assert!(store.advance_metadata(2, true).is_ok());
+        assert!(store.history_matches(stroke, true));
+        store.undo_or_redo(true).unwrap();
+        assert!(store.history_matches(stroke, false));
+        store.advance_metadata(4, false).unwrap();
+        assert!(store.history_matches(stroke, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&tile_id, false).unwrap().rgba, painted);
+        store.undo_or_redo(true).unwrap();
+        store.advance_metadata(7, true).unwrap();
+        assert!(!store.history_matches(stroke, false));
+        assert_eq!(store.revision, 8);
+        assert!(store.read(&tile_id, false).is_some());
+        let _ = active;
     }
 
     #[test]

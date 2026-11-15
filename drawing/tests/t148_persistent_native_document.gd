@@ -109,25 +109,26 @@ func run() -> void:
 		"locked layer rejects native edit")
 	check(doc.set_locked(layer, false).ok, "unlock increments revision")
 	var after_external: DrawingResult = stroke(doc, layer, Vector2(51.5, 48.5), Vector2(54.5, 48.5))
-	check(after_external.ok, "gesture rebases on non-native revisions")
-	check(doc._native_raster_store == store and int(store.call("stats").get("undo", -1)) == 1,
-		"external edit clears stale native history and reuses document-owned store")
-	check(int(store.call("stats").get("bytes_imported", -1)) == imported * 2,
-		"rebase reauthorizes exact document source rather than using stale tile")
-	# The older native events are still on the unified Godot timeline after
-	# an external rebase, although Rust correctly discarded their stale tokens.
+	check(after_external.ok, "gesture continues after metadata-only revisions")
+	check(doc._native_raster_store == store and int(store.call("stats").get("undo", -1)) == 3,
+		"lock/unlock preserve resident native brush history")
+	check(int(store.call("stats").get("bytes_imported", -1)) == imported,
+		"metadata-only revision does not reimport unchanged source")
+	# The prior native events remain available through Rust even across layer
+	# lock/unlock metadata revisions; the document timeline remains chronological.
 	check(doc.undo().ok, "new native gesture undoes through live Rust history")
-	check(doc.undo().ok, "older native event falls back to detached snapshots")
+	check(doc.undo().ok and int(store.call("stats").get("undo", -1)) == 1,
+		"older native event replays using its retained Rust token")
 	check((doc.request_chunk(layer, "0,0").value as DrawingRasterTile).to_rgba8() == first_bytes,
 		"mixed-history fallback recovers the earlier source exactly")
 	check(doc.redo().ok and doc.redo().ok,
-		"fallback redo and live native redo remain in ordered document timeline")
+		"native redo restores both gestures around metadata revisions")
 	check(doc._native_raster_store == store and
-		int(store.call("stats").get("revision", -1)) < doc.revision,
-		"fallback history leaves native mirror stale until checked rebase")
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"metadata and native history maintain shared revision")
 	var resumed: DrawingResult = stroke(doc, layer, Vector2(25.5, 50.5), Vector2(30.5, 50.5))
 	check(resumed.ok and doc._native_raster_store == store,
-		"new brush gesture automatically rebases after mixed-history replay")
+		"new brush gesture reuses source after mixed metadata history")
 	# An actual GDScript raster edit, not just layer metadata, must invalidate
 	# the cached Rust source and still leave the unified document history usable.
 	var earlier_pixel: int = int(doc.read_pixel(layer, 0, 0).value)
@@ -142,7 +143,7 @@ func run() -> void:
 	var shared: Dictionary = store.call("read_tile", layer, 0, 0, false)
 	check(shared.get("ok", false) and (shared.get("bytes") as PackedByteArray).decode_u32(0) == 0x00887766,
 		"native canonical source has freshly authorized external hidden RGB")
-	check(int(store.call("stats").get("undo", -1)) == 3 and
+	check(int(store.call("stats").get("undo", -1)) == 6 and
 		external_raster.delta.native_history_token > 0,
 		"external raster edit joins previous native history without clearing it")
 	var before_substitution: int = doc.revision
@@ -152,7 +153,7 @@ func run() -> void:
 	check(doc.revision == before_substitution,
 		"source identity rejection creates no revision")
 	check(int(store.call("stats").get("revision", -1)) == doc.revision and
-		int(store.call("stats").get("undo", -1)) == 3,
+		int(store.call("stats").get("undo", -1)) == 6,
 		"rejected source leaves persistent history and revision unchanged")
 	# Authorizing a provider that reenters during preflight must never leave
 	# Rust committed while the document rejects the source/permission change.
@@ -165,14 +166,13 @@ func run() -> void:
 	check(not rejected.ok and malicious.history_length() == 0 and
 		malicious._nodes[malicious_layer].tiles.is_empty(),
 		"reentrant source lock at document preflight commits no pixels/history")
-	check(malicious._native_raster_store != null and
-		int(malicious._native_raster_store.call("stats").get("revision", -1)) < malicious.revision,
-		"preflight rejection leaves native store on prior source revision")
+	check(malicious._native_raster_store == null,
+		"reentrant lock detaches active store rather than leaving a stale authority")
 	check(malicious.set_locked(malicious_layer, false).ok, "reentrant lock can be repaired")
 	malicious.lock_on_read = -1
 	check(stroke(malicious, malicious_layer,
 		Vector2(11.5, 11.5), Vector2(14.5, 11.5)).ok,
-		"preflight cancellation can recover through checked rebase")
+		"preflight cancellation can recover through new native store authorization")
 	# After a successful preflight there must be no second resolver callback
 	# following Rust commit. That used to risk a half-native publication.
 	var guarded: ReentrantDocument = ReentrantDocument.new("postcommit-guard", STRIDE)

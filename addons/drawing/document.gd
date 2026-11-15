@@ -63,6 +63,21 @@ func _native_store_for_edit(expected: int) -> Object:
 	return _native_raster_store
 
 
+## Metadata-only mutation: preserve native raster ownership and Undo tokens
+## across a document revision that leaves all raster source bytes unchanged.
+## Native refuses active/stale transitions. If a reentrant caller has already
+## invalidated the bridge, drop its attachment instead of retaining a silently
+## divergent authority; detached history snapshots remain replayable.
+func _advance_nonraster_revision(discard_redo: bool = true) -> void:
+	var previous: int = revision
+	revision += 1
+	if _native_raster_store == null:
+		return
+	if not _native_raster_store.call("advance_metadata_revision", previous, discard_redo):
+		_native_raster_store = null
+		_native_source_identities.clear()
+
+
 func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
 	var identity: String = layer_id + ":" + key
 	return _native_source_identities.has(identity) \
@@ -150,7 +165,7 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 	var siblings: Array[String] = _nodes[parent_id].children
 	var index: int = siblings.size() if insertion_index < 0 else clampi(insertion_index, 0, siblings.size())
 	siblings.insert(index, new_identifier)
-	revision += 1
+	_advance_nonraster_revision()
 	_finish_structure(record_history, {"kind": "structure", "op": "create",
 		"id": new_identifier, "parent": parent_id, "index": index,
 		"node": _nodes[new_identifier].detached_copy()})
@@ -165,7 +180,7 @@ func rename_layer(node_id: String, name: String, record_history: bool = false) -
 	if _nodes[node_id].name != name:
 		var before: String = _nodes[node_id].name
 		_nodes[node_id].name = name
-		revision += 1
+		_advance_nonraster_revision()
 		_finish_structure(record_history, {"kind": "structure", "op": "property",
 			"id": node_id, "field": "name", "before": before, "after": name})
 	return DrawingResult.success(null, revision)
@@ -177,7 +192,7 @@ func set_visibility(node_id: String, visible: bool, record_history: bool = false
 	if _nodes[node_id].visible != visible:
 		var before: bool = _nodes[node_id].visible
 		_nodes[node_id].visible = visible
-		revision += 1
+		_advance_nonraster_revision()
 		_finish_structure(record_history, {"kind": "structure", "op": "property",
 			"id": node_id, "field": "visible", "before": before, "after": visible})
 	return DrawingResult.success(null, revision)
@@ -189,7 +204,7 @@ func set_locked(node_id: String, locked: bool, record_history: bool = false) -> 
 	if _nodes[node_id].locked != locked:
 		var before: bool = _nodes[node_id].locked
 		_nodes[node_id].locked = locked
-		revision += 1
+		_advance_nonraster_revision()
 		_finish_structure(record_history, {"kind": "structure", "op": "property",
 			"id": node_id, "field": "locked", "before": before, "after": locked})
 	return DrawingResult.success(null, revision)
@@ -227,7 +242,7 @@ func reorder(node_id: String, new_parent: String, new_index: int,
 	var destination: Array[String] = _nodes[new_parent].children
 	destination.insert(target_index, node_id)
 	_nodes[node_id].parent_id = new_parent
-	revision += 1
+	_advance_nonraster_revision()
 	_finish_structure(record_history, {"kind": "structure", "op": "reorder",
 		"id": node_id, "old_parent": current_parent, "old_index": old_index,
 		"new_parent": new_parent, "new_index": target_index})
@@ -304,7 +319,7 @@ func set_density(numerator: int, denominator: int) -> DrawingResult:
 	if numerator != density_numerator or denominator != density_denominator:
 		density_numerator = numerator
 		density_denominator = denominator
-		revision += 1
+		_advance_nonraster_revision()
 		_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
@@ -1022,7 +1037,10 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 			_erase_subtree(node_id)
 	else:
 		return DrawingResult.failure("HISTORY_KIND", "Unknown structural operation")
-	revision += 1
+	if op in ["property", "reorder"]:
+		_advance_nonraster_revision(false)
+	else:
+		revision += 1
 	return DrawingResult.success(null, revision)
 
 
@@ -1131,7 +1149,7 @@ func add_object(layer_id: String, data: Dictionary, requested_id: String = "") -
 	if _nodes[layer_id].objects.has(object_id):
 		return DrawingResult.failure("DUPLICATE_ID", "Object ID already exists")
 	_nodes[layer_id].objects[object_id] = data.duplicate(true)
-	revision += 1
+	_advance_nonraster_revision()
 	_mark_untracked_change()
 	_content_committed = true
 	return DrawingResult.success(object_id, revision)
@@ -1145,7 +1163,7 @@ func move_object(layer_id: String, object_id: String, position: Vector2) -> Draw
 	var updated: Dictionary = _nodes[layer_id].objects[object_id].duplicate(true)
 	updated["position"] = position
 	_nodes[layer_id].objects[object_id] = updated
-	revision += 1
+	_advance_nonraster_revision()
 	_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
@@ -1189,7 +1207,7 @@ func commit_text(layer_id: String, draft: DrawingTextElement,
 		_nodes[parent_id].children.append(layer_id)
 	else:
 		_nodes[layer_id] = after
-	revision += 1
+	_advance_nonraster_revision()
 	_content_committed = true
 	if external_history:
 		_mark_untracked_change()
@@ -1291,7 +1309,11 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 	if target != null and target.kind == DrawingLayerNode.RASTER:
 		for tile_key: String in target.tiles:
 			_dirty_tiles[layer_id + ":" + tile_key] = true
-	revision += 1
+	if (target == null or target.kind == DrawingLayerNode.TEXT) and \
+			(expected == null or expected.kind == DrawingLayerNode.TEXT):
+		_advance_nonraster_revision(false)
+	else:
+		revision += 1
 	return DrawingResult.success(null, revision)
 
 
