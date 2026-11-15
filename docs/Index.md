@@ -2,7 +2,7 @@
 
 **Current as of 2026-11-15.** This is the **authoritative active navigation**, synchronized with `docs/Tickets/T-*.md` frontmatter. The old chronological 3,119-line engineering journal is preserved at [Index-History-2026-11-15.md](Index-History-2026-11-15.md). Past narrative status or performance recommendations are source-pinned history, not present acceptance. Review [ticket workflow, prerequisites and manual gates](TICKET_WORKFLOW.md) before implementation.
 
-**Implementation agent handoff for [Sprint 2026-11-15 / PR #19](SPRINT_2026-11-15_HANDOFF.md):** Start with **T-146 only** (real 96px Hokusai hard-round pointer benchmark). Follow the native Rust tile-ownership migration T-147–T-152 one ticket per turn. This handoff is a plan, not completed benchmark evidence.
+**Implementation agent handoff for [Sprint 2026-11-15 / PR #19](SPRINT_2026-11-15_HANDOFF.md):** The original plan started with T-146 (real 96px Hokusai hard-round pointer benchmark). **T-146 is now Done** with [strict native X11 benchmark evidence](evidence/T-146-2026-11-15-hokusai-benchmark.md). Continue the native Rust tile-ownership migration at **T-147**, one ticket per turn.
 
 ## Current alpha architecture — Rust-owned raster
 
@@ -10,16 +10,16 @@
 
 **Do not close the integration/acceptance parents** T-095 (physical 60/96px Brush responsiveness and explicit owner approval), T-068 (native portability and measured full-editor throughput), T-086 (hardware viewport performance), T-088/T-096 (selection/Move acceptance), or T-094 (hosted CI and owner matrix) solely from a passing refactor. Completion of T-104 or the historic 46-step tests never restores GDScript as the target backend.
 
-**Current next ticket:** [T-146 — Hokusai 96px hard-round benchmark](Tickets/T-146.md). The rest of the native migration is sequenced by hard dependencies. See [architecture and ticket audit](NATIVE_RASTER_TICKET_AUDIT_2026-11-15.md) for which previous recommendations were superseded.
+**Current next ticket:** [T-147 — unify NativeHard and Hokusai in the existing Rust GDExtension](Tickets/T-147.md). The rest of the native migration is sequenced by hard dependencies. See [architecture and ticket audit](NATIVE_RASTER_TICKET_AUDIT_2026-11-15.md) for which previous recommendations were superseded.
 
 ## 1. Native raster execution (critical path)
 
-Statuses: T-146 **Ready**; subsequent implementation slices **Blocked** by the previous ticket. No manual-review gate is imposed on engineering refactors; owner physical UX review stays with T-095.
+Statuses: T-146 **Done** (full-canvas source coverage; translucent output and multi-second latency documented), T-147 **Ready**; T-148–T-152 **Blocked** by the previous ticket. No manual-review gate is imposed on engineering refactors; owner physical UX review stays with T-095.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-146 · 96px Hokusai hard-round full-canvas pointer benchmark](Tickets/T-146.md) | Ready | Next: true 96px Hokusai hard-round pointer benchmark; native required for test | [T-097](Tickets/T-097.md), [T-101](Tickets/T-101.md) |
-| [T-147 · Unify NativeHard and Hokusai behind one native stroke engine](Tickets/T-147.md) | Blocked | After T-146: unify the existing Rust hard/preset stroke API | [T-146](Tickets/T-146.md) |
+| [T-146 · 96px Hokusai hard-round full-canvas pointer benchmark](Tickets/T-146.md) | Done | [12 process / 15 gesture native X11 evidence](evidence/T-146-2026-11-15-hokusai-benchmark.md); translucent full-source coverage; T-095 gate remains | [T-097](Tickets/T-097.md), [T-101](Tickets/T-101.md) |
+| [T-147 · Unify NativeHard and Hokusai behind one native stroke engine](Tickets/T-147.md) | Ready | Next: unify the existing Rust hard/preset stroke API; no owner review required | [T-146](Tickets/T-146.md) |
 | [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | Blocked | After T-147: Rust-owned tile staging, masks, blending and Undo | [T-147](Tickets/T-147.md) |
 | [T-149 · Godot native dirty-tile preview, display and persistence seams](Tickets/T-149.md) | Blocked | After T-148: batched Godot inputs and native dirty-tile display/save seams | [T-148](Tickets/T-148.md) |
 | [T-150 · Remove Legacy Brush backend and compatibility paths](Tickets/T-150.md) | Blocked | After T-149: retire Legacy without migration or native-free fallback | [T-149](Tickets/T-149.md) |

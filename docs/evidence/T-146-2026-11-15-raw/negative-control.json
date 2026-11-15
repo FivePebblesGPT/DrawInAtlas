@@ -1,0 +1,9 @@
+{
+  "scenario": "Run Hokusai graphical witness with staged drawing/native .gdextension removed from an isolated copy",
+  "expected_result": "fail closed on missing real DrawingNativeBrush",
+  "exit_code": 2,
+  "success_marker_present": false,
+  "error_marker": "T146_HOKUSAI_FAILED: real native class is registered",
+  "log": "hokusai-native-missing.log",
+  "log_sha256": "45b437b5a03b1fa2f5b7d774996574988ee9f5f6b4280c4070856f4d8a8d099c"
+}
