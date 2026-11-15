@@ -1,6 +1,6 @@
 # DrawInAtlas
 
-**Status: implementation exists, but the 2026-10-30 manual review found the editing experience unusable. Core usability/model corrections precede projector and collaboration work.**
+**Status: [ALPHA] implementation exists, but the 2026-10-30 manual review found the editing experience unusable. Core usability/model corrections precede projector and collaboration work.**
 
 Start with the [completion checklist](docs/Index.md), [manual review](docs/ManualReview_2026-10-30.md), and current epic/ticket notes. Historical implementation reports are archived; previous passing checks are not current usability acceptance.
 
