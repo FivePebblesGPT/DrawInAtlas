@@ -42,3 +42,17 @@ static func from_owned_tile_bytes(target: String, stride: int,
 	result.before_tiles = originals
 	result.after_tiles = replacements
 	return result
+
+
+## Freeze one history payload for a second owner (e.g. Atlas's global
+## timeline). Native whole-tile deltas must never be downgraded to the legacy
+## per-pixel maps, nor share mutable RGBA8 buffers with the commit result.
+func detached_copy() -> DrawingDelta:
+	var copy: DrawingDelta = DrawingDelta.new(layer_id, before, after)
+	copy.tile_stride = tile_stride
+	copy.native_history_token = native_history_token
+	for key: String in before_tiles:
+		copy.before_tiles[key] = before_tiles[key].duplicate()
+	for key: String in after_tiles:
+		copy.after_tiles[key] = after_tiles[key].duplicate()
+	return copy

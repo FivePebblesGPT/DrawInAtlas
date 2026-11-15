@@ -20,7 +20,7 @@ func _init(target: DrawingDocument, change: DrawingDelta,
 		before: DrawingHistoryContext, after: DrawingHistoryContext,
 		regions: Array[DrawingDirtyRegion] = []) -> void:
 	document = target
-	delta = DrawingDelta.new(change.layer_id, change.before, change.after) if change != null else null
+	delta = change.detached_copy() if change != null else null
 	before_context = before.detached_copy() if before != null else null
 	after_context = after.detached_copy() if after != null else null
 	if before_context != null:
