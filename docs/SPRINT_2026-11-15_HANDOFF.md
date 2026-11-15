@@ -1,5 +1,7 @@
 # Sprint 2026-11-15 — Implementation agent handoff
 
+**Owner update (2026-11-16, supersedes the two-strategy renderer plan below):** [T-153](Tickets/T-153.md) removes NativeHard completely, leaving Hokusai/libmypaint presets as the only native Brush/Eraser rasterizer. Complete T-153 before closing T-148; the original T-147 consolidation and earlier NativeHard benchmark instructions remain historical evidence, not requirements to retain that code. T-150 still deletes Legacy. No engineering or owner performance acceptance is implied by this documentation change.
+
 **Prepared:** 2026-11-15 · **Target:** [PR #19](https://github.com/FivePebblesGPT/DrawInAtlas/pull/19), branch `sprint/2026-11-15` · **Phase:** implementation has **not** begun for T-146–T-152 at handoff time.
 
 > **Operating instruction:** Follow [`docs/Index.md`](Index.md), the canonical YAML frontmatter in [`docs/Tickets/`](Tickets/), and [`docs/TICKET_WORKFLOW.md`](TICKET_WORKFLOW.md). **Complete exactly one ticket per agent turn**, respecting hard dependencies and manual-review gates. Implement autonomously within approved scope; test thoroughly; update ticket, evidence and Index; commit and push the change; deliver the complete remote-relative `.lfsmbox.zst` commit diff as requested by the owner. Do **not** mark several tickets Done in a single turn.
