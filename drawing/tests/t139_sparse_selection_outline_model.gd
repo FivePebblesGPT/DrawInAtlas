@@ -57,7 +57,7 @@ func run() -> void:
 	large.set_mask(many)
 	canvas.set_selection_mask(large, false)
 	check(canvas._mask_outline_tile_candidates(span).size() == canvas.MAX_MASK_OUTLINE_CACHE,
-		"over-capacity explicit indexes fall back without unbounded tile allocation")
+		"over-capacity explicit indexes keep bounded tile allocation")
 	check(canvas._mask_outline_tile_candidates(Rect2i()).is_empty(),
 		"empty footprint creates no traversal")
 	check(mask.allows(Vector2i(2900, 1500)) and not mask.allows(Vector2i(10, 0)),

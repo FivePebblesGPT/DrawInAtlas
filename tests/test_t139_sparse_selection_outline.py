@@ -31,7 +31,7 @@ class SparseSelectionOutlineContracts(unittest.TestCase):
             "footprint.has_point(point)",
             "DrawingDocument.TILES.floor_div(point.x, MASK_OUTLINE_TILE)",
             "DrawingDocument.TILES.floor_div(point.y, MASK_OUTLINE_TILE)",
-            "indexed.size() > MAX_MASK_OUTLINE_CACHE",
+            "if candidates.size() > MAX_MASK_OUTLINE_CACHE:",
             "candidates.sort_custom",
             "candidates.size() >= MAX_MASK_OUTLINE_CACHE",
         ):
@@ -50,7 +50,7 @@ class SparseSelectionOutlineContracts(unittest.TestCase):
             "false mask entries do not create contour tiles",
             "inverted explicit masks keep the bounded conservative scan",
             "compound explicit masks keep the bounded conservative scan",
-            "over-capacity explicit indexes fall back",
+            "over-capacity explicit indexes keep bounded tile allocation",
         ):
             self.assertIn(clause, self.model)
         for clause in (

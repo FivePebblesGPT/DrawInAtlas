@@ -41,11 +41,13 @@ func run() -> void:
 	check(candidates == canvas._mask_outline_tile_candidates(span), "fallback order is deterministic")
 	canvas.camera = Vector2(-2560, 1408)
 	var moved: Array[Vector2i] = canvas._mask_outline_tile_candidates(span)
-	check(moved[0] == Vector2i(-40, 22), "camera move changes the prioritized focal cell")
+	check(many.has(moved[0] * 64 + Vector2i(8, 8)) and moved[0] != Vector2i(-40, 22),
+		"camera move prioritizes actual selected tiles when the focal cell is empty")
 	check(moved.size() == canvas.MAX_MASK_OUTLINE_CACHE, "moved camera retains hard tile cap")
 	canvas.camera = Vector2(200000, 200000)
 	moved = canvas._mask_outline_tile_candidates(span)
-	check(moved[0] == Vector2i(62, 40), "outside camera is clamped to footprint")
+	check(many.has(moved[0] * 64 + Vector2i(8, 8)) and moved[0] != Vector2i(62, 40),
+		"outside camera prioritizes the nearest occupied tile in the footprint")
 	var skinny: Rect2i = Rect2i(-32, -180000, 32, 360000)
 	var inverted: DrawingSelection = mask.detached_copy()
 	inverted.inverted = true

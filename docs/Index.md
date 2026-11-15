@@ -4,6 +4,20 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 bounded occupied selection overflow (T-141 Done)
+
+[T-141](Tickets/T-141.md) avoids filling T-140's 4096 contour slots with
+empty focal-ring tiles for explicit positive sparse selections with
+4097–8192 raw pixel entries. A bounded occupied-tile index chooses the
+nearest real selections, preserving exact small-mask ordering and the
+conservative inverted/compound/huge-mask fallback. Unchanged T-140 source
+fails 2/12 model and 4/8 real X11 checks; the corrected candidate passes
+12/12 and 8/8, with a **28-pixel real framebuffer difference** at a distant
+selected island. The 46 required CI IDs stay unchanged. See
+[evidence](evidence/T-141-2026-11-15-occupied-overflow-outlines.md).
+T-088 remains In Progress and T-096 Manual Review; no physical UX/latency
+acceptance or hosted green run is inferred.
+
 ## 2026-11-15 focal-first overflow selection outlines (T-140 Done)
 
 [T-140](Tickets/T-140.md) preserves T-139's exact small sparse-mask indexing,
@@ -2959,6 +2973,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-138 · Over-budget detached-preview focal retention](Tickets/T-138.md) | Done | Complete validated preview/source union selects nearest 144 retained textures; incomplete/unknown fallback, signed pixels and history intact | [T-053](Tickets/T-053.md), [T-103](Tickets/T-103.md), [T-136](Tickets/T-136.md) |
 | [T-139 · Bounded sparse explicit-mask selection outlines](Tickets/T-139.md) | Done | Sparse positive masks trace only selected 64px contour tiles, including far signed islands; conservative inverted/compound fallback and physical UX review remain | [T-053](Tickets/T-053.md) |
 | [T-140 · Focal-first over-budget selection outlines](Tickets/T-140.md) | Done | Center-out 4096-tile contour fallback and focal cache invalidation; signed/compound masks, framebuffer and source history protected | [T-053](Tickets/T-053.md), [T-139](Tickets/T-139.md) |
+| [T-141 · Occupied sparse-mask overflow outlines](Tickets/T-141.md) | Done | Bounded 8192-key exact positive-mask indexing picks 4096 occupied focal tiles, preserving conservative other-mask fallbacks | [T-053](Tickets/T-053.md), [T-139](Tickets/T-139.md), [T-140](Tickets/T-140.md) |
 
 ## Epics
 

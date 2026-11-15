@@ -1,0 +1,23 @@
+{
+  "source_tree_negative_control": "a441ccf3e191d3ec01ad8281be788cca8d6dbc49",
+  "sha256": {
+    "t141_baseline_model_clean.log": "a30c1d1e49b3d50bed614d8fe7711c7869e847da33b048ab19bdbeb2ebde2191",
+    "t141_baseline_native_clean.log": "493b93ea316a389e981fd7e960129a6be8a84d12473a02b0bc4e81042e8c31e7",
+    "t141_candidate_model.log": "97d3cddd4f31fb69b4fe3503da760d9635c0ac2ac73be2fd0fef155f6888d2c0",
+    "t141_candidate_native.log": "74dfd1dd49306131eb31ca475200bdf729ba3318cff18b071c530be227836b4e",
+    "t141_neighbor_t139_sparse_selection_outline_model.log": "ab4b8aa7e6c4691a978b6181dfef959f92bcc8e9f98bb71ab1de605eae1f5666",
+    "t141_neighbor_t139_sparse_selection_outline_native.log": "c186b8dc67a8763e129722cb0847f7263a6782c8561bfaa0dade905ad88d242b",
+    "t141_neighbor_t140_focal_mask_overflow_model.log": "d1414a29be2f2d057e4578a4fff7090fa5a0ed4a36cdc3102a98d4bfba1eb945",
+    "t141_neighbor_t140_focal_mask_overflow_native.log": "5f7ba67b85f61a9456d7413d28eb0014cdcfbc04e672852d796f336aea1dfca0",
+    "t141_neighbor_selection_clipboard_smoke.log": "9d3a8fa0c40c4c6be51a3fe8151725a1f896bf36fee3df3fe65690f4e2e03909",
+    "t141_neighbor_selection_clipboard_native.log": "d738ff15537293c83461f25447958572cb12da00356f1888da6684d4dbc97f17",
+    "t141_neighbor_selection_sparse_paste_smoke.log": "59dbaf294feb64f378321526e12d193423ba68ea7d43695712a1ab7e8e0456b7",
+    "t141_neighbor_selection_sparse_capture_smoke.log": "97c0a8e89c7ae86964954dd2245ee38be7ffdaafdeb0bbb03aa15e8ce3ed2841",
+    "t141_neighbor_selection_large_smoke.log": "23c91c0bcce88d6d220f497ad7b87ac7a6106014fc2f80c4c1d9b4aeb3b7d965",
+    "t141_neighbor_selection_large_native.log": "5200f5b9f80c96bc3bc88478bf186dd31927c7171ed84e1032dd82af71ac4304",
+    "t141_consumer_smoke.log": "d8f732c8631fadf3189792196c1edb78fcb81a98e3faacc491f2c520306e75c3",
+    "t141_final_python.log": "36d07e7ce0fc9b98ac809b6c7dfa8971f8d6a497761fcad4bb1cdcd296c4cf7a",
+    "t141_explicit_types.log": "c6b4189f66b6a4cb7988231d7a20db7001a82c6f78fd5590e05c74edd758634e",
+    "t141_ticket_validate.log": "94b31d0d3bad85ccf53932f4b74b7720375d2a69e878cb9cf6cb150f6004a123"
+  }
+}

@@ -154,6 +154,8 @@ var move_profile_samples: Array[Dictionary] = []
 const MASK_OUTLINE_TILE: int = 64
 const MASK_OUTLINE_TILES_PER_FRAME: int = 4
 const MAX_MASK_OUTLINE_CACHE: int = 4096
+## Bound transient explicit-mask indexing independently of the contour cache.
+const MAX_MASK_OUTLINE_INDEX_POINTS: int = 8192
 var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
 var _mask_outline_window: Rect2i = Rect2i()
 var _mask_outline_focus: Vector2i = Vector2i.ZERO
@@ -1286,9 +1288,13 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 	if not footprint.has_area():
 		return candidates
 	if not selection_mask.inverted and selection_mask._operations.is_empty() \
-			and not selection_mask._pixel_mask.is_empty():
+			and not selection_mask._pixel_mask.is_empty() \
+			and selection_mask._pixel_mask.size() <= MAX_MASK_OUTLINE_INDEX_POINTS:
+		# An exact sparse mask should never spend the 4096-tile contour budget
+		# on *empty* cells. Index at most 8192 input points; larger masks keep
+		# the conservative bounded fallback instead of allocating unbounded
+		# transient index/sort memory on every draw.
 		var indexed: Dictionary[Vector2i, bool] = {}
-		var overflow: bool = false
 		for point: Vector2i in selection_mask._pixel_mask:
 			if not selection_mask._pixel_mask[point] \
 					or not selection_mask._base_bounds.has_point(point) \
@@ -1298,15 +1304,40 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 				DrawingDocument.TILES.floor_div(point.x, MASK_OUTLINE_TILE),
 				DrawingDocument.TILES.floor_div(point.y, MASK_OUTLINE_TILE))
 			indexed[tile] = true
-			if indexed.size() > MAX_MASK_OUTLINE_CACHE:
-				overflow = true
-				break
-		if not overflow:
-			for tile: Vector2i in indexed:
-				candidates.append(tile)
+		for tile: Vector2i in indexed:
+			candidates.append(tile)
+		if candidates.size() > MAX_MASK_OUTLINE_CACHE:
+			var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+			var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+			var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+			var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+			var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
+			# Bucket by Chebyshev ring, then sort only within each ring. A global
+			# GDScript comparator sort of 4k+ cells costs dozens of milliseconds
+			# every redraw; native integer bucket sorting is substantially cheaper.
+			var rings: Dictionary[int, Array] = {}
+			for tile: Vector2i in candidates:
+				var distance: int = maxi(absi(tile.x - focus.x), absi(tile.y - focus.y))
+				var ring: Array = rings.get(distance, [])
+				ring.append(tile)
+				rings[distance] = ring
+			var distances: Array[int] = []
+			for distance: int in rings:
+				distances.append(distance)
+			distances.sort()
+			candidates.clear()
+			for distance: int in distances:
+				var ring: Array = rings[distance]
+				ring.sort()
+				for tile: Vector2i in ring:
+					candidates.append(tile)
+					if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+						return candidates
+		else:
+			# Preserve the legacy exact small-mask traversal/order.
 			candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 				return a.y < b.y if a.y != b.y else a.x < b.x)
-			return candidates
+		return candidates
 	var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
 	var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
 	var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)

@@ -30,7 +30,7 @@ class FocalSelectionOutlineContracts(unittest.TestCase):
             with self.subTest(clause=clause):
                 self.assertIn(clause, focal)
         for clause in (
-            "indexed.size() > MAX_MASK_OUTLINE_CACHE", "_mask_outline_focal_cell(",
+            "selection_mask._pixel_mask.size() <= MAX_MASK_OUTLINE_INDEX_POINTS", "_mask_outline_focal_cell(",
             "radius_limit", "maxi(left, focus.x - radius)",
             "mini(bottom, focus.y + radius)",
             "candidates.size() >= MAX_MASK_OUTLINE_CACHE",
@@ -46,8 +46,8 @@ class FocalSelectionOutlineContracts(unittest.TestCase):
     def test_negative_controls_cover_real_frames_and_overflow(self) -> None:
         for clause in (
             "first fallback tile is the camera focal cell",
-            "camera move changes the prioritized focal cell",
-            "outside camera is clamped to footprint",
+            "camera move prioritizes actual selected tiles when the focal cell is empty",
+            "outside camera prioritizes the nearest occupied tile in the footprint",
             "very tall narrow footprint still bounded",
             "small sparse mask still indexes only actual occupied tiles",
             "inverted fallback prioritizes the camera",
