@@ -633,6 +633,59 @@ impl TileStore {
         self.advance_metadata(expected, discard_redo)
     }
 
+    /// An unrecorded structural removal has no future tree Undo to restore its
+    /// pixels. Retire only the specified layer IDs, including their native
+    /// source authorization and tile history; unrelated layer tokens survive.
+    /// All validation happens before a single mutation boundary.
+    fn retire_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing retire revision");
+        }
+        if layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return Err("Invalid retired raster-layer count");
+        }
+        let mut ids = HashSet::with_capacity(layers.len());
+        if layers
+            .iter()
+            .any(|id| id.is_empty() || !ids.insert(id.as_str()) || self.parked_layers.contains(id))
+        {
+            return Err("Invalid, repeated or parked retired raster-layer ID");
+        }
+        self.tiles
+            .retain(|tile, _| !ids.contains(tile.layer.as_str()));
+        self.authorized
+            .retain(|tile| !ids.contains(tile.layer.as_str()));
+        self.editable_layers
+            .retain(|id, _| !ids.contains(id.as_str()));
+        self.undo.retain(|event| {
+            !ids.contains(event.layer.as_str())
+                && !event
+                    .before
+                    .keys()
+                    .chain(event.after.keys())
+                    .any(|tile| ids.contains(tile.layer.as_str()))
+        });
+        if discard_redo {
+            self.redo.clear();
+        } else {
+            self.redo.retain(|event| {
+                !ids.contains(event.layer.as_str())
+                    && !event
+                        .before
+                        .keys()
+                        .chain(event.after.keys())
+                        .any(|tile| ids.contains(tile.layer.as_str()))
+            });
+        }
+        self.revision = expected + 1;
+        Ok(())
+    }
+
     /// Park or restore a history-backed raster subtree as a reversible tree
     /// mutation. Canonical tile bytes, authorizations and Undo/Redo tokens are
     /// deliberately not released: history can only address a parked layer
@@ -853,6 +906,26 @@ impl DrawingNativeTiles {
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
         self.store
             .advance_unreferenced_layers(expected as u64, &ids, discard_redo)
+            .is_ok()
+    }
+
+    /// A direct unrecorded deletion permanently retires the named raster
+    /// layers. Their history tokens cannot later be replayed; other raster
+    /// layers retain their canonical bytes and reversible native events.
+    #[func]
+    fn retire_layers_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        discard_redo: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store
+            .retire_layers(expected as u64, &ids, discard_redo)
             .is_ok()
     }
 
@@ -1468,6 +1541,93 @@ mod tests {
             .unwrap();
         assert!(store.history_matches(paint, false));
         assert_eq!(store.revision, 4);
+    }
+
+    #[test]
+    fn unrecorded_retirement_preserves_unrelated_tokens_without_leaking_sources() {
+        let mut store = initialized(16);
+        store.editable_layers.insert("removed".into(), true);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let removed = TileId {
+            layer: "removed".into(),
+            x: -1,
+            y: 1,
+        };
+        blank(&mut store, 0, 0);
+        store.import(removed.clone(), 0, &[]).unwrap();
+        let mut paint = |layer: &str, revision: u64, x: i32| {
+            let token = store.begin(layer, revision, false).unwrap();
+            store
+                .stage(
+                    token,
+                    revision,
+                    if layer == "removed" { -16 } else { 0 },
+                    if layer == "removed" { 16 } else { 0 },
+                    &[x, 1],
+                    false,
+                    0xffaabbcc,
+                    false,
+                    Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                )
+                .unwrap();
+            store.commit(token, revision).unwrap();
+            token
+        };
+        let first = paint("ink", 0, 1);
+        let removed_token = paint("removed", 1, 1);
+        let last = paint("ink", 2, 4);
+        assert_eq!(store.undo.len(), 3);
+        let ink_bytes = store.read(&ink, false).unwrap().rgba.clone();
+        let used = store.bytes_used();
+        for (revision, layers) in [
+            (2, vec!["removed".into()]),
+            (3, vec!["removed".into(), "removed".into()]),
+            (3, vec![String::new()]),
+            (3, vec!["removed".into(); MAX_ACTIVE_TILES + 1]),
+        ] {
+            assert!(store.retire_layers(revision, &layers, true).is_err());
+            assert_eq!(store.revision, 3);
+            assert_eq!(store.bytes_used(), used);
+            assert_eq!(store.undo.len(), 3);
+        }
+        let active = store.begin("ink", 3, false).unwrap();
+        assert!(store.retire_layers(3, &["removed".into()], true).is_err());
+        assert!(store.transaction_matches(active, 3, "ink"));
+        store.active = None;
+        store.retire_layers(3, &["removed".into()], true).unwrap();
+        assert_eq!(store.revision, 4);
+        assert_eq!(store.undo.len(), 2);
+        assert!(!store.authorized.contains(&removed));
+        assert!(!store.tiles.contains_key(&removed));
+        assert!(!store.editable_layers.contains_key("removed"));
+        assert!(!store.history_matches(removed_token, true));
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.read(&ink, false).unwrap().rgba, ink_bytes);
+        assert!(store.history_matches(last, true));
+        store.undo_or_redo(true).unwrap();
+        assert!(store.history_matches(first, true));
+        store.undo_or_redo(true).unwrap();
+        assert!(store.history_matches(first, false));
+        store.undo_or_redo(false).unwrap();
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&ink, false).unwrap().rgba, ink_bytes);
+        // The old ID may be safely reused: no parked tombstone, stale bytes,
+        // authorization or history entry survives its permanent retirement.
+        store.retire_layers(8, &["fresh".into()], true).unwrap();
+        store.import(removed.clone(), 9, &[]).unwrap();
+        assert!(store.authorized.contains(&removed));
+        assert!(
+            store
+                .read(&removed, false)
+                .unwrap()
+                .rgba
+                .iter()
+                .all(|pixel| *pixel == 0)
+        );
     }
 
     #[test]

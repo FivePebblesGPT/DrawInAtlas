@@ -173,9 +173,9 @@ func run() -> void:
 		int(store.call("stats").get("revision", -1)) == dest.revision and
 		int(store.call("stats").get("undo", -1)) == before_transfer,
 		"cross-document copy retains native history and leaves source alive")
-	# Reusing an *unrecordedly removed* raster ID is not the same as a fresh
-	# import: Rust may still own its old pixels. The unreferenced guard must
-	# reject the fast path, forcing a checked rebase before the next Brush.
+	# Direct unrecorded removals now retire the removed layer's canonical
+	# tiles/history, so the same identifier may be safely imported with an
+	# independent source. This is deliberately unlike recorded park/restore.
 	var stale: DrawingDocument = DrawingDocument.new("reused-id", STRIDE)
 	var original_id: String = str(stale.create_layer(DrawingLayerNode.RASTER,
 		"Old", "root", "identity-unchanged").value)
@@ -184,21 +184,22 @@ func run() -> void:
 	var old_store: Object = stale._native_raster_store
 	var old_undo: int = int(old_store.call("stats").get("undo", -1))
 	check(stale.remove_subtree(original_id).ok and
-		int(old_store.call("stats").get("revision", -1)) < stale.revision,
-		"unrecorded owned-layer removal leaves native bridge stale")
+		int(old_store.call("stats").get("revision", -1)) == stale.revision and
+		int(old_store.call("stats").get("undo", -1)) == 0,
+		"unrecorded owned-layer removal retires canonical history")
 	var replacement: DrawingDocument = DrawingDocument.new("replacement-source", STRIDE)
 	var new_id: String = str(replacement.create_layer(DrawingLayerNode.RASTER,
 		"Replacement", "root", original_id).value)
 	var detached: DrawingResult = replacement.export_subtree(new_id)
 	var replaced: DrawingResult = stale.import_subtree(detached.value, "root", true)
 	check(replaced.ok and stale.has_node(original_id) and
-		int(old_store.call("stats").get("revision", -1)) < stale.revision and
-		int(old_store.call("stats").get("undo", -1)) == old_undo,
-		"reused native-owned ID rejects unreferenced fast path without mixing pixels")
+		int(old_store.call("stats").get("revision", -1)) == stale.revision and
+		int(old_store.call("stats").get("undo", -1)) == 0 and old_undo == 1,
+		"reused retired ID reenters through fresh unreferenced bridge")
 	check(stroke(stale, original_id, Vector2(40, 40)).ok and
 		int(old_store.call("stats").get("revision", -1)) == stale.revision and
 		int(old_store.call("stats").get("undo", -1)) == 1,
-		"next gesture rebases and records only replacement raster history")
+		"next gesture records only replacement raster history without rebase")
 	check(int(stale.read_pixel(original_id, 8, 8).value) == 0 and
 		int(stale.read_pixel(original_id, 40, 40).value) != 0,
 		"old native bytes cannot bleed into reused source identity")

@@ -152,6 +152,60 @@ func _advance_parked_structure_revision(layers: Array[String], restore: bool,
 	return true
 
 
+## A direct, unrecorded removal has no structural Undo to restore its raster
+## children. Preflight their resident source identity/bytes before Rust drops
+## only those layers; unrelated canonical tiles and tokens remain live.
+## Rejecting retirement leaves both stores untouched and uses the ordinary
+## later checked rebase. This is deliberately not the recorded park path.
+func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary) -> bool:
+	if _native_raster_store == null or layers.is_empty() \
+			or not _native_tree_sources_match(nodes, false):
+		return false
+	var previous: int = revision
+	if not bool(_native_raster_store.call("retire_layers_revision",
+			previous, PackedStringArray(layers), true)):
+		return false
+	for layer_id: String in layers:
+		for identity: String in _native_source_identities.keys():
+			if identity.begins_with(layer_id + ":"):
+				_native_source_identities.erase(identity)
+	revision += 1
+	return true
+
+
+## Prebuild the local history projection *before* Rust retires the layers.
+## Permanently deleted nodes must not leave Undo entries blocking unrelated
+## native history, but host-owned history is never rewritten here. Surviving
+## cursor order/content tokens are retained. Installing this detached result
+## after the native commit does not allocate or invoke external providers.
+func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
+	if external_history or _events.is_empty():
+		return {}
+	var removed: Dictionary[String, bool] = {}
+	for layer_id: String in removed_ids:
+		removed[layer_id] = true
+	var retained: Array[Dictionary] = []
+	var states: Array[int] = [_content_states[0]]
+	var cursor: int = 0
+	for index: int in range(_events.size()):
+		var event: Dictionary = _events[index]
+		var affected: bool = false
+		match String(event.get("kind", "")):
+			"content":
+				affected = removed.has((event["delta"] as DrawingDelta).layer_id)
+			"text_tree":
+				affected = removed.has(String(event["layer"]))
+			"structure":
+				affected = removed.has(String(event["id"]))
+		if affected:
+			continue
+		retained.append(event)
+		states.append(_content_states[index + 1])
+		if index < _cursor:
+			cursor += 1
+	return {"events": retained, "states": states, "cursor": cursor}
+
+
 func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
 	var identity: String = layer_id + ":" + key
 	return _native_source_identities.has(identity) \
@@ -378,9 +432,26 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 			parked = _advance_parked_structure_revision(raster_layers, false, true)
 	if parked:
 		before["native_parked"] = true
+	var retired: bool = false
+	var removed_ids: Array[String] = []
+	var retained_history: Dictionary = {}
+	if not parked and not raster_layers.is_empty() and (not record_history or external_history):
+		# External/transfer callers do not create a reversible tree event.
+		# Verify canonical source before permanently retiring these IDs.
+		var resident_nodes: Dictionary = {}
+		_gather_ids(node_id, removed_ids)
+		for identifier: String in removed_ids:
+			resident_nodes[identifier] = _nodes[identifier]
+		if _native_raster_store != null:
+			retained_history = _prepare_retired_local_history(removed_ids)
+		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes)
 	_erase_subtree(node_id)
-	if parked:
-		pass # Rust and document revisions were advanced atomically before erase.
+	if retired and not retained_history.is_empty():
+		_events = retained_history["events"]
+		_content_states = retained_history["states"]
+		_cursor = int(retained_history["cursor"])
+	if parked or retired:
+		pass # Rust and document revisions advanced before the deterministic erase.
 	elif not raster_layers.is_empty():
 		_advance_raster_structure_revision(raster_layers)
 	else:
