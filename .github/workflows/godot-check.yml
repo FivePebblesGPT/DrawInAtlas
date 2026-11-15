@@ -260,6 +260,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t143-outline-model.log --marker T143_MODEL_PASSED || ci_fail_marker 'T143 clipped contour model rejected'
           grep -Fxq 'T143_MODEL_PASSED checks=14 failures=0' /tmp/godot-t143-outline-model.log || ci_fail_marker 'T143 clipped contour assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t143_contour_clip_reconcile.py' -v || ci_fail_marker 'T143 clipped contour source/CI contract rejected'
+          # T-144 amortizes exact sparse outline planning across the four-contours/frame
+          # backlog, invalidating by mask epoch, clipped viewport and camera focus.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t144_outline_plan_model.gd 2>&1 | tee /tmp/godot-t144-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t144-outline-model.log --marker T144_MODEL_PASSED || ci_fail_marker 'T144 outline plan model rejected'
+          grep -Fxq 'T144_MODEL_PASSED checks=16 failures=0' /tmp/godot-t144-outline-model.log || ci_fail_marker 'T144 outline plan count changed'
+          python3 -m unittest discover -s tests -p 'test_t144_outline_plan_cache.py' -v || ci_fail_marker 'T144 outline plan source/CI contracts rejected'
           # T-096 exact large-mask contours/Move source oracle is mandatory;
           # real pointer/display and owner acceptance remain separate.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log

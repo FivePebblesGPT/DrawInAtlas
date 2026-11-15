@@ -9,6 +9,8 @@ var enabled: bool = false
 ## Conservative enclosing area. Use allows() for the actual per-pixel mask.
 var bounds: Rect2i = Rect2i()
 var inverted: bool = false
+## Bumped by public mutation methods; cached render plans use this epoch.
+var generation: int = 0
 var _base_bounds: Rect2i = Rect2i()
 var _pixel_mask: Dictionary[Vector2i, bool] = {}
 var _operations: Array[Dictionary] = []
@@ -25,6 +27,7 @@ func _init(rect: Rect2i = Rect2i(), active: bool = false) -> void:
 
 
 func clear() -> void:
+	generation += 1
 	enabled = false
 	bounds = Rect2i()
 	_base_bounds = Rect2i()
@@ -43,6 +46,7 @@ func set_rectangle(rect: Rect2i) -> void:
 
 func set_mask(mask: Dictionary[Vector2i, bool]) -> void:
 	_pixel_mask = mask.duplicate()
+	generation += 1
 
 
 func detached_copy() -> DrawingSelection:
@@ -50,6 +54,7 @@ func detached_copy() -> DrawingSelection:
 	copy.enabled = enabled
 	copy.bounds = bounds
 	copy.inverted = inverted
+	copy.generation = generation
 	copy._base_bounds = _base_bounds
 	copy._pixel_mask = _pixel_mask.duplicate()
 	copy._operations = _operations.duplicate(true)
@@ -79,6 +84,7 @@ func combine_rectangle(rect: Rect2i, mode: String = "Replace") -> bool:
 	if _operations.size() >= MAX_OPERATIONS:
 		return false
 	_operations.append({"rect": rect, "mode": mode})
+	generation += 1
 	if mode == "Add":
 		bounds = bounds.merge(rect)
 	elif mode == "Intersect":

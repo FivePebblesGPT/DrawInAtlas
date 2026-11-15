@@ -1,0 +1,18 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T144_MODEL_FAILED: first plan builds once
+T144_MODEL_FAILED: 24 stable redraws do not reindex 4300 source-mask entries
+T144_MODEL_FAILED: changed focal tile rebuilds once
+T144_MODEL_FAILED: sub-tile clipped footprint changes invalidate cached plan
+T144_MODEL_FAILED: in-place mask setter increments its plan generation
+T144_MODEL_FAILED: in-place source-mask change also invalidates traced contours
+T144_MODEL_FAILED: direct inversion invalidates a previously indexed explicit plan
+T144_MODEL_FAILED: restoring non-inverted mask rebuilds exact occupied candidates
+T144_MODEL_FAILED: new selection replaces the bounded plan and uses rectangle fallback
+T144_MODEL_FAILED: fallback candidate plan is also reused when its context is stable
+T144_MODEL_METRICS {"builds":null,"occupied_tiles":4301,"warm_median_us":5517,"warm_p95_us":6562}
+T144_MODEL_PASSED checks=16 failures=10
+WARNING: 1 RID of type "CanvasItem" was leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2733)
+WARNING: 2 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2609)

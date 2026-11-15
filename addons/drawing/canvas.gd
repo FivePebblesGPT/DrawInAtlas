@@ -143,6 +143,7 @@ var selected: Rect2i = Rect2i():
 			_mask_outline_cache.clear()
 			_mask_outline_window = Rect2i()
 			_mask_outline_footprint = Rect2i()
+			_mask_outline_plan_valid = false
 var _marquee: Rect2i = Rect2i()
 var _marquee_dragged: bool = false
 var _marquee_start_screen: Vector2 = Vector2.ZERO
@@ -161,6 +162,19 @@ var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
 var _mask_outline_window: Rect2i = Rect2i()
 var _mask_outline_footprint: Rect2i = Rect2i()
 var _mask_outline_focus: Vector2i = Vector2i.ZERO
+## A four-contour/frame backlog may redraw a stable >4096-tile mask for
+## hundreds of frames. Reuse its bounded eligibility plan until the source
+## mask epoch, clipped footprint or camera priority actually changes.
+var _mask_outline_plan_valid: bool = false
+var _mask_outline_plan_mask: DrawingSelection
+var _mask_outline_plan_generation: int = -1
+var _mask_outline_plan_inverted: bool = false
+var _mask_outline_plan_operation_count: int = -1
+var _mask_outline_plan_pixel_count: int = -1
+var _mask_outline_plan_footprint: Rect2i = Rect2i()
+var _mask_outline_plan_focus: Vector2i = Vector2i.ZERO
+var _mask_outline_plan_candidates: Array[Vector2i] = []
+var _mask_outline_plan_build_count: int = 0
 var _move_target: Vector2i = Vector2i.ZERO
 var _move_target_received_us: int = 0
 var _move_preview_offset: Vector2i = Vector2i.ZERO
@@ -328,6 +342,7 @@ func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> voi
 	_mask_outline_cache.clear()
 	_mask_outline_window = Rect2i()
 	_mask_outline_footprint = Rect2i()
+	_mask_outline_plan_valid = false
 	_updating_selection_bounds = true
 	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
 	_updating_selection_bounds = false
@@ -1290,6 +1305,27 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 	var candidates: Array[Vector2i] = []
 	if not footprint.has_area():
 		return candidates
+	var plan_left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+	var plan_top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+	var plan_right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+	var plan_bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+	var plan_focus: Vector2i = _mask_outline_focal_cell(plan_left, plan_top, plan_right, plan_bottom)
+	var source_changed: bool = _mask_outline_plan_mask == selection_mask and ( \
+		_mask_outline_plan_generation != selection_mask.generation \
+		or _mask_outline_plan_inverted != selection_mask.inverted \
+		or _mask_outline_plan_operation_count != selection_mask._operations.size() \
+		or _mask_outline_plan_pixel_count != selection_mask._pixel_mask.size())
+	if _mask_outline_plan_valid and _mask_outline_plan_mask == selection_mask \
+			and not source_changed \
+			and _mask_outline_plan_footprint == footprint \
+			and _mask_outline_plan_focus == plan_focus:
+		# Never expose the owned array to a caller that could mutate its order.
+		return _mask_outline_plan_candidates.duplicate()
+	if _mask_outline_plan_valid and source_changed:
+		# In-place set_mask/combine_rectangle must also invalidate traced pixels.
+		_mask_outline_cache.clear()
+		_mask_outline_window = Rect2i()
+		_mask_outline_footprint = Rect2i()
 	if not selection_mask.inverted and selection_mask._operations.is_empty() \
 			and not selection_mask._pixel_mask.is_empty() \
 			and selection_mask._pixel_mask.size() <= MAX_MASK_OUTLINE_INDEX_POINTS:
@@ -1335,12 +1371,12 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 				for tile: Vector2i in ring:
 					candidates.append(tile)
 					if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
-						return candidates
+						return _remember_mask_outline_plan(footprint, plan_focus, candidates)
 		else:
 			# Preserve the legacy exact small-mask traversal/order.
 			candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 				return a.y < b.y if a.y != b.y else a.x < b.x)
-		return candidates
+		return _remember_mask_outline_plan(footprint, plan_focus, candidates)
 	var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
 	var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
 	var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
@@ -1363,25 +1399,40 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 			for x: int in range(x_min, x_max + 1):
 				candidates.append(Vector2i(x, focus.y - radius))
 				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
-					return candidates
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
 		if radius > 0 and focus.y + radius <= bottom:
 			for x: int in range(x_min, x_max + 1):
 				candidates.append(Vector2i(x, focus.y + radius))
 				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
-					return candidates
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
 		for y: int in range(y_min, y_max + 1):
 			if absi(y - focus.y) == radius:
 				continue  # Already visited on the top/bottom edges.
 			if focus.x - radius >= left:
 				candidates.append(Vector2i(focus.x - radius, y))
 				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
-					return candidates
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
 			if radius > 0 and focus.x + radius <= right:
 				candidates.append(Vector2i(focus.x + radius, y))
 				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
-					return candidates
-	return candidates
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+	return _remember_mask_outline_plan(footprint, plan_focus, candidates)
 
+
+
+func _remember_mask_outline_plan(footprint: Rect2i, focus: Vector2i,
+		candidates: Array[Vector2i]) -> Array[Vector2i]:
+	_mask_outline_plan_mask = selection_mask
+	_mask_outline_plan_generation = selection_mask.generation
+	_mask_outline_plan_inverted = selection_mask.inverted
+	_mask_outline_plan_operation_count = selection_mask._operations.size()
+	_mask_outline_plan_pixel_count = selection_mask._pixel_mask.size()
+	_mask_outline_plan_footprint = footprint
+	_mask_outline_plan_focus = focus
+	_mask_outline_plan_candidates = candidates.duplicate()
+	_mask_outline_plan_valid = true
+	_mask_outline_plan_build_count += 1
+	return candidates
 
 
 ## Reuse contours across small camera pans, but do not let a saturated
