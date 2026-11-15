@@ -4,6 +4,10 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 alpha native raster consolidation roadmap (T-146–T-152)
+
+**Owner direction:** first run the true 96px full-canvas `Hokusai` hard-round pointer benchmark ([T-146](Tickets/T-146.md)); then unify the existing Rust hard/preset modes under one batched stroke API ([T-147](Tickets/T-147.md)), move raster tile ownership, blending, masks, staging and undo data into Rust ([T-148](Tickets/T-148.md)), connect Godot input/dirty-tile display and save/load via bounded native seams ([T-149](Tickets/T-149.md)), and remove Legacy entirely without migration or fallback ([T-150](Tickets/T-150.md)). Finally, re-profile the **new** full editor ([T-151](Tickets/T-151.md)) and optimize its measured dominant bottleneck ([T-152](Tickets/T-152.md)). Alpha breaking changes are acceptable; production releases and owner physical latency acceptance are **not** claimed. Legacy/NativeHard historical benchmarks remain evidence, not required pixel-equivalence criteria for Hokusai. T-095 and T-068 remain open.
+
 ## 2026-11-15 contour continuity across shifted tile windows (T-145 Done)
 
 [T-145](Tickets/T-145.md) fixes selection-outline disappearance after a
@@ -3033,6 +3037,13 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-143 · Reconcile saturated contour cache for sub-tile clipped pans](Tickets/T-143.md) | Done | Changed pixel-level footprint evicts only off-plan contours even when focal tile/window are stable; X11 edge pixels and four-tile budget verified | [T-053](Tickets/T-053.md), [T-142](Tickets/T-142.md) |
 | [T-144 · Reuse bounded outline candidate plans across deferred frames](Tickets/T-144.md) | Done | Stable mask epoch, camera focus and exact clipped footprint reuse a 4096-entry eligible-tile plan; negative control, native framebuffer and bounded fallback verified | [T-053](Tickets/T-053.md), [T-141](Tickets/T-141.md), [T-143](Tickets/T-143.md) |
 | [T-145 · Retain eligible contours across shifted selection tile windows](Tickets/T-145.md) | Done | Changed camera viewport retains 4,036 shared contour tiles rather than clearing all; native framebuffer island and strict red/green proof | [T-053](Tickets/T-053.md), [T-142](Tickets/T-142.md), [T-143](Tickets/T-143.md), [T-144](Tickets/T-144.md) |
+| [T-146 · 96px Hokusai hard-round full-canvas pointer benchmark](Tickets/T-146.md) | Ready | Benchmark pending; no owner manual gate | [T-097](Tickets/T-097.md), [T-101](Tickets/T-101.md) |
+| [T-147 · Unify NativeHard and Hokusai behind one native stroke engine](Tickets/T-147.md) | Blocked | Awaiting T-146; no owner manual gate | [T-146](Tickets/T-146.md) |
+| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | Blocked | Awaiting T-147; no owner manual gate | [T-147](Tickets/T-147.md) |
+| [T-149 · Godot native dirty-tile preview, display and persistence seams](Tickets/T-149.md) | Blocked | Awaiting T-148; no owner manual gate | [T-148](Tickets/T-148.md) |
+| [T-150 · Remove Legacy Brush backend and compatibility paths](Tickets/T-150.md) | Blocked | Awaiting T-149; no owner manual gate | [T-149](Tickets/T-149.md) |
+| [T-151 · Profile post-consolidation native Brush critical path](Tickets/T-151.md) | Blocked | Awaiting T-150; no owner manual gate | [T-150](Tickets/T-150.md) |
+| [T-152 · Optimize the highest measured native Brush bottleneck](Tickets/T-152.md) | Blocked | Awaiting T-151; no owner manual gate | [T-151](Tickets/T-151.md) |
 
 ## Epics
 
