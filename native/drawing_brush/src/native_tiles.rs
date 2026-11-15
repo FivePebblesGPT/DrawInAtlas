@@ -755,6 +755,68 @@ impl TileStore {
             .is_some_and(|event| event.token == token && !self.parked_layers.contains(&event.layer))
     }
 
+    /// Validate the detached document history payload against the live Rust
+    /// event *and* canonical source. Godot's history buffers are caller-owned
+    /// and may be modified independently of the opaque native token. Replay
+    /// must never publish a Godot projection different from Rust's history.
+    fn history_tiles_match(
+        &self,
+        token: i64,
+        undo: bool,
+        layer: &str,
+        entries: &[(TileId, Vec<u8>, Vec<u8>)],
+    ) -> bool {
+        if !self.history_matches(token, undo)
+            || entries.is_empty()
+            || entries.len() > MAX_ACTIVE_TILES
+        {
+            return false;
+        }
+        let Some(event) = (if undo { &self.undo } else { &self.redo }).last() else {
+            return false;
+        };
+        if event.layer != layer
+            || event.before.len() != entries.len()
+            || event.after.len() != entries.len()
+        {
+            return false;
+        }
+        let Ok(length) = self.stride_bytes() else {
+            return false;
+        };
+        let matches_bytes = |native: &[u8], provided: &[u8]| {
+            (provided.is_empty() && native.iter().all(|byte| *byte == 0))
+                || (provided.len() == length && native == provided)
+        };
+        let mut ids = HashSet::with_capacity(entries.len());
+        for (id, expected, replacement) in entries {
+            if id.layer != layer
+                || id.x.unsigned_abs() > SAFE_COORD as u64
+                || id.y.unsigned_abs() > SAFE_COORD as u64
+                || !ids.insert(id)
+            {
+                return false;
+            }
+            let (from, to) = if undo {
+                (&event.after, &event.before)
+            } else {
+                (&event.before, &event.after)
+            };
+            let (Some(source), Some(target), Some(current)) =
+                (from.get(id), to.get(id), self.tiles.get(id))
+            else {
+                return false;
+            };
+            if !matches_bytes(&source.rgba, expected)
+                || !matches_bytes(&target.rgba, replacement)
+                || current.rgba != source.rgba
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     fn undo_or_redo(&mut self, undo: bool) -> Result<usize, &'static str> {
         if self.active.is_some() {
             return Err("Cannot replay while a tile transaction is open");
@@ -1032,21 +1094,55 @@ impl DrawingNativeTiles {
             && self.store.history_matches(transaction, undo)
     }
 
-    /// Tokenized native replay protects mixed document timelines from
-    /// accidentally undoing a different stroke in the persistent Rust stack.
+    /// Tokenized replay validates the entire detached RGBA8 payload in the
+    /// same call that consumes the native history event. A valid token alone
+    /// cannot authorize a caller-mutated replacement tile or stale source.
+    /// Entries: tile_x/y, expected/replacement PackedByteArray (empty=blank).
     #[func]
     fn replay_history_token(
         &mut self,
         transaction: i64,
         expected_revision: i64,
         undo: bool,
+        layer: GString,
+        tiles: Array<Dictionary<Variant, Variant>>,
     ) -> Dictionary<Variant, Variant> {
         self.store.ffi_calls += 1;
         if expected_revision < 0
             || self.store.revision != expected_revision as u64
-            || !self.store.history_matches(transaction, undo)
+            || tiles.is_empty()
+            || tiles.len() > MAX_ACTIVE_TILES
         {
-            return err("Stale native history token or document revision");
+            return err("Stale revision or invalid native history tile count");
+        }
+        let layer = layer.to_string();
+        let mut entries = Vec::with_capacity(tiles.len());
+        for item in tiles.iter_shared() {
+            let Some((x, y, expected, replacement)) = (|| {
+                Some((
+                    item.get("tile_x")?.try_to::<i64>().ok()?,
+                    item.get("tile_y")?.try_to::<i64>().ok()?,
+                    item.get("expected")?.try_to::<PackedByteArray>().ok()?,
+                    item.get("replacement")?.try_to::<PackedByteArray>().ok()?,
+                ))
+            })() else {
+                return err("Malformed native history tile descriptor");
+            };
+            entries.push((
+                TileId {
+                    layer: layer.clone(),
+                    x,
+                    y,
+                },
+                expected.as_slice().to_vec(),
+                replacement.as_slice().to_vec(),
+            ));
+        }
+        if !self
+            .store
+            .history_tiles_match(transaction, undo, &layer, &entries)
+        {
+            return err("Native history tile snapshots or canonical source differ");
         }
         match self.store.undo_or_redo(undo) {
             Ok(count) => {
@@ -1435,6 +1531,75 @@ mod tests {
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.undo_or_redo(false).unwrap(), 2);
         assert_eq!(store.read(&id, false).unwrap().rgba, changed);
+    }
+
+    #[test]
+    fn token_replay_rejects_detached_payload_tampering_atomically() {
+        let mut store = initialized(16);
+        let first = TileId {
+            layer: "ink".into(),
+            x: -(1 << 42),
+            y: 3,
+        };
+        let second = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let blank = vec![0; 16 * 16 * 4];
+        let mut red = blank.clone();
+        red[..4].copy_from_slice(&0xff112233_u32.to_le_bytes());
+        let mut hidden_rgb = blank.clone();
+        hidden_rgb[..4].copy_from_slice(&0x00123456_u32.to_le_bytes());
+        let (token, _) = store
+            .adopt_external(
+                "ink",
+                0,
+                vec![
+                    (first.clone(), vec![], red.clone()),
+                    (second.clone(), vec![], hidden_rgb.clone()),
+                ],
+            )
+            .unwrap();
+        let undo = vec![
+            (first.clone(), red.clone(), vec![]),
+            (second.clone(), hidden_rgb.clone(), vec![]),
+        ];
+        assert!(store.history_tiles_match(token, true, "ink", &undo));
+        let mut invalid = undo.clone();
+        invalid[1].2 = red.clone(); // A valid-length but unauthorized replacement.
+        assert!(!store.history_tiles_match(token, true, "ink", &invalid));
+        invalid = undo.clone();
+        invalid[1].1[3] = 0xff; // Source snapshot changes, including hidden alpha.
+        assert!(!store.history_tiles_match(token, true, "ink", &invalid));
+        invalid = undo.clone();
+        invalid[1].0 = invalid[0].0.clone(); // Duplicate key, not two tiles.
+        assert!(!store.history_tiles_match(token, true, "ink", &invalid));
+        assert!(!store.history_tiles_match(token, true, "ink", &undo[..1]));
+        assert!(!store.history_tiles_match(token, true, "other", &undo));
+        assert!(!store.history_tiles_match(token, false, "ink", &undo));
+        // Canonical Rust source is also part of replay authorization.
+        store.tiles.get_mut(&first).unwrap().rgba[0] ^= 0x01;
+        assert!(!store.history_tiles_match(token, true, "ink", &undo));
+        store.tiles.get_mut(&first).unwrap().rgba = red.clone();
+        assert_eq!(store.revision, 1);
+        assert!(store.history_matches(token, true));
+        assert_eq!(store.read(&second, false).unwrap().rgba, hidden_rgb);
+        assert!(store.history_tiles_match(token, true, "ink", &undo));
+        assert_eq!(store.undo_or_redo(true).unwrap(), 2);
+        let redo = vec![
+            (second.clone(), vec![], hidden_rgb.clone()),
+            (first.clone(), vec![], red.clone()),
+        ];
+        assert!(store.history_tiles_match(token, false, "ink", &redo));
+        let mut bad_redo = redo.clone();
+        bad_redo[0].2[1] = 0;
+        assert!(!store.history_tiles_match(token, false, "ink", &bad_redo));
+        assert_eq!(store.revision, 2);
+        assert!(store.history_tiles_match(token, false, "ink", &redo));
+        assert_eq!(store.undo_or_redo(false).unwrap(), 2);
+        assert_eq!(store.read(&first, false).unwrap().rgba, red);
+        assert_eq!(store.read(&second, false).unwrap().rgba, hidden_rgb);
     }
 
     #[test]

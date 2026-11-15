@@ -938,8 +938,17 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 	if delta.native_history_token > 0 and _native_raster_store != null \
 			and _native_raster_store.call("has_history_token", delta.native_history_token,
 				base_revision, undo_action):
+		# A history token alone is not permission to publish caller-owned tiles.
+		# Give Rust the full detached before/after pair for an atomic parity
+		# check against its history event and currently resident source.
+		var native_tiles: Array[Dictionary] = []
+		for key: String in original_bytes:
+			var coords: PackedStringArray = key.split(",")
+			native_tiles.append({"tile_x": int(coords[0]), "tile_y": int(coords[1]),
+				"expected": original_bytes[key], "replacement": replacement_bytes[key]})
 		var native_replay: Dictionary = _native_raster_store.call("replay_history_token",
-			delta.native_history_token, base_revision, undo_action)
+			delta.native_history_token, base_revision, undo_action,
+			delta.layer_id, native_tiles)
 		if not bool(native_replay.get("ok", false)) \
 				or int(native_replay.get("revision", -1)) != base_revision + 1:
 			return DrawingResult.failure("NATIVE_HISTORY", "Persistent native replay rejected")
