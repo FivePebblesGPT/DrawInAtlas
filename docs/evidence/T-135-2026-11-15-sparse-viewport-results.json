@@ -1,0 +1,118 @@
+{
+  "engine": "Godot 4.8 beta3 c51ff06e8, Linux x86-64, Mesa 25.0.7 llvmpipe Xvfb, software only",
+  "baseline": "4eae8bb43e223d22dbe58a10f40e335b2d881ee3",
+  "candidate": "working tree T-135 before new commit",
+  "viewport_tiles": 120701,
+  "occupied_tiles_visited_after": 2,
+  "zoom": 0.01,
+  "warm_samples_per_run": 7,
+  "runs": {
+    "baseline": [
+      {
+        "log": "t135-sparse-viewport-logs/baseline-1.txt",
+        "sha256": "cbdfecfd1520a6614d403b9f08c9348ab1764c03f2f0dd178201015ee4c507e4",
+        "p50_ms": 104.884,
+        "p95_ms": 116.514,
+        "warm_draw_ms": [
+          101.836,
+          103.273,
+          104.193,
+          104.884,
+          106.993,
+          110.146,
+          116.514
+        ],
+        "assertion_failures": 4
+      },
+      {
+        "log": "t135-sparse-viewport-logs/baseline-2.txt",
+        "sha256": "de86644992082bc4acb76fd0ae7eac14ebb255759f5edfa813e6a2023d7138c8",
+        "p50_ms": 107.058,
+        "p95_ms": 121.046,
+        "warm_draw_ms": [
+          102.689,
+          105.944,
+          106.305,
+          107.058,
+          108.279,
+          119.978,
+          121.046
+        ],
+        "assertion_failures": 4
+      },
+      {
+        "log": "t135-sparse-viewport-logs/baseline-3.txt",
+        "sha256": "83346c59e50ad39b305cdc9828ad2d98df264455a655e4517309552b47573b0a",
+        "p50_ms": 107.656,
+        "p95_ms": 200.112,
+        "warm_draw_ms": [
+          96.861,
+          104.27,
+          104.336,
+          107.656,
+          108.735,
+          125.704,
+          200.112
+        ],
+        "assertion_failures": 4
+      }
+    ],
+    "candidate": [
+      {
+        "log": "t135-sparse-viewport-logs/candidate-1.txt",
+        "sha256": "24f7592a01540f66af5263c6ed5408c454e94331634f604d0cd0b4ca581e8095",
+        "p50_ms": 0.088,
+        "p95_ms": 0.143,
+        "warm_draw_ms": [
+          0.076,
+          0.079,
+          0.08,
+          0.088,
+          0.091,
+          0.105,
+          0.143
+        ],
+        "assertion_failures": 0
+      },
+      {
+        "log": "t135-sparse-viewport-logs/candidate-2.txt",
+        "sha256": "41fd71a807642c713ac4b69d585fba836db114f5c5346ab2bf85855fb761558b",
+        "p50_ms": 0.07,
+        "p95_ms": 0.076,
+        "warm_draw_ms": [
+          0.064,
+          0.065,
+          0.069,
+          0.07,
+          0.07,
+          0.07,
+          0.076
+        ],
+        "assertion_failures": 0
+      },
+      {
+        "log": "t135-sparse-viewport-logs/candidate-3.txt",
+        "sha256": "4ddac779ca4ea6006696cc9cbac96da415d01fc7ac321ff15b066fd3882158f6",
+        "p50_ms": 0.078,
+        "p95_ms": 0.207,
+        "warm_draw_ms": [
+          0.069,
+          0.069,
+          0.07,
+          0.078,
+          0.118,
+          0.135,
+          0.207
+        ],
+        "assertion_failures": 0
+      }
+    ]
+  },
+  "checks": {
+    "model": 16,
+    "native": 23,
+    "viewport_native": 153
+  },
+  "candidate_source_sha256": "c347bb8ce1b7aabf94120fdabfc22e99440331958c4f630b8481a2cfac5448e0",
+  "baseline_source_sha256": "e213a2054c84f358d9aedf6bdbf441c86c2ee3a64cc54186c21d922328a6751b"
+}

@@ -31,6 +31,15 @@ jobs:
             --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
             --script res://tests/object_discovery_native.gd 2>&1 | tee /tmp/t093-native.log
           python3 tools/check_native_t093_log.py /tmp/t093-native.log
+      - name: Verify T-120 native File/Object pointer, Open/Save, dirty-close and responsive More
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/t120-screenshots
+          T120_SCREENSHOTS=/tmp/t120-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/t120_file_object_native.gd 2>&1 | tee /tmp/t120-native.log
+          python3 tools/check_native_t120_log.py /tmp/t120-native.log
       - name: Upload Xvfb-only framebuffer screenshots and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -39,4 +48,6 @@ jobs:
           path: |
             /tmp/t093-native.log
             /tmp/t093-screenshots/
+            /tmp/t120-native.log
+            /tmp/t120-screenshots/
           if-no-files-found: warn

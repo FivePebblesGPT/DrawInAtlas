@@ -27,6 +27,11 @@ var layer_id: String = "":
 		layer_id = value
 var tool: String = "Brush":
 	set(value):
+		# A second press may be buffered while the previous released stroke
+		# drains; do not splice tool changes into that captured source path.
+		if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]) \
+				and value != tool:
+			_discard_deferred_stroke("Deferred stroke cancelled because the tool changed")
 		# Once released, queued source-space samples and frozen brush settings
 		# outlive a toolbar change (including selecting Pan).
 		if ((session != null and _stroke_phase == StrokePhase.CAPTURING) or dragging \
@@ -96,6 +101,8 @@ var _checker_texture: ImageTexture
 var zoom: float = 4.0:
 	set(value):
 		if value != zoom:
+			if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+				_discard_deferred_stroke("Deferred stroke cancelled because zoom changed during capture")
 			# A released stroke no longer samples screen coordinates: viewport
 			# navigation must never discard its already queued source positions.
 			if (session != null and _stroke_phase == StrokePhase.CAPTURING) \
@@ -108,6 +115,9 @@ var zoom: float = 4.0:
 ## into one gesture. Idle panning and equivalent assignments remain harmless.
 var camera: Vector2 = Vector2.ZERO:
 	set(value):
+		if value != camera and not _deferred_stroke.is_empty() \
+				and bool(_deferred_stroke["capturing"]):
+			_discard_deferred_stroke("Deferred stroke cancelled because the camera moved during capture")
 		if value != camera and ((session != null and _stroke_phase == StrokePhase.CAPTURING) \
 				or (dragging and (selecting or moving))):
 			cancel_gesture()
@@ -132,6 +142,8 @@ var selected: Rect2i = Rect2i():
 			selection_mask.set_rectangle(value)
 			_mask_outline_cache.clear()
 			_mask_outline_window = Rect2i()
+			_mask_outline_footprint = Rect2i()
+			_mask_outline_plan_valid = false
 var _marquee: Rect2i = Rect2i()
 var _marquee_dragged: bool = false
 var _marquee_start_screen: Vector2 = Vector2.ZERO
@@ -144,8 +156,25 @@ var move_profile_samples: Array[Dictionary] = []
 const MASK_OUTLINE_TILE: int = 64
 const MASK_OUTLINE_TILES_PER_FRAME: int = 4
 const MAX_MASK_OUTLINE_CACHE: int = 4096
+## Bound transient explicit-mask indexing independently of the contour cache.
+const MAX_MASK_OUTLINE_INDEX_POINTS: int = 8192
 var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
 var _mask_outline_window: Rect2i = Rect2i()
+var _mask_outline_footprint: Rect2i = Rect2i()
+var _mask_outline_focus: Vector2i = Vector2i.ZERO
+## A four-contour/frame backlog may redraw a stable >4096-tile mask for
+## hundreds of frames. Reuse its bounded eligibility plan until the source
+## mask epoch, clipped footprint or camera priority actually changes.
+var _mask_outline_plan_valid: bool = false
+var _mask_outline_plan_mask: DrawingSelection
+var _mask_outline_plan_generation: int = -1
+var _mask_outline_plan_inverted: bool = false
+var _mask_outline_plan_operation_count: int = -1
+var _mask_outline_plan_pixel_count: int = -1
+var _mask_outline_plan_footprint: Rect2i = Rect2i()
+var _mask_outline_plan_focus: Vector2i = Vector2i.ZERO
+var _mask_outline_plan_candidates: Array[Vector2i] = []
+var _mask_outline_plan_build_count: int = 0
 var _move_target: Vector2i = Vector2i.ZERO
 var _move_target_received_us: int = 0
 var _move_preview_offset: Vector2i = Vector2i.ZERO
@@ -175,7 +204,7 @@ var pointer_known: bool = false
 ## The bounded LRU owns every retained texture; a draw call need not create any.
 const DISPLAY_TILE_SIZE: int = 128
 const MAX_DISPLAY_TILES: int = 144
-## Cold *committed* content with a wholly retainable visible footprint can be
+## Cold committed content or complete, retainable detached preview tiles can be
 ## populated over multiple draw callbacks. Each synchronous raster composite
 ## is atomic, so this is a soft CPU budget, never a hard real-time deadline.
 ## Over-budget dense views use the original complete-frame transient path:
@@ -271,6 +300,13 @@ var _staged_position: Vector2 = Vector2.ZERO
 ## camera-independent; committing publishes one atomic history entry.
 enum StrokePhase { IDLE, CAPTURING, DRAINING, COMMITTING }
 var _stroke_phase: int = StrokePhase.IDLE
+## One bounded follow-up Brush/Eraser may be captured in source space while a
+## released stroke is still draining. No second DrawingEditSession is opened
+## until the first publishes its full atomic history transaction.
+const MAX_DEFERRED_STROKE_SAMPLES: int = 4096
+var _deferred_stroke: Dictionary = {}
+var _deferred_points: Array[Vector2] = []
+var _deferred_times_us: Array[int] = []
 var _finish_requested: bool = false
 var _stroke_color: int = 0
 var _stroke_width: float = 1.0
@@ -305,6 +341,8 @@ func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> voi
 	selection_mask = value.detached_copy() if value != null else DrawingSelection.new()
 	_mask_outline_cache.clear()
 	_mask_outline_window = Rect2i()
+	_mask_outline_footprint = Rect2i()
+	_mask_outline_plan_valid = false
 	_updating_selection_bounds = true
 	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
 	_updating_selection_bounds = false
@@ -318,6 +356,10 @@ func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> voi
 ## from two unrelated grids. A finished floating Move can still be adjusted
 ## before the next drag, and changing guide visibility is always harmless.
 func _cancel_on_effective_snap_change() -> void:
+	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+		_discard_deferred_stroke("Deferred stroke cancelled because snapping changed")
+	if session != null and _stroke_phase == StrokePhase.DRAINING:
+		return  # The released gesture already owns source-space positions.
 	if session != null or (dragging and (selecting or moving)):
 		cancel_gesture()
 		canvas_error.emit("Gesture cancelled because grid snapping changed")
@@ -652,19 +694,48 @@ func _tile_focus_distance(tile: Vector2i, focus: Vector2) -> float:
 	return delta.length_squared()
 
 
-## A viewport containing more occupied display tiles than the cache can hold
-## must build transient textures for the remainder. Choose its 144 retained
-## keys *once* per frame, rather than rescanning every existing texture on each
-## transient cache miss. This is metadata-only; drawing remains pixel-exact.
-## Unknown occupancy, active previews and huge viewports use the old LRU path.
-func _focal_retention_plan(window: Rect2i, focus: Vector2) -> Dictionary[String, bool]:
+## An over-budget viewport retains the 144 closest canonical display keys.
+## Complete detached preview stamps may join committed occupancy; a partial,
+## malformed or excessive index must not influence retention. All tiles are
+## still drawn in source order; this plan changes only which textures survive.
+func _focal_retention_plan(window: Rect2i, focus: Vector2,
+		preview_stamps: Dictionary = {}, preview_complete: bool = false) -> Dictionary[String, bool]:
 	var selected: Dictionary[String, bool] = {}
-	if _occupancy_unknown or session != null or _move_preview != null \
+	var has_preview: bool = session != null or _move_preview != null
+	if _occupancy_unknown or (has_preview and not preview_complete) \
 			or window.get_area() <= MAX_DISPLAY_TILES \
 			or window.get_area() > MAX_FOCAL_PLAN_WINDOW:
 		return selected
 	var occupied: Array[Dictionary] = []
-	if _occupied_display_tiles.size() * 2 < window.get_area():
+	if has_preview:
+		# Check all preview keys and generations, including offscreen entries.
+		# Source occupancy is already capped; do not allocate an unbounded union.
+		if preview_stamps.size() > MAX_FOCAL_PLAN_CANDIDATES \
+				or _occupied_display_tiles.size() + preview_stamps.size() > MAX_FOCAL_PLAN_CANDIDATES:
+			return selected
+		var keys: Dictionary[String, bool] = {}
+		for key: String in _occupied_display_tiles:
+			keys[key] = true
+		for key: String in preview_stamps:
+			if not (preview_stamps[key] is int) or int(preview_stamps[key]) <= 0:
+				return {}
+			keys[key] = true
+		for key: String in keys:
+			var comma: int = key.find(",")
+			if comma < 1 or comma >= key.length() - 1:
+				return {}
+			var x_text: String = key.left(comma)
+			var y_text: String = key.substr(comma + 1)
+			if not x_text.is_valid_int() or not y_text.is_valid_int():
+				return {}
+			var tile: Vector2i = Vector2i(int(x_text), int(y_text))
+			if "%d,%d" % [tile.x, tile.y] != key:
+				return {} # No aliases of a display tile in the plan.
+			if window.has_point(tile):
+				occupied.append({"key": key, "distance": _tile_focus_distance(tile, focus)})
+				if occupied.size() > MAX_FOCAL_PLAN_CANDIDATES:
+					return {}
+	elif _occupied_display_tiles.size() * 2 < window.get_area():
 		for key: String in _occupied_display_tiles:
 			var comma: int = key.find(",")
 			if comma < 1:
@@ -845,42 +916,59 @@ func _preview_index_for_draw(edit: DrawingEditSession, window: Rect2i) -> Dictio
 
 
 ## Choose the nearest missing cold tiles before traversing the draw list.
-## Scans only the bounded *display occupancy* index, never canonical pixels.
-## All tiles must fit the persistent cache; otherwise the old full-frame path
-## is necessary to display transient overflow tiles without holes.
-func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
-	if _occupancy_unknown or session != null or _move_preview != null:
+## Scans only bounded display occupancy metadata, never canonical pixels.
+## An indexed detached preview may participate only if the *validated* union
+## is complete and entirely retainable in the texture cache. Unknown/partial
+## previews and over-budget views retain the original full-frame path.
+func _cold_population_targets(window: Rect2i, focus: Vector2,
+		preview: DrawingEditSession = null, preview_stamps: Dictionary = {},
+		sparse: Dictionary = {}) -> Dictionary:
+	if _occupancy_unknown:
+		return {}
+	var active_preview: DrawingEditSession = session if session != null else _move_preview
+	if active_preview != null and (preview != active_preview \
+			or not bool(sparse.get("indexed", false))):
 		return {}
 	var occupied_tiles: Dictionary[String, Vector2i] = {}
-	# A large sparse zoom-out can expose thousands of empty *display* cells;
-	# enumerate the much smaller existing occupancy index instead. For dense
-	# documents, keep iteration bounded by the viewport rather than the entire
-	# (up to 40,000-entry) document occupancy map.
-	if _occupied_display_tiles.size() * 2 < window.get_area():
-		for key: String in _occupied_display_tiles:
-			var comma: int = key.find(",")
-			if comma < 1:
-				return {} # Invalid hint: use the conservative full-frame path.
-			var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
-			if window.has_point(tile):
-				occupied_tiles[key] = tile
-				if occupied_tiles.size() > MAX_DISPLAY_TILES:
-					return {}
-	else:
-		for y: int in range(window.position.y, window.end.y):
-			for x: int in range(window.position.x, window.end.x):
+	if active_preview != null:
+		# _sparse_visible_draw_rows has already validated canonical signed keys,
+		# positive preview generations and completeness; avoid a second union.
+		if int(sparse.get("count", MAX_DISPLAY_TILES + 1)) > MAX_DISPLAY_TILES:
+			return {}
+		for y: int in sparse.get("ys", []):
+			for x: int in (sparse.get("rows", {}) as Dictionary).get(y, []):
 				var key: String = "%d,%d" % [x, y]
-				if _occupied_display_tiles.has(key):
-					occupied_tiles[key] = Vector2i(x, y)
+				occupied_tiles[key] = Vector2i(x, y)
+	else:
+		# A large sparse zoom-out can expose thousands of empty display cells;
+		# enumerate the smaller occupancy index. Dense views scan the window.
+		if _occupied_display_tiles.size() * 2 < window.get_area():
+			for key: String in _occupied_display_tiles:
+				var comma: int = key.find(",")
+				if comma < 1:
+					return {} # Unknown hint: preserve full-frame traversal.
+				var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
+				if window.has_point(tile):
+					occupied_tiles[key] = tile
 					if occupied_tiles.size() > MAX_DISPLAY_TILES:
 						return {}
+		else:
+			for y: int in range(window.position.y, window.end.y):
+				for x: int in range(window.position.x, window.end.x):
+					var key: String = "%d,%d" % [x, y]
+					if _occupied_display_tiles.has(key):
+						occupied_tiles[key] = Vector2i(x, y)
+						if occupied_tiles.size() > MAX_DISPLAY_TILES:
+							return {}
 	var occupied: int = occupied_tiles.size()
 	var missing: Array[Dictionary] = []
 	for key: String in occupied_tiles:
 		var entry: Dictionary = _display_tiles.get(key, {})
+		var stamp: int = int(preview_stamps.get(key, 0)) if active_preview != null else 0
+		var owner: DrawingEditSession = active_preview if stamp > 0 else null
 		if entry.is_empty() or bool(entry.get("dirty", true)) \
-				or int(entry.get("preview_stamp", 0)) != 0 \
-				or entry.get("preview_owner") != null:
+				or int(entry.get("preview_stamp", 0)) != stamp \
+				or entry.get("preview_owner") != owner:
 			missing.append({"key": key,
 				"distance": _tile_focus_distance(occupied_tiles[key], focus)})
 	# Do not spread a small or sparsely occupied viewport over multiple frames.
@@ -894,6 +982,66 @@ func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
 	for i: int in range(mini(missing.size(), MAX_COLD_TILES_PER_DRAW)):
 		selected[missing[i]["key"]] = true
 	return selected
+
+
+## At extreme zoom-out, a known-complete detached preview also has an
+## occupancy index. Union its exact touched display cells with committed
+## occupancy before culling; never use a partial index to hide staged paint.
+## This keeps signed row-major drawing and the original conservative fallback.
+func _sparse_visible_draw_rows(window: Rect2i, has_preview: bool,
+		preview_stamps: Dictionary = {}, preview_complete: bool = false) -> Dictionary:
+	var fallback: Dictionary = {"indexed": false, "rows": {}, "ys": [], "count": 0}
+	if _occupancy_unknown or not window.has_area() \
+			or _occupied_display_tiles.size() > MAX_OCCUPANCY_ENTRIES \
+			or (has_preview and not preview_complete):
+		return fallback
+	# Do not duplicate a large committed index on ordinary dense/normal-zoom
+	# preview frames: the union cannot be smaller than either input set.
+	if window.get_area() <= 2 * maxi(_occupied_display_tiles.size(),
+			preview_stamps.size() if has_preview else 0):
+		return fallback
+	var keys: Dictionary = _occupied_display_tiles
+	if has_preview:
+		# The index is complete only when the session's bounded per-display
+		# generation table was constructed successfully. Never infer pixels
+		# from an empty *partial* table or accept invalid generation values.
+		if preview_stamps.size() > MAX_OCCUPANCY_ENTRIES:
+			return fallback
+		keys = _occupied_display_tiles.duplicate()
+		for key: String in preview_stamps:
+			if not (preview_stamps[key] is int) or int(preview_stamps[key]) <= 0:
+				return fallback
+			keys[key] = true
+			if keys.size() > MAX_OCCUPANCY_ENTRIES:
+				return fallback
+	if window.get_area() <= 2 * keys.size():
+		return fallback
+	var rows: Dictionary[int, Array] = {}
+	var count: int = 0
+	for key: String in keys:
+		var comma: int = key.find(",")
+		if comma < 1 or comma == key.length() - 1:
+			return fallback
+		var x_text: String = key.left(comma)
+		var y_text: String = key.substr(comma + 1)
+		if not x_text.is_valid_int() or not y_text.is_valid_int():
+			return fallback
+		var tile: Vector2i = Vector2i(int(x_text), int(y_text))
+		# Reject text aliases so a cached tile is submitted at most once.
+		if "%d,%d" % [tile.x, tile.y] != key:
+			return fallback
+		if not window.has_point(tile):
+			continue
+		if not rows.has(tile.y):
+			rows[tile.y] = []
+		(rows[tile.y] as Array).append(tile.x)
+		count += 1
+	var ys: Array[int] = []
+	for y: int in rows:
+		(rows[y] as Array).sort()
+		ys.append(y)
+	ys.sort()
+	return {"indexed": true, "rows": rows, "ys": ys, "count": count}
 
 
 func _draw() -> void:
@@ -912,7 +1060,7 @@ func _draw() -> void:
 		"cold_tiles_deferred": 0, "cold_budgeted": 0,
 		"cache_limit_bytes": MAX_DISPLAY_TILES * DISPLAY_TILE_SIZE * DISPLAY_TILE_SIZE * 4,
 		"focal_plan_tiles": 0, "focal_evictions": 0,
-		"focal_reused_evicted": 0}
+		"focal_reused_evicted": 0, "tiles_examined": 0, "sparse_draw": 0}
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.15, 0.16, 0.18))
 	if document == null or size.x <= 0 or size.y <= 0 or zoom <= 0:
 		_preview_index_for_draw(null, Rect2i())
@@ -930,23 +1078,6 @@ func _draw() -> void:
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
 	var cache_focus: Vector2 = _display_cache_focus()
-	# A batch eviction plan preserves texture hits even when a future near-
-	# focus tile displaces an earlier visible tile. Keep displaced entries alive
-	# locally until their draw command has been submitted this frame.
-	var focal_plan: Dictionary[String, bool] = _focal_retention_plan(visible_tiles, cache_focus)
-	var focal_victims: Array[String] = []
-	var evicted_for_frame: Dictionary[String, Dictionary] = {}
-	if not focal_plan.is_empty():
-		for cached_key: String in _display_tiles:
-			if not focal_plan.has(cached_key):
-				focal_victims.append(cached_key)
-		focal_victims.sort()
-	metrics["focal_plan_tiles"] = focal_plan.size()
-	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus)
-	var cold_budgeted: bool = not cold_targets.is_empty()
-	var cold_rendered: int = 0
-	var cold_failed: bool = false
-	metrics["cold_budgeted"] = 1 if cold_budgeted else 0
 	# Resolve visible layers lazily: an idle redraw consisting entirely of
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
@@ -970,9 +1101,41 @@ func _draw() -> void:
 		# Release the last detached index after commit/cancel, and avoid
 		# retaining an otherwise completed edit session from an idle Canvas.
 		_preview_index_for_draw(null, visible_tiles)
-	for y: int in range(start_y, end_y + 1):
-		for x: int in range(start_x, end_x + 1):
-			metrics["tiles_visible"] = int(metrics["tiles_visible"]) + 1
+	# A batch eviction plan preserves texture hits even when a future near-
+	# focus tile displaces an earlier visible tile. Keep displaced entries alive
+	# locally until their draw command has been submitted this frame.
+	var focal_plan: Dictionary[String, bool] = _focal_retention_plan(visible_tiles, cache_focus,
+		indexed_stamps, preview_session != null and use_preview_index)
+	var focal_victims: Array[String] = []
+	var evicted_for_frame: Dictionary[String, Dictionary] = {}
+	if not focal_plan.is_empty():
+		for cached_key: String in _display_tiles:
+			if not focal_plan.has(cached_key):
+				focal_victims.append(cached_key)
+		focal_victims.sort()
+	metrics["focal_plan_tiles"] = focal_plan.size()
+	var sparse: Dictionary = _sparse_visible_draw_rows(visible_tiles,
+		preview_session != null, indexed_stamps, use_preview_index)
+	var use_sparse: bool = bool(sparse["indexed"])
+	# The same validated preview union now governs both sparse traversal and
+	# bounded first-population scheduling; never throttle partial previews.
+	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus,
+		preview_session, indexed_stamps, sparse)
+	var cold_budgeted: bool = not cold_targets.is_empty()
+	var cold_rendered: int = 0
+	var cold_failed: bool = false
+	metrics["cold_budgeted"] = 1 if cold_budgeted else 0
+	metrics["sparse_draw"] = 1 if use_sparse else 0
+	metrics["tiles_visible"] = visible_tiles.get_area()
+	if use_sparse:
+		metrics["empty_skipped"] = visible_tiles.get_area() - int(sparse["count"])
+	var draw_ys: Array = sparse["ys"] as Array if use_sparse \
+		else range(start_y, end_y + 1)
+	for y: int in draw_ys:
+		var draw_xs: Array = (sparse["rows"] as Dictionary).get(y, []) if use_sparse \
+			else range(start_x, end_x + 1)
+		for x: int in draw_xs:
+			metrics["tiles_examined"] = int(metrics["tiles_examined"]) + 1
 			var key: String = "%d,%d" % [x, y]
 			var area: Rect2i = Rect2i(x * DISPLAY_TILE_SIZE, y * DISPLAY_TILE_SIZE,
 				DISPLAY_TILE_SIZE, DISPLAY_TILE_SIZE)
@@ -1128,6 +1291,181 @@ func _draw() -> void:
 ## The persistent selection always traces mask truth, never the conservative
 ## enclosing bounds. Only viewport-intersecting rows are evaluated; rectangle
 ## boolean expressions have a scanline cost independent of selected area.
+## A sparse explicit pixel mask may span millions of empty source cells.
+## Derive only tiles holding selected pixels; rectangle operations/inversion
+## require the general contour walker and retain its conservative behavior.
+## Both paths bound work to the retained 4096-tile outline budget.
+func _mask_outline_focal_cell(left: int, top: int, right: int, bottom: int) -> Vector2i:
+	return Vector2i(
+		clampi(DrawingDocument.TILES.floor_div(floori(camera.x), MASK_OUTLINE_TILE), left, right),
+		clampi(DrawingDocument.TILES.floor_div(floori(camera.y), MASK_OUTLINE_TILE), top, bottom))
+
+
+func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
+	var candidates: Array[Vector2i] = []
+	if not footprint.has_area():
+		return candidates
+	var plan_left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+	var plan_top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+	var plan_right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+	var plan_bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+	var plan_focus: Vector2i = _mask_outline_focal_cell(plan_left, plan_top, plan_right, plan_bottom)
+	var source_changed: bool = _mask_outline_plan_mask == selection_mask and ( \
+		_mask_outline_plan_generation != selection_mask.generation \
+		or _mask_outline_plan_inverted != selection_mask.inverted \
+		or _mask_outline_plan_operation_count != selection_mask._operations.size() \
+		or _mask_outline_plan_pixel_count != selection_mask._pixel_mask.size())
+	if _mask_outline_plan_valid and _mask_outline_plan_mask == selection_mask \
+			and not source_changed \
+			and _mask_outline_plan_footprint == footprint \
+			and _mask_outline_plan_focus == plan_focus:
+		# Never expose the owned array to a caller that could mutate its order.
+		return _mask_outline_plan_candidates.duplicate()
+	if _mask_outline_plan_valid and source_changed:
+		# In-place set_mask/combine_rectangle must also invalidate traced pixels.
+		_mask_outline_cache.clear()
+		_mask_outline_window = Rect2i()
+		_mask_outline_footprint = Rect2i()
+	if not selection_mask.inverted and selection_mask._operations.is_empty() \
+			and not selection_mask._pixel_mask.is_empty() \
+			and selection_mask._pixel_mask.size() <= MAX_MASK_OUTLINE_INDEX_POINTS:
+		# An exact sparse mask should never spend the 4096-tile contour budget
+		# on *empty* cells. Index at most 8192 input points; larger masks keep
+		# the conservative bounded fallback instead of allocating unbounded
+		# transient index/sort memory on every draw.
+		var indexed: Dictionary[Vector2i, bool] = {}
+		for point: Vector2i in selection_mask._pixel_mask:
+			if not selection_mask._pixel_mask[point] \
+					or not selection_mask._base_bounds.has_point(point) \
+					or not footprint.has_point(point):
+				continue
+			var tile: Vector2i = Vector2i(
+				DrawingDocument.TILES.floor_div(point.x, MASK_OUTLINE_TILE),
+				DrawingDocument.TILES.floor_div(point.y, MASK_OUTLINE_TILE))
+			indexed[tile] = true
+		for tile: Vector2i in indexed:
+			candidates.append(tile)
+		if candidates.size() > MAX_MASK_OUTLINE_CACHE:
+			var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+			var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+			var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+			var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+			var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
+			# Bucket by Chebyshev ring, then sort only within each ring. A global
+			# GDScript comparator sort of 4k+ cells costs dozens of milliseconds
+			# every redraw; native integer bucket sorting is substantially cheaper.
+			var rings: Dictionary[int, Array] = {}
+			for tile: Vector2i in candidates:
+				var distance: int = maxi(absi(tile.x - focus.x), absi(tile.y - focus.y))
+				var ring: Array = rings.get(distance, [])
+				ring.append(tile)
+				rings[distance] = ring
+			var distances: Array[int] = []
+			for distance: int in rings:
+				distances.append(distance)
+			distances.sort()
+			candidates.clear()
+			for distance: int in distances:
+				var ring: Array = rings[distance]
+				ring.sort()
+				for tile: Vector2i in ring:
+					candidates.append(tile)
+					if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+						return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+		else:
+			# Preserve the legacy exact small-mask traversal/order.
+			candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+				return a.y < b.y if a.y != b.y else a.x < b.x)
+		return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+	var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+	var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+	var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+	var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+	# A large or compound mask cannot be indexed cheaply. The old row-major
+	# 4096-tile fallback could consume its entire budget at the top-left of
+	# a wide viewport, never reaching an outline at the user's focal point.
+	# Walk bounded square rings from the camera instead. Clip each ring to
+	# the visible tile window so skinny, enormous views also stay O(budget).
+	var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
+	var radius_limit: int = maxi(maxi(focus.x - left, right - focus.x),
+		maxi(focus.y - top, bottom - focus.y))
+	for radius: int in range(radius_limit + 1):
+		var x_min: int = maxi(left, focus.x - radius)
+		var x_max: int = mini(right, focus.x + radius)
+		var y_min: int = maxi(top, focus.y - radius)
+		var y_max: int = mini(bottom, focus.y + radius)
+		# Top and bottom edges, then sides without overlapping the corners.
+		if focus.y - radius >= top:
+			for x: int in range(x_min, x_max + 1):
+				candidates.append(Vector2i(x, focus.y - radius))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+		if radius > 0 and focus.y + radius <= bottom:
+			for x: int in range(x_min, x_max + 1):
+				candidates.append(Vector2i(x, focus.y + radius))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+		for y: int in range(y_min, y_max + 1):
+			if absi(y - focus.y) == radius:
+				continue  # Already visited on the top/bottom edges.
+			if focus.x - radius >= left:
+				candidates.append(Vector2i(focus.x - radius, y))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+			if radius > 0 and focus.x + radius <= right:
+				candidates.append(Vector2i(focus.x + radius, y))
+				if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+					return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+	return _remember_mask_outline_plan(footprint, plan_focus, candidates)
+
+
+
+func _remember_mask_outline_plan(footprint: Rect2i, focus: Vector2i,
+		candidates: Array[Vector2i]) -> Array[Vector2i]:
+	_mask_outline_plan_mask = selection_mask
+	_mask_outline_plan_generation = selection_mask.generation
+	_mask_outline_plan_inverted = selection_mask.inverted
+	_mask_outline_plan_operation_count = selection_mask._operations.size()
+	_mask_outline_plan_pixel_count = selection_mask._pixel_mask.size()
+	_mask_outline_plan_footprint = footprint
+	_mask_outline_plan_focus = focus
+	_mask_outline_plan_candidates = candidates.duplicate()
+	_mask_outline_plan_valid = true
+	_mask_outline_plan_build_count += 1
+	return candidates
+
+
+## Reuse contours across small camera pans, but do not let a saturated
+## cache starve outlines revealed by sub-tile clipping. Two visible source
+## footprints can have the same 64px tile window and focal tile, while their
+## eligible *occupied* contour tiles differ at the viewport edge. Reconcile
+## those plans only when the clipped footprint or focal tile changes; ordinary
+## stationary redraws avoid rebuilding a 4096-entry eligibility dictionary.
+func _sync_mask_outline_cache(tile_window: Rect2i, focus: Vector2i,
+		candidates: Array[Vector2i], clipped_footprint: Rect2i = Rect2i()) -> void:
+	# Per-tile contours are generated in source coordinates and independent of
+	# viewport clipping. A shifted visible window can therefore retain every
+	# cached tile that remains eligible; clearing all 4096 entries would make
+	# distant outlined islands disappear for hundreds of deferred frames.
+	var reconcile: bool = false
+	if tile_window != _mask_outline_window:
+		reconcile = true
+	elif (candidates.size() >= MAX_MASK_OUTLINE_CACHE \
+			or _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE) \
+			and (focus != _mask_outline_focus or clipped_footprint != _mask_outline_footprint):
+		reconcile = true
+	if reconcile and not _mask_outline_cache.is_empty():
+		var eligible: Dictionary[Vector2i, bool] = {}
+		for tile: Vector2i in candidates:
+			eligible[tile] = true
+		for tile: Vector2i in _mask_outline_cache.keys():
+			if not eligible.has(tile):
+				_mask_outline_cache.erase(tile)
+	_mask_outline_window = tile_window
+	_mask_outline_focus = focus
+	_mask_outline_footprint = clipped_footprint
+
+
 func _draw_selection_outline() -> void:
 	if not selection_mask.enabled or not selected.has_area():
 		return
@@ -1150,28 +1488,26 @@ func _draw_selection_outline() -> void:
 		var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
 		var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
 		var tile_window: Rect2i = Rect2i(left, top, right - left + 1, bottom - top + 1)
-		if tile_window != _mask_outline_window:
-			_mask_outline_cache.clear()
-			_mask_outline_window = tile_window
+		var candidates: Array[Vector2i] = _mask_outline_tile_candidates(footprint)
+		var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
+		# Capped candidates depend on the camera focus *and* the pixel-level
+		# clipped footprint. Even within the same 64px window, an edge island
+		# may enter while the cache is full of newly off-screen contours.
+		_sync_mask_outline_cache(tile_window, focus, candidates, footprint)
 		var created: int = 0
 		var pending: bool = false
-		for tile_y: int in range(top, bottom + 1):
-			for tile_x: int in range(left, right + 1):
-				var tile: Vector2i = Vector2i(tile_x, tile_y)
-				if not _mask_outline_cache.has(tile):
-					if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
-						# At extreme zoom-out/display sizes, an explicit mask may
-						# exceed the retained cache. Stop progressive redraw rather
-						# than evict/rebuild forever; a changed view starts fresh.
-						continue
-					if created >= MASK_OUTLINE_TILES_PER_FRAME:
-						pending = true
-						continue
-					created += 1
-					_mask_outline_cache[tile] = selection_mask.contour_segments(
-						Rect2i(tile * MASK_OUTLINE_TILE,
-							Vector2i(MASK_OUTLINE_TILE, MASK_OUTLINE_TILE)))
-				source_edges.append_array(_mask_outline_cache[tile])
+		for tile: Vector2i in candidates:
+			if not _mask_outline_cache.has(tile):
+				if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
+					continue
+				if created >= MASK_OUTLINE_TILES_PER_FRAME:
+					pending = true
+					continue
+				created += 1
+				_mask_outline_cache[tile] = selection_mask.contour_segments(
+					Rect2i(tile * MASK_OUTLINE_TILE,
+						Vector2i(MASK_OUTLINE_TILE, MASK_OUTLINE_TILE)))
+			source_edges.append_array(_mask_outline_cache[tile])
 		if pending:
 			queue_redraw()
 	var screen_edges: PackedVector2Array = PackedVector2Array()
@@ -1220,7 +1556,7 @@ func _gui_input(event: InputEvent) -> void:
 			last_mouse = motion.position
 			queue_redraw()
 			view_changed.emit()
-		elif dragging:
+		elif dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"])):
 			update_gesture(motion.position)
 		cursor_moved.emit()
 		if tool in ["Brush", "Eraser"]:
@@ -1236,6 +1572,10 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key: InputEventKey = event
 		if key.pressed and not key.echo and key.keycode == KEY_ESCAPE \
+				and not _deferred_stroke.is_empty():
+			_discard_deferred_stroke()
+			get_viewport().set_input_as_handled()
+		elif key.pressed and not key.echo and key.keycode == KEY_ESCAPE \
 				and (dragging or session != null or has_focus()):
 			cancel_gesture()
 			get_viewport().set_input_as_handled()
@@ -1245,11 +1585,13 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		var motion: InputEventMouseMotion = event
-		if dragging and not get_global_rect().has_point(motion.position):
+		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
+				and not get_global_rect().has_point(motion.position):
 			update_gesture(get_global_transform().affine_inverse() * motion.position)
 	elif event is InputEventMouseButton:
 		var button: InputEventMouseButton = event
-		if dragging and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed \
+		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
+				and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed \
 				and not get_global_rect().has_point(button.position):
 			finish_gesture(get_global_transform().affine_inverse() * button.position)
 
@@ -1271,20 +1613,95 @@ func _process(_delta: float) -> void:
 		cancel_gesture()
 
 
-func start_gesture(position: Vector2) -> void:
+func _discard_deferred_stroke(reason: String = "") -> void:
+	_deferred_stroke.clear()
+	_deferred_points.clear()
+	_deferred_times_us.clear()
+	if not reason.is_empty():
+		canvas_error.emit(reason)
+
+
+func _append_deferred_stroke(position: Vector2) -> void:
+	if _deferred_stroke.is_empty() or not bool(_deferred_stroke["capturing"]):
+		return
+	if _deferred_points.size() >= MAX_DEFERRED_STROKE_SAMPLES:
+		_discard_deferred_stroke("Deferred stroke input limit reached; stroke cancelled")
+		return
+	_deferred_points.append(position)
+	_deferred_times_us.append(Time.get_ticks_usec())
+
+
+func _capture_deferred_stroke(position: Vector2) -> void:
+	if not _deferred_stroke.is_empty():
+		canvas_error.emit("Deferred stroke already queued; finish the pending stroke first")
+		return
+	var first: Vector2 = source_position(position)
+	if clip_strokes_to_image_frame and image_bounds.has_area() \
+			and not image_bounds.has_point(Vector2i(floori(first.x), floori(first.y))):
+		return
+	_deferred_points.clear()
+	_deferred_times_us.clear()
+	_deferred_stroke = {"capturing": true, "document": document, "layer": layer_id,
+		"tool": tool, "color": color_rgba, "width": brush_width,
+		"backend": brush_backend, "preset": brush_preset,
+		"selection": selection_mask.detached_copy(),
+		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i(),
+		"clip_enabled": clip_strokes_to_image_frame}
+	_append_deferred_stroke(first)
+
+
+## Promotion happens only after the previous session has committed and reset.
+## Keep real receipt timestamps so backlog telemetry includes time spent
+## waiting behind its predecessor, without running two edits concurrently.
+func _promote_deferred_stroke() -> void:
+	if _deferred_stroke.is_empty():
+		return
+	var pending: Dictionary = _deferred_stroke
+	var points: Array[Vector2] = _deferred_points
+	var times: Array[int] = _deferred_times_us
+	_deferred_stroke = {}
+	_deferred_points = []
+	_deferred_times_us = []
+	if document != pending["document"] or layer_id != pending["layer"] \
+			or clip_strokes_to_image_frame != bool(pending["clip_enabled"]) \
+			or (clip_strokes_to_image_frame and image_bounds != pending["clip"]) \
+			or not selection_mask.same_as(pending["selection"] as DrawingSelection):
+		canvas_error.emit("Deferred stroke cancelled because its edit source changed")
+		return
+	if points.is_empty():
+		return
+	pending["press_us"] = times[0]
+	start_gesture(Vector2.ZERO, points[0], pending)
+	if session == null:
+		return
+	for i: int in range(1, points.size() if bool(pending["capturing"]) else points.size() - 1):
+		_enqueue_sample_at_time(points[i], times[i])
+	if not bool(pending["capturing"]):
+		finish_gesture(Vector2.ZERO, points[points.size() - 1], times[times.size() - 1])
+
+
+func start_gesture(position: Vector2, source_override: Variant = null,
+		configuration: Dictionary = {}) -> void:
 	if session != null:
-		canvas_error.emit("Previous stroke is still draining; wait for its commit")
+		if _stroke_phase == StrokePhase.DRAINING and tool in ["Brush", "Eraser"]:
+			_capture_deferred_stroke(position)
+		else:
+			canvas_error.emit("Previous stroke is still draining; wait for its commit")
 		return
 	if document == null:
 		return
-	gesture_start = position_to_pixel(position)
+	var effective_tool: String = str(configuration.get("tool", tool))
+	var start_source: Vector2 = (source_override as Vector2) \
+		if source_override != null else source_position(position)
+	gesture_start = Vector2i(floori(start_source.x), floori(start_source.y)) \
+		if source_override != null else position_to_pixel(position)
 	grab_focus()
-	if tool == "Text":
+	if effective_tool == "Text":
 		text_requested.emit(gesture_start)
 		return
 	dragging = true
-	selecting = tool == "Select"
-	moving = tool == "Move"
+	selecting = effective_tool == "Select"
+	moving = effective_tool == "Move"
 	if selecting or moving:
 		if selecting:
 			_marquee_start_screen = position
@@ -1322,7 +1739,7 @@ func start_gesture(position: Vector2) -> void:
 			_move_target = _floating_offset
 			_move_target_received_us = 0
 		return
-	if tool not in ["Brush", "Eraser"]:
+	if effective_tool not in ["Brush", "Eraser"]:
 		dragging = false
 		return
 	# The neutral workspace is not a paint target. An in-frame stroke may
@@ -1343,18 +1760,19 @@ func start_gesture(position: Vector2) -> void:
 	_previous_accumulated_input = Input.use_accumulated_input
 	Input.use_accumulated_input = false
 	_owns_accumulated_input = true
-	_stroke_color = color_rgba
-	_stroke_width = brush_width
-	_stroke_erase = tool == "Eraser"
-	_stroke_clip = image_bounds if clip_strokes_to_image_frame else Rect2i()
-	_stroke_selection = selection_mask.detached_copy()
+	_stroke_color = int(configuration.get("color", color_rgba))
+	_stroke_width = float(configuration.get("width", brush_width))
+	_stroke_erase = effective_tool == "Eraser"
+	_stroke_clip = configuration.get("clip", image_bounds if clip_strokes_to_image_frame else Rect2i()) as Rect2i
+	_stroke_selection = (configuration.get("selection", selection_mask) as DrawingSelection).detached_copy()
 	_native_brush = null
 	_active_brush_backend = "Legacy"
-	if brush_backend in ["NativeHard", "Hokusai"]:
+	var effective_backend: String = str(configuration.get("backend", brush_backend))
+	if effective_backend in ["NativeHard", "Hokusai"]:
 		if ClassDB.class_exists("DrawingNativeBrush"):
 			_native_brush = ClassDB.instantiate("DrawingNativeBrush")
-			if brush_backend == "Hokusai" and not _stroke_erase:
-				var preset_path: String = BUNDLED_PRESETS.get(brush_preset, "")
+			if effective_backend == "Hokusai" and not _stroke_erase:
+				var preset_path: String = BUNDLED_PRESETS.get(str(configuration.get("preset", brush_preset)), "")
 				var settings: String = FileAccess.get_file_as_string(preset_path) if not preset_path.is_empty() else ""
 				# A pre-transaction native binary must fail over to Legacy;
 				# otherwise a lazy-source failure could consume pigment on retry.
@@ -1392,8 +1810,11 @@ func start_gesture(position: Vector2) -> void:
 	_pending_preview_first_us = 0
 	_has_segment_target = false
 	_finish_requested = false
-	_staged_position = source_position(position)
-	_metrics = {"down_us": Time.get_ticks_usec(), "first_stage_us": 0,
+	_staged_position = start_source
+	var source_receipt_us: int = Time.get_ticks_usec()
+	if source_override != null:
+		source_receipt_us = int(configuration["press_us"])
+	_metrics = {"down_us": source_receipt_us, "first_stage_us": 0,
 		"first_preview_submit_us": 0, "first_frame_post_draw_us": 0,
 		"release_us": 0, "commit_us": 0, "samples_received": 0,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
@@ -1419,12 +1840,15 @@ func start_gesture(position: Vector2) -> void:
 		"max_frame_selection_outline_cpu_us": 0,
 		"max_frame_pending_input_count": 0, "max_frame_oldest_pending_age_us": 0}
 	gesture_started.emit()
-	_enqueue_sample(_staged_position)
+	_enqueue_sample_at_time(_staged_position, source_receipt_us)
 	# A stationary dab does not wait for the first motion or mouse-up event.
 	_drain_segments(1)
 
 
 func update_gesture(position: Vector2) -> void:
+	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+		_append_deferred_stroke(source_position(position))
+		return
 	if not dragging:
 		return
 	var current: Vector2i = position_to_pixel(position)
@@ -1447,10 +1871,14 @@ func paint_to(point: Vector2i) -> void:
 
 
 func _enqueue_sample(position: Vector2) -> void:
+	_enqueue_sample_at_time(position, Time.get_ticks_usec())
+
+
+func _enqueue_sample_at_time(position: Vector2, received_us: int) -> void:
 	if session == null or _finish_requested:
 		return
 	_samples.append(position)
-	_sample_times_us.append(Time.get_ticks_usec())
+	_sample_times_us.append(received_us)
 	_metrics["samples_received"] = int(_metrics["samples_received"]) + 1
 	_metrics["max_pending"] = maxi(int(_metrics["max_pending"]), _samples.size() - _sample_index)
 	_metrics["max_sample_buffer"] = maxi(int(_metrics["max_sample_buffer"]), _samples.size())
@@ -1863,11 +2291,17 @@ func _commit_stroke() -> void:
 	_finish_requested = false
 	_stroke_phase = StrokePhase.IDLE
 	queue_redraw()
+	if not _deferred_stroke.is_empty():
+		if published_ok:
+			_promote_deferred_stroke()
+		else:
+			_discard_deferred_stroke("Deferred stroke cancelled because its predecessor failed to commit")
 
 
 ## Escape, stale revision and direct host changes discard the entire floating
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
+	_discard_deferred_stroke()
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
 	_pending_preview_drain_calls = 0
@@ -1904,6 +2338,12 @@ func cancel_gesture() -> void:
 	_sample_times_us.clear()
 	_sample_index = 0
 	queue_redraw()
+
+
+## Persistence and tab closure must not observe an unfinished Brush/Eraser
+## transaction as clean. This includes the bounded follow-up input queue.
+func has_pending_stroke() -> bool:
+	return session != null or not _deferred_stroke.is_empty()
 
 
 func has_floating_move() -> bool:
@@ -2000,7 +2440,13 @@ func _stage_move_preview(offset: Vector2i) -> void:
 	queue_redraw()
 
 
-func finish_gesture(position: Vector2) -> void:
+func finish_gesture(position: Vector2, source_override: Variant = null,
+		received_us: int = 0) -> void:
+	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
+		_append_deferred_stroke(source_position(position))
+		if not _deferred_stroke.is_empty():
+			_deferred_stroke["capturing"] = false
+		return
 	if not dragging:
 		return
 	if selecting:
@@ -2026,8 +2472,10 @@ func finish_gesture(position: Vector2) -> void:
 			_move_capture = null
 			_floating_source_revision = -1
 	else:
-		_enqueue_sample(source_position(position))
-		_metrics["release_us"] = Time.get_ticks_usec()
+		var arrival_us: int = received_us if received_us > 0 else Time.get_ticks_usec()
+		_enqueue_sample_at_time((source_override as Vector2) if source_override != null \
+			else source_position(position), arrival_us)
+		_metrics["release_us"] = arrival_us
 		_stroke_phase = StrokePhase.DRAINING
 		_finish_requested = true
 		# Finish small clicks synchronously; long queued strokes are drained

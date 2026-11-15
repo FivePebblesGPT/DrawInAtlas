@@ -1,0 +1,5 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_SPARSE_PASTE_BENCH: 512x512, 6 nonzero, 7 trials, CPU stage median 59 us, samples=[71, 61, 87, 58, 59, 57, 59]
+T088_SPARSE_PASTE: 56 checks; 0 failed
+T088_SPARSE_PASTE_PASSED (56 checks; 0 failed)

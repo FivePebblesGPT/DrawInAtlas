@@ -1,0 +1,698 @@
+name: Godot GDScript checks (fast desktop)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke-and-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Godot cannot import LFS pointer text as textures.
+          lfs: true
+      - name: Install Godot 4.8-beta3 (standard, non-.NET)
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+          include-templates: true
+      - name: Verify the exact beta engine
+        shell: bash
+        run: godot --version | grep -E '^4\.8\.beta3\.official\.'
+      - name: Enforce explicit types in owned GDScript and skill examples
+        id: ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 tests/check_explicit_types.py
+      - name: Verify CI initializes main project before GDScript smokes
+        id: ci_03_verify_ci_initializes_main_project_before_gdscript_smokes
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 -m unittest discover -s tests -p 'test_godot_ci_order.py' -v
+      - name: Verify fail-late CI execution and reporting
+        id: ci_04_fail_late_contract
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 -m unittest discover -s tests -p 'test_godot_ci_fail_late.py' -v
+      - name: Verify T-051 isolated Drawing contract consumer
+        id: ci_04_verify_t_051_isolated_drawing_contract_consumer
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_contract.py' -v
+      - name: Verify T-052 extracted independent Drawing core
+        id: ci_05_verify_t_052_extracted_independent_drawing_core
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_core.py' -v
+      - name: Verify T-053 isolated standalone Drawing and third package consumer
+        id: ci_06_verify_t_053_isolated_standalone_drawing_and_third_package_cons
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_drawing_app.py' -v
+      - name: Verify T-085 detached live-stroke preview and history
+        id: ci_t085_live_stroke_preview
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/live_stroke_smoke.gd 2>&1 | tee /tmp/godot-t085-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t085-model.log --marker T085_MODEL_PASSED || ci_fail_marker 'T085 live-stroke model log rejected'
+          # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
+          # its pointer/framebuffer timing witness stays opt-in and software-only.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t095-oracle.log --marker T095_ORACLE_PASSED || ci_fail_marker 'T095 Brush/Eraser independent pixel oracle rejected'
+          # T-095 Hokusai batch delta staging must match the original pixel
+          # transaction path even when no optional Rust binary is installed.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/godot-t095-hokusai-delta.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED || ci_fail_marker 'T095 Hokusai bulk delta model log rejected'
+          ci_finish
+      - name: Verify T-086 source-space dirty-display tile invalidation
+        id: ci_t086_viewport_cache_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-model.log --marker T086_MODEL_PASSED || ci_fail_marker 'T086 viewport model log rejected'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_cache_focus_smoke.gd 2>&1 | tee /tmp/godot-t086-cache-focus.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-cache-focus.log --marker T086_FOCUS_PASSED || ci_fail_marker 'T086 dense viewport retention priority witness error'
+          # T-102 bounded cold scheduling: signed focal priority, dirty/preview
+          # invalidation and conservative over-budget/unknown occupancy fallback.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t102_cold_population_smoke.gd 2>&1 | tee /tmp/godot-t102-cold-population.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t102-cold-population.log --marker T102_MODEL_PASSED || ci_fail_marker 'T102 cold population scheduling log rejected'
+          # T-103 software-only over-budget focal preselection and safe fallbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t103_retention_plan_smoke.gd 2>&1 | tee /tmp/godot-t103-retention.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t103-retention.log --marker T103_MODEL_PASSED || ci_fail_marker 'T103 focal retention planner rejected'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_cold_tile_smoke.gd 2>&1 | tee /tmp/godot-t086-cold-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-cold-model.log --marker T086_COLD_PASSED || ci_fail_marker 'T086 cold renderer parity witness error'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_pixel_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-pixels.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-sparse-pixels.log --marker T086_SPARSE_PIXEL_PASSED || ci_fail_marker 'T086 sparse source-pixel oracle rejected'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_visible_plan_smoke.gd 2>&1 | tee /tmp/godot-t086-visible-plan.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-visible-plan.log --marker T086_PLAN_PASSED || ci_fail_marker 'T086 visible-layer plan parity witness error'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_shared_chunks_smoke.gd 2>&1 | tee /tmp/godot-t086-shared-chunks.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-shared-chunks.log --marker T086_SHARED_PASSED || ci_fail_marker 'T086 shared source-chunk cache parity witness error'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/renderer_sparse_layer_smoke.gd 2>&1 | tee /tmp/godot-t086-sparse-layers.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-sparse-layers.log --marker T086_SPARSE_PASSED || ci_fail_marker 'T086 sparse-layer source culling parity witness error'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/viewport_preview_index_smoke.gd 2>&1 | tee /tmp/godot-t086-preview-index.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t086-preview-index.log --marker T086_PREVIEW_INDEX_PASSED || ci_fail_marker 'T086 bounded preview index parity witness error'
+          python3 -m unittest discover -s tests -p 'test_t086_benchmark_fixtures.py' -v || ci_fail_marker 'T086 historical fixture integrity contract failure'
+          ci_finish
+      - name: Verify T-087 standalone image frame, portable metadata and independent grid
+        id: ci_t087_image_frame_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/image_frame_smoke.gd 2>&1 | tee /tmp/godot-t087-frame-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t087-frame-model.log --marker T087_MODEL_PASSED || ci_fail_marker 'T087_MODEL_PASSED log rejected'
+          ci_finish
+      - name: Verify T-088 selection channel, clipboard, and transaction history
+        id: ci_t088_selection_clipboard_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd 2>&1 | tee /tmp/godot-t088-selection-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t088-selection-model.log --marker T088_MODEL_PASSED || ci_fail_marker 'T088_MODEL_PASSED log rejected'
+          # T-088 sparse transparent Paste must match a separate dense source oracle.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_paste_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-paste.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-paste.log --marker T088_SPARSE_PASTE_PASSED || ci_fail_marker 'T088 sparse paste source oracle rejected'
+          # T-088 capture must skip empty source tiles and preserve lazy-source failures.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_capture_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-capture.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-capture.log --marker T088_SPARSE_CAPTURE_PASSED || ci_fail_marker 'T088 sparse capture source oracle rejected'
+          # T-096 exact large-mask contours/Move source oracle is mandatory;
+          # real pointer/display and owner acceptance remain separate.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t096-model.log --marker T096_MODEL_PASSED || ci_fail_marker 'T096 large selection and Move oracle rejected'
+          ci_finish
+      - name: Verify T-089 layer hierarchy, row actions, and structural history
+        id: ci_t089_layer_structure_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/layer_structure_smoke.gd 2>&1 | tee /tmp/godot-t089-layers-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t089-layers-model.log --marker T089_MODEL_PASSED || ci_fail_marker 'T089 layers model log rejected'
+          ci_finish
+      - name: Verify T-090 responsive workspace, command routing, and licensed tool icon contracts
+        id: ci_t090_responsive_workspace_contracts
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 -m unittest discover -s tests -p 'test_t090_responsive_workspace.py' -v
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/topbar_overflow_smoke.gd 2>&1 | tee /tmp/godot-t090-overflow.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t090-overflow.log --marker T090_OVERFLOW_PASSED || ci_fail_marker 'T090 overflow checkmark and command parity rejected'
+          ci_finish
+      - name: Verify T-091 one-group floating dock and legacy settings migration
+        id: ci_t091_single_group_docking_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/dock_single_group_smoke.gd 2>&1 | tee /tmp/godot-t091-dock-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t091-dock-model.log --marker T091_MODEL_PASSED || ci_fail_marker 'T091 docking model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t091_dock.py' -v
+          ci_finish
+      - name: Verify T-092 compact Colors, history cursor, and isolated app preferences
+        id: ci_t092_compact_color_history_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/color_history_smoke.gd 2>&1 | tee /tmp/godot-t092-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t092-model.log --marker T092_MODEL_PASSED || ci_fail_marker 'T092 Colors/History model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t092_color_history.py' -v
+          ci_finish
+      - name: Verify T-093 Object source discovery, recent-root consent, image import and safe Open
+        id: ci_t093_object_discovery_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          python3 tools/build_drawing_app.py --in-place
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_discovery_smoke.gd 2>&1 | tee /tmp/godot-t093-discovery-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t093-discovery-model.log --marker T093_MODEL_PASSED || ci_fail_marker 'T093 Object discovery model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t093_object_discovery.py' -v
+          ci_finish
+      - name: Verify T-053 standalone Linux release package
+        id: ci_07_verify_t_053_standalone_linux_release_package
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A fresh isolated stage is required even on repeated CI replays.
+          release_root="$(mktemp -d "${TMPDIR:-/tmp}/drawing-dist.XXXXXXXX")"
+          trap 'rm -rf "$release_root"' EXIT
+          python3 tools/build_drawing_app.py --output "$release_root/project"
+          godot --headless --editor --path "$release_root/project" --import --quit
+          godot --headless --path "$release_root/project" --export-release Linux "$release_root/Drawing.x86_64"
+          test -s "$release_root/Drawing.x86_64"
+          test -s "$release_root/Drawing.pck"
+          # Font bytes ship as imported .fontdata, not raw .ttf.
+          # Probe the exported PCK rather than editor source files.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root" --main-pack "$release_root/Drawing.pck" \
+            --script "$release_root/project/tests/packaged_fonts_smoke.gd" \
+            2>&1 | tee /tmp/godot-export-fonts.log
+          python3 tools/check_godot_model_log.py /tmp/godot-export-fonts.log --marker DRAWING_PACK_FONT_PASSED
+          # Inspect the exported ELF/PCK and launch with a disposable HOME/CWD.
+          python3 tools/benchmarks/t068_release_gate.py \
+            --stage "$release_root/project" --linux "$release_root" \
+            --launch-linux --output /tmp/t068-standalone-linux-release.json
+      # The standalone package import above only registers *its* classes.
+      # The main checkout needs its own class cache before any --path . --script smoke.
+      - name: Import resources and parse scripts
+        id: ci_08_import_resources_and_parse_scripts
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --editor --import --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|Parse Error:|Compile Error:' /tmp/godot-import.log; then exit 1; fi
+      - name: Verify T-015 retired battlemat authoring and marker-only links
+        id: ci_t015_retired_battlemat_authoring
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t015_retirement_smoke.gd 2>&1 | tee /tmp/godot-t015-retirement.log
+          grep -q 'ATLAS_T015_RETIREMENT_PASSED' /tmp/godot-t015-retirement.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-t015-retirement.log; then ci_fail_marker 'Forbidden error marker'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/links_smoke.gd 2>&1 | tee /tmp/godot-t015-links.log
+          grep -q 'ATLAS_LINKS_PASSED' /tmp/godot-t015-links.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-t015-links.log; then ci_fail_marker 'Forbidden error marker'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/linked_maps_ui_smoke.gd 2>&1 | tee /tmp/godot-t015-link-ui.log
+          grep -q 'ATLAS_LINKED_MAPS_UI_PASSED' /tmp/godot-t015-link-ui.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-t015-link-ui.log; then ci_fail_marker 'Forbidden error marker'; fi
+          # Active archival-boundary and modern navigation witnesses: former
+          # spatial placement previews are deliberately not an authoring surface.
+          for witness in \
+              't015_archived_geometry_smoke.gd:ATLAS_T015_ARCHIVE_PASSED' \
+              'overview_smoke.gd:ATLAS_OVERVIEW_PASSED' \
+              'layer_hierarchy_smoke.gd:ATLAS_LAYER_HIERARCHY_PASSED' \
+              'search_stale_actions_smoke.gd:ATLAS_SEARCH_STALE_PASSED' \
+              'organization_ui_smoke.gd:ATLAS_ORGANIZATION_UI_PASSED' \
+              'references_ui_smoke.gd:ATLAS_REFERENCES_UI_PASSED'; do
+            file="${witness%%:*}"
+            marker="${witness#*:}"
+            log="/tmp/godot-t015-${file%.gd}.log"
+            timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script "res://tests/$file" 2>&1 | tee "$log"
+            grep -q "$marker" "$log"
+            if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' "$log"; then ci_fail_marker 'Forbidden error marker'; fi
+          done
+          ci_finish
+      - name: Verify T-054 Drawing/Atlas chronological history
+        id: ci_09_verify_t_054_drawing_atlas_chronological_history
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_history_smoke.gd 2>&1 | tee /tmp/godot-drawing-history.log
+          grep -q 'DRAWING_HISTORY_PASSED' /tmp/godot-drawing-history.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|failed;' /tmp/godot-drawing-history.log; then ci_fail_marker 'Forbidden error marker'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_history_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-history-editor.log
+          grep -q 'DRAWING_HISTORY_EDITOR_PASSED' /tmp/godot-drawing-history-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:' /tmp/godot-drawing-history-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
+      - name: Verify T-058 editable text, font integrity and undoable rasterization
+        id: ci_10_verify_t_058_editable_text_font_integrity_and_undoable_rasteriz
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_text_smoke.gd 2>&1 | tee /tmp/godot-drawing-text.log
+          python3 tools/check_godot_model_log.py /tmp/godot-drawing-text.log --marker DRAWING_TEXT_PASSED || ci_fail_marker 'DRAWING_TEXT_PASSED log rejected'
+          python3 tools/build_drawing_app.py --in-place
+          # Staging refreshes font files: let Godot generate their imported FontFile resources.
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/text_editor_smoke.gd 2>&1 | tee /tmp/godot-drawing-text-ui.log
+          python3 tools/check_godot_model_log.py /tmp/godot-drawing-text-ui.log --marker DRAWING_TEXT_UI_PASSED || ci_fail_marker 'DRAWING_TEXT_UI_PASSED log rejected'
+          ci_finish
+      - name: Verify T-060 reusable Object Assets and atomic Save As
+        id: ci_11_verify_t_060_reusable_object_assets_and_atomic_save_as
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_assets_smoke.gd 2>&1 | tee /tmp/godot-object-assets.log
+          grep -q 'OBJECT_ASSETS_PASSED' /tmp/godot-object-assets.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|FAILED:|OBJECT_ASSETS_FAILED:' /tmp/godot-object-assets.log; then exit 1; fi
+      - name: Verify T-064 nested Object child graph, safe saves and cycle rejection
+        id: ci_11b_verify_t_064_nested_object_graph
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_graph_smoke.gd 2>&1 | tee /tmp/godot-t064-child-graph.log
+          grep -q 'T064_CHILD_GRAPH_PASSED' /tmp/godot-t064-child-graph.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_GRAPH_FAILED:' /tmp/godot-t064-child-graph.log; then exit 1; fi
+      - name: Verify T-064 atomic nested Objects project copying
+        id: ci_t064_nested_project_copy
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_project_copy_smoke.gd 2>&1 | tee /tmp/godot-t064-project-copy.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t064-project-copy.log --marker T064_PROJECT_COPY_PASSED
+          # A saved portable campaign copy includes all retained Drawing/Objects/
+          # Fonts generations, verified before one destination directory rename.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_campaign_copy_smoke.gd 2>&1 | tee /tmp/godot-t064-campaign-copy.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t064-campaign-copy.log --marker T064_CAMPAIGN_COPY_PASSED
+          # Atlas File > Copy saved campaign routes through the same verified API.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_nested_campaign_copy_ui_smoke.gd 2>&1 | tee /tmp/godot-t064-copy-ui.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t064-copy-ui.log --marker T064_COPY_UI_PASSED
+      - name: Verify T-064 bounded nested source composition and hit paths
+        id: ci_t064_nested_source_render
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_render_smoke.gd 2>&1 | tee /tmp/godot-t064-child-render.log
+          grep -q 'T064_CHILD_RENDER_PASSED' /tmp/godot-t064-child-render.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_RENDER_FAILED:' /tmp/godot-t064-child-render.log; then exit 1; fi
+      - name: Verify T-064 parent-scoped nested child transforms and history
+        id: ci_t064_nested_child_edit
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_edit_smoke.gd 2>&1 | tee /tmp/godot-t064-child-edit.log
+          grep -q 'T064_CHILD_EDIT_PASSED' /tmp/godot-t064-child-edit.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_EDIT_FAILED:' /tmp/godot-t064-child-edit.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_structure_smoke.gd 2>&1 | tee /tmp/godot-t064-child-structure.log
+          grep -q 'T064_CHILD_STRUCTURE_PASSED' /tmp/godot-t064-child-structure.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_STRUCTURE_FAILED:' /tmp/godot-t064-child-structure.log; then exit 1; fi
+          # Repair retained NULL children through the same optimistic graph
+          # boundary and reversible parent-scoped history (no owner UX gate).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_null_repair_smoke.gd 2>&1 | tee /tmp/godot-t064-child-null-repair.log
+          grep -q 'T064_CHILD_REPAIR_PASSED' /tmp/godot-t064-child-null-repair.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_REPAIR_FAILED:' /tmp/godot-t064-child-null-repair.log; then exit 1; fi
+          # Uniform child scaling shares the optimistic transform timeline.
+          # A native inspector screenshot is targeted, never fast push CI.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_scale_smoke.gd 2>&1 | tee /tmp/godot-t064-child-scale.log
+          grep -q 'T064_CHILD_SCALE_PASSED' /tmp/godot-t064-child-scale.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_SCALE_FAILED:' /tmp/godot-t064-child-scale.log; then exit 1; fi
+          # T-064 sibling paint order uses the same atomic graph/history path;
+          # no native framebuffer suite is added to the fast push job.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_order_smoke.gd 2>&1 | tee /tmp/godot-t064-child-order.log
+          grep -q 'T064_CHILD_ORDER_PASSED' /tmp/godot-t064-child-order.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_ORDER_FAILED:' /tmp/godot-t064-child-order.log; then exit 1; fi
+          # Optional labels distinguish repeated child instances without renaming
+          # their shared source; no native framebuffer suite runs on fast CI.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_label_smoke.gd 2>&1 | tee /tmp/godot-t064-child-label.log
+          grep -q 'T064_CHILD_LABEL_PASSED' /tmp/godot-t064-child-label.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_LABEL_FAILED:' /tmp/godot-t064-child-label.log; then exit 1; fi
+          # Duplicate only a linked child *placement* with fresh identity;
+          # explicit nested source Save As remains owner-policy gated.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_duplicate_smoke.gd 2>&1 | tee /tmp/godot-t064-child-duplicate.log
+          grep -q 'T064_CHILD_DUPLICATE_PASSED' /tmp/godot-t064-child-duplicate.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_DUPLICATE_FAILED:' /tmp/godot-t064-child-duplicate.log; then exit 1; fi
+          # T-064 child visibility is a reversible, parent-scoped graph edit;
+          # hidden descendants are excluded from rendering and pointer hits.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_visibility_smoke.gd 2>&1 | tee /tmp/godot-t064-child-visibility.log
+          grep -q 'T064_CHILD_VISIBILITY_PASSED' /tmp/godot-t064-child-visibility.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CHILD_VISIBILITY_FAILED:' /tmp/godot-t064-child-visibility.log; then exit 1; fi
+          # Alt+click must resolve the correct nested parent through the live
+          # Atlas canvas, without resetting child-local history or map context.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_canvas_select_smoke.gd 2>&1 | tee /tmp/godot-t064-child-canvas.log
+          grep -q 'T064_CANVAS_CHILD_PASSED' /tmp/godot-t064-child-canvas.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CANVAS_CHILD_FAILED:' /tmp/godot-t064-child-canvas.log; then exit 1; fi
+          # Alt+drag moves a published child only on release; all cancellation,
+          # stale-index and nested ancestor-coordinate cases are checked here.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_child_canvas_drag_smoke.gd 2>&1 | tee /tmp/godot-t064-child-drag.log
+          grep -q 'T064_CANVAS_DRAG_PASSED' /tmp/godot-t064-child-drag.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T064_CANVAS_DRAG_FAILED:' /tmp/godot-t064-child-drag.log; then exit 1; fi
+      - name: Verify T-062 Object Editor source publishing, bound origin and saved variants
+        id: ci_12_verify_t_062_object_editor_source_publishing_bound_origin_and_s
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_editor_smoke.gd 2>&1 | tee /tmp/godot-object-editor.log
+          python3 tools/check_godot_model_log.py /tmp/godot-object-editor.log --marker OBJECT_EDITOR_PASSED || ci_fail_marker 'OBJECT_EDITOR_PASSED log rejected'
+          python3 tools/build_drawing_app.py --in-place
+          # Staged licensed fonts must be imported before UI text editing.
+          godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_editor_ui_smoke.gd 2>&1 | tee /tmp/godot-object-editor-ui.log
+          python3 tools/check_godot_model_log.py /tmp/godot-object-editor-ui.log --marker DRAWING_OBJECT_UI_PASSED || ci_fail_marker 'DRAWING_OBJECT_UI_PASSED log rejected'
+          ci_finish
+      - name: Verify T-061 signed floor/detail world mapping and blank D-levels
+        id: ci_13_verify_t_061_signed_floor_detail_world_mapping_and_blank_d_leve
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_world_mapping_smoke.gd 2>&1 | tee /tmp/godot-world-mapping.log
+          grep -q 'T061_WORLD_MAPPING_PASSED' /tmp/godot-world-mapping.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T061_FAILED:' /tmp/godot-world-mapping.log; then exit 1; fi
+      - name: Verify T-055 Atlas canonical Drawing composition and input
+        id: ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t055-composition.log --marker T055_COMPOSITION_PASSED
+      - name: Verify T-068 hard-dab parity and source-tile cache transactions
+        id: ci_t068_stationary_dab_parity
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_t068_fill_process_profile.py
+          python3 -m unittest discover -s tests -p test_t068_native_thread_jitter.py
+          python3 -m unittest discover -s tests -p test_t068_checked_abi.py
+          python3 -m unittest discover -s tests -p test_t068_bridge_runner.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_gdextension.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_atomicity.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_publication.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_large_publication.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_transform.py
+          python3 -m unittest discover -s tests -p test_t068_quad_gdextension.py
+          python3 -m unittest discover -s tests -p test_t068_quad_publication.py
+          python3 -m unittest discover -s tests -p test_t068_cairo_cpu.py
+          python3 -m unittest discover -s tests -p test_t068_blend2d_cpu.py
+          python3 -m unittest discover -s tests -p test_t068_blend2d_brush.py
+          python3 -m unittest discover -s tests -p test_t068_matched_brush.py
+          python3 -m unittest discover -s tests -p test_t104_backend_decision.py
+          python3 tools/benchmarks/t104_backend_decision.py --verify
+          python3 -m unittest discover -s tests -p test_t068_native_memory.py
+          python3 -m unittest discover -s tests -p test_t068_visual_device.py
+          python3 -m unittest discover -s tests -p test_t068_visual_contention.py
+          python3 -m unittest discover -s tests -p test_t068_visual_counterbalanced.py
+          python3 -m unittest discover -s tests -p test_t068_release_gate.py
+          python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py
+          python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_hard_brush.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_rgba8.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_deltas.py
+          T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_blend2d_quad.py
+          T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_quad_differential.py
+          T068_QUAD_GODOT=godot python3 -m unittest discover -s tests -p test_t068_quad_stress.py
+          python3 -m unittest discover -s tests -p test_t068_quad_compiler_matrix.py
+          python3 -m unittest discover -s tests -p test_t106_oracle_engine_compat.py
+          python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py
+          python3 -m unittest discover -s tests -p test_t068_native_sanitizer.py
+          python3 -m unittest discover -s tests -p test_t068_skia_cpu.py
+          T068_GODOT=godot python3 -m unittest discover -s tests -p test_t068_skia_brush.py
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_dab_geometry_smoke.gd 2>&1 | tee /tmp/godot-t068-dab.log
+          grep -q 'T068_DAB_PASSED' /tmp/godot-t068-dab.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_DAB_FAILED:' /tmp/godot-t068-dab.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_axis_sweep_smoke.gd 2>&1 | tee /tmp/godot-t068-axis-sweep.log
+          grep -q 'T068_AXIS_SWEEP_PASSED' /tmp/godot-t068-axis-sweep.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_AXIS_SWEEP_FAILED:' /tmp/godot-t068-axis-sweep.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_edit_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-tile-cache.log
+          grep -q 'T068_TILE_CACHE_PASSED' /tmp/godot-t068-tile-cache.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_TILE_CACHE_FAILED:' /tmp/godot-t068-tile-cache.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-fill-cache.log
+          grep -q 'T068_FILL_CACHE_PASSED' /tmp/godot-t068-fill-cache.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FILL_CACHE_FAILED:' /tmp/godot-t068-fill-cache.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_frontier_smoke.gd 2>&1 | tee /tmp/godot-t068-frontier.log
+          grep -q 'T068_FRONTIER_PASSED' /tmp/godot-t068-frontier.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_FRONTIER_FAILED:' /tmp/godot-t068-frontier.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_verified_stage_smoke.gd 2>&1 | tee /tmp/godot-t068-verified-stage.log
+          grep -q 'T068_VERIFIED_STAGE_PASSED' /tmp/godot-t068-verified-stage.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_VERIFIED_STAGE_FAILED:' /tmp/godot-t068-verified-stage.log; then exit 1; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_publication_tile_cache_smoke.gd 2>&1 | tee /tmp/godot-t068-publication.log
+          grep -q 'T068_PUBLICATION_PASSED' /tmp/godot-t068-publication.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T068_PUBLICATION_FAILED:' /tmp/godot-t068-publication.log; then exit 1; fi
+      - name: Verify T-066 atomic sparse campaign generations, recovery and editor Save/Load
+        id: ci_15_verify_t_066_atomic_sparse_campaign_generations_recovery_and_ed
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          source tools/ci_fail_late.sh
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/campaign_bundle_smoke.gd 2>&1 | tee /tmp/godot-t066-bundle.log
+          grep -q 'ATLAS_BUNDLE_PASSED' /tmp/godot-t066-bundle.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_FAILED:|ATLAS_BUNDLE_FAILED' /tmp/godot-t066-bundle.log; then ci_fail_marker 'Forbidden error marker'; fi
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/campaign_bundle_editor_smoke.gd 2>&1 | tee /tmp/godot-t066-editor.log
+          grep -q 'ATLAS_BUNDLE_EDITOR_PASSED' /tmp/godot-t066-editor.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T066_EDITOR_FAILED:|ATLAS_BUNDLE_EDITOR_FAILED' /tmp/godot-t066-editor.log; then ci_fail_marker 'Forbidden error marker'; fi
+          ci_finish
+      - name: Verify T-073 approved inventory versus proposed workspace UX
+        id: ci_21_verify_t_073_approved_inventory_versus_proposed_workspace_ux
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t073_feature_ux_docs.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_owner_matrix.py' -v
+          python3 -m unittest discover -s tests -p 'test_t078_t083_docking_plan.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_owner_evidence.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_ci_replay.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_hosted_ci_evidence.py' -v
+          python3 -m unittest discover -s tests -p 'test_t094_godot_model_log.py' -v
+      - name: Verify T-063 compact Drawing workspace and shortcut contract
+        id: ci_22_verify_t_063_compact_drawing_workspace_and_shortcut_contract
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_t063_workspace_docs.py' -v
+      - name: Verify T-078 reusable grouped dock layout model
+        id: ci_dock_layout_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_layout_smoke.gd 2>&1 | tee /tmp/godot-dock-layout.log
+          python3 tools/check_godot_model_log.py /tmp/godot-dock-layout.log --marker DRAWING_DOCK_MODEL_PASSED
+      - name: Verify T-080 transactional dock drag/drop model
+        id: ci_dock_drag_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_drag_smoke.gd 2>&1 | tee /tmp/godot-dock-drag.log
+          grep -q 'T080_DOCK_DRAG_MODEL_PASSED' /tmp/godot-dock-drag.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T080_MODEL_FAILED:' /tmp/godot-dock-drag.log; then exit 1; fi
+      - name: Verify T-081 floating host ownership and transaction model
+        id: ci_dock_floating_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_float_smoke.gd 2>&1 | tee /tmp/godot-dock-float.log
+          grep -q 'T081_FLOAT_MODEL_PASSED' /tmp/godot-dock-float.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T081_MODEL_FAILED:' /tmp/godot-dock-float.log; then exit 1; fi
+      - name: Verify T-082 cross-container docking transaction model
+        id: ci_dock_cross_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_cross_smoke.gd 2>&1 | tee /tmp/godot-dock-cross.log
+          grep -q 'T082_CROSS_MODEL_PASSED' /tmp/godot-dock-cross.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T082_MODEL_FAILED:' /tmp/godot-dock-cross.log; then exit 1; fi
+      - name: Verify T-083 versioned dock layout persistence and corrupt-data recovery
+        id: ci_dock_persistence_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/dock_persistence_smoke.gd 2>&1 | tee /tmp/godot-dock-persistence.log
+          grep -q 'T083_MODEL_PASSED' /tmp/godot-dock-persistence.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T083_MODEL_FAILED:' /tmp/godot-dock-persistence.log; then exit 1; fi
+      - name: Verify T-065 portable Object Asset Browser and dock integration
+        id: ci_t065_asset_browser_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_smoke.gd 2>&1 | tee /tmp/godot-t065-browser.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t065-browser.log --marker T065_ASSET_BROWSER_PASSED
+      - name: Verify T-065 lazily rendered Object source thumbnails
+        id: ci_t065_asset_thumbnail_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_thumbnails_smoke.gd 2>&1 | tee /tmp/godot-t065-thumbnails.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t065-thumbnails.log --marker T065_THUMBNAILS_PASSED
+      - name: Verify T-065 Object metadata listing, full pixel decoding and cache safety
+        id: ci_t065_real_source_io
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_real_io_smoke.gd 2>&1 | tee /tmp/godot-t065-real-io.log
+          grep -q 'T065_REAL_IO_PASSED' /tmp/godot-t065-real-io.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_REAL_IO_FAILED:' /tmp/godot-t065-real-io.log; then exit 1; fi
+      - name: Verify T-065 explicit portable Object source transfers
+        id: ci_t065_asset_transfer_model
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://drawing/tests/asset_browser_transfer_smoke.gd 2>&1 | tee /tmp/godot-t065-transfers.log
+          grep -q 'T065_TRANSFERS_PASSED' /tmp/godot-t065-transfers.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_TRANSFER_FAILED:' /tmp/godot-t065-transfers.log; then exit 1; fi
+      - name: Verify T-065 Atlas source deletion and NULL repair transaction safety
+        id: ci_t065_atlas_null_transactions
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_asset_repair_smoke.gd 2>&1 | tee /tmp/godot-t065-null-transactions.log
+          grep -q 'T065_ASSET_REPAIR_PASSED' /tmp/godot-t065-null-transactions.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_ASSET_REPAIR_FAILED:' /tmp/godot-t065-null-transactions.log; then exit 1; fi
+      - name: Verify T-065 Atlas source manager and deliberate NULL actions
+        id: ci_t065_atlas_source_manager
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_source_manager_smoke.gd 2>&1 | tee /tmp/godot-t065-source-manager.log
+          grep -q 'T065_MANAGER_PASSED' /tmp/godot-t065-source-manager.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_MANAGER_FAILED:' /tmp/godot-t065-source-manager.log; then exit 1; fi
+      - name: Verify T-065 Atlas-owned portable Object registration and export
+        id: ci_t065_atlas_portable_registry
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/object_portable_registry_smoke.gd 2>&1 | tee /tmp/godot-t065-portable-registry.log
+          grep -q 'T065_PORTABLE_PASSED' /tmp/godot-t065-portable-registry.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_PORTABLE_FAILED:' /tmp/godot-t065-portable-registry.log; then exit 1; fi
+      - name: Verify T-065 shared Atlas Asset Browser and guarded linked drops
+        id: ci_t065_atlas_browser_bridge
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/asset_browser_atlas_smoke.gd 2>&1 | tee /tmp/godot-t065-atlas-browser.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t065-atlas-browser.log --marker T065_ATLAS_BROWSER_PASSED
+      - name: Verify T-065 large Atlas source catalog paging and global search
+        id: ci_t065_atlas_browser_paging
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/asset_browser_atlas_paging_smoke.gd 2>&1 | tee /tmp/godot-t065-atlas-paging.log
+          grep -q 'T065_PAGING_PASSED' /tmp/godot-t065-atlas-paging.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T065_PAGING_FAILED:' /tmp/godot-t065-atlas-paging.log; then exit 1; fi
+      - name: Summarize CI failures
+        if: ${{ !cancelled() }}
+        env:
+          GODOT_CI_STEPS_JSON: ${{ toJSON(steps) }}
+        run: python3 tools/report_godot_ci.py
+      - name: Export sanitized hosted CI evidence
+        if: ${{ always() }}
+        env:
+          GODOT_CI_STEPS_JSON: ${{ toJSON(steps) }}
+        run: python3 tools/export_godot_ci_evidence.py --output ci-evidence/godot-fast-ci.json
+      - name: Upload hosted CI evidence (including red runs)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-fast-ci-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-evidence/godot-fast-ci.json
+          if-no-files-found: error
+          retention-days: 30

@@ -100,13 +100,19 @@ func scenario(mode: String) -> void:
     canvas.brush_width = 3.0
     canvas.color_rgba = 0xff000000
 
-    var blocked: Dictionary = {"seen": false}
-    canvas.canvas_error.connect(func(message: String) -> void:
-        if message.contains("still draining"):
-            blocked["seen"] = true
-    )
+    # A new press during release backlog is buffered, not dropped. This
+    # navigation witness cancels that pending press to keep its single-stroke
+    # oracle, while the T-124 suite verifies chronological second commits.
+    canvas.tool = "Brush"
     canvas.start_gesture(canvas.pixel_to_position(Vector2(3, 3)))
-    check(bool(blocked["seen"]) and canvas.session != null, mode + " second stroke is explicitly blocked")
+    check(not canvas._deferred_stroke.is_empty() and canvas.session != null,
+        mode + " second press is retained without replacing first release")
+    var escape: InputEventKey = InputEventKey.new()
+    escape.keycode = KEY_ESCAPE
+    escape.pressed = true
+    canvas._input(escape)
+    check(canvas._deferred_stroke.is_empty() and canvas.session != null,
+        mode + " cancelling queued press leaves released first stroke intact")
     var drain_frames: int = 0
     while canvas.session != null and drain_frames < 360:
         await frames(1)
@@ -149,6 +155,8 @@ func run() -> void:
     for mode: String in ["wheel_middle", "toolbar_pan", "camera"]:
         await scenario(mode)
     print("T095_NAV_RESULT checks=%d failures=%d" % [checks, failures])
+    if failures == 0:
+        print("T095_NAV_PASSED checks=%d failures=0" % checks)
     quit(1 if failures else 0)
 
 

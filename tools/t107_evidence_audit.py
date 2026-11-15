@@ -29,6 +29,10 @@ SHA40 = re.compile(r"[0-9a-f]{40}\Z")
 TICKET = re.compile(r"T-[0-9]{3}")
 REPLAY_UNATTESTED = "Replay lacks a clean, commit-attributed starting tree"
 MANUAL_GATES = ("T-056", "T-059", "T-065", "T-083", "T-095", "T-096")
+# The retained 2026-11-12 run was made against an uncommitted workflow.
+# Its exact original workflow is retained alongside the scripts and logs;
+# later CI changes must not retroactively rewrite historical evidence.
+REPLAY_WORKFLOW_SHA256 = "835f044bf57224999dea386959bbc14b4f60e3d5b4a4bf798db8ff2da79a411f"
 RUNTIME = DOCS / "evidence/T-107-2026-11-12-runtime"
 RUNTIME_MARKERS = {
     "standalone-roundtrip.log": "DRAWING_STANDALONE_PASSED",
@@ -136,10 +140,20 @@ def replay_inventory(directory: Path) -> dict[str, Any]:
     An exploratory run is permitted *only as exploratory evidence*: no future
     caller may convert its green checks into hosted or commit-attested status.
     """
-    workflow = WORKFLOW.read_text(encoding="utf-8")
+    current_checks = extract_checks(WORKFLOW.read_text(encoding="utf-8"))
+    if len(current_checks) != 46:
+        raise AuditError(f"Expected 46 current required checks, found {len(current_checks)}")
+    original_bytes = _read_regular(directory / "workflow.yml")
+    if _hash(original_bytes) != REPLAY_WORKFLOW_SHA256:
+        raise AuditError("Historical workflow SHA-256 differs from pinned capture")
+    try:
+        workflow = original_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise AuditError("Historical workflow is not UTF-8") from exc
     checks = extract_checks(workflow)
-    if len(checks) != 46:
-        raise AuditError(f"Expected 46 required checks, found {len(checks)}")
+    if ([check.identifier for check in checks] !=
+            [check.identifier for check in current_checks]):
+        raise AuditError("Required CI check IDs differ from captured 46-step inventory")
     problems = verify_replay(directory, checks, workflow)
     if problems and problems != [REPLAY_UNATTESTED]:
         raise AuditError("Invalid CI replay: " + "; ".join(problems))
@@ -226,8 +240,8 @@ def copy_replay(source: Path, destination: Path) -> None:
     destination.mkdir(parents=True)
     (destination / "logs").mkdir()
     (destination / "scripts").mkdir()
-    checks = extract_checks(WORKFLOW.read_text(encoding="utf-8"))
-    for name in ("report.json", "summary.md"):
+    checks = extract_checks(_read_regular(source / "workflow.yml").decode("utf-8"))
+    for name in ("report.json", "summary.md", "workflow.yml"):
         (destination / name).write_bytes(_read_regular(source / name))
     for check in checks:
         for group, extension in (("scripts", "sh"), ("logs", "log")):

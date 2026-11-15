@@ -105,11 +105,45 @@ class CapturedReplayTests(unittest.TestCase):
             with self.assertRaises(AuditError):
                 replay_inventory(target)
 
+    def test_original_workflow_is_pinned_and_independent_of_later_script_changes(self) -> None:
+        from hashlib import sha256
+        from t107_evidence_audit import REPLAY_WORKFLOW_SHA256
+        from report_godot_ci import WORKFLOW
+
+        archived = (EXTERNAL / "workflow.yml").read_bytes()
+        self.assertEqual(sha256(archived).hexdigest(), REPLAY_WORKFLOW_SHA256)
+        with tempfile.TemporaryDirectory() as temp:
+            updated = Path(temp) / "current.yml"
+            updated.write_text(WORKFLOW.read_text() +
+                               "\n# Later unrelated workflow comment\n", encoding="utf-8")
+            with patch("t107_evidence_audit.WORKFLOW", updated):
+                self.assertEqual(replay_inventory(EXTERNAL)["checks_passed"], 46)
+
+    def test_missing_or_tampered_archived_workflow_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "replay"
+            copy_replay(EXTERNAL, target)
+            stored = target / "workflow.yml"
+            original = stored.read_bytes()
+            stored.write_bytes(original + b"\n# forged revision\n")
+            with self.assertRaisesRegex(AuditError, "Historical workflow SHA-256"):
+                replay_inventory(target)
+            stored.unlink()
+            with self.assertRaisesRegex(AuditError, "Missing"):
+                replay_inventory(target)
+            stored.write_bytes(original)
+            script = sorted((target / "scripts").glob("*.sh"))[0]
+            script.write_bytes(script.read_bytes() + b"\necho forged\n")
+            with self.assertRaisesRegex(AuditError, "script differs from committed workflow"):
+                replay_inventory(target)
+
     def test_copied_capture_is_self_contained_and_auditable(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             dest = Path(temp) / "replay"
             copy_replay(EXTERNAL, dest)
             self.assertEqual(replay_inventory(dest)["checks_total"], 46)
+            self.assertEqual((dest / "workflow.yml").read_bytes(),
+                             (EXTERNAL / "workflow.yml").read_bytes())
             with self.assertRaises(AuditError):
                 copy_replay(EXTERNAL, dest)
 

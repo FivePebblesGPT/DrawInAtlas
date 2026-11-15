@@ -30,10 +30,74 @@ jobs:
             2>&1 | tee /tmp/t088-native.log
           python3 tools/check_native_t088_log.py /tmp/t088-native.log
           python3 -m unittest discover -s tests -p 'test_t088_floating_log.py' -v
+      - name: Verify T-139 signed sparse mask outlines in the native framebuffer
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t139_sparse_selection_outline_native.gd \
+            2>&1 | tee /tmp/t139-outline-native.log
+          grep -Fxq 'T139_NATIVE_PASSED checks=7 failures=0' /tmp/t139-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t139-outline-native.log --marker T139_NATIVE_PASSED
+      - name: Verify T-140 focal-first capped mask outlines and camera re-entry
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t140_focal_mask_overflow_native.gd \
+            2>&1 | tee /tmp/t140-outline-native.log
+          grep -Fxq 'T140_NATIVE_PASSED checks=9 failures=0' /tmp/t140-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t140-outline-native.log --marker T140_NATIVE_PASSED
+      - name: Verify T-141 exact occupied outlines beyond 4096 tiles
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t141_sparse_mask_overflow_native.gd \
+            2>&1 | tee /tmp/t141-outline-native.log
+          grep -Fxq 'T141_NATIVE_PASSED checks=8 failures=0' /tmp/t141-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t141-outline-native.log --marker T141_NATIVE_PASSED
+      - name: Verify T-142 over-budget contour continuity after an in-window pan
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t142_outline_cache_native.gd \
+            2>&1 | tee /tmp/t142-outline-native.log
+          grep -Fxq 'T142_NATIVE_PASSED checks=11 failures=0' /tmp/t142-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t142-outline-native.log --marker T142_NATIVE_PASSED
+      - name: Verify T-143 clipped contour plan changes within a tile window
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t143_contour_clip_native.gd \
+            2>&1 | tee /tmp/t143-outline-native.log
+          grep -Fxq 'T143_NATIVE_PASSED checks=10 failures=0' /tmp/t143-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t143-outline-native.log --marker T143_NATIVE_PASSED
+      - name: Verify T-144 stable contour planning and actual X11 outlines
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t144_outline_plan_native.gd \
+            2>&1 | tee /tmp/t144-outline-native.log
+          grep -Fxq 'T144_NATIVE_PASSED checks=9 failures=0' /tmp/t144-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t144-outline-native.log --marker T144_NATIVE_PASSED
+      - name: Verify T-145 selection contour continuity across a changed tile window
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t145_outline_window_native.gd \
+            2>&1 | tee /tmp/t145-outline-native.log
+          grep -Fxq 'T145_NATIVE_PASSED checks=10 failures=0' /tmp/t145-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t145-outline-native.log --marker T145_NATIVE_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t088-xvfb-selection-clipboard
-          path: /tmp/t088-native.log
+          path: |
+            /tmp/t088-native.log
+            /tmp/t139-outline-native.log
+            /tmp/t140-outline-native.log
+            /tmp/t141-outline-native.log
+            /tmp/t142-outline-native.log
+            /tmp/t143-outline-native.log
+            /tmp/t144-outline-native.log
+            /tmp/t145-outline-native.log
           if-no-files-found: warn

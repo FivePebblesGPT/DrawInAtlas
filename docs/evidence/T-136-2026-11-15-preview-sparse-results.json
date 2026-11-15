@@ -1,0 +1,175 @@
+{
+  "ticket": "T-136",
+  "date": "2026-11-15",
+  "git_base": "96a0b7ca9f7124805119333a755670aaa054f2f1",
+  "baseline_canvas_sha256": "c347bb8ce1b7aabf94120fdabfc22e99440331958c4f630b8481a2cfac5448e0",
+  "candidate_canvas_sha256": "863f73c102efe926f8770acda8d5b4e1650198fdf7723a577dcba0937400a204",
+  "engine": "4.8.beta3.official.c51ff06e8",
+  "environment": "Linux x86-64 Mesa llvmpipe Xvfb software GL compatibility 820x610 (512x384 Canvas); 1% programmatic zoom",
+  "sample_type": "7 repeated warm per-Canvas _draw CPU timings per trial; not full frame or physical input-to-photon",
+  "model_log_sha256": "703056139b27a27fd602b2343312709b0924d02d4d3ca469cea5f4d8bef2ab94",
+  "baseline_negative_control": "same test unmodified T-135 source, 4 of 26 assertions fail on each run",
+  "trials": {
+    "baseline": [
+      {
+        "log": "baseline-1.txt",
+        "sha256": "b5a0f642f9af2ecb116fed206e3a0da14a58f817b3451f2a411ad4dec1ed28a8",
+        "checks": 26,
+        "failures": 4,
+        "measurements": {
+          "cells": 120701,
+          "engine": "4.8-beta3 (official)",
+          "examined": 120701,
+          "p50_us": 109163,
+          "p95_us": 116993,
+          "warm_draw_us": [
+            104296,
+            106755,
+            108325,
+            109163,
+            110968,
+            113917,
+            116993
+          ],
+          "zoom": 0.01
+        }
+      },
+      {
+        "log": "baseline-2.txt",
+        "sha256": "fc8e39adbcac35ff993e537072b9c220b14720fa052eb1f0e9f56eef13a37b6b",
+        "checks": 26,
+        "failures": 4,
+        "measurements": {
+          "cells": 120701,
+          "engine": "4.8-beta3 (official)",
+          "examined": 120701,
+          "p50_us": 107244,
+          "p95_us": 116380,
+          "warm_draw_us": [
+            102371,
+            103432,
+            105574,
+            107244,
+            107259,
+            108639,
+            116380
+          ],
+          "zoom": 0.01
+        }
+      },
+      {
+        "log": "baseline-3.txt",
+        "sha256": "15cba41d158aba1201ba68e693eaf5a2016b29e9f409970bd9088ac3d3292901",
+        "checks": 26,
+        "failures": 4,
+        "measurements": {
+          "cells": 120701,
+          "engine": "4.8-beta3 (official)",
+          "examined": 120701,
+          "p50_us": 108804,
+          "p95_us": 115138,
+          "warm_draw_us": [
+            106013,
+            106900,
+            108049,
+            108804,
+            113325,
+            114198,
+            115138
+          ],
+          "zoom": 0.01
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "log": "candidate-1.txt",
+        "sha256": "3843d1a680aca6baf9bbf671fca47da04c2dd19a5882e1a1107db13658eeeb5e",
+        "checks": 26,
+        "failures": 0,
+        "measurements": {
+          "cells": 120701,
+          "engine": "4.8-beta3 (official)",
+          "examined": 2,
+          "p50_us": 76,
+          "p95_us": 198,
+          "warm_draw_us": [
+            73,
+            73,
+            76,
+            76,
+            78,
+            83,
+            198
+          ],
+          "zoom": 0.01
+        }
+      },
+      {
+        "log": "candidate-2.txt",
+        "sha256": "d75412392c813a6cd8d35fd3f5ffc16ce9d8711e7e337340d6be2f73135ed4e8",
+        "checks": 26,
+        "failures": 0,
+        "measurements": {
+          "cells": 120701,
+          "engine": "4.8-beta3 (official)",
+          "examined": 2,
+          "p50_us": 84,
+          "p95_us": 102,
+          "warm_draw_us": [
+            76,
+            78,
+            80,
+            84,
+            85,
+            85,
+            102
+          ],
+          "zoom": 0.01
+        }
+      },
+      {
+        "log": "candidate-3.txt",
+        "sha256": "d5909a95e0ba9e7d2ebd12ad10ddb2920586253b6f2fdefeed6ca92b9f8f0b95",
+        "checks": 26,
+        "failures": 0,
+        "measurements": {
+          "cells": 120701,
+          "engine": "4.8-beta3 (official)",
+          "examined": 2,
+          "p50_us": 84,
+          "p95_us": 109,
+          "warm_draw_us": [
+            76,
+            78,
+            79,
+            84,
+            85,
+            91,
+            109
+          ],
+          "zoom": 0.01
+        }
+      }
+    ]
+  },
+  "remote_head_at_work_start": "61c6f689974a848f8a7cc4040c98be418518b156",
+  "neighbor_logs": [
+    {
+      "path": "t086-neighbor-native.txt",
+      "sha256": "6effb1294a81d1e3fb999325f6a7048c151b01100ee602c8f48345238d5d72aa"
+    },
+    {
+      "path": "t135-neighbor-native.txt",
+      "sha256": "3d55f649c7d464bdc811ef3aa76641f12b03afe1aa9ee7f7713eda76bb6ca143"
+    },
+    {
+      "path": "independent-consumer.txt",
+      "sha256": "3a989f88cb2ce7174b1e108c85b4fbde91eb593f504f31e8b235ef79753c45af"
+    },
+    {
+      "path": "t098-preview-model.txt",
+      "sha256": "4c558e8536f9839995a540467f6a90cb18f1756e7bab068a8ffa7f5971737f65"
+    }
+  ]
+}

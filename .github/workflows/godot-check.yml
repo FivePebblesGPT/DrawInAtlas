@@ -71,6 +71,68 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/live_stroke_smoke.gd 2>&1 | tee /tmp/godot-t085-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t085-model.log --marker T085_MODEL_PASSED || ci_fail_marker 'T085 live-stroke model log rejected'
+          # A second Brush/Eraser press while its predecessor drains must not
+          # disappear or collapse two independently undoable transactions.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t124_queued_brush_smoke.gd 2>&1 | tee /tmp/godot-t124-queued-brush.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t124-queued-brush.log --marker T124_QUEUED_PASSED || ci_fail_marker 'T124 queued Brush history and byte oracle rejected'
+          # T-125 prevents Save/Save As, Object publication and Close Tab from
+          # observing an unpublished Brush/queued release as a clean snapshot.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t125_pending_persistence_smoke.gd 2>&1 | tee /tmp/godot-t125-persistence.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t125-persistence.log --marker T125_PENDING_PASSED || ci_fail_marker 'T125 pending persistence/close rollback rejected'
+          python3 -m unittest discover -s tests -p 'test_t125_pending_persistence.py' -v || ci_fail_marker 'T125 persistence contracts rejected'
+          # T-126 preserves the same pending and queued strokes on tab/new/open,
+          # including TabBar reentrancy and inactive-tab closure attempts.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t126_pending_tab_switch_smoke.gd 2>&1 | tee /tmp/godot-t126-tab-switch.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t126-tab-switch.log --marker T126_TAB_SWITCH_PASSED || ci_fail_marker 'T126 pending document switch rejected'
+          python3 -m unittest discover -s tests -p 'test_t126_pending_tab_switch.py' -v || ci_fail_marker 'T126 tab-switch contracts rejected'
+          # T-127 protects released and queued input from Undo/Redo revision
+          # changes; test keyboard, History buttons and chronological pixels.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t127_pending_history_smoke.gd 2>&1 | tee /tmp/godot-t127-history.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t127-history.log --marker T127_HISTORY_PASSED || ci_fail_marker 'T127 pending Brush history rejected'
+          grep -Fqx 'T127_HISTORY_PASSED checks=40 failures=0' /tmp/godot-t127-history.log || ci_fail_marker 'T127 history assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t127_pending_history.py' -v || ci_fail_marker 'T127 pending Brush source/CI contracts rejected'
+          # T-128 closes the History-list row-selection bypass of guarded
+          # Undo/Redo while released/queued Brush strokes remain unpublished.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t128_history_list_pending_smoke.gd 2>&1 | tee /tmp/godot-t128-history-list.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t128-history-list.log --marker T128_HISTORY_LIST_PASSED || ci_fail_marker 'T128 history list pending Brush guard rejected'
+          grep -Fqx 'T128_HISTORY_LIST_PASSED checks=37 failures=0' /tmp/godot-t128-history-list.log || ci_fail_marker 'T128 history list assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t128_history_list_pending.py' -v || ci_fail_marker 'T128 history list source/CI contracts rejected'
+          # T-129 rejects non-history layer/text/clipboard revisions while
+          # a detached Brush or queued successor still owns its source.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t129_pending_content_edit_smoke.gd 2>&1 | tee /tmp/godot-t129-pending-edits.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t129-pending-edits.log --marker T129_PENDING_EDIT_PASSED || ci_fail_marker 'T129 pending source edits failed strict log policy'
+          grep -Fqx 'T129_PENDING_EDIT_PASSED checks=35 failures=0' /tmp/godot-t129-pending-edits.log || ci_fail_marker 'T129 assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t129_pending_content_edit.py' -v || ci_fail_marker 'T129 source and CI contracts rejected'
+          # T-130 refuses selection and authoring-frame context edits while
+          # unpublished Brush/queued input retains its captured source.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t130_pending_source_context_smoke.gd 2>&1 | tee /tmp/godot-t130-pending-context.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t130-pending-context.log --marker T130_CONTEXT_PASSED || ci_fail_marker 'T130 pending source context rejected by strict log'
+          grep -Fqx 'T130_CONTEXT_PASSED checks=34 failures=0' /tmp/godot-t130-pending-context.log || ci_fail_marker 'T130 source context assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t130_pending_source_context.py' -v || ci_fail_marker 'T130 source and CI contracts rejected'
+          # T-131 keeps Object rename and Save As target metadata transactional
+          # through pending Brush/queued input and rejected publisher results.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t131_object_pending_metadata_smoke.gd 2>&1 | tee /tmp/godot-t131-object-metadata.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t131-object-metadata.log --marker T131_OBJECT_META_PASSED || ci_fail_marker 'T131 Object source metadata guard failed strict log'
+          grep -Fqx 'T131_OBJECT_META_PASSED checks=21 failures=0' /tmp/godot-t131-object-metadata.log || ci_fail_marker 'T131 Object metadata assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t131_object_pending_metadata.py' -v || ci_fail_marker 'T131 source/CI contracts rejected'
+          # T-132 binds asynchronous file and Object Save As completion to
+          # the tab/document/session that opened the chooser, never the next tab.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t132_dialog_document_identity_smoke.gd 2>&1 | tee /tmp/godot-t132-dialog-target.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t132-dialog-target.log --marker T132_DIALOG_PASSED || ci_fail_marker 'T132 dialog source identity rejected by strict log'
+          grep -Fqx 'T132_DIALOG_PASSED checks=34 failures=0' /tmp/godot-t132-dialog-target.log || ci_fail_marker 'T132 dialog source identity assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t132_dialog_document_identity.py' -v || ci_fail_marker 'T132 source/CI contract rejected'
+          # T-133 intercepts standalone OS window-close requests and reuses
+          # explicit per-tab Save/Discard/Cancel without losing pending Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t133_window_quit_smoke.gd 2>&1 | tee /tmp/godot-t133-window-quit.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t133-window-quit.log --marker T133_WINDOW_QUIT_PASSED || ci_fail_marker 'T133 window close failed strict log policy'
+          grep -Fqx 'T133_WINDOW_QUIT_PASSED checks=31 failures=0' /tmp/godot-t133-window-quit.log || ci_fail_marker 'T133 window quit assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t133_window_quit.py' -v || ci_fail_marker 'T133 source/CI contracts rejected'
+          # T-134 binds authoring modal confirmation to the originating tab,
+          # selected layer and document revision (without changing direct APIs).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t134_authoring_dialog_identity_smoke.gd 2>&1 | tee /tmp/godot-t134-authoring-dialog.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t134-authoring-dialog.log --marker T134_DIALOG_PASSED || ci_fail_marker 'T134 authoring dialog origin rejected by strict log'
+          grep -Fqx 'T134_DIALOG_PASSED checks=22 failures=0' /tmp/godot-t134-authoring-dialog.log || ci_fail_marker 'T134 authoring dialog assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t134_authoring_dialog_identity.py' -v || ci_fail_marker 'T134 authoring source/CI contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
@@ -97,6 +159,30 @@ jobs:
           # invalidation and conservative over-budget/unknown occupancy fallback.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t102_cold_population_smoke.gd 2>&1 | tee /tmp/godot-t102-cold-population.log
           python3 tools/check_godot_model_log.py /tmp/godot-t102-cold-population.log --marker T102_MODEL_PASSED || ci_fail_marker 'T102 cold population scheduling log rejected'
+          # T-135 visits committed occupied tiles; T-136 extends it to a
+          # trustworthy complete preview index. Unknown/partial stays full scan.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t135_sparse_draw_model.gd 2>&1 | tee /tmp/godot-t135-sparse-draw.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t135-sparse-draw.log --marker T135_SPARSE_PASSED || ci_fail_marker 'T135 sparse viewport traversal log rejected'
+          grep -Fxq 'T135_SPARSE_PASSED checks=16 failures=0' /tmp/godot-t135-sparse-draw.log || ci_fail_marker 'T135 sparse viewport assertion count mismatch'
+          python3 -m unittest discover -s tests -p 'test_t135_sparse_viewport.py' -v || ci_fail_marker 'T135 sparse viewport source/CI contract failed'
+          # T-136 can enumerate indexed detached preview changes with committed
+          # occupancy, falling back when a stamp source is incomplete/unsafe.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t136_preview_sparse_union_model.gd 2>&1 | tee /tmp/godot-t136-preview-sparse.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t136-preview-sparse.log --marker T136_UNION_PASSED || ci_fail_marker 'T136 sparse preview union log rejected'
+          grep -Fxq 'T136_UNION_PASSED checks=18 failures=0' /tmp/godot-t136-preview-sparse.log || ci_fail_marker 'T136 preview union assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t136_preview_sparse_union.py' -v || ci_fail_marker 'T136 preview union source/CI contract failed'
+          # T-137 allows bounded cold population while the detached preview
+          # index is complete; incomplete and >144-tile views stay unthrottled.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t137_preview_cold_population_model.gd 2>&1 | tee /tmp/godot-t137-preview-cold.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t137-preview-cold.log --marker T137_COLD_PASSED || ci_fail_marker 'T137 preview cold scheduling log rejected'
+          grep -Fxq 'T137_COLD_PASSED checks=15 failures=0' /tmp/godot-t137-preview-cold.log || ci_fail_marker 'T137 preview cold assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t137_preview_cold_population.py' -v || ci_fail_marker 'T137 preview cold source/CI contract failed'
+          # T-138 allows bounded focal cache retention in complete over-budget
+          # Brush/Move previews; invalid/partial indexes retain the LRU fallback.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t138_preview_focal_plan_model.gd 2>&1 | tee /tmp/godot-t138-preview-focal.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t138-preview-focal.log --marker T138_FOCAL_PASSED || ci_fail_marker 'T138 focal preview model log rejected'
+          grep -Fxq 'T138_FOCAL_PASSED checks=19 failures=0' /tmp/godot-t138-preview-focal.log || ci_fail_marker 'T138 preview focal count changed'
+          python3 -m unittest discover -s tests -p 'test_t138_preview_focal_plan.py' -v || ci_fail_marker 'T138 focal source/CI contract failed'
           # T-103 software-only over-budget focal preselection and safe fallbacks.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t103_retention_plan_smoke.gd 2>&1 | tee /tmp/godot-t103-retention.log
           python3 tools/check_godot_model_log.py /tmp/godot-t103-retention.log --marker T103_MODEL_PASSED || ci_fail_marker 'T103 focal retention planner rejected'
@@ -143,6 +229,49 @@ jobs:
           # T-088 capture must skip empty source tiles and preserve lazy-source failures.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_capture_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-capture.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-capture.log --marker T088_SPARSE_CAPTURE_PASSED || ci_fail_marker 'T088 sparse capture source oracle rejected'
+          # T-139 explicit sparse pixel-mask outlines must visit occupied
+          # signed contour tiles rather than truncating far islands by row.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t139_sparse_selection_outline_model.gd 2>&1 | tee /tmp/godot-t139-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t139-outline-model.log --marker T139_OUTLINE_PASSED || ci_fail_marker 'T139 sparse outline model log rejected'
+          grep -Fxq 'T139_OUTLINE_PASSED checks=14 failures=0' /tmp/godot-t139-outline-model.log || ci_fail_marker 'T139 outline assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t139_sparse_selection_outline.py' -v || ci_fail_marker 'T139 selection outline source/CI contract rejected'
+          # T-140 capped irregular outlines must prioritize the camera and
+          # invalidate a saturated contour cache when that focus changes.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t140_focal_mask_overflow_model.gd 2>&1 | tee /tmp/godot-t140-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t140-outline-model.log --marker T140_OUTLINE_PASSED || ci_fail_marker 'T140 focal outline model log rejected'
+          grep -Fxq 'T140_OUTLINE_PASSED checks=17 failures=0' /tmp/godot-t140-outline-model.log || ci_fail_marker 'T140 focal outline assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t140_focal_selection_outline.py' -v || ci_fail_marker 'T140 selection outline source/CI contract rejected'
+          # T-141 bounded explicit-mask overflow must prioritize actual selected
+          # tiles (not empty focal rings) when 4096 occupied tiles are visible.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t141_sparse_mask_overflow_model.gd 2>&1 | tee /tmp/godot-t141-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t141-outline-model.log --marker T141_OUTLINE_PASSED || ci_fail_marker 'T141 explicit overflow outline model log rejected'
+          grep -Fxq 'T141_OUTLINE_PASSED checks=12 failures=0' /tmp/godot-t141-outline-model.log || ci_fail_marker 'T141 outline assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t141_sparse_mask_overflow.py' -v || ci_fail_marker 'T141 outline source/CI contract rejected'
+          # T-142 must retain overlapping saturated selection contours after a
+          # one-tile pan rather than dropping 4096 already-rendered outlines.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t142_outline_cache_model.gd 2>&1 | tee /tmp/godot-t142-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t142-outline-model.log --marker T142_OUTLINE_PASSED || ci_fail_marker 'T142 outline cache model rejected'
+          grep -Fxq 'T142_OUTLINE_PASSED checks=13 failures=0' /tmp/godot-t142-outline-model.log || ci_fail_marker 'T142 outline cache count changed'
+          python3 -m unittest discover -s tests -p 'test_t142_outline_cache_reuse.py' -v || ci_fail_marker 'T142 contour cache/CI contracts rejected'
+          # T-143 sub-tile view clipping can exchange eligible selection islands
+          # while the tile window/focal tile remain unchanged; reconcile the
+          # saturated contour cache without discarding shared outlines.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t143_contour_clip_model.gd 2>&1 | tee /tmp/godot-t143-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t143-outline-model.log --marker T143_MODEL_PASSED || ci_fail_marker 'T143 clipped contour model rejected'
+          grep -Fxq 'T143_MODEL_PASSED checks=14 failures=0' /tmp/godot-t143-outline-model.log || ci_fail_marker 'T143 clipped contour assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t143_contour_clip_reconcile.py' -v || ci_fail_marker 'T143 clipped contour source/CI contract rejected'
+          # T-144 amortizes exact sparse outline planning across the four-contours/frame
+          # backlog, invalidating by mask epoch, clipped viewport and camera focus.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t144_outline_plan_model.gd 2>&1 | tee /tmp/godot-t144-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t144-outline-model.log --marker T144_MODEL_PASSED || ci_fail_marker 'T144 outline plan model rejected'
+          grep -Fxq 'T144_MODEL_PASSED checks=16 failures=0' /tmp/godot-t144-outline-model.log || ci_fail_marker 'T144 outline plan count changed'
+          python3 -m unittest discover -s tests -p 'test_t144_outline_plan_cache.py' -v || ci_fail_marker 'T144 outline plan source/CI contracts rejected'
+          # T-145 visible-window shifts retain overlapping cached contours;
+          # a selection/mask mutation still invalidates the previous edges.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t145_outline_window_model.gd 2>&1 | tee /tmp/godot-t145-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t145-outline-model.log --marker T145_MODEL_PASSED || ci_fail_marker 'T145 outline window model log rejected'
+          grep -Fxq 'T145_MODEL_PASSED checks=14 failures=0' /tmp/godot-t145-outline-model.log || ci_fail_marker 'T145 outline window assertions changed'
+          python3 -m unittest discover -s tests -p 'test_t145_outline_window_shift.py' -v || ci_fail_marker 'T145 outline source/CI contract rejected'
           # T-096 exact large-mask contours/Move source oracle is mandatory;
           # real pointer/display and owner acceptance remain separate.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log
@@ -210,6 +339,18 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/object_discovery_smoke.gd 2>&1 | tee /tmp/godot-t093-discovery-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t093-discovery-model.log --marker T093_MODEL_PASSED || ci_fail_marker 'T093 Object discovery model log rejected'
           python3 -m unittest discover -s tests -p 'test_t093_object_discovery.py' -v
+          # T-120 refines File/Open/Object UX without adding to the 46-check inventory.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t120_unified_open_smoke.gd 2>&1 | tee /tmp/godot-t120-open-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t120-open-model.log --marker T120_MODEL_PASSED || ci_fail_marker 'T120 unified Open model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t120_unified_open.py' -v
+          # T-121 rejects path/decoder TOCTOU by asserting one bounded source snapshot.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t121_raster_snapshot_smoke.gd 2>&1 | tee /tmp/godot-t121-snapshot-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t121-snapshot-model.log --marker T121_MODEL_PASSED || ci_fail_marker 'T121 single-snapshot raster Open rejected'
+          python3 -m unittest discover -s tests -p 'test_t121_raster_snapshot.py' -v
+          # T-123 rejects decompression bombs from the same captured header bytes.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t123_raster_predecode_bounds_smoke.gd 2>&1 | tee /tmp/godot-t123-bounds-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t123-bounds-model.log --marker T123_MODEL_PASSED || ci_fail_marker 'T123 predecode dimensions model log rejected'
+          python3 -m unittest discover -s tests -p 'test_t123_raster_predecode_bounds.py' -v
           ci_finish
       - name: Verify T-053 standalone Linux release package
         id: ci_07_verify_t_053_standalone_linux_release_package

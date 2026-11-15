@@ -144,7 +144,7 @@ func run() -> void:
 	check(app.current_document().revision == initial_revision and
 		app.current_document().is_dirty() == initial_dirty,
 		"color controls do not dirty document")
-	var edit_menu: PopupMenu = app.top_bar._menus[1].get_popup()
+	var edit_menu: PopupMenu = app.top_bar._menus[2].get_popup()
 	check(edit_menu.get_item_text(2).contains("Preferences") and not edit_menu.is_item_checkable(2),
 		"Edit menu exposes Preferences, not in-panel setting")
 	app._show_preferences()

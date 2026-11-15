@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-15",
+  "branch": "sprint/2026-11-14",
+  "base_commit": "b43b30fca1432f623f845ffe42442db0338d90ce",
+  "engine": "4.8.beta3.official.c51ff06e8",
+  "display": "Linux Xvfb Mesa llvmpipe OpenGL compatibility (software)",
+  "baseline_source_sha256": "863f73c102efe926f8770acda8d5b4e1650198fdf7723a577dcba0937400a204",
+  "candidate_source_sha256": "9582167fd19ed11c07cbf080cf08b946e113f0bde209fcb1ea892bdc4cd2f663",
+  "logs": {
+    "baseline-native.log": "60f784c00b0919ef5321cd7d97ca388c0e25df84648116bdbf31c7172d82c7d0",
+    "candidate-native.log": "cb851c6c3243cc417f503c10c2a525c5f02d5d1d0655e35cec9722947bb87b41",
+    "candidate-model.log": "755a0992b85ee77e42b7eb30d6959375d7d405581283d6e04204eacf86c67026",
+    "t102-cold-native.log": "d8cc2db446f82121abf1eac9b4e06a54d641f1dcda5dae28308991487d52eeb1",
+    "t086-viewport-native.log": "c9572632a2d20b1ae9c4d8125ccf170da0d821716d553db02108778343f6c890"
+  },
+  "baseline": {
+    "test_marker": "T137_NATIVE_PASSED checks=18 failures=3",
+    "first_frame_draw_cpu_us": 99335,
+    "first_frame_tiles_composited": 34,
+    "first_frame_tiles_deferred": 0,
+    "first_frame_cold_budgeted": 0,
+    "draws_until_settled": 2,
+    "tiles_visible": 80,
+    "preview_index_keys": 4
+  },
+  "candidate": {
+    "test_marker": "T137_NATIVE_PASSED checks=18 failures=0",
+    "first_frame_draw_cpu_us": 11158,
+    "first_frame_tiles_composited": 3,
+    "first_frame_tiles_deferred": 31,
+    "first_frame_cold_budgeted": 1,
+    "draws_until_settled": 10,
+    "tiles_visible": 80,
+    "preview_index_keys": 4
+  }
+}

@@ -34,7 +34,6 @@ var asset_browser: DrawingAssetBrowserPanel
 var asset_browser_directory_dialog: FileDialog
 var recent_objects_root_settings_path: String = "user://drawing-recent-objects-root-v1.json"
 var _recent_objects_root: String = ""
-var image_import_dialog: FileDialog
 var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered new ID
 var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
 var preferences_persistence_enabled: bool = true
@@ -155,7 +154,18 @@ var variant_dialog: ConfirmationDialog
 var variant_name: LineEdit
 var _closing_index: int = -1
 var _close_after_save: bool = false
+## Only the standalone top-level Drawing window owns the process quit policy.
+## Embedded Atlas workspaces must leave their host's window handling intact.
+var _window_quit_guard_enabled: bool = false
+var _old_auto_accept_quit: bool = true
+var _window_quit_requested: bool = false
 var _local_save_as: bool = false
+## FileDialog and the hosted Object-variant dialog complete asynchronously.
+## Freeze the initiating tab/document/session so a later callback cannot
+## write the currently selected *different* tab to the chosen destination.
+var _save_dialog_target: Dictionary = {}
+var _variant_dialog_target: Dictionary = {}
+var _authoring_dialog_targets: Dictionary = {}
 const ROW_PAGE: int = 200
 
 
@@ -169,6 +179,12 @@ func _ready() -> void:
 	_restore_workspace_layout()
 	if start_blank_document:
 		new_drawing()
+	# The OS close button bypasses File > Close Tab. Only the standalone root
+	# installs this gate; the Atlas host owns its own application lifecycle.
+	if get_parent() == get_tree().root:
+		_old_auto_accept_quit = get_tree().auto_accept_quit
+		get_tree().auto_accept_quit = false
+		_window_quit_guard_enabled = true
 
 
 func _build_interface() -> void:
@@ -177,17 +193,17 @@ func _build_interface() -> void:
 	add_child(root)
 	top_bar = TOP_BAR_SCRIPT.new() as HBoxContainer
 	root.add_child(top_bar)
-	# Object source file commands belong under File, while Window only changes
-	# workspaces and document navigation (no separate command toolbar).
-	top_bar.add_menu_spec("File", ["New Drawing  Ctrl+N", "Open Drawing…  Ctrl+O", "Save  Ctrl+S",
-		"Save As…  Ctrl+Shift+S", "Close tab  Ctrl+W", "Object › New source",
-		"Object › Open source…", "Object › Rename source…", "Object › Save source As…",
-		"Import Image as Drawing…", "Object › Browse saved sources…"],
+	# Ordinary documents and portable Object sources have independent commands.
+	# The same canonical workspace is embedded by standalone Drawing and Atlas.
+	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
+		"Save As…  Ctrl+Shift+S", "Close Tab  Ctrl+W"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "_request_close_current"), Callable(self, "new_object"),
-		Callable(self, "_ask_open_object"), Callable(self, "_ask_rename_object"),
-		Callable(self, "_ask_save"), Callable(self, "_ask_import_image"),
+		Callable(self, "_request_close_current")])
+	top_bar.add_menu_spec("Object", ["New Source", "Open Source…", "Rename Source…",
+		"Save Source As…", "Browse Sources…"],
+		[Callable(self, "new_object"), Callable(self, "_ask_open_object"),
+		Callable(self, "_ask_rename_object"), Callable(self, "_ask_save"),
 		Callable(self, "_show_asset_browser_empty")])
 	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
 		"Preferences…", "Copy  Ctrl+C", "Cut  Ctrl+X",
@@ -406,7 +422,8 @@ func _build_interface() -> void:
 	layer_rename_field = LineEdit.new()
 	layer_rename_field.max_length = 128
 	layer_rename_dialog.add_child(layer_rename_field)
-	layer_rename_dialog.confirmed.connect(_commit_layer_rename)
+	layer_rename_dialog.confirmed.connect(_confirm_layer_rename)
+	layer_rename_dialog.canceled.connect(_cancel_authoring_dialog.bind("layer_rename"))
 	var history_pane: VBoxContainer = _add_dock_section("History")
 	var history_actions: HBoxContainer = HBoxContainer.new()
 	history_pane.add_child(history_actions)
@@ -456,24 +473,19 @@ func _build_interface() -> void:
 	var about: AcceptDialog = AcceptDialog.new()
 	about.name = "WorkspaceAbout"
 	about.title = "Drawing workspace"
-	about.dialog_text = "Independent Drawing / Object Editor workspace.\nHelp: File, Edit, View, Image, Layers, Select, Window."
+	about.dialog_text = "Independent Drawing / Object Editor workspace.\nHelp: File, Object, Edit, View, Image, Layers, Select, Window."
 	add_child(about)
 	open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
-	open_dialog.title = "Open ordinary .drawing file (no Object source binding)"
+	open_dialog.title = "Open Drawing document or raster image (not an Object source)"
+	open_dialog.filters = PackedStringArray(["*.drawing ; Drawing documents",
+		"*.png ; PNG images", "*.webp ; WebP images", "*.jpg, *.jpeg ; JPEG images"])
 	open_dialog.file_selected.connect(_open_file)
 	save_dialog = _make_dialog(FileDialog.FILE_MODE_SAVE_FILE)
-	save_dialog.file_selected.connect(_save_file)
-	save_dialog.canceled.connect(_cancel_pending_close)
+	save_dialog.file_selected.connect(_save_dialog_selected)
+	save_dialog.canceled.connect(_save_dialog_cancelled)
 	object_open_dialog = _make_dialog(FileDialog.FILE_MODE_OPEN_FILE)
 	object_open_dialog.title = "Open portable Object source in its own editor tab"
 	object_open_dialog.file_selected.connect(_open_object_file)
-	image_import_dialog = FileDialog.new()
-	image_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	image_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	image_import_dialog.filters = PackedStringArray(["*.png ; PNG", "*.webp ; WebP", "*.jpg, *.jpeg ; JPEG"])
-	image_import_dialog.title = "Import bitmap as new Drawing (not an Object source)"
-	image_import_dialog.file_selected.connect(_import_image_file)
-	add_child(image_import_dialog)
 	asset_browser_directory_dialog = FileDialog.new()
 	asset_browser_directory_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
 	asset_browser_directory_dialog.access = FileDialog.ACCESS_FILESYSTEM
@@ -484,7 +496,10 @@ func _build_interface() -> void:
 	close_dialog.title = "Unsaved Object/Drawing changes"
 	close_dialog.dialog_text = "Save changes before closing this tab?"
 	add_child(close_dialog)
-	close_dialog.confirmed.connect(_save_and_close)
+	close_dialog.confirmed.connect(func() -> void:
+		close_dialog.hide()
+		call_deferred("_save_and_close"))
+	close_dialog.canceled.connect(_cancel_pending_close)
 	close_dialog.add_button("Discard", false, "discard")
 	close_dialog.custom_action.connect(func(action: String) -> void:
 		if action == "discard":
@@ -496,7 +511,8 @@ func _build_interface() -> void:
 	rename_field = LineEdit.new()
 	rename_field.custom_minimum_size.x = 310
 	rename_dialog.add_child(rename_field)
-	rename_dialog.confirmed.connect(_rename_object)
+	rename_dialog.confirmed.connect(_confirm_object_rename)
+	rename_dialog.canceled.connect(_cancel_authoring_dialog.bind("object_rename"))
 	frame_dialog = ConfirmationDialog.new()
 	frame_dialog.title = "Object-local origin and bounds"
 	add_child(frame_dialog)
@@ -522,7 +538,8 @@ func _build_interface() -> void:
 	var frame_info: Label = Label.new()
 	frame_info.text = "Empty bounds = unrestricted sparse canvas; guides never clip pixels."
 	frame_dialog.add_child(frame_info)
-	frame_dialog.confirmed.connect(_change_object_frame)
+	frame_dialog.confirmed.connect(_confirm_object_frame)
+	frame_dialog.canceled.connect(_cancel_authoring_dialog.bind("object_frame"))
 	grid_dialog = ConfirmationDialog.new()
 	grid_dialog.title = "Drawing grid (view only)"
 	add_child(grid_dialog)
@@ -540,7 +557,8 @@ func _build_interface() -> void:
 		field.custom_minimum_size.x = 185
 		grid_form.add_child(field)
 		grid_fields.append(field)
-	grid_dialog.confirmed.connect(_apply_grid_settings)
+	grid_dialog.confirmed.connect(_confirm_grid)
+	grid_dialog.canceled.connect(_cancel_authoring_dialog.bind("grid"))
 	image_frame_dialog = ConfirmationDialog.new()
 	image_frame_dialog.title = "Standalone image frame — guide, not crop"
 	add_child(image_frame_dialog)
@@ -558,7 +576,8 @@ func _build_interface() -> void:
 		field.custom_minimum_size.x = 185
 		image_form.add_child(field)
 		image_frame_fields.append(field)
-	image_frame_dialog.confirmed.connect(_apply_image_frame)
+	image_frame_dialog.confirmed.connect(_confirm_image_frame)
+	image_frame_dialog.canceled.connect(_cancel_authoring_dialog.bind("image_frame"))
 	variant_dialog = ConfirmationDialog.new()
 	variant_dialog.title = "Save Object as independent asset"
 	add_child(variant_dialog)
@@ -571,7 +590,8 @@ func _build_interface() -> void:
 	variant_name.placeholder_text = "New Object name"
 	variant_name.custom_minimum_size.x = 400
 	variant_form.add_child(variant_name)
-	variant_dialog.confirmed.connect(_save_as_named_object)
+	variant_dialog.confirmed.connect(_variant_dialog_confirmed)
+	variant_dialog.canceled.connect(_variant_dialog_cancelled)
 	_build_text_dialog()
 
 
@@ -1062,6 +1082,9 @@ func _input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and _window_quit_guard_enabled:
+		_request_window_quit()
+		return
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		if dock_drag != null and (dock_drag.is_dragging() or not _drag_candidate_id.is_empty()):
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
@@ -1796,6 +1819,19 @@ func _history_item_selected(row: int) -> void:
 		return
 	var target: int = _history_row_positions[row]
 	var document: DrawingDocument = current_document()
+	if target == document.history_position():
+		return
+	# History list rows bypass the Undo/Redo buttons. A jump would revise the
+	# source beneath detached Brush input and silently discard its queued edits.
+	if not _can_persist_or_close("History navigation"):
+		var current_row: int = _history_row_positions.find(document.history_position())
+		_rendering_history = true
+		if current_row >= 0:
+			history_list.select(current_row)
+		else:
+			history_list.deselect_all()
+		_rendering_history = false
+		return
 	while document.history_position() > target:
 		var result: DrawingResult = document.undo()
 		if not result.ok:
@@ -1834,6 +1870,8 @@ func selected_layer_node() -> String:
 
 
 func new_drawing() -> void:
+	if not _can_persist_or_close("New"):
+		return
 	new_counter += 1
 	var document: DrawingDocument = DrawingDocument.new()
 	document.record_selection_history = record_selection_history
@@ -1850,6 +1888,8 @@ func new_drawing() -> void:
 ## Atlas host opens a captured, detached Object Asset draft through this API.
 ## The very same Drawing canvas, text editor and layer panel edit the object.
 func attach_object_session(session: DrawingObjectEditorSession) -> DrawingResult:
+	if not _can_persist_or_close("Open Object"):
+		return DrawingResult.failure("STROKE_PENDING", "Finish the pending stroke before opening another document")
 	if session == null or session.document == null:
 		return DrawingResult.failure("OBJECT", "Missing Object Editor session")
 	session.document.record_selection_history = record_selection_history
@@ -1865,6 +1905,8 @@ func attach_object_session(session: DrawingObjectEditorSession) -> DrawingResult
 ## Standalone authoring uses ordinary portable .drawing assets; no Atlas
 ## instance can be rebound by this local-file publisher.
 func new_object() -> void:
+	if not _can_persist_or_close("New Object"):
+		return
 	new_counter += 1
 	var document: DrawingDocument = DrawingDocument.new()
 	var group: DrawingResult = document.create_layer(DrawingLayerNode.GROUP, "Group 1")
@@ -1957,10 +1999,13 @@ func show_asset_browser(objects_root: String) -> bool:
 
 
 func _ask_open_object() -> void:
-	object_open_dialog.popup_centered()
+	if _can_persist_or_close("Open Object"):
+		object_open_dialog.popup_centered()
 
 
 func _open_object_file(path: String) -> void:
+	if not _can_persist_or_close("Open Object"):
+		return
 	var opened: DrawingResult = DrawingObjectEditorFile.open(path)
 	if not opened.ok:
 		_show_error(opened.message)
@@ -2025,12 +2070,17 @@ func _ask_rename_object() -> void:
 		_show_error("Select an Object Editor tab")
 		return
 	rename_field.text = session.name
+	_capture_authoring_dialog_target("object_rename")
 	rename_dialog.popup_centered()
 
 
 func _rename_object() -> void:
 	var session: DrawingObjectEditorSession = current_object()
 	if session == null:
+		return
+	# A changed source label must not be staged under unpublished paint.
+	# Equivalent text is harmless (e.g. confirming an already-open dialog).
+	if rename_field.text.strip_edges() != session.name and not _can_persist_or_close("Rename Object"):
 		return
 	var changed: DrawingResult = session.set_name(rename_field.text)
 	if changed.ok:
@@ -2049,6 +2099,7 @@ func _ask_object_frame() -> void:
 		session.bounds.size.x, session.bounds.size.y]
 	for index: int in range(frame_fields.size()):
 		frame_fields[index].value = values[index]
+	_capture_authoring_dialog_target("object_frame")
 	frame_dialog.popup_centered()
 
 
@@ -2059,6 +2110,10 @@ func _change_object_frame() -> void:
 	var origin: Vector2i = Vector2i(int(frame_fields[0].value), int(frame_fields[1].value))
 	var bounds: Rect2i = Rect2i(int(frame_fields[2].value), int(frame_fields[3].value),
 		int(frame_fields[4].value), int(frame_fields[5].value))
+	# Object source context may not be rewritten while detached Brush input
+	# still targets its captured document and authoring metadata.
+	if (origin != session.origin or bounds != session.bounds) and not _can_persist_or_close("Change Object Frame"):
+		return
 	var changed: DrawingResult = session.set_frame(origin, bounds)
 	if not changed.ok:
 		_show_error(changed.message)
@@ -2077,8 +2132,53 @@ func _save_as_named_object() -> void:
 	if title.is_empty() or title.length() > 128 or "\n" in title or "\r" in title:
 		_show_error("Choose a 1–128 character Object Asset name")
 		return
+	# A rejected Save As must not leave its proposed name on a private draft.
+	# Authorize before staging, then restore the prior target on any failed
+	# publication (including a malformed or stale source snapshot).
+	if not _can_persist_or_close("Save Object As"):
+		return
+	var previous_variant_name: String = session.variant_name
 	session.variant_name = title
-	_publish_object(true)
+	if not _publish_object(true):
+		session.variant_name = previous_variant_name
+
+
+## Do not serialize or close a still-unpublished stroke. Rejection is
+## intentional: synchronous draining on Save would stall the input loop.
+## The user can Save or Close again after normal frame-budgeted commit.
+func _can_persist_or_close(action: String) -> bool:
+	if not canvas.has_pending_stroke():
+		return true
+	if _close_after_save:
+		_cancel_pending_close()
+	_show_error("Stroke still processing; %s after the stroke finishes" % action)
+	return false
+
+
+## Close the standalone window through the same per-tab Save/Discard/Cancel
+## decisions as File > Close Tab. Never silently discard unpublished strokes.
+func _request_window_quit() -> void:
+	if _window_quit_requested:
+		return
+	if not _can_persist_or_close("Close Window"):
+		return
+	_window_quit_requested = true
+	_advance_window_quit()
+
+
+func _advance_window_quit() -> void:
+	if not _window_quit_requested:
+		return
+	if not _can_persist_or_close("Close Window"):
+		return
+	if tabs.is_empty():
+		_window_quit_requested = false
+		if _window_quit_guard_enabled:
+			get_tree().quit()
+		return
+	# Closing the last tab preserves the current selection until each previous
+	# dirty tab receives its own explicit Save/Discard/Cancel decision.
+	_request_close_tab(tabs.size() - 1)
 
 
 func _request_close_current() -> void:
@@ -2088,6 +2188,8 @@ func _request_close_current() -> void:
 func _request_close_tab(index: int) -> void:
 	if index < 0 or index >= tabs.size():
 		return
+	if not _can_persist_or_close("Close Tab"):
+		return
 	if index == active_tab and canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	_closing_index = index
@@ -2096,7 +2198,10 @@ func _request_close_tab(index: int) -> void:
 	if session != null and session.is_dirty() or (session == null and
 		((tabs[index]["document"] as DrawingDocument).is_dirty() or
 		bool(tabs[index].get("frame_dirty", false)))):
-		close_dialog.popup_centered()
+		if DisplayServer.get_name() == "headless":
+			close_dialog.show()
+		else:
+			close_dialog.popup_centered()
 	else:
 		_close_index(index)
 
@@ -2105,10 +2210,14 @@ func _cancel_pending_close() -> void:
 	_closing_index = -1
 	_close_after_save = false
 	_local_save_as = false
+	_window_quit_requested = false
 
 
 func _save_and_close() -> void:
 	if _closing_index < 0:
+		return
+	if _closing_index != active_tab and not _can_persist_or_close("Save and Close"):
+		_cancel_pending_close()
 		return
 	_close_after_save = true
 	_activate(_closing_index)
@@ -2117,6 +2226,8 @@ func _save_and_close() -> void:
 
 func _close_index(index: int) -> void:
 	if index < 0 or index >= tabs.size():
+		return
+	if not _can_persist_or_close("Close Tab"):
 		return
 	var session: DrawingObjectEditorSession = tabs[index].get("object") as DrawingObjectEditorSession
 	if session != null:
@@ -2133,6 +2244,10 @@ func _close_index(index: int) -> void:
 		status.text = "No document open"
 	else:
 		_activate(mini(index, tabs.size() - 1))
+	if _window_quit_requested:
+		# Let dialog signals and tab changes settle before advancing to the
+		# next tab; a cancelled prompt revokes the quit request immediately.
+		call_deferred("_advance_window_quit")
 
 
 func _close_if_saved() -> void:
@@ -2161,8 +2276,17 @@ func _sync_object_tab() -> void:
 	_after_edit()
 
 
+## TabBar emits tab_changed synchronously, including for programmatic selection.
+## Preserve existing idle same-tab refresh behavior, but never reset the
+## Canvas session while unpublished Brush work belongs to the current tab.
 func _activate(index: int) -> void:
 	if index < 0 or index >= tabs.size():
+		return
+	if index == active_tab and canvas.has_pending_stroke():
+		return
+	if active_tab >= 0 and index != active_tab and not _can_persist_or_close("Switch Tab"):
+		# Restore the UI's selection; the resulting tab_changed is a no-op.
+		tab_bar.current_tab = active_tab
 		return
 	if active_tab >= 0 and active_tab < tabs.size() and active_tab != index:
 		tabs[active_tab]["camera"] = canvas.camera
@@ -2254,6 +2378,20 @@ func _change_layer_page(direction: int) -> void:
 func _select_layer_node(node_id: String, record_context: bool = true) -> void:
 	if active_tab < 0 or not current_document().has_node(node_id):
 		return
+	# Programmatic restoration may emit another Tree selection callback;
+	# do not erase the actionable pending-stroke error for that harmless event.
+	if node_id == selected_layer_node() and canvas.has_pending_stroke():
+		return
+	# Switching source layers invalidates a queued Brush stroke even without
+	# changing document pixels. Restore the Tree selection if a click is refused.
+	if node_id != selected_layer_node() and not _can_persist_or_close("Change Layer"):
+		var item: TreeItem = layers.get_root().get_first_child() if layers.get_root() != null else null
+		while item != null:
+			if String(item.get_metadata(0)) == selected_layer_node():
+				item.select(0)
+				break
+			item = item.get_next()
+		return
 	var before: DrawingHistoryContext = _capture_context() if record_context else null
 	var kind: String = String(current_document().node_metadata(node_id).get("kind", ""))
 	tabs[active_tab]["selected_node"] = node_id
@@ -2326,7 +2464,7 @@ func _insertion_target() -> Dictionary:
 
 
 func _create_selected_layer(kind: String) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Add Layer"):
 		return
 	var target: Dictionary = _insertion_target()
 	var before: DrawingHistoryContext = _capture_context()
@@ -2380,7 +2518,7 @@ func _apply_structure(result: DrawingResult, before: DrawingHistoryContext,
 
 
 func _set_row_visibility(node_id: String) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Change Layer Visibility"):
 		return
 	var info: Dictionary = current_document().node_metadata(node_id)
 	if info.is_empty():
@@ -2390,7 +2528,7 @@ func _set_row_visibility(node_id: String) -> void:
 
 
 func _set_row_lock(node_id: String) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Change Layer Lock"):
 		return
 	var info: Dictionary = current_document().node_metadata(node_id)
 	if info.is_empty():
@@ -2404,7 +2542,7 @@ func _toggle_layer_lock() -> void:
 
 
 func _move_selected_layer(direction: int) -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Reorder Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2419,7 +2557,7 @@ func _move_selected_layer(direction: int) -> void:
 
 
 func _indent_selected_layer() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Indent Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2437,7 +2575,7 @@ func _indent_selected_layer() -> void:
 
 
 func _outdent_selected_layer() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Outdent Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2457,13 +2595,14 @@ func _ask_layer_rename() -> void:
 	if info.is_empty():
 		return
 	layer_rename_field.text = info["name"]
+	_capture_authoring_dialog_target("layer_rename")
 	layer_rename_dialog.popup_centered(Vector2i(340, 110))
 	layer_rename_field.select_all()
 	layer_rename_field.grab_focus()
 
 
 func _commit_layer_rename() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Rename Layer"):
 		return
 	var name: String = layer_rename_field.text.strip_edges()
 	if name.is_empty():
@@ -2512,7 +2651,8 @@ func _build_text_dialog() -> void:
 	text_color = ColorPickerButton.new()
 	text_color.text = "Color"
 	form.add_child(text_color)
-	text_dialog.confirmed.connect(_commit_text_dialog)
+	text_dialog.confirmed.connect(_confirm_text)
+	text_dialog.canceled.connect(_cancel_authoring_dialog.bind("text"))
 
 
 func _edit_text_at(point: Vector2i) -> void:
@@ -2534,12 +2674,13 @@ func _edit_text_at(point: Vector2i) -> void:
 		float((existing.color_rgba >> 24) & 255) / 255.0)
 	if existing != null:
 		text_position = existing.position
+	_capture_authoring_dialog_target("text")
 	text_dialog.popup_centered()
 	text_edit.grab_focus()
 
 
 func _commit_text_dialog() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Commit Text"):
 		return
 	var document: DrawingDocument = current_document()
 	var draft: DrawingTextElement = DrawingTextElement.new()
@@ -2567,7 +2708,7 @@ func _commit_text_dialog() -> void:
 
 
 func _rasterize_text() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Rasterize Text"):
 		return
 	var before: DrawingHistoryContext = _capture_context()
 	var converted: DrawingResult = current_document().rasterize_text(current_layer(), current_document().revision)
@@ -2579,7 +2720,7 @@ func _rasterize_text() -> void:
 
 
 func _remove_layer() -> void:
-	if active_tab < 0:
+	if active_tab < 0 or not _can_persist_or_close("Remove Layer"):
 		return
 	var node_id: String = selected_layer_node()
 	var info: Dictionary = current_document().node_metadata(node_id)
@@ -2663,6 +2804,10 @@ func _cancel_floating_move() -> void:
 
 func _deselect() -> void:
 	if active_tab >= 0:
+		# Clear Selection changes the mask captured by an in-flight stroke.
+		# Refuse instead of letting Canvas cancel the unpublished transaction.
+		if canvas.selection_mask.enabled and not _can_persist_or_close("Clear Selection"):
+			return
 		if canvas.has_floating_move() and not canvas.confirm_floating_move():
 			return
 		canvas.clear_selection()
@@ -2708,6 +2853,8 @@ func _commit_clipboard_edit(edit: DrawingEditSession,
 
 
 func _delete_selection() -> void:
+	if not _can_persist_or_close("Delete Pixels"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	if active_tab < 0 or not canvas.selected.has_area():
@@ -2728,6 +2875,8 @@ func _delete_selection() -> void:
 
 
 func _cut_selection() -> void:
+	if not _can_persist_or_close("Cut Pixels"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	var captured: DrawingResult = _capture_selection_clipboard()
@@ -2752,6 +2901,8 @@ func _cut_selection() -> void:
 
 
 func _paste_selection() -> void:
+	if not _can_persist_or_close("Paste Pixels"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	if drawing_clipboard == null or active_tab < 0:
@@ -2996,6 +3147,7 @@ func _ask_grid_settings() -> void:
 	for index: int in range(3):
 		grid_fields[index].value = [canvas.grid_spacing, canvas.grid_origin.x,
 			canvas.grid_origin.y][index]
+	_capture_authoring_dialog_target("grid")
 	grid_dialog.popup_centered()
 
 
@@ -3020,6 +3172,7 @@ func _ask_image_frame() -> void:
 		bounds.size.x, bounds.size.y]
 	for index: int in range(image_frame_fields.size()):
 		image_frame_fields[index].value = values[index]
+	_capture_authoring_dialog_target("image_frame")
 	image_frame_dialog.popup_centered()
 
 
@@ -3034,6 +3187,10 @@ func _apply_image_frame() -> void:
 		_show_error(checked.message)
 		return
 	if frame == canvas.image_bounds:
+		return
+	# Changing clip/authoring bounds while a stroke drains would cancel
+	# already received paint and its queued successor through Canvas's setter.
+	if not _can_persist_or_close("Change Image Frame"):
 		return
 	tabs[active_tab]["frame"] = frame
 	tabs[active_tab]["frame_dirty"] = frame != tabs[active_tab].get("saved_frame", frame)
@@ -3061,6 +3218,9 @@ func _fit_image_frame() -> void:
 func _undo() -> void:
 	if active_tab < 0:
 		return
+	# History changes the document revision and would cancel unpublished Brush input.
+	if not _can_persist_or_close("Undo"):
+		return
 	if canvas.has_floating_move():
 		_cancel_floating_move()
 		return
@@ -3074,6 +3234,8 @@ func _undo() -> void:
 
 func _redo() -> void:
 	if active_tab < 0:
+		return
+	if not _can_persist_or_close("Redo"):
 		return
 	if canvas.has_floating_move():
 		_cancel_floating_move()
@@ -3102,28 +3264,14 @@ func _reset_view() -> void:
 	_update_status()
 
 
-func _ask_import_image() -> void:
-	image_import_dialog.popup_centered_ratio(0.7)
-
-
-func _import_image_file(path: String) -> void:
-	var extension: String = path.get_extension().to_lower()
-	if extension not in ["png", "webp", "jpg", "jpeg"]:
-		_show_error("Unsupported image type. Import PNG, WebP or JPEG; Open Drawing handles .drawing files.")
+func _open_raster_file(path: String) -> void:
+	if not _can_persist_or_close("Open"):
 		return
-	var stream: FileAccess = FileAccess.open(path, FileAccess.READ)
-	if stream == null or stream.get_length() > 64 * 1024 * 1024:
-		_show_error("Image missing, unreadable or larger than the 64 MiB import limit")
+	var opened: DrawingResult = DrawingRasterImport.load_file_image(path)
+	if not opened.ok:
+		_show_error(opened.message)
 		return
-	stream.close()
-	var image: Image = Image.load_from_file(path)
-	if image == null or image.is_empty():
-		_show_error("Cannot decode image. Source file is missing or corrupt; no Drawing was created.")
-		return
-	if image.get_width() > 4096 or image.get_height() > 4096 or \
-			image.get_width() * image.get_height() > 16777216:
-		_show_error("Image exceeds the 4096px-per-side / 16.8M-pixel import limit")
-		return
+	var image: Image = opened.value as Image
 	var document: DrawingDocument = DrawingDocument.new()
 	document.record_selection_history = record_selection_history
 	var created: DrawingResult = document.create_layer(DrawingLayerNode.RASTER, "Imported image")
@@ -3145,10 +3293,120 @@ func _import_image_file(path: String) -> void:
 
 
 func _ask_open() -> void:
-	open_dialog.popup_centered()
+	if _can_persist_or_close("Open"):
+		open_dialog.popup_centered()
+
+
+## A delayed editing confirmation must remain tied to the exact document
+## and Object session that opened it. Layer/Text dialogs additionally freeze
+## their selected source node and revision. Consume authority on first signal
+## (including rejected signals) so Cancel and duplicate confirms fail closed.
+func _capture_authoring_dialog_target(kind: String) -> void:
+	var target: Dictionary = _capture_save_target()
+	if not target.is_empty():
+		target["layer"] = current_layer()
+		target["selected_node"] = selected_layer_node()
+		target["revision"] = current_document().revision
+	_authoring_dialog_targets[kind] = target
+
+
+func _cancel_authoring_dialog(kind: String) -> void:
+	_authoring_dialog_targets.erase(kind)
+
+
+func _authoring_dialog_is_current(kind: String, require_layer: bool = false) -> bool:
+	var target: Dictionary = _authoring_dialog_targets.get(kind, {})
+	_authoring_dialog_targets.erase(kind)
+	var valid: bool = _save_target_is_current(target)
+	if valid and require_layer:
+		valid = (current_layer() == String(target["layer"])
+			and selected_layer_node() == String(target["selected_node"])
+			and current_document().revision == int(target["revision"]))
+	if not valid:
+		_show_error("Authoring dialog belongs to another document, layer or tab; reopen it")
+	return valid
+
+
+func _confirm_layer_rename() -> void:
+	if _authoring_dialog_is_current("layer_rename", true):
+		_commit_layer_rename()
+
+
+func _confirm_text() -> void:
+	if _authoring_dialog_is_current("text", true):
+		_commit_text_dialog()
+
+
+func _confirm_object_rename() -> void:
+	if _authoring_dialog_is_current("object_rename"):
+		_rename_object()
+
+
+func _confirm_object_frame() -> void:
+	if _authoring_dialog_is_current("object_frame"):
+		_change_object_frame()
+
+
+func _confirm_grid() -> void:
+	if _authoring_dialog_is_current("grid"):
+		_apply_grid_settings()
+
+
+func _confirm_image_frame() -> void:
+	if _authoring_dialog_is_current("image_frame"):
+		_apply_image_frame()
+
+
+## A dialog may outlive its original tab or even its original index.
+## Identity is checked after the signal, before any path or metadata mutation.
+func _capture_save_target() -> Dictionary:
+	if active_tab < 0 or active_tab >= tabs.size():
+		return {}
+	return {"tab": active_tab, "document": current_document(), "object": current_object()}
+
+
+func _save_target_is_current(target: Dictionary) -> bool:
+	return (not target.is_empty() and active_tab >= 0 and active_tab < tabs.size()
+		and active_tab == int(target["tab"])
+		and current_document() == target["document"]
+		and current_object() == target["object"])
+
+
+func _save_dialog_cancelled() -> void:
+	_save_dialog_target.clear()
+	_local_save_as = false
+	_cancel_pending_close()
+
+
+func _save_dialog_selected(path: String) -> void:
+	var target: Dictionary = _save_dialog_target
+	_save_dialog_target = {}
+	if not _save_target_is_current(target):
+		_local_save_as = false
+		_cancel_pending_close()
+		_show_error("Save As belongs to another document or tab; reopen the dialog")
+		return
+	_save_file(path)
+	_local_save_as = false
+
+
+func _variant_dialog_cancelled() -> void:
+	_variant_dialog_target.clear()
+	_cancel_pending_close()
+
+
+func _variant_dialog_confirmed() -> void:
+	var target: Dictionary = _variant_dialog_target
+	_variant_dialog_target = {}
+	if not _save_target_is_current(target):
+		_cancel_pending_close()
+		_show_error("Object Save As belongs to another document or tab; reopen the dialog")
+		return
+	_save_as_named_object()
 
 
 func _show_save_dialog() -> void:
+	_save_dialog_target = _capture_save_target()
 	# Godot headless reports a 0x0 screen: centering the native FileDialog
 	# spawns its window at a negative position and emits a runtime ERROR.
 	# Preserve the real dialog and Save/Close routing in headless CI without
@@ -3162,6 +3420,8 @@ func _show_save_dialog() -> void:
 func _ask_save() -> void:
 	if active_tab < 0:
 		return
+	if not _can_persist_or_close("Save As"):
+		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
 	var session: DrawingObjectEditorSession = current_object()
@@ -3170,6 +3430,7 @@ func _ask_save() -> void:
 		return
 	if session != null and not bool(tabs[active_tab].get("local_object", false)):
 		variant_name.text = session.name + " copy"
+		_variant_dialog_target = _capture_save_target()
 		variant_dialog.popup_centered()
 	else:
 		_local_save_as = session != null
@@ -3178,6 +3439,8 @@ func _ask_save() -> void:
 
 func _save() -> void:
 	if active_tab < 0:
+		return
+	if not _can_persist_or_close("Save"):
 		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
@@ -3199,23 +3462,28 @@ func _save() -> void:
 		_save_file(path)
 
 
-func _publish_object(as_variant: bool) -> void:
+func _publish_object(as_variant: bool) -> bool:
 	var session: DrawingObjectEditorSession = current_object()
 	if session == null:
-		return
+		return false
+	if not _can_persist_or_close("Save Object"):
+		return false
 	var result: DrawingResult = session.save_as() if as_variant else session.save()
 	if not result.ok:
 		if active_tab >= 0:
 			tabs[active_tab].erase("_target_path")
 		_cancel_pending_close()
 		_show_error(result.message)
-		return
+		return false
 	_sync_object_tab()
 	_close_if_saved()
+	return true
 
 
 func _save_file(path: String) -> void:
 	if active_tab < 0:
+		return
+	if not _can_persist_or_close("Save"):
 		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
 		return
@@ -3241,6 +3509,17 @@ func _save_file(path: String) -> void:
 
 
 func _open_file(path: String) -> void:
+	if not _can_persist_or_close("Open"):
+		return
+	match path.get_extension().to_lower():
+		"png", "webp", "jpg", "jpeg":
+			_open_raster_file(path)
+			return
+		"drawing":
+			pass
+		_:
+			_show_error("Unsupported file type. Open supports .drawing, PNG, WebP and JPEG.")
+			return
 	var opened: DrawingResult = DrawingFileIO.open_with_frame(path)
 	if not opened.ok:
 		_show_error(opened.message)
@@ -3440,5 +3719,8 @@ func register_workspace_panel(panel_id: String, view: Control) -> bool:
 
 
 func _exit_tree() -> void:
+	if _window_quit_guard_enabled:
+		get_tree().auto_accept_quit = _old_auto_accept_quit
+		_window_quit_guard_enabled = false
 	if _layout_booted and layout_persistence_enabled:
 		_save_workspace_layout()

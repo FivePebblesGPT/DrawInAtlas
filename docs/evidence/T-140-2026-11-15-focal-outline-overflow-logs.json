@@ -1,0 +1,19 @@
+{
+  "engine": "4.8.beta3.official.c51ff06e8",
+  "log_sha256": {
+    "baseline-model.log": "258dc283a8e1250acf75918cf5f1b5743571b7fafbdd61cbf1da3841b77ca1fc",
+    "baseline-native.log": "bb3c9b45e5bcde6b3bad04f4f49cc67f4490dfefedba5fcd9ef8d04e5b1c8ce1",
+    "candidate-model.log": "b739ba13b39995122b0e71378f05f28b99cadde822439c55ab255776f32cfe30",
+    "candidate-native.log": "c7b50bdf2b79f26f62abab0946fcf24b5b285ecb999f9a689b90c334155d5705",
+    "consumer-standalone.log": "9e69ca10b12941dc3b610e7c0c87790efa396997d7c4b47d3de0ca0f983a54e1",
+    "t088-selection-model.log": "60342c7ef97cf7a11afa0bc4c73b99e7c85a2d97b21f43759feb7605d8eeb66d",
+    "t088-selection-native.log": "1fc337cfef14afa3fd2ee5a21e18ed2fca583a1f36a1c9e4f6445d19dbdf88b0",
+    "t088-sparse-capture.log": "43209b234e5db42727fb9f345c84cc07dc5078d40d4a78166051b578f1e52a20",
+    "t088-sparse-paste.log": "8bb3ccc57192a97b96fc42d2ad990bead2b1de75466d10ad30c62096ba864716",
+    "t096-large-selection-model.log": "29733cbeb601179f31884f6db414677fb224ce962dac9596c9e513cbbdf6d651",
+    "t096-large-selection-native.log": "bd6cfb24f2a799ff86ee4daa3c7b682825bdde125edcb8f9698a32ae7e87e0d9",
+    "t139-model.log": "ee1535099a7fa62d219593214b29adf0d070d444a6563153db723d00219bf629",
+    "t139-native.log": "2f2fc0c054af2c6456b2dcea39513309749cc9e01ff2dae22decd6fbfabb1ccd"
+  },
+  "source_baseline": "bd2b6ba3dfa79d84dc3e28aa68a03f10162ce71a"
+}

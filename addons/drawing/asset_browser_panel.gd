@@ -254,7 +254,7 @@ func _refresh_view() -> void:
 	_queue_thumbnails()
 	message.text = "%d saved sources (Atlas placement not checked; no bindings changed)." % index.entries.size()
 	if index.entries.is_empty():
-		message.text = "No sources found. Import a portable source, create one with File → Object › New source, or choose another Objects/ folder."
+		message.text = "No sources found. Import a portable source, create one with Object → New Source, or choose another Objects/ folder."
 	elif _visible_entries.is_empty():
 		message.text = "No sources match this search. Clear the query or refresh the Objects/ folder."
 	if not index.warnings.is_empty():
@@ -279,7 +279,7 @@ func _refresh_view() -> void:
 		recent_root_button.visible = not atlas_host_mode and not recent_root.is_empty()
 		recent_root_button.tooltip_text = "Use last explicitly chosen root: " + recent_root
 	if index.root_path.is_empty():
-		message.text = "No Objects/ folder selected. Choose an existing project's Objects/ directory. Open Drawing handles ordinary files; this browser edits saved sources, not Atlas placements or missing/NULL links."
+		message.text = "No Objects/ folder selected. Choose an existing project's Objects/ directory. File → Open… handles ordinary files; this browser edits saved sources, not Atlas placements or missing/NULL links."
 	elif atlas_host_mode and index.entries.is_empty():
 		message.text = "No registered sources on this page. Unreferenced saved sources may still be listed; use Atlas source management for missing/NULL links."
 

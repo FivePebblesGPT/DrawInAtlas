@@ -1,0 +1,16 @@
+{
+  "engine": "4.8.beta3.official.c51ff06e8",
+  "log_sha256": {
+    "baseline-native.log": "7786d42a201adff6cba0227e83aa75b4cc21210b349dc4ed8a7e9c9217b7901d",
+    "candidate-model.log": "ee1535099a7fa62d219593214b29adf0d070d444a6563153db723d00219bf629",
+    "candidate-native.log": "2f2fc0c054af2c6456b2dcea39513309749cc9e01ff2dae22decd6fbfabb1ccd",
+    "consumer-standalone.log": "9e69ca10b12941dc3b610e7c0c87790efa396997d7c4b47d3de0ca0f983a54e1",
+    "large-selection-model.log": "a3306375729a286dd49efdc0e2602e7f0cdb1e5f2654296218cb98af0cacdd51",
+    "large-selection-native.log": "ee4d9072da3f748ff215b54d3d26b570510ba0590fdf2937a0b14ad949eae5aa",
+    "selection-model.log": "60342c7ef97cf7a11afa0bc4c73b99e7c85a2d97b21f43759feb7605d8eeb66d",
+    "selection-native.log": "3d247562d9fb0734953e714b33eef120559c8bfda03846dfc24e007b6d8dd9ac",
+    "sparse-capture.log": "83886e46c836b8dd00e9fbfe58245fd4608959545d1ab9859fbcb3bed457626c",
+    "sparse-paste.log": "1b9755e232f873a421cd2c6cf481c760a520d582e576dd5d747e693440e62245"
+  },
+  "source_baseline": "7573db31af75d9684ba9067dc005022b9d93896b"
+}

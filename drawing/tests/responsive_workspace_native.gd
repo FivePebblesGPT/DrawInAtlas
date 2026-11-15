@@ -47,6 +47,22 @@ func click_at(target: Vector2) -> void:
 	await frames(3)
 
 
+func pointer_at(target: Vector2, pressed: bool) -> void:
+	var motion: InputEventMouseMotion = InputEventMouseMotion.new()
+	motion.position = target
+	motion.global_position = target
+	root.push_input(motion, true)
+	await process_frame
+	var event: InputEventMouseButton = InputEventMouseButton.new()
+	event.position = target
+	event.global_position = target
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	event.pressed = pressed
+	root.push_input(event, true)
+	await frames(2)
+
+
 func shortcut(code: Key) -> void:
 	for pressed: bool in [true, false]:
 		var event: InputEventKey = InputEventKey.new()
@@ -151,16 +167,17 @@ func run() -> void:
 		app.tabs_line.get_parent() == app.canvas.get_parent(),
 		"document tabs share the canvas column, not the tool rail or panel dock")
 	var file_menu: PopupMenu = app.top_bar._menus[0].get_popup()
-	var window_menu: PopupMenu = app.top_bar._menus[6].get_popup()
+	var window_menu: PopupMenu = app.top_bar._menus[7].get_popup()
 	var file_labels: String = ""
 	for i: int in range(file_menu.item_count):
 		file_labels += file_menu.get_item_text(i) + ";"
 	var window_labels: String = ""
 	for i: int in range(window_menu.item_count):
 		window_labels += window_menu.get_item_text(i) + ";"
-	check(file_labels.contains("Close tab") and file_labels.contains("Rename source") and
-		file_labels.contains("Save source As") and not window_labels.contains("Object") and
-		not window_labels.contains("Close tab"), "file and object commands stay outside Window")
+	check(file_labels.contains("Close Tab") and not file_labels.contains("Source") and
+		app.top_bar._menus[1].get_popup().get_item_text(2).contains("Rename Source") and
+		not window_labels.contains("Object") and not window_labels.contains("Close tab"),
+		"File and Object stay distinct and outside Window")
 	await shortcut(KEY_N)
 	check(app.tabs.size() == 2 and app.active_tab == 1, "native Ctrl+N opens a second document")
 	await key(KEY_BRACKETRIGHT)
@@ -212,13 +229,17 @@ func run() -> void:
 			"View › Show grid": grid_more_id = item
 			"Window › Show document tabs": tabs_more_id = item
 	check(top.more_menu.visible and tabs_more_id >= 0 and
-		(grid_more_id >= 0 or top._menus[2].visible),
+		(grid_more_id >= 0 or top._menus[3].visible),
 		"narrow native viewport moves Window and later menus into More")
 	if tabs_more_id >= 0:
 		check(more_popup.is_item_checkable(tabs_more_id) and
 			more_popup.is_item_checked(tabs_more_id) == app.show_document_tabs,
 			"native More popup mirrors the current document-tabs checkmark")
-		await click_at(top.more_menu.get_global_rect().get_center())
+		# The 560px test-only app width is below the standalone 800px minimum.
+		# The tall native popup can cover its own trigger on mouse release;
+		# verify the pointer-down opening and release after dispatch instead.
+		var more_target: Vector2 = top.more_menu.get_global_rect().get_center()
+		await pointer_at(more_target, true)
 		check(more_popup.visible, "real pointer opens the native More menu")
 		await screenshot("t090-more-checkmarks")
 		more_popup.id_pressed.emit(tabs_more_id)
@@ -226,6 +247,7 @@ func run() -> void:
 			"native More action updates tabs and its checked state")
 		app._toggle_document_tabs()
 		more_popup.hide()
+		await pointer_at(more_target, false)
 	if grid_more_id >= 0:
 		check(more_popup.is_item_checkable(grid_more_id) and
 			more_popup.is_item_checked(grid_more_id) == app.canvas.show_grid,
@@ -237,7 +259,7 @@ func run() -> void:
 	root.size = Vector2i(1280, 760)
 	app.size = Vector2(1280, 760)
 	await frames(10)
-	check(not top.more_menu.visible and top._menus[6].get_popup().is_item_checked(2),
+	check(not top.more_menu.visible and top._menus[7].get_popup().is_item_checked(2),
 		"wide viewport restores original Window menu and its checked state")
 	app._change_tool("Brush")
 	app.width_spin.value = 5.0

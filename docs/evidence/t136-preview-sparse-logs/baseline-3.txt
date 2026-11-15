@@ -1,0 +1,12 @@
+Fontconfig error: Cannot load default config file: No such file: (null)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T136_NATIVE_FAILED: complete preview union authorizes indexed traversal
+T136_NATIVE_FAILED: committed and preview-only tiles both visited without scanning empty viewport
+T136_NATIVE_FAILED: updated preview index stays bounded at 1% zoom
+T136_NATIVE_FAILED: restored complete source occupancy permits indexed preview again
+T136_NATIVE_TIMING {"cells":120701,"engine":"4.8-beta3 (official)","examined":120701,"p50_us":108804,"p95_us":115138,"warm_draw_us":[106013,106900,108049,108804,113325,114198,115138],"zoom":0.01}
+T136_NATIVE_PASSED checks=26 failures=4

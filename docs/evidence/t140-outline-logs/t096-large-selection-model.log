@@ -1,0 +1,5 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T096_PROFILE: legacy_capture_p50/p95_ms=2.221/2.486 legacy_clear_p50/p95_ms=55.013/58.106 legacy_paste_p50/p95_ms=10.833/12.125 optimized_stage_p50/p95_ms=18.431/20.415
+T096_MODEL: 13847 checks; 0 failed
+T096_MODEL_PASSED
