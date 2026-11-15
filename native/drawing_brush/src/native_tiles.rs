@@ -572,6 +572,51 @@ impl TileStore {
         Ok(())
     }
 
+    /// A raster layer that has never been imported into this store can be
+    /// removed/restored as a structural edit: no canonical tile or reversible
+    /// history event belongs to it. Unlike an unconditional metadata advance,
+    /// this fails closed for even an authorized *blank* tile and for redo.
+    fn advance_unreferenced_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing structural revision");
+        }
+        if layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return Err("Invalid structural raster-layer count");
+        }
+        let mut names = HashSet::with_capacity(layers.len());
+        if layers
+            .iter()
+            .any(|name| name.is_empty() || !names.insert(name.as_str()))
+        {
+            return Err("Invalid or repeated structural raster-layer ID");
+        }
+        if self
+            .tiles
+            .keys()
+            .any(|id| names.contains(id.layer.as_str()))
+            || self
+                .authorized
+                .iter()
+                .any(|id| names.contains(id.layer.as_str()))
+            || self.undo.iter().chain(self.redo.iter()).any(|entry| {
+                names.contains(entry.layer.as_str())
+                    || entry
+                        .before
+                        .keys()
+                        .chain(entry.after.keys())
+                        .any(|id| names.contains(id.layer.as_str()))
+            })
+        {
+            return Err("Raster layer has native tile ownership or history");
+        }
+        self.advance_metadata(expected, discard_redo)
+    }
+
     fn history_matches(&self, token: i64, undo: bool) -> bool {
         if token <= 0 || self.active.is_some() {
             return false;
@@ -712,6 +757,25 @@ impl DrawingNativeTiles {
                 .store
                 .advance_metadata(expected as u64, discard_redo)
                 .is_ok()
+    }
+
+    /// Structural creation/deletion/restore of previously unimported raster
+    /// layers only. This is not a bulk tile-delete API; it never alters pixels.
+    #[func]
+    fn advance_unreferenced_layers_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        discard_redo: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store
+            .advance_unreferenced_layers(expected as u64, &ids, discard_redo)
+            .is_ok()
     }
 
     /// One bounded FFI call for a preflighted external raster edit. The
@@ -1193,6 +1257,112 @@ mod tests {
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.undo_or_redo(false).unwrap(), 2);
         assert_eq!(store.read(&id, false).unwrap().rgba, changed);
+    }
+
+    #[test]
+    fn unreferenced_raster_structure_preserves_unrelated_native_history() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let paint = store.begin("ink", 0, false).unwrap();
+        store
+            .stage(
+                paint,
+                0,
+                0,
+                0,
+                &[0, 0],
+                false,
+                0xff114477,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(paint, 0).unwrap();
+        let bytes = store
+            .read(
+                &TileId {
+                    layer: "ink".into(),
+                    x: 0,
+                    y: 0,
+                },
+                false,
+            )
+            .unwrap()
+            .rgba
+            .clone();
+        let memory = store.bytes_used();
+        let empty = vec!["unimported".to_owned(), "nested".to_owned()];
+        store.advance_unreferenced_layers(1, &empty, true).unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.bytes_used(), memory);
+        assert!(store.history_matches(paint, true));
+        assert_eq!(
+            store
+                .read(
+                    &TileId {
+                        layer: "ink".into(),
+                        x: 0,
+                        y: 0
+                    },
+                    false
+                )
+                .unwrap()
+                .rgba,
+            bytes
+        );
+        assert!(store.advance_unreferenced_layers(1, &empty, false).is_err());
+        assert!(store.advance_unreferenced_layers(2, &[], false).is_err());
+        assert!(
+            store
+                .advance_unreferenced_layers(2, &["nested".into(), "nested".into()], false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_unreferenced_layers(2, &[String::new()], false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_unreferenced_layers(2, &vec!["n".into(); MAX_ACTIVE_TILES + 1], false)
+                .is_err()
+        );
+        assert_eq!(store.revision, 2);
+        // Imported blank counts as resident source, even with no painted pixels.
+        store
+            .import(
+                TileId {
+                    layer: "nested".into(),
+                    x: -1,
+                    y: 0,
+                },
+                2,
+                &[],
+            )
+            .unwrap();
+        assert!(store.advance_unreferenced_layers(2, &empty, false).is_err());
+        let active = store.begin("ink", 2, false).unwrap();
+        assert!(
+            store
+                .advance_unreferenced_layers(2, &["fresh".into()], false)
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, 2, "ink"));
+        store.active = None;
+        // Undo/redo history for an affected raster layer also blocks metadata
+        // treatment, including when its tile bytes become blank after Undo.
+        store.undo_or_redo(true).unwrap();
+        assert!(store.history_matches(paint, false));
+        assert!(
+            store
+                .advance_unreferenced_layers(3, &["ink".into()], true)
+                .is_err()
+        );
+        store
+            .advance_unreferenced_layers(3, &["fresh".into()], false)
+            .unwrap();
+        assert!(store.history_matches(paint, false));
+        assert_eq!(store.revision, 4);
     }
 
     #[test]

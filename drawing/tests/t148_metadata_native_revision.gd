@@ -6,6 +6,11 @@ const STRIDE: int = 64
 const INK: int = 0xff5599cc
 var checks: int = 0
 var failures: int = 0
+var lazy_data: PackedByteArray = PackedByteArray()
+
+
+func lazy_chunk(_reference: String) -> PackedByteArray:
+	return lazy_data.duplicate()
 
 
 func check(ok: bool, label: String) -> void:
@@ -165,11 +170,61 @@ func run() -> void:
 		int(store.call("stats").get("revision", -1)) == doc.revision and
 		int(store.call("stats").get("undo", -1)) == nested_undo,
 		"redo semantic create preserves native tokens")
-	# A nested tree with a raster child must *not* take the metadata path.
-	# Its source can be deleted/recreated while the tile ID is still in Rust.
+	# A raster subtree with no *native* source/history can use the same
+	# revision bridge as semantic metadata. Test nested IDs, a deferred signed
+	# tile, exact hidden RGB and alternating structural Undo/Redo.
+	var virgin_group: String = str(doc.create_layer(DrawingLayerNode.GROUP,
+		"Virgin raster group", "root", "", -1, true).value)
+	var virgin_a: String = str(doc.create_layer(DrawingLayerNode.RASTER,
+		"Unimported lazy", virgin_group, "", -1, true).value)
+	var virgin_b: String = str(doc.create_layer(DrawingLayerNode.RASTER,
+		"Unimported empty", virgin_group, "", -1, true).value)
+	lazy_data.resize(STRIDE * STRIDE * 4)
+	lazy_data.encode_u32(0, 0x00123456)
+	check(doc.register_lazy_chunk(virgin_a, -1, 1, "lazy-hidden",
+		DrawingRasterTile.digest_rgba8(lazy_data, STRIDE),
+		Callable(self, "lazy_chunk")).ok, "deferred raster source registered without import")
+	var virgin_history: int = int(store.call("stats").get("undo", -1))
+	var virgin_imports: int = int(store.call("stats").get("bytes_imported", -1))
+	check(doc.remove_subtree(virgin_group, true).ok and
+		int(store.call("stats").get("revision", -1)) == doc.revision and
+		int(store.call("stats").get("undo", -1)) == virgin_history,
+		"nested never-imported raster removal preserves unrelated Rust history")
+	check(doc.undo().ok and doc.has_node(virgin_a) and doc.has_node(virgin_b) and
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"restore unimported raster children retains native revision")
+	check(doc.request_chunk(virgin_a, "-1,1").ok and
+		(doc.request_chunk(virgin_a, "-1,1").value as DrawingRasterTile).to_rgba8() == lazy_data,
+		"restored deferred signed tile preserves canonical hidden RGB")
+	check(doc.redo().ok and not doc.has_node(virgin_group) and
+		int(store.call("stats").get("undo", -1)) == virgin_history and
+		int(store.call("stats").get("bytes_imported", -1)) == virgin_imports,
+		"redo unimported raster deletion preserves existing native source")
+	check(doc.undo().ok and doc.has_node(virgin_a) and
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"second restore of unimported raster remains synchronized")
+	check(stroke(doc, layer, Vector2(56.5, 33.5)).ok and
+		doc._native_raster_store == store and
+		int(store.call("stats").get("undo", -1)) == virgin_history + 1 and
+		int(store.call("stats").get("bytes_imported", -1)) == virgin_imports,
+		"next unrelated Brush reuses history without canonical reimport")
+	var virgin_save: String = ProjectSettings.globalize_path("user://t148-virgin-" +
+		DrawingDocument.new_id() + ".drawing")
+	check(DrawingFileIO.save(doc, virgin_save).ok, "mixed never-imported raster/Brush saves")
+	var virgin_open: DrawingResult = DrawingFileIO.open(virgin_save)
+	check(virgin_open.ok and
+		(virgin_open.value as DrawingDocument).request_chunk(virgin_a, "-1,1").ok and
+		((virgin_open.value as DrawingDocument).request_chunk(virgin_a, "-1,1").value as DrawingRasterTile).to_rgba8() == lazy_data,
+		"restored deferred source is byte-identical after Save/Open")
+	DirAccess.remove_absolute(virgin_save)
+	# Imported tile and native history forbid a metadata-only structural
+	# revision, even if the node is nested beneath an otherwise empty group.
+
 	var group: String = str(doc.create_layer(DrawingLayerNode.GROUP, "Mixed").value)
 	var nested: String = str(doc.create_layer(DrawingLayerNode.RASTER, "Nested", group).value)
 	check(not group.is_empty() and not nested.is_empty(), "nested raster subtree created")
+	check(stroke(doc, nested, Vector2(19.5, 19.5)).ok,
+		"nested raster tile is authorized and enters native history")
 	var before_remove_revision: int = doc.revision
 	check(doc.remove_subtree(group, true).ok and
 		doc.revision == before_remove_revision + 1 and

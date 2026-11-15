@@ -263,3 +263,5 @@ LightingData.asset     binary
 
 # T-107 archived raw CI logs retain original output bytes, including whitespace.
 docs/evidence/T-107-2026-11-12-replay-capture/logs/*.log whitespace=-trailing-space
+# T-148 raw Godot/Rust process output is retained byte-exact.
+docs/evidence/T-148-2026-11-15-unreferenced-raster-raw/*.log whitespace=-trailing-space

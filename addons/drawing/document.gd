@@ -78,6 +78,26 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 		_native_source_identities.clear()
 
 
+## A structural edit may mention raster layers without modifying any Rust-
+## owned bytes: e.g. a newly created, never-authorized raster child. Ask Rust
+## to prove that none of the affected IDs has source or Undo/Redo state. A
+## rejection leaves its old revision untouched and takes the existing checked
+## source-rebase path on the next native gesture.
+func _advance_raster_structure_revision(layers: Array[String],
+		discard_redo: bool = true) -> void:
+	var previous: int = revision
+	revision += 1
+	if _native_raster_store == null:
+		return
+	var ids: PackedStringArray = PackedStringArray(layers)
+	if _native_raster_store.call("advance_unreferenced_layers_revision",
+			previous, ids, discard_redo):
+		for layer_id: String in layers:
+			for key: String in _native_source_identities.keys():
+				if key.begins_with(layer_id + ":"):
+					_native_source_identities.erase(key)
+
+
 func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
 	var identity: String = layer_id + ":" + key
 	return _native_source_identities.has(identity) \
@@ -288,26 +308,25 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		before = {"kind": "structure", "op": "remove", "id": node_id,
 			"parent": parent_id, "index": _nodes[parent_id].children.find(node_id),
 			"nodes": snapshots, "pending": pending, "known": known, "dirty": dirty}
-	# Deleting a semantic-only subtree changes the layer tree, not canonical
-	# raster bytes. Keep the persistent Rust tiles/history and its revision in
-	# sync; raster-bearing removals still require a checked source rebase.
-	var removes_raster: bool = _subtree_contains_raster(node_id)
+	# Even a raster-bearing tree is metadata-only *to Rust* if none of its
+	# raster layers was ever imported or retained in native history. Otherwise
+	# preserve the conservative rebase boundary.
+	var raster_layers: Array[String] = []
+	_subtree_raster_ids(node_id, raster_layers)
 	_erase_subtree(node_id)
-	if removes_raster:
-		revision += 1
+	if not raster_layers.is_empty():
+		_advance_raster_structure_revision(raster_layers)
 	else:
 		_advance_nonraster_revision()
 	_finish_structure(record_history, before)
 	return DrawingResult.success(null, revision)
 
 
-func _subtree_contains_raster(node_id: String) -> bool:
+func _subtree_raster_ids(node_id: String, output: Array[String]) -> void:
 	if _nodes[node_id].kind == DrawingLayerNode.RASTER:
-		return true
+		output.append(node_id)
 	for child_id: String in _nodes[node_id].children:
-		if _subtree_contains_raster(child_id):
-			return true
-	return false
+		_subtree_raster_ids(child_id, output)
 
 
 func _erase_subtree(node_id: String) -> void:
@@ -1053,20 +1072,19 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 			_erase_subtree(node_id)
 	else:
 		return DrawingResult.failure("HISTORY_KIND", "Unknown structural operation")
-	# Restoring/removing semantic-only trees is metadata replay; preserve
-	# native raster Undo/Redo tokens just as for property and reorder replay.
-	var changes_raster_tree: bool = false
-	if op == "create":
-		changes_raster_tree = (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER
+	# Preserve native tokens for semantic trees and for never-authorized raster
+	# layers. Rust rejects a raster ID referenced by resident source or history.
+	var raster_layers: Array[String] = []
+	if op == "create" and (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER:
+		raster_layers.append(node_id)
 	elif op == "remove":
 		for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
 			if snapshot.kind == DrawingLayerNode.RASTER:
-				changes_raster_tree = true
-				break
-	if not changes_raster_tree:
+				raster_layers.append(snapshot.id)
+	if raster_layers.is_empty():
 		_advance_nonraster_revision(false)
 	else:
-		revision += 1
+		_advance_raster_structure_revision(raster_layers, false)
 	return DrawingResult.success(null, revision)
 
 
