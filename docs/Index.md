@@ -4,6 +4,20 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 over-budget detached-preview focal retention (T-138 Done)
+
+[T-138](Tickets/T-138.md) extends T-103's bounded focal texture-retention
+planner to complete, validated T-136 Brush/Move preview tile indexes. A real
+191-chunk source and preview-only center tile under a 50% software X11
+viewport retain the nearest 144 textures without clipping over-budget tiles.
+The unchanged T-137 Canvas fails 2/22 new native assertions while the
+candidate passes 22/22; the 19-check model verifies signed/invalid/unknown
+index fallback and Move ownership. In one paired pan frame, recomposited tiles
+fell from 57 to 48, without a general throughput or physical-latency claim.
+[Evidence](evidence/T-138-2026-11-15-preview-focal-retention.md) records raw
+logs and the independent consumer. T-086/T-095 remain In Progress and manual
+and hosted CI gates are unchanged; fast CI retains 46 required IDs.
+
 ## 2026-11-15 bounded cold detached-preview population (T-137 Done)
 
 [T-137](Tickets/T-137.md) extends T-102's bounded cold texture population
@@ -2917,6 +2931,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-135 · Sparse indexed committed viewport traversal](Tickets/T-135.md) | Done | Signed occupied-only display enumeration removes empty-cell work on wide sparse views, with full-scan fallback for previews/uncertainty; hardware acceptance still open | [T-053](Tickets/T-053.md), [T-102](Tickets/T-102.md), [T-103](Tickets/T-103.md) |
 | [T-136 · Indexed detached-preview plus committed sparse traversal](Tickets/T-136.md) | Done | Complete bounded preview stamp union skips empty cells on synthetic 1% sparse draws; uncertain, dense or malformed source keeps full scan; owner hardware gate stays open | [T-053](Tickets/T-053.md), [T-135](Tickets/T-135.md) |
 | [T-137 · Bounded cold detached-preview population](Tickets/T-137.md) | Done | Complete retainable detached preview indexes use the four-tile soft cold budget; progressive 50% software framebuffer keeps fallback, source, and history intact | [T-053](Tickets/T-053.md), [T-102](Tickets/T-102.md), [T-136](Tickets/T-136.md) |
+| [T-138 · Over-budget detached-preview focal retention](Tickets/T-138.md) | Done | Complete validated preview/source union selects nearest 144 retained textures; incomplete/unknown fallback, signed pixels and history intact | [T-053](Tickets/T-053.md), [T-103](Tickets/T-103.md), [T-136](Tickets/T-136.md) |
 
 ## Epics
 

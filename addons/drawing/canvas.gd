@@ -673,19 +673,48 @@ func _tile_focus_distance(tile: Vector2i, focus: Vector2) -> float:
 	return delta.length_squared()
 
 
-## A viewport containing more occupied display tiles than the cache can hold
-## must build transient textures for the remainder. Choose its 144 retained
-## keys *once* per frame, rather than rescanning every existing texture on each
-## transient cache miss. This is metadata-only; drawing remains pixel-exact.
-## Unknown occupancy, active previews and huge viewports use the old LRU path.
-func _focal_retention_plan(window: Rect2i, focus: Vector2) -> Dictionary[String, bool]:
+## An over-budget viewport retains the 144 closest canonical display keys.
+## Complete detached preview stamps may join committed occupancy; a partial,
+## malformed or excessive index must not influence retention. All tiles are
+## still drawn in source order; this plan changes only which textures survive.
+func _focal_retention_plan(window: Rect2i, focus: Vector2,
+		preview_stamps: Dictionary = {}, preview_complete: bool = false) -> Dictionary[String, bool]:
 	var selected: Dictionary[String, bool] = {}
-	if _occupancy_unknown or session != null or _move_preview != null \
+	var has_preview: bool = session != null or _move_preview != null
+	if _occupancy_unknown or (has_preview and not preview_complete) \
 			or window.get_area() <= MAX_DISPLAY_TILES \
 			or window.get_area() > MAX_FOCAL_PLAN_WINDOW:
 		return selected
 	var occupied: Array[Dictionary] = []
-	if _occupied_display_tiles.size() * 2 < window.get_area():
+	if has_preview:
+		# Check all preview keys and generations, including offscreen entries.
+		# Source occupancy is already capped; do not allocate an unbounded union.
+		if preview_stamps.size() > MAX_FOCAL_PLAN_CANDIDATES \
+				or _occupied_display_tiles.size() + preview_stamps.size() > MAX_FOCAL_PLAN_CANDIDATES:
+			return selected
+		var keys: Dictionary[String, bool] = {}
+		for key: String in _occupied_display_tiles:
+			keys[key] = true
+		for key: String in preview_stamps:
+			if not (preview_stamps[key] is int) or int(preview_stamps[key]) <= 0:
+				return {}
+			keys[key] = true
+		for key: String in keys:
+			var comma: int = key.find(",")
+			if comma < 1 or comma >= key.length() - 1:
+				return {}
+			var x_text: String = key.left(comma)
+			var y_text: String = key.substr(comma + 1)
+			if not x_text.is_valid_int() or not y_text.is_valid_int():
+				return {}
+			var tile: Vector2i = Vector2i(int(x_text), int(y_text))
+			if "%d,%d" % [tile.x, tile.y] != key:
+				return {} # No aliases of a display tile in the plan.
+			if window.has_point(tile):
+				occupied.append({"key": key, "distance": _tile_focus_distance(tile, focus)})
+				if occupied.size() > MAX_FOCAL_PLAN_CANDIDATES:
+					return {}
+	elif _occupied_display_tiles.size() * 2 < window.get_area():
 		for key: String in _occupied_display_tiles:
 			var comma: int = key.find(",")
 			if comma < 1:
@@ -1028,18 +1057,6 @@ func _draw() -> void:
 	var visible_tiles: Rect2i = Rect2i(start_x, start_y,
 		end_x - start_x + 1, end_y - start_y + 1)
 	var cache_focus: Vector2 = _display_cache_focus()
-	# A batch eviction plan preserves texture hits even when a future near-
-	# focus tile displaces an earlier visible tile. Keep displaced entries alive
-	# locally until their draw command has been submitted this frame.
-	var focal_plan: Dictionary[String, bool] = _focal_retention_plan(visible_tiles, cache_focus)
-	var focal_victims: Array[String] = []
-	var evicted_for_frame: Dictionary[String, Dictionary] = {}
-	if not focal_plan.is_empty():
-		for cached_key: String in _display_tiles:
-			if not focal_plan.has(cached_key):
-				focal_victims.append(cached_key)
-		focal_victims.sort()
-	metrics["focal_plan_tiles"] = focal_plan.size()
 	# Resolve visible layers lazily: an idle redraw consisting entirely of
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
@@ -1063,6 +1080,19 @@ func _draw() -> void:
 		# Release the last detached index after commit/cancel, and avoid
 		# retaining an otherwise completed edit session from an idle Canvas.
 		_preview_index_for_draw(null, visible_tiles)
+	# A batch eviction plan preserves texture hits even when a future near-
+	# focus tile displaces an earlier visible tile. Keep displaced entries alive
+	# locally until their draw command has been submitted this frame.
+	var focal_plan: Dictionary[String, bool] = _focal_retention_plan(visible_tiles, cache_focus,
+		indexed_stamps, preview_session != null and use_preview_index)
+	var focal_victims: Array[String] = []
+	var evicted_for_frame: Dictionary[String, Dictionary] = {}
+	if not focal_plan.is_empty():
+		for cached_key: String in _display_tiles:
+			if not focal_plan.has(cached_key):
+				focal_victims.append(cached_key)
+		focal_victims.sort()
+	metrics["focal_plan_tiles"] = focal_plan.size()
 	var sparse: Dictionary = _sparse_visible_draw_rows(visible_tiles,
 		preview_session != null, indexed_stamps, use_preview_index)
 	var use_sparse: bool = bool(sparse["indexed"])

@@ -87,6 +87,15 @@ jobs:
             2>&1 | tee /tmp/t137-preview-cold-native.log
           grep -Fxq 'T137_NATIVE_PASSED checks=18 failures=0' /tmp/t137-preview-cold-native.log
           python3 tools/check_godot_model_log.py /tmp/t137-preview-cold-native.log --marker T137_NATIVE_PASSED
+      - name: T-138 over-budget detached preview focal retention and framebuffer
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/t138_preview_focal_plan_native.gd \
+            2>&1 | tee /tmp/t138-preview-focal-native.log
+          grep -Fxq 'T138_NATIVE_PASSED checks=22 failures=0' /tmp/t138-preview-focal-native.log
+          python3 tools/check_godot_model_log.py /tmp/t138-preview-focal-native.log --marker T138_NATIVE_PASSED
       - name: Compare pre-cache and cached software frame timings
         run: |
           set -euo pipefail
@@ -118,6 +127,7 @@ jobs:
             /tmp/t103-overbudget-native.log
             /tmp/t135-sparse-native.log
             /tmp/t136-preview-sparse-native.log
+            /tmp/t138-preview-focal-native.log
             /tmp/t137-preview-cold-native.log
             /tmp/t086-comparison.log
             /tmp/t086-cold-comparison.log
