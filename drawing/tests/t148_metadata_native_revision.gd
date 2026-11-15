@@ -188,8 +188,9 @@ func run() -> void:
 	var virgin_imports: int = int(store.call("stats").get("bytes_imported", -1))
 	check(doc.remove_subtree(virgin_group, true).ok and
 		int(store.call("stats").get("revision", -1)) == doc.revision and
+		int(store.call("stats").get("parked_layers", -1)) == 0 and
 		int(store.call("stats").get("undo", -1)) == virgin_history,
-		"nested never-imported raster removal preserves unrelated Rust history")
+		"never-imported raster removal uses metadata bridge, not parked tombstones")
 	check(doc.undo().ok and doc.has_node(virgin_a) and doc.has_node(virgin_b) and
 		int(store.call("stats").get("revision", -1)) == doc.revision,
 		"restore unimported raster children retains native revision")
@@ -225,14 +226,108 @@ func run() -> void:
 	check(not group.is_empty() and not nested.is_empty(), "nested raster subtree created")
 	check(stroke(doc, nested, Vector2(19.5, 19.5)).ok,
 		"nested raster tile is authorized and enters native history")
+	var owned_bytes: PackedByteArray = packed(doc, nested)
+	var owned_undo: int = int(store.call("stats").get("undo", -1))
+	var owned_imports: int = int(store.call("stats").get("bytes_imported", -1))
 	var before_remove_revision: int = doc.revision
 	check(doc.remove_subtree(group, true).ok and
 		doc.revision == before_remove_revision + 1 and
-		int(store.call("stats").get("revision", -1)) < doc.revision,
-		"raster-bearing subtree removal retains conservative rebase guard")
-	check(stroke(doc, layer, Vector2(24.5, 52.5)).ok and
 		int(store.call("stats").get("revision", -1)) == doc.revision and
-		int(store.call("stats").get("undo", -1)) == 1,
-		"subsequent brush rebases after raster-bearing deletion")
+		int(store.call("stats").get("parked_layers", -1)) == 1 and
+		int(store.call("stats").get("undo", -1)) == owned_undo,
+		"native-owned raster subtree is parked without evicting history")
+	check(not bool(store.call("import_source", nested, 1, 0, doc.revision,
+		PackedByteArray())) and
+		not bool((store.call("begin_edit", nested, doc.revision, false) as Dictionary).get("ok", false)),
+		"parked raster layer rejects direct native edit and source import")
+	check(not doc.create_layer(DrawingLayerNode.RASTER, "Alias", "root", nested).ok,
+		"new layer cannot reuse a parked Rust-owned identity")
+	# Tamper with a detached history snapshot: structural Undo must fail before
+	# changing Godot's tree, the native parked set, or either revision.
+	var removal: Dictionary = doc._events[doc._cursor - 1]
+	var snapshot: DrawingLayerNode = removal["nodes"][nested]
+	var original_tile: DrawingRasterTile = snapshot.tiles["0,0"]
+	var tampered: DrawingRasterTile = original_tile.detached_copy()
+	tampered.set_rgba(0, 0, 0xff123456)
+	snapshot.tiles["0,0"] = tampered
+	var rejected: DrawingResult = doc.undo()
+	check(not rejected.ok and not doc.has_node(group) and
+		int(store.call("stats").get("parked_layers", -1)) == 1 and
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"tampered structural source fails without partial native restoration")
+	snapshot.tiles["0,0"] = original_tile
+	check(doc.undo().ok and doc.has_node(nested) and
+		packed(doc, nested) == owned_bytes and
+		int(store.call("stats").get("parked_layers", -1)) == 0 and
+		int(store.call("stats").get("undo", -1)) == owned_undo,
+		"structural Undo restores native source and history tokens byte-exactly")
+	check(doc.redo().ok and not doc.has_node(group) and
+		int(store.call("stats").get("parked_layers", -1)) == 1 and
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"structural Redo parks same raster source without invalidating history")
+	check(stroke(doc, layer, Vector2(24.5, 52.5)).ok and
+		doc._native_raster_store == store and
+		int(store.call("stats").get("undo", -1)) == owned_undo + 1 and
+		int(store.call("stats").get("bytes_imported", -1)) == owned_imports,
+		"other native strokes continue while raster subtree is parked")
+	check(doc.undo().ok and doc.undo().ok and doc.has_node(nested) and
+		packed(doc, nested) == owned_bytes and
+		int(store.call("stats").get("parked_layers", -1)) == 0,
+		"Undo later stroke then tree deletion restores full native-owned subtree")
+	check(stroke(doc, nested, Vector2(29.5, 29.5)).ok and
+		doc._native_raster_store == store and
+		int(store.call("stats").get("bytes_imported", -1)) == owned_imports,
+		"restored native tiles paint without reimporting source")
+	var owned_save: String = ProjectSettings.globalize_path("user://t148-owned-" +
+		DrawingDocument.new_id() + ".drawing")
+	check(DrawingFileIO.save(doc, owned_save).ok, "restored owned subtree saves")
+	var owned_open: DrawingResult = DrawingFileIO.open(owned_save)
+	check(owned_open.ok and
+		packed(owned_open.value as DrawingDocument, nested) == packed(doc, nested),
+		"native-owned raster subtree survives actual Save/Open")
+	DirAccess.remove_absolute(owned_save)
+	# Two native-owned raster children of one group are parked and restored
+	# atomically; mixed-layer Undo and detached source identity survive.
+	var shared_group: String = str(doc.create_layer(DrawingLayerNode.GROUP, "Shared").value)
+	var child_a: String = str(doc.create_layer(DrawingLayerNode.RASTER, "A", shared_group).value)
+	var child_b: String = str(doc.create_layer(DrawingLayerNode.RASTER, "B", shared_group).value)
+	check(stroke(doc, child_a, Vector2(13, 14)).ok and
+		stroke(doc, child_b, Vector2(37, 35)).ok,
+		"two sibling native raster layers commit independent paint")
+	var bytes_a: PackedByteArray = packed(doc, child_a)
+	var bytes_b: PackedByteArray = packed(doc, child_b)
+	var shared_history: int = int(store.call("stats").get("undo", -1))
+	var shared_imports: int = int(store.call("stats").get("bytes_imported", -1))
+	check(doc.remove_subtree(shared_group, true).ok and
+		int(store.call("stats").get("parked_layers", -1)) == 2 and
+		int(store.call("stats").get("undo", -1)) == shared_history,
+		"nested two-layer removal atomically parks all native source history")
+	check(doc.undo().ok and doc.has_node(child_a) and doc.has_node(child_b) and
+		packed(doc, child_a) == bytes_a and packed(doc, child_b) == bytes_b and
+		int(store.call("stats").get("parked_layers", -1)) == 0,
+		"two-layer structural Undo restores exact independent RGBA8")
+	check(doc.redo().ok and doc.undo().ok and
+		packed(doc, child_a) == bytes_a and packed(doc, child_b) == bytes_b,
+		"two-layer structural Redo/Undo remains lossless")
+	check(stroke(doc, child_a, Vector2(48, 21)).ok and
+		stroke(doc, child_b, Vector2(23, 42)).ok and
+		int(store.call("stats").get("bytes_imported", -1)) == shared_imports and
+		int(store.call("stats").get("undo", -1)) == shared_history + 2,
+		"both restored native layers continue paint without reimport or rebase")
+	# A caller can mutate a public-but-private-by-convention tile object
+	# without replacing its identity or advancing the document revision.
+	# Such an unsupported stale source must never be parked as canonical.
+	var stale_doc: DrawingDocument = DrawingDocument.new("stale-park", STRIDE)
+	var stale_layer: String = str(stale_doc.create_layer(DrawingLayerNode.RASTER, "stale").value)
+	check(stroke(stale_doc, stale_layer, Vector2(11, 11)).ok,
+		"stale-source negative control first authorizes a Rust tile")
+	var stale_store: Object = stale_doc._native_raster_store
+	var stale_before: int = int(stale_store.call("stats").get("revision", -1))
+	(stale_doc._nodes[stale_layer].tiles["0,0"] as DrawingRasterTile).set_rgba(0, 0, 0xff332211)
+	check(stale_doc.remove_subtree(stale_layer, true).ok and
+		int(stale_store.call("stats").get("revision", -1)) == stale_before and
+		int(stale_store.call("stats").get("parked_layers", -1)) == 0 and
+		stale_doc.revision == stale_before + 1,
+		"in-place source mutation fails native parking and retains checked rebase")
 	print("T148_METADATA_RESULT checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)

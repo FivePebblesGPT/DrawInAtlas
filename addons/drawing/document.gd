@@ -98,6 +98,60 @@ func _advance_raster_structure_revision(layers: Array[String],
 					_native_source_identities.erase(key)
 
 
+## Check all resident source identities without invoking lazy providers. On
+## removal, object identity must still match the authorized source. History
+## restoration creates detached tile objects, so compare their exact RGBA8
+## instead; never blindly trust an edited history snapshot.
+func _native_tree_sources_match(nodes: Dictionary, restore: bool) -> bool:
+	for identity: String in _native_source_identities:
+		var layer_id: String = identity.get_slice(":", 0)
+		if not nodes.has(layer_id):
+			continue
+		var key: String = identity.substr(layer_id.length() + 1)
+		var source: Variant = _native_source_identities[identity]
+		var current: Variant = (nodes[layer_id] as DrawingLayerNode).tiles.get(key)
+		if restore:
+			var old_bytes: PackedByteArray = source.to_rgba8() if source != null else PackedByteArray()
+			var new_bytes: PackedByteArray = current.to_rgba8() if current != null else PackedByteArray()
+			if old_bytes != new_bytes:
+				return false
+		elif not is_same(source, current):
+			return false
+		# Object identity alone does not prove in-place RGBA8 mutations are
+		# absent. Structural work is cold: compare each imported full tile to
+		# Rust's canonical bytes before changing either revision.
+		var coordinates: PackedStringArray = key.split(",")
+		if _native_raster_store == null or coordinates.size() != 2 or \
+				not coordinates[0].is_valid_int() or not coordinates[1].is_valid_int():
+			return false
+		var resident: Dictionary = _native_raster_store.call("read_tile", layer_id,
+			int(coordinates[0]), int(coordinates[1]), false)
+		if not bool(resident.get("ok", false)):
+			return false
+		var bytes: PackedByteArray = current.to_rgba8() if current != null else PackedByteArray()
+		var native_bytes: PackedByteArray = resident.get("bytes", PackedByteArray())
+		if bytes.is_empty():
+			bytes.resize(tile_stride * tile_stride * 4)
+		if bytes != native_bytes:
+			return false
+	return true
+
+
+## A recorded structural removal can temporarily park native-owned raster
+## layers without forfeiting their RGBA8 or history tokens. This call is made
+## after Godot preflight and before the deterministic tree mutation; no lazy
+## source callbacks or allocations occur between Rust commit and tree change.
+func _advance_parked_structure_revision(layers: Array[String], restore: bool,
+		discard_redo: bool) -> bool:
+	if _native_raster_store == null or layers.is_empty():
+		return false
+	if not bool(_native_raster_store.call("advance_parked_layers_revision",
+			revision, PackedStringArray(layers), restore, discard_redo)):
+		return false
+	revision += 1
+	return true
+
+
 func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
 	var identity: String = layer_id + ":" + key
 	return _native_source_identities.has(identity) \
@@ -181,6 +235,8 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 		return DrawingResult.failure("LAYER_ID", "Layer IDs contain only ASCII letters, digits, _ and -")
 	if new_identifier == ROOT_ID or _nodes.has(new_identifier):
 		return DrawingResult.failure("DUPLICATE_ID", "Layer/group identity already exists")
+	if _native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", new_identifier)):
+		return DrawingResult.failure("LAYER_ID", "Raster ID is reserved by native structural history")
 	_nodes[new_identifier] = DrawingLayerNode.new(new_identifier, kind, name, parent_id)
 	var siblings: Array[String] = _nodes[parent_id].children
 	var index: int = siblings.size() if insertion_index < 0 else clampi(insertion_index, 0, siblings.size())
@@ -313,8 +369,19 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 	# preserve the conservative rebase boundary.
 	var raster_layers: Array[String] = []
 	_subtree_raster_ids(node_id, raster_layers)
+	var parked: bool = false
+	if not raster_layers.is_empty() and record_history and not external_history:
+		var resident_nodes: Dictionary = {}
+		for identifier: String in ids:
+			resident_nodes[identifier] = _nodes[identifier]
+		if _native_tree_sources_match(resident_nodes, false):
+			parked = _advance_parked_structure_revision(raster_layers, false, true)
+	if parked:
+		before["native_parked"] = true
 	_erase_subtree(node_id)
-	if not raster_layers.is_empty():
+	if parked:
+		pass # Rust and document revisions were advanced atomically before erase.
+	elif not raster_layers.is_empty():
 		_advance_raster_structure_revision(raster_layers)
 	else:
 		_advance_nonraster_revision()
@@ -1023,6 +1090,7 @@ func _finish_structure(record_history: bool, event: Dictionary) -> void:
 ## Structural replay is failure-atomic: all preconditions are checked before
 ## modifying the tree. Content events are undone first in chronological order.
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
+	var parked_replay: bool = false
 	var node_id: String = event["id"]
 	var op: String = event["op"]
 	if op == "property":
@@ -1050,14 +1118,42 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		var parent_id: String = event["parent"]
 		if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP:
 			return DrawingResult.failure("HISTORY_TARGET", "Structural parent disappeared")
+		var affected_raster: Array[String] = []
+		if op == "remove":
+			for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
+				if snapshot.kind == DrawingLayerNode.RASTER:
+					affected_raster.append(snapshot.id)
+		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
+		# All tree preconditions precede the Rust revision update; rejected
+		# structural replays must leave both histories and trees unchanged.
 		if restore:
-			var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
 			for identifier: String in restored:
 				if _nodes.has(identifier):
 					return DrawingResult.failure("HISTORY_TARGET", "Structural ID was reused")
+		elif not _nodes.has(node_id) or _nodes[node_id].parent_id != parent_id or \
+				_nodes[parent_id].children.find(node_id) != int(event["index"]):
+			return DrawingResult.failure("HISTORY_TARGET", "Removed subtree diverged")
+		if bool(event.get("native_parked", false)) and not affected_raster.is_empty():
+			if restore and not _native_tree_sources_match(restored, true):
+				return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")
+			if not restore:
+				var live_nodes: Dictionary = {}
+				for identifier: String in restored:
+					live_nodes[identifier] = _nodes[identifier]
+				if not _native_tree_sources_match(live_nodes, false):
+					return DrawingResult.failure("STALE_PIXEL", "Structural source identity changed")
+			parked_replay = _advance_parked_structure_revision(affected_raster, restore, false)
+		if restore:
 			for identifier: String in restored:
 				_nodes[identifier] = (restored[identifier] as DrawingLayerNode).detached_copy()
 			_nodes[parent_id].children.insert(mini(int(event["index"]), _nodes[parent_id].children.size()), node_id)
+			if parked_replay:
+				for identity: String in _native_source_identities.keys():
+					var owner: String = identity.get_slice(":", 0)
+					if not restored.has(owner):
+						continue
+					var key: String = identity.substr(owner.length() + 1)
+					_native_source_identities[identity] = _nodes[owner].tiles.get(key)
 			if op == "remove":
 				for key: String in event["pending"]:
 					_pending_tiles[key] = event["pending"][key].duplicate(true)
@@ -1066,9 +1162,6 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 				for key: String in event["dirty"]:
 					_dirty_tiles[key] = event["dirty"][key]
 		else:
-			if not _nodes.has(node_id) or _nodes[node_id].parent_id != parent_id or \
-				_nodes[parent_id].children.find(node_id) != int(event["index"]):
-				return DrawingResult.failure("HISTORY_TARGET", "Removed subtree diverged")
 			_erase_subtree(node_id)
 	else:
 		return DrawingResult.failure("HISTORY_KIND", "Unknown structural operation")
@@ -1081,7 +1174,9 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
 			if snapshot.kind == DrawingLayerNode.RASTER:
 				raster_layers.append(snapshot.id)
-	if raster_layers.is_empty():
+	if op == "remove" and parked_replay:
+		pass # Native and document revisions already advanced at structural preflight.
+	elif raster_layers.is_empty():
 		_advance_nonraster_revision(false)
 	else:
 		_advance_raster_structure_revision(raster_layers, false)

@@ -71,6 +71,8 @@ pub(super) struct TileStore {
     revision: u64,
     tiles: HashMap<TileId, Tile>,
     authorized: HashSet<TileId>,
+    /// Removed but undoable raster layers retain canonical pixels and tokens.
+    parked_layers: HashSet<String>,
     editable_layers: HashMap<String, bool>,
     active: Option<Edit>,
     undo: Vec<History>,
@@ -131,6 +133,7 @@ impl TileStore {
             || id.x.unsigned_abs() > SAFE_COORD as u64
             || id.y.unsigned_abs() > SAFE_COORD as u64
             || self.authorized.contains(&id)
+            || self.parked_layers.contains(&id.layer)
             || self
                 .active
                 .as_ref()
@@ -163,7 +166,11 @@ impl TileStore {
         revision: u64,
         selection_required: bool,
     ) -> Result<i64, &'static str> {
-        if revision != self.revision || !self.allowed(layer) || self.active.is_some() {
+        if revision != self.revision
+            || !self.allowed(layer)
+            || self.parked_layers.contains(layer)
+            || self.active.is_some()
+        {
             return Err("Stale revision, locked/hidden layer or active edit");
         }
         let id = NEXT_EDIT.fetch_add(1, Ordering::Relaxed) as i64;
@@ -452,7 +459,11 @@ impl TileStore {
         changes: Vec<(TileId, Vec<u8>, Vec<u8>)>,
     ) -> Result<(i64, usize), &'static str> {
         let len = self.stride_bytes()?;
-        if self.revision != revision || self.active.is_some() || !self.allowed(layer) {
+        if self.revision != revision
+            || self.active.is_some()
+            || !self.allowed(layer)
+            || self.parked_layers.contains(layer)
+        {
             return Err("Stale revision, active transaction or inaccessible layer");
         }
         if changes.is_empty() || changes.len() > MAX_ACTIVE_TILES || revision == i64::MAX as u64 {
@@ -553,6 +564,7 @@ impl TileStore {
         self.authorized.clear();
         self.undo.clear();
         self.redo.clear();
+        self.parked_layers.clear();
         self.revision = next;
         Ok(())
     }
@@ -596,9 +608,13 @@ impl TileStore {
             return Err("Invalid or repeated structural raster-layer ID");
         }
         if self
-            .tiles
-            .keys()
-            .any(|id| names.contains(id.layer.as_str()))
+            .parked_layers
+            .iter()
+            .any(|layer| names.contains(layer.as_str()))
+            || self
+                .tiles
+                .keys()
+                .any(|id| names.contains(id.layer.as_str()))
             || self
                 .authorized
                 .iter()
@@ -617,12 +633,73 @@ impl TileStore {
         self.advance_metadata(expected, discard_redo)
     }
 
+    /// Park or restore a history-backed raster subtree as a reversible tree
+    /// mutation. Canonical tile bytes, authorizations and Undo/Redo tokens are
+    /// deliberately not released: history can only address a parked layer
+    /// after structural Undo restores it. Every ID is checked before mutation.
+    fn advance_parked_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        restore: bool,
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing parked-layer revision");
+        }
+        if layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return Err("Invalid parked layer count");
+        }
+        let mut seen = HashSet::with_capacity(layers.len());
+        for layer in layers {
+            if layer.is_empty()
+                || !seen.insert(layer)
+                || self.parked_layers.contains(layer) != restore
+            {
+                return Err("Duplicate ID or wrong parked-layer lifecycle");
+            }
+        }
+        if !restore {
+            if self.parked_layers.len().saturating_add(layers.len()) > MAX_ACTIVE_TILES {
+                return Err("Too many retained parked-layer identities");
+            }
+            // Unreferenced layers use the metadata-only structural bridge.
+            // Never accumulate tombstones for arbitrary empty layer names.
+            let owned = self.authorized.iter().any(|id| seen.contains(&id.layer))
+                || self.tiles.keys().any(|id| seen.contains(&id.layer))
+                || self
+                    .undo
+                    .iter()
+                    .chain(self.redo.iter())
+                    .any(|entry| seen.contains(&entry.layer));
+            if !owned {
+                return Err("Structural subtree has no native-owned source or history");
+            }
+        }
+        if restore {
+            for layer in layers {
+                self.parked_layers.remove(layer);
+            }
+        } else {
+            for layer in layers {
+                self.parked_layers.insert(layer.clone());
+            }
+        }
+        if discard_redo {
+            self.redo.clear();
+        }
+        self.revision = expected + 1;
+        Ok(())
+    }
+
     fn history_matches(&self, token: i64, undo: bool) -> bool {
         if token <= 0 || self.active.is_some() {
             return false;
         }
         let stack = if undo { &self.undo } else { &self.redo };
-        stack.last().is_some_and(|event| event.token == token)
+        stack
+            .last()
+            .is_some_and(|event| event.token == token && !self.parked_layers.contains(&event.layer))
     }
 
     fn undo_or_redo(&mut self, undo: bool) -> Result<usize, &'static str> {
@@ -635,11 +712,12 @@ impl TileStore {
             (&mut self.redo, &mut self.undo)
         };
         let entry = from.last().ok_or("No native history entry")?;
-        if !self
-            .editable_layers
-            .get(&entry.layer)
-            .copied()
-            .unwrap_or(false)
+        if self.parked_layers.contains(&entry.layer)
+            || !self
+                .editable_layers
+                .get(&entry.layer)
+                .copied()
+                .unwrap_or(false)
         {
             return Err("History layer is locked/hidden");
         }
@@ -776,6 +854,32 @@ impl DrawingNativeTiles {
         self.store
             .advance_unreferenced_layers(expected as u64, &ids, discard_redo)
             .is_ok()
+    }
+
+    /// Quiescent structural removal/restoration of raster layers already
+    /// owned by Rust. No bytes leave Rust; parked layers cannot be painted,
+    /// imported or replayed until structural Undo restores the same IDs.
+    #[func]
+    fn advance_parked_layers_revision(
+        &mut self,
+        expected: i64,
+        layers: PackedStringArray,
+        restore: bool,
+        discard_redo: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store
+            .advance_parked_layers(expected as u64, &ids, restore, discard_redo)
+            .is_ok()
+    }
+
+    #[func]
+    fn is_layer_parked(&self, layer: GString) -> bool {
+        self.store.parked_layers.contains(&layer.to_string())
     }
 
     /// One bounded FFI call for a preflighted external raster edit. The
@@ -1132,6 +1236,7 @@ impl DrawingNativeTiles {
         result.set("revision", self.store.revision as i64);
         result.set("stride", self.store.stride as i64);
         result.set("tiles", self.store.tiles.len() as i64);
+        result.set("parked_layers", self.store.parked_layers.len() as i64);
         result.set("bytes_used", self.store.bytes_used() as i64);
         result.set("ffi_calls", self.store.ffi_calls as i64);
         result.set("bytes_imported", self.store.bytes_imported as i64);
@@ -1363,6 +1468,109 @@ mod tests {
             .unwrap();
         assert!(store.history_matches(paint, false));
         assert_eq!(store.revision, 4);
+    }
+
+    #[test]
+    fn parked_raster_layers_retain_history_and_reject_mutation_until_restored() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let id = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let stroke = store.begin("ink", 0, false).unwrap();
+        store
+            .stage(
+                stroke,
+                0,
+                0,
+                0,
+                &[1, 1],
+                false,
+                0xff112233,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(stroke, 0).unwrap();
+        let pixels = store.read(&id, false).unwrap().rgba.clone();
+        let bytes = store.bytes_used();
+        let ids = vec!["ink".into(), "never-imported".into()];
+        assert!(store.advance_parked_layers(0, &ids, false, true).is_err());
+        assert!(
+            store
+                .advance_parked_layers(1, &["ink".into(), "ink".into()], false, true)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_parked_layers(1, &[String::new()], false, true)
+                .is_err()
+        );
+        assert_eq!(store.revision, 1);
+        assert!(
+            store
+                .advance_parked_layers(1, &["empty".into()], false, false)
+                .is_err()
+        );
+        assert!(
+            store
+                .advance_parked_layers(1, &vec!["ink".into(); MAX_ACTIVE_TILES + 1], false, false)
+                .is_err()
+        );
+        let open = store.begin("ink", 1, false).unwrap();
+        assert!(store.advance_parked_layers(1, &ids, false, true).is_err());
+        assert!(store.transaction_matches(open, 1, "ink"));
+        store.active = None;
+        store.advance_parked_layers(1, &ids, false, true).unwrap();
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.bytes_used(), bytes);
+        assert_eq!(store.read(&id, false).unwrap().rgba, pixels);
+        assert!(!store.history_matches(stroke, true));
+        assert!(store.begin("ink", 2, false).is_err());
+        assert!(
+            store
+                .import(
+                    TileId {
+                        layer: "ink".into(),
+                        x: 2,
+                        y: 2
+                    },
+                    2,
+                    &[]
+                )
+                .is_err()
+        );
+        assert!(store.undo_or_redo(true).is_err());
+        assert!(store.advance_parked_layers(2, &ids, false, false).is_err());
+        assert!(
+            store
+                .advance_parked_layers(2, &["ink".into()], true, false)
+                .is_ok()
+        );
+        assert!(
+            store
+                .advance_parked_layers(3, &["never-imported".into()], true, false)
+                .is_ok()
+        );
+        assert_eq!(store.revision, 4);
+        assert_eq!(store.bytes_used(), bytes);
+        assert!(store.history_matches(stroke, true));
+        store.undo_or_redo(true).unwrap();
+        assert!(store.history_matches(stroke, false));
+        assert!(store.advance_parked_layers(5, &ids, false, false).is_ok());
+        assert!(store.advance_parked_layers(6, &ids, true, false).is_ok());
+        assert!(store.history_matches(stroke, false));
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&id, false).unwrap().rgba, pixels);
+        // A rebased store must release tombstones, not accidentally authorize
+        // pixels from deleted document layers after another producer changes them.
+        store.advance_parked_layers(8, &ids, false, true).unwrap();
+        store.rebase_external(9, 10).unwrap();
+        assert!(store.parked_layers.is_empty());
+        assert!(store.tiles.is_empty());
+        assert!(store.undo.is_empty());
     }
 
     #[test]
