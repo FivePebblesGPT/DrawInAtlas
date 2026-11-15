@@ -538,7 +538,7 @@ func _publish_tile_edit(layer_id: String, expected: int,
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, true)
+		detached, bounds, record_history, true, session_sources)
 
 
 ## Publish detached whole-tile snapshots from a native brush transaction.
@@ -785,7 +785,7 @@ func _publish_edit(layer_id: String, expected: int,
 			rect[3] = maxi(int(rect[3]), y)
 
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history)
+		detached, bounds, record_history, false, sources)
 
 
 ## Shared atomic installation, history and dirty-region publication for both
@@ -794,15 +794,65 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		before: Dictionary[String, int], after: Dictionary[String, int],
 		detached: Dictionary[String, DrawingRasterTile],
 		bounds: Dictionary[String, Array], record_history: bool,
-		owned_history_maps: bool = false) -> DrawingResult:
-	# A lazy source provider can invoke application code while resolving a tile.
-	# Reject reentrant revision/visibility changes before installing detached data.
-	if revision != expected:
+		owned_history_maps: bool = false,
+		sources: Dictionary[String, Variant] = {}) -> DrawingResult:
+	# All source resolution must have finished before the native commit. Do not
+	# call a lazy provider after Rust accepts an external tile transaction.
+	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id):
 		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated the gesture")
-	if not _editable(layer_id):
-		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
-	# No owned pixels change until every source, digest and revision check succeeds.
-	var result: DrawingResult = DrawingResult.success(null)
+	for key: String in detached:
+		if not sources.has(key) or _pending_tiles.has(layer_id + ":" + key) \
+				or _nodes[layer_id].tiles.get(key) != sources[key]:
+			return DrawingResult.failure("STALE_PIXEL", "External raster source identity changed")
+	var result: DrawingResult = DrawingResult.success(null, expected + 1)
+	for key: String in detached:
+		var rect: Array = bounds[key]
+		result.regions.append(DrawingDirtyRegion.new(layer_id, int(rect[0]), int(rect[1]),
+			int(rect[2]) - int(rect[0]) + 1, int(rect[3]) - int(rect[1]) + 1))
+	# Legacy direct-session fixtures without a native store retain their pixel
+	# delta format. Once a persistent store exists, ordinary raster edits join
+	# the same Rust revision/history stack as Brush/Eraser via whole RGBA8 tiles.
+	var adopt: bool = record_history and _native_raster_store != null \
+		and int(_native_raster_store.call("stats").get("revision", -1)) == expected
+	var originals: Dictionary[String, PackedByteArray] = {}
+	var replacements: Dictionary[String, PackedByteArray] = {}
+	var descriptors: Array[Dictionary] = []
+	if adopt:
+		if detached.size() > 128:
+			return DrawingResult.failure("NATIVE_TILES", "External raster transaction exceeds 128 tiles")
+		for key: String in detached:
+			var parts: PackedStringArray = key.split(",")
+			if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int() \
+					or key != "%d,%d" % [int(parts[0]), int(parts[1])]:
+				return DrawingResult.failure("COORD", "Invalid native external tile key")
+			var source: DrawingRasterTile = sources[key] as DrawingRasterTile
+			var has_native: bool = bool(_native_raster_store.call("has_source", layer_id,
+				int(parts[0]), int(parts[1]), expected))
+			if has_native and not _native_source_matches(layer_id, key, source):
+				return DrawingResult.failure("STALE_PIXEL", "External tile lost native source identity")
+			var from_bytes: PackedByteArray = source.to_rgba8() if source != null else PackedByteArray()
+			var to_bytes: PackedByteArray = detached[key].to_rgba8()
+			originals[key] = from_bytes
+			replacements[key] = to_bytes
+			descriptors.append({"tile_x": int(parts[0]), "tile_y": int(parts[1]),
+				"before": from_bytes, "after": to_bytes})
+		# Construct the reversible document envelope before Rust commits.
+		# After its commit there must be no provider call or allocation-dependent
+		# validation that could reject the paired Godot projection.
+		result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
+			originals, replacements)
+		if not _native_raster_store.call("set_layer_editable", layer_id, true):
+			return DrawingResult.failure("NATIVE_TILES", "Native raster layer rejected")
+		# The call is failure-atomic on the Rust side. The document projection
+		# then installs only detached tiles, with no fallible source lookups.
+		var accepted: Dictionary = _native_raster_store.call("adopt_external_edit",
+			layer_id, expected, descriptors)
+		if not bool(accepted.get("ok", false)) or int(accepted.get("revision", -1)) != expected + 1:
+			return DrawingResult.failure("NATIVE_TILES", str(accepted.get("error", "Native adoption failed")))
+		result.delta.native_history_token = int(accepted.get("history_token", 0))
+	else:
+		result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
+			else DrawingDelta.new(layer_id, before, after)
 	for key: String in detached:
 		if detached[key].is_empty():
 			_nodes[layer_id].tiles.erase(key)
@@ -810,26 +860,15 @@ func _install_prepared_edit(layer_id: String, expected: int,
 			_nodes[layer_id].tiles[key] = detached[key]
 		_dirty_tiles[layer_id + ":" + key] = true
 		_known_refs.erase(layer_id + ":" + key)
-		var rect: Array = bounds[key]
-		result.regions.append(DrawingDirtyRegion.new(layer_id, int(rect[0]), int(rect[1]),
-			int(rect[2]) - int(rect[0]) + 1, int(rect[3]) - int(rect[1]) + 1))
+		if adopt:
+			_remember_native_source(layer_id, key, _nodes[layer_id].tiles.get(key))
 	revision += 1
 	_content_committed = true
-	result.revision = revision
-	# The tile publisher built these two canonical maps privately, so it can
-	# transfer them into the delta without duplicating hundreds of thousands
-	# of String keys. The mixed/global publisher receives caller-owned maps
-	# and must keep DrawingDelta.new()'s defensive-copy contract.
-	result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
-		else DrawingDelta.new(layer_id, before, after)
 	if record_history:
 		if external_history:
 			_mark_untracked_change()
 		else:
 			_append_event({"kind": "content", "delta": result.delta}, true)
-	# A frame cache can skip other already-composed display tiles after this
-	# atomic content publication. Keep the journal bounded; consumers falling
-	# behind use a conservative full invalidation instead of stale pixels.
 	_display_changes.append({"revision": revision, "regions": result.regions.duplicate()})
 	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
 		_display_changes.pop_front()

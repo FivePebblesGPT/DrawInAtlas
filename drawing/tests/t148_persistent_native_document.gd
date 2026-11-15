@@ -142,8 +142,9 @@ func run() -> void:
 	var shared: Dictionary = store.call("read_tile", layer, 0, 0, false)
 	check(shared.get("ok", false) and (shared.get("bytes") as PackedByteArray).decode_u32(0) == 0x00887766,
 		"native canonical source has freshly authorized external hidden RGB")
-	check(int(store.call("stats").get("undo", -1)) == 1,
-		"external raster edit reset stale native history")
+	check(int(store.call("stats").get("undo", -1)) == 3 and
+		external_raster.delta.native_history_token > 0,
+		"external raster edit joins previous native history without clearing it")
 	var before_substitution: int = doc.revision
 	doc._nodes[layer].tiles["0,0"] = (doc._nodes[layer].tiles["0,0"] as DrawingRasterTile).detached_copy()
 	check(not stroke(doc, layer, Vector2(32.5, 28.5), Vector2(34.5, 28.5)).ok,
@@ -151,7 +152,7 @@ func run() -> void:
 	check(doc.revision == before_substitution,
 		"source identity rejection creates no revision")
 	check(int(store.call("stats").get("revision", -1)) == doc.revision and
-		int(store.call("stats").get("undo", -1)) == 1,
+		int(store.call("stats").get("undo", -1)) == 3,
 		"rejected source leaves persistent history and revision unchanged")
 	# Authorizing a provider that reenters during preflight must never leave
 	# Rust committed while the document rejects the source/permission change.
