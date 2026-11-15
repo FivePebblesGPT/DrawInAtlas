@@ -68,7 +68,7 @@ func run() -> void:
 	if started.ok:
 		canvas._move_preview = started.value as DrawingEditSession
 		check(canvas._cold_population_targets(window, Vector2.ZERO).is_empty(),
-			"a live detached preview is always rendered without cold throttling")
+			"unindexed detached preview remains unthrottled and conservative")
 		canvas._move_preview.cancel()
 		canvas._move_preview = null
 	check(canvas._cold_population_targets(window, Vector2.ZERO).size() == 4,

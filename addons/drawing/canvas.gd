@@ -185,7 +185,7 @@ var pointer_known: bool = false
 ## The bounded LRU owns every retained texture; a draw call need not create any.
 const DISPLAY_TILE_SIZE: int = 128
 const MAX_DISPLAY_TILES: int = 144
-## Cold *committed* content with a wholly retainable visible footprint can be
+## Cold committed content or complete, retainable detached preview tiles can be
 ## populated over multiple draw callbacks. Each synchronous raster composite
 ## is atomic, so this is a soft CPU budget, never a hard real-time deadline.
 ## Over-budget dense views use the original complete-frame transient path:
@@ -866,42 +866,59 @@ func _preview_index_for_draw(edit: DrawingEditSession, window: Rect2i) -> Dictio
 
 
 ## Choose the nearest missing cold tiles before traversing the draw list.
-## Scans only the bounded *display occupancy* index, never canonical pixels.
-## All tiles must fit the persistent cache; otherwise the old full-frame path
-## is necessary to display transient overflow tiles without holes.
-func _cold_population_targets(window: Rect2i, focus: Vector2) -> Dictionary:
-	if _occupancy_unknown or session != null or _move_preview != null:
+## Scans only bounded display occupancy metadata, never canonical pixels.
+## An indexed detached preview may participate only if the *validated* union
+## is complete and entirely retainable in the texture cache. Unknown/partial
+## previews and over-budget views retain the original full-frame path.
+func _cold_population_targets(window: Rect2i, focus: Vector2,
+		preview: DrawingEditSession = null, preview_stamps: Dictionary = {},
+		sparse: Dictionary = {}) -> Dictionary:
+	if _occupancy_unknown:
+		return {}
+	var active_preview: DrawingEditSession = session if session != null else _move_preview
+	if active_preview != null and (preview != active_preview \
+			or not bool(sparse.get("indexed", false))):
 		return {}
 	var occupied_tiles: Dictionary[String, Vector2i] = {}
-	# A large sparse zoom-out can expose thousands of empty *display* cells;
-	# enumerate the much smaller existing occupancy index instead. For dense
-	# documents, keep iteration bounded by the viewport rather than the entire
-	# (up to 40,000-entry) document occupancy map.
-	if _occupied_display_tiles.size() * 2 < window.get_area():
-		for key: String in _occupied_display_tiles:
-			var comma: int = key.find(",")
-			if comma < 1:
-				return {} # Invalid hint: use the conservative full-frame path.
-			var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
-			if window.has_point(tile):
-				occupied_tiles[key] = tile
-				if occupied_tiles.size() > MAX_DISPLAY_TILES:
-					return {}
-	else:
-		for y: int in range(window.position.y, window.end.y):
-			for x: int in range(window.position.x, window.end.x):
+	if active_preview != null:
+		# _sparse_visible_draw_rows has already validated canonical signed keys,
+		# positive preview generations and completeness; avoid a second union.
+		if int(sparse.get("count", MAX_DISPLAY_TILES + 1)) > MAX_DISPLAY_TILES:
+			return {}
+		for y: int in sparse.get("ys", []):
+			for x: int in (sparse.get("rows", {}) as Dictionary).get(y, []):
 				var key: String = "%d,%d" % [x, y]
-				if _occupied_display_tiles.has(key):
-					occupied_tiles[key] = Vector2i(x, y)
+				occupied_tiles[key] = Vector2i(x, y)
+	else:
+		# A large sparse zoom-out can expose thousands of empty display cells;
+		# enumerate the smaller occupancy index. Dense views scan the window.
+		if _occupied_display_tiles.size() * 2 < window.get_area():
+			for key: String in _occupied_display_tiles:
+				var comma: int = key.find(",")
+				if comma < 1:
+					return {} # Unknown hint: preserve full-frame traversal.
+				var tile: Vector2i = Vector2i(int(key.left(comma)), int(key.substr(comma + 1)))
+				if window.has_point(tile):
+					occupied_tiles[key] = tile
 					if occupied_tiles.size() > MAX_DISPLAY_TILES:
 						return {}
+		else:
+			for y: int in range(window.position.y, window.end.y):
+				for x: int in range(window.position.x, window.end.x):
+					var key: String = "%d,%d" % [x, y]
+					if _occupied_display_tiles.has(key):
+						occupied_tiles[key] = Vector2i(x, y)
+						if occupied_tiles.size() > MAX_DISPLAY_TILES:
+							return {}
 	var occupied: int = occupied_tiles.size()
 	var missing: Array[Dictionary] = []
 	for key: String in occupied_tiles:
 		var entry: Dictionary = _display_tiles.get(key, {})
+		var stamp: int = int(preview_stamps.get(key, 0)) if active_preview != null else 0
+		var owner: DrawingEditSession = active_preview if stamp > 0 else null
 		if entry.is_empty() or bool(entry.get("dirty", true)) \
-				or int(entry.get("preview_stamp", 0)) != 0 \
-				or entry.get("preview_owner") != null:
+				or int(entry.get("preview_stamp", 0)) != stamp \
+				or entry.get("preview_owner") != owner:
 			missing.append({"key": key,
 				"distance": _tile_focus_distance(occupied_tiles[key], focus)})
 	# Do not spread a small or sparsely occupied viewport over multiple frames.
@@ -1023,11 +1040,6 @@ func _draw() -> void:
 				focal_victims.append(cached_key)
 		focal_victims.sort()
 	metrics["focal_plan_tiles"] = focal_plan.size()
-	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus)
-	var cold_budgeted: bool = not cold_targets.is_empty()
-	var cold_rendered: int = 0
-	var cold_failed: bool = false
-	metrics["cold_budgeted"] = 1 if cold_budgeted else 0
 	# Resolve visible layers lazily: an idle redraw consisting entirely of
 	# cached texture hits must not traverse the document tree at all.
 	var visible_plan: Dictionary = {}
@@ -1054,6 +1066,14 @@ func _draw() -> void:
 	var sparse: Dictionary = _sparse_visible_draw_rows(visible_tiles,
 		preview_session != null, indexed_stamps, use_preview_index)
 	var use_sparse: bool = bool(sparse["indexed"])
+	# The same validated preview union now governs both sparse traversal and
+	# bounded first-population scheduling; never throttle partial previews.
+	var cold_targets: Dictionary = _cold_population_targets(visible_tiles, cache_focus,
+		preview_session, indexed_stamps, sparse)
+	var cold_budgeted: bool = not cold_targets.is_empty()
+	var cold_rendered: int = 0
+	var cold_failed: bool = false
+	metrics["cold_budgeted"] = 1 if cold_budgeted else 0
 	metrics["sparse_draw"] = 1 if use_sparse else 0
 	metrics["tiles_visible"] = visible_tiles.get_area()
 	if use_sparse:

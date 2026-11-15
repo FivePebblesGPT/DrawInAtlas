@@ -171,6 +171,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t136-preview-sparse.log --marker T136_UNION_PASSED || ci_fail_marker 'T136 sparse preview union log rejected'
           grep -Fxq 'T136_UNION_PASSED checks=18 failures=0' /tmp/godot-t136-preview-sparse.log || ci_fail_marker 'T136 preview union assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t136_preview_sparse_union.py' -v || ci_fail_marker 'T136 preview union source/CI contract failed'
+          # T-137 allows bounded cold population while the detached preview
+          # index is complete; incomplete and >144-tile views stay unthrottled.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t137_preview_cold_population_model.gd 2>&1 | tee /tmp/godot-t137-preview-cold.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t137-preview-cold.log --marker T137_COLD_PASSED || ci_fail_marker 'T137 preview cold scheduling log rejected'
+          grep -Fxq 'T137_COLD_PASSED checks=15 failures=0' /tmp/godot-t137-preview-cold.log || ci_fail_marker 'T137 preview cold assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t137_preview_cold_population.py' -v || ci_fail_marker 'T137 preview cold source/CI contract failed'
           # T-103 software-only over-budget focal preselection and safe fallbacks.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t103_retention_plan_smoke.gd 2>&1 | tee /tmp/godot-t103-retention.log
           python3 tools/check_godot_model_log.py /tmp/godot-t103-retention.log --marker T103_MODEL_PASSED || ci_fail_marker 'T103 focal retention planner rejected'
