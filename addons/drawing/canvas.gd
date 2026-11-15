@@ -1782,7 +1782,8 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 				preset_text = FileAccess.get_file_as_string(preset_path) \
 					if not preset_path.is_empty() else ""
 			var started: DrawingResult = session.begin_native_stroke(_native_brush,
-				mode, preset_text, _stroke_width, _stroke_color, _stroke_clip)
+				mode, preset_text, _stroke_width, _stroke_color, _stroke_clip,
+				true, _stroke_selection)
 			if started.ok:
 				_active_brush_backend = mode
 			else:

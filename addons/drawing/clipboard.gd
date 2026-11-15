@@ -63,7 +63,7 @@ static func capture(document: DrawingDocument, layer_id: String,
 			var tile: DrawingRasterTile = fetched.value as DrawingRasterTile
 			if tile == null:
 				continue
-			for index: int in tile._pixels:
+			for index: int in tile.sparse_pixels():
 				var global_x: int = chunk_x + index % stride
 				var global_y: int = chunk_y + index / stride
 				if global_x < left or global_x >= right or global_y < top or global_y >= bottom:
@@ -71,7 +71,7 @@ static func capture(document: DrawingDocument, layer_id: String,
 				var local: Vector2i = Vector2i(global_x - origin_x, global_y - origin_y)
 				if selection != null and not selection.allows(local):
 					continue
-				result._pixels[local - area.position] = tile._pixels[index]
+				result._pixels[local - area.position] = tile.sparse_pixels()[index]
 	return DrawingResult.success(result, document.revision)
 
 

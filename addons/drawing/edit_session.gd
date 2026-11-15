@@ -174,7 +174,7 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 
 
 func change_count() -> int:
-	return _after.size() + _hokusai_change_count + _brush_change_count
+	return _after.size() + _hokusai_change_count + _brush_change_count + _native_change_count
 
 
 ## Publish uses canonical global string-keyed _before/_after; retain that
@@ -190,7 +190,7 @@ func _materialize_hokusai_preview() -> void:
 		var source: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
 		var source_pixels: Dictionary[int, int] = {}
 		if source != null:
-			source_pixels = source._pixels
+			source_pixels = source.sparse_pixels()
 		var patch: Dictionary = _preview_tiles[tile_key]
 		for local_index: int in patch:
 			var local_x: int = local_index % stride
@@ -216,7 +216,7 @@ func _materialize_brush_preview() -> void:
 		var source: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
 		var source_pixels: Dictionary[int, int] = {}
 		if source != null:
-			source_pixels = source._pixels
+			source_pixels = source.sparse_pixels()
 		var patch: Dictionary = _preview_tiles[tile_key]
 		for local_index: int in patch:
 			var x: int = tile_x * stride + local_index % stride
@@ -233,6 +233,26 @@ func preview_tile(tile_key: String) -> Dictionary:
 	if _closed or document.revision != expected_revision:
 		return {}
 	return _preview_tiles.get(tile_key, {})
+
+
+## The renderer can consume one native whole-tile byte span, bypassing the
+## per-pixel GDScript patch dictionary used by historical stroke fixtures.
+func preview_rgba8_tile(tile_key: String) -> PackedByteArray:
+	if _closed or _native_tiles == null or not _preview_tile_versions.has(tile_key) \
+			or document.revision != expected_revision:
+		return PackedByteArray()
+	if _native_preview_cache.has(tile_key):
+		return _native_preview_cache[tile_key]
+	var coordinates: PackedStringArray = tile_key.split(",")
+	if coordinates.size() != 2:
+		return PackedByteArray()
+	var source: Dictionary = _native_tiles.call("read_tile", layer_id,
+		int(coordinates[0]), int(coordinates[1]), true)
+	if not bool(source.get("ok", false)):
+		return PackedByteArray()
+	var bytes: PackedByteArray = source.get("bytes", PackedByteArray())
+	_native_preview_cache[tile_key] = bytes
+	return bytes
 
 
 func preview_stamp_for_area(area: Rect2i) -> int:
@@ -402,6 +422,12 @@ func _rollback_paint() -> void:
 
 
 func cancel() -> void:
+	if _native_tiles != null:
+		_native_tiles.call("discard_edit", _native_transaction)
+		_native_tiles = null
+		_native_transaction = 0
+		_native_change_count = 0
+		_native_preview_cache.clear()
 	_finish_native_stroke(false)
 	_stationary_dab_valid = false
 	_brush_deferred = false
@@ -429,6 +455,8 @@ func commit() -> DrawingResult:
 	if document.revision != expected_revision:
 		cancel()
 		return DrawingResult.failure("STALE_REVISION", "Stroke source revision changed")
+	if _native_tiles != null:
+		return _commit_native_tile_stroke()
 	if not _finish_native_stroke(true):
 		cancel()
 		return DrawingResult.failure("NATIVE_COMMIT", "Native stroke commit failed")
@@ -519,7 +547,7 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 				return resolved
 			_source_tiles[tile_key] = resolved.value
 		var tile: DrawingRasterTile = _source_tiles[tile_key] as DrawingRasterTile
-		old = int(tile._pixels.get(local_index, 0)) if tile != null else 0
+		old = int(tile.sparse_pixels().get(local_index, 0)) if tile != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
 	var preview_tile_key: String = tile_key
 	if _journaling and not _paint_journal.has(key):
@@ -599,7 +627,7 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 		_brush_cached_source_ready = true
 	var old: int = verified_source
 	if old == -1:
-		old = int(_brush_cached_source._pixels.get(local_index, 0)) \
+		old = int(_brush_cached_source.sparse_pixels().get(local_index, 0)) \
 			if _brush_cached_source != null else 0
 	var replacement: int = _blend(rgba, old) if blend else rgba
 	var patch: Dictionary = _brush_cached_patch
@@ -696,10 +724,18 @@ var _native_handle: int = 0
 var _native_mode: String = ""
 var _native_clip_bounds: Rect2i = Rect2i()
 var native_ffi_stats: Dictionary = {}
+## Native tile batches are optional only for historical direct adapter fixtures.
+## Production Canvas opts into this Rust-owned staging path.
+var _native_tiles: Object
+var _native_transaction: int = 0
+var _native_change_count: int = 0
+var _native_preview_cache: Dictionary[String, PackedByteArray] = {}
+var _native_selection: DrawingSelection
 
 
 func begin_native_stroke(native: Object, mode: String, preset_text: String,
-		width: float, rgba: int, clip_bounds: Rect2i) -> DrawingResult:
+		width: float, rgba: int, clip_bounds: Rect2i,
+		use_native_tiles: bool = false, selection: DrawingSelection = null) -> DrawingResult:
 	if _closed or native == null or _native_handle != 0 \
 			or not native.has_method("stroke_abi_version") \
 			or int(native.call("stroke_abi_version")) != 1:
@@ -712,6 +748,25 @@ func begin_native_stroke(native: Object, mode: String, preset_text: String,
 	_native_handle = int(started["handle"])
 	_native_mode = mode
 	_native_clip_bounds = clip_bounds
+	if use_native_tiles:
+		if not ClassDB.class_exists("DrawingNativeTiles"):
+			_finish_native_stroke(false)
+			return DrawingResult.failure("NATIVE_ABI", "Native tile store unavailable")
+		_native_tiles = ClassDB.instantiate("DrawingNativeTiles")
+		if int(_native_tiles.call("tile_abi_version")) != 1 \
+				or not _native_tiles.call("configure", document.tile_stride, expected_revision) \
+				or not _native_tiles.call("set_layer_editable", layer_id, true):
+			_native_tiles = null
+			_finish_native_stroke(false)
+			return DrawingResult.failure("NATIVE_ABI", "Native tile store configuration failed")
+		_native_selection = selection.detached_copy() if selection != null else null
+		var opened: Dictionary = _native_tiles.call("begin_edit", layer_id,
+			expected_revision, _native_selection != null and _native_selection.enabled)
+		if not bool(opened.get("ok", false)):
+			_native_tiles = null
+			_finish_native_stroke(false)
+			return DrawingResult.failure("NATIVE_BEGIN", str(opened.get("error", "Native tile edit unavailable")))
+		_native_transaction = int(opened["transaction"])
 	return DrawingResult.success(_native_handle)
 
 
@@ -728,6 +783,138 @@ func _finish_native_stroke(commit_native: bool) -> bool:
 	_native_stroke = null
 	_native_mode = ""
 	return completed
+
+
+## One source import per storage tile; missing source is explicitly blank
+## only after the document's lazy loader has successfully resolved it.
+func _authorize_native_tiles(selection: DrawingSelection) -> DrawingResult:
+	var needed: Dictionary = _native_stroke.call("required_tiles", _native_handle,
+		expected_revision, document.tile_stride, anchor_x, anchor_y)
+	if not bool(needed.get("ok", false)):
+		return DrawingResult.failure("NATIVE_TILES", str(needed.get("error", "Native tile discovery failed")))
+	var stride: int = document.tile_stride
+	for identity: Dictionary in needed.get("tiles", []):
+		var tile_x: int = int(identity["tile_x"])
+		var tile_y: int = int(identity["tile_y"])
+		var key: String = "%d,%d" % [tile_x, tile_y]
+		if _source_tiles.has(key):
+			continue
+		var resolved: DrawingResult = document._resolve_chunk(layer_id, key)
+		if not resolved.ok:
+			return resolved
+		# Lazy source providers execute user-owned code. Detect reentrant
+		# structure/revision changes before importing source into Rust.
+		if document.revision != expected_revision or not document._editable(layer_id):
+			return DrawingResult.failure("STALE_REVISION",
+				"Native source authorization changed during lazy load")
+		var tile: DrawingRasterTile = resolved.value as DrawingRasterTile
+		var bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
+		if not bool(_native_tiles.call("import_source", layer_id, tile_x, tile_y,
+				expected_revision, bytes)):
+			return DrawingResult.failure("NATIVE_SOURCE", "Native source import rejected " + key)
+		if selection != null and selection.enabled:
+			var mask: PackedByteArray = PackedByteArray()
+			mask.resize(stride * stride)
+			for row: int in range(stride):
+				for col: int in range(stride):
+					if selection.allows(Vector2i(tile_x * stride + col - anchor_x,
+							tile_y * stride + row - anchor_y)):
+						mask[row * stride + col] = 1
+			if not bool(_native_tiles.call("import_mask", _native_transaction,
+					layer_id, tile_x, tile_y, mask)):
+				return DrawingResult.failure("NATIVE_MASK", "Native selection import rejected " + key)
+		_source_tiles[key] = tile
+	return DrawingResult.success()
+
+
+func _stage_native_tile_batch(erase: bool, selection: DrawingSelection) -> DrawingResult:
+	# Each native transaction binds to its initial selection. Allowing a caller
+	# to replace it between batches would leave already imported tile masks
+	# authorized by the old selection while later batches use the new one.
+	var frozen: DrawingSelection = _native_selection if _native_selection != null \
+		and _native_selection.enabled else null
+	var current: DrawingSelection = selection if selection != null \
+		and selection.enabled else null
+	if (frozen == null) != (current == null) or \
+			(frozen != null and not frozen.same_as(current)):
+		return DrawingResult.failure("NATIVE_SELECTION", "Gesture selection changed")
+	var authorized: DrawingResult = _authorize_native_tiles(frozen)
+	if not authorized.ok:
+		return authorized
+	var staged: Dictionary = _native_stroke.call("apply_tile_batch", _native_tiles,
+		_native_handle, expected_revision, _native_transaction, anchor_x, anchor_y, erase)
+	if not bool(staged.get("ok", false)):
+		return DrawingResult.failure("NATIVE_BATCH", str(staged.get("error", "Native tile batch rejected")))
+	for entry: Dictionary in _native_tiles.call("dirty_tiles", _native_transaction):
+		var key: String = "%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]
+		_preview_epoch += 1
+		_preview_tile_versions[key] = _preview_epoch
+		_native_preview_cache.erase(key)
+	_invalidate_exact_preview_display_index()
+	_native_change_count = _preview_tile_versions.size()
+	return DrawingResult.success(_native_change_count)
+
+
+func _commit_native_tile_stroke() -> DrawingResult:
+	if not document._nodes.has(layer_id) or not document._editable(layer_id):
+		cancel()
+		return DrawingResult.failure("LOCKED", "Stroke target changed before publication")
+	var dirty: Array = _native_tiles.call("dirty_tiles", _native_transaction)
+	if dirty.is_empty():
+		cancel()
+		return DrawingResult.success(null, expected_revision)
+	var images: Dictionary[String, PackedByteArray] = {}
+	var sources: Dictionary[String, Variant] = {}
+	var bounds: Dictionary[String, Rect2i] = {}
+	for entry: Dictionary in dirty:
+		var tile_x: int = int(entry["tile_x"])
+		var tile_y: int = int(entry["tile_y"])
+		var key: String = "%d,%d" % [tile_x, tile_y]
+		if not _source_tiles.has(key):
+			cancel()
+			return DrawingResult.failure("STALE_PIXEL", "Native dirty tile missing source")
+		var resolved: DrawingResult = document._resolve_chunk(layer_id, key)
+		if not resolved.ok or resolved.value != _source_tiles[key]:
+			cancel()
+			return DrawingResult.failure("STALE_PIXEL", "Native commit source changed")
+		var exported: Dictionary = _native_tiles.call("read_tile", layer_id, tile_x,
+			tile_y, true)
+		if not bool(exported.get("ok", false)):
+			cancel()
+			return DrawingResult.failure("NATIVE_TILE", "Native committed bytes unavailable")
+		images[key] = exported.get("bytes", PackedByteArray())
+		sources[key] = _source_tiles[key]
+		bounds[key] = entry["dirty"]
+	native_ffi_stats = _native_stroke.call("stroke_stats", _native_handle,
+		expected_revision)
+	var native_commit: Dictionary = _native_stroke.call("commit_tiles", _native_tiles,
+		_native_handle, expected_revision, _native_transaction)
+	if not bool(native_commit.get("ok", false)):
+		cancel()
+		return DrawingResult.failure("NATIVE_COMMIT", str(native_commit.get("error", "Native commit rejected")))
+	var new_revision: int = int(native_commit.get("revision", -1))
+	var output: DrawingResult
+	if bool(native_commit.get("no_change", false)):
+		output = DrawingResult.success(null, expected_revision)
+	else:
+		output = document._publish_native_tile_edit(layer_id, expected_revision,
+			new_revision, images, sources, bounds)
+	var tile_stats: Dictionary = _native_tiles.call("stats")
+	native_ffi_stats["tile_ffi_calls"] = int(tile_stats.get("ffi_calls", 0))
+	native_ffi_stats["tile_bytes_imported"] = int(tile_stats.get("bytes_imported", 0))
+	native_ffi_stats["tile_bytes_exported"] = int(tile_stats.get("bytes_exported", 0))
+	native_ffi_stats["tile_pixel_stream_calls"] = int(tile_stats.get("pixel_stream_calls", -1))
+	_native_handle = 0
+	_native_stroke = null
+	_native_mode = ""
+	_native_tiles = null
+	_native_transaction = 0
+	_native_preview_cache.clear()
+	_source_tiles.clear()
+	_preview_tile_versions.clear()
+	_native_change_count = 0
+	_closed = true
+	return output
 
 
 ## Canvas passes source-coordinate segments; the frozen transform, layer,
@@ -754,6 +941,8 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 		expected_revision, samples)
 	if not bool(accepted.get("ok", false)):
 		return DrawingResult.failure("NATIVE_BATCH", str(accepted.get("error", "Sample batch rejected")))
+	if _native_tiles != null:
+		return _stage_native_tile_batch(erase, selection)
 	var exported: Dictionary = _native_stroke.call("preview_changes", _native_handle, expected_revision)
 	var native_elapsed_us: int = Time.get_ticks_usec() - native_start_us
 	if not bool(exported.get("ok", false)):
@@ -905,7 +1094,7 @@ func _stage_native_pigment_delta(changed: PackedInt32Array, rgba: int,
 		# resident map once per tile avoids a GDScript getter for every native dab.
 		var source_pixels: Dictionary[int, int] = {}
 		if tile != null:
-			source_pixels = tile._pixels
+			source_pixels = tile.sparse_pixels()
 		var pixels: PackedInt32Array = tile_deltas[tile_key]
 		var patch: Dictionary = _preview_tiles.get(tile_key, {})
 		var touched: bool = false

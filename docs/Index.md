@@ -2,7 +2,7 @@
 
 **Current as of 2026-11-15.** This is the **authoritative active navigation**, synchronized with `docs/Tickets/T-*.md` frontmatter. The old chronological 3,119-line engineering journal is preserved at [Index-History-2026-11-15.md](Index-History-2026-11-15.md). Past narrative status or performance recommendations are source-pinned history, not present acceptance. Review [ticket workflow, prerequisites and manual gates](TICKET_WORKFLOW.md) before implementation.
 
-**Implementation agent handoff for [Sprint 2026-11-15 / PR #19](SPRINT_2026-11-15_HANDOFF.md):** The original plan started with T-146 (real 96px Hokusai hard-round pointer benchmark). **T-146 is now Done** with [strict native X11 benchmark evidence](evidence/T-146-2026-11-15-hokusai-benchmark.md). T-147 has also completed its single native stroke ABI. **T-148 is In Progress:** a direct native tile store, atomic edit/Undo, and Godot bridge are tested, but production Canvas still stages painted pixels in GDScript. Continue **T-148's live Brush/Eraser cutover** before opening T-149; see [native-tile execution evidence](evidence/T-148-2026-11-15-native-store.md).
+**Implementation agent handoff for [Sprint 2026-11-15 / PR #19](SPRINT_2026-11-15_HANDOFF.md):** The original plan started with T-146 (real 96px Hokusai hard-round pointer benchmark). **T-146 is now Done** with [strict native X11 benchmark evidence](evidence/T-146-2026-11-15-hokusai-benchmark.md). T-147 has also completed its single native stroke ABI. **T-148 is In Progress:** native tile storage, atomic brush transactions, and the production Canvas tile-only Brush/Eraser path now pass live graphical tests. **T-148 remains open** because the native store is per-gesture and Godot still owns durable raster/history state. Finish the persistent native revision/ownership protocol before opening T-149; see [native-tile execution evidence](evidence/T-148-2026-11-15-native-store.md).
 
 ## Current alpha architecture — Rust-owned raster
 
@@ -14,13 +14,13 @@
 
 ## 1. Native raster execution (critical path)
 
-Statuses: T-146 and T-147 **Done**; T-148 **In Progress** (native-tile foundation verified; live GDScript hot-path removal remains); T-149–T-152 **Blocked** by the previous ticket. No manual-review gate is imposed on engineering refactors; owner physical UX review stays with T-095.
+Statuses: T-146 and T-147 **Done**; T-148 **In Progress** (live tile-only Brush/Eraser verified; persistent native raster/history authority remains); T-149–T-152 **Blocked** by the previous ticket. No manual-review gate is imposed on engineering refactors; owner physical UX review stays with T-095.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
 | [T-146 · 96px Hokusai hard-round full-canvas pointer benchmark](Tickets/T-146.md) | Done | [12 process / 15 gesture native X11 evidence](evidence/T-146-2026-11-15-hokusai-benchmark.md); translucent full-source coverage; T-095 gate remains | [T-097](Tickets/T-097.md), [T-101](Tickets/T-101.md) |
 | [T-147 · Unify NativeHard and Hokusai behind one native stroke engine](Tickets/T-147.md) | Done | [One v1 stroke ABI and real native rollback/FFI evidence](evidence/T-147-2026-11-15-unified-stroke.md); native tile contract documented | [T-146](Tickets/T-146.md) |
-| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | In Progress | [Native tile core & 512² bridge verified](evidence/T-148-2026-11-15-native-store.md); next: eliminate production Canvas GDScript per-pixel staging and share one document revision | [T-147](Tickets/T-147.md) |
+| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | In Progress | [Live 96px Canvas native tile cutover verified](evidence/T-148-2026-11-15-live-cutover.md); next: persistent native document/history ownership and one durable revision protocol | [T-147](Tickets/T-147.md) |
 | [T-149 · Godot native dirty-tile preview, display and persistence seams](Tickets/T-149.md) | Blocked | After T-148: batched Godot inputs and native dirty-tile display/save seams | [T-148](Tickets/T-148.md) |
 | [T-150 · Remove Legacy Brush backend and compatibility paths](Tickets/T-150.md) | Blocked | After T-149: retire Legacy without migration or native-free fallback | [T-149](Tickets/T-149.md) |
 | [T-151 · Profile post-consolidation native Brush critical path](Tickets/T-151.md) | Blocked | After T-150: profile the consolidated full editor and all native seams | [T-150](Tickets/T-150.md) |

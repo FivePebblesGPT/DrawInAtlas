@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T095_NATIVE_HARD legacy_ms=452.891 native_ms=121.614 legacy_stage_ms=117.617 native_stage_ms=29.405
+T095_HOKUSAI preset=hard stage_ms=1.113
+T095_HOKUSAI preset=soft stage_ms=0.801
+T095_HOKUSAI preset=ink stage_ms=0.750
+T095_HOKUSAI preset=airbrush stage_ms=0.766
+T095_NATIVE_BRUSH_RESULT checks=32 failures=0

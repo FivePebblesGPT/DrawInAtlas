@@ -452,7 +452,7 @@ func _publish_tile_edit(layer_id: String, expected: int,
 			return DrawingResult.failure("STALE_PIXEL", "Source tile changed during gesture")
 		var source_pixels: Dictionary[int, int] = {}
 		if original != null:
-			source_pixels = original._pixels
+			source_pixels = original.sparse_pixels()
 		var patch: Dictionary = patches[tile_key]
 		var has_zero_replacements: bool = false
 		for local_index: int in patch:
@@ -489,19 +489,153 @@ func _publish_tile_edit(layer_id: String, expected: int,
 			var candidate: DrawingRasterTile = original.detached_copy() if original != null \
 				else DrawingRasterTile.new(tile_stride)
 			if not has_zero_replacements:
-				candidate._pixels.merge(patch, true)
+				candidate.sparse_pixels().merge(patch, true)
 			else:
 				for local_index: int in patch:
 					var replacement: int = int(patch[local_index])
 					if replacement == 0:
-						candidate._pixels.erase(local_index)
+						candidate.sparse_pixels().erase(local_index)
 					else:
-						candidate._pixels[local_index] = replacement
+						candidate.sparse_pixels()[local_index] = replacement
 			detached[tile_key] = candidate
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
 	return _install_prepared_edit(layer_id, expected, before, after,
 		detached, bounds, record_history, true)
+
+
+## Publish detached whole-tile snapshots from a native brush transaction.
+## This preparatory document seam never constructs per-pixel String history
+## maps. Callers must preflight the Rust transaction before committing it;
+## all validation and allocation here finish before any document mutation.
+func _publish_native_tile_edit(layer_id: String, expected: int,
+		native_revision: int, images: Dictionary[String, PackedByteArray],
+		sources: Dictionary[String, Variant], bounds: Dictionary[String, Rect2i],
+		record_history: bool = true) -> DrawingResult:
+	if revision != expected or native_revision != expected + 1:
+		return DrawingResult.failure("STALE_REVISION", "Native and document revisions disagree")
+	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER \
+			or not _editable(layer_id):
+		return DrawingResult.failure("LOCKED", "Edited raster layer became unavailable")
+	if images.is_empty() or images.size() > 128 or bounds.size() != images.size():
+		return DrawingResult.failure("NATIVE_TILES", "Invalid native tile publication count")
+	var prepared: Dictionary[String, DrawingRasterTile] = {}
+	var before_bytes: Dictionary[String, PackedByteArray] = {}
+	var after_bytes: Dictionary[String, PackedByteArray] = {}
+	var regions: Array[DrawingDirtyRegion] = []
+	for key: String in images:
+		var components: PackedStringArray = key.split(",")
+		if components.size() != 2 or not components[0].is_valid_int() \
+				or not components[1].is_valid_int():
+			return DrawingResult.failure("COORD", "Invalid native tile key")
+		var cx: int = int(components[0])
+		var cy: int = int(components[1])
+		if key != "%d,%d" % [cx, cy] or abs(cx) > 4503599627370496 / tile_stride \
+				or abs(cy) > 4503599627370496 / tile_stride:
+			return DrawingResult.failure("COORD", "Native tile coordinate outside safe bounds")
+		if not sources.has(key) or not bounds.has(key):
+			return DrawingResult.failure("STALE_PIXEL", "Native tile lacks verified source or dirty bounds")
+		var dirty: Rect2i = bounds[key]
+		if not dirty.has_area() or dirty.position.x < 0 or dirty.position.y < 0 \
+				or dirty.end.x > tile_stride or dirty.end.y > tile_stride:
+			return DrawingResult.failure("COORD", "Native tile dirty bounds invalid")
+		var resolved: DrawingResult = _resolve_chunk(layer_id, key)
+		if not resolved.ok:
+			return resolved
+		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
+		if original != sources[key]:
+			return DrawingResult.failure("STALE_PIXEL", "Native source identity changed")
+		var bytes: PackedByteArray = images[key]
+		if bytes.size() != tile_stride * tile_stride * 4:
+			return DrawingResult.failure("RGBA", "Native RGBA8 tile length mismatch")
+		var candidate: DrawingRasterTile = DrawingRasterTile.from_rgba8(tile_stride, bytes)
+		var previous: PackedByteArray = original.to_rgba8() if original != null \
+			else PackedByteArray()
+		if previous == bytes:
+			return DrawingResult.failure("NATIVE_TILES", "Native dirty tile did not change")
+		before_bytes[key] = previous
+		after_bytes[key] = candidate.to_rgba8()
+		prepared[key] = candidate
+		regions.append(DrawingDirtyRegion.new(layer_id,
+			cx * tile_stride + dirty.position.x, cy * tile_stride + dirty.position.y,
+			dirty.size.x, dirty.size.y))
+	var result: DrawingResult = DrawingResult.success(null, native_revision)
+	result.regions = regions
+	result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
+		before_bytes, after_bytes)
+	for key: String in prepared:
+		var candidate: DrawingRasterTile = prepared[key]
+		if candidate.is_empty():
+			_nodes[layer_id].tiles.erase(key)
+		else:
+			_nodes[layer_id].tiles[key] = candidate
+		_dirty_tiles[layer_id + ":" + key] = true
+		_known_refs.erase(layer_id + ":" + key)
+	revision = native_revision
+	_content_committed = true
+	if record_history:
+		if external_history:
+			_mark_untracked_change()
+		else:
+			_append_event({"kind": "content", "delta": result.delta}, true)
+	_display_changes.append({"revision": revision, "regions": regions.duplicate()})
+	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
+		_display_changes.pop_front()
+	return result
+
+
+## Replay a native tile delta as one atomic history operation. No sparse
+## pixel maps are materialized; each source is verified before replacement.
+func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+	if delta.tile_stride != tile_stride or not _nodes.has(delta.layer_id) \
+			or not _editable(delta.layer_id):
+		return DrawingResult.failure("HISTORY_TARGET", "Native history target unavailable")
+	var expected: Dictionary[String, PackedByteArray] = delta.after_tiles \
+		if undo_action else delta.before_tiles
+	var replacement: Dictionary[String, PackedByteArray] = delta.before_tiles \
+		if undo_action else delta.after_tiles
+	var detached: Dictionary[String, DrawingRasterTile] = {}
+	var regions: Array[DrawingDirtyRegion] = []
+	for key: String in replacement:
+		if not expected.has(key):
+			return DrawingResult.failure("HISTORY_TARGET", "Native history snapshot missing")
+		var resolved: DrawingResult = _resolve_chunk(delta.layer_id, key)
+		if not resolved.ok:
+			return resolved
+		var source: DrawingRasterTile = resolved.value as DrawingRasterTile
+		var source_bytes: PackedByteArray = source.to_rgba8() if source != null \
+			else PackedByteArray()
+		var expected_bytes: PackedByteArray = expected[key]
+		if source_bytes != expected_bytes and not (source_bytes.is_empty() and \
+				expected_bytes.count(0) == expected_bytes.size()):
+			return DrawingResult.failure("STALE_PIXEL", "Native history source differs")
+		var bytes: PackedByteArray = replacement[key]
+		if not bytes.is_empty() and bytes.size() != tile_stride * tile_stride * 4:
+			return DrawingResult.failure("RGBA", "Native history buffer malformed")
+		if not bytes.is_empty():
+			detached[key] = DrawingRasterTile.from_rgba8(tile_stride, bytes)
+		var coordinates: PackedStringArray = key.split(",")
+		if coordinates.size() != 2 or not coordinates[0].is_valid_int() \
+				or not coordinates[1].is_valid_int():
+			return DrawingResult.failure("COORD", "Invalid native history key")
+		regions.append(DrawingDirtyRegion.new(delta.layer_id,
+			int(coordinates[0]) * tile_stride, int(coordinates[1]) * tile_stride,
+			tile_stride, tile_stride))
+	for key: String in replacement:
+		if detached.has(key) and not detached[key].is_empty():
+			_nodes[delta.layer_id].tiles[key] = detached[key]
+		else:
+			_nodes[delta.layer_id].tiles.erase(key)
+		_dirty_tiles[delta.layer_id + ":" + key] = true
+		_known_refs.erase(delta.layer_id + ":" + key)
+	revision += 1
+	_content_committed = true
+	_display_changes.append({"revision": revision, "regions": regions.duplicate()})
+	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
+		_display_changes.pop_front()
+	var result: DrawingResult = DrawingResult.success(null, revision)
+	result.regions = regions
+	return result
 
 
 ## Read and compare originals before publication, then detach only touched tiles.
@@ -803,9 +937,13 @@ func record_selection_change(before: DrawingHistoryContext,
 func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
 	if delta == null:
 		return DrawingResult.failure("DELTA", "Missing drawing delta")
-	var result: DrawingResult = _publish_edit(delta.layer_id, revision,
-		delta.after if undo_action else delta.before,
-		delta.before if undo_action else delta.after, false)
+	var result: DrawingResult
+	if delta.tile_stride > 0:
+		result = _replay_native_tile_delta(delta, undo_action)
+	else:
+		result = _publish_edit(delta.layer_id, revision,
+			delta.after if undo_action else delta.before,
+			delta.before if undo_action else delta.after, false)
 	if result.ok and external_history:
 		_mark_untracked_change()
 	return result
