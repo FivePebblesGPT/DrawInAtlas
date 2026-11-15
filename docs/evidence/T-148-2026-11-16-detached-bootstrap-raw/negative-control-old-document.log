@@ -1,0 +1,24 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T148_BOOTSTRAP_FAILED: new Rust authority published at same revision
+T148_BOOTSTRAP_FAILED: after missing-store Undo: native canonical store must be attached
+T148_BOOTSTRAP_FAILED: after missing-store Undo: native canonical store must be attached
+T148_BOOTSTRAP_FAILED: after Redo: native canonical store must be attached
+T148_BOOTSTRAP_FAILED: after Redo: native canonical store must be attached
+T148_BOOTSTRAP_FAILED: new Brush uses recovered canonical source without store rebase
+T148_BOOTSTRAP_FAILED: new native Brush history remains valid after recovery
+T148_BOOTSTRAP_FAILED: recovery leaves discarded stale Rust store untouched
+T148_BOOTSTRAP_FAILED: stale-store recovery shares document revision
+T148_BOOTSTRAP_FAILED: after stale-store Undo: Rust canonical source matches document RGBA8
+T148_BOOTSTRAP_FAILED: native-ahead authority rejects older detached snapshot
+T148_BOOTSTRAP_FAILED: ahead-store rejection preserves current Rust attachment and Godot bytes
+T148_BOOTSTRAP_FAILED: replay succeeds once document revision catches up to Rust
+T148_BOOTSTRAP_FAILED: corrected source can retry through Rust without losing history
+T148_BOOTSTRAP_FAILED: after recovered retry: native canonical store must be attached
+T148_BOOTSTRAP_FAILED: Rust rejects a no-op detached replay after provisional imports
+T148_BOOTSTRAP_FAILED: native rejection never attaches provisional tiles or publishes pixels
+T148_BOOTSTRAP_FAILED: valid history remains replayable after rejected provisional transaction
+T148_BOOTSTRAP_FAILED: after native rejection retry: native canonical store must be attached
+T148_BOOTSTRAP_RESULT checks=34 failures=19

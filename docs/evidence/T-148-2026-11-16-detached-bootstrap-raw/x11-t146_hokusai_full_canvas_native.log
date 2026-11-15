@@ -1,0 +1,25 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T146_IDENTITY backend=Hokusai preset=hard width=96 preset_sha256=40838b34344409a0830a3b63f14120113a02635bdbeabd4d69ad2a62d24c5905 godot=4.8-beta3 (official) native_sha256= repo_sha=
+T146_HOKUSAI_RUN index=0 backend=Hokusai source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=577.814 release_to_commit_ms=529.613 stage_cpu_ms=149.459 drain_frames=18 max_pending=99 commit_cpu_ms=1.526 compose_cpu_ms=233.040 texture_cpu_ms=5.184 preview_frames=18 segments_staged=296 drain_calls=20 max_batch_ms=11.436 max_drain_ms=11.467 frame_compose_p95_ms=17.376 max_frame_compose_ms=17.376 max_frame_draw_ms=17.989 retained_texture_bytes=524288
+T100_POINTER_MEMORY index=0 static_before_bytes=58059025 static_after_bytes=59636589 peak_before_bytes=80975204 peak_after_bytes=80975204
+T099_FRAME_METRICS index=0 input_draw_p50_ms=241.751 input_draw_p95_ms=519.382 input_draw_max_ms=519.382 input_callback_p50_ms=276.523 input_callback_p95_ms=525.350 input_callback_max_ms=525.350 pending_depth_p95=94 pending_depth_max=94 pending_age_p95_ms=519.352 pending_age_max_ms=519.352 preview_draws=18 drain_calls=20 max_drain_ms=11.467
+T146_SOURCE label=stroke-0 sha256=b9b330c75fe7dae6d4e89f71b7a1fc008e8ec8fe0c1eb2ae420771828930f73e covered=262144 zero=0 alpha_1_63=6 alpha_64_127=10352 alpha_128_191=247691 alpha_192_254=4095 alpha_255=0 red=262144 nonred=0 first_hole=(-1, -1) fills_512=true
+T146_FIRST_VISIBLE index=0 first_submit_us=969299 first_postdraw_us=1002461 down_us=950622 postdraw_matches=17 frame_samples=18
+T146_NATIVE_PHASE index=0 native_cpu_ms=0.000 native_changed=0 stage_cpu_ms=149.459 perf={"native_us":0,"pixels":0,"stage_us":0}
+T104_DISPLAY_SETTLE index=0 backend=Hokusai extra_frames=6
+T146_FRAMEBUFFER index=0 point=(4.5, 4.5) rgba=(0.9373, 0.2745, 0.2863, 1.0) source_rgba=aa0000ff
+T146_FRAMEBUFFER index=0 point=(256.5, 256.5) rgba=(0.9098, 0.3961, 0.4078, 1.0) source_rgba=850000ff
+T146_FRAMEBUFFER index=0 point=(507.5, 4.5) rgba=(0.8471, 0.2863, 0.3059, 1.0) source_rgba=910000ff
+T146_FRAMEBUFFER index=0 point=(4.5, 507.5) rgba=(0.8431, 0.2902, 0.3059, 1.0) source_rgba=900000ff
+T146_FRAMEBUFFER index=0 point=(507.5, 507.5) rgba=(0.8706, 0.5725, 0.5922, 1.0) source_rgba=4f0000ff
+T146_SOURCE label=redo-0 sha256=b9b330c75fe7dae6d4e89f71b7a1fc008e8ec8fe0c1eb2ae420771828930f73e covered=262144 zero=0 alpha_1_63=6 alpha_64_127=10352 alpha_128_191=247691 alpha_192_254=4095 alpha_255=0 red=262144 nonred=0 first_hole=(-1, -1) fills_512=true
+T146_FILL_STATUS index=0 full_coverage=true holes=0
+T146_CANCEL_RETRY revision=2 base_revision=1 events=1 tiles=["0,0", "0,1", "1,0", "1,1"] metrics={"bytes_uploaded":0,"commit_cpu_us":1147,"commit_us":1794236,"compose_cpu_us":0,"down_us":1789709,"drain_calls":2,"duplicate_drain_batched":0,"first_frame_post_draw_us":0,"first_preview_submit_us":0,"first_stage_us":1789741,"frame_phase_total":0,"frame_phases_us":[],"frame_post_draw_matches":0,"frame_preview_stage_submissions":0,"hokusai_perf":{"native_us":0,"pixels":0,"stage_us":0},"max_drain_cpu_us":3006,"max_frame_compose_cpu_us":0,"max_frame_end_to_post_draw_us":0,"max_frame_full_draw_cpu_us":0,"max_frame_oldest_pending_age_us":0,"max_frame_pending_input_count":0,"max_frame_preview_index_cpu_us":0,"max_frame_preview_stage_to_frame_end_us":0,"max_frame_selection_outline_cpu_us":0,"max_frame_texture_cpu_us":0,"max_pending":9,"max_preview_input_to_frame_end_us":0,"max_preview_input_to_post_draw_us":0,"max_preview_stage_to_post_draw_us":0,"max_sample_buffer":9,"max_sample_to_stage_us":3037,"max_stage_batch_us":2972,"native_ffi_stats":{"batches":2,"exported_ints":25683,"ffi_calls":8,"input_floats":40,"layer":"drawing-882c86e7a42a8ba7c7e8787599ce0785","mode":"xy_rgba","ok":true,"rgba":4278190335,"tile_bytes_exported":1048576,"tile_bytes_imported":0,"tile_ffi_calls":15,"tile_pixel_stream_calls":0},"preview_frames":0,"preview_index_cpu_us":0,"preview_input_post_draw_matches":0,"preview_stage_post_draw_matches":0,"release_us":1790065,"sample_compactions":0,"sample_to_stage_total":10,"sample_to_stage_us":[32,3037,3026,3020,3015,3010,3005,3000,2995,2985],"samples_received":10,"segments_staged":10,"stage_batch_total":2,"stage_batches_us":[19,2972],"stage_cpu_us":2991,"texture_cpu_us":0}
+T146_MASK_HIDDEN_RGB native=Hokusai rgba=00332211 revision=5
+T146_HOKUSAI_SUMMARY backend=Hokusai runs=1 total_p50_ms=577.814 total_p95_ms=577.814 release_p95_ms=529.613 stage_p95_ms=149.459 proposed_target_ms=100 target_met=false failures=0
+T146_HOKUSAI_BENCHMARK_PASSED
