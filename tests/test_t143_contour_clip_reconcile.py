@@ -41,7 +41,7 @@ class SubtileClipReconciliation(unittest.TestCase):
         for assertion in (
             "old clipped plan saturates cache", "edge islands exchange visibility",
             "only stale edge tile evicted", "all 4095 shared contours remain cached",
-            "stable plan reuses the complete cache", "different tile windows still invalidate",
+            "stable plan reuses the complete cache", "different tile windows retain unchanged shared eligible contours",
         ):
             self.assertIn(assertion, self.model)
         for assertion in (

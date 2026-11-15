@@ -25,7 +25,7 @@ class OutlineCacheReuseContracts(unittest.TestCase):
         draw = self.source.split("func _draw_selection_outline() -> void:", 1)[1].split("\nfunc ", 1)[0]
         for requirement in (
             "if tile_window != _mask_outline_window:",
-            "_mask_outline_cache.clear()",
+            "reconcile = true",
             "candidates.size() >= MAX_MASK_OUTLINE_CACHE",
             "focus != _mask_outline_focus",
             "var eligible: Dictionary[Vector2i, bool] = {}",
@@ -45,7 +45,7 @@ class OutlineCacheReuseContracts(unittest.TestCase):
         for requirement in (
             "all overlapping tiles retain their cached contour data",
             "no stale/out-of-plan tiles retained",
-            "changed tile window invalidates all old contours",
+            "changed tile window retains shared eligible contours",
             "mask authorization is not changed by cache planning",
             "overlap",
         ):

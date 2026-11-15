@@ -1443,18 +1443,25 @@ func _remember_mask_outline_plan(footprint: Rect2i, focus: Vector2i,
 ## stationary redraws avoid rebuilding a 4096-entry eligibility dictionary.
 func _sync_mask_outline_cache(tile_window: Rect2i, focus: Vector2i,
 		candidates: Array[Vector2i], clipped_footprint: Rect2i = Rect2i()) -> void:
+	# Per-tile contours are generated in source coordinates and independent of
+	# viewport clipping. A shifted visible window can therefore retain every
+	# cached tile that remains eligible; clearing all 4096 entries would make
+	# distant outlined islands disappear for hundreds of deferred frames.
+	var reconcile: bool = false
 	if tile_window != _mask_outline_window:
-		_mask_outline_cache.clear()
-		_mask_outline_window = tile_window
+		reconcile = true
 	elif (candidates.size() >= MAX_MASK_OUTLINE_CACHE \
 			or _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE) \
 			and (focus != _mask_outline_focus or clipped_footprint != _mask_outline_footprint):
+		reconcile = true
+	if reconcile and not _mask_outline_cache.is_empty():
 		var eligible: Dictionary[Vector2i, bool] = {}
 		for tile: Vector2i in candidates:
 			eligible[tile] = true
 		for tile: Vector2i in _mask_outline_cache.keys():
 			if not eligible.has(tile):
 				_mask_outline_cache.erase(tile)
+	_mask_outline_window = tile_window
 	_mask_outline_focus = focus
 	_mask_outline_footprint = clipped_footprint
 

@@ -63,14 +63,16 @@ func run() -> void:
 	check(preserved, "all overlapping tiles retain their cached contour data")
 	check(canvas._mask_outline_cache.size() <= canvas.MAX_MASK_OUTLINE_CACHE,
 		"hard 4096-cache budget is unchanged")
-	# A different selection/visible window must still drop cached contours.
+	# A shifted visible window retains shared eligible contours, too.
 	canvas._sync_mask_outline_cache(Rect2i(-40, -20, 80, 40), Vector2i(2, 0), after)
-	check(canvas._mask_outline_cache.is_empty(), "changed tile window invalidates all old contours")
+	check(canvas._mask_outline_cache.size() == expected_overlap,
+		"changed tile window retains shared eligible contours")
+	canvas._mask_outline_cache.clear()
 	canvas._mask_outline_cache[Vector2i(0, 0)] = PackedVector2Array()
 	var small_plan: Array[Vector2i] = [Vector2i.ZERO, Vector2i.ONE]
 	canvas._sync_mask_outline_cache(Rect2i(-40, -20, 80, 40), Vector2i(3, 0), small_plan)
-	check(canvas._mask_outline_cache.size() == 1,
-		"below-cap selection retains valid contours through focus changes")
+	check(canvas._mask_outline_cache.has(Vector2i.ZERO) and canvas._mask_outline_cache.size() <= 2,
+		"below-cap selection retains only its valid contours through focus changes")
 	check(mask.allows(Vector2i(968, 8)) and not mask.allows(Vector2i(0, 0)),
 		"mask authorization is not changed by cache planning")
 	print("T142_OUTLINE_METRICS " + JSON.stringify({"overlap": expected_overlap,

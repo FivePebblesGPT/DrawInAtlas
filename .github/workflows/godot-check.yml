@@ -266,6 +266,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t144-outline-model.log --marker T144_MODEL_PASSED || ci_fail_marker 'T144 outline plan model rejected'
           grep -Fxq 'T144_MODEL_PASSED checks=16 failures=0' /tmp/godot-t144-outline-model.log || ci_fail_marker 'T144 outline plan count changed'
           python3 -m unittest discover -s tests -p 'test_t144_outline_plan_cache.py' -v || ci_fail_marker 'T144 outline plan source/CI contracts rejected'
+          # T-145 visible-window shifts retain overlapping cached contours;
+          # a selection/mask mutation still invalidates the previous edges.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t145_outline_window_model.gd 2>&1 | tee /tmp/godot-t145-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t145-outline-model.log --marker T145_MODEL_PASSED || ci_fail_marker 'T145 outline window model log rejected'
+          grep -Fxq 'T145_MODEL_PASSED checks=14 failures=0' /tmp/godot-t145-outline-model.log || ci_fail_marker 'T145 outline window assertions changed'
+          python3 -m unittest discover -s tests -p 'test_t145_outline_window_shift.py' -v || ci_fail_marker 'T145 outline source/CI contract rejected'
           # T-096 exact large-mask contours/Move source oracle is mandatory;
           # real pointer/display and owner acceptance remain separate.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log

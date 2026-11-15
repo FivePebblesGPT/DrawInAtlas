@@ -78,6 +78,14 @@ jobs:
             2>&1 | tee /tmp/t144-outline-native.log
           grep -Fxq 'T144_NATIVE_PASSED checks=9 failures=0' /tmp/t144-outline-native.log
           python3 tools/check_godot_model_log.py /tmp/t144-outline-native.log --marker T144_NATIVE_PASSED
+      - name: Verify T-145 selection contour continuity across a changed tile window
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t145_outline_window_native.gd \
+            2>&1 | tee /tmp/t145-outline-native.log
+          grep -Fxq 'T145_NATIVE_PASSED checks=10 failures=0' /tmp/t145-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t145-outline-native.log --marker T145_NATIVE_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -91,4 +99,5 @@ jobs:
             /tmp/t142-outline-native.log
             /tmp/t143-outline-native.log
             /tmp/t144-outline-native.log
+            /tmp/t145-outline-native.log
           if-no-files-found: warn

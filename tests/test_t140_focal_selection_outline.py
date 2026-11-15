@@ -41,7 +41,7 @@ class FocalSelectionOutlineContracts(unittest.TestCase):
         sync = self.canvas.split("func _sync_mask_outline_cache(", 1)[1].split("\nfunc ", 1)[0]
         self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates, footprint)", draw)
         self.assertIn("focus != _mask_outline_focus", sync)
-        self.assertIn("_mask_outline_cache.clear()", sync)
+        self.assertIn("if reconcile and not _mask_outline_cache.is_empty():", sync)
         self.assertIn("_mask_outline_cache.erase(tile)", sync)
         self.assertIn("MASK_OUTLINE_TILES_PER_FRAME", draw)
         self.assertIn("selection_mask.contour_segments(", draw)
