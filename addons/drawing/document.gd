@@ -288,10 +288,26 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		before = {"kind": "structure", "op": "remove", "id": node_id,
 			"parent": parent_id, "index": _nodes[parent_id].children.find(node_id),
 			"nodes": snapshots, "pending": pending, "known": known, "dirty": dirty}
+	# Deleting a semantic-only subtree changes the layer tree, not canonical
+	# raster bytes. Keep the persistent Rust tiles/history and its revision in
+	# sync; raster-bearing removals still require a checked source rebase.
+	var removes_raster: bool = _subtree_contains_raster(node_id)
 	_erase_subtree(node_id)
-	revision += 1
+	if removes_raster:
+		revision += 1
+	else:
+		_advance_nonraster_revision()
 	_finish_structure(record_history, before)
 	return DrawingResult.success(null, revision)
+
+
+func _subtree_contains_raster(node_id: String) -> bool:
+	if _nodes[node_id].kind == DrawingLayerNode.RASTER:
+		return true
+	for child_id: String in _nodes[node_id].children:
+		if _subtree_contains_raster(child_id):
+			return true
+	return false
 
 
 func _erase_subtree(node_id: String) -> void:
@@ -1037,7 +1053,17 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 			_erase_subtree(node_id)
 	else:
 		return DrawingResult.failure("HISTORY_KIND", "Unknown structural operation")
-	if op in ["property", "reorder"]:
+	# Restoring/removing semantic-only trees is metadata replay; preserve
+	# native raster Undo/Redo tokens just as for property and reorder replay.
+	var changes_raster_tree: bool = false
+	if op == "create":
+		changes_raster_tree = (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER
+	elif op == "remove":
+		for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
+			if snapshot.kind == DrawingLayerNode.RASTER:
+				changes_raster_tree = true
+				break
+	if not changes_raster_tree:
 		_advance_nonraster_revision(false)
 	else:
 		revision += 1

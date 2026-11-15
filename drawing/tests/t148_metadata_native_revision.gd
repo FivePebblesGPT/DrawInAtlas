@@ -110,11 +110,74 @@ func run() -> void:
 	check(reopened.ok and packed(reopened.value as DrawingDocument, layer) == packed(doc, layer),
 		"save/reload raster pixels agree across metadata operations")
 	DirAccess.remove_absolute(saved_path)
-	check(doc.remove_subtree(objects).ok and
-		int(store.call("stats").get("revision", -1)) < doc.revision,
-		"source-changing subtree operation remains on conservative rebase path")
-	check(stroke(doc, layer, Vector2(52.5, 53.5)).ok and
+	# Semantic subtree deletion must not evict unrelated native pixels or
+	# reversible history. Exercise the structural Undo/Redo replay too.
+	var semantic_bytes: PackedByteArray = packed(doc, layer)
+	var semantic_history: int = int(store.call("stats").get("undo", -1))
+	check(doc.remove_subtree(objects, true).ok and
+		int(store.call("stats").get("revision", -1)) == doc.revision and
+		int(store.call("stats").get("undo", -1)) == semantic_history,
+		"remove semantic subtree retains native source/history")
+	check(doc.undo().ok and doc.has_node(objects) and
 		int(store.call("stats").get("revision", -1)) == doc.revision,
-		"subsequent brush safely rebases on subtree mutation")
+		"restore semantic subtree preserves Rust revision")
+	check(doc.redo().ok and not doc.has_node(objects) and
+		packed(doc, layer) == semantic_bytes and
+		int(store.call("stats").get("undo", -1)) == semantic_history,
+		"semantic subtree redo preserves native raster bytes/history")
+	check(stroke(doc, layer, Vector2(52.5, 53.5)).ok and
+		doc._native_raster_store == store and
+		int(store.call("stats").get("bytes_imported", -1)) == imported and
+		int(store.call("stats").get("undo", -1)) == semantic_history + 1,
+		"brush after semantic removal reuses existing native tile history")
+	# Nested group, text and semantic objects carry no RGBA8 tiles. Replaying
+	# both subtree removal and a separate structural create must leave the
+	# previously imported Rust source untouched.
+	var semantic_group: String = str(doc.create_layer(
+		DrawingLayerNode.GROUP, "Semantic group", "root", "", -1, true).value)
+	var semantic_objects: String = str(doc.create_layer(
+		DrawingLayerNode.OBJECTS, "Objects", semantic_group, "", -1, true).value)
+	var semantic_text: String = str(doc.create_layer(
+		DrawingLayerNode.TEXT, "Text", semantic_group, "", -1, true).value)
+	check(not semantic_group.is_empty() and not semantic_objects.is_empty() and
+		not semantic_text.is_empty() and
+		doc.add_object(semantic_objects, {"position": Vector2(1, 2)}, "token").ok,
+		"nested semantic subtree registered")
+	var nested_imports: int = int(store.call("stats").get("bytes_imported", -1))
+	var nested_undo: int = int(store.call("stats").get("undo", -1))
+	check(doc.remove_subtree(semantic_group, true).ok and
+		int(store.call("stats").get("revision", -1)) == doc.revision and
+		int(store.call("stats").get("undo", -1)) == nested_undo,
+		"nested semantic removal keeps native authority")
+	check(doc.undo().ok and doc.has_node(semantic_text) and
+		doc.has_node(semantic_objects) and
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"nested semantic undo restores structure with native revision")
+	check(doc.redo().ok and not doc.has_node(semantic_group) and
+		int(store.call("stats").get("bytes_imported", -1)) == nested_imports,
+		"nested semantic redo does not reimport canonical tiles")
+	var added: String = str(doc.create_layer(
+		DrawingLayerNode.OBJECTS, "Created", "root", "", -1, true).value)
+	check(not added.is_empty() and doc.undo().ok and not doc.has_node(added) and
+		int(store.call("stats").get("revision", -1)) == doc.revision,
+		"undo semantic create preserves native authority")
+	check(doc.redo().ok and doc.has_node(added) and
+		int(store.call("stats").get("revision", -1)) == doc.revision and
+		int(store.call("stats").get("undo", -1)) == nested_undo,
+		"redo semantic create preserves native tokens")
+	# A nested tree with a raster child must *not* take the metadata path.
+	# Its source can be deleted/recreated while the tile ID is still in Rust.
+	var group: String = str(doc.create_layer(DrawingLayerNode.GROUP, "Mixed").value)
+	var nested: String = str(doc.create_layer(DrawingLayerNode.RASTER, "Nested", group).value)
+	check(not group.is_empty() and not nested.is_empty(), "nested raster subtree created")
+	var before_remove_revision: int = doc.revision
+	check(doc.remove_subtree(group, true).ok and
+		doc.revision == before_remove_revision + 1 and
+		int(store.call("stats").get("revision", -1)) < doc.revision,
+		"raster-bearing subtree removal retains conservative rebase guard")
+	check(stroke(doc, layer, Vector2(24.5, 52.5)).ok and
+		int(store.call("stats").get("revision", -1)) == doc.revision and
+		int(store.call("stats").get("undo", -1)) == 1,
+		"subsequent brush rebases after raster-bearing deletion")
 	print("T148_METADATA_RESULT checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)
