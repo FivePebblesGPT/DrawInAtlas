@@ -1270,6 +1270,48 @@ func _draw() -> void:
 ## The persistent selection always traces mask truth, never the conservative
 ## enclosing bounds. Only viewport-intersecting rows are evaluated; rectangle
 ## boolean expressions have a scanline cost independent of selected area.
+## A sparse explicit pixel mask may span millions of empty source cells.
+## Derive only tiles holding selected pixels; rectangle operations/inversion
+## require the general contour walker and retain its conservative behavior.
+## Both paths bound work to the retained 4096-tile outline budget.
+func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
+	var candidates: Array[Vector2i] = []
+	if not footprint.has_area():
+		return candidates
+	if not selection_mask.inverted and selection_mask._operations.is_empty() \
+			and not selection_mask._pixel_mask.is_empty():
+		var indexed: Dictionary[Vector2i, bool] = {}
+		var overflow: bool = false
+		for point: Vector2i in selection_mask._pixel_mask:
+			if not selection_mask._pixel_mask[point] \
+					or not selection_mask._base_bounds.has_point(point) \
+					or not footprint.has_point(point):
+				continue
+			var tile: Vector2i = Vector2i(
+				DrawingDocument.TILES.floor_div(point.x, MASK_OUTLINE_TILE),
+				DrawingDocument.TILES.floor_div(point.y, MASK_OUTLINE_TILE))
+			indexed[tile] = true
+			if indexed.size() > MAX_MASK_OUTLINE_CACHE:
+				overflow = true
+				break
+		if not overflow:
+			for tile: Vector2i in indexed:
+				candidates.append(tile)
+			candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+				return a.y < b.y if a.y != b.y else a.x < b.x)
+			return candidates
+	var left: int = DrawingDocument.TILES.floor_div(footprint.position.x, MASK_OUTLINE_TILE)
+	var top: int = DrawingDocument.TILES.floor_div(footprint.position.y, MASK_OUTLINE_TILE)
+	var right: int = DrawingDocument.TILES.floor_div(footprint.end.x - 1, MASK_OUTLINE_TILE)
+	var bottom: int = DrawingDocument.TILES.floor_div(footprint.end.y - 1, MASK_OUTLINE_TILE)
+	for tile_y: int in range(top, bottom + 1):
+		for tile_x: int in range(left, right + 1):
+			candidates.append(Vector2i(tile_x, tile_y))
+			if candidates.size() >= MAX_MASK_OUTLINE_CACHE:
+				return candidates
+	return candidates
+
+
 func _draw_selection_outline() -> void:
 	if not selection_mask.enabled or not selected.has_area():
 		return
@@ -1297,23 +1339,18 @@ func _draw_selection_outline() -> void:
 			_mask_outline_window = tile_window
 		var created: int = 0
 		var pending: bool = false
-		for tile_y: int in range(top, bottom + 1):
-			for tile_x: int in range(left, right + 1):
-				var tile: Vector2i = Vector2i(tile_x, tile_y)
-				if not _mask_outline_cache.has(tile):
-					if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
-						# At extreme zoom-out/display sizes, an explicit mask may
-						# exceed the retained cache. Stop progressive redraw rather
-						# than evict/rebuild forever; a changed view starts fresh.
-						continue
-					if created >= MASK_OUTLINE_TILES_PER_FRAME:
-						pending = true
-						continue
-					created += 1
-					_mask_outline_cache[tile] = selection_mask.contour_segments(
-						Rect2i(tile * MASK_OUTLINE_TILE,
-							Vector2i(MASK_OUTLINE_TILE, MASK_OUTLINE_TILE)))
-				source_edges.append_array(_mask_outline_cache[tile])
+		for tile: Vector2i in _mask_outline_tile_candidates(footprint):
+			if not _mask_outline_cache.has(tile):
+				if _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE:
+					continue
+				if created >= MASK_OUTLINE_TILES_PER_FRAME:
+					pending = true
+					continue
+				created += 1
+				_mask_outline_cache[tile] = selection_mask.contour_segments(
+					Rect2i(tile * MASK_OUTLINE_TILE,
+						Vector2i(MASK_OUTLINE_TILE, MASK_OUTLINE_TILE)))
+			source_edges.append_array(_mask_outline_cache[tile])
 		if pending:
 			queue_redraw()
 	var screen_edges: PackedVector2Array = PackedVector2Array()

@@ -1,0 +1,5 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_SPARSE_CAPTURE_BENCH: 512x512, 8 stored, seven CPU-only samples, median 801 us, samples=[801, 1551, 828, 731, 731, 711, 801]
+T088_SPARSE_CAPTURE: 54 checks; 0 failed
+T088_SPARSE_CAPTURE_PASSED (54 checks; 0 failed)

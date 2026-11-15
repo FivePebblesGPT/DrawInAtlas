@@ -30,10 +30,20 @@ jobs:
             2>&1 | tee /tmp/t088-native.log
           python3 tools/check_native_t088_log.py /tmp/t088-native.log
           python3 -m unittest discover -s tests -p 'test_t088_floating_log.py' -v
+      - name: Verify T-139 signed sparse mask outlines in the native framebuffer
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t139_sparse_selection_outline_native.gd \
+            2>&1 | tee /tmp/t139-outline-native.log
+          grep -Fxq 'T139_NATIVE_PASSED checks=7 failures=0' /tmp/t139-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t139-outline-native.log --marker T139_NATIVE_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t088-xvfb-selection-clipboard
-          path: /tmp/t088-native.log
+          path: |
+            /tmp/t088-native.log
+            /tmp/t139-outline-native.log
           if-no-files-found: warn

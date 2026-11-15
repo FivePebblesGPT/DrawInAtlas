@@ -229,6 +229,12 @@ jobs:
           # T-088 capture must skip empty source tiles and preserve lazy-source failures.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_capture_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-capture.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-capture.log --marker T088_SPARSE_CAPTURE_PASSED || ci_fail_marker 'T088 sparse capture source oracle rejected'
+          # T-139 explicit sparse pixel-mask outlines must visit occupied
+          # signed contour tiles rather than truncating far islands by row.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t139_sparse_selection_outline_model.gd 2>&1 | tee /tmp/godot-t139-outline-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t139-outline-model.log --marker T139_OUTLINE_PASSED || ci_fail_marker 'T139 sparse outline model log rejected'
+          grep -Fxq 'T139_OUTLINE_PASSED checks=14 failures=0' /tmp/godot-t139-outline-model.log || ci_fail_marker 'T139 outline assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t139_sparse_selection_outline.py' -v || ci_fail_marker 'T139 selection outline source/CI contract rejected'
           # T-096 exact large-mask contours/Move source oracle is mandatory;
           # real pointer/display and owner acceptance remain separate.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/godot-t096-model.log

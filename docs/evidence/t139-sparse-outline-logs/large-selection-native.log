@@ -1,0 +1,8 @@
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T096_NATIVE_TIMING: capture_ms=1.547 motion_stage_p50_ms=9.553 motion_stage_p95_ms=10.761 receipt_to_submit_p50_ms=9.913 receipt_to_submit_p95_ms=10.879 callback_p50_ms=49.231 callback_p95_ms=50.786 compose_p95_ms=16.680 upload_p95_ms=1.307 drop_callback_ms=49.661 drop_cpu_ms=8.384 cold_frame_callback_ms=45.632 cold_compose_ms=13.677 warm_compose_ms=0.000 cold_outline_ms=0.564
+T096_NATIVE: 34 checks; 0 failed
+T096_NATIVE_PASSED
