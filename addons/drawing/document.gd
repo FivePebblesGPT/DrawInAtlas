@@ -1405,11 +1405,15 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 			for channel: int in range(4):
 				rgba |= int(bytes[offset + channel]) << (channel * 8)
 			after.tiles[tile_key].set_rgba(local.x, local.y, rgba)
+	# Conversion creates a raster source at a previously semantic layer ID.
+	# If Rust has never authorized that ID, keep other layers' canonical tiles
+	# and native history. The guarded bridge falls back to a later rebase when
+	# the ID was previously painted/parked or the revision is stale.
+	_advance_raster_structure_revision([layer_id])
 	_nodes[layer_id] = after
 	for tile_key: String in after.tiles:
 		_dirty_tiles[layer_id + ":" + tile_key] = true
 		_known_refs.erase(layer_id + ":" + tile_key)
-	revision += 1
 	if external_history:
 		_mark_untracked_change()
 	else:
@@ -1452,7 +1456,10 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 			(expected == null or expected.kind == DrawingLayerNode.TEXT):
 		_advance_nonraster_revision(false)
 	else:
-		revision += 1
+		# Undo/Redo of text rasterization changes the layer's kind and
+		# consumer raster bytes, but not Rust-owned source when that layer
+		# was never authorized. Preserve unrelated native Undo/Redo tokens.
+		_advance_raster_structure_revision([layer_id], false)
 	return DrawingResult.success(null, revision)
 
 
