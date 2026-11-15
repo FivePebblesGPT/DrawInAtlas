@@ -2,6 +2,8 @@
 
 **Current as of 2026-11-15.** This is the **authoritative active navigation**, synchronized with `docs/Tickets/T-*.md` frontmatter. The old chronological 3,119-line engineering journal is preserved at [Index-History-2026-11-15.md](Index-History-2026-11-15.md). Past narrative status or performance recommendations are source-pinned history, not present acceptance. Review [ticket workflow, prerequisites and manual gates](TICKET_WORKFLOW.md) before implementation.
 
+**Implementation agent handoff for [Sprint 2026-11-15 / PR #19](SPRINT_2026-11-15_HANDOFF.md):** Start with **T-146 only** (real 96px Hokusai hard-round pointer benchmark). Follow the native Rust tile-ownership migration T-147–T-152 one ticket per turn. This handoff is a plan, not completed benchmark evidence.
+
 ## Current alpha architecture — Rust-owned raster
 
 **Owner decision:** benchmark existing Hokusai **96px hard-round** first (real mouse events/full 512×512 coverage), consolidate NativeHard/Hokusai **inside their existing Rust GDExtension**, move canonical raster tiles, blending, masks, staging, rollback and undo data **out of GDScript**, connect Godot through **batched stroke commands → native-owned dirty tile/byte buffers**, and **delete Legacy** (no compatibility, native-free fallback or migration required in alpha). Godot retains workspace, tools/input reception, layer/metadata UI and GPU texture submission; Rust owns painting. Hokusai is **not required to match Legacy pixel geometry**. Only after retiring Legacy should the new pipeline be reprofiled and its measured dominant bottleneck optimized.
@@ -16,13 +18,13 @@ Statuses: T-146 **Ready**; subsequent implementation slices **Blocked** by the p
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-146 · 96px Hokusai hard-round full-canvas pointer benchmark](Tickets/T-146.md) | Ready | Completed scope; see ticket evidence | [T-097](Tickets/T-097.md), [T-101](Tickets/T-101.md) |
-| [T-147 · Unify NativeHard and Hokusai behind one native stroke engine](Tickets/T-147.md) | Blocked | Completed scope; see ticket evidence | [T-146](Tickets/T-146.md) |
-| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | Blocked | Completed scope; see ticket evidence | [T-147](Tickets/T-147.md) |
-| [T-149 · Godot native dirty-tile preview, display and persistence seams](Tickets/T-149.md) | Blocked | Completed scope; see ticket evidence | [T-148](Tickets/T-148.md) |
-| [T-150 · Remove Legacy Brush backend and compatibility paths](Tickets/T-150.md) | Blocked | Completed scope; see ticket evidence | [T-149](Tickets/T-149.md) |
-| [T-151 · Profile post-consolidation native Brush critical path](Tickets/T-151.md) | Blocked | Completed scope; see ticket evidence | [T-150](Tickets/T-150.md) |
-| [T-152 · Optimize the highest measured native Brush bottleneck](Tickets/T-152.md) | Blocked | Completed scope; see ticket evidence | [T-151](Tickets/T-151.md) |
+| [T-146 · 96px Hokusai hard-round full-canvas pointer benchmark](Tickets/T-146.md) | Ready | Next: true 96px Hokusai hard-round pointer benchmark; native required for test | [T-097](Tickets/T-097.md), [T-101](Tickets/T-101.md) |
+| [T-147 · Unify NativeHard and Hokusai behind one native stroke engine](Tickets/T-147.md) | Blocked | After T-146: unify the existing Rust hard/preset stroke API | [T-146](Tickets/T-146.md) |
+| [T-148 · Native-owned tiled raster editing and atomic undo transactions](Tickets/T-148.md) | Blocked | After T-147: Rust-owned tile staging, masks, blending and Undo | [T-147](Tickets/T-147.md) |
+| [T-149 · Godot native dirty-tile preview, display and persistence seams](Tickets/T-149.md) | Blocked | After T-148: batched Godot inputs and native dirty-tile display/save seams | [T-148](Tickets/T-148.md) |
+| [T-150 · Remove Legacy Brush backend and compatibility paths](Tickets/T-150.md) | Blocked | After T-149: retire Legacy without migration or native-free fallback | [T-149](Tickets/T-149.md) |
+| [T-151 · Profile post-consolidation native Brush critical path](Tickets/T-151.md) | Blocked | After T-150: profile the consolidated full editor and all native seams | [T-150](Tickets/T-150.md) |
+| [T-152 · Optimize the highest measured native Brush bottleneck](Tickets/T-152.md) | Blocked | After T-151: optimize one evidenced latency bottleneck | [T-151](Tickets/T-151.md) |
 
 ## 2. Active performance, application and CI work
 
