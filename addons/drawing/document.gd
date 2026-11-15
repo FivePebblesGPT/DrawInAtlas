@@ -1533,10 +1533,18 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		for child: String in source.children:
 			if not nodes.has(child) or nodes[child].parent_id != old_id:
 				return DrawingResult.failure("SNAPSHOT", "Broken nested group reference")
-	# Validate before publishing any nodes. No source/target tile object is shared.
+	# Prepare the entire detached projection before publishing. A failed copy
+	# must not install a partial group, advance either revision or leave a
+	# half-populated dirty map. Native parked IDs are reserved even while the
+	# corresponding Godot layer is absent from the live tree.
+	var prepared: Dictionary[String, DrawingLayerNode] = {}
+	var imported_rasters: Array[String] = []
 	for old_id: Variant in nodes:
 		var imported: DrawingLayerNode = (nodes[old_id] as DrawingLayerNode).detached_copy()
 		imported.id = mapping[String(old_id)]
+		if _native_raster_store != null and bool(_native_raster_store.call(
+				"is_layer_parked", imported.id)):
+			return DrawingResult.failure("DUPLICATE_ID", "Imported layer ID is reserved by native history")
 		imported.parent_id = parent_id if old_id == original_root else mapping[imported.parent_id]
 		if not preserve_ids and not imported.objects.is_empty():
 			var distinct_objects: Dictionary[String, Dictionary] = {}
@@ -1547,11 +1555,23 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		for child: String in imported.children:
 			mapped_children.append(mapping[child])
 		imported.children = mapped_children
-		_nodes[imported.id] = imported
+		prepared[imported.id] = imported
+		if imported.kind == DrawingLayerNode.RASTER:
+			imported_rasters.append(imported.id)
+	# All native preflight is side-effect-free. This previously used a bare
+	# revision increment, which forced a history-clearing rebase even when
+	# every imported raster layer was new to Rust. The checked bridge keeps
+	# unrelated native Brush history and source authorizations alive.
+	if imported_rasters.is_empty():
+		_advance_nonraster_revision()
+	else:
+		_advance_raster_structure_revision(imported_rasters)
+	for identifier: String in prepared:
+		var imported: DrawingLayerNode = prepared[identifier]
+		_nodes[identifier] = imported
 		for tile_key: String in imported.tiles:
-			_dirty_tiles[imported.id + ":" + tile_key] = true
+			_dirty_tiles[identifier + ":" + tile_key] = true
 	_nodes[parent_id].children.append(mapping[original_root])
-	revision += 1
 	_mark_untracked_change()
 	return DrawingResult.success(mapping[original_root], revision)
 
