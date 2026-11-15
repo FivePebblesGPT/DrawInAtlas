@@ -1,0 +1,9 @@
+Fontconfig error: Cannot load default config file: No such file: (null)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T088_SPARSE_CAPTURE_BENCH: 512x512, 8 stored, seven CPU-only samples, median 832 us, samples=[1064, 1612, 832, 740, 701, 1069, 710]
+T088_SPARSE_CAPTURE: 54 checks; 0 failed
+T088_SPARSE_CAPTURE_PASSED (54 checks; 0 failed)

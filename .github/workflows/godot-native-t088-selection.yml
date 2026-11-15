@@ -62,6 +62,14 @@ jobs:
             2>&1 | tee /tmp/t142-outline-native.log
           grep -Fxq 'T142_NATIVE_PASSED checks=11 failures=0' /tmp/t142-outline-native.log
           python3 tools/check_godot_model_log.py /tmp/t142-outline-native.log --marker T142_NATIVE_PASSED
+      - name: Verify T-143 clipped contour plan changes within a tile window
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t143_contour_clip_native.gd \
+            2>&1 | tee /tmp/t143-outline-native.log
+          grep -Fxq 'T143_NATIVE_PASSED checks=10 failures=0' /tmp/t143-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t143-outline-native.log --marker T143_NATIVE_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -73,4 +81,5 @@ jobs:
             /tmp/t140-outline-native.log
             /tmp/t141-outline-native.log
             /tmp/t142-outline-native.log
+            /tmp/t143-outline-native.log
           if-no-files-found: warn

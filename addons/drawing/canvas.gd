@@ -142,6 +142,7 @@ var selected: Rect2i = Rect2i():
 			selection_mask.set_rectangle(value)
 			_mask_outline_cache.clear()
 			_mask_outline_window = Rect2i()
+			_mask_outline_footprint = Rect2i()
 var _marquee: Rect2i = Rect2i()
 var _marquee_dragged: bool = false
 var _marquee_start_screen: Vector2 = Vector2.ZERO
@@ -158,6 +159,7 @@ const MAX_MASK_OUTLINE_CACHE: int = 4096
 const MAX_MASK_OUTLINE_INDEX_POINTS: int = 8192
 var _mask_outline_cache: Dictionary[Vector2i, PackedVector2Array] = {}
 var _mask_outline_window: Rect2i = Rect2i()
+var _mask_outline_footprint: Rect2i = Rect2i()
 var _mask_outline_focus: Vector2i = Vector2i.ZERO
 var _move_target: Vector2i = Vector2i.ZERO
 var _move_target_received_us: int = 0
@@ -325,6 +327,7 @@ func _assign_selection_mask(value: DrawingSelection, notify: bool = true) -> voi
 	selection_mask = value.detached_copy() if value != null else DrawingSelection.new()
 	_mask_outline_cache.clear()
 	_mask_outline_window = Rect2i()
+	_mask_outline_footprint = Rect2i()
 	_updating_selection_bounds = true
 	selected = selection_mask.bounds if selection_mask.enabled else Rect2i()
 	_updating_selection_bounds = false
@@ -1381,17 +1384,20 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 
 
 
-## Reuse contours when an over-budget focus shift changes only part of the
-## eligible plan. Resetting all 4096 tiles made distant already-visible
-## outlines disappear for hundreds of frames after a one-tile pan. Entries
-## outside the new plan are not drawn and must be evicted to make room for
-## newly focal contours; each redraw still creates at most four new tiles.
+## Reuse contours across small camera pans, but do not let a saturated
+## cache starve outlines revealed by sub-tile clipping. Two visible source
+## footprints can have the same 64px tile window and focal tile, while their
+## eligible *occupied* contour tiles differ at the viewport edge. Reconcile
+## those plans only when the clipped footprint or focal tile changes; ordinary
+## stationary redraws avoid rebuilding a 4096-entry eligibility dictionary.
 func _sync_mask_outline_cache(tile_window: Rect2i, focus: Vector2i,
-		candidates: Array[Vector2i]) -> void:
+		candidates: Array[Vector2i], clipped_footprint: Rect2i = Rect2i()) -> void:
 	if tile_window != _mask_outline_window:
 		_mask_outline_cache.clear()
 		_mask_outline_window = tile_window
-	elif candidates.size() >= MAX_MASK_OUTLINE_CACHE and focus != _mask_outline_focus:
+	elif (candidates.size() >= MAX_MASK_OUTLINE_CACHE \
+			or _mask_outline_cache.size() >= MAX_MASK_OUTLINE_CACHE) \
+			and (focus != _mask_outline_focus or clipped_footprint != _mask_outline_footprint):
 		var eligible: Dictionary[Vector2i, bool] = {}
 		for tile: Vector2i in candidates:
 			eligible[tile] = true
@@ -1399,6 +1405,7 @@ func _sync_mask_outline_cache(tile_window: Rect2i, focus: Vector2i,
 			if not eligible.has(tile):
 				_mask_outline_cache.erase(tile)
 	_mask_outline_focus = focus
+	_mask_outline_footprint = clipped_footprint
 
 
 func _draw_selection_outline() -> void:
@@ -1425,10 +1432,10 @@ func _draw_selection_outline() -> void:
 		var tile_window: Rect2i = Rect2i(left, top, right - left + 1, bottom - top + 1)
 		var candidates: Array[Vector2i] = _mask_outline_tile_candidates(footprint)
 		var focus: Vector2i = _mask_outline_focal_cell(left, top, right, bottom)
-		# Capped candidates depend on focus, even if the clipped selection
-		# window remains fixed while the camera pans inside it. Do not let
-		# an old full cache starve newly focal contour tiles.
-		_sync_mask_outline_cache(tile_window, focus, candidates)
+		# Capped candidates depend on the camera focus *and* the pixel-level
+		# clipped footprint. Even within the same 64px window, an edge island
+		# may enter while the cache is full of newly off-screen contours.
+		_sync_mask_outline_cache(tile_window, focus, candidates, footprint)
 		var created: int = 0
 		var pending: bool = false
 		for tile: Vector2i in candidates:

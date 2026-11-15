@@ -44,7 +44,7 @@ class SparseSelectionOutlineContracts(unittest.TestCase):
         # helper; it still clears on a changed window, but preserves overlap
         # across an in-window saturated focus change.
         sync = self.canvas.split("func _sync_mask_outline_cache(", 1)[1].split("\nfunc ", 1)[0]
-        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates)", draw)
+        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates, footprint)", draw)
         self.assertIn("_mask_outline_cache.clear()", sync)
         self.assertNotIn("_pixel_mask.clear()", helper)
 

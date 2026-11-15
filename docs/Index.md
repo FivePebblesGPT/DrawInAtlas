@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 sub-tile clipped contour plan correctness (T-143 Done)
+
+[T-143](Tickets/T-143.md) reconciles saturated selection-outline cache tiles
+when the **pixel-level clipped footprint** changes after an 8px camera pan but
+the 64px tile window and focal tile stay the same. The unchanged T-142 native
+Canvas fails **3/10** checks and omits the newly visible far-edge island;
+the corrected native witness passes **10/10**, displaying 12 changed real
+framebuffer pixels. A 14-check headless model verifies 4095 shared contours
+stay cached and only the off-screen tile is evicted. [Evidence](evidence/T-143-2026-11-15-subtile-contour-clip.md)
+includes red/green logs and neighboring regressions. This is bounded overlay
+correctness, not physical latency or T-088/T-096 approval. Fast CI keeps
+46 check IDs.
+
 ## 2026-11-15 contour cache continuity after a focal pan (T-142 Done)
 
 [T-142](Tickets/T-142.md) retains already-traced selection contour tiles shared
@@ -2989,6 +3002,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-141 · Occupied sparse-mask overflow outlines](Tickets/T-141.md) | Done | Bounded 8192-key exact positive-mask indexing picks 4096 occupied focal tiles, preserving conservative other-mask fallbacks | [T-053](Tickets/T-053.md), [T-139](Tickets/T-139.md), [T-140](Tickets/T-140.md) |
 
 | [T-142 · Preserve overlapping contour tiles after an in-window pan](Tickets/T-142.md) | Done | Saturated selection outlines evict only out-of-plan tiles on focal changes; retain visible contours and four-new-tile budget, with real X11 pixel parity | [T-053](Tickets/T-053.md), [T-140](Tickets/T-140.md), [T-141](Tickets/T-141.md) |
+| [T-143 · Reconcile saturated contour cache for sub-tile clipped pans](Tickets/T-143.md) | Done | Changed pixel-level footprint evicts only off-plan contours even when focal tile/window are stable; X11 edge pixels and four-tile budget verified | [T-053](Tickets/T-053.md), [T-142](Tickets/T-142.md) |
 
 ## Epics
 

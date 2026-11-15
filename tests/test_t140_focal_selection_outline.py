@@ -39,7 +39,7 @@ class FocalSelectionOutlineContracts(unittest.TestCase):
                 self.assertIn(clause, candidates)
         self.assertIn("var candidates: Array[Vector2i] = _mask_outline_tile_candidates(footprint)", draw)
         sync = self.canvas.split("func _sync_mask_outline_cache(", 1)[1].split("\nfunc ", 1)[0]
-        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates)", draw)
+        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates, footprint)", draw)
         self.assertIn("focus != _mask_outline_focus", sync)
         self.assertIn("_mask_outline_cache.clear()", sync)
         self.assertIn("_mask_outline_cache.erase(tile)", sync)

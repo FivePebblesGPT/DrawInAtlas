@@ -1,0 +1,20 @@
+test_bounded_focal_fallback_and_stale_cache_rejection (test_t140_focal_selection_outline.FocalSelectionOutlineContracts.test_bounded_focal_fallback_and_stale_cache_rejection) ... ok
+test_existing_46_check_inventory_and_strict_ci (test_t140_focal_selection_outline.FocalSelectionOutlineContracts.test_existing_46_check_inventory_and_strict_ci) ... ok
+test_negative_controls_cover_real_frames_and_overflow (test_t140_focal_selection_outline.FocalSelectionOutlineContracts.test_negative_controls_cover_real_frames_and_overflow) ... ok
+test_index_is_bounded_and_selects_only_true_pixels (test_t141_sparse_mask_overflow.SparseMaskOverflowContracts.test_index_is_bounded_and_selects_only_true_pixels) ... ok
+test_red_green_probes_include_real_pixels_and_fallback (test_t141_sparse_mask_overflow.SparseMaskOverflowContracts.test_red_green_probes_include_real_pixels_and_fallback) ... ok
+test_success_markers_fail_closed (test_t141_sparse_mask_overflow.SparseMaskOverflowContracts.test_success_markers_fail_closed) ... ok
+test_workflow_stays_in_46_checks_and_strict_log_policy (test_t141_sparse_mask_overflow.SparseMaskOverflowContracts.test_workflow_stays_in_46_checks_and_strict_log_policy) ... ok
+test_ci_preserves_46_required_check_ids (test_t142_outline_cache_reuse.OutlineCacheReuseContracts.test_ci_preserves_46_required_check_ids) ... ok
+test_reconcile_only_eligible_contours_and_preserve_budget (test_t142_outline_cache_reuse.OutlineCacheReuseContracts.test_reconcile_only_eligible_contours_and_preserve_budget) ... ok
+test_regressions_check_pan_overlap_and_real_pixels (test_t142_outline_cache_reuse.OutlineCacheReuseContracts.test_regressions_check_pan_overlap_and_real_pixels) ... ok
+test_strict_markers_reject_corrupted_success (test_t142_outline_cache_reuse.OutlineCacheReuseContracts.test_strict_markers_reject_corrupted_success) ... ok
+test_ci_contract_remains_one_of_46_and_native_is_on_demand (test_t143_contour_clip_reconcile.SubtileClipReconciliation.test_ci_contract_remains_one_of_46_and_native_is_on_demand) ... ok
+test_footprint_changes_reconcile_saturated_cache_without_full_reset (test_t143_contour_clip_reconcile.SubtileClipReconciliation.test_footprint_changes_reconcile_saturated_cache_without_full_reset) ... ok
+test_log_verifier_rejects_forged_or_post_success_errors (test_t143_contour_clip_reconcile.SubtileClipReconciliation.test_log_verifier_rejects_forged_or_post_success_errors) ... ok
+test_model_and_native_verify_real_changed_footprint_not_just_focal_tile (test_t143_contour_clip_reconcile.SubtileClipReconciliation.test_model_and_native_verify_real_changed_footprint_not_just_focal_tile) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.010s
+
+OK

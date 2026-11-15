@@ -37,7 +37,7 @@ class OutlineCacheReuseContracts(unittest.TestCase):
         ):
             with self.subTest(requirement=requirement):
                 self.assertIn(requirement, sync)
-        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates)", draw)
+        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates, footprint)", draw)
         self.assertIn("created >= MASK_OUTLINE_TILES_PER_FRAME", draw)
         self.assertIn("MAX_MASK_OUTLINE_CACHE", draw)
 
