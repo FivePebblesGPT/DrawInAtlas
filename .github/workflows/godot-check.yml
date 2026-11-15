@@ -127,6 +127,12 @@ jobs:
           python3 tools/check_godot_model_log.py /tmp/godot-t133-window-quit.log --marker T133_WINDOW_QUIT_PASSED || ci_fail_marker 'T133 window close failed strict log policy'
           grep -Fqx 'T133_WINDOW_QUIT_PASSED checks=31 failures=0' /tmp/godot-t133-window-quit.log || ci_fail_marker 'T133 window quit assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t133_window_quit.py' -v || ci_fail_marker 'T133 source/CI contracts rejected'
+          # T-134 binds authoring modal confirmation to the originating tab,
+          # selected layer and document revision (without changing direct APIs).
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t134_authoring_dialog_identity_smoke.gd 2>&1 | tee /tmp/godot-t134-authoring-dialog.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t134-authoring-dialog.log --marker T134_DIALOG_PASSED || ci_fail_marker 'T134 authoring dialog origin rejected by strict log'
+          grep -Fqx 'T134_DIALOG_PASSED checks=22 failures=0' /tmp/godot-t134-authoring-dialog.log || ci_fail_marker 'T134 authoring dialog assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t134_authoring_dialog_identity.py' -v || ci_fail_marker 'T134 authoring source/CI contracts rejected'
           # T-095 60px Brush/Eraser exact-pixel and rollback oracle is mandatory;
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log

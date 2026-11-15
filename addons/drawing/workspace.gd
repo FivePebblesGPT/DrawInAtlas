@@ -165,6 +165,7 @@ var _local_save_as: bool = false
 ## write the currently selected *different* tab to the chosen destination.
 var _save_dialog_target: Dictionary = {}
 var _variant_dialog_target: Dictionary = {}
+var _authoring_dialog_targets: Dictionary = {}
 const ROW_PAGE: int = 200
 
 
@@ -421,7 +422,8 @@ func _build_interface() -> void:
 	layer_rename_field = LineEdit.new()
 	layer_rename_field.max_length = 128
 	layer_rename_dialog.add_child(layer_rename_field)
-	layer_rename_dialog.confirmed.connect(_commit_layer_rename)
+	layer_rename_dialog.confirmed.connect(_confirm_layer_rename)
+	layer_rename_dialog.canceled.connect(_cancel_authoring_dialog.bind("layer_rename"))
 	var history_pane: VBoxContainer = _add_dock_section("History")
 	var history_actions: HBoxContainer = HBoxContainer.new()
 	history_pane.add_child(history_actions)
@@ -509,7 +511,8 @@ func _build_interface() -> void:
 	rename_field = LineEdit.new()
 	rename_field.custom_minimum_size.x = 310
 	rename_dialog.add_child(rename_field)
-	rename_dialog.confirmed.connect(_rename_object)
+	rename_dialog.confirmed.connect(_confirm_object_rename)
+	rename_dialog.canceled.connect(_cancel_authoring_dialog.bind("object_rename"))
 	frame_dialog = ConfirmationDialog.new()
 	frame_dialog.title = "Object-local origin and bounds"
 	add_child(frame_dialog)
@@ -535,7 +538,8 @@ func _build_interface() -> void:
 	var frame_info: Label = Label.new()
 	frame_info.text = "Empty bounds = unrestricted sparse canvas; guides never clip pixels."
 	frame_dialog.add_child(frame_info)
-	frame_dialog.confirmed.connect(_change_object_frame)
+	frame_dialog.confirmed.connect(_confirm_object_frame)
+	frame_dialog.canceled.connect(_cancel_authoring_dialog.bind("object_frame"))
 	grid_dialog = ConfirmationDialog.new()
 	grid_dialog.title = "Drawing grid (view only)"
 	add_child(grid_dialog)
@@ -553,7 +557,8 @@ func _build_interface() -> void:
 		field.custom_minimum_size.x = 185
 		grid_form.add_child(field)
 		grid_fields.append(field)
-	grid_dialog.confirmed.connect(_apply_grid_settings)
+	grid_dialog.confirmed.connect(_confirm_grid)
+	grid_dialog.canceled.connect(_cancel_authoring_dialog.bind("grid"))
 	image_frame_dialog = ConfirmationDialog.new()
 	image_frame_dialog.title = "Standalone image frame — guide, not crop"
 	add_child(image_frame_dialog)
@@ -571,7 +576,8 @@ func _build_interface() -> void:
 		field.custom_minimum_size.x = 185
 		image_form.add_child(field)
 		image_frame_fields.append(field)
-	image_frame_dialog.confirmed.connect(_apply_image_frame)
+	image_frame_dialog.confirmed.connect(_confirm_image_frame)
+	image_frame_dialog.canceled.connect(_cancel_authoring_dialog.bind("image_frame"))
 	variant_dialog = ConfirmationDialog.new()
 	variant_dialog.title = "Save Object as independent asset"
 	add_child(variant_dialog)
@@ -2064,6 +2070,7 @@ func _ask_rename_object() -> void:
 		_show_error("Select an Object Editor tab")
 		return
 	rename_field.text = session.name
+	_capture_authoring_dialog_target("object_rename")
 	rename_dialog.popup_centered()
 
 
@@ -2092,6 +2099,7 @@ func _ask_object_frame() -> void:
 		session.bounds.size.x, session.bounds.size.y]
 	for index: int in range(frame_fields.size()):
 		frame_fields[index].value = values[index]
+	_capture_authoring_dialog_target("object_frame")
 	frame_dialog.popup_centered()
 
 
@@ -2587,6 +2595,7 @@ func _ask_layer_rename() -> void:
 	if info.is_empty():
 		return
 	layer_rename_field.text = info["name"]
+	_capture_authoring_dialog_target("layer_rename")
 	layer_rename_dialog.popup_centered(Vector2i(340, 110))
 	layer_rename_field.select_all()
 	layer_rename_field.grab_focus()
@@ -2642,7 +2651,8 @@ func _build_text_dialog() -> void:
 	text_color = ColorPickerButton.new()
 	text_color.text = "Color"
 	form.add_child(text_color)
-	text_dialog.confirmed.connect(_commit_text_dialog)
+	text_dialog.confirmed.connect(_confirm_text)
+	text_dialog.canceled.connect(_cancel_authoring_dialog.bind("text"))
 
 
 func _edit_text_at(point: Vector2i) -> void:
@@ -2664,6 +2674,7 @@ func _edit_text_at(point: Vector2i) -> void:
 		float((existing.color_rgba >> 24) & 255) / 255.0)
 	if existing != null:
 		text_position = existing.position
+	_capture_authoring_dialog_target("text")
 	text_dialog.popup_centered()
 	text_edit.grab_focus()
 
@@ -3136,6 +3147,7 @@ func _ask_grid_settings() -> void:
 	for index: int in range(3):
 		grid_fields[index].value = [canvas.grid_spacing, canvas.grid_origin.x,
 			canvas.grid_origin.y][index]
+	_capture_authoring_dialog_target("grid")
 	grid_dialog.popup_centered()
 
 
@@ -3160,6 +3172,7 @@ func _ask_image_frame() -> void:
 		bounds.size.x, bounds.size.y]
 	for index: int in range(image_frame_fields.size()):
 		image_frame_fields[index].value = values[index]
+	_capture_authoring_dialog_target("image_frame")
 	image_frame_dialog.popup_centered()
 
 
@@ -3282,6 +3295,66 @@ func _open_raster_file(path: String) -> void:
 func _ask_open() -> void:
 	if _can_persist_or_close("Open"):
 		open_dialog.popup_centered()
+
+
+## A delayed editing confirmation must remain tied to the exact document
+## and Object session that opened it. Layer/Text dialogs additionally freeze
+## their selected source node and revision. Consume authority on first signal
+## (including rejected signals) so Cancel and duplicate confirms fail closed.
+func _capture_authoring_dialog_target(kind: String) -> void:
+	var target: Dictionary = _capture_save_target()
+	if not target.is_empty():
+		target["layer"] = current_layer()
+		target["selected_node"] = selected_layer_node()
+		target["revision"] = current_document().revision
+	_authoring_dialog_targets[kind] = target
+
+
+func _cancel_authoring_dialog(kind: String) -> void:
+	_authoring_dialog_targets.erase(kind)
+
+
+func _authoring_dialog_is_current(kind: String, require_layer: bool = false) -> bool:
+	var target: Dictionary = _authoring_dialog_targets.get(kind, {})
+	_authoring_dialog_targets.erase(kind)
+	var valid: bool = _save_target_is_current(target)
+	if valid and require_layer:
+		valid = (current_layer() == String(target["layer"])
+			and selected_layer_node() == String(target["selected_node"])
+			and current_document().revision == int(target["revision"]))
+	if not valid:
+		_show_error("Authoring dialog belongs to another document, layer or tab; reopen it")
+	return valid
+
+
+func _confirm_layer_rename() -> void:
+	if _authoring_dialog_is_current("layer_rename", true):
+		_commit_layer_rename()
+
+
+func _confirm_text() -> void:
+	if _authoring_dialog_is_current("text", true):
+		_commit_text_dialog()
+
+
+func _confirm_object_rename() -> void:
+	if _authoring_dialog_is_current("object_rename"):
+		_rename_object()
+
+
+func _confirm_object_frame() -> void:
+	if _authoring_dialog_is_current("object_frame"):
+		_change_object_frame()
+
+
+func _confirm_grid() -> void:
+	if _authoring_dialog_is_current("grid"):
+		_apply_grid_settings()
+
+
+func _confirm_image_frame() -> void:
+	if _authoring_dialog_is_current("image_frame"):
+		_apply_image_frame()
 
 
 ## A dialog may outlive its original tab or even its original index.

@@ -4,6 +4,19 @@
 
 **Canonical state:** ticket frontmatter (`status`, `manual_review`, `depends_on`). See [ticket workflow and closure gates](TICKET_WORKFLOW.md). The [fast desktop GDScript CI policy](CI_TESTING.md) runs required Drawing/core checks before reporting failures; legacy Atlas/native/Web suites are retained but non-gating; this changes verification only, not ticket status or manual approvals. **Done** on a pre-split ticket means its original acceptance was completed, *not* that the new Drawing application/Atlas integration exists. Web ticket T-044 is archived ([full historical ticket](Archive/Web/T-044.md)).
 
+## 2026-11-15 authoring dialogs respect their originating tab (T-134 Done)
+
+[T-134](Tickets/T-134.md) closes a stale-confirmation gap left by T-132:
+layer rename, Text editor, Object rename/frame, standalone image-frame and
+grid dialogs could publish into a different active tab after navigation or
+a reused index. Each UI dialog now consumes a captured exact document/Object
+identity before mutating state; layer/Text additionally check selected node
+and source revision. A cancelled dialog cannot replay its confirmation.
+[Red/green evidence](evidence/T-134-2026-11-15-authoring-modal-targets.md)
+records 9/22 failures on T-133 and 22/22 passing in headless and native X11,
+with existing editing regressions unchanged. This is document safety, not
+T-095 latency acceptance or a hosted CI pass; 46 required CI IDs remain.
+
 ## 2026-11-15 standalone window-close protects pending edits and dirty tabs (T-133 Done)
 
 [T-133](Tickets/T-133.md) closes the operating-system quit path that bypassed
@@ -2856,6 +2869,7 @@ separately in Manual Review, and hosted CI and hardware approval are unverified.
 | [T-131 · Preserve Object rename and variant metadata on rejected publication](Tickets/T-131.md) | Done | Pending Brush rejects metadata changes; failed Save As restores prior variant target, successful publish unchanged | [T-125](Tickets/T-125.md) |
 | [T-132 · Bind asynchronous Save As to its originating document](Tickets/T-132.md) | Done | File and named Object variant choosers reject stale cross-tab/reused-index confirmations before writing; ordinary Save preserved | [T-120](Tickets/T-120.md), [T-131](Tickets/T-131.md) |
 | [T-133 · Guard standalone OS window-close against unsaved state](Tickets/T-133.md) | Done | Pending Brush blocks OS quit; per-tab Save/Discard/Cancel and Save As sequencing preserve files; Atlas host policy unchanged | [T-125](Tickets/T-125.md), [T-132](Tickets/T-132.md) |
+| [T-134 · Bind authoring dialogs to originating document and layer](Tickets/T-134.md) | Done | Six authoring dialogs refuse stale tab/document/Object or selected-layer confirmations; cancellation consumes authority; original edit methods retained | [T-132](Tickets/T-132.md) |
 
 ## Epics
 
