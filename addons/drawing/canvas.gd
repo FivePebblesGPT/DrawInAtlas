@@ -1769,33 +1769,26 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 	_active_brush_backend = "Legacy"
 	var effective_backend: String = str(configuration.get("backend", brush_backend))
 	if effective_backend in ["NativeHard", "Hokusai"]:
-		if ClassDB.class_exists("DrawingNativeBrush"):
-			_native_brush = ClassDB.instantiate("DrawingNativeBrush")
-			if effective_backend == "Hokusai" and not _stroke_erase:
-				var preset_path: String = BUNDLED_PRESETS.get(str(configuration.get("preset", brush_preset)), "")
-				var settings: String = FileAccess.get_file_as_string(preset_path) if not preset_path.is_empty() else ""
-				# A pre-transaction native binary must fail over to Legacy;
-				# otherwise a lazy-source failure could consume pigment on retry.
-				var supports_transactions: bool = _native_brush.has_method("begin_preset_batch") and \
-					_native_brush.has_method("commit_preset_batch") and \
-					_native_brush.has_method("rollback_preset_batch")
-				if supports_transactions and not settings.is_empty() and _native_brush.call(
-						"configure_preset", settings, _stroke_width, _stroke_color):
-					_active_brush_backend = "Hokusai"
-				else:
-					canvas_error.emit("Hokusai preset or batch rollback unavailable; using the legacy Brush")
-			else:
-				# Reject a pre-transaction binary at gesture start rather than
-				# letting a failed source read consume native hard coverage.
-				if _native_brush.has_method("begin_hard_batch") and \
-						_native_brush.has_method("commit_hard_batch") and \
-						_native_brush.has_method("rollback_hard_batch"):
-					_native_brush.call("reset_hard")
-					_active_brush_backend = "NativeHard"
-				else:
-					canvas_error.emit("Native hard rollback unavailable; using the legacy Brush")
-		else:
+		if not ClassDB.class_exists("DrawingNativeBrush"):
+			# Native-absent legacy fallback is retired separately under T-150.
 			canvas_error.emit("Native brush unavailable; using the legacy Brush")
+		else:
+			_native_brush = ClassDB.instantiate("DrawingNativeBrush")
+			var mode: String = "NativeHard" if _stroke_erase else effective_backend
+			var preset_text: String = ""
+			if mode == "Hokusai":
+				var preset_path: String = BUNDLED_PRESETS.get(
+					str(configuration.get("preset", brush_preset)), "")
+				preset_text = FileAccess.get_file_as_string(preset_path) \
+					if not preset_path.is_empty() else ""
+			var started: DrawingResult = session.begin_native_stroke(_native_brush,
+				mode, preset_text, _stroke_width, _stroke_color, _stroke_clip)
+			if started.ok:
+				_active_brush_backend = mode
+			else:
+				canvas_error.emit(started.message)
+				cancel_gesture()
+				return
 	_samples.clear()
 	_sample_times_us.clear()
 	_sample_index = 0
@@ -1950,14 +1943,9 @@ func _drain_segments(budget: int) -> void:
 		var start_us: int = Time.get_ticks_usec()
 		var preview_epoch_before_batch: int = session._preview_epoch
 		var stage: DrawingResult
-		if _active_brush_backend == "NativeHard":
-			stage = session.paint_path_native_hard(batch, _stroke_color, _stroke_width,
-				_stroke_erase, _stroke_selection if _stroke_selection.enabled else null,
-				_native_brush, _stroke_clip)
-		elif _active_brush_backend == "Hokusai":
-			stage = session.paint_path_hokusai(batch, _stroke_color,
-				_stroke_selection if _stroke_selection.enabled else null,
-				_native_brush, _stroke_clip)
+		if _active_brush_backend != "Legacy":
+			stage = session.paint_path_native(batch, _stroke_color,
+				_stroke_erase, _stroke_selection if _stroke_selection.enabled else null)
 		else:
 			stage = session.paint_path(batch, _stroke_color, _stroke_width, _stroke_erase,
 				_stroke_selection if _stroke_selection.enabled else null, 1048576, _stroke_clip)
@@ -2275,6 +2263,7 @@ func _commit_stroke() -> void:
 		_publish(result)
 	else:
 		active.cancel()
+	_metrics["native_ffi_stats"] = active.native_ffi_stats.duplicate(true)
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	_finalize_stage_latency_window()

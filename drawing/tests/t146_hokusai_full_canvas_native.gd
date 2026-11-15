@@ -199,12 +199,17 @@ func run() -> void:
 	var settings: String = FileAccess.get_file_as_string(preset_path)
 	check(not settings.is_empty(), "hard_round.myb settings read")
 	var probe: Object = ClassDB.instantiate("DrawingNativeBrush")
-	check(probe != null and probe.has_method("configure_preset") and
-		probe.has_method("begin_preset_batch") and
-		probe.has_method("rollback_preset_batch"), "native preset API is present")
+	check(probe != null and probe.has_method("begin_stroke") and
+		probe.has_method("append_samples") and
+		int(probe.call("stroke_abi_version")) == 1,
+		"native v1 hard-round stroke API is present")
 	if failures == 0:
-		check(bool(probe.call("configure_preset", settings, BRUSH_WIDTH, PAINT_RED)),
-			"real hard-round configure_preset succeeds")
+		var opened: Dictionary = probe.call("begin_stroke", "probe", "Hokusai",
+			settings, BRUSH_WIDTH, PAINT_RED, 1, Rect2i())
+		check(bool(opened.get("ok", false)), "real hard-round begin_stroke succeeds")
+		if bool(opened.get("ok", false)):
+			check(bool(probe.call("abort_stroke", opened["handle"])),
+				"native probe aborts without modifying document")
 	if failures > 0:
 		quit(2)
 		return

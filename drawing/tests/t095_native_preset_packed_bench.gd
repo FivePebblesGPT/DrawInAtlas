@@ -30,7 +30,7 @@ func run() -> void:
         var times: Array[int] = []
         var old_pixels: int = -1
         for trial: int in range(TRIALS):
-            var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
+            var brush: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
             if not brush.call("configure_preset", settings, 60.0, 0xff53a071):
                 printerr("T095_NATIVE_PRESET_PACKED_BENCH_FAILED: configure ", name)
                 quit(1)

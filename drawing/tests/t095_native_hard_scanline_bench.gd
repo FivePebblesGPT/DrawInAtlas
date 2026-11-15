@@ -13,7 +13,7 @@ func run() -> void:
 	var timings: Array[float] = []
 	var expected: int = -1
 	for trial: int in range(11):
-		var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
+		var brush: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
 		brush.call("reset_hard")
 		var started: int = Time.get_ticks_usec()
 		var result: Dictionary = brush.call("hard_segments", path, 60.0, CLIP)

@@ -1,6 +1,7 @@
-//! Batched Drawing GDExtension. The legacy path remains available until parity,
-//! packaging and owner-device latency are verified.
+//! Versioned stroke transactions for NativeHard and Hokusai. GDScript owns
+//! canonical source/history until the native tile-store migration (T-148).
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use godot::classes::IRefCounted;
 use godot::prelude::*;
@@ -167,7 +168,6 @@ struct PresetStroke {
     /// quantized repeat must not re-enter GDScript staging or invalidate a
     /// detached preview, even when the underlying native surface changed.
     published: HashMap<(i32, i32), ExportedTile>,
-    pending: Option<PresetBatch>,
 }
 
 /// A prevalidated segment whose candidate count fits the bounded batch.
@@ -295,274 +295,491 @@ impl HardBatch {
     }
 }
 
+/// The ABI is v1; handle and source revision must accompany every operation.
+/// One DrawingNativeBrush owns at most one live stroke; transaction handles are
+/// globally monotonic to reject stale calls even across distinct instances.
+const STROKE_ABI_VERSION: i32 = 1;
+const MAX_BATCH_SAMPLES: usize = 4096;
+const MAX_EXPORTED_INTS: usize = 3 * 1_048_576;
+static NEXT_STROKE_HANDLE: AtomicU64 = AtomicU64::new(1);
+
+struct BrushSample {
+    point: Vector2,
+    pressure: f32,
+    delta_seconds: f32,
+}
+
+fn parse_samples(values: &[f32]) -> Result<Vec<BrushSample>, &'static str> {
+    if values.is_empty() || !values.len().is_multiple_of(4) || values.len() > MAX_BATCH_SAMPLES * 4
+    {
+        return Err("Expected 1..4096 packed [x,y,pressure,delta_seconds] samples");
+    }
+    let mut samples = Vec::with_capacity(values.len() / 4);
+    for data in values.as_chunks::<4>().0 {
+        if !data[0].is_finite()
+            || !data[1].is_finite()
+            || data[0].abs() >= 1_000_000_000.0
+            || data[1].abs() >= 1_000_000_000.0
+            || !data[2].is_finite()
+            || !(0.0..=1.0).contains(&data[2])
+            || !data[3].is_finite()
+            || !(0.0..=1.0).contains(&data[3])
+            || data[3] == 0.0
+        {
+            return Err("Invalid signed sample coordinate, pressure, or delta seconds");
+        }
+        samples.push(BrushSample {
+            point: Vector2::new(data[0], data[1]),
+            pressure: data[2],
+            delta_seconds: data[3],
+        });
+    }
+    Ok(samples)
+}
+
+/// Validate the *entire* hard batch before accepting any covered pixel. A
+/// zero-pressure sample lifts the tip so its next mark cannot bridge a gap.
+fn hard_windows_for_samples(
+    samples: &[BrushSample],
+    width: f32,
+    clip: Rect2i,
+    previous: Option<Vector2>,
+) -> Result<Vec<Option<(HardWindow, f32)>>, &'static str> {
+    let mut output = Vec::with_capacity(samples.len());
+    let mut last = previous;
+    let mut candidates = 0_i64;
+    for sample in samples {
+        if sample.pressure == 0.0 {
+            last = None;
+            output.push(None);
+            continue;
+        }
+        let radius_width = width * sample.pressure;
+        let mut windows = validate_hard_windows(&[sample.point], radius_width, clip, last)?;
+        let window = windows.pop().expect("single point validated");
+        let rows = i64::from(window.bottom) - i64::from(window.top);
+        let columns = i64::from(window.right) - i64::from(window.left);
+        if rows > 0 && columns > 0 {
+            candidates = candidates
+                .checked_add(rows.checked_mul(columns).ok_or("Hard candidate overflow")?)
+                .ok_or("Hard candidate overflow")?;
+            if candidates > MAX_HARD_CANDIDATES {
+                return Err("Hard batch exceeds candidate budget");
+            }
+        }
+        output.push(Some((window, radius_width)));
+        last = Some(sample.point);
+    }
+    Ok(output)
+}
+
+enum StrokeStrategy {
+    Hard {
+        last: Option<Vector2>,
+        covered: HashSet<(i32, i32)>,
+    },
+    Preset(Box<PresetStroke>),
+}
+
+/// Single native batch lifetime for *both* brush strategies. GDScript must
+/// acknowledge only after source tile authorization and staging have passed.
+enum BatchRollback {
+    Hard(HardBatch),
+    Preset(Box<PresetBatch>),
+}
+
+struct NativeStroke {
+    handle: i64,
+    layer: String,
+    source_revision: i64,
+    width: f32,
+    rgba: i64,
+    clip: Rect2i,
+    strategy: StrokeStrategy,
+    pending: Option<BatchRollback>,
+    preview: Vec<i32>,
+    ffi_calls: i64,
+    batches: i64,
+    input_floats: i64,
+    emitted_ints: i64,
+}
+
+impl NativeStroke {
+    fn format(&self) -> &'static str {
+        match self.strategy {
+            StrokeStrategy::Hard { .. } => "xy",
+            StrokeStrategy::Preset(_) => "xy_rgba",
+        }
+    }
+
+    fn acknowledge(&mut self, accepted: bool) -> bool {
+        let Some(batch) = self.pending.take() else {
+            return false;
+        };
+        match (batch, &mut self.strategy) {
+            (BatchRollback::Hard(snapshot), StrokeStrategy::Hard { last, covered }) => {
+                if !accepted {
+                    snapshot.rollback(covered, last);
+                }
+            }
+            (BatchRollback::Preset(snapshot), StrokeStrategy::Preset(preset)) => {
+                if accepted {
+                    preset.surface.commit_batch();
+                } else {
+                    preset.surface.rollback_batch();
+                    preset.state = snapshot.state;
+                    for (key, previous) in snapshot.published {
+                        if let Some(previous) = previous {
+                            preset.published.insert(key, previous);
+                        } else {
+                            preset.published.remove(&key);
+                        }
+                    }
+                }
+            }
+            _ => unreachable!("strategy and rollback snapshot must match"),
+        }
+        self.preview.clear();
+        if accepted {
+            self.batches += 1;
+        }
+        true
+    }
+
+    fn append(&mut self, samples: &[BrushSample]) -> Result<(), &'static str> {
+        if self.pending.is_some() {
+            return Err("Previous native sample batch needs acknowledgement");
+        }
+        let mut output = Vec::new();
+        match &mut self.strategy {
+            StrokeStrategy::Hard { last, covered } => {
+                let windows = hard_windows_for_samples(samples, self.width, self.clip, *last)?;
+                let snapshot = HardBatch {
+                    last_hard: *last,
+                    inserted: Vec::new(),
+                };
+                self.pending = Some(BatchRollback::Hard(snapshot));
+                for window in windows {
+                    let Some((window, point_width)) = window else {
+                        *last = None;
+                        continue;
+                    };
+                    let delta = window.end - window.begin;
+                    let squared = delta.length_squared();
+                    let radius_squared = (point_width * 0.5).powi(2);
+                    for y in window.top..window.bottom {
+                        let (row_left, row_right) = hard_row_bounds(&window, y, point_width * 0.5);
+                        for x in row_left..row_right {
+                            if covered.contains(&(x, y)) {
+                                continue;
+                            }
+                            let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
+                            let fraction = if squared > 0.0 {
+                                ((center - window.begin).dot(delta) / squared).clamp(0.0, 1.0)
+                            } else {
+                                0.0
+                            };
+                            if (center - (window.begin + delta * fraction)).length_squared()
+                                <= radius_squared
+                            {
+                                covered.insert((x, y));
+                                if let Some(BatchRollback::Hard(batch)) = self.pending.as_mut() {
+                                    batch.inserted.push((x, y));
+                                }
+                                output.extend_from_slice(&[x, y]);
+                            }
+                        }
+                    }
+                    *last = Some(window.end);
+                }
+            }
+            StrokeStrategy::Preset(preset) => {
+                self.pending = Some(BatchRollback::Preset(Box::new(PresetBatch {
+                    state: preset.state.clone(),
+                    published: HashMap::new(),
+                })));
+                preset.surface.begin_batch();
+                for sample in samples {
+                    preset.brush.stroke_to(
+                        &mut preset.state,
+                        &mut preset.surface,
+                        sample.point.x,
+                        sample.point.y,
+                        sample.pressure,
+                        0.0,
+                        0.0,
+                        sample.delta_seconds as f64,
+                    );
+                }
+                let mut dirty: Vec<_> = preset.surface.changed.drain().collect();
+                dirty.sort_unstable();
+                for (tx, ty) in dirty {
+                    let Some(tile) = preset.surface.tile(tx, ty) else {
+                        continue;
+                    };
+                    if let Some(BatchRollback::Preset(batch)) = self.pending.as_mut() {
+                        batch
+                            .published
+                            .entry((tx, ty))
+                            .or_insert_with(|| preset.published.get(&(tx, ty)).cloned());
+                    }
+                    let exported = preset.published.entry((tx, ty)).or_default();
+                    scan_changed_pixels(tile, exported, |index, rgba| {
+                        output.extend_from_slice(&[
+                            tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32,
+                            ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32,
+                            rgba as i32,
+                        ]);
+                    });
+                }
+            }
+        }
+        if output.len() > MAX_EXPORTED_INTS {
+            self.acknowledge(false);
+            return Err("Native sample delta exceeds batch output limit");
+        }
+        self.input_floats += (samples.len() * 4) as i64;
+        self.emitted_ints += output.len() as i64;
+        self.preview = output;
+        Ok(())
+    }
+}
+
+fn error_result(message: &str) -> Dictionary<Variant, Variant> {
+    let mut result = Dictionary::new();
+    result.set("ok", false);
+    result.set("error", message);
+    result
+}
+
 #[derive(GodotClass)]
 #[class(base=RefCounted)]
 struct DrawingNativeBrush {
     base: Base<RefCounted>,
-    last_hard: Option<Vector2>,
-    covered: HashSet<(i32, i32)>,
-    pending_hard: Option<HardBatch>,
-    preset: Option<PresetStroke>,
+    stroke: Option<NativeStroke>,
 }
 
 #[godot_api]
 impl IRefCounted for DrawingNativeBrush {
     fn init(base: Base<RefCounted>) -> Self {
-        Self {
-            base,
-            last_hard: None,
-            covered: HashSet::new(),
-            pending_hard: None,
-            preset: None,
-        }
+        Self { base, stroke: None }
     }
 }
 
 #[godot_api]
 impl DrawingNativeBrush {
-    /// Per-stroke coverage is never shared between sessions or committed edits.
+    /// Versioned API: one instance owns one stroke, whose opaque handle and
+    /// Godot-owned source revision authorize all following calls.
     #[func]
-    fn reset_hard(&mut self) {
-        self.covered.clear();
-        self.last_hard = None;
-        self.pending_hard = None;
-        self.preset = None;
+    fn stroke_abi_version(&self) -> i32 {
+        STROKE_ABI_VERSION
     }
 
-    /// Begin the native half of a GDScript sample transaction. Source tile
-    /// loads can fail *after* rasterization; until acknowledged, all newly
-    /// covered pixels and the last sweep endpoint must remain reversible.
+    /// Frozen at pointer-down: layer, raster brush strategy, width, color,
+    /// edit revision and signed relative clip. Transform/selection are frozen
+    /// and enforced by the DrawingEditSession adapter until T-148.
+    // The frozen source options are intentionally explicit at this ABI boundary.
+    #[allow(clippy::too_many_arguments)]
     #[func]
-    fn begin_hard_batch(&mut self) -> bool {
-        if self.pending_hard.is_some() {
-            return false;
-        }
-        self.pending_hard = Some(HardBatch {
-            last_hard: self.last_hard,
-            inserted: Vec::new(),
-        });
-        true
-    }
-
-    #[func]
-    fn commit_hard_batch(&mut self) {
-        self.pending_hard = None;
-    }
-
-    #[func]
-    fn rollback_hard_batch(&mut self) {
-        if let Some(batch) = self.pending_hard.take() {
-            batch.rollback(&mut self.covered, &mut self.last_hard);
-        }
-    }
-
-    /// Returns only *new* pixel positions, not an RGBA buffer for every dab.
-    /// Signed positions are relative to the DrawingEditSession anchor.
-    #[func]
-    fn hard_segments(
+    fn begin_stroke(
         &mut self,
-        points: PackedVector2Array,
+        layer: GString,
+        mode: GString,
+        preset_text: GString,
         width: f32,
+        rgba: i64,
+        source_revision: i64,
         clip: Rect2i,
     ) -> Dictionary<Variant, Variant> {
-        let mut result = Dictionary::new();
-        if !width.is_finite() || width <= 0.0 || points.is_empty() {
-            result.set("ok", false);
-            result.set("error", "Invalid hard-brush width or path");
-            return result;
+        if self.stroke.is_some() {
+            return error_result("Native brush already has a live stroke");
         }
-        // Validate *all* segment bounds and the cumulative raster budget
-        // before touching self.covered or self.last_hard. A late malformed
-        // point, unsafe bound or oversized batch must be retryable.
-        let windows = match validate_hard_windows(points.as_slice(), width, clip, self.last_hard) {
-            Ok(windows) => windows,
-            Err(message) => {
-                result.set("ok", false);
-                result.set("error", message);
-                return result;
+        if layer.is_empty()
+            || !width.is_finite()
+            || !(0.0..=4096.0).contains(&width)
+            || width == 0.0
+            || !(0..=0xffffffff).contains(&rgba)
+            || source_revision < 0
+            || clip.size.x < 0
+            || clip.size.y < 0
+            || (clip.position.x as i64 + clip.size.x as i64) > i32::MAX as i64
+            || (clip.position.y as i64 + clip.size.y as i64) > i32::MAX as i64
+        {
+            return error_result("Invalid stroke layer, color, width, revision, or clip");
+        }
+        let strategy = match mode.to_string().as_str() {
+            "NativeHard" => StrokeStrategy::Hard {
+                last: None,
+                covered: HashSet::new(),
+            },
+            "Hokusai" => {
+                let Ok(mut brush) = hokusai::myb::from_str(&preset_text.to_string()) else {
+                    return error_result("Invalid Hokusai .myb preset");
+                };
+                let r = (rgba & 255) as f32 / 255.0;
+                let g = ((rgba >> 8) & 255) as f32 / 255.0;
+                let b = ((rgba >> 16) & 255) as f32 / 255.0;
+                let hsv = hokusai::color::rgb_to_hsv(r, g, b);
+                brush.set(BrushSetting::ColorH, SettingValue::constant(hsv.h));
+                brush.set(BrushSetting::ColorS, SettingValue::constant(hsv.s));
+                brush.set(BrushSetting::ColorV, SettingValue::constant(hsv.v));
+                brush.set(
+                    BrushSetting::Radius,
+                    SettingValue::constant((width / 2.0).ln()),
+                );
+                StrokeStrategy::Preset(Box::new(PresetStroke {
+                    brush,
+                    state: BrushState::new(1000),
+                    surface: TrackedSurface::default(),
+                    published: HashMap::new(),
+                }))
             }
+            _ => return error_result("Unknown native stroke strategy"),
         };
-        let radius_squared = (width * 0.5) * (width * 0.5);
-        // Accumulate coordinates in contiguous native memory, then transfer
-        // once to the Godot packed array. Pushing two Godot elements per hit
-        // crosses the extension API boundary tens of thousands of times for
-        // a single 60px sweep; conversion retains exact y/x insertion order.
-        let mut coordinates: Vec<i32> = Vec::new();
-        for window in windows {
-            let delta = window.end - window.begin;
-            let squared = delta.length_squared();
-            for y in window.top..window.bottom {
-                let (row_left, row_right) = hard_row_bounds(&window, y, width * 0.5);
-                for x in row_left..row_right {
-                    if self.covered.contains(&(x, y)) {
-                        continue;
-                    }
-                    let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
-                    let fraction = if squared > 0.0 {
-                        ((center - window.begin).dot(delta) / squared).clamp(0.0, 1.0)
-                    } else {
-                        0.0
-                    };
-                    let distance = center - (window.begin + delta * fraction);
-                    if distance.length_squared() <= radius_squared {
-                        self.covered.insert((x, y));
-                        if let Some(batch) = self.pending_hard.as_mut() {
-                            batch.inserted.push((x, y));
-                        }
-                        coordinates.push(x);
-                        coordinates.push(y);
-                    }
-                }
-            }
-            self.last_hard = Some(window.end);
-        }
-        let output = PackedInt32Array::from(coordinates);
+        let handle = NEXT_STROKE_HANDLE.fetch_add(1, Ordering::Relaxed) as i64;
+        self.stroke = Some(NativeStroke {
+            handle,
+            layer: layer.to_string(),
+            source_revision,
+            width,
+            rgba,
+            clip,
+            strategy,
+            pending: None,
+            preview: Vec::new(),
+            ffi_calls: 1,
+            batches: 0,
+            input_floats: 0,
+            emitted_ints: 0,
+        });
+        let mut result = Dictionary::new();
         result.set("ok", true);
-        result.set("points", &output);
+        result.set("handle", handle);
+        result.set("abi_version", STROKE_ABI_VERSION);
         result
     }
 
-    /// Hokusai parses unmodified .myb text; only authoring size and HSV color
-    /// are overridden. Brush alpha is applied during canonical composition.
+    /// One input FFI call for up to 4096 interleaved f32 samples. Native
+    /// changes are pending until GDScript source staging acknowledges them.
     #[func]
-    fn configure_preset(&mut self, myb: GString, width: f32, rgba: i64) -> bool {
-        if !width.is_finite() || width <= 0.0 || width > 4096.0 {
-            return false;
+    fn append_samples(
+        &mut self,
+        handle: i64,
+        source_revision: i64,
+        packed_samples: PackedFloat32Array,
+    ) -> Dictionary<Variant, Variant> {
+        let Some(stroke) = self.stroke.as_mut() else {
+            return error_result("No active stroke");
+        };
+        if stroke.handle != handle || stroke.source_revision != source_revision {
+            return error_result("Invalid stroke handle or stale source revision");
         }
-        let Ok(mut brush) = hokusai::myb::from_str(&myb.to_string()) else {
+        stroke.ffi_calls += 1;
+        let samples = match parse_samples(packed_samples.as_slice()) {
+            Ok(samples) => samples,
+            Err(message) => return error_result(message),
+        };
+        match stroke.append(&samples) {
+            Ok(()) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("samples", samples.len() as i64);
+                result
+            }
+            Err(message) => error_result(message),
+        }
+    }
+
+    /// Changes are valid only during a pending batch. v1's transitional
+    /// format is signed relative [x,y] for hard and [x,y,rgba8] for preset.
+    /// Native tile RGBA8 buffers replace this pixel stream under T-148.
+    #[func]
+    fn preview_changes(
+        &mut self,
+        handle: i64,
+        source_revision: i64,
+    ) -> Dictionary<Variant, Variant> {
+        let Some(stroke) = self.stroke.as_mut() else {
+            return error_result("No active stroke");
+        };
+        if stroke.handle != handle
+            || stroke.source_revision != source_revision
+            || stroke.pending.is_none()
+        {
+            return error_result("Invalid handle, revision, or no pending sample batch");
+        }
+        stroke.ffi_calls += 1;
+        let mut result = Dictionary::new();
+        result.set("ok", true);
+        result.set("format", stroke.format());
+        result.set("changes", &PackedInt32Array::from(stroke.preview.clone()));
+        result
+    }
+
+    /// Rejecting a source read restores the *same* batch in either strategy.
+    /// Accepted batches accumulate until the single whole-stroke commit.
+    #[func]
+    fn acknowledge_batch(&mut self, handle: i64, source_revision: i64, accepted: bool) -> bool {
+        let Some(stroke) = self.stroke.as_mut() else {
             return false;
         };
-        let r = (rgba & 255) as f32 / 255.0;
-        let g = ((rgba >> 8) & 255) as f32 / 255.0;
-        let b = ((rgba >> 16) & 255) as f32 / 255.0;
-        let hsv = hokusai::color::rgb_to_hsv(r, g, b);
-        brush.set(BrushSetting::ColorH, SettingValue::constant(hsv.h));
-        brush.set(BrushSetting::ColorS, SettingValue::constant(hsv.s));
-        brush.set(BrushSetting::ColorV, SettingValue::constant(hsv.v));
-        // MyPaint's radius_logarithmic is the log of the dab's pixel radius.
-        brush.set(
-            BrushSetting::Radius,
-            SettingValue::constant((width / 2.0).ln()),
-        );
-        self.preset = Some(PresetStroke {
-            brush,
-            state: BrushState::new(1000),
-            surface: TrackedSurface::default(),
-            published: HashMap::new(),
-            pending: None,
-        });
-        self.covered.clear();
-        self.last_hard = None;
-        self.pending_hard = None;
+        if stroke.handle != handle || stroke.source_revision != source_revision {
+            return false;
+        }
+        stroke.ffi_calls += 1;
+        stroke.acknowledge(accepted)
+    }
+
+    /// Stable metrics report boundary call count and packed payload volumes;
+    /// no per-pixel Godot call is performed on the native side.
+    #[func]
+    fn stroke_stats(&mut self, handle: i64, source_revision: i64) -> Dictionary<Variant, Variant> {
+        let Some(stroke) = self.stroke.as_mut() else {
+            return error_result("No active stroke");
+        };
+        if stroke.handle != handle || stroke.source_revision != source_revision {
+            return error_result("Invalid stroke handle or stale revision");
+        }
+        stroke.ffi_calls += 1;
+        let mut result = Dictionary::new();
+        result.set("ok", true);
+        result.set("layer", stroke.layer.as_str());
+        result.set("rgba", stroke.rgba);
+        result.set("mode", stroke.format());
+        result.set("ffi_calls", stroke.ffi_calls);
+        result.set("batches", stroke.batches);
+        result.set("input_floats", stroke.input_floats);
+        result.set("exported_ints", stroke.emitted_ints);
+        result
+    }
+
+    #[func]
+    fn commit_stroke(&mut self, handle: i64, source_revision: i64) -> bool {
+        if !self.stroke.as_ref().is_some_and(|stroke| {
+            stroke.handle == handle
+                && stroke.source_revision == source_revision
+                && stroke.pending.is_none()
+        }) {
+            return false;
+        }
+        self.stroke = None;
         true
     }
 
-    /// GDScript acknowledges the batch only after validating every source tile.
-    /// A rejected GDScript read must rewind native pigment, dab RNG/cursor and
-    /// the cached quantized output; retrying must be byte-identical.
     #[func]
-    fn begin_preset_batch(&mut self) -> bool {
-        let Some(stroke) = self.preset.as_mut() else {
-            return false;
-        };
-        if stroke.pending.is_some() {
+    fn abort_stroke(&mut self, handle: i64) -> bool {
+        if !self
+            .stroke
+            .as_ref()
+            .is_some_and(|stroke| stroke.handle == handle)
+        {
             return false;
         }
-        stroke.pending = Some(PresetBatch {
-            state: stroke.state.clone(),
-            published: HashMap::new(),
-        });
-        stroke.surface.begin_batch();
+        if let Some(stroke) = self.stroke.as_mut() {
+            stroke.acknowledge(false);
+        }
+        self.stroke = None;
         true
-    }
-
-    #[func]
-    fn commit_preset_batch(&mut self) {
-        if let Some(stroke) = self.preset.as_mut()
-            && stroke.pending.take().is_some()
-        {
-            stroke.surface.commit_batch();
-        }
-    }
-
-    #[func]
-    fn rollback_preset_batch(&mut self) {
-        if let Some(stroke) = self.preset.as_mut()
-            && let Some(snapshot) = stroke.pending.take()
-        {
-            stroke.surface.rollback_batch();
-            stroke.state = snapshot.state;
-            for (position, exported) in snapshot.published {
-                if let Some(exported) = exported {
-                    stroke.published.insert(position, exported);
-                } else {
-                    stroke.published.remove(&position);
-                }
-            }
-        }
-    }
-
-    /// One FFI call per sample batch. Only changed **quantized RGBA8** pixels
-    /// cross the boundary, including reversions to transparent. Full 64x64
-    /// Hokusai tiles stay native and are never restaged in their entirety.
-    /// Result is [signed_x, signed_y, straight_rgba_le_as_i32] repeated.
-    #[func]
-    fn preset_segments(&mut self, points: PackedVector2Array, pressure: f32) -> PackedInt32Array {
-        let empty = PackedInt32Array::new();
-        let Some(stroke) = self.preset.as_mut() else {
-            return empty;
-        };
-        // Check the entire batch before calling into the stateful brush.
-        // Returning an empty array halfway through the loop used to leave
-        // native pigment and pending dirty tiles behind for the next call,
-        // while GDScript saw a harmless empty delta rather than a failed edit.
-        if !pressure.is_finite()
-            || points.as_slice().iter().any(|point| {
-                !point.x.is_finite()
-                    || !point.y.is_finite()
-                    || point.x.abs() >= 1_000_000_000.0
-                    || point.y.abs() >= 1_000_000_000.0
-            })
-        {
-            return empty;
-        }
-        // Accumulate sparse quantized deltas in native memory. Three Godot
-        // packed-array push calls per changed pixel add repeated Godot
-        // container work; preserve sorted-tile, row-major output order while
-        // transferring the entire packed array once per successful batch.
-        let mut coordinates: Vec<i32> = Vec::new();
-        for &point in points.as_slice() {
-            stroke.brush.stroke_to(
-                &mut stroke.state,
-                &mut stroke.surface,
-                point.x,
-                point.y,
-                pressure.clamp(0.0, 1.0),
-                0.0,
-                0.0,
-                0.01,
-            );
-        }
-        let mut dirty: Vec<_> = stroke.surface.changed.drain().collect();
-        dirty.sort_unstable();
-        for (tx, ty) in dirty {
-            let Some(tile) = stroke.surface.tile(tx, ty) else {
-                continue;
-            };
-            if let Some(batch) = stroke.pending.as_mut() {
-                batch
-                    .published
-                    .entry((tx, ty))
-                    .or_insert_with(|| stroke.published.get(&(tx, ty)).cloned());
-            }
-            let published = stroke.published.entry((tx, ty)).or_default();
-            scan_changed_pixels(tile, published, |index, rgba| {
-                coordinates.push(tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32);
-                coordinates.push(ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32);
-                coordinates.push(rgba as i32);
-            });
-        }
-        PackedInt32Array::from(coordinates)
     }
 }
 
@@ -871,5 +1088,161 @@ mod tests {
         scan_changed_pixels(&raw, &mut cache, |index, rgba| emitted.push((index, rgba)));
         assert!(emitted.is_empty());
         assert_eq!(cache.raw[0], raw[0][0]);
+    }
+    fn sample(x: f32, y: f32, pressure: f32) -> BrushSample {
+        BrushSample {
+            point: Vector2::new(x, y),
+            pressure,
+            delta_seconds: 0.01,
+        }
+    }
+
+    fn hard_stroke(width: f32, clip: Rect2i) -> NativeStroke {
+        NativeStroke {
+            handle: 1,
+            layer: "test-layer".to_string(),
+            source_revision: 7,
+            width,
+            rgba: 0xff123456,
+            clip,
+            strategy: StrokeStrategy::Hard {
+                last: None,
+                covered: HashSet::new(),
+            },
+            pending: None,
+            preview: Vec::new(),
+            ffi_calls: 1,
+            batches: 0,
+            input_floats: 0,
+            emitted_ints: 0,
+        }
+    }
+
+    #[test]
+    fn stroke_samples_validate_entire_batch_before_state_mutation() {
+        assert!(parse_samples(&[]).is_err());
+        assert!(parse_samples(&[1.0, 2.0, 3.0]).is_err());
+        assert!(parse_samples(&[1.0, 2.0, 1.01, 0.01]).is_err());
+        assert!(parse_samples(&[1.0, 2.0, f32::NAN, 0.01]).is_err());
+        assert!(parse_samples(&[1.0, 2.0, 0.8, 0.0]).is_err());
+        assert!(parse_samples(&[1.0, 2.0, 1.0, f32::INFINITY]).is_err());
+        assert!(parse_samples(&[1.0, 2.0, 1.0, 0.01, f32::NAN, 0.0, 1.0, 0.01]).is_err());
+        assert!(parse_samples(&vec![0.0; (MAX_BATCH_SAMPLES + 1) * 4]).is_err());
+        assert_eq!(parse_samples(&[-10.0, 2.0, 0.5, 0.01]).unwrap().len(), 1);
+        let mut stroke = hard_stroke(12.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
+        assert!(stroke.append(&[sample(-9.0, 3.0, 1.0)]).is_ok());
+        assert!(!stroke.preview.is_empty());
+        assert!(stroke.acknowledge(true));
+        let before = match &stroke.strategy {
+            StrokeStrategy::Hard { covered, .. } => covered.clone(),
+            _ => unreachable!(),
+        };
+        assert!(
+            stroke
+                .append(&[sample(0.0, 1.0, 1.0), sample(f32::NAN, 2.0, 1.0)])
+                .is_err()
+        );
+        assert!(stroke.pending.is_none());
+        assert_eq!(stroke.batches, 1);
+        assert_eq!(
+            match &stroke.strategy {
+                StrokeStrategy::Hard { covered, .. } => covered,
+                _ => unreachable!(),
+            },
+            &before
+        );
+    }
+
+    #[test]
+    fn unified_hard_pressure_mask_clip_and_rollback_are_exact() {
+        let clip = Rect2i::new(Vector2i::new(-16, -16), Vector2i::new(32, 32));
+        let mut stroke = hard_stroke(18.0, clip);
+        let batch = [sample(-6.5, -3.5, 0.5), sample(7.5, 2.5, 1.0)];
+        stroke.append(&batch).unwrap();
+        let expected = stroke.preview.clone();
+        assert!(expected.len() > 100);
+        assert!(
+            expected
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .all(|pixel| { (-16..16).contains(&pixel[0]) && (-16..16).contains(&pixel[1]) })
+        );
+        assert!(
+            stroke.append(&batch).is_err(),
+            "pending batch must be acknowledged"
+        );
+        assert!(stroke.acknowledge(false));
+        assert_eq!(stroke.batches, 0);
+        stroke.append(&batch).unwrap();
+        assert_eq!(
+            stroke.preview, expected,
+            "rollback replay is byte-identical"
+        );
+        assert!(stroke.acknowledge(true));
+        stroke.append(&batch).unwrap();
+        assert!(stroke.preview.is_empty(), "hard overlap is once per stroke");
+        assert!(stroke.acknowledge(true));
+        let mut full = hard_stroke(18.0, clip);
+        full.append(&[sample(-6.5, -3.5, 1.0)]).unwrap();
+        assert!(
+            full.preview.len() > expected.len() / 4,
+            "pressure must affect footprint"
+        );
+        assert!(full.acknowledge(true));
+        stroke.append(&[sample(0.0, 0.0, 0.0)]).unwrap();
+        assert!(stroke.preview.is_empty());
+        assert!(stroke.acknowledge(true));
+        stroke.append(&[sample(-13.0, 12.5, 1.0)]).unwrap();
+        assert!(stroke.acknowledge(true));
+        assert_eq!(stroke.batches, 4);
+        assert_eq!(stroke.input_floats, 32);
+    }
+
+    #[test]
+    fn unified_preset_batch_rollback_preserves_state_surface_and_quantized_export() {
+        let mut brush = hokusai::myb::from_str(include_str!(
+            "../../../addons/drawing/brushes/hard_round.myb"
+        ))
+        .expect("bundled preset must be parseable");
+        brush.set(
+            BrushSetting::Radius,
+            SettingValue::constant((12.0_f32).ln()),
+        );
+        let preset = PresetStroke {
+            brush,
+            state: BrushState::new(1000),
+            surface: TrackedSurface::default(),
+            published: HashMap::new(),
+        };
+        let mut stroke = hard_stroke(24.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
+        stroke.strategy = StrokeStrategy::Preset(Box::new(preset));
+        let batch = [sample(-2.5, 3.5, 0.7), sample(3.5, -5.5, 1.0)];
+        stroke.append(&batch).unwrap();
+        let expected = stroke.preview.clone();
+        assert!(!expected.is_empty());
+        assert_eq!(expected.len() % 3, 0);
+        assert!(stroke.acknowledge(false));
+        stroke.append(&batch).unwrap();
+        assert_eq!(
+            stroke.preview, expected,
+            "state RNG and tile cache rollback replay"
+        );
+        assert!(stroke.acknowledge(true));
+        stroke.append(&[sample(5.0, 10.0, 0.1)]).unwrap();
+        assert!(stroke.acknowledge(true));
+        assert_eq!(stroke.batches, 2);
+    }
+
+    #[test]
+    fn large_hard_batch_budget_rejects_before_stroke_changes() {
+        let mut stroke = hard_stroke(1024.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
+        let bad = [sample(-500.0, -500.0, 1.0), sample(500.0, 500.0, 1.0)];
+        assert!(stroke.append(&bad).is_err());
+        assert!(stroke.pending.is_none());
+        assert!(stroke.preview.is_empty());
+        stroke.width = 10.0;
+        assert!(stroke.append(&[sample(-4.5, -4.5, 1.0)]).is_ok());
+        assert!(stroke.acknowledge(true));
     }
 }

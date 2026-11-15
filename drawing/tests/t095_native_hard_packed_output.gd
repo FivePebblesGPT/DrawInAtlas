@@ -64,7 +64,7 @@ func run() -> void:
 	check(expected_first.size() > 50000, "stress oracle contains tens of thousands of ordered pixels")
 	var expected_second: PackedInt32Array = reference(second, first[1], first_covered)
 
-	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
+	var brush: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
 	brush.call("reset_hard")
 	check(bool(brush.call("begin_hard_batch")), "start first transaction")
 	var got_first: PackedInt32Array = output(brush, first, "initial 60px sweep")

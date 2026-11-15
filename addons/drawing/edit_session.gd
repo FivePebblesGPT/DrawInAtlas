@@ -402,6 +402,7 @@ func _rollback_paint() -> void:
 
 
 func cancel() -> void:
+	_finish_native_stroke(false)
 	_stationary_dab_valid = false
 	_brush_deferred = false
 	_brush_change_count = 0
@@ -425,6 +426,12 @@ func commit() -> DrawingResult:
 	_stationary_dab_valid = false
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if document.revision != expected_revision:
+		cancel()
+		return DrawingResult.failure("STALE_REVISION", "Stroke source revision changed")
+	if not _finish_native_stroke(true):
+		cancel()
+		return DrawingResult.failure("NATIVE_COMMIT", "Native stroke commit failed")
 	# Native Hokusai and ordinary Brush-only sessions already own verified
 	# tile-local patches. Publish them without reparsing global pixel keys.
 	# Mixed edit APIs retain the original canonical-key publication contract.
@@ -681,40 +688,98 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 	return fill_rect(area, 0, selection, max_pixels)
 
 
-## Native batched coverage avoids revisiting every 60px candidate in
-## GDScript. Only newly hit pixels cross the ABI; the document's _stage()
-## still owns straight-alpha compositing, selection, previews and history.
-## Native output differences must be regression-tested before enabling Auto.
-func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
-		erase: bool, selection: DrawingSelection, native: Object,
-		clip_bounds: Rect2i = Rect2i()) -> DrawingResult:
+## v1 native ABI: one opaque stroke handle, one packed input batch and one
+## acknowledge/rollback path for both hard coverage and preset pigment.
+## This temporary source adapter is removed with native tile ownership (T-148).
+var _native_stroke: Object
+var _native_handle: int = 0
+var _native_mode: String = ""
+var _native_clip_bounds: Rect2i = Rect2i()
+var native_ffi_stats: Dictionary = {}
+
+
+func begin_native_stroke(native: Object, mode: String, preset_text: String,
+		width: float, rgba: int, clip_bounds: Rect2i) -> DrawingResult:
+	if _closed or native == null or _native_handle != 0 \
+			or not native.has_method("stroke_abi_version") \
+			or int(native.call("stroke_abi_version")) != 1:
+		return DrawingResult.failure("NATIVE_ABI", "Required native stroke ABI v1 unavailable")
+	var started: Dictionary = native.call("begin_stroke", layer_id, mode,
+		preset_text, width, rgba, expected_revision, clip_bounds)
+	if not bool(started.get("ok", false)) or int(started.get("handle", 0)) <= 0:
+		return DrawingResult.failure("NATIVE_BEGIN", str(started.get("error", "Native stroke begin failed")))
+	_native_stroke = native
+	_native_handle = int(started["handle"])
+	_native_mode = mode
+	_native_clip_bounds = clip_bounds
+	return DrawingResult.success(_native_handle)
+
+
+func _finish_native_stroke(commit_native: bool) -> bool:
+	if _native_handle == 0:
+		return true
+	var completed: bool = true
+	if commit_native:
+		native_ffi_stats = _native_stroke.call("stroke_stats", _native_handle, expected_revision)
+		completed = bool(_native_stroke.call("commit_stroke", _native_handle, expected_revision))
+	else:
+		completed = bool(_native_stroke.call("abort_stroke", _native_handle))
+	_native_handle = 0
+	_native_stroke = null
+	_native_mode = ""
+	return completed
+
+
+## Canvas passes source-coordinate segments; the frozen transform, layer,
+## source revision and clip bind every batch to the original gesture. The
+## interleaved packed samples keep one FFI call per batch, never per dab.
+func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
+		selection: DrawingSelection, pressure: float = 1.0,
+		delta_seconds: float = 0.01) -> DrawingResult:
 	_stationary_dab_valid = false
-	if _closed or path.is_empty() or width <= 0.0 or not is_finite(width) or native == null:
-		return DrawingResult.failure("NATIVE_BRUSH", "Invalid native hard-brush stroke")
+	if _closed or _native_handle == 0 or path.is_empty() \
+			or document.revision != expected_revision:
+		return DrawingResult.failure("NATIVE_STALE", "Native stroke is closed or source revision changed")
 	var inverse: Transform2D = view_transform.affine_inverse()
-	var relative: PackedVector2Array = PackedVector2Array()
-	for point: Vector2 in path:
-		relative.append(inverse * point)
-	# NativeHard's coverage/cursor must be rolled back on a failed *GDScript*
-	# source read too. Scripted deterministic oracles without native state keep
-	# their original contract; an incompatible installed binary fails closed.
-	var transactional: bool = native.has_method("begin_hard_batch") and \
-		native.has_method("commit_hard_batch") and native.has_method("rollback_hard_batch")
-	if native.get_class() == "DrawingNativeBrush" and not transactional:
-		return DrawingResult.failure("NATIVE_BRUSH_TRANSACTION",
-			"Native hard brush binary lacks source-read rollback")
-	if transactional and not native.call("begin_hard_batch"):
-		return DrawingResult.failure("NATIVE_BRUSH_TRANSACTION", "Native hard batch is already pending")
-	var result: Dictionary = native.call("hard_segments", relative, width, clip_bounds)
-	if not result.get("ok", false):
-		if transactional:
-			native.call("rollback_hard_batch")
-		return DrawingResult.failure("NATIVE_BRUSH", str(result.get("error", "Native coverage failed")))
-	var coordinates: PackedInt32Array = result.get("points", PackedInt32Array())
-	if coordinates.size() % 2 != 0:
-		if transactional:
-			native.call("rollback_hard_batch")
-		return DrawingResult.failure("NATIVE_BRUSH", "Native coverage returned invalid coordinates")
+	var samples: PackedFloat32Array = PackedFloat32Array()
+	samples.resize(path.size() * 4)
+	for index: int in range(path.size()):
+		var relative: Vector2 = inverse * path[index]
+		samples[index * 4] = relative.x
+		samples[index * 4 + 1] = relative.y
+		samples[index * 4 + 2] = pressure
+		samples[index * 4 + 3] = delta_seconds
+	var native_start_us: int = Time.get_ticks_usec()
+	var accepted: Dictionary = _native_stroke.call("append_samples", _native_handle,
+		expected_revision, samples)
+	if not bool(accepted.get("ok", false)):
+		return DrawingResult.failure("NATIVE_BATCH", str(accepted.get("error", "Sample batch rejected")))
+	var exported: Dictionary = _native_stroke.call("preview_changes", _native_handle, expected_revision)
+	var native_elapsed_us: int = Time.get_ticks_usec() - native_start_us
+	if not bool(exported.get("ok", false)):
+		_native_stroke.call("acknowledge_batch", _native_handle, expected_revision, false)
+		return DrawingResult.failure("NATIVE_PREVIEW", str(exported.get("error", "Preview unavailable")))
+	var changed: PackedInt32Array = exported.get("changes", PackedInt32Array())
+	var format: String = str(exported.get("format", ""))
+	var staged: DrawingResult
+	if format == "xy" and _native_mode == "NativeHard":
+		staged = _stage_native_hard_delta(changed, rgba, erase, selection)
+	elif format == "xy_rgba" and _native_mode == "Hokusai" and not erase:
+		staged = _stage_native_pigment_delta(changed, rgba, selection)
+		hokusai_perf["native_us"] = int(hokusai_perf["native_us"]) + native_elapsed_us
+		hokusai_perf["pixels"] = int(hokusai_perf["pixels"]) + changed.size() / 3
+	else:
+		staged = DrawingResult.failure("NATIVE_FORMAT", "Unknown native pixel delta format")
+	if not bool(_native_stroke.call("acknowledge_batch", _native_handle,
+			expected_revision, staged.ok)):
+		return DrawingResult.failure("NATIVE_ACK", "Native batch acknowledgement failed")
+	return staged
+
+
+func _stage_native_hard_delta(coordinates: PackedInt32Array, rgba: int,
+		erase: bool, selection: DrawingSelection) -> DrawingResult:
+	if coordinates.size() % 2 != 0 or coordinates.size() > 1048576 * 2:
+		return DrawingResult.failure("NATIVE_LIMIT", "Invalid native hard coverage buffer")
 	_journaling = true
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
@@ -732,8 +797,6 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 				coordinates[index + 1], ink, selection, true, not erase, -1)
 			if not staged.ok:
 				_rollback_paint()
-				if transactional:
-					native.call("rollback_hard_batch")
 				return staged
 	else:
 		# Public edits or Hokusai staging in the same session require the
@@ -743,51 +806,20 @@ func paint_path_native_hard(path: PackedVector2Array, rgba: int, width: float,
 				coordinates[index + 1], ink, selection, true, not erase, -1, true)
 			if not staged.ok:
 				_rollback_paint()
-				if transactional:
-					native.call("rollback_hard_batch")
 				return staged
 	_paint_journal.clear()
 	_brush_tile_journal.clear()
 	_journaling = false
-	if transactional:
-		native.call("commit_hard_batch")
 	return DrawingResult.success(change_count())
 
 
-## Hokusai samples paint a native pigment surface rather than the prior
-## detached preview. Apply exported deltas against the original layer snapshot;
-## never stack opacity against the previous preview of the same stroke.
-## Preflight ALL coordinates and source tiles before any write so a failed
-## source read cannot leave a partially published preview batch.
-func paint_path_hokusai(path: PackedVector2Array, rgba: int,
-		selection: DrawingSelection, native: Object,
-		clip_bounds: Rect2i = Rect2i(), pressure: float = 1.0) -> DrawingResult:
-	_stationary_dab_valid = false
-	if _closed or path.is_empty() or native == null:
-		return DrawingResult.failure("HOKUSAI", "Invalid Hokusai brush stroke")
-	# The real GDExtension must support acknowledgement/rollback. Scripted
-	# deterministic delta stubs have no native pigment surface to rewind.
-	var transactional: bool = native.has_method("begin_preset_batch") and \
-		native.has_method("commit_preset_batch") and native.has_method("rollback_preset_batch")
-	if native.get_class() == "DrawingNativeBrush" and not transactional:
-		return DrawingResult.failure("HOKUSAI_TRANSACTION",
-			"Native brush binary lacks rollback support")
-	if transactional and not native.call("begin_preset_batch"):
-		return DrawingResult.failure("HOKUSAI_TRANSACTION", "Native batch is already pending")
+func _stage_native_pigment_delta(changed: PackedInt32Array, rgba: int,
+		selection: DrawingSelection) -> DrawingResult:
+	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
+		return DrawingResult.failure("NATIVE_LIMIT", "Invalid native pigment buffer")
+	var clip_bounds: Rect2i = _native_clip_bounds
 	_brush_tile_publish = false
 	_materialize_brush_preview()
-	var inverse: Transform2D = view_transform.affine_inverse()
-	var relative: PackedVector2Array = PackedVector2Array()
-	for point: Vector2 in path:
-		relative.append(inverse * point)
-	var native_start_us: int = Time.get_ticks_usec()
-	var changed: PackedInt32Array = native.call("preset_segments", relative, pressure)
-	hokusai_perf["native_us"] = int(hokusai_perf["native_us"]) + Time.get_ticks_usec() - native_start_us
-	hokusai_perf["pixels"] = int(hokusai_perf["pixels"]) + changed.size() / 3
-	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
-		if transactional:
-			native.call("rollback_preset_batch")
-		return DrawingResult.failure("HOKUSAI_LIMIT", "Invalid or excessive native pixel delta")
 	var stage_start_us: int = Time.get_ticks_usec()
 	var opacity: int = (rgba >> 24) & 255
 	var stride: int = document.tile_stride
@@ -827,8 +859,6 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		var x: int = changed[index]
 		var y: int = changed[index + 1]
 		if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
-			if transactional:
-				native.call("rollback_preset_batch")
 			return DrawingResult.failure("COORD_RANGE", "Hokusai pixel exceeds safe edit coordinates")
 		if clipping and (x < clip_left or y < clip_top or x >= clip_right or y >= clip_bottom):
 			continue
@@ -861,8 +891,6 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		if not _source_tiles.has(source_key):
 			var resolved: DrawingResult = document._resolve_chunk(layer_id, source_key)
 			if not resolved.ok:
-				if transactional:
-					native.call("rollback_preset_batch")
 				return resolved
 			_source_tiles[source_key] = resolved.value
 	# Sessions using another edit API already have canonical global keys; the
@@ -925,8 +953,6 @@ func paint_path_hokusai(path: PackedVector2Array, rgba: int,
 		else:
 			_preview_tiles[tile_key] = patch
 
-	if transactional:
-		native.call("commit_preset_batch")
 	hokusai_perf["stage_us"] = int(hokusai_perf["stage_us"]) + Time.get_ticks_usec() - stage_start_us
 	return DrawingResult.success(change_count())
 

@@ -36,10 +36,8 @@ func check(valid: bool, description: String) -> void:
 
 func make_preset() -> Object:
     var native: Object = ClassDB.instantiate("DrawingNativeBrush")
-    var myb: String = FileAccess.get_file_as_string(
-        "res://addons/drawing/brushes/hard_round.myb")
-    check(not myb.is_empty() and native.call("configure_preset", myb, 14.0, TINT),
-        "real bundled Hokusai preset configures")
+    check(native.call("stroke_abi_version") == 1,
+        "real bundled Hokusai provides unified native stroke ABI")
     return native
 
 func make_edit(name: String, faulty: bool) -> Dictionary:
@@ -53,6 +51,17 @@ func make_edit(name: String, faulty: bool) -> Dictionary:
     var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision,
         Transform2D.IDENTITY, ANCHOR_X, ANCHOR_Y).value
     return {"doc": doc, "layer": layer, "edit": edit, "native": make_preset()}
+
+func paint(edit: DrawingEditSession, path: PackedVector2Array,
+        mask: DrawingSelection, native: Object, clip: Rect2i) -> DrawingResult:
+    if edit._native_handle == 0:
+        var myb: String = FileAccess.get_file_as_string(
+            "res://addons/drawing/brushes/hard_round.myb")
+        var started: DrawingResult = edit.begin_native_stroke(native,
+            "Hokusai", myb, 14.0, TINT, clip)
+        if not started.ok:
+            return started
+    return edit.paint_path_native(path, TINT, false, mask)
 
 func preview(doc: DrawingDocument, edit: DrawingEditSession) -> PackedByteArray:
     var image: DrawingResult = DrawingRenderer.render(
@@ -79,8 +88,8 @@ func verify_case(retry_after_failure: bool) -> void:
     var oracle_native: Object = clean["native"]
     var clip: Rect2i = Rect2i(-52, -52, 104, 104)
 
-    check(faulty_edit.paint_path_hokusai(FIRST, TINT, mask, native, clip).ok and
-        clean_edit.paint_path_hokusai(FIRST, TINT, mask, oracle_native, clip).ok,
+    check(paint(faulty_edit, FIRST, mask, native, clip).ok and
+        paint(clean_edit, FIRST, mask, oracle_native, clip).ok,
         "first batch accepted in both real Hokusai engines")
     var expected_before: PackedByteArray = preview(clean_doc, clean_edit)
     check(faulty_edit.change_count() > 0 and preview(faulty_doc, faulty_edit) == expected_before,
@@ -89,8 +98,7 @@ func verify_case(retry_after_failure: bool) -> void:
     var original_revision: int = faulty_doc.revision
     faulty_doc.reject_resolution = 2
     faulty_doc.resolutions = 0
-    var failure: DrawingResult = faulty_edit.paint_path_hokusai(
-        SECOND, TINT, mask, native, clip)
+    var failure: DrawingResult = paint(faulty_edit, SECOND, mask, native, clip)
     check(not failure.ok and failure.code == "INJECTED_TILE" and
         faulty_doc.resolutions == 2, "late source failure occurs after one source resolution")
     faulty_doc.reject_resolution = -1
@@ -100,14 +108,14 @@ func verify_case(retry_after_failure: bool) -> void:
         "failed batch does not publish detached or committed GDScript changes")
 
     if retry_after_failure:
-        check(faulty_edit.paint_path_hokusai(SECOND, TINT, mask, native, clip).ok and
-            clean_edit.paint_path_hokusai(SECOND, TINT, mask, oracle_native, clip).ok,
+        check(paint(faulty_edit, SECOND, mask, native, clip).ok and
+            paint(clean_edit, SECOND, mask, oracle_native, clip).ok,
             "the exact failed source batch retries on the same native object")
         check(preview(faulty_doc, faulty_edit) == preview(clean_doc, clean_edit) and
             faulty_edit.change_count() == clean_edit.change_count(),
             "replayed pigment/preview exactly equals uninterrupted native stroke")
-        check(faulty_edit.paint_path_hokusai(THIRD, TINT, mask, native, clip).ok and
-            clean_edit.paint_path_hokusai(THIRD, TINT, mask, oracle_native, clip).ok,
+        check(paint(faulty_edit, THIRD, mask, native, clip).ok and
+            paint(clean_edit, THIRD, mask, oracle_native, clip).ok,
             "next batch exercises retained Hokusai brush state and cache")
         check(preview(faulty_doc, faulty_edit) == preview(clean_doc, clean_edit),
             "later RGBA8 bytes and hole/clip remain identical after retry")

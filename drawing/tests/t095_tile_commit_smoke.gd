@@ -1,4 +1,5 @@
 extends SceneTree
+const TestBridge = preload("res://tests/t147_scripted_session_bridge.gd")
 ## T-095: independent native tile-commit transaction oracle. The expected
 ## canonical history comes from the original _stage() + _publish_edit() path.
 
@@ -63,7 +64,7 @@ func run() -> void:
 					0x10203040 if (x + y + batch) % 13 == 0 else
 					(0x30a080e0 if batch == 0 else 0x7080c040)]))
 		source.deltas = pixels
-		check(native_edit.paint_path_hokusai(path, COLOR, mask, source, CLIP).ok,
+		check(TestBridge.paint_pigment(native_edit, path, COLOR, mask, source, CLIP).ok,
 			"direct batch %d accepted" % batch)
 		var reference_ok: bool = true
 		for index: int in range(0, pixels.size(), 3):
@@ -119,7 +120,7 @@ func run() -> void:
 	var invalid_doc: Dictionary = make_target("invalid-later-tile")
 	var invalid: DrawingEditSession = begin(invalid_doc)
 	source.deltas = PackedInt32Array([-60, -60, 0x60ffffff, 62, 62, 0x60ffffff])
-	check(invalid.paint_path_hokusai(path, COLOR, null, source).ok,
+	check(TestBridge.paint_pigment(invalid, path, COLOR, null, source).ok,
 		"two-tile native batch is valid")
 	var before_invalid: PackedByteArray = snapshot(invalid_doc)
 	var revision_invalid: int = invalid_doc["doc"].revision
@@ -141,7 +142,7 @@ func run() -> void:
 	# transaction after preparing its detached preview.
 	var stale: DrawingEditSession = begin(invalid_doc)
 	source.deltas = PackedInt32Array([38, 38, 0x60aabbcc])
-	check(stale.paint_path_hokusai(path, COLOR, null, source).ok,
+	check(TestBridge.paint_pigment(stale, path, COLOR, null, source).ok,
 		"stale-test native delta initially accepted")
 	var concurrent: DrawingEditSession = begin(invalid_doc)
 	check(concurrent.fill_rect(Rect2i(-19, -19, 1, 1), 0x80ff1122).ok and
@@ -159,7 +160,7 @@ func run() -> void:
 	# identity; never trust a detached session cache as a publication source.
 	var replaced: DrawingEditSession = begin(invalid_doc)
 	source.deltas = PackedInt32Array([41, 41, 0x60ffffff])
-	check(replaced.paint_path_hokusai(path, COLOR, null, source).ok,
+	check(TestBridge.paint_pigment(replaced, path, COLOR, null, source).ok,
 		"source-identity native delta accepted")
 	var tile_key: String = DrawingDocument.TILES.tile_key64(
 		ORIGIN_X + 41, ORIGIN_Y + 41, invalid_doc["doc"].tile_stride)

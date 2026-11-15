@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-15",
+  "godot": "4.8.beta3.official.c51ff06e8",
+  "renderer": "Linux X11 / llvmpipe for the 3 graphical files; headless for suite-*",
+  "reference": "T-147 documented source and test commands",
+  "runs": [
+    {
+      "name": "suite-hokusai_bulk_delta_smoke.log",
+      "sha256": "c115353c4ca7874ad5aa050431623710915d858827cf5270352a31e557cbcd1f",
+      "bytes": 214,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-native_brush_fallback.log",
+      "sha256": "ac20a66219c021004ecd68b9daee280bfc8430ce72199461ba87a3cb8bc1bb64",
+      "bytes": 229,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_export_cache.log",
+      "sha256": "ae95a313e8d1ac3ca6e6769c0b5c4a04cef212698c6248ea11713ef060007dec",
+      "bytes": 678,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_hard_atomic.log",
+      "sha256": "326ff45956d808bb1928fb8f2f68f2873fd4cd0835fc19c97e48911cf9f29c82",
+      "bytes": 252,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_hard_packed_output.log",
+      "sha256": "023666ebb4506c8e47cb2bf6a09f58789f6a6344f4d0d2145dc8ea2a55afaa51",
+      "bytes": 307,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_hard_scanline_smoke.log",
+      "sha256": "16f4e700cfdd393795a341a5eca3917aef823dceb46e3d3a661eba15e1f1ac66",
+      "bytes": 256,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_hard_source_atomic.log",
+      "sha256": "8dc61cb686fff3470fdbcd8def6fd8c75b41c8b8894e2d2fc85f7a31e4fe6ae6",
+      "bytes": 267,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_pigment_atomic.log",
+      "sha256": "0974c48d2eea929e08d83c8029aa449283cd5807cd2b68ffdf058fd28edc0276",
+      "bytes": 258,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_native_preset_packed_output.log",
+      "sha256": "23f2b2f8130a35d5967205f0ceb31dd1dd34905a5b18b9c0e01f4b59bc4dda8c",
+      "bytes": 779,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_tile_commit_smoke.log",
+      "sha256": "7c3c8f33d2ba9911bb01f769590772559b39e09da074b76030a6fdf684570d7e",
+      "bytes": 214,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t095_tile_shift_smoke.log",
+      "sha256": "150591797a615f142a12abc94279119437485a3497fc785f2b9592e8e8bb7c6e",
+      "bytes": 214,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t101_native_hard_dispatch_smoke.log",
+      "sha256": "0493ac53fd915a7eb795d3b6aa960a0067394d15dbfdcfb08644e51e7f84f5e5",
+      "bytes": 552,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "suite-t147_native_stroke_contract.log",
+      "sha256": "26b3ab74772f55c3a4c1dae52a2f754771f02210b27ef437dd7b081f5ce21ba9",
+      "bytes": 273,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "native_brush_integration.log",
+      "sha256": "b2326e4d3f872526682265f0e5b98f91741bbe21283d2f4219b449c5ddacc0c4",
+      "bytes": 1692,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "hokusai-96.log",
+      "sha256": "001f34db519d3168375901dcbe86bf3e4ec79e11b0199a794c966b5f4041667f",
+      "bytes": 6088,
+      "exit_code": 0,
+      "verified_success_marker": true
+    },
+    {
+      "name": "native-hard-96.log",
+      "sha256": "e5700c83b0cad8a1e2a15f47a4d0b7033b8460601bf46a83b0d5b92393763ef5",
+      "bytes": 2889,
+      "exit_code": 0,
+      "verified_success_marker": true
+    }
+  ]
+}

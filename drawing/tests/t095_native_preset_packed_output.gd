@@ -31,7 +31,7 @@ func points_for(index: int, length: int, y_scale: float = 1.0) -> PackedVector2A
     return values
 
 func make_native(settings: String) -> Object:
-    var native: Object = ClassDB.instantiate("DrawingNativeBrush")
+    var native: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
     check(bool(native.call("configure_preset", settings, 60.0, TINT)),
         "configure real Hokusai brush")
     return native

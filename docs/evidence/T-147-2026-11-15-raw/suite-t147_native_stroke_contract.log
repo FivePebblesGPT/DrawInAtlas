@@ -1,0 +1,4 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T147_NATIVE_CONTRACT_PASSED checks=35 errors=0 hard_ffi=13 hard_ints=1824 preset_ffi=8 preset_ints=2784

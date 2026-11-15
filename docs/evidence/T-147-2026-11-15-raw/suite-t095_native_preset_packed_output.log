@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T095_NATIVE_PRESET_PACKED_SAMPLE preset=hard pixels=69132 sha256=90190a1390e89e0615c077bddb27b59cec99613c6de30b17514381f30495227a
+T095_NATIVE_PRESET_PACKED_SAMPLE preset=soft pixels=67088 sha256=86ab6b6c7e901be85f6740166770e3310a0c76edca465df785d640b0b2e66a7d
+T095_NATIVE_PRESET_PACKED_SAMPLE preset=ink pixels=37782 sha256=abe74096f2f4807d94491f5e054b0066e7831d64d4ef41ff4ba92f95dea6cb82
+T095_NATIVE_PRESET_PACKED_SAMPLE preset=airbrush pixels=68649 sha256=081a34720cbb7a1b6a7fdde4ac1bedb9fbf31f380885b07c80bc540bf38cc174
+T095_NATIVE_PRESET_PACKED_RESULT checks=69 failures=0
+T095_NATIVE_PRESET_PACKED_PASSED

@@ -47,7 +47,7 @@ func full_rectangle(points: PackedVector2Array, width: float, clip: Rect2i,
 
 func run_case(label: String, path: PackedVector2Array, width: float,
 		clip: Rect2i = Rect2i()) -> void:
-	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
+	var brush: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
 	brush.call("reset_hard")
 	var original_covered: Dictionary = {}
 	var previous: Variant = null

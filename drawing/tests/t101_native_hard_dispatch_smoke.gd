@@ -1,4 +1,5 @@
 extends SceneTree
+const TestBridge = preload("res://tests/t147_scripted_session_bridge.gd")
 ## T-101: NativeHard's verified packed deltas take the tile-local path without
 ## the generic _stage() dispatcher. Mixed edits still use canonical staging;
 ## failures roll back both the GDScript preview and native transaction.
@@ -85,7 +86,7 @@ func make_edit(state: Dictionary) -> CountingSession:
 
 func paint(edit: CountingSession, native: PackedCoverage,
 		selection: DrawingSelection = null, erase: bool = false) -> DrawingResult:
-	return edit.paint_path_native_hard(PackedVector2Array([Vector2(-8.5, -8.5)]), INK, 24.0, erase, selection,
+	return TestBridge.paint_hard(edit, PackedVector2Array([Vector2(-8.5, -8.5)]), INK, 24.0, erase, selection,
 		native, WINDOW)
 
 func compare_commit(a: Dictionary, b: Dictionary, stage_a: CountingSession,

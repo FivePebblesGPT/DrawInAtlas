@@ -47,7 +47,6 @@ func make_pair(faulty: bool, erase: bool) -> Dictionary:
 		seed._stage(22, 20, 0x8141762b).ok and seed.commit().ok,
 		"transparent hidden RGB, partial alpha and Eraser source field seeded")
 	var native: Object = ClassDB.instantiate("DrawingNativeBrush")
-	native.call("reset_hard")
 	return {"doc": doc, "layer": layer,
 		"edit": doc.begin_edit(layer, doc.revision,
 		Transform2D.IDENTITY, ANCHOR_X, ANCHOR_Y).value,
@@ -55,8 +54,13 @@ func make_pair(faulty: bool, erase: bool) -> Dictionary:
 
 func paint(data: Dictionary, path: PackedVector2Array, mask: DrawingSelection,
 		erase: bool) -> DrawingResult:
-	return (data["edit"] as DrawingEditSession).paint_path_native_hard(
-		path, TINT, WIDTH, erase, mask, data["native"], Rect2i(-52, -52, 104, 104))
+	var edit: DrawingEditSession = data["edit"]
+	if edit._native_handle == 0:
+		var started: DrawingResult = edit.begin_native_stroke(data["native"],
+			"NativeHard", "", WIDTH, TINT, Rect2i(-52, -52, 104, 104))
+		if not started.ok:
+			return started
+	return edit.paint_path_native(path, TINT, erase, mask)
 
 func preview(data: Dictionary, detached: bool) -> PackedByteArray:
 	var doc: DrawingDocument = data["doc"]

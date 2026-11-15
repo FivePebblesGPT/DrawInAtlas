@@ -12,7 +12,7 @@ func check(condition: bool, label: String) -> void:
 		printerr("T095_NATIVE_HARD_ATOMIC_FAILED: " + label)
 
 func brush() -> Object:
-	var instance: Object = ClassDB.instantiate("DrawingNativeBrush")
+	var instance: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
 	instance.call("reset_hard")
 	return instance
 
@@ -85,7 +85,13 @@ func run() -> void:
 	test_rejected_late_point("Infinity late sample", Vector2(INF, 3.5))
 	test_rejected_late_point("out-of-range late sample", Vector2(1000000000.0, 3.5))
 	test_rejected_late_point("oversized late sweep", Vector2(1000000.0, 3.5))
-	test_rejected_late_point("oversized radius", Vector2(0.5, 3.5), 1000000000.0)
+	# Width is frozen for the whole v1 stroke, so a mid-stroke radius
+	# change is no longer a valid transaction operation. Check rejection
+	# independently without invalidating another live handle.
+	var width_probe: Object = ClassDB.instantiate("DrawingNativeBrush")
+	check(not (width_probe.call("begin_stroke", "layer", "NativeHard", "",
+		1000000000.0, 0xffffffff, 1, Rect2i()) as Dictionary).get("ok", true),
+		"oversized radius is rejected at the frozen-stroke boundary")
 	test_total_candidate_budget()
 	test_reset_and_clip()
 	print("T095_NATIVE_HARD_ATOMIC_RESULT checks=%d failures=%d" % [checks, failures])

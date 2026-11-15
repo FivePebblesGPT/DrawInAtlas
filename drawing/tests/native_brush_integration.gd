@@ -60,13 +60,20 @@ func run() -> void:
         quit(1)
         return
     var native: Object = ClassDB.instantiate("DrawingNativeBrush")
-    native.call("reset_hard")
-    var native_pixels: Dictionary = native.call("hard_segments",
-        PackedVector2Array([Vector2(-2.5, -2.5), Vector2(2.5, 2.5)]),
-        10.0, Rect2i())
-    check(native_pixels.get("ok", false) and
-        (native_pixels.get("points", PackedInt32Array()) as PackedInt32Array).size() > 0,
+    check(native.call("stroke_abi_version") == 1,
+        "native stroke engine exposes v1")
+    var started: Dictionary = native.call("begin_stroke", "Ink", "NativeHard", "",
+        10.0, 0xffa054a7, 1, Rect2i())
+    var handle: int = int(started.get("handle", 0))
+    var accepted: Dictionary = native.call("append_samples", handle, 1,
+        PackedFloat32Array([-2.5, -2.5, 1.0, 0.01, 2.5, 2.5, 1.0, 0.01]))
+    var native_pixels: Dictionary = native.call("preview_changes", handle, 1)
+    check(bool(started.get("ok", false)) and bool(accepted.get("ok", false)) and
+        bool(native_pixels.get("ok", false)) and
+        (native_pixels.get("changes", PackedInt32Array()) as PackedInt32Array).size() > 0,
         "signed native hard coverage is nonempty")
+    check(native.call("acknowledge_batch", handle, 1, true) and
+        native.call("abort_stroke", handle), "unified native hard batch/abort succeeds")
 
     var source: PackedVector2Array = PackedVector2Array()
     for index: int in range(155):

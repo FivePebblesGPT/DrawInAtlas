@@ -1,4 +1,5 @@
 extends SceneTree
+const TestBridge = preload("res://tests/t147_scripted_session_bridge.gd")
 ## Opt-in T-101 CPU-only microbenchmark: identical prebuilt NativeHard packed
 ## coordinates on a fresh 256px sparse tile per trial. Measures GDScript
 ## staging/transaction only; does not measure Rust rasterization, framebuffer,
@@ -44,7 +45,7 @@ func run() -> void:
 		var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision,
 			Transform2D.IDENTITY, 0, 0).value
 		var start_us: int = Time.get_ticks_usec()
-		var result: DrawingResult = edit.paint_path_native_hard(
+		var result: DrawingResult = TestBridge.paint_hard(edit,
 			PackedVector2Array([Vector2(64.5, 64.5)]), INK, 96.0, false,
 			null, stub, Rect2i(0, 0, SIDE, SIDE))
 		var duration: int = Time.get_ticks_usec() - start_us
