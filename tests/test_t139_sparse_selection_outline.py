@@ -40,7 +40,12 @@ class SparseSelectionOutlineContracts(unittest.TestCase):
         self.assertIn("_mask_outline_tile_candidates(footprint)", draw)
         self.assertIn("MASK_OUTLINE_TILES_PER_FRAME", draw)
         self.assertIn("selection_mask.contour_segments(", draw)
-        self.assertIn("_mask_outline_cache.clear()", draw)
+        # T-142 moves window/focus invalidation into a shared reconciliation
+        # helper; it still clears on a changed window, but preserves overlap
+        # across an in-window saturated focus change.
+        sync = self.canvas.split("func _sync_mask_outline_cache(", 1)[1].split("\nfunc ", 1)[0]
+        self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates)", draw)
+        self.assertIn("_mask_outline_cache.clear()", sync)
         self.assertNotIn("_pixel_mask.clear()", helper)
 
     def test_oracles_cover_signed_mask_fallback_and_real_framebuffer(self) -> None:

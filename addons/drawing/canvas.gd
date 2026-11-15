@@ -1380,6 +1380,27 @@ func _mask_outline_tile_candidates(footprint: Rect2i) -> Array[Vector2i]:
 	return candidates
 
 
+
+## Reuse contours when an over-budget focus shift changes only part of the
+## eligible plan. Resetting all 4096 tiles made distant already-visible
+## outlines disappear for hundreds of frames after a one-tile pan. Entries
+## outside the new plan are not drawn and must be evicted to make room for
+## newly focal contours; each redraw still creates at most four new tiles.
+func _sync_mask_outline_cache(tile_window: Rect2i, focus: Vector2i,
+		candidates: Array[Vector2i]) -> void:
+	if tile_window != _mask_outline_window:
+		_mask_outline_cache.clear()
+		_mask_outline_window = tile_window
+	elif candidates.size() >= MAX_MASK_OUTLINE_CACHE and focus != _mask_outline_focus:
+		var eligible: Dictionary[Vector2i, bool] = {}
+		for tile: Vector2i in candidates:
+			eligible[tile] = true
+		for tile: Vector2i in _mask_outline_cache.keys():
+			if not eligible.has(tile):
+				_mask_outline_cache.erase(tile)
+	_mask_outline_focus = focus
+
+
 func _draw_selection_outline() -> void:
 	if not selection_mask.enabled or not selected.has_area():
 		return
@@ -1407,11 +1428,7 @@ func _draw_selection_outline() -> void:
 		# Capped candidates depend on focus, even if the clipped selection
 		# window remains fixed while the camera pans inside it. Do not let
 		# an old full cache starve newly focal contour tiles.
-		if tile_window != _mask_outline_window or (candidates.size() >= MAX_MASK_OUTLINE_CACHE \
-				and focus != _mask_outline_focus):
-			_mask_outline_cache.clear()
-			_mask_outline_window = tile_window
-		_mask_outline_focus = focus
+		_sync_mask_outline_cache(tile_window, focus, candidates)
 		var created: int = 0
 		var pending: bool = false
 		for tile: Vector2i in candidates:

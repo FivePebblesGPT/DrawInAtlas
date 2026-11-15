@@ -54,6 +54,14 @@ jobs:
             2>&1 | tee /tmp/t141-outline-native.log
           grep -Fxq 'T141_NATIVE_PASSED checks=8 failures=0' /tmp/t141-outline-native.log
           python3 tools/check_godot_model_log.py /tmp/t141-outline-native.log --marker T141_NATIVE_PASSED
+      - name: Verify T-142 over-budget contour continuity after an in-window pan
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path drawing --script res://tests/t142_outline_cache_native.gd \
+            2>&1 | tee /tmp/t142-outline-native.log
+          grep -Fxq 'T142_NATIVE_PASSED checks=11 failures=0' /tmp/t142-outline-native.log
+          python3 tools/check_godot_model_log.py /tmp/t142-outline-native.log --marker T142_NATIVE_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,4 +72,5 @@ jobs:
             /tmp/t139-outline-native.log
             /tmp/t140-outline-native.log
             /tmp/t141-outline-native.log
+            /tmp/t142-outline-native.log
           if-no-files-found: warn
