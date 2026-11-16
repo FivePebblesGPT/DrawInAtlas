@@ -145,7 +145,7 @@ def verify_extracted(directory: Path, *, legacy: bool = False) -> None:
     for path in directory.rglob("*"):
         if path.is_symlink():
             raise ToolchainError(f"Bundle contains a symlink: {path}")
-        if not path.is_file() or path == manifest_path:
+        if not path.is_file() or path == manifest_path or path.name == ".complete":
             continue
         relative = path.relative_to(directory).as_posix()
         actual_paths.add(relative)
@@ -200,6 +200,8 @@ def tool_paths(mode: str, bundle: str) -> tuple[dict[str, str], Path | None, boo
         return env, None, False
     root, legacy = resolve_bundle(bundle)
     env["CARGO_NET_OFFLINE"] = "true"
+    if (root / "rust/bin/cargo").is_file():
+        env["CARGO"] = str(root / "rust/bin/cargo")
     env["UV_OFFLINE"] = "1"
     env["UV_PYTHON_DOWNLOADS"] = "never"
     env["CARGO_TARGET_DIR"] = str(BUILD / "target")
