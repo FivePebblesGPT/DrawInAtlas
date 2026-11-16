@@ -49,6 +49,7 @@ atlas: import-atlas
 build: import-drawing import-atlas
 
 test: build
+	@$(WITH_TOOL) bash tools/build_native_brush.sh --test
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/native_brush_integration.gd
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/t148_native_tiles_contract.gd
 	@$(WITH_TOOL) godot --headless --path . --script res://tests/t148_atlas_native_tile_history.gd
