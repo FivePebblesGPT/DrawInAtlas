@@ -106,6 +106,12 @@ func revert(_campaign: AtlasCampaign) -> bool:
 	if not _applied or source.revision != _source_revision \
 			or target.revision != _target_revision or not target.has_node(target_node_id):
 		return false
+	# Undo of a move must not restore the source before Rust approves
+	# retirement of the target's native-owned raster subtree. If the target
+	# is busy, stale or has modified source bytes, compensating deletion of
+	# the restored source would be another fallible transaction.
+	if not target.preflight_unrecorded_subtree_removal(target_node_id).ok:
+		return false
 	if not copied:
 		var restored: DrawingResult = source.import_subtree(_snapshot, source_parent_id, true)
 		if not restored.ok:

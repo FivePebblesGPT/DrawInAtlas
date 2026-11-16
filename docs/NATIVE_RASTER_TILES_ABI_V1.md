@@ -372,3 +372,14 @@ Native-absent import retains the historical non-native behavior until T-150.
 This is a cold structural boundary, not a replacement for the host-owned
 history or T-149 display/persistence migration. See
 [T-169 evidence](evidence/T-169-2026-11-16-native-import-fence.md).
+
+**T-172 Atlas transfer Undo preflight (2026-11-16):** The host's
+`AtlasDrawingTransfer.revert()` checks destination
+`DrawingDocument.preflight_unrecorded_subtree_removal(target_node_id)` before
+restoring the source subtree. This reuses T-170's read-only
+`DrawingNativeTiles.can_retire_layers_revision` validation (including native
+revision, active transaction, parked source and ID limits) and T-168's
+canonical full-RGBA8 projection check. Rejected native retirement leaves both
+Godot documents, native stores and Atlas Undo cursor unchanged, rather than
+mutating source history and trying a second fallible rollback. This does not
+create a general cross-document two-phase commit; T-148 remains open.
