@@ -6,19 +6,25 @@ Start with the [completion checklist](docs/Index.md), [manual review](docs/Manua
 
 DrawInAtlas is a drawing board and map-first tabletop editor for West Marches / hexcrawl campaigns. Artwork is primary; grids and linked world, regional, city or encounter maps are optional structure, with one editable map at a time.
 
-The development engine is **Godot 4.8-beta2**, standard build. Application code is GDScript. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
+The Linux development engine is **Godot 4.8 beta 3**. Application UI code is GDScript; Brush/Eraser require the Rust Hokusai GDExtension. Canonical raster artwork must use lossless **WebP**; derived previews may use lossy WebP. Web export compatibility is required.
 
 ## Current split architecture and standalone Drawing — 2026-11-05
 
 **Important:** The Atlas-specific walkthrough below describes substantial **older pre-split** workflows and is not a reliable description of current standalone Drawing or the new Atlas multi-file storage contract. The active architecture is one canonical `addons/drawing/` package, an independently runnable `drawing/` Godot project, and the root Atlas Godot project. Current Windows/Linux desktop is first; Web is paused. See [E-009](docs/Epics/E-009.md), [Drawing storage](docs/DRAWING_STORAGE_CONTRACT.md) and the [new owner usability review](docs/DRAWING_USABILITY_REVIEW_2026-11-05.md).
 
-To launch the **standalone Drawing app** from the repository root with Godot 4.8-beta2:
+To build and launch **standalone Drawing** from a Linux x86-64 checkout:
 
 ```sh
-python3 tools/build_drawing_app.py --in-place
-godot --headless --editor --path drawing --import --quit
-godot --path drawing
+make drawing                      # installed Godot/Cargo/uv; see local.mk.example
+# or from a verified portable offline archive:
+make drawing TOOLCHAIN=bundle BUNDLE=/path/to/drawing-toolchain-linux-x86_64.tar.zst
 ```
+
+The Rust Hokusai extension is mandatory. `make drawing` builds it, stages the addon,
+registers the GDExtension before Godot import, and launches the editor. To generate
+a new source-pinned offline archive on an online Linux host, run `make bundle`;
+use `make bundle-check` for offline-native smoke validation. See
+[toolchain setup](docs/TOOLCHAIN.md) and [T-180](docs/Tickets/T-180.md).
 
 `drawing/main.tscn` is the entry scene, not a separate 'Drawing module' scene inside Atlas. For a clean isolated package use `python3 tools/build_drawing_app.py --output /tmp/drawing-project` and launch that project. The app is **not yet owner-accepted as usable**: live strokes, zoom, selection, layer and dock issues remain. `.drawing` Save/Open worked in the owner's reported test; older single-file Atlas `.scn` save descriptions below are historical. [Corrective tickets](docs/Index.md).
 
@@ -35,7 +41,7 @@ godot --path drawing
 
 ## Run and test the existing implementation
 
-- Open `project.godot` in Godot **4.8-beta2** and run `main.tscn` / F5.
+- Open `project.godot` in Godot **4.8-beta3** and run `main.tscn` / F5.
 - The sample campaign includes world and city coordinate grids with a linked Greyhaven map. Paint raster with the brush, clear pixels with the eraser, and undo/redo complete gestures. Artwork uses continuous board coordinates, including on gridless maps.
 - **File → New board** creates an independent blank board with no grid, square cells, or pointy/flat hexes. Choose native units and distance per cell. The inspector edits spacing, origin, rotation and visibility without moving artwork; creation/grid edits support undo/redo.
 - The **Tools** sidebar groups raster drawing/shapes and Objects tools. B/E/F and L/R/O/P automatically target raster; W/T/V/M target Objects. Lines, rectangles, ellipses and polygons commit pixels. Walls, text and image props remain independently selectable, movable and editable. Inspector transforms also scale and rotate selected objects.
