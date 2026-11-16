@@ -37,6 +37,13 @@ cache. No existing DrawInAtlas toolchain bundle is necessary.
     make bundle-verify
     make bundle-check
 
+To reuse previously downloaded **official source archives** instead of
+fetching again, pass optional `GODOT_ARCHIVE=/path/to/Godot...zip` and
+`UV_ARCHIVE=/path/to/uv-...tar.gz` to `make bundle`. Their hashes must match
+`toolchain.lock.toml` even when the local download cache already exists.
+An arbitrary installed Godot executable is supported for system development,
+but not silently embedded into the version-locked bundle.
+
 The output defaults to:
 
     .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
