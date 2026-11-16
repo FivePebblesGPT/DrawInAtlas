@@ -22,15 +22,22 @@ Legacy GDScript algorithm awaits removal in T-150 and is not Canvas-reachable.
 ABI: [native strokes](../../docs/NATIVE_STROKE_ABI_V1.md) and
 [native tiles](../../docs/NATIVE_RASTER_TILES_ABI_V1.md).
 
-## Pinned offline build
+## Make-first build (T-180)
 
-Use the supplied `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` with SHA-256 `f486c8d13fb4005b864e9c6ba3af4fcf83f512deb1b871b794295f5704dcdeaa`. Extract its contents to `/your/tooling/directory`, verify with `./verify.sh --quick`, then from the project root execute:
+Linux x86-64 builds use `make drawing` with installed Godot/Rust, or
+`make drawing TOOLCHAIN=bundle BUNDLE=/path/to/archive.tar.zst` with a pinned
+offline archive. `make bundle` now reconstructs that archive on a connected
+Linux host directly from `toolchain.lock.toml` plus `Cargo.lock`, without
+requiring the older manually assembled bundle. The resulting archive and
+per-file manifest are verified before native import. See
+[toolchain setup](../../docs/TOOLCHAIN.md).
 
-```bash
-./tools/build_native_brush.sh /your/tooling/directory
-```
-
-The build uses the bundle's vendored Cargo registry/lockfile offline, Hokusai 0.3.0 and godot-rust 0.5.5 built against the Godot 4.7 stable API for testing on Godot 4.8 beta 3. The generated `.so` binary and tool archive are **not** source-controlled. Linux x86-64 only; other platform release exports require separate testing. For standalone stage: `python3 tools/build_drawing_app.py --in-place`, followed by Godot import; in this beta, bundle's `prepare-godot-example.sh /staged/project res://addons/drawing/native/drawing_brush.gdextension` permits early script class loading.
+The historical `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` remains an
+accepted SHA-256 checked input for transition, not the source of truth.
+Every normal staged app requires both `libdrawing_brush.so` and
+`drawing_brush.gdextension`; missing native binaries fail explicitly.
+The tested target is Linux x86-64, Godot 4.8 beta 3, Rust 1.99.1,
+Hokusai 0.3.0 and godot-rust 0.5.5 using the Godot 4.7 ABI.
 
 ## Regression suite
 
