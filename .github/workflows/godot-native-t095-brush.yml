@@ -397,6 +397,17 @@ jobs:
             --marker T178_TEXT_HISTORY_PASSED
           grep -Fqx 'T178_TEXT_HISTORY_RESULT checks=43 failures=0' \
             /tmp/t178-text-native-history.log
+      - name: T-179 semantic-only subtree removal fails closed on native rejection
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t179_semantic_subtree_removal_native_fence.gd \
+            2>&1 | tee /tmp/t179-semantic-native-removal.log
+          python3 tools/check_godot_model_log.py /tmp/t179-semantic-native-removal.log \
+            --marker T179_SEMANTIC_REMOVE_PASSED
+          grep -Fqx 'T179_SEMANTIC_REMOVE_RESULT checks=62 failures=0' \
+            /tmp/t179-semantic-native-removal.log
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

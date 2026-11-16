@@ -9,6 +9,18 @@ original source alpha and preserves source RGB. Other generic native
 selection/tile/history mechanisms remain unchanged. Historical NativeHard
 benchmarks are not current correctness or timing oracles.
 
+**Semantic-only subtree removal (T-179, 2026-11-16):**
+`DrawingDocument.remove_subtree()` checks the exact native metadata revision
+*before* deleting any semantic-only subtree, for recorded local, unrecorded
+and host-owned history modes. An active native edit returns `NATIVE_METADATA`,
+and native-ahead revisions return `STALE_REVISION`; both leave the hierarchy,
+local history cursor, dirty state and canonical RGBA8/native Undo tokens
+unchanged. A successful deletion advances both revisions exactly once and
+never evicts the native store; local recorded structural Undo/Redo uses the
+T-176 checked replay boundary. The T-168 raster-bearing park/retire path and
+native-absent operations are unchanged. This does not confer universal
+T-148 host-history authority. See [T-179 evidence](evidence/T-179-2026-11-16-semantic-removal.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.

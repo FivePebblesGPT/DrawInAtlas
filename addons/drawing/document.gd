@@ -522,6 +522,15 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		if _native_raster_store != null:
 			retained_history = _prepare_retired_local_history(removed_ids)
 		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes)
+	# Semantic-only subtree deletion must acquire Rust metadata authority
+	# before erasing even one Godot node. The old post-mutation bridge could
+	# detach a busy/stale native store while leaving the local tree deleted.
+	var metadata_advanced: bool = false
+	if raster_layers.is_empty() and _native_raster_store != null:
+		var advanced: DrawingResult = _advance_checked_layer_metadata()
+		if not advanced.ok:
+			return advanced
+		metadata_advanced = true
 	var unreferenced: bool = false
 	if not raster_layers.is_empty() and _native_raster_store != null and not parked and not retired:
 		# A never-authorized raster may be removed without parking any bytes,
@@ -537,7 +546,7 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		_events = retained_history["events"]
 		_content_states = retained_history["states"]
 		_cursor = int(retained_history["cursor"])
-	if parked or retired or unreferenced:
+	if parked or retired or unreferenced or metadata_advanced:
 		pass # Rust and document revisions advanced before the deterministic erase.
 	elif not raster_layers.is_empty():
 		_advance_raster_structure_revision(raster_layers)
