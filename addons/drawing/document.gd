@@ -510,7 +510,7 @@ func begin_edit(layer_id: String, expected_revision: int,
 		return DrawingResult.failure("LOCKED", "Layer or ancestor is hidden or locked")
 	if not view_transform.x.is_finite() or not view_transform.y.is_finite() or not view_transform.origin.is_finite():
 		return DrawingResult.failure("TRANSFORM", "Gesture transform is not finite")
-	if abs(anchor_x) > 1152921504606846976 or abs(anchor_y) > 1152921504606846976:
+	if not TILES.document_anchor_in_range(anchor_x, anchor_y):
 		return DrawingResult.failure("COORD_RANGE", "Signed pixel anchor is outside safe 64-bit bounds")
 	if not is_finite(view_transform.determinant()) or absf(view_transform.determinant()) < 0.00000001:
 		return DrawingResult.failure("TRANSFORM", "Gesture transform is not invertible")

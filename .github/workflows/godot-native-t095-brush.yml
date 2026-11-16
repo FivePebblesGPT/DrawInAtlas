@@ -281,7 +281,8 @@ jobs:
             t157_lazy_source_reentrant_guard:T157_LAZY_GUARD_PASSED \
             t158_signed_lazy_tile_bounds:T158_TILE_BOUNDS_PASSED \
             t159_signed_replay_publication_bounds:T159_SIGNED_REPLAY_PASSED \
-            t160_direct_raster_publish_bounds:T160_DIRECT_BOUNDS_PASSED; do
+            t160_direct_raster_publish_bounds:T160_DIRECT_BOUNDS_PASSED \
+            t161_signed_public_anchor_bounds:T161_SIGNED_ANCHOR_PASSED; do
             name="${entry%%:*}"
             marker="${entry#*:}"
             timeout 150s godot --headless --path drawing --script "res://tests/${name}.gd" \

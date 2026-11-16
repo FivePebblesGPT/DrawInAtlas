@@ -1,5 +1,7 @@
 class_name DrawingRasterImport
 extends RefCounted
+
+const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 ## Import a source image into signed sparse tiles without a full-canvas allocation.
 ## Each bounded edit-region request uses canonical straight RGBA8, even on partial edges.
 
@@ -170,7 +172,7 @@ static func import_image(document: DrawingDocument, layer_id: String,
 	var height: int = source.get_height()
 	if max_import_pixels <= 0 or width > max_import_pixels or height > max_import_pixels / width:
 		return DrawingResult.failure("IMPORT_LIMIT", "Import exceeds pixel budget")
-	if abs(left) > 1152921504606846976 or abs(top) > 1152921504606846976:
+	if not TILES.document_anchor_in_range(left, top):
 		return DrawingResult.failure("COORD_RANGE", "Image anchor exceeds safe signed 64-bit range")
 	var image: Image = source.duplicate()
 	if image.is_compressed() and image.decompress() != OK:

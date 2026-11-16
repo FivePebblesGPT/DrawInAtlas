@@ -18,6 +18,16 @@ static func floor_div(value: int, positive_divisor: int) -> int:
 const MAX_PROJECTION_PIXEL_COORD: int = 4503599627370496
 
 
+## Legacy-compatible public gesture, image-import and viewport anchor limit.
+## Compare both signed halves: abs(INT64_MIN) wraps to a negative value.
+const MAX_DOCUMENT_ANCHOR_COORD: int = 1152921504606846976
+
+
+static func document_anchor_in_range(x: int, y: int) -> bool:
+	return x >= -MAX_DOCUMENT_ANCHOR_COORD and x <= MAX_DOCUMENT_ANCHOR_COORD \
+		and y >= -MAX_DOCUMENT_ANCHOR_COORD and y <= MAX_DOCUMENT_ANCHOR_COORD
+
+
 ## Pixel-based history has the same signed projection budget as storage tiles.
 ## Never use abs() here: abs(INT64_MIN) wraps back to a negative number.
 static func pixel_coordinates_in_projection_range(x: int, y: int) -> bool:
