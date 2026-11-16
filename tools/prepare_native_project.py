@@ -21,10 +21,10 @@ def prepare(project: Path) -> Path:
     for path in (manifest, binary):
         if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
             raise ValueError(f"Required Brush/Eraser extension is missing or unsafe: {path}")
-    if EXTENSION not in manifest.read_text(encoding="utf-8"):
-        # The manifest references its library path, not its own resource path.
-        if "res://addons/drawing/native/bin/libdrawing_brush.so" not in manifest.read_text(encoding="utf-8"):
-            raise ValueError(f"GDExtension manifest does not point at its staged library: {manifest}")
+    text = manifest.read_text(encoding="utf-8")
+    if ('entry_symbol = "gdext_rust_init"' not in text
+            or 'res://addons/drawing/native/bin/libdrawing_brush.so' not in text):
+        raise ValueError(f"GDExtension ABI or library mapping invalid: {manifest}")
     cache = project / ".godot"
     cache.mkdir(exist_ok=True)
     destination = cache / "extension_list.cfg"
