@@ -10,8 +10,8 @@ BUNDLE_OUT ?= .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
 
 TOOL = $(PYTHON) tools/toolchain.py
 WITH_TOOL = GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" $(TOOL) exec --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)" --
-RUFF_VERSION := 0.17.5
-TY_VERSION := 0.0.104
+RUFF_VERSION := $(shell $(PYTHON) tools/toolchain.py pin ruff)
+TY_VERSION := $(shell $(PYTHON) tools/toolchain.py pin ty)
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
         test check lint format clean bundle bundle-check bundle-verify python-test
