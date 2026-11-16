@@ -1,0 +1,4 @@
+30/30 final process exits=0; 30/30 no failure markers
+9 named strict markers verified
+24/24 T-158 with fixed code; 9/24 failed under pre-fix sources
+158 tickets validated

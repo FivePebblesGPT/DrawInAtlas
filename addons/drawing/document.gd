@@ -607,6 +607,8 @@ func register_lazy_chunk(layer_id: String, cx: int, cy: int,
 		return DrawingResult.failure("LAYER", "Missing raster layer")
 	if canonical_sha256.length() != 64 or not canonical_sha256.is_valid_hex_number(false) or canonical_sha256 != canonical_sha256.to_lower():
 		return DrawingResult.failure("DIGEST", "Expected lowercase 64-character SHA-256")
+	if not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+		return DrawingResult.failure("COORD_RANGE", "Lazy tile is outside safe signed projection bounds")
 	var key: String = "%d,%d" % [cx, cy]
 	if _nodes[layer_id].tiles.has(key) or _pending_tiles.has(layer_id + ":" + key):
 		return DrawingResult.failure("DUPLICATE_TILE", "Chunk already registered")
@@ -2002,6 +2004,8 @@ func export_manifest() -> DrawingResult:
 			var cy: int = int(coordinates[1])
 			if tile_key != "%d,%d" % [cx, cy]:
 				return DrawingResult.failure("COORD", "Noncanonical tile key")
+			if not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+				return DrawingResult.failure("COORD_RANGE", "Raster source outside safe signed projection bounds")
 			var combined: String = layer_id + ":" + tile_key
 			var descriptor: Dictionary = {}
 			if _known_refs.has(combined) and not _dirty_tiles.has(combined):

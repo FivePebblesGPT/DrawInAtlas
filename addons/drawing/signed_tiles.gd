@@ -12,6 +12,20 @@ static func floor_div(value: int, positive_divisor: int) -> int:
 	return quotient
 
 
+## Godot display/manifest coordinates use a stricter 2^52 pixel bound than
+## the Rust input ABI. Compare rather than abs(): abs(INT64_MIN) overflows
+## signed 64-bit and must never accidentally pass the bound.
+const MAX_PROJECTION_PIXEL_COORD: int = 4503599627370496
+
+
+static func tile_coordinates_in_projection_range(cx: int, cy: int, stride: int) -> bool:
+	if stride <= 0:
+		return false
+	@warning_ignore("integer_division")
+	var limit: int = MAX_PROJECTION_PIXEL_COORD / stride
+	return cx >= -limit and cx <= limit and cy >= -limit and cy <= limit
+
+
 static func tile_for_pixel(pixel: Vector2i, stride: int) -> Vector2i:
 	return Vector2i(floor_div(pixel.x, stride), floor_div(pixel.y, stride))
 

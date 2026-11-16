@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+ERROR: Attempt to open script 'res://tests/drawing_fill_tile_cache_smoke.gd' resulted in error 'File not found'.
+   at: load_source_code (modules/gdscript/gdscript.cpp:1160)
+ERROR: Failed loading resource: res://tests/drawing_fill_tile_cache_smoke.gd.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Can't load script: res://tests/drawing_fill_tile_cache_smoke.gd
+   at: start (main/main.cpp:4412)
