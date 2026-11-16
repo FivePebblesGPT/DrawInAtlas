@@ -73,7 +73,7 @@ class ToolchainTests(unittest.TestCase):
             (native / "bin").mkdir(parents=True)
             (native / "bin/libdrawing_brush.so").write_bytes(b"native-fixture")
             (native / "drawing_brush.gdextension").write_text(
-                '[libraries]\nlinux.release.x86_64 = "res://addons/drawing/native/bin/libdrawing_brush.so"\n',
+                '[configuration]\nentry_symbol = "gdext_rust_init"\n[libraries]\nlinux.release.x86_64 = "res://addons/drawing/native/bin/libdrawing_brush.so"\n',
                 encoding="utf-8",
             )
             self.assertEqual(prepare(root), prepare(root))
