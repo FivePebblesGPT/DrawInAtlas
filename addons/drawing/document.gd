@@ -1576,6 +1576,31 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 	return DrawingResult.success(layer_id, revision)
 
 
+## Text-to-raster Undo/Redo can temporarily hide a layer that Rust already
+## owns. Park its canonical source/history rather than invalidating every
+## native token. Validate caller-owned tree snapshots before touching Rust;
+## an unowned text layer still takes the no-source structural revision bridge.
+func _replay_text_raster_native(layer_id: String, expected: DrawingLayerNode,
+		target: DrawingLayerNode) -> DrawingResult:
+	if _native_raster_store == null:
+		return DrawingResult.success(false, revision)
+	var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
+	if native_revision != revision:
+		return DrawingResult.failure("STALE_REVISION", "Text history native revision diverged")
+	var restore: bool = target.kind == DrawingLayerNode.RASTER
+	var source_nodes: Dictionary = {layer_id: target if restore else _nodes[layer_id]}
+	if not _native_tree_sources_match(source_nodes, restore):
+		return DrawingResult.failure("STALE_PIXEL", "Text history native RGBA8 source diverged")
+	var ids: PackedStringArray = PackedStringArray([layer_id])
+	if _native_raster_store.call("advance_parked_layers_revision", revision,
+			ids, restore, false):
+		return DrawingResult.success(true, revision + 1)
+	if _native_raster_store.call("advance_unreferenced_layers_revision", revision,
+			ids, false):
+		return DrawingResult.success(false, revision + 1)
+	return DrawingResult.failure("NATIVE_STRUCTURE", "Text history native layer transition rejected")
+
+
 func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 	var target: DrawingLayerNode = event["before"] if undo_action else event["after"]
 	var expected: DrawingLayerNode = event["after"] if undo_action else event["before"]
@@ -1588,6 +1613,23 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 			return DrawingResult.failure("HISTORY_TARGET", "Created text ID was reused")
 	elif not _nodes.has(layer_id) or _nodes[layer_id].kind != expected.kind:
 		return DrawingResult.failure("HISTORY_TARGET", "Text layer changed outside history")
+	var kind_transition: bool = expected != null and target != null and \
+		(expected.kind == DrawingLayerNode.RASTER) != (target.kind == DrawingLayerNode.RASTER)
+	var native_bridged: bool = false
+	var parked: bool = false
+	if kind_transition and _native_raster_store != null:
+		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
+		if native_revision > revision:
+			return DrawingResult.failure("STALE_REVISION", "Text history native store is ahead")
+		if native_revision == revision:
+			var bridge: DrawingResult = _replay_text_raster_native(layer_id, expected, target)
+			if not bridge.ok:
+				return bridge
+			native_bridged = true
+			parked = bool(bridge.value)
+		# Older previously-rebased consumers may already be behind the host
+		# revision. They cannot preserve an obsolete native timeline; leave
+		# that store untouched and let the normal checked rebase reauthorize it.
 	if target == null:
 		_nodes.erase(layer_id)
 		_nodes[parent_id].children.erase(layer_id)
@@ -1595,6 +1637,13 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 		_nodes[layer_id] = target.detached_copy()
 		if expected == null:
 			_nodes[parent_id].children.insert(mini(int(event["index"]), _nodes[parent_id].children.size()), layer_id)
+	# A restored native source has new Godot tile object identities. Rebind only
+	# after Rust accepted the exact snapshot, without any lazy provider calls.
+	if native_bridged and parked and target.kind == DrawingLayerNode.RASTER:
+		for identity: String in _native_source_identities.keys():
+			if identity.begins_with(layer_id + ":"):
+				var key: String = identity.substr(layer_id.length() + 1)
+				_native_source_identities[identity] = _nodes[layer_id].tiles.get(key)
 	# Rasterized tiles are invalidated when conversion is undone/redone.
 	for key: String in _dirty_tiles.keys():
 		if key.begins_with(layer_id + ":"):
@@ -1605,13 +1654,12 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 	if target != null and target.kind == DrawingLayerNode.RASTER:
 		for tile_key: String in target.tiles:
 			_dirty_tiles[layer_id + ":" + tile_key] = true
-	if (target == null or target.kind == DrawingLayerNode.TEXT) and \
+	if native_bridged:
+		revision += 1
+	elif (target == null or target.kind == DrawingLayerNode.TEXT) and \
 			(expected == null or expected.kind == DrawingLayerNode.TEXT):
 		_advance_nonraster_revision(false)
 	else:
-		# Undo/Redo of text rasterization changes the layer's kind and
-		# consumer raster bytes, but not Rust-owned source when that layer
-		# was never authorized. Preserve unrelated native Undo/Redo tokens.
 		_advance_raster_structure_revision([layer_id], false)
 	return DrawingResult.success(null, revision)
 

@@ -1,6 +1,6 @@
 extends SceneTree
 ## T-148: text/raster kind transitions preserve unrelated Rust ownership only
-## when the converted layer ID has never held native source or history.
+## while parked native-owned text layers retain their tokens through Undo/Redo.
 
 const STRIDE: int = 64
 var checks: int = 0
@@ -138,8 +138,8 @@ func run() -> void:
 			"Save/Open preserves text glyph bytes and both native paint sources")
 	DirAccess.remove_absolute(save_path)
 
-	# Once text-derived raster source enters Rust, the inverse kind change
-	# cannot pretend that layer is unreferenced. Checked rebase is required.
+	# Previously authorized text-derived raster tiles now park reversibly;
+	# a subsequent Brush on another layer must not discard unrelated tokens.
 	var guarded: DrawingDocument = DrawingDocument.new("text-native-history", STRIDE)
 	var base: String = str(guarded.create_layer(DrawingLayerNode.RASTER, "Ink").value)
 	check(stroke(guarded, base, Vector2(9, 10)).ok, "negative control owns a raster source")
@@ -151,13 +151,15 @@ func run() -> void:
 	check(guarded.undo().ok and guarded.inspect_node(label).kind == DrawingLayerNode.RASTER,
 		"Undo text-derived native Brush")
 	check(guarded.undo().ok and guarded.inspect_node(label).kind == DrawingLayerNode.TEXT and
-		int(guard_store.call("stats").get("revision", -1)) < guarded.revision,
-		"previously native-owned layer correctly rejects unreferenced replay")
+		int(guard_store.call("stats").get("revision", -1)) == guarded.revision and
+		guard_store.call("is_layer_parked", label),
+		"previously native-owned layer is parked without revision divergence")
 	check(stroke(guarded, base, Vector2(36, 37)).ok and
 		guarded._native_raster_store == guard_store and
 		int(guard_store.call("stats").get("revision", -1)) == guarded.revision and
-		int(guard_store.call("stats").get("undo", -1)) == 1,
-		"next Brush rebases stale source and clears retired native history")
-	check(not guarded.can_redo(), "new Brush invalidates detached text-raster Redo")
+		int(guard_store.call("stats").get("undo", -1)) == 2 and
+		guard_store.call("is_layer_parked", label),
+		"next Brush preserves existing native history and parked glyphs")
+	check(not guarded.can_redo(), "new Brush invalidates text-raster Redo")
 	print("T148_TEXT_RASTER_PASSED (%d checks; %d failed)" % [checks, failures])
 	quit(0 if failures == 0 else 1)

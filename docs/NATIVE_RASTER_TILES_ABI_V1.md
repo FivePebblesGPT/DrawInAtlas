@@ -91,3 +91,27 @@ A full Atlas campaign-generation save/lazy reload and fresh Brush on a reopened 
 6. An ordinary non-brush raster publication with a current native store preflights source identities, allocates detached display/save tiles and prepares a tile history envelope **before** `adopt_external_edit`. The FFI call accepts at most 128 tile descriptors with full packed before/after buffers; on success its token joins the Brush/Eraser history and document installation performs no fallible provider calls. On any rejection the Godot document has not mutated. With no native store (historical test fixtures) the original GDScript publisher remains; other raster mutation paths can still trigger rebase, so universal authority and Atlas/Object native-source integration remain open.
 
 The mixed-raster 64px 2-tile witness transfers **49,152 external packed RGBA8 bytes** in one accepted call (one resident `before+after` plus one blank `before` and full `after`), separately counted as `external_bytes_received`; zero per-pixel native output is returned. This excludes failed calls and does not establish a latency improvement. The historical pre-T-153 NativeHard 64px-canvas held/committed witness exported 49,152 tile bytes and imported 16,384 bytes over 10 tile-store FFI calls and 11 Rust-stroke calls; `tile_pixel_stream_calls` is zero. Legacy direct stroke statistics may still count `exported_ints` internally, so this number alone is *not* a proof that the engine computes no per-pixel integer values. See [T-148 live evidence](evidence/T-148-2026-11-15-live-cutover.md).
+
+
+## Native-owned text/raster history parking (T-154, 2026-11-16)
+
+`DrawingDocument._replay_text_tree` calls the existing bounded native
+`advance_parked_layers_revision(expected_revision, [layer_id], restore,
+false)` when a previously authorized text-derived raster is hidden by Undo
+or restored by Redo. Rust retains exact canonical straight RGBA8, hidden
+RGB, source authorization and prior Undo/Redo tokens; an unrelated layer
+remains paintable. Before this native revision advances, Godot checks that
+its currently displayed raster (park) or detached event raster (restore)
+matches every tracked authorized source identity and corresponding full Rust
+`read_tile` bytes; no lazy callbacks run after the native mutation. Restoring
+rebinds detached Godot object identities only after native acceptance.
+
+An unowned text ID cannot create a parked tombstone: rejection of the park
+operation must be followed by successful
+`advance_unreferenced_layers_revision` at the same revision, or the edit
+fails closed. If an attached Rust store was already *behind* the document
+from an earlier unsupported edit, the existing checked rebase boundary is
+retained instead of pretending to own new data. A store *ahead* is rejected.
+This handles reversible **history playback of previously-owned** rasterized
+text, not arbitrary live text rerasterization into a parked ID or complete
+native-only history serialization. See [T-154 evidence](evidence/T-154-2026-11-16-text-raster-parking.md).
