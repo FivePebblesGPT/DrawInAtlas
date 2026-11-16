@@ -176,8 +176,8 @@ def resolve_bundle(value: str) -> tuple[Path, bool]:
     destination = BUILD / "toolchains" / digest
     if not (destination / ".complete").is_file():
         destination.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="unpack-", dir=destination.parent) as tmp:
-            temp = Path(tmp)
+        temp = Path(tempfile.mkdtemp(prefix="unpack-", dir=destination.parent))
+        try:
             safe_extract_zstd(path, temp)
             root = find_bundle_root(temp)
             verify_extracted(root, legacy=is_legacy)
@@ -185,6 +185,9 @@ def resolve_bundle(value: str) -> tuple[Path, bool]:
             if destination.exists():
                 shutil.rmtree(destination)
             os.replace(temp, destination)
+        finally:
+            if temp.exists():
+                shutil.rmtree(temp)
     root = find_bundle_root(destination)
     verify_extracted(root, legacy=is_legacy)
     return root, is_legacy
