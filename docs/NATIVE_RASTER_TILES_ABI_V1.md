@@ -80,6 +80,19 @@ benchmarks are not current correctness or timing oracles.
   the pre-T-150 historical direct path. No ABI shape or Rust kernel changes.
   See [T-165](evidence/T-165-2026-11-16-attached-revision-fence.md).
 
+- **Save/export authority fence (T-166):** Before `export_manifest()` or
+  `mark_published()` can issue/acknowledge a document snapshot, an attached
+  native store must have exactly the current document revision and all live,
+  Rust-authorized projected tiles must match the original source object and
+  complete canonical native RGBA8. This includes hidden RGB in alpha-zero
+  pixels; a same-object Godot tile mutation is not authorized by unchanged
+  document revision. `STALE_SOURCE` rejects the operation without consuming
+  native history or clearing save dirty state. This cold path uses existing
+  native tile reads, without resolving previously unreferenced lazy sources.
+  The low-level `snapshot_for_save()` dictionary remains a T-148 integration
+  seam requiring an authoritative caller; this guard does not certify arbitrary
+  host-owned detached snapshots. See [T-166 evidence](evidence/T-166-2026-11-16-native-save-fence.md).
+
 - **Public signed anchor guard (T-161):** The legacy-compatible
   `DrawingDocument.begin_edit`, `DrawingRenderer.render` and
   `DrawingRasterImport.import_image` entry points reject anchors outside

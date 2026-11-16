@@ -147,6 +147,16 @@ func _native_tree_sources_match(nodes: Dictionary, restore: bool) -> bool:
 	return true
 
 
+## Save is a cold authority boundary: Godot tiles are only a projection of
+## Rust-authorized bytes. Detect in-place mutation (which object identity alone
+## misses) and attached revision drift before exporting or acknowledging blobs.
+## Pending, never-authorized lazy sources are still valid existing content.
+func _native_save_projection_matches() -> bool:
+	return _native_raster_store == null or \
+		(_attached_native_revision_matches(revision) and
+		_native_tree_sources_match(_nodes, false))
+
+
 ## A recorded structural removal can temporarily park native-owned raster
 ## layers without forfeiting their RGBA8 or history tokens. This call is made
 ## after Godot preflight and before the deterministic tree mutation; no lazy
@@ -1998,6 +2008,8 @@ func mark_published(saved_revision: int,
 		published_refs: Dictionary[String, String] = {}) -> DrawingResult:
 	if saved_revision != revision:
 		return DrawingResult.failure("STALE_REVISION", "Cannot publish an older snapshot")
+	if not _native_save_projection_matches():
+		return DrawingResult.failure("STALE_SOURCE", "Native raster source differs from save projection")
 	# A physical savepoint must resolve every newly written tile to a durable ref.
 	for combined: String in _dirty_tiles:
 		var separator: int = combined.find(":")
@@ -2027,6 +2039,8 @@ func mark_published(saved_revision: int,
 ## Logical, format-neutral manifest. T-066 owns the physical file/schema, codecs
 ## and atomic generation publication. A blank ref denotes a tile needing staging.
 func export_manifest() -> DrawingResult:
+	if not _native_save_projection_matches():
+		return DrawingResult.failure("STALE_SOURCE", "Native raster source differs from save projection")
 	var layers: Array[Dictionary] = []
 	var ids: Array[String] = _nodes.keys()
 	ids.sort()

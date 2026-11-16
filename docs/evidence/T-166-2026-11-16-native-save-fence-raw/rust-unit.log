@@ -1,0 +1,31 @@
+    Finished `test` profile [unoptimized] target(s) in 0.05s
+     Running unittests src/lib.rs (/mnt/data/work/cargo-target/debug/deps/drawing_brush-86892d54b2db4064)
+
+running 24 tests
+test native_tiles::tests::atomic_undo_redo_and_locked_rejection ... ok
+test native_tiles::tests::hidden_rgb_and_alpha_roundtrip ... ok
+test native_tiles::tests::detached_replay_checks_all_tiles_then_retires_old_tokens ... ok
+test native_tiles::tests::external_raster_adoption_is_atomic_and_joins_brush_history ... ok
+test native_tiles::tests::hokusai_eraser_uses_dab_alpha_and_preserves_hidden_rgb_and_history ... ok
+test native_tiles::tests::missing_source_masks_and_budget_fail_closed ... ok
+test native_tiles::tests::large_signed_tile_identity_and_layer_isolation ... ok
+test native_tiles::tests::metadata_revisions_keep_native_history_and_reject_stale_or_active_advances ... ok
+test native_tiles::tests::no_op_paint_does_not_create_revision_or_history ... ok
+test native_tiles::tests::parked_raster_layers_retain_history_and_reject_mutation_until_restored ... ok
+test native_tiles::tests::persistent_transactions_rebase_and_history_tokens ... ok
+test native_tiles::tests::parked_text_raster_replacement_preserves_unrelated_history_atomically ... ok
+test native_tiles::tests::signed_seams_mask_hidden_rgb_and_cancel ... ok
+test native_tiles::tests::stale_unauthorized_oversized_and_zero_change_fail_closed ... ok
+test native_tiles::tests::unrecorded_retirement_preserves_unrelated_tokens_without_leaking_sources ... ok
+test native_tiles::tests::token_replay_rejects_detached_payload_tampering_atomically ... ok
+test native_tiles::tests::untracked_external_commit_is_atomic_and_preserves_native_source ... ok
+test native_tiles::tests::unreferenced_raster_structure_preserves_unrelated_native_history ... ok
+test tests::native_changes_with_identical_rgba_do_not_reenter_script ... ok
+test tests::pigment_tile_batch_rolls_back_existing_and_new_surface_tiles ... ok
+test tests::all_bundled_presets_parse ... ok
+test tests::preset_samples_validate_entire_batch_before_state_mutation ... ok
+test tests::hokusai_hard_round_rollback_and_signed_alpha ... ok
+test tests::cached_native_scan_matches_full_quantized_export ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
