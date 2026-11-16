@@ -1,0 +1,30 @@
+# Linux x86-64 development toolchain source of truth.
+# URLs and SHA-256 digests below are published release artifacts, not outputs
+# of a local, manually assembled bundle.
+format = 1
+platform = "x86_64-unknown-linux-gnu"
+python = ">=3.11,<3.16"
+
+[rust]
+version = "1.99.1"
+components = ["rustfmt", "clippy"]
+
+[godot]
+version = "4.8.beta3"
+url = "https://github.com/godotengine/godot-builds/releases/download/4.8-beta3/Godot_v4.8-beta3_linux.x86_64.zip"
+sha256 = "5595db30bbad4d3076d132ebc8ebafb02aafc3958dc2f730fcbfdab9ea51313c"
+executable = "Godot_v4.8-beta3_linux.x86_64"
+
+[uv]
+version = "0.13.8"
+url = "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-x86_64-unknown-linux-gnu.tar.gz"
+sha256 = "5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91"
+
+[python_tools]
+ruff = "0.17.5"
+ty = "0.0.104"
+
+[legacy_bundle]
+# Kept only to ingest the already-supplied v8 offline build archive.
+filename = "Godot_v4.8b3_rust_hokusai_bundle8.tar.zst"
+sha256 = "f486c8d13fb4005b864e9c6ba3af4fcf83f512deb1b871b794295f5704dcdeaa"
