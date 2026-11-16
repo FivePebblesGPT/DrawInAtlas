@@ -1,35 +1,49 @@
 #!/usr/bin/env bash
-# Compile the optional native addon from the supplied, checksum-verified
-# offline tooling archive. No system Rust or network dependency.
+# Native GDExtension compilation for system or Make-selected offline toolchains.
 set -euo pipefail
-root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-bundle="${1:-${DRAWING_RUST_TOOLING:-}}"
-if [[ -z "$bundle" ]]; then
-  echo "usage: $0 /path/to/extracted/Godot_v4.8b3_rust_hokusai_bundle8" >&2
+ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd -P)"
+TRIPLE="x86_64-unknown-linux-gnu"
+if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
+  echo "Required native painting extension currently supports Linux x86-64 only" >&2
   exit 2
 fi
-bundle="$(cd -- "$bundle" && pwd -P)"
-test -s "$bundle/setup-rust-env.sh"
-test -d "$bundle/rust-hokusai/vendor"
-source "$bundle/setup-rust-env.sh"
-export CARGO_NET_OFFLINE=true
-workspace="$root/native/drawing_brush"
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$workspace/target}"
-export CARGO_BUILD_TARGET=x86_64-unknown-linux-gnu
+
+# Historical direct invocation remains usable; Make passes env instead.
+if [[ $# -gt 0 ]]; then
+  bundle="$(cd -- "$1" && pwd -P)"
+  source "$bundle/setup-rust-env.sh"
+  export CARGO_VENDOR_DIR="$bundle/rust-hokusai/vendor"
+  export CARGO_NET_OFFLINE=true
+fi
+
+CARGO="${CARGO:-cargo}"
+WORKSPACE="$ROOT/native/drawing_brush"
+TARGET_DIR="${CARGO_TARGET_DIR:-$WORKSPACE/target}"
+export CARGO_TARGET_DIR="$TARGET_DIR"
 export CARGO_INCREMENTAL=0
-# A clean clone contains only pinned manifests/lock. The vendored source path
-# is injected from the user's extracted archive rather than hard-coded in git.
-config="$(mktemp)"
-trap 'rm -f "$config"' EXIT
-printf '[source.crates-io]\nreplace-with = "vendored-sources"\n' >"$config"
-printf '[source.vendored-sources]\ndirectory = "%s"\n' "$bundle/rust-hokusai/vendor" >>"$config"
-printf '[net]\noffline = true\n' >>"$config"
-cd "$workspace"
-cargo --config "$config" build --offline --locked --release
-cargo --config "$config" fmt -- --check
-target="$root/addons/drawing/native"
-mkdir -p "$target/bin"
-cp -- "$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/libdrawing_brush.so" \
-  "$target/bin/libdrawing_brush.so"
-cp -- "$workspace/drawing_brush.gdextension.template" "$target/drawing_brush.gdextension"
-echo "Native addon available at $target (Linux x86-64, Godot 4.7 API)."
+args=(--locked --release --target "$TRIPLE")
+config=""
+if [[ -n "${CARGO_VENDOR_DIR:-}" ]]; then
+  [[ -d "$CARGO_VENDOR_DIR" ]] || { echo "Missing Cargo vendor directory: $CARGO_VENDOR_DIR" >&2; exit 2; }
+  config="$(mktemp)"
+  trap 'rm -f "$config"' EXIT
+  # Cargo TOML accepts escaped backslash and quote characters in source paths.
+  vendor_escaped="${CARGO_VENDOR_DIR//\\/\\\\}"
+  vendor_escaped="${vendor_escaped//\"/\\\"}"
+  printf '[source.crates-io]\nreplace-with = "vendored-sources"\n' > "$config"
+  printf '[source.vendored-sources]\ndirectory = "%s"\n' "$vendor_escaped" >> "$config"
+  printf '[net]\noffline = true\n' >> "$config"
+  args=(--offline "${args[@]}")
+  "$CARGO" --config "$config" build "${args[@]}" --manifest-path "$WORKSPACE/Cargo.toml"
+else
+  "$CARGO" build "${args[@]}" --manifest-path "$WORKSPACE/Cargo.toml"
+fi
+"$CARGO" fmt --manifest-path "$WORKSPACE/Cargo.toml" -- --check
+
+binary="$TARGET_DIR/$TRIPLE/release/libdrawing_brush.so"
+[[ -s "$binary" ]] || { echo "Native build did not produce $binary" >&2; exit 1; }
+destination="$ROOT/addons/drawing/native"
+mkdir -p "$destination/bin"
+cp -- "$binary" "$destination/bin/libdrawing_brush.so"
+cp -- "$WORKSPACE/drawing_brush.gdextension.template" "$destination/drawing_brush.gdextension"
+printf 'Required native Brush/Eraser: %s\n' "$destination/bin/libdrawing_brush.so"
