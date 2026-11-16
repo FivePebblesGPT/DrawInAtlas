@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T167_SNAPSHOT_FAILED: snapshot API returns checked result
+T167_SNAPSHOT_FAILED: valid snapshot returns matching revision
+T167_SNAPSHOT_FAILED: dirty source equals complete canonical Rust RGBA8
+T167_SNAPSHOT_FAILED: snapshot metadata retains original schema
+T167_SNAPSHOT_FAILED: unauthorized hidden-RGB snapshot rejected
+T167_SNAPSHOT_FAILED: byte-exact retry succeeds without rebase
+T167_SNAPSHOT_FAILED: detached save bytes cannot mutate native source
+T167_SNAPSHOT_FAILED: post-history snapshot still valid
+T167_SNAPSHOT_FAILED: native-ahead snapshot rejected
+T167_SNAPSHOT_FAILED: native-absent historical save snapshot remains supported
+T167_SNAPSHOT_FAILED: native-absent snapshot retains ordinary empty dirty map
+T167_SNAPSHOT_RESULT checks=25 failures=11

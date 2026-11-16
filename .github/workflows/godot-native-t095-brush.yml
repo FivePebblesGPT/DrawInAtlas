@@ -287,7 +287,8 @@ jobs:
             t163_clipboard_capture_signed_bounds:T163_CLIPBOARD_PASSED \
             t164_image_import_extent_bounds:T164_IMAGE_EXTENT_PASSED \
             t165_attached_native_revision_fence:T165_FENCE_PASSED \
-            t166_native_save_source_fence:T166_SAVE_FENCE_PASSED; do
+            t166_native_save_source_fence:T166_SAVE_FENCE_PASSED \
+            t167_checked_native_dirty_snapshot:T167_SNAPSHOT_PASSED; do
             name="${entry%%:*}"
             marker="${entry#*:}"
             timeout 150s godot --headless --path drawing --script "res://tests/${name}.gd" \

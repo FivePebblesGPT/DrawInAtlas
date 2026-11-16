@@ -1977,7 +1977,13 @@ static func transfer_subtree(source: DrawingDocument, target: DrawingDocument,
 	return inserted
 
 
-func snapshot_for_save() -> Dictionary:
+## Low-level dirty RGBA8 snapshot for save consumers. A snapshot is a
+## publication boundary, not permission to trust mutable Godot projection
+## bytes: require exact Rust source/revision authority before reading any
+## source bytes or exposing the detached payload. No lazy providers run here.
+func snapshot_for_save() -> DrawingResult:
+	if not _native_save_projection_matches():
+		return DrawingResult.failure("STALE_SOURCE", "Native raster source differs from save projection")
 	var tree: Array[Dictionary] = []
 	var ids: Array[String] = _nodes.keys()
 	ids.sort()
@@ -1999,9 +2005,9 @@ func snapshot_for_save() -> Dictionary:
 			dirty[combined] = tile.to_rgba8()
 		else:
 			removed.append(combined)
-	return {"id": id, "revision": revision, "stride": tile_stride,
+	return DrawingResult.success({"id": id, "revision": revision, "stride": tile_stride,
 		"density": [density_numerator, density_denominator], "tree": tree,
-		"dirty_rgba8": dirty, "removed_tile_ids": removed}
+		"dirty_rgba8": dirty, "removed_tile_ids": removed}, revision)
 
 
 func mark_published(saved_revision: int,

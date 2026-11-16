@@ -89,9 +89,21 @@ benchmarks are not current correctness or timing oracles.
   document revision. `STALE_SOURCE` rejects the operation without consuming
   native history or clearing save dirty state. This cold path uses existing
   native tile reads, without resolving previously unreferenced lazy sources.
-  The low-level `snapshot_for_save()` dictionary remains a T-148 integration
-  seam requiring an authoritative caller; this guard does not certify arbitrary
-  host-owned detached snapshots. See [T-166 evidence](evidence/T-166-2026-11-16-native-save-fence.md).
+  The low-level dirty snapshot was subsequently fenced by T-167; arbitrary
+  host-owned detached timeline snapshots still require universal native history
+  authority. See [T-166 evidence](evidence/T-166-2026-11-16-native-save-fence.md).
+
+- **Checked dirty snapshot (T-167):** `DrawingDocument.snapshot_for_save()`
+  now returns `DrawingResult` (success carries the existing `id`, `revision`,
+  `stride`, `density`, `tree`, `dirty_rgba8`, `removed_tile_ids` dictionary;
+  failure carries `STALE_SOURCE`). Before reading or returning any dirty RGBA8
+  bytes it applies the same no-lazy-load native revision, source identity, and
+  full-tile byte parity fence as manifest export. No dictionary fallback is
+  provided: callers must check `.ok` before consuming `.value`. A successful
+  snapshot is detached, and a rejected snapshot changes neither Rust authority
+  nor document dirty/history state. This is a checked export seam only, not a
+  migration of external Atlas/host-owned history snapshots. See
+  [T-167 evidence](evidence/T-167-2026-11-16-checked-dirty-snapshot.md).
 
 - **Public signed anchor guard (T-161):** The legacy-compatible
   `DrawingDocument.begin_edit`, `DrawingRenderer.render` and

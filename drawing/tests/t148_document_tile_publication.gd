@@ -121,9 +121,11 @@ func test_native_publication() -> void:
 		check(tile != null and tile.has_packed_rgba8(),
 			"native source remains packed rather than GDScript sparse map: " + key)
 		check(tile.to_rgba8() == images[key], "source tile bytes equal Rust export: " + key)
-	var snapshot: Dictionary = doc.snapshot_for_save()
+	var snapshot_result: DrawingResult = doc.snapshot_for_save()
+	check(snapshot_result.ok, "native snapshot passes checked authority fence")
+	var snapshot: Dictionary = snapshot_result.value if snapshot_result.ok else {}
 	for key: String in images:
-		check(snapshot["dirty_rgba8"][layer + ":" + key] == images[key],
+		check(snapshot.get("dirty_rgba8", {}).get(layer + ":" + key) == images[key],
 			".drawing save snapshot uses identical Rust bytes: " + key)
 	# The actual standalone file writer/loader must agree with native source
 	# bytes, not just the in-memory snapshot's metadata.
@@ -171,7 +173,8 @@ func test_native_publication() -> void:
 	var copy: PackedByteArray = images[first_key]
 	copy.encode_u32(0, 0xff123456)
 	images[first_key] = copy
-	check(doc.snapshot_for_save()["dirty_rgba8"][layer + ":" + first_key] != copy,
+	var detached_snapshot: DrawingResult = doc.snapshot_for_save()
+	check(detached_snapshot.ok and (detached_snapshot.value as Dictionary)["dirty_rgba8"][layer + ":" + first_key] != copy,
 		"caller mutation cannot rewrite document tile")
 
 
