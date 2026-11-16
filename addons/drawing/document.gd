@@ -1377,6 +1377,78 @@ func record_selection_change(before: DrawingHistoryContext,
 	return true
 
 
+## Historical local/Atlas events may hold per-pixel deltas from before a
+## native Brush attached its tile store. Convert those cold history entries
+## into checked whole-tile replay once Rust owns the document revision;
+## publishing only the Godot pixels would silently leave Rust one step behind.
+func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
+	if not _nodes.has(delta.layer_id) or not _editable(delta.layer_id):
+		return DrawingResult.failure("HISTORY_TARGET", "Legacy history layer unavailable")
+	var expected: Dictionary[String, int] = (delta.after if undo_action else delta.before).duplicate()
+	var replacement: Dictionary[String, int] = (delta.before if undo_action else delta.after).duplicate()
+	var source_layer: String = delta.layer_id
+	if expected.is_empty() or expected.size() != replacement.size():
+		return DrawingResult.failure("HISTORY_TARGET", "Invalid legacy pixel history")
+	var grouped: Dictionary[String, Array] = {}
+	# Bound the detached bytes prepared in Godot *before* entering Rust. Three
+	# full spans per tile cover source, replacement and temporary native replay.
+	var bytes_per_tile: int = tile_stride * tile_stride * 4
+	var max_tiles: int = mini(128, (256 * 1024 * 1024) / (3 * bytes_per_tile))
+	for coordinate: String in replacement:
+		if not expected.has(coordinate):
+			return DrawingResult.failure("HISTORY_TARGET", "Legacy pixel history is incomplete")
+		var parts: PackedStringArray = coordinate.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+			return DrawingResult.failure("COORD", "Malformed legacy pixel coordinate")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		if coordinate != TILES.pixel_key64(x, y) or abs(x) > 4503599627370496 \
+				or abs(y) > 4503599627370496:
+			return DrawingResult.failure("COORD", "Unsafe legacy history coordinate")
+		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
+		if not grouped.has(tile_key):
+			if grouped.size() >= max_tiles:
+				return DrawingResult.failure("HISTORY_TARGET", "Legacy history exceeds native tile budget")
+			grouped[tile_key] = []
+		var from_rgba: int = int(expected[coordinate])
+		var to_rgba: int = int(replacement[coordinate])
+		if from_rgba < 0 or from_rgba > 4294967295 \
+				or to_rgba < 0 or to_rgba > 4294967295:
+			return DrawingResult.failure("RGBA", "Legacy history has invalid RGBA8")
+		var offset: Vector2i = TILES.local_offset64(x, y, tile_stride)
+		grouped[tile_key].append([offset.y * tile_stride + offset.x, from_rgba, to_rgba])
+	var originals: Dictionary[String, PackedByteArray] = {}
+	var changed: Dictionary[String, PackedByteArray] = {}
+	var base_revision: int = revision
+	for key: String in grouped:
+		var source: DrawingResult = _resolve_chunk(source_layer, key)
+		if not source.ok:
+			return source
+		if revision != base_revision or not _nodes.has(source_layer) \
+				or not _editable(source_layer):
+			return DrawingResult.failure("STALE_REVISION", "History source changed during load")
+		var tile: DrawingRasterTile = source.value as DrawingRasterTile
+		var old_bytes: PackedByteArray = tile.to_rgba8() if tile != null else PackedByteArray()
+		var updated: PackedByteArray = old_bytes.duplicate()
+		if updated.is_empty():
+			updated.resize(tile_stride * tile_stride * 4)
+		for change: Array in grouped[key]:
+			var offset: int = int(change[0]) * 4
+			if updated.decode_u32(offset) != int(change[1]):
+				return DrawingResult.failure("STALE_PIXEL", "Legacy history source RGBA8 differs")
+			updated.encode_u32(offset, int(change[2]))
+		originals[key] = old_bytes
+		changed[key] = PackedByteArray() if updated.count(0) == updated.size() else updated
+	if delta.layer_id != source_layer or delta.before != (replacement if undo_action else expected) \
+			or delta.after != (expected if undo_action else replacement):
+		return DrawingResult.failure("STALE_PIXEL", "Legacy history changed during source loading")
+	# Canonical native replay resolves sources again, rechecking identities and
+	# bytes after every lazy callback and inside the atomic Rust transaction.
+	var native_delta: DrawingDelta = DrawingDelta.from_owned_tile_bytes(
+		source_layer, tile_stride, originals, changed)
+	return _replay_native_tile_delta(native_delta, false)
+
+
 ## Replays a detached delta without creating a second history entry.
 ## The caller must validate the stable document identity before invoking it.
 func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
@@ -1385,6 +1457,8 @@ func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
 	var result: DrawingResult
 	if delta.tile_stride > 0:
 		result = _replay_native_tile_delta(delta, undo_action)
+	elif _native_raster_store != null:
+		result = _replay_pixel_delta_native(delta, undo_action)
 	else:
 		result = _publish_edit(delta.layer_id, revision,
 			delta.after if undo_action else delta.before,

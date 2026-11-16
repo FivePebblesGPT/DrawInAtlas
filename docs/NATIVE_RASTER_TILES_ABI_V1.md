@@ -113,6 +113,29 @@ This does not replace T-154 byte-checked Undo/Redo park/unpark or make
 GDScript text glyph rasterization a Rust operation. See
 [T-155 evidence](evidence/T-155-2026-11-16-reraster.md).
 
+## Historical pixel-map history replay after native attachment (T-156, 2026-11-16)
+
+`DrawingDelta` events from pre-native ordinary raster work may carry only
+`before/after` pixel dictionaries (`tile_stride == 0`). When the document
+already has `DrawingNativeTiles`, `replay_delta` now converts those cold
+history events into bounded detached whole-tile RGBA8 images, then calls the
+**same** `_replay_native_tile_delta` and Rust `replay_detached_history` used
+by native snapshots. It never publishes a Godot-only raster revision while an
+attached Rust owner remains in sync; malformed/noncanonical signed pixel
+IDs, changed caller-owned deltas, stale pixels, native-ahead revisions and
+oversized tile sets reject before Rust mutates. The conversion limits
+allocated tile spans to 128 and conservatively budgeted 256MiB before any
+lazy source resolution; it neither creates per-pixel Brush stage calls nor
+invents new Rust Undo tokens outside the document/Atlas chronological owner.
+
+Detached native replay deliberately clears obsolete Rust tokens; an older
+pixel-map event remains a host-owned history snapshot. Its later Undo/Redo
+repeats the checked native replay, including when the next Hokusai event's
+Rust token has been invalidated. Without an attached native store, the
+historical direct-session pixel publisher remains outside this narrow bridge.
+General source producers, host history lifetime and final T-148 universal
+authority still require further integration. See [T-156 evidence](evidence/T-156-2026-11-16-legacy-pixel-native.md).
+
 ## Native-owned text/raster history parking (T-154, 2026-11-16)
 
 `DrawingDocument._replay_text_tree` calls the existing bounded native
