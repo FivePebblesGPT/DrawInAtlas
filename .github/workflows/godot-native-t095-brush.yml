@@ -349,6 +349,17 @@ jobs:
             2>&1 | tee /tmp/t174-native-semantic.log
           python3 tools/check_godot_model_log.py /tmp/t174-native-semantic.log \
             --marker T174_SEMANTIC_PASSED
+      - name: T-175 native-authoritative semantic-only detached subtree import
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t175_semantic_import_native_fence.gd \
+            2>&1 | tee /tmp/t175-native-semantic-import.log
+          python3 tools/check_godot_model_log.py /tmp/t175-native-semantic-import.log \
+            --marker T175_SEMANTIC_IMPORT_PASSED
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

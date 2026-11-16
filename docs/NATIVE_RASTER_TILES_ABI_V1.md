@@ -411,3 +411,16 @@ native source bytes/Undo tokens; new semantic edits discard branched Redo.
 A native-absent document retains the pre-T-150 behavior. Structural-history
 replay and semantic-only detached subtree import are **not** made universal
 by this checkpoint; see [T-174 evidence](evidence/T-174-2026-11-16-native-semantic-preflight.md).
+
+**T-175 semantic-only detached import fence (2026-11-16):** The no-raster
+branch of `DrawingDocument.import_subtree` now uses the same pre-publication
+`_advance_checked_layer_metadata()` protocol as T-173/T-174. Previously it
+called `_advance_nonraster_revision`, which advanced Godot and detached Rust
+when an active transaction or divergent native revision rejected metadata;
+standalone Copy could thus half-publish the destination. Prepared semantic
+nodes remain detached on `NATIVE_METADATA` or `STALE_REVISION`, with original
+Rust tile/history authority intact. A successful import advances one shared
+revision, then installs its prepared group/text/object tree as an untracked
+change. Historical native-absent imports are unchanged. This does **not** fix
+internal structure replay or the host-owned detached history timeline; see
+[T-175 evidence](evidence/T-175-2026-11-16-semantic-import-fence.md).

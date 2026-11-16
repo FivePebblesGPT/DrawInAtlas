@@ -90,8 +90,8 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 
 ## Public metadata and semantic operations acquire the native revision *before*
 ## mutating Godot's tree or objects. The older post-mutation bridge remains
-## for internal structural-history and semantic-only detached import paths;
-## public failure must never detach canonical Rust source. No callbacks occur
+## for internal structural-history paths; public and detached-import
+## failure must never detach canonical Rust source. No callbacks occur
 ## between the checked native step and the deterministic live-state write.
 func _advance_checked_layer_metadata() -> DrawingResult:
 	if _native_raster_store != null:
@@ -2044,12 +2044,17 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		prepared[imported.id] = imported
 		if imported.kind == DrawingLayerNode.RASTER:
 			imported_rasters.append(imported.id)
-	# All native preflight is side-effect-free. This previously used a bare
-	# revision increment, which forced a history-clearing rebase even when
+	# Prepare the full tree before a checked, single-step native revision.
+	# The previous raster import used a bare increment and forced a rebase even when
 	# every imported raster layer was new to Rust. The checked bridge keeps
 	# unrelated native Brush history and source authorizations alive.
 	if imported_rasters.is_empty():
-		_advance_nonraster_revision()
+		# Semantic-only detached imports must obey the same fail-closed native
+		# revision boundary as public object/text edits. The old post-mutation
+		# bridge advanced Godot and dropped the Rust attachment on rejection.
+		var metadata: DrawingResult = _advance_checked_layer_metadata()
+		if not metadata.ok:
+			return metadata
 	else:
 		# A rejected native bridge is not permission to publish a Godot-only
 		# subtree. Keep the detached projection uninstalled and allow retry.
