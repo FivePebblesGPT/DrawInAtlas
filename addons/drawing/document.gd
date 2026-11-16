@@ -443,13 +443,22 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 	# preserve the conservative rebase boundary.
 	var raster_layers: Array[String] = []
 	_subtree_raster_ids(node_id, raster_layers)
+	var resident_nodes: Dictionary = {}
+	if _native_raster_store != null and not raster_layers.is_empty():
+		# An attached Rust store must authorize the deletion before the Godot
+		# tree changes. A rejected park/retire may not degrade into a silent
+		# revision-only edit that strands canonical tiles and Undo tokens.
+		if not _attached_native_revision_matches(revision):
+			return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before removal")
+		var resident_ids: Array[String] = []
+		_gather_ids(node_id, resident_ids)
+		for identifier: String in resident_ids:
+			resident_nodes[identifier] = _nodes[identifier]
+		if not _native_tree_sources_match(resident_nodes, false):
+			return DrawingResult.failure("STALE_SOURCE", "Native raster subtree source changed")
 	var parked: bool = false
 	if not raster_layers.is_empty() and record_history and not external_history:
-		var resident_nodes: Dictionary = {}
-		for identifier: String in ids:
-			resident_nodes[identifier] = _nodes[identifier]
-		if _native_tree_sources_match(resident_nodes, false):
-			parked = _advance_parked_structure_revision(raster_layers, false, true)
+		parked = _advance_parked_structure_revision(raster_layers, false, true)
 	if parked:
 		before["native_parked"] = true
 	var retired: bool = false
@@ -458,19 +467,26 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 	if not parked and not raster_layers.is_empty() and (not record_history or external_history):
 		# External/transfer callers do not create a reversible tree event.
 		# Verify canonical source before permanently retiring these IDs.
-		var resident_nodes: Dictionary = {}
 		_gather_ids(node_id, removed_ids)
-		for identifier: String in removed_ids:
-			resident_nodes[identifier] = _nodes[identifier]
 		if _native_raster_store != null:
 			retained_history = _prepare_retired_local_history(removed_ids)
 		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes)
+	var unreferenced: bool = false
+	if not raster_layers.is_empty() and _native_raster_store != null and not parked and not retired:
+		# A never-authorized raster may be removed without parking any bytes,
+		# but Rust must prove it has neither source nor history references.
+		# This is the last fallible step before deterministic Godot erasure.
+		unreferenced = bool(_native_raster_store.call("advance_unreferenced_layers_revision",
+			revision, PackedStringArray(raster_layers), true))
+		if not unreferenced:
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster subtree removal rejected")
+		revision += 1
 	_erase_subtree(node_id)
 	if retired and not retained_history.is_empty():
 		_events = retained_history["events"]
 		_content_states = retained_history["states"]
 		_cursor = int(retained_history["cursor"])
-	if parked or retired:
+	if parked or retired or unreferenced:
 		pass # Rust and document revisions advanced before the deterministic erase.
 	elif not raster_layers.is_empty():
 		_advance_raster_structure_revision(raster_layers)
