@@ -41,6 +41,8 @@ var _saved_untracked_revision: int = 0
 ## history in one checked rebase before the next native brush transaction.
 var _native_raster_store: Object
 var _native_source_identities: Dictionary[String, Variant] = {}
+## Reentrant lazy providers must never resolve the same key recursively.
+var _resolving_chunks: Dictionary[String, bool] = {}
 
 
 func _native_store_for_edit(expected: int) -> Object:
@@ -559,15 +561,36 @@ func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 		return DrawingResult.failure("LAYER", "Missing raster layer")
 	var lookup: String = layer_id + ":" + key
 	if _pending_tiles.has(lookup):
+		if _resolving_chunks.has(lookup):
+			return DrawingResult.failure("SOURCE_BUSY", "Recursive lazy chunk resolution " + lookup)
 		var pending: Dictionary = _pending_tiles[lookup]
 		var provider: Callable = pending["fetch"] as Callable
 		if not provider.is_valid():
 			return DrawingResult.failure("MISSING_TILE", "No provider for referenced chunk " + lookup)
-		var content: Variant = provider.call(pending["ref"])
+		# A loader is arbitrary external code. It can mutate the document, swap
+		# the pending reference, or remove/recreate the layer before returning.
+		# Capture its authority before entering the callback; never install a
+		# decoded tile from an obsolete pending reference.
+		var source_node: DrawingLayerNode = _nodes[layer_id]
+		var source_revision: int = revision
+		var source_epoch: int = display_source_epoch
+		var source_ref: Variant = pending.get("ref")
+		var source_digest: Variant = pending.get("sha256")
+		var known_ref: Dictionary = (_known_refs.get(lookup, {}) as Dictionary).duplicate(true)
+		_resolving_chunks[lookup] = true
+		var content: Variant = provider.call(source_ref)
+		_resolving_chunks.erase(lookup)
+		if revision != source_revision or display_source_epoch != source_epoch:
+			return DrawingResult.failure("STALE_REVISION", "Lazy source changed document revision or epoch")
+		if not _nodes.has(layer_id) or _nodes[layer_id] != source_node 				or not _pending_tiles.has(lookup) or _nodes[layer_id].tiles.has(key):
+			return DrawingResult.failure("STALE_SOURCE", "Lazy source layer or pending tile was replaced")
+		var current: Dictionary = _pending_tiles[lookup]
+		if current.get("ref") != source_ref or current.get("sha256") != source_digest 				or current.get("fetch") != provider or _known_refs.get(lookup) != known_ref:
+			return DrawingResult.failure("STALE_SOURCE", "Lazy source reference changed during fetch")
 		if not content is PackedByteArray:
 			return DrawingResult.failure("MISSING_TILE", "Referenced chunk is missing " + lookup)
 		var bytes: PackedByteArray = content
-		if bytes.size() != tile_stride * tile_stride * 4 or DrawingRasterTile.digest_rgba8(bytes, tile_stride) != pending["sha256"]:
+		if bytes.size() != tile_stride * tile_stride * 4 or DrawingRasterTile.digest_rgba8(bytes, tile_stride) != source_digest:
 			return DrawingResult.failure("CORRUPT_TILE", "Referenced chunk is corrupt " + lookup)
 		var decoded: DrawingRasterTile = DrawingRasterTile.from_rgba8(tile_stride, bytes)
 		if decoded == null:

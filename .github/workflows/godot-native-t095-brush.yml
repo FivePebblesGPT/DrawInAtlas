@@ -277,7 +277,8 @@ jobs:
             t147_native_stroke_contract:T147_NATIVE_CONTRACT_PASSED \
             native_brush_fallback:T095_NATIVE_REQUIRED_RESULT \
             native_brush_integration:T095_NATIVE_BRUSH_RESULT \
-            t148_native_tiles_contract:T148_NATIVE_TILES_RESULT; do
+            t148_native_tiles_contract:T148_NATIVE_TILES_RESULT \
+            t157_lazy_source_reentrant_guard:T157_LAZY_GUARD_PASSED; do
             name="${entry%%:*}"
             marker="${entry#*:}"
             timeout 150s godot --headless --path drawing --script "res://tests/${name}.gd" \

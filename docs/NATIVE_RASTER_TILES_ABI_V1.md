@@ -158,3 +158,20 @@ retained instead of pretending to own new data. A store *ahead* is rejected.
 This handles reversible **history playback of previously-owned** rasterized
 text, not arbitrary live text rerasterization into a parked ID or complete
 native-only history serialization. See [T-154 evidence](evidence/T-154-2026-11-16-text-raster-parking.md).
+
+## Reentrant lazy source materialization (T-157, 2026-11-16)
+
+`DrawingDocument._resolve_chunk` is a **Godot consumer source-hydration**
+boundary, not a Rust paint kernel. A pending blob's loader is an external
+callback and can reenter document edits, repoint its pending source, or
+recursively request the same key. Before callback invocation, Godot freezes
+its revision, display-source epoch, layer identity, lazy ref/digest/loader and
+known persistence metadata. Once the callback returns, it rejects changed
+authority **before** decoding or installing RGBA8. A per-document key guard
+rejects recursive same-key requests with `SOURCE_BUSY`; changed revision
+returns `STALE_REVISION`, changed layer/pending source returns `STALE_SOURCE`.
+An unsuccessful fetch leaves the current pending reference in place for a
+corrected retry. Exact byte length, straight-RGBA8 SHA-256 and hidden RGB are
+still required. This closes a direct read/display stale-source gap but does
+not serialize Rust history or make all non-Brush raster producers native. See
+[T-157 evidence](evidence/T-157-2026-11-16-lazy-guard.md).
