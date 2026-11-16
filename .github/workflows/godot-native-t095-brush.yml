@@ -384,6 +384,19 @@ jobs:
             --marker T177_RASTER_PASSED
           grep -Fqx 'T177_RASTER_RESULT checks=89 failures=0' \
             /tmp/t177-raster-native-history.log
+      - name: T-178 checked semantic text Undo/Redo against native history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t178_text_history_native_fence.gd \
+            2>&1 | tee /tmp/t178-text-native-history.log
+          python3 tools/check_godot_model_log.py /tmp/t178-text-native-history.log \
+            --marker T178_TEXT_HISTORY_PASSED
+          grep -Fqx 'T178_TEXT_HISTORY_RESULT checks=43 failures=0' \
+            /tmp/t178-text-native-history.log
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

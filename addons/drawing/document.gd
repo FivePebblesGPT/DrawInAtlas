@@ -1893,7 +1893,18 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 	var kind_transition: bool = expected != null and target != null and \
 		(expected.kind == DrawingLayerNode.RASTER) != (target.kind == DrawingLayerNode.RASTER)
 	var native_bridged: bool = false
+	var metadata_advanced: bool = false
 	var parked: bool = false
+	# Semantic-only text creation/edit replay must acquire Rust's revision
+	# before modifying the Godot tree or history cursor. The previous
+	# post-mutation bridge detached a busy/stale native store on rejection.
+	var semantic_only: bool = (target == null or target.kind == DrawingLayerNode.TEXT) and \
+		(expected == null or expected.kind == DrawingLayerNode.TEXT)
+	if semantic_only:
+		var metadata: DrawingResult = _advance_checked_layer_metadata(false)
+		if not metadata.ok:
+			return metadata
+		metadata_advanced = true
 	if kind_transition and _native_raster_store != null:
 		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
 		if native_revision > revision:
@@ -1933,10 +1944,7 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 			_dirty_tiles[layer_id + ":" + tile_key] = true
 	if native_bridged:
 		revision += 1
-	elif (target == null or target.kind == DrawingLayerNode.TEXT) and \
-			(expected == null or expected.kind == DrawingLayerNode.TEXT):
-		_advance_nonraster_revision(false)
-	else:
+	elif not metadata_advanced:
 		_advance_raster_structure_revision([layer_id], false)
 	return DrawingResult.success(null, revision)
 

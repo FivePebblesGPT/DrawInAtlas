@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T148_PERSISTENT_RESULT checks=44 failures=2
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+T148_PERSISTENT_FAILED: reentrant source lock at document preflight commits no pixels/history
+T148_PERSISTENT_FAILED: reentrant lock detaches active store rather than leaving a stale authority

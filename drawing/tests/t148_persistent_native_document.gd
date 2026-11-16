@@ -163,12 +163,17 @@ func run() -> void:
 	malicious.lock_on_read = 3
 	var rejected: DrawingResult = stroke(malicious, malicious_layer,
 		Vector2(11.5, 11.5), Vector2(14.5, 11.5))
-	check(not rejected.ok and malicious.history_length() == 0 and
-		malicious._nodes[malicious_layer].tiles.is_empty(),
-		"reentrant source lock at document preflight commits no pixels/history")
-	check(malicious._native_raster_store == null,
-		"reentrant lock detaches active store rather than leaving a stale authority")
-	check(malicious.set_locked(malicious_layer, false).ok, "reentrant lock can be repaired")
+	# Since T-173, a lazy provider cannot lock a layer while the native
+	# transaction is active. The lock itself fails closed and the unchanged
+	# source/permission lets the pending Brush commit on the same Rust store.
+	check(rejected.ok and malicious.history_length() == 1 and
+		not malicious._nodes[malicious_layer].tiles.is_empty() and
+		not malicious._nodes[malicious_layer].locked,
+		"reentrant lock rejection leaves the valid Brush stroke committed")
+	check(malicious._native_raster_store != null and
+		int(malicious._native_raster_store.call("stats").get("revision", -1)) == malicious.revision,
+		"rejected lock preserves native authority and revision")
+	check(malicious.set_locked(malicious_layer, false).ok, "unlocked layer remains available")
 	malicious.lock_on_read = -1
 	check(stroke(malicious, malicious_layer,
 		Vector2(11.5, 11.5), Vector2(14.5, 11.5)).ok,

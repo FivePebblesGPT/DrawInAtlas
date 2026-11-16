@@ -1,0 +1,34 @@
+suite	exit	marker	result
+t178_text_history_native_fence	0	1	T178_TEXT_HISTORY_PASSED
+t177_raster_history_native_fence	0	1	T177_RASTER_PASSED
+t176_structural_history_native_fence	0	1	T176_STRUCTURAL_PASSED
+t174_semantic_native_preflight	0	1	T174_SEMANTIC_PASSED
+t175_semantic_import_native_fence	0	1	T175_SEMANTIC_IMPORT_PASSED
+t154_text_raster_parked_history	0	1	T154_PARKED_PASSED checks=30 failures=0
+t155_text_reraster_native_history	0	1	T155_RERASTER_PASSED checks=32 failures=0
+t148_text_raster_native_revision	0	1	T148_TEXT_RASTER_PASSED (32 checks; 0 failed)
+t148_native_tiles_contract	0	1	T148_NATIVE_TILES_PASSED checks=312 failures=0
+t148_metadata_native_revision	0	1	T148_METADATA_RESULT checks=61 failures=0
+t148_import_subtree_native_revision	0	1	T148_IMPORT_RESULT checks=33 failures=0
+t148_unrecorded_retire_native_revision	0	1	T148_RETIRE_PASSED checks=34 failures=0
+t168_native_subtree_removal_fence	0	1	T168_SUBTREE_PASSED (30 checks; 0 failed)
+t169_native_import_fence	0	1	T169_IMPORT_PASSED
+t165_attached_native_revision_fence	0	1	T165_FENCE_PASSED (51 checks; 0 failed)
+t156_legacy_pixel_native_replay	0	1	T156_LEGACY_NATIVE_RESULT checks=37 failures=0
+t173_native_metadata_preflight	0	1	T173_METADATA_PASSED
+t148_persistent_native_document	0	1	T148_PERSISTENT_RESULT checks=44 failures=0
+root_import	0	1	import
+drawing_text_smoke	0	1	DRAWING_TEXT_PASSED (60 checks; 0 failed)
+drawing_history_smoke	0	1	DRAWING_HISTORY_PASSED (101 checks; 0 failed)
+t148_atlas_native_tile_history	0	1	T148_ATLAS_NATIVE_RESULT checks=43 failures=0
+t148_object_native_source	0	1	T148_OBJECT_NATIVE_PASSED (38 checks; 0 failed)
+t148_native_history_reentrant_replay	0	1	T148_HISTORY_REENTRANT_PASSED checks=26 failures=0
+t148_detached_native_replay	0	1	T148_DETACHED_PASSED checks=21 failures=0
+object_editor_smoke	0	1	OBJECT_EDITOR_PASSED (45 checks; 0 failed)
+rust_tests	0	1	25/25 tests
+rustfmt	0	1	cargo fmt --check
+clippy	0	1	-D warnings
+release_build	0	1	release build
+drawing_import	0	1	resource import
+graphic_cutover	0	1	T148_CANVAS_TILES_RESULT checks=46 failures=0
+graphic_96px	0	1	strict checker all_valid=true

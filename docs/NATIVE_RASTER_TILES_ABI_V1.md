@@ -453,3 +453,17 @@ that already has retained native tokens cannot be undone via the
 unreferenced-layer bridge; refusal is preferable to silent source loss.
 Host-owned detached history and other unbridged raster mutation paths remain
 T-148 work; see [T-177 evidence](evidence/T-177-2026-11-16-raster-history.md).
+
+**T-178 checked local semantic text-history replay (2026-11-16):**
+`DrawingDocument._replay_text_tree()` now requests
+`advance_metadata_revision(revision, false)` through the same typed checked
+bridge as public `commit_text`, **before** replacing semantic TEXT nodes or
+changing parent membership on Undo/Redo. A busy native transaction returns
+`NATIVE_METADATA`; a divergent attached revision returns `STALE_REVISION`.
+Neither failure changes the document history cursor, text content, native
+RGBA8 (including hidden RGB), or Rust Undo/Redo tokens. Accepted replay
+advances both revisions exactly once and retains native Redo. Native-absent
+semantic text history remains usable. TEXT↔RASTER transitions still use the
+separate T-154 parking bridge, and host-owned detached history is not newly
+made native-authoritative by this change; see
+[T-178 evidence](evidence/T-178-2026-11-16-text-history.md).
