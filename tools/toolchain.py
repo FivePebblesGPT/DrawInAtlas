@@ -59,14 +59,15 @@ def download(url: str, expected_sha: str, destination: Path, local_source: str =
     if not url.startswith("https://") or len(expected_sha) != 64:
         raise ToolchainError("Toolchain downloads require HTTPS and a pinned SHA-256 digest")
     destination.parent.mkdir(parents=True, exist_ok=True)
+    source_file = Path(local_source).expanduser().resolve() if local_source else None
+    if source_file is not None:
+        if not source_file.is_file() or sha256_file(source_file) != expected_sha:
+            raise ToolchainError(f"Local artifact missing or SHA-256 incorrect: {source_file}")
     if destination.is_file() and sha256_file(destination) == expected_sha:
         return
     temp = destination.with_suffix(destination.suffix + ".part")
     try:
-        if local_source:
-            source_file = Path(local_source).expanduser().resolve()
-            if not source_file.is_file():
-                raise ToolchainError(f"Local pinned artifact does not exist: {source_file}")
+        if source_file is not None:
             shutil.copyfile(source_file, temp)
         else:
             with urllib.request.urlopen(url, timeout=120) as source, temp.open("wb") as output:
