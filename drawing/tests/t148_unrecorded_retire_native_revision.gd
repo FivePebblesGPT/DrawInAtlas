@@ -145,14 +145,19 @@ func run() -> void:
 		"stale-source fixture owns two layers")
 	var old_store: Object = stale._native_raster_store
 	var previous_native: int = int(old_store.call("stats").get("revision", -1))
-	(stale._nodes[victim].tiles["0,0"] as DrawingRasterTile).set_rgba(0, 0, 0x00112233)
-	check(stale.remove_subtree(victim).ok and stale.revision == previous_native + 1 and
+	var stale_tile: DrawingRasterTile = stale._nodes[victim].tiles["0,0"]
+	var old_pixel: int = stale_tile.get_rgba(0, 0)
+	check(stale_tile.set_rgba(0, 0, 0x00112233), "mutate hidden RGB in native-owned source")
+	var rejected: DrawingResult = stale.remove_subtree(victim)
+	check(not rejected.ok and rejected.code == "STALE_SOURCE" and
+		stale.revision == previous_native and stale.has_node(victim) and
 		int(old_store.call("stats").get("revision", -1)) == previous_native,
-		"tampered canonical source refuses fast retirement; bridge stays stale")
-	check(stroke(stale, safe, Vector2(40, 40)).ok and
+		"tampered canonical source fails closed without removing the subtree")
+	check(stale_tile.set_rgba(0, 0, old_pixel) and
+		stroke(stale, safe, Vector2(40, 40)).ok and
 		int(old_store.call("stats").get("revision", -1)) == stale.revision and
-		int(old_store.call("stats").get("undo", -1)) == 1,
-		"next Brush performs checked rebase without accepting stale history")
+		int(old_store.call("stats").get("undo", -1)) == 3,
+		"restored source permits Brush without discarding unrelated native history")
 	# Native park/restore remains reserved for reversible recorded removals.
 	var parked_doc: DrawingDocument = DrawingDocument.new("parked", STRIDE)
 	var park: String = str(parked_doc.create_layer(DrawingLayerNode.RASTER, "Park").value)

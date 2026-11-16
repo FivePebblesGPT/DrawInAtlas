@@ -404,6 +404,32 @@ func can_remove_subtree(node_id: String) -> bool:
 	return node_id != ROOT_ID and _nodes.has(node_id) and _editable(node_id)
 
 
+## Read-only source-side gate for cross-document moves. A destination must
+## never publish imported tiles before the source proves that its native
+## raster ownership can be retired. No lazy provider is called by this gate.
+## Keep this paired with remove_subtree's unrecorded retirement checks.
+func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
+	if not can_remove_subtree(node_id):
+		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
+	var rasters: Array[String] = []
+	_subtree_raster_ids(node_id, rasters)
+	if _native_raster_store == null or rasters.is_empty():
+		return DrawingResult.success(null, revision)
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Native source revision diverged before transfer")
+	var ids: Array[String] = []
+	_gather_ids(node_id, ids)
+	var nodes: Dictionary = {}
+	for identifier: String in ids:
+		nodes[identifier] = _nodes[identifier]
+	if not _native_tree_sources_match(nodes, false):
+		return DrawingResult.failure("STALE_SOURCE", "Native subtree bytes differ before transfer")
+	if not bool(_native_raster_store.call("can_retire_layers_revision",
+			revision, PackedStringArray(rasters))):
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Native source retirement refused before transfer")
+	return DrawingResult.success(null, revision)
+
+
 func remove_subtree(node_id: String, record_history: bool = false) -> DrawingResult:
 	if not can_remove_subtree(node_id):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
@@ -1994,12 +2020,22 @@ static func transfer_subtree(source: DrawingDocument, target: DrawingDocument,
 	var exported: DrawingResult = source.export_subtree(node_id)
 	if not exported.ok:
 		return exported
+	if source.revision != source_revision or target.revision != target_revision:
+		return DrawingResult.failure("STALE_REVISION", "Transfer changed during source export")
+	if move:
+		var allowed: DrawingResult = source.preflight_unrecorded_subtree_removal(node_id)
+		if not allowed.ok:
+			return allowed
 	var inserted: DrawingResult = target.import_subtree(exported.value, target_parent, move)
 	if not inserted.ok:
 		return inserted
 	if move:
-		# The previous validation and single-threaded commit prevent an aliasing window.
-		source.remove_subtree(node_id)
+		var removed: DrawingResult = source.remove_subtree(node_id)
+		if not removed.ok:
+			var rolled_back: DrawingResult = target.remove_subtree(str(inserted.value))
+			if not rolled_back.ok:
+				return DrawingResult.failure("TRANSFER_ROLLBACK", "Source and destination require manual recovery")
+			return removed
 	return inserted
 
 

@@ -298,6 +298,17 @@ jobs:
               2>&1 | tee "/tmp/t153-${name}.log"
             python3 tools/check_godot_model_log.py "/tmp/t153-${name}.log" --marker "$marker"
           done
+      - name: T-170 native source retirement preflight across Atlas moves
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            godot --headless --editor --path . --import --quit
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path . \
+            --script res://tests/t170_cross_document_move_preflight.gd \
+            2>&1 | tee /tmp/t170-native-transfer.log
+          python3 tools/check_godot_model_log.py /tmp/t170-native-transfer.log \
+            --marker T170_TRANSFER_PASSED
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

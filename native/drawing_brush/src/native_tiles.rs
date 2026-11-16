@@ -695,12 +695,11 @@ impl TileStore {
     /// pixels. Retire only the specified layer IDs, including their native
     /// source authorization and tile history; unrelated layer tokens survive.
     /// All validation happens before a single mutation boundary.
-    fn retire_layers(
-        &mut self,
-        expected: u64,
-        layers: &[String],
-        discard_redo: bool,
-    ) -> Result<(), &'static str> {
+    /// Read-only counterpart of the unrecorded removal gate. Cross-document
+    /// moves check this before publishing the destination, so a busy/stale
+    /// source cannot leave a half-transferred tree. No revision, source or
+    /// history state is changed by this check.
+    fn can_retire_layers(&self, expected: u64, layers: &[String]) -> Result<(), &'static str> {
         if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
             return Err("Active edit, stale or overflowing retire revision");
         }
@@ -714,6 +713,17 @@ impl TileStore {
         {
             return Err("Invalid, repeated or parked retired raster-layer ID");
         }
+        Ok(())
+    }
+
+    fn retire_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+        discard_redo: bool,
+    ) -> Result<(), &'static str> {
+        self.can_retire_layers(expected, layers)?;
+        let ids: HashSet<&str> = layers.iter().map(String::as_str).collect();
         self.tiles
             .retain(|tile, _| !ids.contains(tile.layer.as_str()));
         self.authorized
@@ -1072,6 +1082,18 @@ impl DrawingNativeTiles {
         self.store
             .advance_unreferenced_layers(expected as u64, &ids, discard_redo)
             .is_ok()
+    }
+
+    /// Read-only retire preflight for a source-side cross-document move.
+    /// Mirrors the exact validation used by retire_layers_revision, including
+    /// active edit, revision, ID limit and parked-layer checks.
+    #[func]
+    fn can_retire_layers_revision(&self, expected: i64, layers: PackedStringArray) -> bool {
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store.can_retire_layers(expected as u64, &ids).is_ok()
     }
 
     /// A direct unrecorded deletion permanently retires the named raster
@@ -1661,6 +1683,42 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn t170_retire_preflight_is_read_only_and_matches_commit_gate() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let ids = vec!["ink".to_owned()];
+        let source = store.tiles.clone();
+        assert!(store.can_retire_layers(0, &ids).is_ok());
+        assert!(store.can_retire_layers(0, &ids).is_ok());
+        assert_eq!(store.revision, 0);
+        assert!(store.tiles == source);
+        assert!(store.can_retire_layers(1, &ids).is_err());
+        assert!(
+            store
+                .can_retire_layers(0, &["ink".into(), "ink".into()])
+                .is_err()
+        );
+        assert!(store.can_retire_layers(0, &[String::new()]).is_err());
+        assert!(
+            store
+                .can_retire_layers(0, &vec!["x".into(); MAX_ACTIVE_TILES + 1])
+                .is_err()
+        );
+        let tx = store.begin("ink", 0, false).unwrap();
+        assert!(store.can_retire_layers(0, &ids).is_err());
+        assert_eq!(store.revision, 0);
+        assert!(store.transaction_matches(tx, 0, "ink"));
+        store.active = None;
+        store.parked_layers.insert("ink".into());
+        assert!(store.can_retire_layers(0, &ids).is_err());
+        store.parked_layers.clear();
+        assert!(store.can_retire_layers(0, &ids).is_ok());
+        store.retire_layers(0, &ids, true).unwrap();
+        assert_eq!(store.revision, 1);
+        assert!(store.tiles.is_empty());
+    }
+
     #[test]
     fn hokusai_eraser_uses_dab_alpha_and_preserves_hidden_rgb_and_history() {
         let mut store = initialized(16);
