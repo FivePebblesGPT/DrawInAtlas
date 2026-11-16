@@ -381,7 +381,7 @@ def bundle(output: Path, python: str) -> None:
                                      encoding="utf-8")
         temporary_archive = output.with_name(output.name + ".part")
         try:
-            run(["tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0",
+            run(["tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--hard-dereference",
                  "--numeric-owner", "--dereference", "-I", "zstd -19 -T1", "-cf",
                  str(temporary_archive), "-C", str(stage), "."])
             os.replace(temporary_archive, output)
