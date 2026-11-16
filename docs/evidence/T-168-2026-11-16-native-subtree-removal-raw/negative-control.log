@@ -1,0 +1,23 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T168_SUBTREE_FAILED: tampered native subtree refuses recorded removal
+T168_SUBTREE_FAILED: rejected removal preserves complete Godot structure and revision
+T168_SUBTREE_FAILED: rejected removal preserves local history timeline
+T168_SUBTREE_FAILED: busy native store rejects recorded removal
+T168_SUBTREE_FAILED: busy rejection leaves Godot and native revisions/history unchanged
+T168_SUBTREE_FAILED: valid recorded group removal succeeds
+T168_SUBTREE_FAILED: recorded removal parks native subtree in matching revision
+T168_SUBTREE_FAILED: Undo restores exact raster bytes from Rust
+T168_SUBTREE_FAILED: Redo re-parks the same native source
+T168_SUBTREE_FAILED: unrelated native source and revision remain authoritative
+T168_SUBTREE_FAILED: begin second active native edit
+T168_SUBTREE_FAILED: busy native store rejects unrecorded removal without erasing layer
+T168_SUBTREE_FAILED: unrecorded rejection retains native source and revision
+T168_SUBTREE_FAILED: discard second blocking transaction
+T168_SUBTREE_FAILED: valid unrecorded retirement keeps unrelated native source
+T168_SUBTREE_FAILED: unreferenced raster removal advances native and Godot together
+T168_SUBTREE_FAILED: unreferenced raster Undo retains synchronized revisions
+T168_SUBTREE_FAILED: inject independent native revision advance
+T168_SUBTREE_FAILED: native-ahead subtree removal rejected without Godot mutation
+T168_SUBTREE_RESULT checks=30 failures=19

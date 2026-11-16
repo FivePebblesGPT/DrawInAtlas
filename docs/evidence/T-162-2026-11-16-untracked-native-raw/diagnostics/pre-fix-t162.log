@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T162_UNTRACKED_FAILED: direct publication shares a native revision
+T162_UNTRACKED_FAILED: canonical native source retains signed hidden RGB
+T162_UNTRACKED_FAILED: untracked write invalidates obsolete native tokens instead of inventing one
+T162_UNTRACKED_FAILED: untracked native publication marks source dirty since saved Hokusai baseline
+T162_UNTRACKED_FAILED: stale direct source is failure atomic
+T162_UNTRACKED_FAILED: existing native source accepts a checked nonhistorical update
+T162_UNTRACKED_FAILED: existing signed tile preserves both alpha-zero hidden-RGB pixels
+T162_UNTRACKED_FAILED: tile-local publication shares native revision
+T162_UNTRACKED_FAILED: tile-local RGBA8 bytes are resident in Rust
+T162_UNTRACKED_FAILED: future Brush does not discard previously adopted untracked native tiles
+T162_UNTRACKED_FAILED: both storage projections exactly equal canonical Rust bytes
+T162_UNTRACKED_RESULT checks=25 failures=11

@@ -1,10 +1,12 @@
 class_name DrawingRasterTile
 extends RefCounted
-## Sparse canonical straight RGBA8 storage for one tile; unmodified hidden RGB survives.
-## Packed RGBA8 is 0xAABBGGRR. A zero value is implicit absent/transparent black.
+## Canonical straight RGBA8. Small/script edits use sparse int indices; native
+## publications retain a dense byte buffer without per-pixel GDScript decoding.
+## Packed RGBA8 is 0xAABBGGRR, including RGB when alpha is zero.
 
 var stride: int = 0
 var _pixels: Dictionary[int, int] = {}
+var _rgba8: PackedByteArray = PackedByteArray()
 
 
 func _init(tile_stride: int = 256) -> void:
@@ -12,15 +14,25 @@ func _init(tile_stride: int = 256) -> void:
 	stride = tile_stride
 
 
+func has_packed_rgba8() -> bool:
+	return not _rgba8.is_empty()
+
+
 func get_rgba(x: int, y: int) -> int:
 	assert(x >= 0 and y >= 0 and x < stride and y < stride)
-	return _pixels.get(y * stride + x, 0)
+	var index: int = y * stride + x
+	return _rgba8.decode_u32(index * 4) if has_packed_rgba8() else _pixels.get(index, 0)
 
 
 func set_rgba(x: int, y: int, rgba: int) -> bool:
 	assert(x >= 0 and y >= 0 and x < stride and y < stride)
 	assert(rgba >= 0 and rgba <= 0xffffffff)
 	var key: int = y * stride + x
+	if has_packed_rgba8():
+		if _rgba8.decode_u32(key * 4) == rgba:
+			return false
+		_rgba8.encode_u32(key * 4, rgba)
+		return true
 	var old: int = _pixels.get(key, 0)
 	if old == rgba:
 		return false
@@ -31,29 +43,55 @@ func set_rgba(x: int, y: int, rgba: int) -> bool:
 	return true
 
 
+## Explicit legacy editing APIs may request the sparse representation.
+## This is intentionally NOT used by native tile publication or history.
+func materialize_sparse() -> void:
+	if not has_packed_rgba8():
+		return
+	var bytes: PackedByteArray = _rgba8
+	var sparse: Dictionary[int, int] = {}
+	for index: int in range(stride * stride):
+		var rgba: int = bytes.decode_u32(index * 4)
+		if rgba != 0:
+			sparse[index] = rgba
+	_pixels = sparse
+	_rgba8 = PackedByteArray()
+
+
+func sparse_pixels() -> Dictionary[int, int]:
+	materialize_sparse()
+	return _pixels
+
+
 func is_empty() -> bool:
-	return _pixels.is_empty()
+	return _rgba8.count(0) == _rgba8.size() if has_packed_rgba8() else _pixels.is_empty()
 
 
 func pixel_count() -> int:
-	return _pixels.size()
+	if not has_packed_rgba8():
+		return _pixels.size()
+	var count: int = 0
+	for index: int in range(stride * stride):
+		if _rgba8.decode_u32(index * 4) != 0:
+			count += 1
+	return count
 
 
 func detached_copy() -> DrawingRasterTile:
 	var result: DrawingRasterTile = DrawingRasterTile.new(stride)
 	result._pixels = _pixels.duplicate()
+	result._rgba8 = _rgba8.duplicate()
 	return result
 
 
-## Only materialize a whole tile when a consumer explicitly requests its bytes.
+## Preserve packed native tiles directly through serialization.
 func to_rgba8() -> PackedByteArray:
+	if has_packed_rgba8():
+		return _rgba8.duplicate()
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(stride * stride * 4)
 	for index: int in _pixels:
-		var value: int = _pixels[index]
-		var offset: int = index * 4
-		for channel: int in range(4):
-			bytes[offset + channel] = (value >> (channel * 8)) & 255
+		bytes.encode_u32(index * 4, _pixels[index])
 	return bytes
 
 
@@ -61,12 +99,7 @@ static func from_rgba8(tile_stride: int, bytes: PackedByteArray) -> DrawingRaste
 	if tile_stride <= 0 or tile_stride > 2048 or bytes.size() != tile_stride * tile_stride * 4:
 		return null
 	var tile: DrawingRasterTile = DrawingRasterTile.new(tile_stride)
-	for index: int in range(tile_stride * tile_stride):
-		var offset: int = index * 4
-		var rgba: int = (int(bytes[offset]) | (int(bytes[offset + 1]) << 8)
-			| (int(bytes[offset + 2]) << 16) | (int(bytes[offset + 3]) << 24))
-		if rgba != 0:
-			tile._pixels[index] = rgba
+	tile._rgba8 = bytes.duplicate()
 	return tile
 
 

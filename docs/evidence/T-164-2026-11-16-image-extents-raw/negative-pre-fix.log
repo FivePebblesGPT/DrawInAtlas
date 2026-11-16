@@ -1,0 +1,14 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T164_IMAGE_EXTENT_FAILED: rightmost pixel above positive x limit rejected as COORD_RANGE
+T164_IMAGE_EXTENT_FAILED: rightmost pixel above positive x limit never reads sources or mutates document/history
+T164_IMAGE_EXTENT_FAILED: bottom pixel above positive y limit rejected as COORD_RANGE
+T164_IMAGE_EXTENT_FAILED: bottom pixel above positive y limit never reads sources or mutates document/history
+T164_IMAGE_EXTENT_FAILED: both positive endpoints rejected as COORD_RANGE
+T164_IMAGE_EXTENT_FAILED: both positive endpoints never reads sources or mutates document/history
+T164_IMAGE_EXTENT_FAILED: native positive x overhang rejected as COORD_RANGE
+T164_IMAGE_EXTENT_FAILED: native positive x overhang never reads sources or mutates document/history
+T164_IMAGE_EXTENT_FAILED: native positive y overhang rejected as COORD_RANGE
+T164_IMAGE_EXTENT_FAILED: native positive y overhang never reads sources or mutates document/history
+T164_IMAGE_EXTENT_RESULT checks=26 failures=10

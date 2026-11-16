@@ -1,0 +1,11 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T161_SIGNED_ANCHOR_FAILED: unsafe gesture anchor rejected before session creation: -9223372036854775808,0
+T161_SIGNED_ANCHOR_FAILED: unsafe viewport anchor rejected before compositing: -9223372036854775808,0
+T161_SIGNED_ANCHOR_FAILED: unsafe image anchor rejected before source mutation: -9223372036854775808,0
+T161_SIGNED_ANCHOR_FAILED: unsafe gesture anchor rejected before session creation: 0,-9223372036854775808
+T161_SIGNED_ANCHOR_FAILED: unsafe viewport anchor rejected before compositing: 0,-9223372036854775808
+T161_SIGNED_ANCHOR_FAILED: unsafe image anchor rejected before source mutation: 0,-9223372036854775808
+T161_SIGNED_ANCHOR_FAILED: viewport origin checked before addition can overflow
+T161_SIGNED_ANCHOR_RESULT checks=47 failures=7

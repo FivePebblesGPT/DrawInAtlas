@@ -1,0 +1,40 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5205:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5728:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2722:(snd_pcm_open_noupdate) Unknown PCM default
+ERROR: Condition "status < 0" is true. Returning: ERR_CANT_OPEN
+   at: init_output_device (drivers/alsa/audio_driver_alsa.cpp:97)
+WARNING: All audio drivers failed, falling back to the dummy driver.
+     at: initialize (servers/audio/audio_driver.cpp:244)
+
+T146_IDENTITY backend=Hokusai preset=hard width=96 preset_sha256=40838b34344409a0830a3b63f14120113a02635bdbeabd4d69ad2a62d24c5905 godot=4.8-beta3 (official) native_sha256= repo_sha=
+T146_HOKUSAI_RUN index=0 backend=Hokusai source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=2756.192 release_to_commit_ms=2711.279 stage_cpu_ms=828.316 drain_frames=18 max_pending=99 commit_cpu_ms=1459.996 compose_cpu_ms=238.583 texture_cpu_ms=6.556 preview_frames=18 segments_staged=296 drain_calls=20 max_batch_ms=65.005 max_drain_ms=65.040 frame_compose_p95_ms=18.526 max_frame_compose_ms=18.526 max_frame_draw_ms=19.216 retained_texture_bytes=458752
+T100_POINTER_MEMORY index=0 static_before_bytes=57652441 static_after_bytes=140179397 peak_before_bytes=78343093 peak_after_bytes=161643657
+T099_FRAME_METRICS index=0 input_draw_p50_ms=614.434 input_draw_p95_ms=1232.050 input_draw_max_ms=1232.050 input_callback_p50_ms=701.773 input_callback_p95_ms=1240.288 input_callback_max_ms=1240.288 pending_depth_p95=94 pending_depth_max=94 pending_age_p95_ms=1232.021 pending_age_max_ms=1232.021 preview_draws=18 drain_calls=20 max_drain_ms=65.040
+T146_SOURCE label=stroke-0 sha256=b9b330c75fe7dae6d4e89f71b7a1fc008e8ec8fe0c1eb2ae420771828930f73e covered=262144 zero=0 alpha_1_63=6 alpha_64_127=10352 alpha_128_191=247691 alpha_192_254=4095 alpha_255=0 red=262144 nonred=0 first_hole=(-1, -1) fills_512=true
+T146_FIRST_VISIBLE index=0 first_submit_us=1694901 first_postdraw_us=1787168 down_us=1614876 postdraw_matches=17 frame_samples=18
+T146_NATIVE_PHASE index=0 native_cpu_ms=132.413 native_changed=600683 stage_cpu_ms=828.316 perf={"native_us":132413,"pixels":600683,"stage_us":693840}
+T104_DISPLAY_SETTLE index=0 backend=Hokusai extra_frames=8
+T146_FRAMEBUFFER index=0 point=(4.5, 4.5) rgba=(0.9373, 0.2745, 0.2863, 1.0) source_rgba=aa0000ff
+T146_FRAMEBUFFER index=0 point=(256.5, 256.5) rgba=(0.9098, 0.3961, 0.4078, 1.0) source_rgba=850000ff
+T146_FRAMEBUFFER index=0 point=(507.5, 4.5) rgba=(0.8471, 0.2863, 0.3059, 1.0) source_rgba=910000ff
+T146_FRAMEBUFFER index=0 point=(4.5, 507.5) rgba=(0.8431, 0.2902, 0.3059, 1.0) source_rgba=900000ff
+T146_FRAMEBUFFER index=0 point=(507.5, 507.5) rgba=(0.8706, 0.5725, 0.5922, 1.0) source_rgba=4f0000ff
+T146_SOURCE label=redo-0 sha256=b9b330c75fe7dae6d4e89f71b7a1fc008e8ec8fe0c1eb2ae420771828930f73e covered=262144 zero=0 alpha_1_63=6 alpha_64_127=10352 alpha_128_191=247691 alpha_192_254=4095 alpha_255=0 red=262144 nonred=0 first_hole=(-1, -1) fills_512=true
+T146_FILL_STATUS index=0 full_coverage=true holes=0
+T146_CANCEL_RETRY revision=2 base_revision=1 events=1 tiles=["0,0", "0,1", "1,0", "1,1"] metrics={"bytes_uploaded":0,"commit_cpu_us":21611,"commit_us":7790503,"compose_cpu_us":0,"down_us":7758357,"drain_calls":2,"duplicate_drain_batched":0,"first_frame_post_draw_us":0,"first_preview_submit_us":0,"first_stage_us":7758389,"frame_phase_total":0,"frame_phases_us":[],"frame_post_draw_matches":0,"frame_preview_stage_submissions":0,"hokusai_perf":{"native_us":657,"pixels":8561,"stage_us":9687},"max_drain_cpu_us":10414,"max_frame_compose_cpu_us":0,"max_frame_end_to_post_draw_us":0,"max_frame_full_draw_cpu_us":0,"max_frame_oldest_pending_age_us":0,"max_frame_pending_input_count":0,"max_frame_preview_index_cpu_us":0,"max_frame_preview_stage_to_frame_end_us":0,"max_frame_selection_outline_cpu_us":0,"max_frame_texture_cpu_us":0,"max_pending":9,"max_preview_input_to_frame_end_us":0,"max_preview_input_to_post_draw_us":0,"max_preview_stage_to_post_draw_us":0,"max_sample_buffer":9,"max_sample_to_stage_us":10435,"max_stage_batch_us":10379,"native_ffi_stats":{"batches":2,"exported_ints":25683,"ffi_calls":8,"input_floats":40,"layer":"drawing-46ff6af6f61bb598b77e95798686d591","mode":"xy_rgba","ok":true,"rgba":4278190335},"preview_frames":0,"preview_index_cpu_us":0,"preview_input_post_draw_matches":0,"preview_stage_post_draw_matches":0,"release_us":7758458,"sample_compactions":0,"sample_to_stage_total":10,"sample_to_stage_us":[32,10435,10427,10421,10416,10410,10406,10401,10396,10387],"samples_received":10,"segments_staged":10,"stage_batch_total":2,"stage_batches_us":[19,10379],"stage_cpu_us":10398,"texture_cpu_us":0}
+T146_MASK_HIDDEN_RGB native=Hokusai rgba=00332211 revision=5
+T146_HOKUSAI_SUMMARY backend=Hokusai runs=1 total_p50_ms=2756.192 total_p95_ms=2756.192 release_p95_ms=2711.279 stage_p95_ms=828.316 proposed_target_ms=100 target_met=false failures=0
+T146_HOKUSAI_BENCHMARK_PASSED

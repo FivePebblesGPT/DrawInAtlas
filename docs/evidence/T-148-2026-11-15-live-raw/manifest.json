@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-15",
+  "environment": "Godot 4.8 beta3; native drawing-brush GDExtension; Xvfb software Mesa llvmpipe for graphical tests",
+  "tests": {
+    "t148_document_tile_publication": {
+      "file": "t148_document_tile_publication.log",
+      "sha256": "9c69c636b123bb1ef9c754ed6a06304dd1042923a4b9384c18436a6dd611c491",
+      "bytes": 466,
+      "exit_status_observed": 0
+    },
+    "t148_native_tiles_contract": {
+      "file": "t148_native_tiles_contract.log",
+      "sha256": "2fe6591f1c8dd4950633d6711d807a52994e2d1739b10ba647fcb12df0b44e7e",
+      "bytes": 782,
+      "exit_status_observed": 0
+    },
+    "t147_native_stroke_contract": {
+      "file": "t147_native_stroke_contract.log",
+      "sha256": "328d8cd8eaf0c427634a07dd115f91762c9d3e3e61d21c94a52c47eff1869280",
+      "bytes": 522,
+      "exit_status_observed": 0
+    },
+    "t095_native_hard_source_atomic": {
+      "file": "t095_native_hard_source_atomic.log",
+      "sha256": "95a781b63a346c36c645eed41d7d096d704bd8f2ebe54dd7b0e3c26dfc7e98b3",
+      "bytes": 516,
+      "exit_status_observed": 0
+    },
+    "t095_native_pigment_atomic": {
+      "file": "t095_native_pigment_atomic.log",
+      "sha256": "2d78d31c2af4d4e422d97776e752dac4036ff78fbdc563f179de3b32909a5ef4",
+      "bytes": 507,
+      "exit_status_observed": 0
+    },
+    "renderer_sparse_layer_smoke": {
+      "file": "renderer_sparse_layer_smoke.log",
+      "sha256": "a0111e922b584a1678169a682e843240057411d40db8d6df73e49605cca616b4",
+      "bytes": 639,
+      "exit_status_observed": 0
+    },
+    "selection_clipboard_smoke": {
+      "file": "selection_clipboard_smoke.log",
+      "sha256": "3162b34ce7453eb65115683c3cdb4e86b6c12f9e943ff579a8072f947ee3e4c6",
+      "bytes": 469,
+      "exit_status_observed": 0
+    },
+    "standalone_smoke": {
+      "file": "standalone_smoke.log",
+      "sha256": "d1ac0fb5cc61e57423520d4921ee078a5b2a9922919a3a61d665549af0c47426",
+      "bytes": 1237,
+      "exit_status_observed": 0
+    },
+    "layer_structure_smoke": {
+      "file": "layer_structure_smoke.log",
+      "sha256": "f078c566f1259c6e042c148dbe77972f2d3587567e92c20cb815b43e7e9ab6d1",
+      "bytes": 1681,
+      "exit_status_observed": 0
+    },
+    "image_frame_smoke": {
+      "file": "image_frame_smoke.log",
+      "sha256": "d1efe7784db3fba5e955601b4089801a902944c340b26784a843ea7763070bca",
+      "bytes": 3269,
+      "exit_status_observed": 0
+    },
+    "NativeHard-96px": {
+      "file": "NativeHard-96px.log",
+      "sha256": "b385236c53887b1354982db1eaee6f5dc1eddfd652d6471073fd261fa96c93d0",
+      "bytes": 1933,
+      "exit_status_observed": 0
+    },
+    "Hokusai-96px": {
+      "file": "Hokusai-96px.log",
+      "sha256": "cc4400c6e8ed2e5f52023bd442a3d1511f0c86ae51d324a288f4dfd39e43b83e",
+      "bytes": 5198,
+      "exit_status_observed": 0
+    },
+    "t148_canvas_tile_cutover_x11": {
+      "file": "t148_canvas_tile_cutover_x11.log",
+      "sha256": "ab3a8a3cb2fcc17b0d1663299789e9a8cb4ee4117503d160f516468313eb99c0",
+      "bytes": 1043,
+      "exit_status_observed": 0
+    },
+    "native_brush_integration": {
+      "file": "native_brush_integration.log",
+      "sha256": "e074a1f4b7759b2dfdc50a764c1da53ae0ab91663ae7140d63b8504bb3ab7dcc",
+      "bytes": 1014,
+      "exit_status_observed": 0
+    },
+    "ticket-board": {
+      "file": "ticket-board.log",
+      "sha256": "b21fa60efa1bc13cab2e89dea8bb196dc2390eca94b9d9d1c4c0e103f50d85ee",
+      "bytes": 58,
+      "exit_status_observed": 0
+    }
+  }
+}

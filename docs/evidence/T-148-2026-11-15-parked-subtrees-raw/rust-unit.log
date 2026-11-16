@@ -1,0 +1,29 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas.sprint_2026-11-15/native/drawing_brush)
+    Finished `test` profile [unoptimized] target(s) in 2.09s
+     Running unittests src/lib.rs (target/debug/deps/drawing_brush-86892d54b2db4064)
+
+running 22 tests
+test native_tiles::tests::hidden_rgb_and_alpha_roundtrip ... ok
+test native_tiles::tests::atomic_undo_redo_and_locked_rejection ... ok
+test native_tiles::tests::external_raster_adoption_is_atomic_and_joins_brush_history ... ok
+test native_tiles::tests::large_signed_tile_identity_and_layer_isolation ... ok
+test native_tiles::tests::metadata_revisions_keep_native_history_and_reject_stale_or_active_advances ... ok
+test native_tiles::tests::no_op_paint_does_not_create_revision_or_history ... ok
+test native_tiles::tests::parked_raster_layers_retain_history_and_reject_mutation_until_restored ... ok
+test native_tiles::tests::persistent_transactions_rebase_and_history_tokens ... ok
+test native_tiles::tests::signed_seams_mask_hidden_rgb_and_cancel ... ok
+test native_tiles::tests::stale_unauthorized_oversized_and_zero_change_fail_closed ... ok
+test native_tiles::tests::unreferenced_raster_structure_preserves_unrelated_native_history ... ok
+test tests::hard_batch_rollback_keeps_previous_coverage_and_cursor ... ok
+test native_tiles::tests::missing_source_masks_and_budget_fail_closed ... ok
+test tests::large_hard_batch_budget_rejects_before_stroke_changes ... ok
+test tests::native_hard_preflight_rejects_late_batch_errors ... ok
+test tests::pigment_tile_batch_rolls_back_existing_and_new_surface_tiles ... ok
+test tests::native_changes_with_identical_rgba_do_not_reenter_script ... ok
+test tests::stroke_samples_validate_entire_batch_before_state_mutation ... ok
+test tests::unified_hard_pressure_mask_clip_and_rollback_are_exact ... ok
+test tests::unified_preset_batch_rollback_preserves_state_surface_and_quantized_export ... ok
+test tests::cached_native_scan_matches_full_quantized_export ... ok
+test tests::hard_scanlines_equal_original_rectangles ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s

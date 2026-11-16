@@ -1,0 +1,14 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T169_IMPORT_FAILED: active Rust transaction rejects raster import
+T169_IMPORT_FAILED: rejected import leaves Godot tree and revision unchanged
+T169_IMPORT_FAILED: valid import publishes complete nested tree in one revision
+T169_IMPORT_FAILED: native revision and unrelated history survive valid import
+T169_IMPORT_FAILED: earlier native Undo remains usable after import
+T169_IMPORT_FAILED: advance native revision independently for negative control
+T169_IMPORT_FAILED: native-ahead revision rejects raster import
+T169_IMPORT_FAILED: native-ahead rejection does not commit Godot nodes
+T169_IMPORT_FAILED: over-limit native structural bridge rejects entire subtree
+T169_IMPORT_FAILED: over-limit rejection leaves both documents' sources unchanged
+T169_IMPORT_RESULT checks=23 failures=10

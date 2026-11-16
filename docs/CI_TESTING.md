@@ -1,3 +1,29 @@
+## T-153 Hokusai-only native Brush/Eraser cutover (2026-11-16)
+
+**Current implementation:** NativeHard dispatch and old hard-only fixtures
+are deleted; all active Canvas Brush/Eraser preset strokes use the required
+Hokusai extension and native tile path. `native_brush_fallback` now asserts
+explicit errors, not fallback. `t147_native_stroke_contract`,
+`native_brush_integration`, `t148_native_tiles_contract` and
+`t148_canvas_tile_cutover_x11` are updated independent MyPaint oracles.
+`tools/run_t146_hokusai_bench.py` accepts only Hokusai and validates real
+`native_ffi_calls`, `tile_ffi_calls`, exported tile bytes and zero
+per-pixel tile-stream calls; a removed native CPU counter is **not** claimed.
+
+The local tested command for the software X11 benchmark is:
+
+```
+python3 tools/run_t146_hokusai_bench.py \
+  --godot /path/to/Godot_v4.8-beta3_linux.x86_64 \
+  --output /tmp/t153-bench --cold 1 --warm 0
+```
+
+See [run-level exits, coverage, histogram and timings](evidence/T-153-2026-11-16-hokusai-only.md).
+Older sections below describe historical NativeHard and Legacy experiments;
+those retired fixture names are not current runnable smoke tests and do not
+set present-day renderer policy. The T-095 physical-device acceptance remains
+separate.
+
 ## T-119 GM Token registry ownership (2026-11-12)
 
 The existing required `ci_14_verify_t_055_atlas_canonical_drawing_composition_and_input`

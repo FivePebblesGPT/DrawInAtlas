@@ -1,0 +1,129 @@
+RUN rust-unit
+RUN rustfmt
+RUN rust-clippy
+RUN rust-release
+RUN stage
+RUN import-drawing
+RUN import-root
+RUN drawing-t160_direct_raster_publish_bounds
+RUN drawing-t159_signed_replay_publication_bounds
+RUN drawing-t158_signed_lazy_tile_bounds
+RUN drawing-t157_lazy_source_reentrant_guard
+RUN drawing-t156_legacy_pixel_native_replay
+RUN drawing-t155_text_reraster_native_history
+RUN drawing-t154_text_raster_parked_history
+RUN drawing-t148_native_tiles_contract
+RUN drawing-t148_persistent_native_document
+RUN drawing-t148_external_raster_adoption
+RUN drawing-t148_document_tile_publication
+RUN drawing-native_brush_integration
+RUN drawing-t147_native_stroke_contract
+RUN root-drawing_publication_tile_cache_smoke
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_PUBLICATION_FAILED: far-coordinate commit creates four exact dirty tiles
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_publication_tile_cache_smoke.gd:29)
+       [1] _run (res://tests/drawing_publication_tile_cache_smoke.gd:72)
+ERROR: T068_PUBLICATION_FAILED: resolve each of four source tiles once
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_publication_tile_cache_smoke.gd:29)
+       [1] _run (res://tests/drawing_publication_tile_cache_smoke.gd:74)
+ERROR: T068_PUBLICATION_FAILED: signed coordinate remains exact without float rounding
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_publication_tile_cache_smoke.gd:29)
+       [1] _run (res://tests/drawing_publication_tile_cache_smoke.gd:75)
+ERROR: T068_PUBLICATION_FAILED: four-tile undo/redo is intact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_publication_tile_cache_smoke.gd:29)
+       [1] _run (res://tests/drawing_publication_tile_cache_smoke.gd:77)
+T068_PUBLICATION_FAILED checks=30 failures=4
+RUN root-drawing_edit_tile_cache_smoke
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_TILE_CACHE_FAILED: signed 64-bit anchors allow pixel-accurate cached reads
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_edit_tile_cache_smoke.gd:21)
+       [1] _run (res://tests/drawing_edit_tile_cache_smoke.gd:161)
+ERROR: T068_TILE_CACHE_FAILED: far signed pixel remains exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_edit_tile_cache_smoke.gd:21)
+       [1] _run (res://tests/drawing_edit_tile_cache_smoke.gd:164)
+T068_TILE_CACHE_FAILED checks=31 failures=2
+RUN root-drawing_fill_tile_cache_smoke
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_FILL_CACHE_FAILED: seed far positive/negative signed world coordinates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:151)
+ERROR: T068_FILL_CACHE_FAILED: fill crosses a far signed-64-bit tile seam
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:155)
+ERROR: T068_FILL_CACHE_FAILED: exact far signed coordinates remain distinct
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:158)
+ERROR: T068_FILL_CACHE_FAILED: far-world Undo restores original hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:161)
+T068_FILL_CACHE_FAILED checks=30 failures=4
+RUN root-t148_native_history_reentrant_replay
+RUN root-t148_native_history_payload_guard
+RUN root-t148_atlas_native_tile_history
+RUN root-t148_object_native_source
+RUN root-t148_detached_native_bootstrap
+RUN root-t148_detached_native_replay
+RUN root-drawing_text_smoke
+RUN x11-canvas
+RUN x11-96px-hokusai
+rust-unit	0	PASS
+rustfmt	0	PASS
+rust-clippy	0	PASS
+rust-release	0	PASS
+stage	0	PASS
+import-drawing	0	PASS
+import-root	0	PASS
+drawing-t160_direct_raster_publish_bounds	0	PASS
+drawing-t159_signed_replay_publication_bounds	0	PASS
+drawing-t158_signed_lazy_tile_bounds	0	PASS
+drawing-t157_lazy_source_reentrant_guard	0	PASS
+drawing-t156_legacy_pixel_native_replay	0	PASS
+drawing-t155_text_reraster_native_history	0	PASS
+drawing-t154_text_raster_parked_history	0	PASS
+drawing-t148_native_tiles_contract	0	PASS
+drawing-t148_persistent_native_document	0	PASS
+drawing-t148_external_raster_adoption	0	PASS
+drawing-t148_document_tile_publication	0	PASS
+drawing-native_brush_integration	0	PASS
+drawing-t147_native_stroke_contract	0	PASS
+root-drawing_publication_tile_cache_smoke	1	MISSING_SUCCESS_MARKER
+root-drawing_edit_tile_cache_smoke	1	MISSING_SUCCESS_MARKER
+root-drawing_fill_tile_cache_smoke	1	MISSING_SUCCESS_MARKER
+root-t148_native_history_reentrant_replay	0	PASS
+root-t148_native_history_payload_guard	0	PASS
+root-t148_atlas_native_tile_history	0	PASS
+root-t148_object_native_source	0	PASS
+root-t148_detached_native_bootstrap	0	PASS
+root-t148_detached_native_replay	0	PASS
+root-drawing_text_smoke	0	PASS
+x11-canvas	0	PASS
+x11-96px-hokusai	0	PASS

@@ -1,0 +1,5 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T095_NATIVE_HARD_SCANLINE_RESULT checks=42 failures=0
+T095_NATIVE_HARD_SCANLINE_PASSED

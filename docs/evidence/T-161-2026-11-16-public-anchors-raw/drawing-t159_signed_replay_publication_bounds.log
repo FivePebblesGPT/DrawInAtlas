@@ -1,0 +1,4 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T159_SIGNED_REPLAY_PASSED checks=39 failures=0

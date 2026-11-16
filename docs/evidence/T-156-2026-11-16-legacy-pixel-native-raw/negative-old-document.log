@@ -1,0 +1,23 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T156_LEGACY_NATIVE_FAILED: legacy replay advances the identical native store revision atomically
+T156_LEGACY_NATIVE_FAILED: canonical Rust and Godot RGBA8 match after Undo at -1,0
+T156_LEGACY_NATIVE_FAILED: canonical Rust and Godot RGBA8 match after Undo at 0,0
+T156_LEGACY_NATIVE_FAILED: old pixel Redo also uses same Rust authority
+T156_LEGACY_NATIVE_FAILED: detached native Brush Redo also remains replayable without rebase
+T156_LEGACY_NATIVE_FAILED: fresh Hokusai Brush continues on the same native source
+T156_LEGACY_NATIVE_FAILED: noncanonical coordinate fails before any Rust mutation
+T156_LEGACY_NATIVE_FAILED: unsafe signed coordinate rejects
+T156_LEGACY_NATIVE_FAILED: 129 distinct signed tiles reject without allocating an unbounded replay
+T156_LEGACY_NATIVE_FAILED: hold native transaction for atomic failure control
+T156_LEGACY_NATIVE_FAILED: active Rust transaction rejects old pixel replay atomically
+T156_LEGACY_NATIVE_FAILED: active transaction cancelled after rejection
+T156_LEGACY_NATIVE_FAILED: identical pixel event retries successfully after cancellation
+T156_LEGACY_NATIVE_FAILED: checked inverse restores source for native-ahead test
+T156_LEGACY_NATIVE_FAILED: inject native-ahead revision for guarded legacy replay
+T156_LEGACY_NATIVE_FAILED: native-ahead rejection preserves both owners and original pixel
+T156_LEGACY_NATIVE_FAILED: host old pixel Undo remains native-authoritative
+T156_LEGACY_NATIVE_FAILED: host old pixel Redo restores exact hidden RGB
+T156_LEGACY_NATIVE_FAILED: host native Brush Redo works after detached older replay
+T156_LEGACY_NATIVE_RESULT checks=37 failures=19

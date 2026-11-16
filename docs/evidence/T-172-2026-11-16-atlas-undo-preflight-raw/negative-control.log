@@ -1,0 +1,12 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T172_UNDO_FAILED: refused Undo cannot advance either document revision
+T172_UNDO_FAILED: refused Undo keeps both Rust timelines and revisions unchanged
+T172_UNDO_FAILED: Atlas Undo succeeds when native retirement becomes eligible
+T172_UNDO_FAILED: Atlas Redo reuses the same transferred identity
+T172_UNDO_RESULT checks=30 failures=4

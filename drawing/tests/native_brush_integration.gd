@@ -1,6 +1,6 @@
 extends SceneTree
-## T-095: opt-in Rust coverage parity, real .myb Hokusai staged painting,
-## canonical preview/history, alpha/erase, signed tiles and bundled assets.
+## T-153: required Hokusai presets, native history, alpha/erase, signed tiles,
+## masks, cancellation and bundled assets (no Legacy pixel-parity oracle).
 
 var checks: int = 0
 var failures: int = 0
@@ -18,14 +18,13 @@ func frames(n: int = 1) -> void:
         await process_frame
 
 
-func make_canvas(engine: String, preset: String = "hard") -> Dictionary:
-    var doc: DrawingDocument = DrawingDocument.new("native-" + engine)
+func make_canvas(preset: String = "hard") -> Dictionary:
+    var doc: DrawingDocument = DrawingDocument.new("native-" + preset)
     var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
     var canvas: Control = Control.new()
     canvas.set_script(load("res://addons/drawing/canvas.gd"))
     canvas.size = Vector2(420, 360)
     canvas.zoom = 7.86
-    canvas.brush_backend = engine
     canvas.brush_preset = preset
     canvas.document = doc
     canvas.layer_id = layer
@@ -60,36 +59,51 @@ func run() -> void:
         quit(1)
         return
     var native: Object = ClassDB.instantiate("DrawingNativeBrush")
-    native.call("reset_hard")
-    var native_pixels: Dictionary = native.call("hard_segments",
-        PackedVector2Array([Vector2(-2.5, -2.5), Vector2(2.5, 2.5)]),
-        10.0, Rect2i())
-    check(native_pixels.get("ok", false) and
-        (native_pixels.get("points", PackedInt32Array()) as PackedInt32Array).size() > 0,
-        "signed native hard coverage is nonempty")
+    check(native.call("stroke_abi_version") == 1,
+        "native stroke engine exposes v1")
+    var started: Dictionary = native.call("begin_stroke", "Ink",
+        FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"),
+        10.0, 0xffa054a7, 1, Rect2i())
+    var handle: int = int(started.get("handle", 0))
+    var accepted: Dictionary = native.call("append_samples", handle, 1,
+        PackedFloat32Array([-2.5, -2.5, 1.0, 0.01, 2.5, 2.5, 1.0, 0.01]))
+    var native_pixels: Dictionary = native.call("preview_changes", handle, 1)
+    check(bool(started.get("ok", false)) and bool(accepted.get("ok", false)) and
+        bool(native_pixels.get("ok", false)) and native_pixels.get("format", "") == "xy_rgba" and
+        (native_pixels.get("changes", PackedInt32Array()) as PackedInt32Array).size() > 0,
+        "Hokusai Hard Round emits nonempty signed RGBA8 pigment")
+    check(native.call("acknowledge_batch", handle, 1, true) and
+        native.call("abort_stroke", handle), "native pigment acknowledge/abort succeeds")
 
     var source: PackedVector2Array = PackedVector2Array()
     for index: int in range(155):
         var t: float = float(index) / 154.0
         source.append(Vector2(-24.5 + 51.0 * t,
             -15.5 + sin(t * TAU * 5.0) * 23.0))
-    var legacy_setup: Dictionary = make_canvas("Legacy")
-    var fast_setup: Dictionary = make_canvas("NativeHard")
+    var fast_setup: Dictionary = make_canvas("hard")
     await frames(3)
-    var legacy: Control = legacy_setup["canvas"]
     var fast: Control = fast_setup["canvas"]
-    var old_metrics: Dictionary = await draw_stroke(legacy, source)
     var new_metrics: Dictionary = await draw_stroke(fast, source)
-    check(fast._native_brush == null and fast._active_brush_backend == "Legacy",
+    check(fast._native_brush == null and fast._active_brush_backend.is_empty(),
         "native state disposed after document commit")
     var area: Rect2i = Rect2i(-85, -85, 170, 170)
-    var old_render: DrawingResult = DrawingRenderer.render(legacy_setup["doc"], area)
     var new_render: DrawingResult = DrawingRenderer.render(fast_setup["doc"], area)
-    check(old_render.ok and new_render.ok, "both strokes render")
-    check(old_render.ok and new_render.ok and
-        old_render.value.get_data() == new_render.value.get_data(),
-        "native hard 60px stroke matches legacy straight RGBA8 bytes")
-    check(int(new_metrics["queued"]) == source.size(), "native samples are not dropped")
+    check(new_render.ok, "signed Hokusai Hard Round renders")
+    var coverage: int = 0
+    var translucent: int = 0
+    var opaque: int = 0
+    if new_render.ok:
+        var pixels: PackedByteArray = new_render.value.get_data()
+        for i: int in range(3, pixels.size(), 4):
+            if pixels[i] > 0:
+                coverage += 1
+                if pixels[i] == 255:
+                    opaque += 1
+                else:
+                    translucent += 1
+    check(coverage > 0 and translucent + opaque == coverage,
+        "independent nonempty Hokusai coverage and alpha distribution")
+    check(int(new_metrics["queued"]) == source.size(), "native samples not dropped")
     check((new_metrics["metrics"] as Dictionary).get("commit_us", 0) > 0,
         "native stroke recorded a committed history transaction")
     var fast_doc: DrawingDocument = fast_setup["doc"]
@@ -97,10 +111,8 @@ func run() -> void:
     check(fast_doc.redo().ok and
         DrawingRenderer.render(fast_doc, area).value.get_data() == new_render.value.get_data(),
         "native stroke Redo restores exact pixels")
-    print("T095_NATIVE_HARD legacy_ms=%.3f native_ms=%.3f legacy_stage_ms=%.3f native_stage_ms=%.3f" %
-        [float(old_metrics["elapsed_us"]) / 1000.0, float(new_metrics["elapsed_us"]) / 1000.0,
-        float((old_metrics["metrics"] as Dictionary).get("stage_cpu_us", 0)) / 1000.0,
-        float((new_metrics["metrics"] as Dictionary).get("stage_cpu_us", 0)) / 1000.0])
+    print("T095_HOKUSAI_HARD coverage=%d translucent=%d opaque=%d duration_ms=%.3f" % [
+        coverage, translucent, opaque, float(new_metrics["elapsed_us"]) / 1000.0])
 
     # Same native hard engine must honor erasure and the once-per-stroke
     # transactional model when painting onto an existing nonempty layer.
@@ -119,7 +131,7 @@ func run() -> void:
     # Hokusai's actual .myb parser/rasterizer is exercised via Canvas, not
     # merely via a standalone CLI or class-instantiation smoke test.
     for preset: String in ["hard", "soft", "ink", "airbrush"]:
-        var setup: Dictionary = make_canvas("Hokusai", preset)
+        var setup: Dictionary = make_canvas(preset)
         var canvas: Control = setup["canvas"]
         canvas.brush_width = 24.0
         canvas.color_rgba = 0xff38af74
@@ -147,7 +159,7 @@ func run() -> void:
         canvas.queue_free()
         await frames(2)
     # Selection mask expression: preserve an internal hole and signed edges.
-    var selected_setup: Dictionary = make_canvas("Hokusai", "hard")
+    var selected_setup: Dictionary = make_canvas("hard")
     var selected_canvas: Control = selected_setup["canvas"]
     await frames(2)
     var hole_mask: DrawingSelection = DrawingSelection.new(Rect2i(-30, -30, 60, 60), true)

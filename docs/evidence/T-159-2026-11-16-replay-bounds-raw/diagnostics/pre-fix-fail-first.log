@@ -1,0 +1,8 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T159_SIGNED_REPLAY_FAILED: unsafe native publication key rejected before tile preflight: -9223372036854775808,0
+T159_SIGNED_REPLAY_FAILED: unsafe native history tile key rejected before import: -9223372036854775808,0
+T159_SIGNED_REPLAY_FAILED: unsafe native publication key rejected before tile preflight: 0,-9223372036854775808
+T159_SIGNED_REPLAY_FAILED: unsafe native history tile key rejected before import: 0,-9223372036854775808
+T159_SIGNED_REPLAY_RESULT checks=39 failures=4

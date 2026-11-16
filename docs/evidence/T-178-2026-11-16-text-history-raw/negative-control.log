@@ -1,0 +1,28 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T178_TEXT_HISTORY_FAILED: busy native store refuses text edit Undo
+T178_TEXT_HISTORY_FAILED: rejected edit Undo preserves document, cursor, tiles and Rust tokens
+T178_TEXT_HISTORY_FAILED: edit Undo retries with same Rust store
+T178_TEXT_HISTORY_FAILED: edit Redo begins active native transaction
+T178_TEXT_HISTORY_FAILED: busy native store refuses text edit Redo
+T178_TEXT_HISTORY_FAILED: rejected edit Redo preserves document and Rust state
+T178_TEXT_HISTORY_FAILED: releases edit Redo transaction
+T178_TEXT_HISTORY_FAILED: edit Redo retries with exact text and native revision
+T178_TEXT_HISTORY_FAILED: create Undo begins active native transaction
+T178_TEXT_HISTORY_FAILED: busy native store refuses text creation Undo
+T178_TEXT_HISTORY_FAILED: rejected create Undo preserves layer membership and cursor
+T178_TEXT_HISTORY_FAILED: releases create Undo transaction
+T178_TEXT_HISTORY_FAILED: create Undo removes text and advances Rust exactly once
+T178_TEXT_HISTORY_FAILED: create Redo begins active native transaction
+T178_TEXT_HISTORY_FAILED: busy native store refuses text creation Redo
+T178_TEXT_HISTORY_FAILED: rejected create Redo preserves missing layer and history
+T178_TEXT_HISTORY_FAILED: releases create Redo transaction
+T178_TEXT_HISTORY_FAILED: create Redo retries without detaching Rust
+T178_TEXT_HISTORY_FAILED: subsequent Hokusai stroke keeps original native authority
+T178_TEXT_HISTORY_FAILED: text history and native source round-trip through .drawing
+T178_TEXT_HISTORY_FAILED: native-ahead text edit Undo fails before mutating tree or cursor
+T178_TEXT_HISTORY_RESULT checks=43 failures=21

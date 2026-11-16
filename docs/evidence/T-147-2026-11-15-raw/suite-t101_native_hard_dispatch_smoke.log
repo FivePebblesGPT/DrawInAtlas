@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T101_NATIVE_DISPATCH_CPU masked=false erase=false pixels=1225 stage_ms=6.369
+T101_NATIVE_DISPATCH_CPU masked=false erase=true pixels=1225 stage_ms=3.356
+T101_NATIVE_DISPATCH_CPU masked=true erase=false pixels=1225 stage_ms=7.428
+T101_NATIVE_DISPATCH_CPU masked=true erase=true pixels=1225 stage_ms=6.559
+T101_NATIVE_DISPATCH_RESULT checks=5035 failures=0
+T101_NATIVE_DISPATCH_PASSED

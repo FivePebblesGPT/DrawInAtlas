@@ -66,6 +66,11 @@ func apply(_campaign: AtlasCampaign) -> bool:
 	if not _prepared or _applied or source.revision != _source_revision \
 			or target.revision != _target_revision:
 		return false
+	# Atlas owns the history cursor, not a two-document native transaction.
+	# Reject a busy, stale or tampered Rust source before publishing the
+	# destination; the later source retirement uses the same native check.
+	if not copied and not source.preflight_unrecorded_subtree_removal(source_node_id).ok:
+		return false
 	var inserted: DrawingResult = target.import_subtree(
 		_inserted_snapshot if not _inserted_snapshot.is_empty() else _snapshot,
 		target_parent_id, not _inserted_snapshot.is_empty() or not copied)
@@ -100,6 +105,12 @@ func apply(_campaign: AtlasCampaign) -> bool:
 func revert(_campaign: AtlasCampaign) -> bool:
 	if not _applied or source.revision != _source_revision \
 			or target.revision != _target_revision or not target.has_node(target_node_id):
+		return false
+	# Undo of a move must not restore the source before Rust approves
+	# retirement of the target's native-owned raster subtree. If the target
+	# is busy, stale or has modified source bytes, compensating deletion of
+	# the restored source would be another fallible transaction.
+	if not target.preflight_unrecorded_subtree_removal(target_node_id).ok:
 		return false
 	if not copied:
 		var restored: DrawingResult = source.import_subtree(_snapshot, source_parent_id, true)

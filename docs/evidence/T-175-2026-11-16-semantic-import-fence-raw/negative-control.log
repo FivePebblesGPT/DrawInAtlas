@@ -1,0 +1,17 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T175_IMPORT_FAILED: busy native store rejects semantic subtree import
+T175_IMPORT_FAILED: rejected import installs no nodes and advances no document revision
+T175_IMPORT_FAILED: rejected import does not alter dirty or history cursors
+T175_IMPORT_FAILED: rejection retains Rust authority and byte-exact paint
+T175_IMPORT_FAILED: standalone Copy refuses busy destination without half-publish
+T175_IMPORT_FAILED: semantic group and all descendants publish atomically
+T175_IMPORT_FAILED: successful import preserves native history and source bytes
+T175_IMPORT_FAILED: historical native Brush Undo works after semantic import
+T175_IMPORT_FAILED: historical native Brush Redo retains exact bytes
+T175_IMPORT_FAILED: subsequent Hokusai stroke keeps the original Rust store
+T175_IMPORT_FAILED: advance Rust independently for stale-revision control
+T175_IMPORT_FAILED: native-ahead semantic import fails without detaching Rust
+T175_IMPORT_FAILED: native-ahead failure leaves tree and Rust revision unchanged
+T175_SEMANTIC_IMPORT_RESULT checks=27 failures=13

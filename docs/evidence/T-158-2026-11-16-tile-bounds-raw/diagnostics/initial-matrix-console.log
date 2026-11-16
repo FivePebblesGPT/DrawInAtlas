@@ -1,0 +1,92 @@
+RUN rust-unit
+RUN rustfmt
+RUN rust-clippy
+RUN rust-release
+RUN stage
+RUN import-drawing
+RUN import-root
+RUN drawing-t158_signed_lazy_tile_bounds
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T158_TILE_BOUNDS_FAILED: logical manifest rejects unsafe lazy coordinate before loader (code=MISSING_TILE ok=false)
+T158_TILE_BOUNDS_RESULT checks=23 failures=1
+RUN drawing-t157_lazy_source_reentrant_guard
+RUN drawing-drawing_publication_tile_cache_smoke
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+ERROR: Attempt to open script 'res://tests/drawing_publication_tile_cache_smoke.gd' resulted in error 'File not found'.
+   at: load_source_code (modules/gdscript/gdscript.cpp:1160)
+ERROR: Failed loading resource: res://tests/drawing_publication_tile_cache_smoke.gd.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Can't load script: res://tests/drawing_publication_tile_cache_smoke.gd
+   at: start (main/main.cpp:4412)
+RUN drawing-drawing_edit_tile_cache_smoke
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+ERROR: Attempt to open script 'res://tests/drawing_edit_tile_cache_smoke.gd' resulted in error 'File not found'.
+   at: load_source_code (modules/gdscript/gdscript.cpp:1160)
+ERROR: Failed loading resource: res://tests/drawing_edit_tile_cache_smoke.gd.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Can't load script: res://tests/drawing_edit_tile_cache_smoke.gd
+   at: start (main/main.cpp:4412)
+RUN drawing-drawing_fill_tile_cache_smoke
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+ERROR: Attempt to open script 'res://tests/drawing_fill_tile_cache_smoke.gd' resulted in error 'File not found'.
+   at: load_source_code (modules/gdscript/gdscript.cpp:1160)
+ERROR: Failed loading resource: res://tests/drawing_fill_tile_cache_smoke.gd.
+   at: _load (core/io/resource_loader.cpp:317)
+ERROR: Can't load script: res://tests/drawing_fill_tile_cache_smoke.gd
+   at: start (main/main.cpp:4412)
+RUN drawing-t156_legacy_pixel_native_replay
+RUN drawing-t155_text_reraster_native_history
+RUN drawing-t154_text_raster_parked_history
+RUN drawing-t148_native_tiles_contract
+RUN drawing-t148_persistent_native_document
+RUN drawing-t148_external_raster_adoption
+RUN drawing-t148_document_tile_publication
+RUN drawing-native_brush_integration
+RUN drawing-t147_native_stroke_contract
+RUN root-t148_native_history_reentrant_replay
+RUN root-t148_native_history_payload_guard
+RUN root-t148_atlas_native_tile_history
+RUN root-t148_object_native_source
+RUN root-t148_detached_native_bootstrap
+RUN root-t148_detached_native_replay
+RUN root-drawing_text_smoke
+RUN x11-canvas
+RUN x11-96px-hokusai
+rust-unit	0	PASS
+rustfmt	0	PASS
+rust-clippy	0	PASS
+rust-release	0	PASS
+stage	0	PASS
+import-drawing	0	PASS
+import-root	0	PASS
+drawing-t158_signed_lazy_tile_bounds	1	FAILED_MARKER
+drawing-t157_lazy_source_reentrant_guard	0	PASS
+drawing-drawing_publication_tile_cache_smoke	1	PASS
+drawing-drawing_edit_tile_cache_smoke	1	PASS
+drawing-drawing_fill_tile_cache_smoke	1	PASS
+drawing-t156_legacy_pixel_native_replay	0	PASS
+drawing-t155_text_reraster_native_history	0	PASS
+drawing-t154_text_raster_parked_history	0	PASS
+drawing-t148_native_tiles_contract	0	PASS
+drawing-t148_persistent_native_document	0	PASS
+drawing-t148_external_raster_adoption	0	PASS
+drawing-t148_document_tile_publication	0	PASS
+drawing-native_brush_integration	0	PASS
+drawing-t147_native_stroke_contract	0	PASS
+root-t148_native_history_reentrant_replay	0	PASS
+root-t148_native_history_payload_guard	0	PASS
+root-t148_atlas_native_tile_history	0	PASS
+root-t148_object_native_source	0	PASS
+root-t148_detached_native_bootstrap	0	PASS
+root-t148_detached_native_replay	0	PASS
+root-drawing_text_smoke	0	PASS
+x11-canvas	0	PASS
+x11-96px-hokusai	0	PASS

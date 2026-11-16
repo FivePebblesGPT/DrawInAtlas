@@ -1,0 +1,35 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T160_DIRECT_BOUNDS_FAILED: unsafe tile rejected before staging: 70368744177665,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile leaves revision and save dirties untouched: 70368744177665,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile rejected before staging: -70368744177665,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile leaves revision and save dirties untouched: -70368744177665,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile rejected before staging: 0,70368744177665
+T160_DIRECT_BOUNDS_FAILED: unsafe tile leaves revision and save dirties untouched: 0,70368744177665
+T160_DIRECT_BOUNDS_FAILED: unsafe tile rejected before staging: 0,-70368744177665
+T160_DIRECT_BOUNDS_FAILED: unsafe tile leaves revision and save dirties untouched: 0,-70368744177665
+T160_DIRECT_BOUNDS_FAILED: unsafe tile rejected before staging: 9223372036854775807,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile leaves revision and save dirties untouched: 9223372036854775807,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile rejected before staging: -9223372036854775808,0
+T160_DIRECT_BOUNDS_FAILED: unsafe tile leaves revision and save dirties untouched: -9223372036854775808,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel rejected before detaching a source: 4503599627370497,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel leaves revision and save dirties untouched: 4503599627370497,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel rejected before detaching a source: -4503599627370497,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel leaves revision and save dirties untouched: -4503599627370497,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel rejected before detaching a source: 0,4503599627370497
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel leaves revision and save dirties untouched: 0,4503599627370497
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel rejected before detaching a source: 0,-4503599627370497
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel leaves revision and save dirties untouched: 0,-4503599627370497
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel rejected before detaching a source: 9223372036854775807,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel leaves revision and save dirties untouched: 9223372036854775807,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel rejected before detaching a source: -9223372036854775808,0
+T160_DIRECT_BOUNDS_FAILED: unsafe pixel leaves revision and save dirties untouched: -9223372036854775808,0
+T160_DIRECT_BOUNDS_FAILED: noncanonical or malformed direct pixel is rejected: whoops,0
+T160_DIRECT_BOUNDS_FAILED: noncanonical or malformed direct pixel is rejected: 01,0
+T160_DIRECT_BOUNDS_FAILED: noncanonical or malformed direct pixel is rejected: +1,0
+T160_DIRECT_BOUNDS_FAILED: noncanonical or malformed direct pixel is rejected: 0,
+T160_DIRECT_BOUNDS_FAILED: noncanonical or malformed direct pixel is rejected: 0,01
+T160_DIRECT_BOUNDS_FAILED: all invalid submissions preserve native source, history and metadata
+T160_DIRECT_BOUNDS_FAILED: rejected inputs cannot corrupt the document before valid controls
+T160_DIRECT_BOUNDS_RESULT checks=39 failures=31

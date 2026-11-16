@@ -1,4 +1,5 @@
 extends SceneTree
+const TestBridge = preload("res://tests/t147_scripted_session_bridge.gd")
 ## T-095: batch-native pigment deltas must preserve the original pixel-by-pixel
 ## transaction oracle, including signed 64-bit anchors and atomic failures.
 
@@ -101,7 +102,7 @@ func run() -> void:
 	var path: PackedVector2Array = PackedVector2Array([Vector2(-12.5, -3.5)])
 	for batch: int in range(deltas.size()):
 		source.delta = deltas[batch]
-		var changed: DrawingResult = stage.paint_path_hokusai(path, TINT, mask, source, CLIP)
+		var changed: DrawingResult = TestBridge.paint_pigment(stage, path, TINT, mask, source, CLIP)
 		check(changed.ok, "native batch %d accepted" % batch)
 		legacy_oracle(oracle, source.delta, mask)
 		check(preview(optimized_doc, stage) == preview(reference_doc, oracle),
@@ -116,17 +117,17 @@ func run() -> void:
 	var stable_preview: PackedByteArray = preview(optimized_doc, stage)
 	var stable_count: int = stage.change_count()
 	source.delta = PackedInt32Array([3, 4, 0x60ffffff, 1073741824, 0, 0x70ffffff])
-	var invalid: DrawingResult = stage.paint_path_hokusai(path, TINT, mask, source, CLIP)
+	var invalid: DrawingResult = TestBridge.paint_pigment(stage, path, TINT, mask, source, CLIP)
 	check(not invalid.ok and invalid.code == "COORD_RANGE" and stage.change_count() == stable_count,
 		"invalid trailing coordinate rejects complete batch before mutation")
 	check(preview(optimized_doc, stage) == stable_preview,
 		"failed batch retains prior preview and tile stamps")
 	source.delta = PackedInt32Array([0, 0])
-	invalid = stage.paint_path_hokusai(path, TINT, mask, source, CLIP)
-	check(not invalid.ok and invalid.code == "HOKUSAI_LIMIT" and stage.change_count() == stable_count,
+	invalid = TestBridge.paint_pigment(stage, path, TINT, mask, source, CLIP)
+	check(not invalid.ok and invalid.code == "NATIVE_LIMIT" and stage.change_count() == stable_count,
 		"malformed native transfer rejects before staging")
 	source.delta = PackedInt32Array([12, -11, 0x5aff0000])
-	check(stage.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+	check(TestBridge.paint_pigment(stage, path, TINT, mask, source, CLIP).ok,
 		"valid batch can follow a rejected batch")
 	legacy_oracle(oracle, source.delta, mask)
 	check(preview(optimized_doc, stage) == preview(reference_doc, oracle),
@@ -144,7 +145,7 @@ func run() -> void:
 	var cancelled: DrawingEditSession = optimized_doc.begin_edit(optimized["layer"], optimized_doc.revision,
 		Transform2D.IDENTITY, ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
 	source.delta = PackedInt32Array([11, 11, 0x70abcdef])
-	check(cancelled.paint_path_hokusai(path, TINT, mask, source, CLIP).ok and
+	check(TestBridge.paint_pigment(cancelled, path, TINT, mask, source, CLIP).ok and
 		cancelled.change_count() > 0, "pending native pigment is staged before cancel")
 	var prior_revision: int = optimized_doc.revision
 	cancelled.cancel()
@@ -161,14 +162,14 @@ func run() -> void:
 	source.delta = PackedInt32Array([-10, -10, 0x70abcdef, 14, 14, 0x70abcdef])
 	faulty_doc.rejected_key = DrawingDocument.TILES.tile_key64(
 		ORIGIN_X + 14, ORIGIN_Y + 14, faulty_doc.tile_stride)
-	var rejected: DrawingResult = faulty.paint_path_hokusai(path, TINT, mask, source, CLIP)
+	var rejected: DrawingResult = TestBridge.paint_pigment(faulty, path, TINT, mask, source, CLIP)
 	check(not rejected.ok and rejected.code == "INJECTED_TILE",
 		"late failed source-tile resolution propagates")
 	check(faulty.change_count() == 0 and faulty._preview_tiles.is_empty() and
 		faulty_doc.read_pixel(faulty_layer, ORIGIN_X - 10, ORIGIN_Y - 10).value == 0,
 		"failed source preflight leaves all detached pixels unmodified")
 	faulty_doc.rejected_key = ""
-	check(faulty.paint_path_hokusai(path, TINT, mask, source, CLIP).ok and
+	check(TestBridge.paint_pigment(faulty, path, TINT, mask, source, CLIP).ok and
 		faulty.change_count() == 2 and faulty.commit().ok,
 		"retry after transient source load failure commits both pixels")
 	# Deferred storage must not build one global string key for every repeated
@@ -183,7 +184,7 @@ func run() -> void:
 		ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
 	source.delta = PackedInt32Array([-7, -4, 0x60406080, -7, -4, 0x60406080,
 		-4, 2, 0x70999010, -6, -4, 0x00303030])
-	check(optimized_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+	check(TestBridge.paint_pigment(optimized_edit, path, TINT, mask, source, CLIP).ok,
 		"tile-local staging accepts duplicate and transparent pigments")
 	legacy_oracle(legacy_edit, source.delta, mask)
 	check(optimized_edit._after.is_empty() and optimized_edit._before.is_empty() \
@@ -192,7 +193,7 @@ func run() -> void:
 	var unchanged_stamp: int = optimized_edit._preview_epoch
 	source.delta = PackedInt32Array([-7, -4, 0x60406080, -4, 2, 0x70999010,
 		-6, -4, 0x00303030])
-	check(optimized_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+	check(TestBridge.paint_pigment(optimized_edit, path, TINT, mask, source, CLIP).ok,
 		"repeated native quantization is accepted")
 	legacy_oracle(legacy_edit, source.delta, mask)
 	check(optimized_edit._preview_epoch == unchanged_stamp and
@@ -208,7 +209,7 @@ func run() -> void:
 		preview(tiled["doc"], optimized_edit) == preview(tiled_ref["doc"], legacy_edit),
 		"materialization before mixed edit preserves exact preview and history")
 	source.delta = PackedInt32Array([-7, -4, 0x4540aaff, -12, -8, 0x6030ee77])
-	check(optimized_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+	check(TestBridge.paint_pigment(optimized_edit, path, TINT, mask, source, CLIP).ok,
 		"subsequent native batch uses canonical-key fallback in mixed session")
 	legacy_oracle(legacy_edit, source.delta, mask)
 	check(preview(tiled["doc"], optimized_edit) == preview(tiled_ref["doc"], legacy_edit),
@@ -228,7 +229,7 @@ func run() -> void:
 		tiled_ref["layer"], tiled_ref["doc"].revision, Transform2D.IDENTITY,
 		ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
 	source.delta = PackedInt32Array([-12, -9, 0x607733aa])
-	check(failed_edit.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+	check(TestBridge.paint_pigment(failed_edit, path, TINT, mask, source, CLIP).ok,
 		"native batch staged before invalid region request")
 	legacy_oracle(failed_reference, source.delta, mask)
 	var expected_mixed_preview: PackedByteArray = preview(tiled_ref["doc"], failed_reference)
@@ -247,7 +248,7 @@ func run() -> void:
 	var mixed_fault: DrawingEditSession = mixed_fault_doc.begin_edit(mixed_fault_layer,
 		mixed_fault_doc.revision, Transform2D.IDENTITY, ORIGIN_X, ORIGIN_Y).value as DrawingEditSession
 	source.delta = PackedInt32Array([-12, -9, 0x60eeee33])
-	check(mixed_fault.paint_path_hokusai(path, TINT, mask, source, CLIP).ok,
+	check(TestBridge.paint_pigment(mixed_fault, path, TINT, mask, source, CLIP).ok,
 		"native edit begins deferred before a later source-read failure")
 	var pre_failure: PackedByteArray = preview(mixed_fault_doc, mixed_fault)
 	var pre_failure_count: int = mixed_fault.change_count()
@@ -310,7 +311,7 @@ func run() -> void:
 			-65, -65, 0x60998877, 75, 75, -1,
 			-65, -65, 0x20335577]))
 		source.delta = samples
-		var batch_result: DrawingResult = boundary_sessions[0].paint_path_hokusai(
+		var batch_result: DrawingResult = TestBridge.paint_pigment(boundary_sessions[0],
 			path, TINT, boundary_mask, source, boundary_clip)
 		check(batch_result.ok, "stress batch %d accepted" % batch)
 		var reference_session: DrawingEditSession = boundary_sessions[1]
@@ -373,7 +374,7 @@ func run() -> void:
 	long_deltas.append_array(PackedInt32Array([61, 0, -1,
 		-3, -41, 0x60a0b0c0, 61, 1, 0x40ff0000, -3, -41, 0x20001234]))
 	source.delta = long_deltas
-	var long_result: DrawingResult = long_edits[0].paint_path_hokusai(
+	var long_result: DrawingResult = TestBridge.paint_pigment(long_edits[0],
 		path, TINT, null, source)
 	check(long_result.ok and long_edits[0].change_count() == 4098,
 		"full 64px tile plus alternating tile revisits stages all distinct pixels")

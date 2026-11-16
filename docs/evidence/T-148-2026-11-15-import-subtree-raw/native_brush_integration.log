@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T095_NATIVE_HARD legacy_ms=244.656 native_ms=81.639 legacy_stage_ms=99.741 native_stage_ms=36.733
+T095_HOKUSAI preset=hard stage_ms=7.373
+T095_HOKUSAI preset=soft stage_ms=8.773
+T095_HOKUSAI preset=ink stage_ms=1.084
+T095_HOKUSAI preset=airbrush stage_ms=2.347
+T095_NATIVE_BRUSH_RESULT checks=32 failures=0

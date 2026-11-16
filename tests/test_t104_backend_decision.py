@@ -100,13 +100,15 @@ class DecisionContracts(unittest.TestCase):
                 self.assertIn(b"T095_FULL_CANVAS_PASSED", raw)
                 self.assertIn("NOT a verified pass", row["interpretation"])
 
-    def test_pointer_gate_waits_for_progressive_display(self) -> None:
-        pointer = (ROOT / "drawing/tests/t095_full_canvas_brush_native.gd").read_text()
-        self.assertIn("T104_DISPLAY_SETTLE", pointer)
+    def test_historical_pointer_gate_replaced_by_live_hokusai_oracle(self) -> None:
+        # The old T-104 decision evidence stays pinned, but its NativeHard-only
+        # fixture was deleted under T-153. Validate the new independent gate.
+        pointer = (ROOT / "drawing/tests/t146_hokusai_full_canvas_native.gd").read_text()
+        self.assertIn("T146_FILL_STATUS", pointer)
         self.assertIn("canvas._cold_population_pending", pointer)
-        self.assertIn("cold_tiles_deferred", pointer)
-        self.assertIn("check_all_red(doc, layer", pointer)
+        self.assertIn("T146_FRAMEBUFFER", pointer)
         self.assertIn("doc.undo().ok", pointer)
+        self.assertNotIn("NativeHard", pointer)
 
 
 if __name__ == "__main__":

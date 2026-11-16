@@ -1,5 +1,7 @@
 class_name DrawingRenderer
 extends RefCounted
+
+const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 ## Bounded, render-on-demand source compositing; never allocates a whole canvas.
 
 
@@ -44,10 +46,15 @@ static func render(document: DrawingDocument, view: Rect2i,
 	var shared_source_chunks: Dictionary = visible_plan.get("source_chunks", {})
 	var bytes: PackedByteArray = PackedByteArray()
 	bytes.resize(view.size.x * view.size.y * 4)
+	# Guard the origin before adding the signed viewport offset. Checking only
+	# the sum allows MAX_I64 + 1 to wrap to MIN_I64, which abs() also misses.
+	# These bounded origins plus 32-bit Rect2i offsets cannot overflow int64.
+	if not TILES.document_anchor_in_range(origin_x, origin_y):
+		return DrawingResult.failure("COORD_RANGE", "Viewport origin outside Drawing range")
 	# Keep 64-bit camera anchors out of Vector2i, which truncates at 32 bits.
 	var world_x: int = origin_x + int(view.position.x)
 	var world_y: int = origin_y + int(view.position.y)
-	if abs(world_x) > 1152921504606846976 or abs(world_y) > 1152921504606846976:
+	if not TILES.document_anchor_in_range(world_x, world_y):
 		return DrawingResult.failure("COORD_RANGE", "Viewport anchor outside Drawing range")
 	var font_warnings: Array[String] = []
 	for layer_id: String in leaf_layers:
@@ -117,6 +124,7 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 	const MAX_FRAME_SOURCE_REFS: int = 256
 	var source_tiles: Dictionary[String, Variant] = {}
 	var preview_patches: Dictionary[String, Dictionary] = {}
+	var preview_packed: Dictionary[String, PackedByteArray] = {}
 	var cached_row: int = -9223372036854775807
 	for y: int in range(size.y):
 		var world_row: int = world_y + y
@@ -124,6 +132,7 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 		if storage_row != cached_row:
 			source_tiles.clear()
 			preview_patches.clear()
+			preview_packed.clear()
 			cached_row = storage_row
 		var local_y: int = posmod(world_row, stride)
 		var x: int = 0
@@ -134,9 +143,11 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 			var key: String = DrawingDocument.TILES.tile_key64(absolute_x, world_y + y, stride)
 			var tile: DrawingRasterTile = null
 			var patch: Dictionary = {}
+			var native_preview: PackedByteArray = PackedByteArray()
 			if source_tiles.has(key):
 				tile = source_tiles[key] as DrawingRasterTile
 				patch = preview_patches.get(key, {})
+				native_preview = preview_packed.get(key, PackedByteArray())
 			else:
 				# Adjacent 128px display tiles often share a 256px storage
 				# chunk. The revision/epoch-pinned visible plan can reuse the
@@ -156,19 +167,25 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				# detached edit even when its source chunk was cached before.
 				if preview != null:
 					patch = preview.preview_tile(key)
+					native_preview = preview.preview_rgba8_tile(key)
 				if stride > 1 and source_tiles.size() < MAX_SOURCE_TILE_REFS:
 					source_tiles[key] = tile
 					if preview != null:
 						preview_patches[key] = patch
-			if tile != null or not patch.is_empty():
+						preview_packed[key] = native_preview
+			if tile != null or not patch.is_empty() or not native_preview.is_empty():
 				# Both the detached source tile and preview patch are immutable for
 				# this synchronous render. Read the canonical sparse RGBA map by
 				# linear tile index: the public coordinate-checked getter otherwise
 				# adds a GDScript call and two assertions for *every* dense pixel.
 				# Never alter the owned map or let preview pixels escape into it.
 				var source_pixels: Dictionary[int, int] = {}
-				if tile != null:
-					source_pixels = tile._pixels
+				var packed_source: PackedByteArray = native_preview
+				if tile != null and native_preview.is_empty():
+					if tile.has_packed_rgba8():
+						packed_source = tile._rgba8
+					else:
+						source_pixels = tile._pixels
 				var has_preview_patch: bool = not patch.is_empty()
 				# A nearly empty 256px source tile can occupy four 128px
 				# display tiles. Scanning every destination pixel would be
@@ -188,7 +205,7 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 				# Cap per-run work and keep dense Brush footprints on the
 				# sequential scan path. This is independent of the source tile
 				# stride and never constructs 32-bit global coordinates.
-				if run_length >= 16 and source_pixels.size() + patch.size() <= mini(64, run_length >> 1):
+				if packed_source.is_empty() and run_length >= 16 and source_pixels.size() + patch.size() <= mini(64, run_length >> 1):
 					var first_index: int = local_y * stride + local_x
 					var end_index: int = first_index + run_length
 					for pixel_index: int in source_pixels:
@@ -225,7 +242,8 @@ static func _composite_raster(document: DrawingDocument, layer_id: String,
 						# pixels in a brush footprint. Do not fetch the canonical
 						# source for coordinates overridden by the detached patch.
 						var source: int = int(patch[pixel_index]) if has_preview_patch and patch.has(pixel_index) \
-							else int(source_pixels.get(pixel_index, 0))
+							else (packed_source.decode_u32(pixel_index * 4) if not packed_source.is_empty() \
+								else int(source_pixels.get(pixel_index, 0)))
 						if (source & 0xff000000) == 0:
 							continue
 						var index: int = (y * size.x + x + offset) * 4

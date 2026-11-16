@@ -26,7 +26,7 @@ func run() -> void:
 		quit(1)
 		return
 	for preset: String in PRESETS:
-		var native: Object = ClassDB.instantiate("DrawingNativeBrush")
+		var native: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
 		var resource: String = "res://addons/drawing/brushes/%s.myb" % {
 			"hard": "hard_round", "soft": "soft", "ink": "ink", "airbrush": "airbrush"
 		}[preset]
@@ -56,8 +56,8 @@ func run() -> void:
 		check(checksum == EXPECTED[preset], "pre-cache pixel stream identical for " + preset)
 		# An invalid trailing point may not mutate the earlier valid points:
 		# the following valid batch must match a never-invalid reference brush.
-		var reference: Object = ClassDB.instantiate("DrawingNativeBrush")
-		var candidate: Object = ClassDB.instantiate("DrawingNativeBrush")
+		var reference: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
+		var candidate: Object = load("res://tests/t147_historical_ffi_fixture.gd").new()
 		check(reference.call("configure_preset", settings, 32.0, 0xff53a071) and
 			candidate.call("configure_preset", settings, 32.0, 0xff53a071),
 			"initialize side-effect reference for " + preset)

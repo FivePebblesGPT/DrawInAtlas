@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_SPARSE_CAPTURE_BENCH: 512x512, 8 stored, seven CPU-only samples, median 644 us, samples=[641, 641, 647, 641, 668, 675, 644]
+T088_SPARSE_CAPTURE: 54 checks; 0 failed
+T088_SPARSE_CAPTURE_PASSED (54 checks; 0 failed)

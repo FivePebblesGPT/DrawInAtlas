@@ -1,0 +1,16 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T095_FULL_CANVAS_RUN index=0 backend=NativeHard source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=5000.587 release_to_commit_ms=4936.148 stage_cpu_ms=1506.010 drain_frames=163 max_pending=99 commit_cpu_ms=1029.577 compose_cpu_ms=976.670 texture_cpu_ms=40.257 preview_frames=93 segments_staged=296 drain_calls=165 max_batch_ms=33.194 max_drain_ms=33.216 frame_compose_p95_ms=14.241 max_frame_compose_ms=17.166 max_frame_draw_ms=18.249 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=0 static_before_bytes=57549244 static_after_bytes=145703888 peak_before_bytes=78246364 peak_after_bytes=183281900
+T099_FRAME_METRICS index=0 input_draw_p50_ms=1941.620 input_draw_p95_ms=3717.431 input_draw_max_ms=3897.586 input_callback_p50_ms=1950.029 input_callback_p95_ms=3724.992 input_callback_max_ms=3905.657 pending_depth_p95=94 pending_depth_max=99 pending_age_p95_ms=3717.422 pending_age_max_ms=3897.573 preview_draws=93 drain_calls=165 max_drain_ms=33.216
+T104_DISPLAY_SETTLE index=0 backend=NativeHard extra_frames=7
+T095_FULL_CANVAS_RUN index=1 backend=NativeHard source_pixels=262144 width_px=96 input_events=100 total_to_postdraw_ms=5150.842 release_to_commit_ms=5089.109 stage_cpu_ms=1488.680 drain_frames=160 max_pending=99 commit_cpu_ms=1118.748 compose_cpu_ms=937.716 texture_cpu_ms=44.623 preview_frames=91 segments_staged=296 drain_calls=162 max_batch_ms=53.861 max_drain_ms=55.423 frame_compose_p95_ms=16.396 max_frame_compose_ms=22.339 max_frame_draw_ms=24.088 retained_texture_bytes=1048576
+T100_POINTER_MEMORY index=1 static_before_bytes=64175304 static_after_bytes=151602936 peak_before_bytes=193939040 peak_after_bytes=193939040
+T099_FRAME_METRICS index=1 input_draw_p50_ms=1896.566 input_draw_p95_ms=3778.637 input_draw_max_ms=3935.403 input_callback_p50_ms=1903.618 input_callback_p95_ms=3786.784 input_callback_max_ms=3945.068 pending_depth_p95=92 pending_depth_max=99 pending_age_p95_ms=3778.632 pending_age_max_ms=3935.403 preview_draws=91 drain_calls=162 max_drain_ms=55.423
+T104_DISPLAY_SETTLE index=1 backend=NativeHard extra_frames=6
+T095_FULL_CANVAS_SUMMARY backend=NativeHard runs=2 total_p50_ms=5000.587 total_p95_ms=5150.842 release_p95_ms=5089.109 stage_p95_ms=1506.010 proposed_target_ms=100 target_met=false failures=0
+T095_FULL_CANVAS_PASSED

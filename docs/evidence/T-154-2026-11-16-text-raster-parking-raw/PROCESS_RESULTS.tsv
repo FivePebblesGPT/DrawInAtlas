@@ -1,0 +1,29 @@
+log	exit	marker_or_note
+fail-first-previous-implementation.log	1 expected failure	T154_PARKED_PASSED checks=30 failures=15
+fail-first-editor-import.log	0	not applicable
+rust-unit.log	0	test result: ok. 22 passed
+rust-fmt.log	0	not applicable
+rust-strict-clippy.log	0	Finished `dev` profile
+rust-release-build-interrupted.log	timeout, unverified	not applicable
+editor-import.log	0	not applicable
+editor-root-import.log	0	not applicable
+t154-native-text-parking.log	0	T154_PARKED_PASSED checks=30 failures=0
+t148-text-raster-revision.log	0	T148_TEXT_RASTER_PASSED (32 checks; 0 failed)
+t148-metadata-native-revision.log	0	T148_METADATA_RESULT checks=61 failures=0
+t148-import-subtree.log	0	T148_IMPORT_RESULT checks=33 failures=0
+t148-unrecorded-retire.log	0	T148_RETIRE_PASSED checks=33 failures=0
+t148-native-tiles-contract.log	0	T148_NATIVE_TILES_RESULT checks=312 failures=0
+t148-persistent-document.log	0	T148_PERSISTENT_RESULT checks=44 failures=0
+t148-external-raster.log	0	T148_EXTERNAL_RESULT checks=28 failures=0
+t148-document-publish.log	0	T148_DOCUMENT_TILES_RESULT checks=55 failures=0
+native-brush-integration.log	0	T095_NATIVE_BRUSH_RESULT checks=32 failures=0
+t147-stroke-contract.log	0	T147_NATIVE_CONTRACT_PASSED checks=20 errors=0 ints=2784
+drawing-text-root.log	0	DRAWING_TEXT_PASSED (60 checks; 0 failed)
+t148-atlas-native-history.log	0	T148_ATLAS_NATIVE_RESULT checks=43 failures=0
+t148-object-native-source.log	0	T148_OBJECT_NATIVE_PASSED (38 checks; 0 failed)
+t148-detached-bootstrap.log	0	T148_BOOTSTRAP_PASSED checks=34 failures=0
+t148-detached-replay.log	0	T148_DETACHED_PASSED checks=21 failures=0
+t148-history-payload.log	0	T148_HISTORY_PAYLOAD_PASSED checks=20 failures=0
+t148-history-reentrancy.log	0	T148_HISTORY_REENTRANT_PASSED checks=25 failures=0
+x11-native-canvas.log	0	T148_CANVAS_TILES_RESULT checks=46 failures=0 ffi={ "ok": true, "layer": "drawing-865ed3ce28735bc90577f2ba8b86f36a", "rgba": 4278190318, "format": "xy_rgba", "ffi_calls": 11, "batches": 3, "input_floats": 16, "exported_ints": 2379, "tile_ffi_calls": 9, "tile_bytes_imported": 16384, "tile_bytes_exported": 32768, "tile_pixel_stream_calls": 0 }
+x11-96px-hokusai.log	0	T146_HOKUSAI_BENCHMARK_PASSED

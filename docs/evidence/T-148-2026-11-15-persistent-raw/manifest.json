@@ -1,0 +1,86 @@
+{
+  "environment": "Offline bundle 8, Godot 4.8 beta 3; Linux X11 Mesa llvmpipe for graphical tests",
+  "files": {
+    "canvas-x11.log": {
+      "bytes": 1043,
+      "exit_code_observed": 0,
+      "sha256": "17af2006956c3e7f83b07f144b7711a602f64b33a489946b5961c75d0a2706e0"
+    },
+    "document-publication.log": {
+      "bytes": 466,
+      "exit_code_observed": 0,
+      "sha256": "9c69c636b123bb1ef9c754ed6a06304dd1042923a4b9384c18436a6dd611c491"
+    },
+    "hokusai-96px-x11.log": {
+      "bytes": 5198,
+      "exit_code_observed": 0,
+      "sha256": "88ce612152c1504788fb7149b83b8d5dc489a661d2f3ca1f499a90b01d91840f"
+    },
+    "native-build.log": {
+      "bytes": 278,
+      "exit_code_observed": 0,
+      "sha256": "8fd1107eece2f274fe833c9ba17b89dd056c960820fdb6ef884accff36501b88"
+    },
+    "native-hard-96px-x11.log": {
+      "bytes": 1933,
+      "exit_code_observed": 0,
+      "sha256": "5ed77909123b6e01993d2eadfc76feea53efe820af538f9f42ca5f016ae48d85"
+    },
+    "native-hard-source-atomic.log": {
+      "bytes": 516,
+      "exit_code_observed": 0,
+      "sha256": "95a781b63a346c36c645eed41d7d096d704bd8f2ebe54dd7b0e3c26dfc7e98b3"
+    },
+    "native-pigment-atomic.log": {
+      "bytes": 507,
+      "exit_code_observed": 0,
+      "sha256": "2d78d31c2af4d4e422d97776e752dac4036ff78fbdc563f179de3b32909a5ef4"
+    },
+    "native-stroke-contract.log": {
+      "bytes": 522,
+      "exit_code_observed": 0,
+      "sha256": "328d8cd8eaf0c427634a07dd115f91762c9d3e3e61d21c94a52c47eff1869280"
+    },
+    "native-tile-contract.log": {
+      "bytes": 782,
+      "exit_code_observed": 0,
+      "sha256": "6de43210e0e79363b13e79c6164814e887c19902fdd418074cf8b571a994a5d7"
+    },
+    "persistent-document.log": {
+      "bytes": 462,
+      "exit_code_observed": 0,
+      "sha256": "d30f2ab2363a33c16fb4a580b9dd8794930b62c2f0cadd0dcdde2df36d70c702"
+    },
+    "renderer-sparse.log": {
+      "bytes": 639,
+      "exit_code_observed": 0,
+      "sha256": "ada5a7c63158608fca5fa413a1b6c47e99e8ebd803af9443ec4fe8a187b7eca1"
+    },
+    "rust-clippy.log": {
+      "bytes": 157,
+      "exit_code_observed": 0,
+      "sha256": "ab40eb3d39b9befbae328d9571af9f193e9b5b6aa1391bd842e2a1a14b855307"
+    },
+    "rust-test.log": {
+      "bytes": 1749,
+      "exit_code_observed": 0,
+      "sha256": "0450cf972adf17497b778dde9ec55cdd4d90da7588dd205bd1eb3bdf6fd86265"
+    },
+    "selection-clipboard.log": {
+      "bytes": 469,
+      "exit_code_observed": 0,
+      "sha256": "3162b34ce7453eb65115683c3cdb4e86b6c12f9e943ff579a8072f947ee3e4c6"
+    },
+    "standalone-smoke.log": {
+      "bytes": 1237,
+      "exit_code_observed": 0,
+      "note": "Test success marker and exit 0, but Godot reported shutdown RID/ObjectDB leaks (see raw log).",
+      "sha256": "d1ac0fb5cc61e57423520d4921ee078a5b2a9922919a3a61d665549af0c47426"
+    },
+    "ticket-board.log": {
+      "bytes": 58,
+      "exit_code_observed": 0,
+      "sha256": "b21fa60efa1bc13cab2e89dea8bb196dc2390eca94b9d9d1c4c0e103f50d85ee"
+    }
+  }
+}

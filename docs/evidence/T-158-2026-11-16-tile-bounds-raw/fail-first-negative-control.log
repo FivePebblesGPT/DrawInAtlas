@@ -1,0 +1,13 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T158_TILE_BOUNDS_FAILED: out-of-range positive/negative signed tile ID fails before registration
+T158_TILE_BOUNDS_FAILED: out-of-range positive/negative signed tile ID fails before registration
+T158_TILE_BOUNDS_FAILED: out-of-range positive/negative signed tile ID fails before registration
+T158_TILE_BOUNDS_FAILED: out-of-range positive/negative signed tile ID fails before registration
+T158_TILE_BOUNDS_FAILED: rejected IDs leave document and persistence metadata unchanged
+T158_TILE_BOUNDS_FAILED: logical manifest rejects unsafe lazy coordinate before loader
+T158_TILE_BOUNDS_FAILED: manifest export refuses forged out-of-range resident tile
+T158_TILE_BOUNDS_FAILED: portable .drawing decode rejects unsafe source metadata
+T158_TILE_BOUNDS_FAILED: valid distant signed source roundtrips exact RGBA8 through .drawing
+T158_TILE_BOUNDS_RESULT checks=24 failures=9

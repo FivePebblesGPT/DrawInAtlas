@@ -1,4 +1,5 @@
 extends SceneTree
+const TestBridge = preload("res://tests/t147_scripted_session_bridge.gd")
 ## T-095: fast signed power-of-two native tile coordinates must be exact.
 ## The reference stages the same Hokusai deltas through independent _stage().
 
@@ -88,7 +89,7 @@ func run() -> void:
 			points.append_array(PackedInt32Array([-20, 17, 0x70804020,
 				28, -19, -1, -20, 17, 0x60ffffff]))
 			native.deltas = points
-			check(edit.paint_path_hokusai(pressure_path, TINT, mask, native, CLIP).ok,
+			check(TestBridge.paint_pigment(edit, pressure_path, TINT, mask, native, CLIP).ok,
 				"native preflight stride %d batch %d" % [stride, batch])
 			var reference_ok: bool = true
 			for index: int in range(0, points.size(), 3):

@@ -1,0 +1,23 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T179_SEMANTIC_REMOVE_FAILED: recorded refuses semantic removal while Rust is busy
+T179_SEMANTIC_REMOVE_FAILED: recorded rejected removal changes neither tree, source nor histories
+T179_SEMANTIC_REMOVE_FAILED: recorded succeeds atomically on retry
+T179_SEMANTIC_REMOVE_FAILED: recorded Undo restores nested semantic tree
+T179_SEMANTIC_REMOVE_FAILED: recorded Redo removes semantic tree with native revision
+T179_SEMANTIC_REMOVE_FAILED: recorded subsequent Hokusai paint preserves existing native store
+T179_SEMANTIC_REMOVE_FAILED: untracked refuses semantic removal while Rust is busy
+T179_SEMANTIC_REMOVE_FAILED: untracked rejected removal changes neither tree, source nor histories
+T179_SEMANTIC_REMOVE_FAILED: untracked succeeds atomically on retry
+T179_SEMANTIC_REMOVE_FAILED: untracked subsequent Hokusai paint preserves existing native store
+T179_SEMANTIC_REMOVE_FAILED: host refuses semantic removal while Rust is busy
+T179_SEMANTIC_REMOVE_FAILED: host rejected removal changes neither tree, source nor histories
+T179_SEMANTIC_REMOVE_FAILED: host succeeds atomically on retry
+T179_SEMANTIC_REMOVE_FAILED: host subsequent Hokusai paint preserves existing native store
+T179_SEMANTIC_REMOVE_FAILED: divergent native revision rejects semantic subtree removal
+T179_SEMANTIC_REMOVE_FAILED: divergence leaves both revisions and all source/history state unchanged
+T179_SEMANTIC_REMOVE_RESULT checks=62 failures=16

@@ -1,0 +1,11 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T157_LAZY_GUARD_FAILED: reentrant revision invalidates lazy materialization
+T157_LAZY_GUARD_FAILED: failed load retains pending source without installing bytes
+T157_LAZY_GUARD_FAILED: changed pending reference rejects old provider response
+T157_LAZY_GUARD_FAILED: provider's new pending source remains available for retry
+T157_LAZY_GUARD_FAILED: retry resolves new source, not stale earlier RGBA8
+T157_LAZY_GUARD_FAILED: same-key recursive fetch fails explicitly without stack recursion
+T157_LAZY_GUARD_FAILED: all materializations complete with no duplicate recursive callback
+T157_LAZY_GUARD_RESULT checks=23 failures=7
