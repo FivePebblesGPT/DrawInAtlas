@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -26,10 +27,25 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCK_PATH = ROOT / "toolchain.lock.toml"
 BUILD = ROOT / ".build"
 MANIFEST = "bundle-manifest.json"
+UPLOAD_LIMIT_BYTES = 500 * 1024 * 1024
 
 
 class ToolchainError(RuntimeError):
     """An actionable toolchain or artifact validation error."""
+
+
+def check_bundle_size(archive: Path) -> int:
+    """Reject compressed output that exceeds the sandbox's 500 MiB upload cap."""
+    size = archive.stat().st_size
+    if size > UPLOAD_LIMIT_BYTES:
+        raise ToolchainError(f"Bundle is {size} bytes; upload limit is 500 MiB ({UPLOAD_LIMIT_BYTES} bytes)")
+    return size
+
+
+def normalize_rust_metadata(rust: Path) -> None:
+    """rustup installs components concurrently; their registry order is immaterial."""
+    components = rust / "lib/rustlib/components"
+    components.write_text("\n".join(sorted(components.read_text().splitlines())) + "\n", encoding="utf-8")
 
 
 def sha256_file(path: Path) -> str:
@@ -48,7 +64,9 @@ def pins() -> dict:
 
 def check_platform() -> None:
     if sys.platform != "linux" or platform.machine() not in ("x86_64", "amd64"):
-        raise ToolchainError("Bundle mode currently supports Linux x86-64 only; use TOOLCHAIN=system elsewhere")
+        raise ToolchainError(
+            "Bundle mode currently supports Linux x86-64 only; use TOOLCHAIN=system elsewhere"
+        )
 
 
 def run(argv: list[str], *, env: dict[str, str] | None = None, cwd: Path | None = None) -> None:
@@ -151,7 +169,7 @@ def verify_extracted(directory: Path, *, legacy: bool = False) -> None:
     for path in directory.rglob("*"):
         if path.is_symlink():
             raise ToolchainError(f"Bundle contains a symlink: {path}")
-        if not path.is_file() or path == manifest_path or path.name == ".complete":
+        if not path.is_file() or path == manifest_path or path == directory / ".complete":
             continue
         relative = path.relative_to(directory).as_posix()
         actual_paths.add(relative)
@@ -164,7 +182,9 @@ def verify_extracted(directory: Path, *, legacy: bool = False) -> None:
 def resolve_bundle(value: str) -> tuple[Path, bool]:
     check_platform()
     if not value:
-        raise ToolchainError("TOOLCHAIN=bundle requires BUNDLE=/path/to/archive.tar.zst or extracted directory")
+        raise ToolchainError(
+            "TOOLCHAIN=bundle requires BUNDLE=/path/to/archive.tar.zst or extracted directory"
+        )
     path = Path(value).expanduser().resolve()
     if path.is_dir():
         root = find_bundle_root(path)
@@ -174,12 +194,14 @@ def resolve_bundle(value: str) -> tuple[Path, bool]:
         raise ToolchainError(f"Bundle does not exist: {path}")
     digest = sha256_file(path)
     legacy = pins()["legacy_bundle"]
-    is_legacy = path.name == legacy["filename"]
-    if is_legacy and digest != legacy["sha256"]:
+    is_legacy = digest == legacy["sha256"]
+    if path.name == legacy["filename"] and not is_legacy:
         raise ToolchainError("Legacy bundle SHA-256 does not match the committed lockfile")
     sidecar = path.with_name(path.name + ".sha256")
-    if sidecar.is_file() and sidecar.read_text(encoding="utf-8").split()[0] != digest:
-        raise ToolchainError("Bundle archive SHA-256 sidecar mismatch")
+    if sidecar.is_file():
+        fields = sidecar.read_text(encoding="utf-8").split()
+        if not fields or fields[0] != digest:
+            raise ToolchainError("Bundle archive SHA-256 sidecar mismatch")
     destination = BUILD / "toolchains" / digest
     if not (destination / ".complete").is_file():
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -211,8 +233,48 @@ def tool_paths(mode: str, bundle: str) -> tuple[dict[str, str], Path | None, boo
         return env, None, False
     root, legacy = resolve_bundle(bundle)
     env["CARGO_NET_OFFLINE"] = "true"
-    if (root / "rust/bin/cargo").is_file():
-        env["CARGO"] = str(root / "rust/bin/cargo")
+    if not legacy:
+        for relative in (
+            "rust/bin/cargo",
+            "rust/bin/rustc",
+            "rust/bin/rustfmt",
+            "rust/bin/rustdoc",
+            "bin/godot",
+            "bin/uv",
+        ):
+            executable = root / relative
+            if not executable.is_file() or not os.access(executable, os.X_OK):
+                raise ToolchainError(f"Bundle missing executable {relative}; regenerate it")
+        for key in (
+            "RUSTC_WRAPPER",
+            "RUSTC_WORKSPACE_WRAPPER",
+            "RUSTUP_TOOLCHAIN",
+            "RUST_BIN",
+            "CARGO_ENCODED_RUSTFLAGS",
+            "RUSTFLAGS",
+            "CARGO_BUILD_RUSTC",
+            "CARGO_BUILD_RUSTC_WRAPPER",
+            "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER",
+        ):
+            env.pop(key, None)
+        for key, relative in {
+            "CARGO": "rust/bin/cargo",
+            "RUSTC": "rust/bin/rustc",
+            "RUSTFMT": "rust/bin/rustfmt",
+            "RUSTDOC": "rust/bin/rustdoc",
+            "GODOT": "bin/godot",
+            "UV": "bin/uv",
+        }.items():
+            env[key] = str(root / relative)
+        identity = hashlib.sha256(str(root).encode()).hexdigest()[:16]
+        runtime = BUILD / "runtime" / identity
+        env["CARGO_HOME"] = str(runtime / "cargo")
+        env["UV_CACHE_DIR"] = str(runtime / "uv-cache")
+        env["UV_NO_INDEX"] = "1"
+        env["UV_FIND_LINKS"] = str(root / "wheels")
+        env["UV_NO_CONFIG"] = "1"
+        if not (root / "wheels").is_dir():
+            raise ToolchainError("Bundle missing pinned Python wheels; regenerate it")
     env["UV_OFFLINE"] = "1"
     env["UV_PYTHON_DOWNLOADS"] = "never"
     env["CARGO_TARGET_DIR"] = str(BUILD / "target")
@@ -221,8 +283,13 @@ def tool_paths(mode: str, bundle: str) -> tuple[dict[str, str], Path | None, boo
     if not vendor.is_dir():
         raise ToolchainError("Bundle lacks Cargo vendor directory")
     env["CARGO_VENDOR_DIR"] = str(vendor)
-    if (root / "uv-cache").is_dir():
-        env["UV_CACHE_DIR"] = str(root / "uv-cache")
+    if legacy and (root / "uv-cache").is_dir():
+        # Never let uv mutate the checked legacy input either.
+        cache = BUILD / "runtime" / "legacy-uv-cache"
+        if not cache.exists():
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(root / "uv-cache", cache)
+        env["UV_CACHE_DIR"] = str(cache)
     env["PATH"] = os.pathsep.join([str(root / "rust/bin"), str(root / "bin"), env["PATH"]])
     return env, root, legacy
 
@@ -245,7 +312,7 @@ def tool_command(command: list[str], env: dict[str, str], root: Path | None, leg
     if not command:
         raise ToolchainError("No command supplied after --")
     command = list(command)
-    aliases = {"godot": "GODOT", "cargo": "CARGO", "uv": "UV"}
+    aliases = {"godot": "GODOT", "cargo": "CARGO", "uv": "UV", "rustc": "RUSTC"}
     tool = command[0]
     if root is None and tool in aliases:
         command[0] = env.get(aliases[tool], tool)
@@ -257,14 +324,34 @@ def tool_command(command: list[str], env: dict[str, str], root: Path | None, leg
         elif tool == "uv" and (root / "bin/uv").is_file():
             command[0] = str(root / "bin/uv")
         if legacy and (root / "setup-rust-env.sh").is_file():
-            return ["bash", "-c", 'set -e; source "$1"; shift; exec "$@"', "bundle-env",
-                    str(root / "setup-rust-env.sh"), *command]
+            return [
+                "bash",
+                "-c",
+                'set -e; source "$1"; shift; exec "$@"',
+                "bundle-env",
+                str(root / "setup-rust-env.sh"),
+                *command,
+            ]
     return command
 
 
 def exec_command(mode: str, bundle: str, command: list[str]) -> int:
     env, root, legacy = tool_paths(mode, bundle)
     argv = tool_command(command, env, root, legacy)
+    if command and command[0] == "godot":
+        version = subprocess.check_output(
+            tool_command(["godot", "--version"], env, root, legacy), env=env, text=True
+        ).strip()
+        expected = pins()["godot"]["version"]
+        if not version.startswith(expected + "."):
+            raise ToolchainError(f"Required Godot {expected}; got {version} from {argv[0]}")
+        if "--script" in command or "--import" in command:
+            result = subprocess.run(argv, env=env, cwd=ROOT, capture_output=True, text=True, timeout=300)
+            print(result.stdout, end="")
+            print(result.stderr, end="", file=sys.stderr)
+            if re.search(r"SCRIPT ERROR:|Parse Error:|Compile Error:", result.stdout + result.stderr):
+                raise ToolchainError("Godot reported a script/compile error, even if its exit code was zero")
+            return result.returncode
     return subprocess.call(argv, env=env, cwd=ROOT)
 
 
@@ -282,8 +369,21 @@ def doctor(mode: str, bundle: str) -> int:
     ):
         try:
             cmd = tool_command(args, env, root, legacy)
-            output = subprocess.check_output(cmd, env=env, cwd=ROOT, stderr=subprocess.STDOUT, text=True).strip()
-            print(f"{key}: {output}")
+            output = subprocess.check_output(
+                cmd, env=env, cwd=ROOT, stderr=subprocess.STDOUT, text=True
+            ).strip()
+            resolved = shutil.which(cmd[0], path=env.get("PATH")) or cmd[0]
+            print(f"{key}: {output} ({resolved})")
+            if root is None and key == "Rust":
+                match = re.match(r"rustc (\d+)\.(\d+)\.(\d+)", output)
+                if not match or tuple(map(int, match.groups())) < (1, 94, 0):
+                    print("  REQUIRED Rust >=1.94.0")
+                    failures += 1
+                continue
+            if root is None and key == "uv":
+                if want and want not in output:
+                    print(f"  bundle pin is {want}; using installed uv in system mode")
+                continue
             if want and want.lower() not in output.lower():
                 print(f"  EXPECTED {want}")
                 failures += 1
@@ -292,9 +392,14 @@ def doctor(mode: str, bundle: str) -> int:
             failures += 1
     if root is not None:
         print(f"Cargo vendor: {env['CARGO_VENDOR_DIR']}")
-    for rel in ("addons/drawing/native/bin/libdrawing_brush.so",
-                "drawing/addons/drawing/native/bin/libdrawing_brush.so"):
+    for rel in (
+        "addons/drawing/native/bin/libdrawing_brush.so",
+        "drawing/addons/drawing/native/bin/libdrawing_brush.so",
+    ):
         print(f"{rel}: {'present' if (ROOT / rel).is_file() else 'missing'}")
+    if not (3, 11) <= sys.version_info[:2] < (3, 16):
+        print("REQUIRED system Python >=3.11,<3.16")
+        failures += 1
     return 1 if failures else 0
 
 
@@ -321,24 +426,6 @@ def extract_uv(archive: Path, destination: Path) -> None:
     destination.chmod(0o755)
 
 
-def normalize_uv_cache(cache: Path) -> None:
-    """Drop host-specific uv virtualenvs and flatten remaining wheel-cache links."""
-    if not cache.is_dir():
-        raise ToolchainError("uv did not populate its dependency cache")
-    for environment in cache.glob("environments-v*"):
-        if environment.is_symlink() or environment.is_file():
-            environment.unlink()
-        elif environment.is_dir():
-            shutil.rmtree(environment)
-    # uv caches wheels using relative links into archive-v*; tar --dereference
-    # would traverse those links but pathlib.rglob would not. Flatten first.
-    with tempfile.TemporaryDirectory(prefix="uv-cache-normalize-", dir=cache.parent) as tmp:
-        normalized = Path(tmp) / "uv-cache"
-        shutil.copytree(cache, normalized, symlinks=False)
-        shutil.rmtree(cache)
-        os.replace(normalized, cache)
-
-
 def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str = "") -> None:
     check_platform()
     lock = pins()
@@ -348,42 +435,78 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
         raise ToolchainError("Generating bundles requires GNU tar and zstd")
     output = output.expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    download_cache = BUILD / "downloads"
+    download_cache = Path(os.environ.get("TOOLCHAIN_DOWNLOAD_CACHE", str(BUILD / "downloads"))).resolve()
     godot_zip = download_cache / "godot-4.8-beta3.zip"
     uv_tgz = download_cache / "uv-linux-x86_64.tar.gz"
     download(lock["godot"]["url"], lock["godot"]["sha256"], godot_zip, godot_archive)
     download(lock["uv"]["url"], lock["uv"]["sha256"], uv_tgz, uv_archive)
 
     rust = lock["rust"]["version"]
-    rustup_cmd = ["rustup", "toolchain", "install", rust, "--profile", "minimal"]
-    for component in lock["rust"]["components"]:
-        rustup_cmd.extend(["--component", component])
-    run(rustup_cmd)
-    rustc = Path(subprocess.check_output(
-        ["rustup", "which", "--toolchain", rust, "rustc"], text=True).strip()).resolve()
-    rust_dir = rustc.parent.parent
     with tempfile.TemporaryDirectory(prefix="toolchain-build-", dir=output.parent) as tmp:
+        # A private installation excludes extra components and files installed in
+        # the builder's existing rustup toolchain. No previously assembled bundle.
+        rustup_env = os.environ.copy()
+        rustup_env["RUSTUP_HOME"] = str(Path(tmp) / "rustup")
+        rustup_cmd = ["rustup", "toolchain", "install", rust, "--profile", "minimal", "--no-self-update"]
+        for component in lock["rust"]["components"]:
+            rustup_cmd.extend(["--component", component])
+        run(rustup_cmd, env=rustup_env)
+        rustc = Path(
+            subprocess.check_output(
+                ["rustup", "which", "--toolchain", rust, "rustc"], env=rustup_env, text=True
+            ).strip()
+        ).resolve()
+        rust_dir = rustc.parent.parent
         stage = Path(tmp) / "stage"
         (stage / "bin").mkdir(parents=True)
         shutil.copytree(rust_dir, stage / "rust")
+        normalize_rust_metadata(stage / "rust")
         extract_godot(godot_zip, stage / "bin/godot", lock["godot"]["executable"])
         extract_uv(uv_tgz, stage / "bin/uv")
         rust_env = os.environ.copy()
         rust_env["CARGO_NET_OFFLINE"] = "false"
+        rust_env["CARGO_HOME"] = str(Path(tmp) / "cargo")
+        rust_env["RUSTC"] = str(rust_dir / "bin/rustc")
         rust_env["PATH"] = str(rust_dir / "bin") + os.pathsep + rust_env["PATH"]
-        run(["cargo", "vendor", "--locked", "--versioned-dirs", str(stage / "vendor")],
-            env=rust_env, cwd=ROOT / "native/drawing_brush")
+        run(
+            ["cargo", "vendor", "--locked", "--versioned-dirs", str(stage / "vendor")],
+            env=rust_env,
+            cwd=ROOT / "native/drawing_brush",
+        )
 
-        # Populate the portable uv cache for the requested Python minor.
-        # The sandbox still uses its system interpreter; no Python distribution is shipped.
+        # Ship immutable, source-pinned universal wheels instead of uv's mutable
+        # random-ID cache (which embeds host virtualenv paths and interpreter data).
+        wheels = stage / "wheels"
+        wheels.mkdir()
+        for artifact in lock["wheels"].values():
+            cached = download_cache / artifact["url"].rsplit("/", 1)[-1]
+            download(artifact["url"], artifact["sha256"], cached)
+            shutil.copyfile(cached, wheels / cached.name)
         uv_env = os.environ.copy()
-        uv_env["UV_CACHE_DIR"] = str(stage / "uv-cache")
+        uv_env["UV_CACHE_DIR"] = str(Path(tmp) / "uv-cache")
+        uv_env["UV_NO_CONFIG"] = "1"
+        uv_env["UV_OFFLINE"] = "1"
+        uv_env["UV_NO_INDEX"] = "1"
+        uv_env["UV_FIND_LINKS"] = str(wheels)
         uv_env["UV_PYTHON_DOWNLOADS"] = "never"
         for name in ("ruff", "ty"):
-            run([str(stage / "bin/uv"), "run", "--no-project", "--no-managed-python",
-                 "--python", python, "--with", f"{name}=={lock['python_tools'][name]}",
-                 "--", name, "--version"], env=uv_env, cwd=ROOT)
-        normalize_uv_cache(stage / "uv-cache")
+            run(
+                [
+                    str(stage / "bin/uv"),
+                    "run",
+                    "--no-project",
+                    "--no-managed-python",
+                    "--python",
+                    python,
+                    "--with",
+                    f"{name}=={lock['python_tools'][name]}",
+                    "--",
+                    name,
+                    "--version",
+                ],
+                env=uv_env,
+                cwd=ROOT,
+            )
         version_env = rust_env.copy()
         for executable, version in (
             ([str(stage / "rust/bin/rustc"), "--version"], lock["rust"]["version"]),
@@ -396,32 +519,51 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
 
         if any(p.is_symlink() for p in stage.rglob("*")):
             raise ToolchainError("Toolchain staging contains unexpected symlinks")
+        stage.chmod(0o755)
+        for path in stage.rglob("*"):
+            path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)
         files = {
-            p.relative_to(stage).as_posix(): sha256_file(p)
-            for p in sorted(stage.rglob("*")) if p.is_file()
+            p.relative_to(stage).as_posix(): sha256_file(p) for p in sorted(stage.rglob("*")) if p.is_file()
         }
         manifest = {
             "format": 1,
             "platform": lock["platform"],
-            "python_builder_minor": f"{sys.version_info.major}.{sys.version_info.minor}",
             "lock_sha256": sha256_file(LOCK_PATH),
             "cargo_lock_sha256": sha256_file(ROOT / "native/drawing_brush/Cargo.lock"),
             "files": files,
         }
-        (stage / MANIFEST).write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n",
-                                     encoding="utf-8")
+        (stage / MANIFEST).write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        (stage / MANIFEST).chmod(0o644)
         temporary_archive = output.with_name(output.name + ".part")
         try:
-            run(["tar", "--sort=name", "--mtime=@0", "--owner=0", "--group=0", "--hard-dereference",
-                 "--numeric-owner", "--dereference", "-I", "zstd -19 -T1", "-cf",
-                 str(temporary_archive), "-C", str(stage), "."])
+            run(
+                [
+                    "tar",
+                    "--sort=name",
+                    "--mtime=@0",
+                    "--owner=0",
+                    "--group=0",
+                    "--hard-dereference",
+                    "--numeric-owner",
+                    "--dereference",
+                    "-I",
+                    "zstd -19 -T1",
+                    "-cf",
+                    str(temporary_archive),
+                    "-C",
+                    str(stage),
+                    ".",
+                ]
+            )
+            check_bundle_size(temporary_archive)
             os.replace(temporary_archive, output)
         finally:
             temporary_archive.unlink(missing_ok=True)
     digest = sha256_file(output)
-    output.with_name(output.name + ".sha256").write_text(
-        f"{digest}  {output.name}\n", encoding="ascii")
-    print(f"Bundle generated: {output}\nSHA-256: {digest}")
+    output.with_name(output.name + ".sha256").write_text(f"{digest}  {output.name}\n", encoding="ascii")
+    print(
+        f"Bundle generated: {output}\nSHA-256: {digest}\nSize: {check_bundle_size(output)} bytes (limit 500 MiB)"
+    )
 
 
 def main() -> int:
@@ -461,7 +603,7 @@ def main() -> int:
         if args.action == "pin":
             print(pins()["python_tools"][args.name])
             return 0
-    except (ToolchainError, OSError, subprocess.CalledProcessError, ValueError) as exc:
+    except (ToolchainError, OSError, subprocess.SubprocessError, ValueError, tarfile.TarError) as exc:
         print(f"toolchain: {exc}", file=sys.stderr)
         return 1
     return 2

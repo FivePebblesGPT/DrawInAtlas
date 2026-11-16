@@ -42,7 +42,7 @@ func _ready() -> void:
 
 func _test_sparse_and_layers() -> void:
 	var document: DrawingDocument = DrawingDocument.new("test-document", 16, 2, 1)
-	_check(document.layer_count() == 0 and document.snapshot_for_save()["dirty_rgba8"].is_empty(),
+	_check(document.layer_count() == 0 and document.snapshot_for_save().value["dirty_rgba8"].is_empty(),
 		"Blank document has zero raster allocation")
 	var group: String = String(document.create_layer(DrawingLayerNode.GROUP, "Art").value)
 	var nested: String = String(document.create_layer(DrawingLayerNode.GROUP, "Foreground", group).value)
@@ -124,7 +124,9 @@ func _test_edit_and_history() -> void:
 	_check(document.revision == revision_before and document.tile_keys(raster).size() == 2,
 		"Cancellation changes no stored document bytes or revision")
 	_check(not cancelled.commit().ok, "Closed session cannot commit")
-	var snapshot_save: Dictionary = document.snapshot_for_save()
+	var snapshot_result: DrawingResult = document.snapshot_for_save()
+	_check(snapshot_result.ok, "Native authority authorizes save snapshot")
+	var snapshot_save: Dictionary = snapshot_result.value
 	_check(snapshot_save["dirty_rgba8"].size() == 2 and snapshot_save["stride"] == 16,
 		"Snapshot owns only modified tile leases and versioned tile stride")
 	_check(not document.mark_published(document.revision).ok and document.is_dirty(),
@@ -133,7 +135,7 @@ func _test_edit_and_history() -> void:
 	for combined: String in snapshot_save["dirty_rgba8"]:
 		refs[combined] = "blob-" + combined
 	_check(document.mark_published(document.revision, refs).ok and not document.is_dirty()
-		and document.snapshot_for_save()["dirty_rgba8"].is_empty(),
+		and document.snapshot_for_save().value["dirty_rgba8"].is_empty(),
 		"Published references clear dirty leases only after explicit savepoint")
 
 
@@ -349,7 +351,7 @@ func _test_manifest_roundtrip() -> void:
 	var unstaged: DrawingResult = DrawingDocument.open_manifest(manifest, Callable(self, "_fetch_blob"))
 	_check(not unstaged.ok and unstaged.code == "MISSING_TILE",
 		"Unpublished manifest refuses an unstaged chunk")
-	var dirty: Dictionary = original.snapshot_for_save()["dirty_rgba8"]
+	var dirty: Dictionary = original.snapshot_for_save().value["dirty_rgba8"]
 	var refs: Dictionary[String, String] = {}
 	for layer: Dictionary in manifest["layers"]:
 		for chunk: Dictionary in layer["chunks"]:

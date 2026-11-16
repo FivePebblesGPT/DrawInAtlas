@@ -5,8 +5,10 @@ import copy
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
+
+from native_test_support import experimental_extensions
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE = ROOT / "tools/benchmarks/t068_bridge"
@@ -36,7 +38,7 @@ class ScalarGodotBridgeContracts(unittest.TestCase):
         self.assertIn('str(ROOT / "tools/benchmarks/t068_scalar_hard_brush.cpp")', build)
         self.assertIn('"res://scalar_test.gd"', build)
         self.assertIn('shutil.copyfile(BRIDGE / "t068_scalar_sparse_smoke.gd"', build)
-        self.assertFalse(list(ROOT.rglob("*.gdextension")),
+        self.assertFalse(experimental_extensions(ROOT),
                          "No experimental descriptor may be committed into the app")
 
     def test_two_run_evidence_is_complete_and_source_pinned(self) -> None:

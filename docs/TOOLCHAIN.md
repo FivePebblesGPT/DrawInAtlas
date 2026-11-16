@@ -29,9 +29,9 @@ which overrides defaults. No Nix, Docker or global Python packages are needed.
 
 ## Build a new offline bundle on a connected Linux x86-64 host
 
-Required builder prerequisites: GNU Make, Python >=3.11, `rustup`, GNU tar,
-`zstd`, internet access, and a compatible system Python used to warm the uv
-cache. No existing DrawInAtlas toolchain bundle is necessary.
+Required builder prerequisites: GNU Make, Python >=3.11,<3.16, `rustup`, GNU tar,
+`zstd`, internet access, and a compatible system Python used to validate the
+pinned Python tools. No existing DrawInAtlas toolchain bundle is necessary.
 
     make bundle
     make bundle-verify
@@ -54,22 +54,24 @@ and uv release URLs and SHA-256 hashes, Rust 1.99.1, Ruff/ty versions and the
 Linux target triple. Rust distribution components are obtained by `rustup`
 for the pinned Rust version; rustup verifies upstream component checksums.
 Crates come from `native/drawing_brush/Cargo.lock` via `cargo vendor --locked`.
-The bundle packages a Rust installation, Godot executable, uv executable,
-Cargo vendor directory, and warmed uv cache; **it does not package Python or
+The bundle packages a private Rust installation, Godot executable, uv executable,
+Cargo vendor directory, and checksum-pinned universal Ruff/ty wheels; **it does not package Python or
 compiled DrawInAtlas binaries**.
 
-The generator writes a per-file SHA-256 manifest and archive SHA-256 sidecar.
+The generator uses **`zstd -19 -T1`** and rejects compressed output larger than
+**500 MiB (524,288,000 bytes)** before publishing it. It writes a per-file
+SHA-256 manifest and archive SHA-256 sidecar.
 A transferred archive is checked before use and checked against both the
 current toolchain lockfile and Cargo.lock after extraction. The output is
 relocatable and built outside the Git tree in ignored `.build/` directories.
 The archive itself is a derived, replaceable build artifact; keep a copy in
 releases/backups to survive upstream deletion.
 
-Archive ordering, ownership and timestamps are normalized. This is not a
-claim of byte-identical rebuilds across hosts: compare two clean archive
-SHA-256 hashes to establish that property separately. Verify uv cache
-portability, Rust glibc/runtime requirements, and any host-dependent compiler
-components on the actual consumer host before declaring the bundle portable.
+Archive ordering, ownership, permissions and timestamps are normalized, as is
+rustup's concurrently written component registry. No mutable uv cache or virtual
+environment is shipped. Compare two clean archive SHA-256 hashes before claiming
+byte identity; matching results on one host do not prove cross-host identity.
+Verify Rust/glibc/runtime requirements on the actual consumer distribution.
 
 ## Use the bundle on a new sandbox
 
@@ -83,14 +85,31 @@ Supply one `.tar.zst` archive and the checked-out source:
 otherwise it uses installed tools. The generated bundle is verified, unpacked
 into `.build/toolchains/<archive-sha256>/`, and reused. Cargo is then invoked
 with `--offline --locked` and the vendored registry. uv runs with
-`UV_OFFLINE=1`, `--no-managed-python`, and pinned Ruff/ty versions from the
-manifest; Python is the local compatible system executable selected by
+`UV_OFFLINE=1`, `UV_NO_INDEX=1`, `--no-managed-python`, and pinned Ruff/ty wheels
+from the bundle. Its writable cache lives separately in `.build/runtime/`;
+repeated linting never mutates the verified archive payload. Python is the local compatible system executable selected by
 `PYTHON=/path/to/python3`.
 
 The old `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` remains usable as a
 transition input if its SHA-256 matches the committed historic checksum.
 The old archive cannot be *regenerated* from its assembled bytes; `make
-bundle` creates the new source-defined format instead.
+bundle` creates the new source-defined format instead. Legacy compatibility
+was not revalidated locally because the historic archive was unavailable.
+
+For a cold network-isolated acceptance run (optional **bubblewrap** validator
+dependency; ordinary builds do not require it):
+
+    python3 tools/check_offline_toolchain.py \
+      --bundle .build/bundles/drawing-toolchain-linux-x86_64.tar.zst \
+      --output /tmp/t180-cold-consumer
+
+This copies only source plus archive to a new directory, excludes all generated
+native/Cargo/Godot state, hides host home directories, disables networking, sets
+host-tool overrides to nonexistent executables, and runs doctor, verification,
+native tests and two lint passes. Both source and bundle paths contain spaces.
+It retains raw logs and `results.json`. `bundle-verify` / `bundle-check` accept
+`BUNDLE=...`; otherwise they use `BUNDLE_OUT`. Set `GODOT_ARGS` to pass launch
+arguments (for example `GODOT_ARGS='--quit-after 120'`).
 
 ## Native extension import and diagnostics
 
@@ -117,8 +136,11 @@ Linux build proof; preserve the separate T-105 portability gate.
 
 ## Local validation status
 
-This PR's source and structural tests were written without a functioning
-container execution service. **No archive build, off-network rebuild, lint
-result, X11 launch, Godot smoke pass, or byte-reproducibility claim is made.**
-The local-agent handoff in `docs/T-180_LOCAL_AGENT_HANDOFF.md` is a required
-acceptance step before merging or marking T-180 Done.
+The initial implementation was unexecuted. Local Linux validation now includes
+system Rust 1.100.0, Godot 4.8 beta3, a new source-built Rust 1.99.1 bundle,
+network-isolated cold native compilation and repeated offline Ruff/ty runs.
+The real Wayland GUI/native Canvas test passed 46 checks, including tile FFI,
+Brush/Eraser, Undo/Redo and portable Save/Open. Early archive builds differed
+only in rustup component-list order; the normalization fix is being revalidated.
+T-180 stays In Progress pending the final reproducibility/hosted CI evidence.
+T-095 physical input and T-105 Windows gates remain open.

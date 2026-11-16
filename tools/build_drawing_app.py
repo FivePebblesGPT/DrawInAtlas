@@ -11,6 +11,11 @@ import argparse
 import shutil
 from pathlib import Path
 
+try:
+    from tools.prepare_native_project import prepare
+except ModuleNotFoundError:  # Direct `python tools/build_drawing_app.py` invocation.
+    from prepare_native_project import prepare
+
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "drawing"
 PACKAGE = ROOT / "addons" / "drawing"
@@ -94,6 +99,9 @@ def stage(destination: Path, in_place: bool = False, *, without_native: bool = F
         (native_destination / "bin").mkdir(parents=True, exist_ok=True)
         shutil.copy2(manifest, native_destination / manifest.name)
         shutil.copy2(binary, native_destination / "bin" / binary.name)
+        # External consumers need registration before their very first import,
+        # just like the in-place Make workflow (Godot discovers scripts first).
+        prepare(output)
     return output
 
 

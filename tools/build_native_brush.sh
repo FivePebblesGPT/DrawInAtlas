@@ -55,6 +55,10 @@ binary="$TARGET_DIR/$TRIPLE/release/libdrawing_brush.so"
 [[ -s "$binary" ]] || { echo "Native build did not produce $binary" >&2; exit 1; }
 destination="$ROOT/addons/drawing/native"
 mkdir -p "$destination/bin"
-cp -- "$binary" "$destination/bin/libdrawing_brush.so"
-cp -- "$WORKSPACE/drawing_brush.gdextension.template" "$destination/drawing_brush.gdextension"
+if ! cmp -s -- "$binary" "$destination/bin/libdrawing_brush.so"; then
+  cp -- "$binary" "$destination/bin/libdrawing_brush.so"
+fi
+if ! cmp -s -- "$WORKSPACE/drawing_brush.gdextension.template" "$destination/drawing_brush.gdextension"; then
+  cp -- "$WORKSPACE/drawing_brush.gdextension.template" "$destination/drawing_brush.gdextension"
+fi
 printf 'Required native Brush/Eraser: %s\n' "$destination/bin/libdrawing_brush.so"

@@ -1,10 +1,10 @@
 """Fail-closed T-139 selection outline source, witness and CI contracts."""
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -41,11 +41,11 @@ class SparseSelectionOutlineContracts(unittest.TestCase):
         self.assertIn("MASK_OUTLINE_TILES_PER_FRAME", draw)
         self.assertIn("selection_mask.contour_segments(", draw)
         # T-142 moves window/focus invalidation into a shared reconciliation
-        # helper; it still clears on a changed window, but preserves overlap
-        # across an in-window saturated focus change.
+        # helper; retain eligible overlap on window/focus changes (T-142/T-143).
         sync = self.canvas.split("func _sync_mask_outline_cache(", 1)[1].split("\nfunc ", 1)[0]
         self.assertIn("_sync_mask_outline_cache(tile_window, focus, candidates, footprint)", draw)
-        self.assertIn("_mask_outline_cache.clear()", sync)
+        self.assertIn("if not eligible.has(tile):", sync)
+        self.assertIn("_mask_outline_cache.erase(tile)", sync)
         self.assertNotIn("_pixel_mask.clear()", helper)
 
     def test_oracles_cover_signed_mask_fallback_and_real_framebuffer(self) -> None:

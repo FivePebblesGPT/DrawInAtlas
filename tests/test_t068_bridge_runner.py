@@ -4,12 +4,12 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
-from pathlib import Path
-import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from pathlib import Path
+
+from native_test_support import experimental_extensions
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "tools/benchmarks/t068_bridge/run_bridge.py"
@@ -34,7 +34,7 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
         self.assertTrue((bridge.BRIDGE / "t068_document_sparse_smoke.gd").is_file())
         self.assertTrue((bridge.BRIDGE / "t068_marshal_profile.gd").is_file())
         self.assertTrue((ROOT / "tools/benchmarks/t068_raster_kernel.cpp").is_file())
-        self.assertFalse(list(ROOT.rglob("*.gdextension")),
+        self.assertFalse(experimental_extensions(ROOT),
                          "The experimental native extension must not load at app startup")
 
     def test_correctness_marker_and_multiple_runs(self) -> None:
@@ -153,7 +153,7 @@ class IsolatedBridgeRunnerContracts(unittest.TestCase):
             self.assertIn(marker, witness)
         self.assertNotIn("ImageTexture", adapter)
         self.assertNotIn("workspace.gd", adapter)
-        self.assertFalse(list(ROOT.rglob("*.gdextension")))
+        self.assertFalse(experimental_extensions(ROOT))
 
     def test_sparse_runner_is_on_demand_with_fail_closed_evidence(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")

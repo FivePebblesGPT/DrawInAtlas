@@ -38,6 +38,11 @@ func gesture(canvas: Control, begin: Vector2i, finish: Vector2i) -> void:
 		motion.position = canvas.pixel_to_position(Vector2(finish) + Vector2(0.5, 0.5))
 		canvas._gui_input(motion)
 	mouse(canvas, finish, false)
+	for frame: int in range(180):
+		if canvas.session == null:
+			return
+		await process_frame
+	check(canvas.session == null, "native pointer gesture finishes within frame budget")
 
 
 func _run() -> void:
@@ -55,21 +60,22 @@ func _run() -> void:
 	var canvas: Control = shell.canvas
 	check(canvas.document == document, "UI uses canonical DrawingDocument")
 	canvas.tool = "Brush"
-	gesture(canvas, Vector2i(-3, 2), Vector2i(-2, 2))
+	await gesture(canvas, Vector2i(-3, 2), Vector2i(-2, 2))
 	var painted: int = read_pixel(document, layer, -3, 2)
 	check(painted != 0 and document.revision > 2, "pointer paint commits raster edit")
 	canvas.tool = "Eraser"
-	gesture(canvas, Vector2i(-3, 2), Vector2i(-3, 2))
-	check(read_pixel(document, layer, -3, 2) == 0, "pointer eraser clears raster")
+	await gesture(canvas, Vector2i(-4, 2), Vector2i(-2, 2))
+	var erased: int = read_pixel(document, layer, -3, 2)
+	check((erased >> 24) < (painted >> 24), "native pointer eraser reduces alpha")
 	check(document.undo().ok and read_pixel(document, layer, -3, 2) == painted, "undo eraser")
-	check(document.redo().ok and read_pixel(document, layer, -3, 2) == 0, "redo eraser")
+	check(document.redo().ok and read_pixel(document, layer, -3, 2) == erased, "redo eraser")
 	check(document.undo().ok, "restore paint for move")
 	canvas.tool = "Select"
-	gesture(canvas, Vector2i(-4, 1), Vector2i(0, 4))
+	await gesture(canvas, Vector2i(-4, 1), Vector2i(0, 4))
 	check(canvas.selected == Rect2i(-4, 1, 5, 4), "pointer creates rectangular selection")
 	canvas.tool = "Move"
 	var move_revision: int = document.revision
-	gesture(canvas, Vector2i(-3, 2), Vector2i(7, 7))
+	await gesture(canvas, Vector2i(-3, 2), Vector2i(7, 7))
 	check(canvas.has_floating_move() and document.revision == move_revision and
 		read_pixel(document, layer, -3, 2) == painted and
 		read_pixel(document, layer, 7, 7) == 0,
@@ -122,6 +128,9 @@ func _run() -> void:
 	check(rendered.ok and (rendered.value as Image).get_width() == 6,
 		"framebuffer render succeeds after file open")
 	DirAccess.remove_absolute(file_path)
+	shell.queue_free()
+	await process_frame
+	await process_frame
 	print("DRAWING_STANDALONE: %d passed; %d failed" % [passes, failures])
 	if failures == 0:
 		print("DRAWING_STANDALONE_PASSED")

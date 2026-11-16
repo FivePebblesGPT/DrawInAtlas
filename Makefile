@@ -8,13 +8,15 @@ UV ?= uv
 RUST_BIN ?=
 GODOT_ARCHIVE ?=
 UV_ARCHIVE ?=
+GODOT_ARGS ?=
 BUNDLE_OUT ?= .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
 -include local.mk
 
-TOOL = $(PYTHON) tools/toolchain.py
+TOOL = "$(PYTHON)" tools/toolchain.py
 WITH_TOOL = GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" RUST_BIN="$(RUST_BIN)" $(TOOL) exec --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)" --
-RUFF_VERSION := $(shell $(PYTHON) tools/toolchain.py pin ruff)
-TY_VERSION := $(shell $(PYTHON) tools/toolchain.py pin ty)
+RUFF_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ruff)
+TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
+PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
         test check lint format clean bundle bundle-check bundle-verify python-test
@@ -30,23 +32,23 @@ native:
 	@$(WITH_TOOL) bash tools/build_native_brush.sh
 
 stage-drawing: native
-	@$(PYTHON) tools/build_drawing_app.py --in-place
-	@$(PYTHON) tools/prepare_native_project.py drawing
+	@"$(PYTHON)" tools/build_drawing_app.py --in-place
+	@"$(PYTHON)" tools/prepare_native_project.py drawing
 
 import-drawing: stage-drawing
 	@$(WITH_TOOL) godot --headless --editor --path drawing --import --quit
 	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/native_extension_ready.gd
 
 import-atlas: native
-	@$(PYTHON) tools/prepare_native_project.py .
+	@"$(PYTHON)" tools/prepare_native_project.py .
 	@$(WITH_TOOL) godot --headless --editor --path . --import --quit
 	@$(WITH_TOOL) godot --headless --path . --script res://drawing/tests/native_extension_ready.gd
 
 drawing: import-drawing
-	@$(WITH_TOOL) godot --path drawing
+	@$(WITH_TOOL) godot --path drawing $(GODOT_ARGS)
 
 atlas: import-atlas
-	@$(WITH_TOOL) godot --path .
+	@$(WITH_TOOL) godot --path . $(GODOT_ARGS)
 
 build: import-drawing import-atlas
 
@@ -57,25 +59,25 @@ test: build
 	@$(WITH_TOOL) godot --headless --path . --script res://tests/t148_atlas_native_tile_history.gd
 
 python-test:
-	@$(PYTHON) -m unittest discover -s tests -p 'test_toolchain_build.py'
+	@"$(PYTHON)" -m unittest discover -s tests -p 'test_toolchain_build.py'
 
 lint:
-	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" --with "ty==$(TY_VERSION)" -- ruff check tools/toolchain.py tools/prepare_native_project.py tests/test_toolchain_build.py
-	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" --with "ty==$(TY_VERSION)" -- ty check tools/toolchain.py tools/prepare_native_project.py
+	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" --with "ty==$(TY_VERSION)" -- ruff check $(PYTHON_CHECKS) tests/test_toolchain_build.py
+	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" --with "ty==$(TY_VERSION)" -- ty check $(PYTHON_CHECKS)
 
 format:
-	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" -- ruff format tools/toolchain.py tools/prepare_native_project.py tests/test_toolchain_build.py
+	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" -- ruff format $(PYTHON_CHECKS) tests/test_toolchain_build.py
 
 check: python-test lint test
 
 bundle:
-	@$(PYTHON) tools/toolchain.py bundle --output "$(BUNDLE_OUT)" --python "$(PYTHON)"
+	@$(TOOL) bundle --output "$(BUNDLE_OUT)" --python "$(PYTHON)" --godot-archive "$(GODOT_ARCHIVE)" --uv-archive "$(UV_ARCHIVE)"
 
 bundle-verify:
-	@$(PYTHON) tools/toolchain.py verify --bundle "$(BUNDLE_OUT)"
+	@$(TOOL) verify --bundle "$(if $(BUNDLE),$(BUNDLE),$(BUNDLE_OUT))"
 
 bundle-check: bundle-verify
-	@$(MAKE) test TOOLCHAIN=bundle BUNDLE="$(BUNDLE_OUT)"
+	@$(MAKE) test TOOLCHAIN=bundle BUNDLE="$(if $(BUNDLE),$(BUNDLE),$(BUNDLE_OUT))"
 
 clean:
 	@rm -rf .build/target native/drawing_brush/target addons/drawing/native drawing/addons/drawing

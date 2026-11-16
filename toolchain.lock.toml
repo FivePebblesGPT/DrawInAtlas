@@ -24,6 +24,15 @@ sha256 = "5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91"
 ruff = "0.17.5"
 ty = "0.0.104"
 
+# Universal Python 3 wheels; no interpreter-specific mutable uv cache is shipped.
+[wheels.ruff]
+url = "https://files.pythonhosted.org/packages/f2/8a/1e29c0c3785ae7e5cd0d54ee8717a08867ef71545796340be4c653c57e24/ruff-0.17.5-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+sha256 = "40ca8afaac309b41a5b2e09e4e7beb1f824826b93c25697c4d74f573324fba4e"
+
+[wheels.ty]
+url = "https://files.pythonhosted.org/packages/c0/55/ac634ca578d3a3b39a293aab14c9c9334009c179c79564e59af7ea61ca12/ty-0.0.104-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+sha256 = "57b142b2e1a7396e0775df67469ec89f0e519d0a842787ffb8a2f5276f61c12e"
+
 [legacy_bundle]
 # Kept only to ingest the already-supplied v8 offline build archive.
 filename = "Godot_v4.8b3_rust_hokusai_bundle8.tar.zst"

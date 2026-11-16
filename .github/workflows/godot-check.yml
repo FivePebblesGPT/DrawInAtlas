@@ -20,7 +20,11 @@ jobs:
           include-templates: true
       - name: Verify the exact beta engine
         shell: bash
-        run: godot --version | grep -E '^4\.8\.beta3\.official\.'
+        timeout-minutes: 10
+        run: |
+          godot --version | grep -E '^4\.8\.beta3\.official\.'
+          # All runnable consumers require native classes before their first import.
+          make test TOOLCHAIN=system
       - name: Enforce explicit types in owned GDScript and skill examples
         id: ci_02_enforce_explicit_types_in_owned_gdscript_and_skill_examples
         if: ${{ !cancelled() }}

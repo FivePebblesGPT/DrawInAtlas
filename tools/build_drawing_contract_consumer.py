@@ -11,6 +11,11 @@ import argparse
 import shutil
 from pathlib import Path
 
+try:
+    from tools.prepare_native_project import prepare
+except ModuleNotFoundError:
+    from prepare_native_project import prepare
+
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "addons" / "drawing"
 
@@ -85,6 +90,15 @@ def stage(output: Path, fixture_name: str = "drawing_contract_consumer") -> Path
         if source.is_symlink():
             raise ValueError("Drawing icons must not be symbolic links")
         shutil.copy2(source, icon_destination / source.name)
+    if fixture_name != "drawing_contract_consumer":
+        # Runnable consumers use the same required native engine and presets.
+        native = PACKAGE / "native"
+        binary = native / "bin/libdrawing_brush.so"
+        if not binary.is_file() or binary.is_symlink() or not binary.stat().st_size:
+            raise ValueError("Required native Brush/Eraser extension missing; run 'make native' first")
+        shutil.copytree(native, target / "addons/drawing/native")
+        shutil.copytree(PACKAGE / "brushes", target / "addons/drawing/brushes")
+        prepare(target)
     return target
 
 

@@ -22,8 +22,10 @@ def prepare(project: Path) -> Path:
         if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
             raise ValueError(f"Required Brush/Eraser extension is missing or unsafe: {path}")
     text = manifest.read_text(encoding="utf-8")
-    if ('entry_symbol = "gdext_rust_init"' not in text
-            or 'res://addons/drawing/native/bin/libdrawing_brush.so' not in text):
+    if (
+        'entry_symbol = "gdext_rust_init"' not in text
+        or "res://addons/drawing/native/bin/libdrawing_brush.so" not in text
+    ):
         raise ValueError(f"GDExtension ABI or library mapping invalid: {manifest}")
     cache = project / ".godot"
     cache.mkdir(exist_ok=True)
@@ -32,8 +34,11 @@ def prepare(project: Path) -> Path:
     lines = [line.strip() for line in lines if line.strip()]
     if EXTENSION not in lines:
         lines.append(EXTENSION)
+    contents = "\n".join(lines) + "\n"
+    if destination.is_file() and destination.read_text(encoding="utf-8") == contents:
+        return destination
     temporary = destination.with_suffix(".cfg.tmp")
-    temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    temporary.write_text(contents, encoding="utf-8")
     os.replace(temporary, destination)
     return destination
 

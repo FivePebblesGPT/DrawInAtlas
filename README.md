@@ -25,6 +25,9 @@ registers the GDExtension before Godot import, and launches the editor. To gener
 a new source-pinned offline archive on an online Linux host, run `make bundle`;
 use `make bundle-check` for offline-native smoke validation. See
 [toolchain setup](docs/TOOLCHAIN.md) and [T-180](docs/Tickets/T-180.md).
+The generated archive uses zstd level 19 and is capped at **500 MiB** compressed.
+For an explicitly network-isolated cold rebuild, use
+`tools/check_offline_toolchain.py` as documented in the toolchain guide.
 
 `drawing/main.tscn` is the entry scene, not a separate 'Drawing module' scene inside Atlas. For a clean isolated package use `python3 tools/build_drawing_app.py --output /tmp/drawing-project` and launch that project. The app is **not yet owner-accepted as usable**: live strokes, zoom, selection, layer and dock issues remain. `.drawing` Save/Open worked in the owner's reported test; older single-file Atlas `.scn` save descriptions below are historical. [Corrective tickets](docs/Index.md).
 
