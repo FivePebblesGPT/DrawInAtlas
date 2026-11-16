@@ -55,7 +55,7 @@ def run(argv: list[str], *, env: dict[str, str] | None = None, cwd: Path | None 
     subprocess.run(argv, check=True, env=env, cwd=cwd)
 
 
-def download(url: str, expected_sha: str, destination: Path) -> None:
+def download(url: str, expected_sha: str, destination: Path, local_source: str = "") -> None:
     if not url.startswith("https://") or len(expected_sha) != 64:
         raise ToolchainError("Toolchain downloads require HTTPS and a pinned SHA-256 digest")
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -63,8 +63,14 @@ def download(url: str, expected_sha: str, destination: Path) -> None:
         return
     temp = destination.with_suffix(destination.suffix + ".part")
     try:
-        with urllib.request.urlopen(url, timeout=120) as source, temp.open("wb") as output:
-            shutil.copyfileobj(source, output)
+        if local_source:
+            source_file = Path(local_source).expanduser().resolve()
+            if not source_file.is_file():
+                raise ToolchainError(f"Local pinned artifact does not exist: {source_file}")
+            shutil.copyfile(source_file, temp)
+        else:
+            with urllib.request.urlopen(url, timeout=120) as source, temp.open("wb") as output:
+                shutil.copyfileobj(source, output)
         actual = sha256_file(temp)
         if actual != expected_sha:
             raise ToolchainError(f"SHA-256 mismatch for {url}: {actual} != {expected_sha}")
@@ -314,7 +320,7 @@ def extract_uv(archive: Path, destination: Path) -> None:
     destination.chmod(0o755)
 
 
-def bundle(output: Path, python: str) -> None:
+def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str = "") -> None:
     check_platform()
     lock = pins()
     if shutil.which("rustup") is None:
@@ -326,8 +332,8 @@ def bundle(output: Path, python: str) -> None:
     download_cache = BUILD / "downloads"
     godot_zip = download_cache / "godot-4.8-beta3.zip"
     uv_tgz = download_cache / "uv-linux-x86_64.tar.gz"
-    download(lock["godot"]["url"], lock["godot"]["sha256"], godot_zip)
-    download(lock["uv"]["url"], lock["uv"]["sha256"], uv_tgz)
+    download(lock["godot"]["url"], lock["godot"]["sha256"], godot_zip, godot_archive)
+    download(lock["uv"]["url"], lock["uv"]["sha256"], uv_tgz, uv_archive)
 
     rust = lock["rust"]["version"]
     rustup_cmd = ["rustup", "toolchain", "install", rust, "--profile", "minimal"]
@@ -408,6 +414,8 @@ def main() -> int:
     create = commands.add_parser("bundle")
     create.add_argument("--output", required=True, type=Path)
     create.add_argument("--python", default=sys.executable)
+    create.add_argument("--godot-archive", default="")
+    create.add_argument("--uv-archive", default="")
     verify = commands.add_parser("verify")
     verify.add_argument("--bundle", required=True)
     pin = commands.add_parser("pin")
@@ -421,7 +429,7 @@ def main() -> int:
         if args.action == "doctor":
             return doctor(args.mode, args.bundle)
         if args.action == "bundle":
-            bundle(args.output, args.python)
+            bundle(args.output, args.python, args.godot_archive, args.uv_archive)
             return 0
         if args.action == "verify":
             root, legacy = resolve_bundle(args.bundle)
