@@ -781,8 +781,8 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 			return DrawingResult.failure("COORD", "Invalid native tile key")
 		var cx: int = int(components[0])
 		var cy: int = int(components[1])
-		if key != "%d,%d" % [cx, cy] or abs(cx) > 4503599627370496 / tile_stride \
-				or abs(cy) > 4503599627370496 / tile_stride:
+		if key != "%d,%d" % [cx, cy] \
+				or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
 			return DrawingResult.failure("COORD", "Native tile coordinate outside safe bounds")
 		if not sources.has(key) or not bounds.has(key):
 			return DrawingResult.failure("STALE_PIXEL", "Native tile lacks verified source or dirty bounds")
@@ -907,8 +907,8 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 			return DrawingResult.failure("COORD", "Invalid native history key")
 		var cx: int = int(coordinates[0])
 		var cy: int = int(coordinates[1])
-		if key != "%d,%d" % [cx, cy] or abs(cx) > 4503599627370496 / tile_stride \
-				or abs(cy) > 4503599627370496 / tile_stride:
+		if key != "%d,%d" % [cx, cy] \
+				or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
 			return DrawingResult.failure("COORD", "Native history tile outside safe bounds")
 		# Take immutable preflight snapshots: a lazy provider can reenter and
 		# mutate either the document or its caller-owned delta dictionaries.
@@ -1427,8 +1427,8 @@ func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> Drawi
 			return DrawingResult.failure("COORD", "Malformed legacy pixel coordinate")
 		var x: int = int(parts[0])
 		var y: int = int(parts[1])
-		if coordinate != TILES.pixel_key64(x, y) or abs(x) > 4503599627370496 \
-				or abs(y) > 4503599627370496:
+		if coordinate != TILES.pixel_key64(x, y) \
+				or not TILES.pixel_coordinates_in_projection_range(x, y):
 			return DrawingResult.failure("COORD", "Unsafe legacy history coordinate")
 		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
 		if not grouped.has(tile_key):

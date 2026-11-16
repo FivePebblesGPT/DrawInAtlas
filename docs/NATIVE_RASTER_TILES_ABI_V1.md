@@ -25,6 +25,17 @@ benchmarks are not current correctness or timing oracles.
   coordinates and alpha-zero hidden RGB still roundtrip. This does **not**
   expand the supported Godot display coordinate range or change native
   stroke/history semantics. See [T-158 regression](evidence/T-158-2026-11-16-tile-bounds.md).
+- **Signed native replay/publication guard (T-159):** In addition to T-158's
+  lazy/manifest boundary, `_publish_native_tile_edit` and
+  `_replay_native_tile_delta` now validate both tile axes against the same
+  signed `floor(2^52 / storage_stride)` limit **before** source resolution or
+  dirty rectangle construction. `_replay_pixel_delta_native` validates both
+  historical pixel axes against inclusive `±2^52` **before** tile grouping.
+  Every comparison is sign-safe for `INT64_MIN` (where Godot's `abs()` returns
+  an overflowing negative value); rejection leaves native history and the
+  document revision untouched. These checks do not expand Rust coordinate
+  limits, modify tile encoding, or complete T-148's universal ownership gate.
+  See [T-159 regression](evidence/T-159-2026-11-16-replay-bounds.md).
 - A tile contains exactly `stride * stride * 4` bytes in **straight** `[R,G,B,A]` order, row-major with row stride `stride*4`; data are **not premultiplied**. Alpha-zero pixels can retain RGB, including through masks, Undo, Redo, read and reimport. A full transparent black tile may be imported with an **empty** byte array, but still counts as an **explicitly authorized** source identity. An absent tile is an error, never implied blank. Imported source identities cannot be replaced in place *within one document revision*. An externally changed document revision not covered by an atomic native transaction requires `rebase_external_revision`; this invalidates all prior source authorizations and native history, then source imports must match the new revision. `has_source` plus the Godot document's verified source-object identity prevents redundant tile imports across native gestures without accepting silent source replacement. The buffer length must remain exact.
 - `set_layer_editable(layer, editable)` authorizes non-raster layer authority before an edit; changing it to false before native publication rejects the whole commit. Until Godot document integration, callers must interpret this as the combined visible/unlocked state and fail closed on missing authority.
 - Memory limits: at most **128** touched storage tiles per open transaction and **128** simultaneously parked raster-layer identities, **256 MiB** counted across resident source, working drafts, masks and retained Undo/Redo tile snapshots, and **64** retained Undo transactions. History uses reversible full-tile before/after snapshots; these are conservative bounds, not byte-delta/COW subrect compression. Dense RGBA8 bytes are chosen for full-canvas paint over per-pixel string dictionaries; the map of tile IDs is sparse. Out-of-budget requests fail before publication. A full 512² (four 256px tiles) source + one edit with Undo history occupies **3,145,728 counted bytes** at the tested point.

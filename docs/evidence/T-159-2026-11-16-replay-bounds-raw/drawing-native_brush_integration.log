@@ -1,0 +1,9 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T095_HOKUSAI_HARD coverage=10100 translucent=10100 opaque=0 duration_ms=32.837
+T095_HOKUSAI preset=hard stage_ms=0.854
+T095_HOKUSAI preset=soft stage_ms=1.217
+T095_HOKUSAI preset=ink stage_ms=0.519
+T095_HOKUSAI preset=airbrush stage_ms=0.483
+T095_NATIVE_BRUSH_RESULT checks=32 failures=0

@@ -18,6 +18,13 @@ static func floor_div(value: int, positive_divisor: int) -> int:
 const MAX_PROJECTION_PIXEL_COORD: int = 4503599627370496
 
 
+## Pixel-based history has the same signed projection budget as storage tiles.
+## Never use abs() here: abs(INT64_MIN) wraps back to a negative number.
+static func pixel_coordinates_in_projection_range(x: int, y: int) -> bool:
+	return x >= -MAX_PROJECTION_PIXEL_COORD and x <= MAX_PROJECTION_PIXEL_COORD \
+		and y >= -MAX_PROJECTION_PIXEL_COORD and y <= MAX_PROJECTION_PIXEL_COORD
+
+
 static func tile_coordinates_in_projection_range(cx: int, cy: int, stride: int) -> bool:
 	if stride <= 0:
 		return false
