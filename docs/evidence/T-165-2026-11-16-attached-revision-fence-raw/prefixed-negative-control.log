@@ -1,0 +1,22 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T165_FENCE_FAILED: ahead-pixel rejects divergent attachment
+T165_FENCE_FAILED: ahead-pixel neither revision advances
+T165_FENCE_FAILED: ahead-pixel preserves ownership, dirty state, epoch and history
+T165_FENCE_FAILED: ahead-pixel cannot publish a Godot-only tile
+T165_FENCE_FAILED: ahead-tile rejects divergent attachment
+T165_FENCE_FAILED: ahead-tile neither revision advances
+T165_FENCE_FAILED: ahead-tile cannot publish a Godot-only tile
+T165_FENCE_FAILED: behind-pixel rejects divergent attachment
+T165_FENCE_FAILED: behind-pixel neither revision advances
+T165_FENCE_FAILED: behind-pixel cannot publish a Godot-only tile
+T165_FENCE_FAILED: behind-pixel retry publishes through native Rust
+T165_FENCE_FAILED: behind-tile rejects divergent attachment
+T165_FENCE_FAILED: behind-tile neither revision advances
+T165_FENCE_FAILED: behind-tile preserves ownership, dirty state, epoch and history
+T165_FENCE_FAILED: behind-tile cannot publish a Godot-only tile
+T165_FENCE_FAILED: behind-tile retry publishes through native Rust
+T165_FENCE_FAILED: final preflight rejects newly divergent native authority
+T165_FENCE_FAILED: rejected reentrant publish cannot dirty pixels or append history
+T165_FENCE_RESULT checks=51 failures=18

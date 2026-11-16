@@ -45,6 +45,14 @@ var _native_source_identities: Dictionary[String, Variant] = {}
 var _resolving_chunks: Dictionary[String, bool] = {}
 
 
+## Once Rust is attached, no direct raster publisher may fall back to a
+## Godot-only commit just because its native revision is stale. A deliberate
+## checked rebase is a separate recovery boundary, never an implicit write.
+func _attached_native_revision_matches(expected: int) -> bool:
+	return _native_raster_store == null or \
+		int(_native_raster_store.call("stats").get("revision", -1)) == expected
+
+
 func _native_store_for_edit(expected: int) -> Object:
 	if revision != expected or not ClassDB.class_exists("DrawingNativeTiles"):
 		return null
@@ -672,6 +680,8 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		record_history: bool = true) -> DrawingResult:
 	if revision != expected:
 		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated the gesture")
+	if not _attached_native_revision_matches(expected):
+		return DrawingResult.failure("STALE_REVISION", "Attached native raster revision diverged")
 	if not _nodes.has(layer_id) or not _editable(layer_id):
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if patches.is_empty():
@@ -1042,6 +1052,8 @@ func _publish_edit(layer_id: String, expected: int,
 		record_history: bool = true, track_unrecorded: bool = true) -> DrawingResult:
 	if revision != expected:
 		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated the gesture")
+	if not _attached_native_revision_matches(expected):
+		return DrawingResult.failure("STALE_REVISION", "Attached native raster revision diverged")
 	if not _nodes.has(layer_id) or not _editable(layer_id):
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if after.is_empty():
@@ -1108,8 +1120,9 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		track_unrecorded: bool = true) -> DrawingResult:
 	# All source resolution must have finished before the native commit. Do not
 	# call a lazy provider after Rust accepts an external tile transaction.
-	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id):
-		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated the gesture")
+	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id) \
+			or not _attached_native_revision_matches(expected):
+		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated native raster authority")
 	for key: String in detached:
 		if not sources.has(key) or _pending_tiles.has(layer_id + ":" + key) \
 				or _nodes[layer_id].tiles.get(key) != sources[key]:
@@ -1122,8 +1135,10 @@ func _install_prepared_edit(layer_id: String, expected: int,
 	# Once Rust owns this document, even a non-historical direct raster edit
 	# must advance its canonical tiles in the same revision. Untracked edits
 	# invalidate native Undo tokens; they never invent a history event.
-	var adopt: bool = _native_raster_store != null \
-		and int(_native_raster_store.call("stats").get("revision", -1)) == expected
+	# The last preflight above proved an attached store is at exactly the
+	# document revision. Only a genuinely native-absent document uses the
+	# historical GDScript-only projection until T-150 retires that backend.
+	var adopt: bool = _native_raster_store != null
 	var originals: Dictionary[String, PackedByteArray] = {}
 	var replacements: Dictionary[String, PackedByteArray] = {}
 	var descriptors: Array[Dictionary] = []

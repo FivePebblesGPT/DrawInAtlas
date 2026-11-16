@@ -63,8 +63,22 @@ benchmarks are not current correctness or timing oracles.
   re-marking content dirty so it can preserve the preexisting history cursor.
   With no attached
   store, historical nonnative publishing remains unchanged. Rejected native
-  transactions do not modify either source or revision; stale/out-of-sync
-  stores still follow T-148's conservative external rebase boundary.
+  transactions do not modify either source or revision. A divergent attached
+  store is now rejected by T-165 before an external publisher can commit;
+  behind-store rebase remains a distinct checked recovery action.
+
+- **Attached native revision publication fence (T-165):** For both
+  `_publish_edit` and `_publish_tile_edit`, an already attached native store
+  **must** have exactly the expected document revision before source
+  resolution. `_install_prepared_edit` rechecks that stamp after every lazy
+  callback and before Rust adoption. Native-ahead/behind state returns
+  `STALE_REVISION` with no Godot-only source, history or dirty publication;
+  there is no implicit fallback to GDScript. A deliberate checked
+  `_native_store_for_edit` rebase can recover a behind store on a later
+  transaction (invalidating old native source/tokens), but cannot roll back
+  a native-ahead store. A genuinely uninitialized native store still follows
+  the pre-T-150 historical direct path. No ABI shape or Rust kernel changes.
+  See [T-165](evidence/T-165-2026-11-16-attached-revision-fence.md).
 
 - **Public signed anchor guard (T-161):** The legacy-compatible
   `DrawingDocument.begin_edit`, `DrawingRenderer.render` and

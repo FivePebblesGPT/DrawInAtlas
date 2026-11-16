@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T088_SPARSE_PASTE_BENCH: 512x512, 6 nonzero, 7 trials, CPU stage median 58 us, samples=[67, 60, 58, 54, 167, 55, 55]
+T088_SPARSE_PASTE: 56 checks; 0 failed
+T088_SPARSE_PASTE_PASSED (56 checks; 0 failed)
