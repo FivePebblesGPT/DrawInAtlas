@@ -17,19 +17,26 @@ jobs:
           use-dotnet: false
       - name: Install software-display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import from canonical Drawing source
+      # Required Hokusai native engine must load before any Canvas test.
+      - name: Select Rust for required Hokusai GDExtension
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build and preimport required native brush
         run: |
           set -euo pipefail
+          cargo build --manifest-path native/drawing_brush/Cargo.toml --locked --release
+          mkdir -p addons/drawing/native/bin
+          cp native/drawing_brush/target/release/libdrawing_brush.so \
+            addons/drawing/native/bin/libdrawing_brush.so
+          cp native/drawing_brush/drawing_brush.gdextension.template \
+            addons/drawing/native/drawing_brush.gdextension
           python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
-      - name: T-124 native pointer-backlog replay and framebuffer parity
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s xvfb-run -a -s '-screen 0 1280x900x24' \
-            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
-            --path drawing --script res://tests/t124_queued_brush_native.gd \
-            2>&1 | tee /tmp/t124-native.log
-          python3 tools/check_godot_model_log.py /tmp/t124-native.log --marker T124_NATIVE_PASSED
+          # Pin the extension in Godot's initial registry before editor import;
+          # registering after cold editor startup is unsafe on the beta runtime.
+          mkdir -p drawing/.godot
+          printf 'res://addons/drawing/native/drawing_brush.gdextension\n' \
+            > drawing/.godot/extension_list.cfg
+          timeout --signal=TERM --kill-after=5s 240s \
+            godot --headless --editor --path drawing --import --quit
       - name: T-095 released-stroke pan/zoom regression with cancelled pending press
         run: |
           set -euo pipefail
@@ -60,14 +67,6 @@ jobs:
             2>&1 | tee /tmp/t095-cross-batch-dab.log
           python3 tools/check_godot_model_log.py /tmp/t095-cross-batch-dab.log \
             --marker T095_CROSS_BATCH_DAB_PASSED
-      - name: T-095 bounded Legacy duplicate-target drain and exact input accounting
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
-            --script res://tests/t095_duplicate_drain_batch_smoke.gd \
-            2>&1 | tee /tmp/t095-duplicate-drain.log
-          python3 tools/check_godot_model_log.py /tmp/t095-duplicate-drain.log \
-            --marker T095_DUPLICATE_DRAIN_PASSED
       - name: T-095 suppress unchanged-preview redraws across delivered input frames
         run: |
           set -euo pipefail
@@ -101,14 +100,6 @@ jobs:
             2>&1 | tee /tmp/t100-sparse-publication.log
           python3 tools/check_godot_model_log.py /tmp/t100-sparse-publication.log \
             --marker T100_SPARSE_PUBLICATION_PASSED
-      - name: T-101 NativeHard tile-dispatch bypass, mixed transaction and retry oracle
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy \
-            --path drawing --script res://tests/t101_native_hard_dispatch_smoke.gd \
-            2>&1 | tee /tmp/t101-native-dispatch.log
-          python3 tools/check_godot_model_log.py /tmp/t101-native-dispatch.log \
-            --marker T101_NATIVE_DISPATCH_PASSED
       - name: T-095 internal Brush success-result ownership and history
         run: |
           set -euo pipefail
@@ -279,67 +270,29 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_sparse_preview_smoke.gd 2>&1 | tee /tmp/t095-sparse-preview.log
           python3 tools/check_godot_model_log.py /tmp/t095-sparse-preview.log --marker T095_SPARSE_PREVIEW_PASSED
-      # Opt-in native checks are separate from the required fast GDScript CI.
-      # Build at the pinned Rust crate versions; do not commit this binary.
-      - name: Select Rust for optional NativeHard GDExtension
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build and preimport optional native brush
+      - name: T-153 stroke ABI and required-native errors
         run: |
           set -euo pipefail
-          cargo build --manifest-path native/drawing_brush/Cargo.toml --locked --release
-          mkdir -p addons/drawing/native/bin
-          cp native/drawing_brush/target/release/libdrawing_brush.so \
-            addons/drawing/native/bin/libdrawing_brush.so
-          cp native/drawing_brush/drawing_brush.gdextension.template \
-            addons/drawing/native/drawing_brush.gdextension
-          python3 tools/build_drawing_app.py --in-place
-          # Pin the extension in Godot's initial registry before editor import;
-          # registering after cold editor startup is unsafe on the beta runtime.
-          mkdir -p drawing/.godot
-          printf 'res://addons/drawing/native/drawing_brush.gdextension\n' \
-            > drawing/.godot/extension_list.cfg
-          timeout --signal=TERM --kill-after=5s 240s \
-            godot --headless --editor --path drawing --import --quit
-      - name: T-095 NativeHard whole-batch preflight and retry atomicity
+          for entry in \
+            t147_native_stroke_contract:T147_NATIVE_CONTRACT_PASSED \
+            native_brush_fallback:T095_NATIVE_REQUIRED_RESULT \
+            native_brush_integration:T095_NATIVE_BRUSH_RESULT \
+            t148_native_tiles_contract:T148_NATIVE_TILES_RESULT; do
+            name="${entry%%:*}"
+            marker="${entry#*:}"
+            timeout 150s godot --headless --path drawing --script "res://tests/${name}.gd" \
+              2>&1 | tee "/tmp/t153-${name}.log"
+            python3 tools/check_godot_model_log.py "/tmp/t153-${name}.log" --marker "$marker"
+          done
+      - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
-            --path drawing --script res://tests/t095_native_hard_atomic.gd \
-            2>&1 | tee /tmp/t095-native-hard-atomic.log
-          python3 tools/check_godot_model_log.py /tmp/t095-native-hard-atomic.log \
-            --marker T095_NATIVE_HARD_ATOMIC_PASSED
-      - name: T-095 NativeHard conservative scanlines vs original full rectangles
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
-            --path drawing --script res://tests/t095_native_hard_scanline_smoke.gd \
-            2>&1 | tee /tmp/t095-native-hard-scanline.log
-          python3 tools/check_godot_model_log.py /tmp/t095-native-hard-scanline.log \
-            --marker T095_NATIVE_HARD_SCANLINE_PASSED
-      - name: T-095 NativeHard packed output transfer and rollback parity
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
-            --path drawing --script res://tests/t095_native_hard_packed_output.gd \
-            2>&1 | tee /tmp/t095-native-hard-packed-output.log
-          python3 tools/check_godot_model_log.py /tmp/t095-native-hard-packed-output.log \
-            --marker T095_NATIVE_HARD_PACKED_OUTPUT_PASSED
-      - name: T-095 real NativeHard rollback across failed GDScript source reads
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
-            --path drawing --script res://tests/t095_native_hard_source_atomic.gd \
-            2>&1 | tee /tmp/t095-native-hard-source-atomic.log
-          python3 tools/check_godot_model_log.py /tmp/t095-native-hard-source-atomic.log \
-            --marker T095_NATIVE_HARD_SOURCE_ATOMIC_PASSED
-      - name: T-095 Hokusai packed pigment output bytes and transaction parity
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
-            --path drawing --script res://tests/t095_native_preset_packed_output.gd \
-            2>&1 | tee /tmp/t095-native-preset-packed-output.log
-          python3 tools/check_godot_model_log.py /tmp/t095-native-preset-packed-output.log \
-            --marker T095_NATIVE_PRESET_PACKED_PASSED
+          timeout 150s xvfb-run -a -s '-screen 0 1280x900x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/t148_canvas_tile_cutover_x11.gd \
+            2>&1 | tee /tmp/t153-native-tile-cutover.log
+          python3 tools/check_godot_model_log.py /tmp/t153-native-tile-cutover.log \
+            --marker T148_CANVAS_TILES_RESULT
       - name: T-095 real Hokusai pigment rollback across failed GDScript source reads
         run: |
           set -euo pipefail
@@ -348,27 +301,11 @@ jobs:
             2>&1 | tee /tmp/t095-native-pigment-atomic.log
           python3 tools/check_godot_model_log.py /tmp/t095-native-pigment-atomic.log \
             --marker T095_NATIVE_PIGMENT_ATOMIC_PASSED
-      - name: T-095 rapid 96px red Brush across 512x512 through real pointer routing
+      - name: T-153 real 96px Hokusai benchmark (strict measured FFI/tile, alpha and framebuffer)
         run: |
           set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 180s xvfb-run -a -s '-screen 0 1280x900x24' \
-            env T099_MAX_PREVIEW_FRAMES=110 godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
-            --path drawing --script res://tests/t095_full_canvas_brush_native.gd \
-            2>&1 | tee /tmp/t095-full-canvas.log
-          python3 tools/check_godot_model_log.py /tmp/t095-full-canvas.log \
-            --marker T095_FULL_CANVAS_PASSED
-          # No synthetic-speed pass/fail threshold: the test reports whether the
-          # proposed 100ms target is met, but only owner reference hardware can
-          # apply the opt-in T095_FULL_CANVAS_P95_BUDGET_MS ceiling.
-      - name: T-099 held preview, signed masked Brush/Eraser and navigation parity
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 180s xvfb-run -a -s '-screen 0 1280x900x24' \
-            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
-            --path drawing --script res://tests/t099_preview_schedule_native.gd \
-            2>&1 | tee /tmp/t099-preview-schedule.log
-          python3 tools/check_godot_model_log.py /tmp/t099-preview-schedule.log \
-            --marker T099_PREVIEW_SCHEDULE_PASSED
+          python3 tools/run_t146_hokusai_bench.py --godot "$(command -v godot)" \
+            --output /tmp/t153-bench --cold 1 --warm 0 --timeout 180
       - name: Real mouse routing and held-button software framebuffer profile
         run: |
           set -euo pipefail
@@ -387,11 +324,9 @@ jobs:
             /tmp/t095-noop-redraw.log
             /tmp/t095-duplicate-waypoints.log
             /tmp/t095-cross-batch-dab.log
-            /tmp/t095-duplicate-drain.log
             /tmp/t095-preview-index-reuse.log
             /tmp/t098-preview-display.log
             /tmp/t100-sparse-publication.log
-            /tmp/t101-native-dispatch.log
             /tmp/t095-brush-deferred.log
             /tmp/t095-brush-tile-reference.log
             /tmp/t095-brush-result.log
@@ -422,6 +357,7 @@ jobs:
             /tmp/t095-native-pigment-atomic.log
             /tmp/t095-native-preset-packed-output.log
             /tmp/t095-full-canvas.log
-            /tmp/t099-preview-schedule.log
             /tmp/t095-native.log
+            /tmp/t153-*.log
+            /tmp/t153-bench/**
           if-no-files-found: warn

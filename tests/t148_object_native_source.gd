@@ -45,7 +45,7 @@ func stroke(document: DrawingDocument, layer: String, point: Vector2) -> Drawing
 	var edit: DrawingEditSession = begun.value
 	var native: Object = ClassDB.instantiate("DrawingNativeBrush")
 	var started: DrawingResult = edit.begin_native_stroke(native,
-		"NativeHard", "", 8.0, INK, CLIP, true)
+		FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"), 8.0, INK, CLIP, true)
 	if not started.ok:
 		edit.cancel()
 		return started

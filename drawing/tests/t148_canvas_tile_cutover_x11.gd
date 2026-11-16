@@ -73,7 +73,6 @@ func run() -> void:
 	canvas.layer_id = layer
 	canvas.image_bounds = Rect2i(0, 0, SIZE, SIZE)
 	canvas.clip_strokes_to_image_frame = true
-	canvas.brush_backend = "NativeHard"
 	canvas.brush_width = 18.0
 	canvas.color_rgba = RED
 	canvas.tool = "Brush"
@@ -124,7 +123,7 @@ func run() -> void:
 		(doc._events[0]["delta"] as DrawingDelta).after.is_empty(),
 		"one document history event uses packed tile snapshots")
 	var committed: PackedByteArray = pixel_bytes(doc)
-	check(preview_bytes == committed, "held NativeHard preview equals committed source bytes")
+	check(preview_bytes == committed, "held Hokusai Hard Round preview equals committed source bytes")
 	check(int(doc.read_pixel(layer, 32, 32).value) == 0,
 		"native selection hole excludes pigment")
 	check(((int(doc.read_pixel(layer, 25, 25).value) >> 24) & 255) > 0,
@@ -163,7 +162,7 @@ func run() -> void:
 		"native eraser publishes one changed tile revision")
 	check(doc._native_raster_store == persistent and
 		int(persistent.call("stats").get("undo", 0)) == 2,
-		"NativeHard and Eraser share one persistent tile/history store")
+		"Hokusai Hard Round and Eraser share one persistent tile/history store")
 	check(doc.undo().ok and pixel_bytes(doc) == committed,
 		"native Eraser Undo restores original RGBA8")
 	# A cancelled brush must not publish new tile content or history.
@@ -192,16 +191,17 @@ func run() -> void:
 	failed_canvas.layer_id = failing_layer
 	failed_canvas.image_bounds = Rect2i(0, 0, SIZE, SIZE)
 	failed_canvas.clip_strokes_to_image_frame = true
-	failed_canvas.brush_backend = "NativeHard"
 	failed_canvas.brush_width = 18.0
 	failed_canvas.color_rgba = RED
 	failed_canvas.tool = "Brush"
 	root.add_child(failed_canvas)
 	await frames(3)
 	var fault_start: Vector2 = failed_canvas.pixel_to_position(Vector2(20.5, 20.5))
+	# MyPaint needs a nonzero gesture span before producing raster dabs.
+	var fault_finish: Vector2 = failed_canvas.pixel_to_position(Vector2(25.5, 23.5))
 	var failure_revision: int = failing_doc.revision
 	failed_canvas.start_gesture(fault_start)
-	failed_canvas.finish_gesture(fault_start)
+	failed_canvas.finish_gesture(fault_finish)
 	await drain(failed_canvas)
 	check(failed_canvas.session == null and failing_doc.revision == failure_revision,
 		"failed lazy source aborts live native stroke without publication")
@@ -209,7 +209,7 @@ func run() -> void:
 		"failed lazy source leaves canonical pixels and undo stack unchanged")
 	failing_doc.reject_source = false
 	failed_canvas.start_gesture(fault_start)
-	failed_canvas.finish_gesture(fault_start)
+	failed_canvas.finish_gesture(fault_finish)
 	await drain(failed_canvas)
 	check(failing_doc.revision == failure_revision + 1 and
 		failing_doc.history_length() == 1,
@@ -225,7 +225,7 @@ func run() -> void:
 	check(failed_canvas.session != null, "selection witness started native gesture")
 	if failed_canvas.session != null:
 		failed_canvas._stroke_selection.set_rectangle(Rect2i(40, 40, 8, 8))
-		failed_canvas.finish_gesture(fault_start)
+		failed_canvas.finish_gesture(fault_finish)
 		await drain(failed_canvas)
 		check(failing_doc.revision == selection_revision and
 			failing_doc.history_length() == 1 and failed_canvas.session == null,
@@ -237,7 +237,7 @@ func run() -> void:
 	failing_doc.lock_during_read = true
 	var before_lock_revision: int = failing_doc.revision
 	failed_canvas.start_gesture(fault_start)
-	failed_canvas.finish_gesture(fault_start)
+	failed_canvas.finish_gesture(fault_finish)
 	await drain(failed_canvas)
 	check(failing_doc.revision == before_lock_revision + 1 and
 		failing_doc._nodes[failing_layer].locked and failed_canvas.session == null,

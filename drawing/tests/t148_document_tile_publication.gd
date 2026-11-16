@@ -62,7 +62,7 @@ func test_native_publication() -> void:
 	check(edit.get("ok", false), "native edit started")
 	var transaction: int = int(edit.get("transaction", 0))
 	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
-	var started: Dictionary = brush.call("begin_stroke", layer, "NativeHard", "", 6.0,
+	var started: Dictionary = brush.call("begin_stroke", layer, FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"), 6.0,
 		COLOR, start_revision, Rect2i(-12, 0, 36, 16))
 	check(started.get("ok", false), "native stroke started")
 	var handle: int = int(started.get("handle", 0))

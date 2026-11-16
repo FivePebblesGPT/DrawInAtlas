@@ -34,7 +34,7 @@ func paint(document: DrawingDocument, layer: String, y: float) -> DrawingResult:
 	var session: DrawingEditSession = opened.value
 	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
 	var started: DrawingResult = session.begin_native_stroke(
-		brush, "NativeHard", "", 8.0, INK, CLIP, true)
+		brush, FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"), 8.0, INK, CLIP, true)
 	if not started.ok:
 		return started
 	var stamped: DrawingResult = session.paint_path_native(PackedVector2Array([

@@ -39,7 +39,7 @@ func stroke(doc: DrawingDocument, layer: String, from: Vector2,
 	var session: DrawingEditSession = begin.value as DrawingEditSession
 	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
 	var native_begin: DrawingResult = session.begin_native_stroke(brush,
-		"NativeHard", "", 8.0, INK, CLIP, true)
+		FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"), 8.0, INK, CLIP, true)
 	if not native_begin.ok:
 		session.cancel()
 		return native_begin

@@ -41,10 +41,7 @@ var tool: String = "Brush":
 		tool = value
 var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
-## Explicit opt-in until coverage parity and owner-device profiling pass.
-## "Hokusai" loads an actual bundled MyPaint .myb; "NativeHard" accelerates
-## the legacy hard shape while retaining document-owned alpha/history.
-var brush_backend: String = "Legacy"
+## Every Brush/Eraser preset uses the required Hokusai native extension.
 var brush_preset: String = "hard"
 const BUNDLED_PRESETS: Dictionary = {
     "hard": "res://addons/drawing/brushes/hard_round.myb",
@@ -76,7 +73,7 @@ var _stroke_clip: Rect2i = Rect2i()
 ## region that happens to share the same enclosing rectangle.
 var _stroke_selection: DrawingSelection
 var _native_brush: Object
-var _active_brush_backend: String = "Legacy"
+var _active_brush_backend: String = ""
 var show_grid: bool = false
 ## Pixel boundaries appear automatically when individual pixels become large.
 var show_pixel_grid: bool = true
@@ -1643,7 +1640,7 @@ func _capture_deferred_stroke(position: Vector2) -> void:
 	_deferred_times_us.clear()
 	_deferred_stroke = {"capturing": true, "document": document, "layer": layer_id,
 		"tool": tool, "color": color_rgba, "width": brush_width,
-		"backend": brush_backend, "preset": brush_preset,
+		"preset": brush_preset,
 		"selection": selection_mask.detached_copy(),
 		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i(),
 		"clip_enabled": clip_strokes_to_image_frame}
@@ -1766,30 +1763,26 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 	_stroke_clip = configuration.get("clip", image_bounds if clip_strokes_to_image_frame else Rect2i()) as Rect2i
 	_stroke_selection = (configuration.get("selection", selection_mask) as DrawingSelection).detached_copy()
 	_native_brush = null
-	_active_brush_backend = "Legacy"
-	var effective_backend: String = str(configuration.get("backend", brush_backend))
-	if effective_backend in ["NativeHard", "Hokusai"]:
-		if not ClassDB.class_exists("DrawingNativeBrush"):
-			# Native-absent legacy fallback is retired separately under T-150.
-			canvas_error.emit("Native brush unavailable; using the legacy Brush")
-		else:
-			_native_brush = ClassDB.instantiate("DrawingNativeBrush")
-			var mode: String = "NativeHard" if _stroke_erase else effective_backend
-			var preset_text: String = ""
-			if mode == "Hokusai":
-				var preset_path: String = BUNDLED_PRESETS.get(
-					str(configuration.get("preset", brush_preset)), "")
-				preset_text = FileAccess.get_file_as_string(preset_path) \
-					if not preset_path.is_empty() else ""
-			var started: DrawingResult = session.begin_native_stroke(_native_brush,
-				mode, preset_text, _stroke_width, _stroke_color, _stroke_clip,
-				true, _stroke_selection)
-			if started.ok:
-				_active_brush_backend = mode
-			else:
-				canvas_error.emit(started.message)
-				cancel_gesture()
-				return
+	_active_brush_backend = ""
+	if not ClassDB.class_exists("DrawingNativeBrush") or not ClassDB.class_exists("DrawingNativeTiles"):
+		canvas_error.emit("Required native Brush/Eraser extension unavailable")
+		cancel_gesture()
+		return
+	_native_brush = ClassDB.instantiate("DrawingNativeBrush")
+	var preset_path: String = BUNDLED_PRESETS.get(str(configuration.get("preset", brush_preset)), "")
+	if preset_path.is_empty() or not FileAccess.file_exists(preset_path):
+		canvas_error.emit("Unknown or missing MyPaint brush preset: " + preset_path)
+		cancel_gesture()
+		return
+	var preset_text: String = FileAccess.get_file_as_string(preset_path)
+	var started: DrawingResult = session.begin_native_stroke(_native_brush,
+		preset_text, _stroke_width, _stroke_color, _stroke_clip,
+		true, _stroke_selection)
+	if not started.ok:
+		canvas_error.emit(started.message)
+		cancel_gesture()
+		return
+	_active_brush_backend = "Hokusai"  # Trace identity, not a user-selectable renderer.
 	_samples.clear()
 	_sample_times_us.clear()
 	_sample_index = 0
@@ -1898,20 +1891,13 @@ func _drain_segments(budget: int) -> void:
 	# Hokusai accumulates pigment natively: exporting every intermediate 60px
 	# dab would repeatedly restage the same dirty tiles. Collapse up to sixteen
 	# adjacent source samples into one atomic native call/preview update.
-	if _active_brush_backend == "Hokusai":
-		batch_limit = MAX_SEGMENTS_PER_BATCH
+	batch_limit = MAX_SEGMENTS_PER_BATCH
 	while segments < budget:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
 		var batch_first_receipt_us: int = 0
 		var next_position: Vector2 = _staged_position
-		# A 60px stroke normally gets a one-segment atomic budget. Allow a
-		# *consecutive identical* Legacy source position to extend that batch:
-		# it adds no new candidate footprint, and paint_path already skips
-		# duplicate waypoints exactly. Never collapse Hokusai pigment input or
-		# enlarge a batch with a moving segment beyond the original budget.
-		var batch_capacity: int = MAX_SEGMENTS_PER_BATCH \
-			if _active_brush_backend == "Legacy" else batch_limit
+		var batch_capacity: int = batch_limit
 		while batch.size() < batch_capacity and segments < budget:
 			if not _has_segment_target:
 				if _sample_index == _samples.size():
@@ -1944,12 +1930,8 @@ func _drain_segments(budget: int) -> void:
 		var start_us: int = Time.get_ticks_usec()
 		var preview_epoch_before_batch: int = session._preview_epoch
 		var stage: DrawingResult
-		if _active_brush_backend != "Legacy":
-			stage = session.paint_path_native(batch, _stroke_color,
-				_stroke_erase, _stroke_selection if _stroke_selection.enabled else null)
-		else:
-			stage = session.paint_path(batch, _stroke_color, _stroke_width, _stroke_erase,
-				_stroke_selection if _stroke_selection.enabled else null, 1048576, _stroke_clip)
+		stage = session.paint_path_native(batch, _stroke_color,
+			_stroke_erase, _stroke_selection if _stroke_selection.enabled else null)
 		var staged_at_us: int = Time.get_ticks_usec()
 		var batch_cpu_us: int = staged_at_us - start_us
 		_metrics["stage_cpu_us"] = int(_metrics["stage_cpu_us"]) + batch_cpu_us
@@ -2255,7 +2237,7 @@ func _commit_stroke() -> void:
 	session = null
 	_stroke_selection = null
 	_native_brush = null
-	_active_brush_backend = "Legacy"
+	_active_brush_backend = ""
 	var commit_start_us: int = Time.get_ticks_usec()
 	var published_ok: bool = true
 	if active.change_count() > 0:
@@ -2301,7 +2283,7 @@ func cancel_gesture() -> void:
 		session = null
 	_stroke_selection = null
 	_native_brush = null
-	_active_brush_backend = "Legacy"
+	_active_brush_backend = ""
 	if _move_preview != null:
 		_move_preview.cancel()
 		_move_preview = null

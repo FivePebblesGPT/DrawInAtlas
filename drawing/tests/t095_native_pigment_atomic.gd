@@ -58,7 +58,7 @@ func paint(edit: DrawingEditSession, path: PackedVector2Array,
         var myb: String = FileAccess.get_file_as_string(
             "res://addons/drawing/brushes/hard_round.myb")
         var started: DrawingResult = edit.begin_native_stroke(native,
-            "Hokusai", myb, 14.0, TINT, clip)
+            myb, 14.0, TINT, clip)
         if not started.ok:
             return started
     return edit.paint_path_native(path, TINT, false, mask)

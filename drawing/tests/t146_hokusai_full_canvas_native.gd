@@ -189,8 +189,6 @@ func run() -> void:
 	canvas.image_bounds = Rect2i(0, 0, SIDE, SIDE)
 	canvas.clip_strokes_to_image_frame = true
 	canvas.tool = "Brush"
-	var backend: String = OS.get_environment("DRAWING_BRUSH_BACKEND")
-	check(backend == "Hokusai", "requires explicit DRAWING_BRUSH_BACKEND=Hokusai")
 	check(ClassDB.class_exists("DrawingNativeBrush"), "real native class is registered")
 	if failures > 0:
 		quit(2)
@@ -204,7 +202,7 @@ func run() -> void:
 		int(probe.call("stroke_abi_version")) == 1,
 		"native v1 hard-round stroke API is present")
 	if failures == 0:
-		var opened: Dictionary = probe.call("begin_stroke", "probe", "Hokusai",
+		var opened: Dictionary = probe.call("begin_stroke", "probe",
 			settings, BRUSH_WIDTH, PAINT_RED, 1, Rect2i())
 		check(bool(opened.get("ok", false)), "real hard-round begin_stroke succeeds")
 		if bool(opened.get("ok", false)):
@@ -213,7 +211,6 @@ func run() -> void:
 	if failures > 0:
 		quit(2)
 		return
-	canvas.brush_backend = "Hokusai"
 	canvas.brush_preset = "hard"
 	print("T146_IDENTITY backend=Hokusai preset=hard width=96 " +
 		"preset_sha256=%s godot=%s native_sha256=%s repo_sha=%s" % [
@@ -289,7 +286,7 @@ func run() -> void:
 		check(Input.use_accumulated_input == original_accumulation,
 			"stroke %d restores engine input accumulation" % run_index)
 		print("T146_HOKUSAI_RUN index=%d backend=%s source_pixels=%d width_px=96 input_events=100 total_to_postdraw_ms=%.3f release_to_commit_ms=%.3f stage_cpu_ms=%.3f drain_frames=%d max_pending=%d commit_cpu_ms=%.3f compose_cpu_ms=%.3f texture_cpu_ms=%.3f preview_frames=%d segments_staged=%d drain_calls=%d max_batch_ms=%.3f max_drain_ms=%.3f frame_compose_p95_ms=%.3f max_frame_compose_ms=%.3f max_frame_draw_ms=%.3f retained_texture_bytes=%d" % [
-			run_index, canvas.brush_backend, SIDE * SIDE, elapsed, release, stage,
+			run_index, "Hokusai", SIDE * SIDE, elapsed, release, stage,
 			drained_frames, int(stats.get("max_pending", 0)),
 			float(stats.get("commit_cpu_us", 0)) / 1000.0,
 			float(stats.get("compose_cpu_us", 0)) / 1000.0,
@@ -335,11 +332,12 @@ func run() -> void:
 				int(stats.get("down_us", 0)),
 				int(stats.get("frame_post_draw_matches", 0)),
 				int(stats.get("frame_phase_total", 0))])
-		var hokusai_perf: Dictionary = stats.get("hokusai_perf", {})
-		print("T146_NATIVE_PHASE index=%d native_cpu_ms=%.3f native_changed=%s " % [
-			run_index, float(hokusai_perf.get("native_us", 0)) / 1000.0,
-			str(hokusai_perf.get("pixels", "unavailable"))] +
-			"stage_cpu_ms=%.3f perf=%s" % [stage, JSON.stringify(hokusai_perf)])
+		var ffi: Dictionary = stats.get("native_ffi_stats", {})
+		print("T146_NATIVE_PHASE index=%d native_ffi_calls=%d tile_ffi_calls=%d " % [
+			run_index, int(ffi.get("ffi_calls", 0)), int(ffi.get("tile_ffi_calls", 0))] +
+			"tile_bytes_exported=%d tile_pixel_stream_calls=%d stage_cpu_ms=%.3f" % [
+				int(ffi.get("tile_bytes_exported", 0)),
+				int(ffi.get("tile_pixel_stream_calls", -1)), stage])
 		# T-102 intentionally populates missing display tiles over successive
 		# frames. The first post-draw callback certifies frame submission, not
 		# that every cold corner has reached the framebuffer.
@@ -353,7 +351,7 @@ func run() -> void:
 			int(canvas.last_frame_metrics.get("cold_tiles_deferred", 0)) == 0,
 			"stroke %d finishes progressive display population" % run_index)
 		print("T104_DISPLAY_SETTLE index=%d backend=%s extra_frames=%d" % [
-			run_index, canvas.brush_backend, settle_frames])
+			run_index, "Hokusai", settle_frames])
 		var framebuffer: Image = root.get_texture().get_image()
 		for position: Vector2 in [Vector2(4.5, 4.5), Vector2(256.5, 256.5),
 				Vector2(507.5, 4.5), Vector2(4.5, 507.5), Vector2(507.5, 507.5)]:
@@ -459,7 +457,7 @@ func run() -> void:
 		check(budget.is_valid_float() and float(budget) > 0.0 and p95 <= float(budget),
 			"reference-hardware synthetic input-to-postdraw p95 <= %s ms" % budget)
 	print("T146_HOKUSAI_SUMMARY backend=%s runs=%d total_p50_ms=%.3f total_p95_ms=%.3f release_p95_ms=%.3f stage_p95_ms=%.3f proposed_target_ms=100 target_met=%s failures=%d" % [
-		canvas.brush_backend, run_count, percentile(elapsed_ms, 0.5), p95,
+		"Hokusai", run_count, percentile(elapsed_ms, 0.5), p95,
 		percentile(release_ms, 0.95), percentile(stage_ms, 0.95), str(p95 <= 100.0), failures])
 	if failures == 0:
 		print("T146_HOKUSAI_BENCHMARK_PASSED")

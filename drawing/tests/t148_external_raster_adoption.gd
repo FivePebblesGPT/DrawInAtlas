@@ -25,7 +25,7 @@ func stroke(doc: DrawingDocument, layer: String,
 		return start
 	var session: DrawingEditSession = start.value as DrawingEditSession
 	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
-	var opened: DrawingResult = session.begin_native_stroke(brush, "NativeHard", "",
+	var opened: DrawingResult = session.begin_native_stroke(brush, FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"),
 		8.0, 0xff3322bb, Rect2i(0, 0, 64, 64), true)
 	if not opened.ok:
 		session.cancel()

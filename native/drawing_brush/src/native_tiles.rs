@@ -322,7 +322,20 @@ impl TileStore {
                         .try_into()
                         .expect("RGBA8 offset"),
                 );
-                let next = if erase {
+                let next = if erase && pigment {
+                    // Erase using the same MyPaint dab alpha as Brush, rebased
+                    // onto immutable source across successive preview batches.
+                    // Keep hidden RGB when the source was already transparent.
+                    let original = u32::from_le_bytes(
+                        self.tiles.get(&id).expect("authorized source").rgba[offset..offset + 4]
+                            .try_into()
+                            .expect("source RGBA8"),
+                    );
+                    let strength = (rgba >> 24) & 255;
+                    let original_alpha = (original >> 24) & 255;
+                    let remaining = (original_alpha * (255 - strength) + 127) / 255;
+                    (original & 0x00ff_ffff) | (remaining << 24)
+                } else if erase {
                     0
                 } else if pigment {
                     // Hokusai's pigment is rebased against immutable source,
@@ -1558,6 +1571,58 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn hokusai_eraser_uses_dab_alpha_and_preserves_hidden_rgb_and_history() {
+        let mut store = initialized(16);
+        let id = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut source = vec![0; 16 * 16 * 4];
+        let painted_offset = (4 * 16 + 4) * 4;
+        let hidden_offset = (4 * 16 + 5) * 4;
+        source[painted_offset..painted_offset + 4].copy_from_slice(&0xc8123456_u32.to_le_bytes());
+        source[hidden_offset..hidden_offset + 4].copy_from_slice(&0x00123456_u32.to_le_bytes());
+        store.import(id.clone(), 0, &source).unwrap();
+        let transaction = store.begin("ink", 0, false).unwrap();
+        // MyPaint output supplies per-dab alpha; it is not an opaque
+        // hard-circle erase. Hidden RGB at alpha zero must survive.
+        let changed = store
+            .stage(
+                transaction,
+                0,
+                0,
+                0,
+                &[4, 4, 0x8000ff00_u32 as i32, 5, 4, 0xff00ff00_u32 as i32],
+                true,
+                0xff000000,
+                true,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        assert_eq!(changed, 1);
+        let preview = store.read(&id, true).unwrap().rgba.clone();
+        let painted = u32::from_le_bytes(
+            preview[painted_offset..painted_offset + 4]
+                .try_into()
+                .unwrap(),
+        );
+        let hidden = u32::from_le_bytes(
+            preview[hidden_offset..hidden_offset + 4]
+                .try_into()
+                .unwrap(),
+        );
+        assert_eq!(painted & 0xffffff, 0x123456);
+        assert_eq!(painted >> 24, 100); // 200 * (255 - 128) / 255
+        assert_eq!(hidden, 0x00123456);
+        store.commit(transaction, 0).unwrap();
+        assert_eq!(store.undo_or_redo(true).unwrap(), 1);
+        assert_eq!(store.read(&id, false).unwrap().rgba, source);
+        assert_eq!(store.undo_or_redo(false).unwrap(), 1);
+        assert_eq!(store.read(&id, false).unwrap().rgba, preview.clone());
+    }
+
     #[test]
     fn external_raster_adoption_is_atomic_and_joins_brush_history() {
         let mut store = initialized(16);

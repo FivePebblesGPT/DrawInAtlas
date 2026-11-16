@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """T-146 strict software-X11 96px Brush benchmark (real Godot process per trial).
 
-Native-required Hokusai uses its independent alpha oracle; Legacy/NativeHard
-retain the existing T-095 exact-opaque-red source oracle. A log success marker
+Native-required Hokusai uses its independent alpha/coverage oracle. A log success marker
 is necessary but NEVER sufficient without a zero process exit and complete
 100-event, 512x512 observations. Generated logs/JSON are local evidence.
 """
@@ -20,13 +19,9 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
-BACKENDS = ("Legacy", "NativeHard", "Hokusai")
-PREFIX = {"Legacy": "T095_FULL_CANVAS", "NativeHard": "T095_FULL_CANVAS",
-          "Hokusai": "T146_HOKUSAI"}
-SCRIPT = {"Legacy": "t095_full_canvas_brush_native.gd",
-          "NativeHard": "t095_full_canvas_brush_native.gd",
-          "Hokusai": "t146_hokusai_full_canvas_native.gd"}
-
+BACKENDS = ("Hokusai",)
+PREFIX = {"Hokusai": "T146_HOKUSAI"}
+SCRIPT = {"Hokusai": "t146_hokusai_full_canvas_native.gd"}
 
 def fields(line: str) -> dict[str, str]:
     """Read the key=value scalar subset, excluding arbitrary JSON/Vector2 fields."""
@@ -92,8 +87,9 @@ def verify_run_log(text: str, backend: str, runs: int) -> list[dict[str, Any]]:
                 raise ValueError("Hokusai preview/postdraw trace incomplete")
             measurements[idx]["first_submit_ms"] = (submit - down) / 1000.
             measurements[idx]["first_postdraw_ms"] = (post - down) / 1000.
-            measurements[idx]["native_cpu_ms"] = float(native_phases[idx]["native_cpu_ms"])
-            measurements[idx]["marshal_changed_pixels"] = int(native_phases[idx]["native_changed"])
+            measurements[idx]["native_ffi_calls"] = int(native_phases[idx]["native_ffi_calls"])
+            measurements[idx]["tile_ffi_calls"] = int(native_phases[idx]["tile_ffi_calls"])
+            measurements[idx]["tile_bytes_exported"] = int(native_phases[idx]["tile_bytes_exported"])
             if source.get("label") != f"stroke-{idx}":
                 raise ValueError("Hokusai source histogram run misaligned")
             buckets = ("zero", "alpha_1_63", "alpha_64_127",
@@ -108,12 +104,13 @@ def verify_run_log(text: str, backend: str, runs: int) -> list[dict[str, Any]]:
             if (fill_statuses[idx].get("index") != str(idx) or
                     fill_statuses[idx].get("full_coverage") != "true" or
                     fill_statuses[idx].get("holes") != "0" or
-                    source.get("zero") != "0" or source.get("nonred") != "0"):
-                raise ValueError("Hokusai source is not full-coverage red")
-            if (not math.isfinite(float(native_phases[idx]["native_cpu_ms"])) or
-                    float(native_phases[idx]["native_cpu_ms"]) <= 0 or
-                    int(native_phases[idx]["native_changed"]) <= 0):
-                raise ValueError("Hokusai native phases missing activity")
+                    source.get("zero") != "0"):
+                raise ValueError("Hokusai source is not full-coverage")
+            if (measurements[idx]["native_ffi_calls"] <= 0 or
+                    measurements[idx]["tile_ffi_calls"] <= 0 or
+                    measurements[idx]["tile_bytes_exported"] <= 0 or
+                    native_phases[idx].get("tile_pixel_stream_calls") != "0"):
+                raise ValueError("Hokusai tile/FFI phases missing activity or pixel stream still in use")
             measurements[idx]["source_coverage"] = int(source["covered"])
             measurements[idx]["source_opaque"] = int(source["alpha_255"])
             measurements[idx]["source_sha256"] = source["sha256"]
@@ -127,8 +124,8 @@ def summary(rows: list[dict[str, Any]]) -> dict[str, dict[str, float | int]]:
     metrics = ("total_to_postdraw_ms", "release_to_commit_ms", "stage_cpu_ms",
                "commit_cpu_ms", "compose_cpu_ms", "texture_cpu_ms",
                "max_drain_ms", "max_frame_draw_ms",
-               "first_submit_ms", "first_postdraw_ms", "native_cpu_ms",
-               "marshal_changed_pixels")
+               "first_submit_ms", "first_postdraw_ms", "native_ffi_calls",
+               "tile_ffi_calls", "tile_bytes_exported")
     result: dict[str, dict[str, float | int]] = {}
     for name in metrics:
         values = [float(row[name]) for row in rows if name in row]
@@ -146,7 +143,7 @@ def execute(godot: Path, output: Path, timeout: int, backend: str, mode: str,
     log = output / f"{name}.log"
     timing = output / f"{name}.time"
     env = os.environ.copy()
-    env.update({"DRAWING_BRUSH_BACKEND": backend, "LIBGL_ALWAYS_SOFTWARE": "1",
+    env.update({"LIBGL_ALWAYS_SOFTWARE": "1",
                 "T146_RUNS": str(count), "T095_FULL_CANVAS_RUNS": str(count),
                 "T146_NATIVE_SHA256": native_sha, "T146_REPO_SHA": repo_sha})
     command = [
@@ -162,7 +159,7 @@ def execute(godot: Path, output: Path, timeout: int, backend: str, mode: str,
     body = log.read_text(encoding="utf-8", errors="replace")
     checker = subprocess.run([
         sys.executable, str(REPO / "tools/check_godot_model_log.py"), str(log),
-        "--marker", PREFIX[backend] + ("_BENCHMARK_PASSED" if backend == "Hokusai" else "_PASSED")
+        "--marker", PREFIX[backend] + "_BENCHMARK_PASSED"
     ], capture_output=True, text=True, check=False)
     result: dict[str, Any] = {
         "backend": backend, "mode": mode, "index": index, "runs": count,
@@ -196,7 +193,6 @@ def main() -> int:
     parser.add_argument("--warm", type=int, default=2,
                         help="Gestures within one fresh process; 0 disables warm")
     parser.add_argument("--timeout", type=int, default=120)
-    parser.add_argument("--candidate-only", action="store_true")
     args = parser.parse_args()
     if args.cold < 1 or args.warm not in (0, 2, 3) or args.timeout < 10:
         parser.error("cold >= 1, warm=0|2|3, timeout >= 10")
@@ -205,7 +201,7 @@ def main() -> int:
         parser.error("real native release library missing")
     native_sha = hashlib.sha256(native.read_bytes()).hexdigest()
     repo_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
-    backends = ["Hokusai"] if args.candidate_only else list(BACKENDS)
+    backends = list(BACKENDS)
     results: list[dict[str, Any]] = []
     for backend in backends:
         for i in range(args.cold):

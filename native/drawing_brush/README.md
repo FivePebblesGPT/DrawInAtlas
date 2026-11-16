@@ -1,13 +1,26 @@
-# Native drawing stroke engine — experimental alpha ABI v1 (T-147)
+# Native drawing stroke engine — required Hokusai ABI v1 (T-153)
 
-`DrawingNativeBrush` is a **single** optional godot-rust GDExtension with two internal raster strategies:
+`DrawingNativeBrush` is the **single** Rust GDExtension Brush/Eraser engine.
+Every preset (`hard_round.myb`, `soft.myb`, `ink.myb`, `airbrush.myb`) is
+parsed and rasterized by **Hokusai/libmypaint**. Hard Round is **not** a
+separate raster kernel. Pressure, timing, overlapping pigment, signed
+coordinates and alpha obey the chosen MyPaint preset. Eraser consumes the
+**same** MyPaint dab coverage/opacity and decreases source alpha, preserving
+source RGB (including RGB hidden at alpha zero); it does not use an opaque
+hard-circle shortcut.
 
-- **NativeHard** — deterministic, once-per-gesture hard-circle swept coverage, opaque Brush/Eraser and signed-coordinate clipping.
-- **Hokusai** — MyPaint `.myb` pigment brush presets, pressure/time dynamics, native surface/RNG state and translucent RGBA8 export; not pixel-equivalent to NativeHard or Legacy.
+`begin_stroke(layer,preset_text,width,rgba,source_revision,clip)` has **no
+renderer mode argument**. The handle-based `append_samples →
+required_tiles → apply_tile_batch → commit_tiles` transaction stages RGBA8,
+selection masks, source authorization and Undo/Redo in the shared Rust tile
+store. `preview_changes → acknowledge_batch` is available for test/legacy
+adapter consumers, but production Canvas has **no per-pixel Brush/Eraser
+staging**. Missing or incompatible native binaries and invalid presets fail
+explicitly; no GDScript Brush fallback is selected. The old *separate*
+Legacy GDScript algorithm awaits removal in T-150 and is not Canvas-reachable.
 
-Both use exactly the same `begin_stroke → append_samples → preview_changes → acknowledge_batch → commit_stroke/abort_stroke` **versioned, handle-based transaction ABI**. Source revision and brush state are frozen at start; invalid handles, source revisions, malformed samples and unacknowledged overlapping batches are rejected. No old mode-specific native transaction methods are retained.
-
-**Authoritative interface and tile-buffer design:** [docs/NATIVE_STROKE_ABI_V1.md](../../docs/NATIVE_STROKE_ABI_V1.md). The current GDScript `DrawingEditSession` adapter still does source authorization, blending, mask and per-pixel staging; T-148 replaces the pixel-change stream with native-owned authoritative tile buffers and Undo transactions. Canvas NativeHard and Hokusai share the single v1 dispatch. The test directory contains *test-only* historical fixture adapters, not shipped native compatibility APIs. Legacy is present until T-150 as a temporary alpha fallback.
+ABI: [native strokes](../../docs/NATIVE_STROKE_ABI_V1.md) and
+[native tiles](../../docs/NATIVE_RASTER_TILES_ABI_V1.md).
 
 ## Pinned offline build
 
@@ -21,11 +34,23 @@ The build uses the bundle's vendored Cargo registry/lockfile offline, Hokusai 0.
 
 ## Regression suite
 
-After compiling and importing the real native binary, run via Godot's `--script res://tests/<name>.gd`:
+After compiling and importing the real native binary, run with Godot's
+`--script res://tests/<name>.gd`:
 
-- `t147_native_stroke_contract`: v1 state machine, pressure, invalid handles, source-revision rejection, exact hard/pigment rollback, packed-transfer metrics.
-- `t095_native_hard_source_atomic`, `t095_native_pigment_atomic`: actual late source failure, retry/skip, transparent hidden RGB, signed 64-bit anchored storage, source/history parity.
-- `native_brush_integration`: actual GUI Canvas gestures for native hard/eraser, four Hokusai presets and masked selection, pixel/Undo oracles.
-- `t095_full_canvas_native`, `t146_hokusai_full_canvas_native`: separate **96px, 512²** graphical witnesses using software X11, which do **not** assert cross-backend pixel equality.
+- `t147_native_stroke_contract`: one MyPaint preset ABI, invalid preset/handles,
+  revision binding, pressure validation and deterministic pigment rollback.
+- `t095_native_pigment_atomic`: late source failure, rollback, hidden RGB.
+- `t148_native_tiles_contract`: 312 checks for source authorization, signed
+  64-bit tile IDs, alpha-preserving Eraser, masks, source histories and 512² fill.
+- `native_brush_fallback` (renamed behavior, retained fixture name): required
+  native/preset errors fail closed rather than falling back.
+- `native_brush_integration`: four bundled preset canvases, Brush/Eraser,
+  independent coverage/alpha, Undo/Redo and mask-hole regression.
+- `t148_canvas_tile_cutover_x11`: live graphical native source/history,
+  lazy-source retry, stale mask, atomic cancellation and Save/Open.
+- `t146_hokusai_full_canvas_native` via `tools/run_t146_hokusai_bench.py`:
+  96px/512² **100-event** Hokusai Hard Round, alpha histogram, full coverage,
+  frame samples, Undo/Redo and failed-source recovery. No comparison backend.
 
-See [T-147 evidence](../../docs/evidence/T-147-2026-11-15-unified-stroke.md), [T-146 baseline](../../docs/evidence/T-146-2026-11-15-hokusai-benchmark.md), and [T-095 historical source-rollback evidence](../../docs/evidence/T-095-2026-11-11-native-hard-source-rollback.md). None of this closes T-095 owner hardware review or proves the input-to-photon latency target.
+See [T-153 execution evidence](../../docs/evidence/T-153-2026-11-16-hokusai-only.md).
+Software-X11 results do **not** approve T-095's physical latency gate.

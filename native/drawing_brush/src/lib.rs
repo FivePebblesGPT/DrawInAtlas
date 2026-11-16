@@ -1,4 +1,4 @@
-//! Versioned NativeHard/Hokusai stroke transactions and native tile editing.
+//! Versioned Hokusai preset stroke transactions and native tile editing.
 //! The T-148 tile store is implemented independently; production Canvas still
 //! uses its transitional GDScript source adapter pending the T-149 cutover.
 mod native_tiles;
@@ -172,131 +172,6 @@ struct PresetStroke {
     published: HashMap<(i32, i32), ExportedTile>,
 }
 
-/// A prevalidated segment whose candidate count fits the bounded batch.
-/// Validation must finish before mutating the per-stroke coverage or cursor:
-/// otherwise a bad *later* point can silently consume earlier brush pixels.
-struct HardWindow {
-    begin: Vector2,
-    end: Vector2,
-    left: i32,
-    right: i32,
-    top: i32,
-    bottom: i32,
-}
-
-const MAX_HARD_CANDIDATES: i64 = 1_048_576;
-
-fn validate_hard_windows(
-    points: &[Vector2],
-    width: f32,
-    clip: Rect2i,
-    previous: Option<Vector2>,
-) -> Result<Vec<HardWindow>, &'static str> {
-    if !width.is_finite() || width <= 0.0 || points.is_empty() {
-        return Err("Invalid hard-brush width or path");
-    }
-    let radius = width * 0.5;
-    let mut windows = Vec::with_capacity(points.len());
-    let mut last = previous;
-    let mut candidates = 0_i64;
-    for &end in points {
-        if !end.x.is_finite()
-            || !end.y.is_finite()
-            || end.x.abs() >= 1_000_000_000.0
-            || end.y.abs() >= 1_000_000_000.0
-        {
-            return Err("Brush position exceeds safe coordinates");
-        }
-        let begin = last.unwrap_or(end);
-        let mut left = (begin.x.min(end.x) - radius - 0.5).floor() as i32;
-        let mut right = (begin.x.max(end.x) + radius + 0.5).ceil() as i32;
-        let mut top = (begin.y.min(end.y) - radius - 0.5).floor() as i32;
-        let mut bottom = (begin.y.max(end.y) + radius + 0.5).ceil() as i32;
-        if clip.size.x > 0 && clip.size.y > 0 {
-            left = left.max(clip.position.x);
-            right = right.min(clip.position.x.saturating_add(clip.size.x));
-            top = top.max(clip.position.y);
-            bottom = bottom.min(clip.position.y.saturating_add(clip.size.y));
-        }
-        let columns = i64::from(right) - i64::from(left);
-        let rows = i64::from(bottom) - i64::from(top);
-        if columns > 0 && rows > 0 {
-            let area = columns
-                .checked_mul(rows)
-                .ok_or("Native brush candidate budget overflow")?;
-            candidates = candidates
-                .checked_add(area)
-                .ok_or("Native brush candidate budget overflow")?;
-            if candidates > MAX_HARD_CANDIDATES {
-                return Err("Native brush batch exceeds candidate budget");
-            }
-        }
-        windows.push(HardWindow {
-            begin,
-            end,
-            left,
-            right,
-            top,
-            bottom,
-        });
-        last = Some(end);
-    }
-    Ok(windows)
-}
-
-/// Conservative X interval for a single oblique NativeHard candidate row.
-/// The final f32 distance predicate is intentionally unchanged: this only
-/// avoids testing pixels farther than the swept disc can possibly reach.
-/// Use f64 for the bound, with extra error margin for f32 vector rounding.
-/// Very large coordinates and near-horizontal slopes retain the reference
-/// full-rectangle scan to avoid any change in edge-pixel semantics.
-fn hard_row_bounds(window: &HardWindow, y: i32, radius: f32) -> (i32, i32) {
-    let dy = window.end.y - window.begin.y;
-    if !radius.is_finite()
-        || dy.abs() < 0.001
-        || !dy.is_finite()
-        || [window.begin.x, window.begin.y, window.end.x, window.end.y]
-            .iter()
-            .any(|coordinate| coordinate.abs() >= 1_000_000.0)
-    {
-        return (window.left, window.right);
-    }
-    let broad = f64::from(radius) + 4.0;
-    let center_y = f64::from(y) + 0.5;
-    let begin_y = f64::from(window.begin.y);
-    let slope_y = f64::from(dy);
-    let a = (center_y - broad - begin_y) / slope_y;
-    let b = (center_y + broad - begin_y) / slope_y;
-    let lower = a.min(b).max(0.0);
-    let upper = a.max(b).min(1.0);
-    if lower > upper {
-        return (window.left, window.left);
-    }
-    let begin_x = f64::from(window.begin.x);
-    let slope_x = f64::from(window.end.x) - begin_x;
-    let x_a = begin_x + slope_x * lower;
-    let x_b = begin_x + slope_x * upper;
-    let left = (x_a.min(x_b) - broad - 1.0).floor() as i32;
-    let right = (x_a.max(x_b) + broad + 1.0).ceil() as i32;
-    (left.max(window.left), right.min(window.right))
-}
-
-/// Only newly accepted coverage is journaled per GDScript sample batch; do
-/// not copy the entire long-running coverage set on every input event.
-struct HardBatch {
-    last_hard: Option<Vector2>,
-    inserted: Vec<(i32, i32)>,
-}
-
-impl HardBatch {
-    fn rollback(self, covered: &mut HashSet<(i32, i32)>, last_hard: &mut Option<Vector2>) {
-        for pixel in self.inserted {
-            covered.remove(&pixel);
-        }
-        *last_hard = self.last_hard;
-    }
-}
-
 /// The ABI is v1; handle and source revision must accompany every operation.
 /// One DrawingNativeBrush owns at most one live stroke; transaction handles are
 /// globally monotonic to reject stale calls even across distinct instances.
@@ -339,66 +214,14 @@ fn parse_samples(values: &[f32]) -> Result<Vec<BrushSample>, &'static str> {
     Ok(samples)
 }
 
-/// Validate the *entire* hard batch before accepting any covered pixel. A
-/// zero-pressure sample lifts the tip so its next mark cannot bridge a gap.
-fn hard_windows_for_samples(
-    samples: &[BrushSample],
-    width: f32,
-    clip: Rect2i,
-    previous: Option<Vector2>,
-) -> Result<Vec<Option<(HardWindow, f32)>>, &'static str> {
-    let mut output = Vec::with_capacity(samples.len());
-    let mut last = previous;
-    let mut candidates = 0_i64;
-    for sample in samples {
-        if sample.pressure == 0.0 {
-            last = None;
-            output.push(None);
-            continue;
-        }
-        let radius_width = width * sample.pressure;
-        let mut windows = validate_hard_windows(&[sample.point], radius_width, clip, last)?;
-        let window = windows.pop().expect("single point validated");
-        let rows = i64::from(window.bottom) - i64::from(window.top);
-        let columns = i64::from(window.right) - i64::from(window.left);
-        if rows > 0 && columns > 0 {
-            candidates = candidates
-                .checked_add(rows.checked_mul(columns).ok_or("Hard candidate overflow")?)
-                .ok_or("Hard candidate overflow")?;
-            if candidates > MAX_HARD_CANDIDATES {
-                return Err("Hard batch exceeds candidate budget");
-            }
-        }
-        output.push(Some((window, radius_width)));
-        last = Some(sample.point);
-    }
-    Ok(output)
-}
-
-enum StrokeStrategy {
-    Hard {
-        last: Option<Vector2>,
-        covered: HashSet<(i32, i32)>,
-    },
-    Preset(Box<PresetStroke>),
-}
-
-/// Single native batch lifetime for *both* brush strategies. GDScript must
-/// acknowledge only after source tile authorization and staging have passed.
-enum BatchRollback {
-    Hard(HardBatch),
-    Preset(Box<PresetBatch>),
-}
-
 struct NativeStroke {
     handle: i64,
     layer: String,
     source_revision: i64,
-    width: f32,
     rgba: i64,
     clip: Rect2i,
-    strategy: StrokeStrategy,
-    pending: Option<BatchRollback>,
+    preset: PresetStroke,
+    pending: Option<PresetBatch>,
     preview: Vec<i32>,
     ffi_calls: i64,
     batches: i64,
@@ -407,44 +230,25 @@ struct NativeStroke {
 }
 
 impl NativeStroke {
-    fn format(&self) -> &'static str {
-        match self.strategy {
-            StrokeStrategy::Hard { .. } => "xy",
-            StrokeStrategy::Preset(_) => "xy_rgba",
-        }
-    }
-
     fn acknowledge(&mut self, accepted: bool) -> bool {
-        let Some(batch) = self.pending.take() else {
+        let Some(snapshot) = self.pending.take() else {
             return false;
         };
-        match (batch, &mut self.strategy) {
-            (BatchRollback::Hard(snapshot), StrokeStrategy::Hard { last, covered }) => {
-                if !accepted {
-                    snapshot.rollback(covered, last);
-                }
-            }
-            (BatchRollback::Preset(snapshot), StrokeStrategy::Preset(preset)) => {
-                if accepted {
-                    preset.surface.commit_batch();
+        if accepted {
+            self.preset.surface.commit_batch();
+            self.batches += 1;
+        } else {
+            self.preset.surface.rollback_batch();
+            self.preset.state = snapshot.state;
+            for (key, previous) in snapshot.published {
+                if let Some(previous) = previous {
+                    self.preset.published.insert(key, previous);
                 } else {
-                    preset.surface.rollback_batch();
-                    preset.state = snapshot.state;
-                    for (key, previous) in snapshot.published {
-                        if let Some(previous) = previous {
-                            preset.published.insert(key, previous);
-                        } else {
-                            preset.published.remove(&key);
-                        }
-                    }
+                    self.preset.published.remove(&key);
                 }
             }
-            _ => unreachable!("strategy and rollback snapshot must match"),
         }
         self.preview.clear();
-        if accepted {
-            self.batches += 1;
-        }
         true
     }
 
@@ -452,89 +256,44 @@ impl NativeStroke {
         if self.pending.is_some() {
             return Err("Previous native sample batch needs acknowledgement");
         }
+        self.pending = Some(PresetBatch {
+            state: self.preset.state.clone(),
+            published: HashMap::new(),
+        });
+        self.preset.surface.begin_batch();
+        for sample in samples {
+            self.preset.brush.stroke_to(
+                &mut self.preset.state,
+                &mut self.preset.surface,
+                sample.point.x,
+                sample.point.y,
+                sample.pressure,
+                0.0,
+                0.0,
+                sample.delta_seconds as f64,
+            );
+        }
         let mut output = Vec::new();
-        match &mut self.strategy {
-            StrokeStrategy::Hard { last, covered } => {
-                let windows = hard_windows_for_samples(samples, self.width, self.clip, *last)?;
-                let snapshot = HardBatch {
-                    last_hard: *last,
-                    inserted: Vec::new(),
-                };
-                self.pending = Some(BatchRollback::Hard(snapshot));
-                for window in windows {
-                    let Some((window, point_width)) = window else {
-                        *last = None;
-                        continue;
-                    };
-                    let delta = window.end - window.begin;
-                    let squared = delta.length_squared();
-                    let radius_squared = (point_width * 0.5).powi(2);
-                    for y in window.top..window.bottom {
-                        let (row_left, row_right) = hard_row_bounds(&window, y, point_width * 0.5);
-                        for x in row_left..row_right {
-                            if covered.contains(&(x, y)) {
-                                continue;
-                            }
-                            let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
-                            let fraction = if squared > 0.0 {
-                                ((center - window.begin).dot(delta) / squared).clamp(0.0, 1.0)
-                            } else {
-                                0.0
-                            };
-                            if (center - (window.begin + delta * fraction)).length_squared()
-                                <= radius_squared
-                            {
-                                covered.insert((x, y));
-                                if let Some(BatchRollback::Hard(batch)) = self.pending.as_mut() {
-                                    batch.inserted.push((x, y));
-                                }
-                                output.extend_from_slice(&[x, y]);
-                            }
-                        }
-                    }
-                    *last = Some(window.end);
-                }
+        let mut dirty: Vec<_> = self.preset.surface.changed.drain().collect();
+        dirty.sort_unstable();
+        for (tx, ty) in dirty {
+            let Some(tile) = self.preset.surface.tile(tx, ty) else {
+                continue;
+            };
+            if let Some(snapshot) = self.pending.as_mut() {
+                snapshot
+                    .published
+                    .entry((tx, ty))
+                    .or_insert_with(|| self.preset.published.get(&(tx, ty)).cloned());
             }
-            StrokeStrategy::Preset(preset) => {
-                self.pending = Some(BatchRollback::Preset(Box::new(PresetBatch {
-                    state: preset.state.clone(),
-                    published: HashMap::new(),
-                })));
-                preset.surface.begin_batch();
-                for sample in samples {
-                    preset.brush.stroke_to(
-                        &mut preset.state,
-                        &mut preset.surface,
-                        sample.point.x,
-                        sample.point.y,
-                        sample.pressure,
-                        0.0,
-                        0.0,
-                        sample.delta_seconds as f64,
-                    );
-                }
-                let mut dirty: Vec<_> = preset.surface.changed.drain().collect();
-                dirty.sort_unstable();
-                for (tx, ty) in dirty {
-                    let Some(tile) = preset.surface.tile(tx, ty) else {
-                        continue;
-                    };
-                    if let Some(BatchRollback::Preset(batch)) = self.pending.as_mut() {
-                        batch
-                            .published
-                            .entry((tx, ty))
-                            .or_insert_with(|| preset.published.get(&(tx, ty)).cloned());
-                    }
-                    let exported = preset.published.entry((tx, ty)).or_default();
-                    scan_changed_pixels(tile, exported, |index, rgba| {
-                        output.extend_from_slice(&[
-                            tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32,
-                            ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32,
-                            rgba as i32,
-                        ]);
-                    });
-                }
-            }
+            let exported = self.preset.published.entry((tx, ty)).or_default();
+            scan_changed_pixels(tile, exported, |index, rgba| {
+                output.extend_from_slice(&[
+                    tx * TILE_SIZE as i32 + (index % TILE_SIZE) as i32,
+                    ty * TILE_SIZE as i32 + (index / TILE_SIZE) as i32,
+                    rgba as i32,
+                ]);
+            });
         }
         if output.len() > MAX_EXPORTED_INTS {
             self.acknowledge(false);
@@ -577,7 +336,7 @@ impl DrawingNativeBrush {
         STROKE_ABI_VERSION
     }
 
-    /// Frozen at pointer-down: layer, raster brush strategy, width, color,
+    /// Frozen at pointer-down: layer, MyPaint preset, width, color,
     /// edit revision and signed relative clip. Transform/selection are frozen
     /// and enforced by the DrawingEditSession adapter until T-148.
     // The frozen source options are intentionally explicit at this ABI boundary.
@@ -586,7 +345,6 @@ impl DrawingNativeBrush {
     fn begin_stroke(
         &mut self,
         layer: GString,
-        mode: GString,
         preset_text: GString,
         width: f32,
         rgba: i64,
@@ -609,44 +367,34 @@ impl DrawingNativeBrush {
         {
             return error_result("Invalid stroke layer, color, width, revision, or clip");
         }
-        let strategy = match mode.to_string().as_str() {
-            "NativeHard" => StrokeStrategy::Hard {
-                last: None,
-                covered: HashSet::new(),
-            },
-            "Hokusai" => {
-                let Ok(mut brush) = hokusai::myb::from_str(&preset_text.to_string()) else {
-                    return error_result("Invalid Hokusai .myb preset");
-                };
-                let r = (rgba & 255) as f32 / 255.0;
-                let g = ((rgba >> 8) & 255) as f32 / 255.0;
-                let b = ((rgba >> 16) & 255) as f32 / 255.0;
-                let hsv = hokusai::color::rgb_to_hsv(r, g, b);
-                brush.set(BrushSetting::ColorH, SettingValue::constant(hsv.h));
-                brush.set(BrushSetting::ColorS, SettingValue::constant(hsv.s));
-                brush.set(BrushSetting::ColorV, SettingValue::constant(hsv.v));
-                brush.set(
-                    BrushSetting::Radius,
-                    SettingValue::constant((width / 2.0).ln()),
-                );
-                StrokeStrategy::Preset(Box::new(PresetStroke {
-                    brush,
-                    state: BrushState::new(1000),
-                    surface: TrackedSurface::default(),
-                    published: HashMap::new(),
-                }))
-            }
-            _ => return error_result("Unknown native stroke strategy"),
+        let Ok(mut brush) = hokusai::myb::from_str(&preset_text.to_string()) else {
+            return error_result("Invalid Hokusai .myb preset");
+        };
+        let r = (rgba & 255) as f32 / 255.0;
+        let g = ((rgba >> 8) & 255) as f32 / 255.0;
+        let b = ((rgba >> 16) & 255) as f32 / 255.0;
+        let hsv = hokusai::color::rgb_to_hsv(r, g, b);
+        brush.set(BrushSetting::ColorH, SettingValue::constant(hsv.h));
+        brush.set(BrushSetting::ColorS, SettingValue::constant(hsv.s));
+        brush.set(BrushSetting::ColorV, SettingValue::constant(hsv.v));
+        brush.set(
+            BrushSetting::Radius,
+            SettingValue::constant((width / 2.0).ln()),
+        );
+        let preset = PresetStroke {
+            brush,
+            state: BrushState::new(1000),
+            surface: TrackedSurface::default(),
+            published: HashMap::new(),
         };
         let handle = NEXT_STROKE_HANDLE.fetch_add(1, Ordering::Relaxed) as i64;
         self.stroke = Some(NativeStroke {
             handle,
             layer: layer.to_string(),
             source_revision,
-            width,
             rgba,
             clip,
-            strategy,
+            preset,
             pending: None,
             preview: Vec::new(),
             ffi_calls: 1,
@@ -693,7 +441,7 @@ impl DrawingNativeBrush {
     }
 
     /// Changes are valid only during a pending batch. v1's transitional
-    /// format is signed relative [x,y] for hard and [x,y,rgba8] for preset.
+    /// format is signed relative [x,y,rgba8] for every preset.
     /// Native tile RGBA8 buffers replace this pixel stream under T-148.
     #[func]
     fn preview_changes(
@@ -713,12 +461,12 @@ impl DrawingNativeBrush {
         stroke.ffi_calls += 1;
         let mut result = Dictionary::new();
         result.set("ok", true);
-        result.set("format", stroke.format());
+        result.set("format", "xy_rgba");
         result.set("changes", &PackedInt32Array::from(stroke.preview.clone()));
         result
     }
 
-    /// Rejecting a source read restores the *same* batch in either strategy.
+    /// Rejecting a source read restores the *same* Hokusai batch.
     /// Accepted batches accumulate until the single whole-stroke commit.
     #[func]
     fn acknowledge_batch(&mut self, handle: i64, source_revision: i64, accepted: bool) -> bool {
@@ -756,7 +504,7 @@ impl DrawingNativeBrush {
             return error_result("Invalid native storage tile stride");
         }
         stroke.ffi_calls += 1;
-        let step = if stroke.format() == "xy_rgba" { 3 } else { 2 };
+        let step = 3;
         let mut coords = HashSet::new();
         for delta in stroke.preview.chunks_exact(step) {
             if stroke.clip.size.x > 0
@@ -797,7 +545,7 @@ impl DrawingNativeBrush {
     }
 
     /// Atomically stage AND acknowledge a pending raster batch. The source
-    /// buffer, hard coverage/pigment state and tile draft must never diverge:
+    /// buffer, MyPaint raster state and tile draft must never diverge:
     /// on failure both roll back, so the caller may reappend the same samples
     /// after authorizing the missing source tile or mask. No per-pixel values
     /// cross the Godot boundary.
@@ -836,7 +584,7 @@ impl DrawingNativeBrush {
             anchor_x,
             anchor_y,
             &stroke.preview,
-            stroke.format() == "xy_rgba",
+            true,
             stroke.rgba as u32,
             erase,
             stroke.clip,
@@ -922,7 +670,7 @@ impl DrawingNativeBrush {
         result.set("ok", true);
         result.set("layer", stroke.layer.as_str());
         result.set("rgba", stroke.rgba);
-        result.set("mode", stroke.format());
+        result.set("format", "xy_rgba");
         result.set("ffi_calls", stroke.ffi_calls);
         result.set("batches", stroke.batches);
         result.set("input_floats", stroke.input_floats);
@@ -973,128 +721,6 @@ mod tests {
     /// Exact native-f32 reference: never use hard_row_bounds to generate its
     /// expected pixels. Checks order, fractional edges and large coordinates.
     #[test]
-    fn hard_scanlines_equal_original_rectangles() {
-        let samples: &[(Vector2, Vector2, f32, Option<Rect2i>)] = &[
-            (
-                Vector2::new(-92.25, -86.5),
-                Vector2::new(94.75, 87.625),
-                60.0,
-                None,
-            ),
-            (
-                Vector2::new(91.875, -84.5),
-                Vector2::new(-91.625, 83.125),
-                60.0,
-                None,
-            ),
-            (
-                Vector2::new(-92.25, 1.125),
-                Vector2::new(94.75, 3.375),
-                60.0,
-                None,
-            ),
-            (
-                Vector2::new(-92.25, 1.125),
-                Vector2::new(94.75, 1.12505),
-                60.0,
-                None,
-            ),
-            (
-                Vector2::new(-94.5, 3.5),
-                Vector2::new(91.5, 3.5),
-                60.0,
-                None,
-            ),
-            (
-                Vector2::new(3.5, -91.5),
-                Vector2::new(3.5, 94.5),
-                60.0,
-                None,
-            ),
-            (Vector2::new(-7.5, 5.5), Vector2::new(-7.5, 5.5), 60.0, None),
-            (
-                Vector2::new(-68.125, -75.375),
-                Vector2::new(74.875, 69.625),
-                1.25,
-                None,
-            ),
-            (
-                Vector2::new(71.5, -71.5),
-                Vector2::new(-76.5, 74.5),
-                0.75,
-                None,
-            ),
-            (
-                Vector2::new(-88.5, -73.5),
-                Vector2::new(91.5, 78.5),
-                60.0,
-                Some(Rect2i::new(Vector2i::new(-43, -37), Vector2i::new(84, 69))),
-            ),
-            (
-                Vector2::new(10_000_012.0, -10_000_042.0),
-                Vector2::new(10_000_068.0, -10_000_001.0),
-                7.0,
-                Some(Rect2i::new(
-                    Vector2i::new(10_000_008, -10_000_048),
-                    Vector2i::new(75, 63),
-                )),
-            ),
-        ];
-        let mut cases = samples.to_vec();
-        // Deterministic additional slopes/centers exercise f32 edge rounding
-        // without pulling in an RNG dependency or altering the native path.
-        let mut seed = 0x9e37_79b9_u32;
-        for sample in 0..96 {
-            let mut draw = || {
-                seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-                (seed % 200_001) as f32 / 1000.0 - 100.0
-            };
-            let begin = Vector2::new(draw(), draw());
-            let end = Vector2::new(draw(), draw());
-            let width = [0.75, 1.25, 7.0, 16.5, 31.3, 60.0][sample % 6];
-            cases.push((begin, end, width, None));
-        }
-        for &(begin, end, width, clip) in &cases {
-            let window = validate_hard_windows(
-                &[end],
-                width,
-                clip.unwrap_or(Rect2i::new(Vector2i::ZERO, Vector2i::ZERO)),
-                Some(begin),
-            )
-            .unwrap()
-            .pop()
-            .unwrap();
-            let radius_squared = (width * 0.5) * (width * 0.5);
-            let delta = end - begin;
-            let squared = delta.length_squared();
-            let accepted = |x: i32, y: i32| {
-                let center = Vector2::new(x as f32 + 0.5, y as f32 + 0.5);
-                let fraction = if squared > 0.0 {
-                    ((center - begin).dot(delta) / squared).clamp(0.0, 1.0)
-                } else {
-                    0.0
-                };
-                (center - (begin + delta * fraction)).length_squared() <= radius_squared
-            };
-            let reference: Vec<_> = (window.top..window.bottom)
-                .flat_map(|y| (window.left..window.right).map(move |x| (x, y)))
-                .filter(|&(x, y)| accepted(x, y))
-                .collect();
-            let optimized: Vec<_> = (window.top..window.bottom)
-                .flat_map(|y| {
-                    let (left, right) = hard_row_bounds(&window, y, width * 0.5);
-                    (left..right).map(move |x| (x, y))
-                })
-                .filter(|&(x, y)| accepted(x, y))
-                .collect();
-            assert_eq!(
-                optimized, reference,
-                "width={width} begin={begin:?} end={end:?}"
-            );
-        }
-    }
-
-    #[test]
     fn pigment_tile_batch_rolls_back_existing_and_new_surface_tiles() {
         let mut surface = TrackedSurface::default();
         surface.tile_request_start(-1, 2)[3][4] = [21, 43, 65, 32768];
@@ -1119,36 +745,6 @@ mod tests {
         surface.commit_batch();
         assert_eq!(surface.tile(3, -2).unwrap()[0][0], [11, 12, 13, 14]);
         assert!(surface.before_batch.is_none());
-    }
-
-    #[test]
-    fn native_hard_preflight_rejects_late_batch_errors() {
-        let clip = Rect2i::new(Vector2i::ZERO, Vector2i::ZERO);
-        let first = Vector2::new(-1.5, -2.5);
-        let good = [first, Vector2::new(7.5, 3.5)];
-        let windows = validate_hard_windows(&good, 12.0, clip, None).unwrap();
-        assert_eq!(windows.len(), good.len());
-        assert_eq!(windows[1].begin, first);
-        assert!(
-            validate_hard_windows(&[first, Vector2::new(f32::NAN, 1.0)], 12.0, clip, None).is_err()
-        );
-        assert!(
-            validate_hard_windows(&[first, Vector2::new(1_000_000.0, 1.0)], 12.0, clip, None)
-                .is_err()
-        );
-        assert!(validate_hard_windows(&[first], f32::MAX, clip, None).is_err());
-        // A small clip can safely bound a distant sweep. Validation must
-        // agree with the renderer's original clip-window behavior.
-        let clipped = Rect2i::new(Vector2i::new(-10, -10), Vector2i::new(20, 20));
-        assert!(
-            validate_hard_windows(
-                &[first, Vector2::new(1_000_000.0, 1.0)],
-                12.0,
-                clipped,
-                None
-            )
-            .is_ok()
-        );
     }
 
     #[test]
@@ -1210,26 +806,6 @@ mod tests {
     }
 
     #[test]
-    fn hard_batch_rollback_keeps_previous_coverage_and_cursor() {
-        let mut covered = HashSet::from([(-9, 3), (2, 2)]);
-        let mut last_hard = Some(Vector2::new(-8.5, 3.5));
-        let saved = last_hard;
-        let mut batch = HardBatch {
-            last_hard: saved,
-            inserted: Vec::new(),
-        };
-        for point in [(-9, 3), (3, 2), (-11, -1), (3, 2)] {
-            if covered.insert(point) {
-                batch.inserted.push(point);
-            }
-        }
-        last_hard = Some(Vector2::new(22.5, -12.5));
-        batch.rollback(&mut covered, &mut last_hard);
-        assert_eq!(covered, HashSet::from([(-9, 3), (2, 2)]));
-        assert_eq!(last_hard, saved);
-    }
-
-    #[test]
     fn native_changes_with_identical_rgba_do_not_reenter_script() {
         let mut raw = [[[0_u16; 4]; TILE_SIZE]; TILE_SIZE];
         let mut cache = ExportedTile::default();
@@ -1274,17 +850,26 @@ mod tests {
         }
     }
 
-    fn hard_stroke(width: f32, clip: Rect2i) -> NativeStroke {
+    fn preset_stroke(width: f32, clip: Rect2i) -> NativeStroke {
+        let mut brush = hokusai::myb::from_str(include_str!(
+            "../../../addons/drawing/brushes/hard_round.myb"
+        ))
+        .expect("bundled preset must parse");
+        brush.set(
+            BrushSetting::Radius,
+            SettingValue::constant((width / 2.0).ln()),
+        );
         NativeStroke {
             handle: 1,
-            layer: "test-layer".to_string(),
+            layer: "test-layer".into(),
             source_revision: 7,
-            width,
             rgba: 0xff123456,
             clip,
-            strategy: StrokeStrategy::Hard {
-                last: None,
-                covered: HashSet::new(),
+            preset: PresetStroke {
+                brush,
+                state: BrushState::new(1000),
+                surface: TrackedSurface::default(),
+                published: HashMap::new(),
             },
             pending: None,
             preview: Vec::new(),
@@ -1296,7 +881,7 @@ mod tests {
     }
 
     #[test]
-    fn stroke_samples_validate_entire_batch_before_state_mutation() {
+    fn preset_samples_validate_entire_batch_before_state_mutation() {
         assert!(parse_samples(&[]).is_err());
         assert!(parse_samples(&[1.0, 2.0, 3.0]).is_err());
         assert!(parse_samples(&[1.0, 2.0, 1.01, 0.01]).is_err());
@@ -1306,120 +891,65 @@ mod tests {
         assert!(parse_samples(&[1.0, 2.0, 1.0, 0.01, f32::NAN, 0.0, 1.0, 0.01]).is_err());
         assert!(parse_samples(&vec![0.0; (MAX_BATCH_SAMPLES + 1) * 4]).is_err());
         assert_eq!(parse_samples(&[-10.0, 2.0, 0.5, 0.01]).unwrap().len(), 1);
-        let mut stroke = hard_stroke(12.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
-        assert!(stroke.append(&[sample(-9.0, 3.0, 1.0)]).is_ok());
-        assert!(!stroke.preview.is_empty());
+        let mut stroke = preset_stroke(12.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
+        stroke.append(&[sample(-9.0, 3.0, 1.0)]).unwrap();
         assert!(stroke.acknowledge(true));
-        let before = match &stroke.strategy {
-            StrokeStrategy::Hard { covered, .. } => covered.clone(),
-            _ => unreachable!(),
-        };
-        assert!(
-            stroke
-                .append(&[sample(0.0, 1.0, 1.0), sample(f32::NAN, 2.0, 1.0)])
-                .is_err()
-        );
+        let count = stroke.batches;
+        let last = stroke.preset.surface.tiles.len();
+        assert!(parse_samples(&[0.0, 1.0, 1.0, 0.01, f32::NAN, 2.0, 1.0, 0.01]).is_err());
         assert!(stroke.pending.is_none());
-        assert_eq!(stroke.batches, 1);
-        assert_eq!(
-            match &stroke.strategy {
-                StrokeStrategy::Hard { covered, .. } => covered,
-                _ => unreachable!(),
-            },
-            &before
-        );
+        assert_eq!(stroke.batches, count);
+        assert_eq!(stroke.preset.surface.tiles.len(), last);
     }
 
     #[test]
-    fn unified_hard_pressure_mask_clip_and_rollback_are_exact() {
-        let clip = Rect2i::new(Vector2i::new(-16, -16), Vector2i::new(32, 32));
-        let mut stroke = hard_stroke(18.0, clip);
-        let batch = [sample(-6.5, -3.5, 0.5), sample(7.5, 2.5, 1.0)];
-        stroke.append(&batch).unwrap();
-        let expected = stroke.preview.clone();
-        assert!(expected.len() > 100);
-        assert!(
-            expected
-                .as_chunks::<2>()
-                .0
-                .iter()
-                .all(|pixel| { (-16..16).contains(&pixel[0]) && (-16..16).contains(&pixel[1]) })
+    fn hokusai_hard_round_rollback_and_signed_alpha() {
+        let mut stroke = preset_stroke(
+            24.0,
+            Rect2i::new(Vector2i::new(-16, -16), Vector2i::new(32, 32)),
         );
-        assert!(
-            stroke.append(&batch).is_err(),
-            "pending batch must be acknowledged"
-        );
-        assert!(stroke.acknowledge(false));
-        assert_eq!(stroke.batches, 0);
-        stroke.append(&batch).unwrap();
-        assert_eq!(
-            stroke.preview, expected,
-            "rollback replay is byte-identical"
-        );
-        assert!(stroke.acknowledge(true));
-        stroke.append(&batch).unwrap();
-        assert!(stroke.preview.is_empty(), "hard overlap is once per stroke");
-        assert!(stroke.acknowledge(true));
-        let mut full = hard_stroke(18.0, clip);
-        full.append(&[sample(-6.5, -3.5, 1.0)]).unwrap();
-        assert!(
-            full.preview.len() > expected.len() / 4,
-            "pressure must affect footprint"
-        );
-        assert!(full.acknowledge(true));
-        stroke.append(&[sample(0.0, 0.0, 0.0)]).unwrap();
-        assert!(stroke.preview.is_empty());
-        assert!(stroke.acknowledge(true));
-        stroke.append(&[sample(-13.0, 12.5, 1.0)]).unwrap();
-        assert!(stroke.acknowledge(true));
-        assert_eq!(stroke.batches, 4);
-        assert_eq!(stroke.input_floats, 32);
-    }
-
-    #[test]
-    fn unified_preset_batch_rollback_preserves_state_surface_and_quantized_export() {
-        let mut brush = hokusai::myb::from_str(include_str!(
-            "../../../addons/drawing/brushes/hard_round.myb"
-        ))
-        .expect("bundled preset must be parseable");
-        brush.set(
-            BrushSetting::Radius,
-            SettingValue::constant((12.0_f32).ln()),
-        );
-        let preset = PresetStroke {
-            brush,
-            state: BrushState::new(1000),
-            surface: TrackedSurface::default(),
-            published: HashMap::new(),
-        };
-        let mut stroke = hard_stroke(24.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
-        stroke.strategy = StrokeStrategy::Preset(Box::new(preset));
-        let batch = [sample(-2.5, 3.5, 0.7), sample(3.5, -5.5, 1.0)];
-        stroke.append(&batch).unwrap();
+        let path = [sample(-2.5, 3.5, 0.7), sample(3.5, -5.5, 1.0)];
+        stroke.append(&path).unwrap();
         let expected = stroke.preview.clone();
         assert!(!expected.is_empty());
         assert_eq!(expected.len() % 3, 0);
+        assert!(
+            expected
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .any(|triple| triple[0] < 0 || triple[1] < 0)
+        );
+        assert!(
+            expected
+                .as_chunks::<3>()
+                .0
+                .iter()
+                .any(|triple| (triple[2] as u32 >> 24) > 0)
+        );
+        assert!(stroke.append(&path).is_err());
         assert!(stroke.acknowledge(false));
-        stroke.append(&batch).unwrap();
+        stroke.append(&path).unwrap();
         assert_eq!(
             stroke.preview, expected,
-            "state RNG and tile cache rollback replay"
+            "rejected Hokusai batch replays byte-exact"
         );
         assert!(stroke.acknowledge(true));
         stroke.append(&[sample(5.0, 10.0, 0.1)]).unwrap();
         assert!(stroke.acknowledge(true));
         assert_eq!(stroke.batches, 2);
+        assert_eq!(stroke.input_floats, 20);
     }
 
     #[test]
-    fn large_hard_batch_budget_rejects_before_stroke_changes() {
-        let mut stroke = hard_stroke(1024.0, Rect2i::new(Vector2i::ZERO, Vector2i::ZERO));
-        let bad = [sample(-500.0, -500.0, 1.0), sample(500.0, 500.0, 1.0)];
-        assert!(stroke.append(&bad).is_err());
-        assert!(stroke.pending.is_none());
-        assert!(stroke.preview.is_empty());
-        stroke.width = 10.0;
-        assert!(stroke.append(&[sample(-4.5, -4.5, 1.0)]).is_ok());
-        assert!(stroke.acknowledge(true));
+    fn all_bundled_presets_parse() {
+        for text in [
+            include_str!("../../../addons/drawing/brushes/hard_round.myb"),
+            include_str!("../../../addons/drawing/brushes/soft.myb"),
+            include_str!("../../../addons/drawing/brushes/ink.myb"),
+            include_str!("../../../addons/drawing/brushes/airbrush.myb"),
+        ] {
+            assert!(hokusai::myb::from_str(text).is_ok());
+        }
     }
 }

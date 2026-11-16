@@ -60,7 +60,7 @@ func run() -> void:
 		return
 	var session: DrawingEditSession = opened.value
 	var native: Object = ClassDB.instantiate("DrawingNativeBrush")
-	check(session.begin_native_stroke(native, "NativeHard", "", 8.0, INK,
+	check(session.begin_native_stroke(native, FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"), 8.0, INK,
 		CLIP, true).ok, "native tile stroke begins")
 	check(session.paint_path_native(PackedVector2Array([
 		Vector2(-20.5, 10.5), Vector2(-12.5, 10.5)]), INK, false, null).ok,

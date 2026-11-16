@@ -721,7 +721,6 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 ## This temporary source adapter is removed with native tile ownership (T-148).
 var _native_stroke: Object
 var _native_handle: int = 0
-var _native_mode: String = ""
 var _native_clip_bounds: Rect2i = Rect2i()
 var native_ffi_stats: Dictionary = {}
 ## Native tile batches are optional only for historical direct adapter fixtures.
@@ -733,20 +732,19 @@ var _native_preview_cache: Dictionary[String, PackedByteArray] = {}
 var _native_selection: DrawingSelection
 
 
-func begin_native_stroke(native: Object, mode: String, preset_text: String,
+func begin_native_stroke(native: Object, preset_text: String,
 		width: float, rgba: int, clip_bounds: Rect2i,
 		use_native_tiles: bool = false, selection: DrawingSelection = null) -> DrawingResult:
 	if _closed or native == null or _native_handle != 0 \
 			or not native.has_method("stroke_abi_version") \
 			or int(native.call("stroke_abi_version")) != 1:
 		return DrawingResult.failure("NATIVE_ABI", "Required native stroke ABI v1 unavailable")
-	var started: Dictionary = native.call("begin_stroke", layer_id, mode,
+	var started: Dictionary = native.call("begin_stroke", layer_id,
 		preset_text, width, rgba, expected_revision, clip_bounds)
 	if not bool(started.get("ok", false)) or int(started.get("handle", 0)) <= 0:
 		return DrawingResult.failure("NATIVE_BEGIN", str(started.get("error", "Native stroke begin failed")))
 	_native_stroke = native
 	_native_handle = int(started["handle"])
-	_native_mode = mode
 	_native_clip_bounds = clip_bounds
 	if use_native_tiles:
 		if not ClassDB.class_exists("DrawingNativeTiles"):
@@ -780,7 +778,6 @@ func _finish_native_stroke(commit_native: bool) -> bool:
 		completed = bool(_native_stroke.call("abort_stroke", _native_handle))
 	_native_handle = 0
 	_native_stroke = null
-	_native_mode = ""
 	return completed
 
 
@@ -918,7 +915,6 @@ func _commit_native_tile_stroke() -> DrawingResult:
 	native_ffi_stats["tile_pixel_stream_calls"] = int(tile_stats.get("pixel_stream_calls", -1))
 	_native_handle = 0
 	_native_stroke = null
-	_native_mode = ""
 	_native_tiles = null
 	_native_transaction = 0
 	_native_preview_cache.clear()
@@ -963,10 +959,8 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 	var changed: PackedInt32Array = exported.get("changes", PackedInt32Array())
 	var format: String = str(exported.get("format", ""))
 	var staged: DrawingResult
-	if format == "xy" and _native_mode == "NativeHard":
-		staged = _stage_native_hard_delta(changed, rgba, erase, selection)
-	elif format == "xy_rgba" and _native_mode == "Hokusai" and not erase:
-		staged = _stage_native_pigment_delta(changed, rgba, selection)
+	if format == "xy_rgba":
+		staged = _stage_native_pigment_delta(changed, rgba, selection, erase)
 		hokusai_perf["native_us"] = int(hokusai_perf["native_us"]) + native_elapsed_us
 		hokusai_perf["pixels"] = int(hokusai_perf["pixels"]) + changed.size() / 3
 	else:
@@ -977,45 +971,8 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 	return staged
 
 
-func _stage_native_hard_delta(coordinates: PackedInt32Array, rgba: int,
-		erase: bool, selection: DrawingSelection) -> DrawingResult:
-	if coordinates.size() % 2 != 0 or coordinates.size() > 1048576 * 2:
-		return DrawingResult.failure("NATIVE_LIMIT", "Invalid native hard coverage buffer")
-	_journaling = true
-	_paint_journal.clear()
-	_brush_tile_journal.clear()
-	_brush_change_count_before_batch = _brush_change_count
-	# Native coverage is already prevalidated by Rust. Avoid routing every
-	# returned pixel through _stage's generic/mixed-edit dispatch; preserve that
-	# dispatch when an earlier public operation has disabled tile-only staging.
-	var tile_staging: bool = _brush_tile_publish and not _hokusai_deferred
-	var ink: int = 0 if erase else rgba
-	if tile_staging:
-		# Keep the dispatch outside the pixel loop: a 96px full-canvas
-		# NativeHard gesture can contain more than 262,000 covered pixels.
-		for index: int in range(0, coordinates.size(), 2):
-			var staged: DrawingResult = _stage_brush_tile(coordinates[index],
-				coordinates[index + 1], ink, selection, true, not erase, -1)
-			if not staged.ok:
-				_rollback_paint()
-				return staged
-	else:
-		# Public edits or Hokusai staging in the same session require the
-		# original global-key bookkeeping and atomic rollback semantics.
-		for index: int in range(0, coordinates.size(), 2):
-			var staged: DrawingResult = _stage(coordinates[index],
-				coordinates[index + 1], ink, selection, true, not erase, -1, true)
-			if not staged.ok:
-				_rollback_paint()
-				return staged
-	_paint_journal.clear()
-	_brush_tile_journal.clear()
-	_journaling = false
-	return DrawingResult.success(change_count())
-
-
 func _stage_native_pigment_delta(changed: PackedInt32Array, rgba: int,
-		selection: DrawingSelection) -> DrawingResult:
+		selection: DrawingSelection, erase: bool) -> DrawingResult:
 	if changed.size() % 3 != 0 or changed.size() > 1048576 * 3:
 		return DrawingResult.failure("NATIVE_LIMIT", "Invalid native pigment buffer")
 	var clip_bounds: Rect2i = _native_clip_bounds
@@ -1118,7 +1075,13 @@ func _stage_native_pigment_delta(changed: PackedInt32Array, rgba: int,
 			var local_x: int = local_index % stride
 			var local_y: int = local_index / stride
 			var old: int = int(source_pixels.get(local_index, 0))
-			var replacement: int = _blend(pixels[index + 1], old)
+			var replacement: int
+			if erase:
+				var remaining: int = (old >> 24) & 255
+				var pigment_alpha: int = (pixels[index + 1] >> 24) & 255
+				replacement = (old & 0xffffff) | (((remaining * (255 - pigment_alpha) + 127) / 255) << 24)
+			else:
+				replacement = _blend(pixels[index + 1], old)
 			var previous: int = int(patch.get(local_index, old))
 			if replacement == previous:
 				continue

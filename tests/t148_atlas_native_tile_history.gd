@@ -47,7 +47,7 @@ func stroke(document: DrawingDocument, layer: String, timeline: AtlasEditHistory
 	var session: DrawingEditSession = opened.value as DrawingEditSession
 	var native: Object = ClassDB.instantiate("DrawingNativeBrush")
 	var started: DrawingResult = session.begin_native_stroke(native,
-		"NativeHard", "", 8.0, INK, CLIP, true)
+		FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"), 8.0, INK, CLIP, true)
 	if not started.ok:
 		session.cancel()
 		return started

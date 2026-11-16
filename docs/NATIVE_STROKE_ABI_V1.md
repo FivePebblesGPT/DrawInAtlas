@@ -1,27 +1,49 @@
-# Native stroke transaction ABI v1 (T-147)
+# Native Hokusai stroke ABI v1 (T-153; alpha breaking revision)
 
-Status: implemented as of 2026-11-15 in `DrawingNativeBrush` (the existing single Rust GDExtension). This describes the T-147 stroke ABI. T-148 now implements a **separate** [native tile-store ABI v1](NATIVE_RASTER_TILES_ABI_V1.md), while the current production Canvas still invokes the transitional per-pixel adapter until T-149. This is an alpha-only breaking API; old hard/preset methods and production compatibility wrappers are intentionally gone.
+T-147 introduced the shared stroke ABI; T-153 **removed NativeHard and its
+mode selector**. `DrawingNativeBrush` now always parses a MyPaint `.myb`
+preset (including `hard_round.myb`) and uses Hokusai/libmypaint. Existing
+caller argument arrays with a `mode` are rejected as incompatible.
 
-## Ownership and frozen source context
+## Frozen source and transaction lifecycle
 
-Each `DrawingNativeBrush` instance owns **at most one live stroke**. Its monotonically generated opaque signed-64-bit `handle` is valid only on that instance until commit/abort; it must not be reused or synthesized. A Godot `DrawingEditSession` owns the native instance/handle for the gesture. `begin_stroke` freezes the `layer` string, brush strategy (`NativeHard` or `Hokusai`), valid `.myb` preset contents (Hokusai only), finite width in `(0,4096]`, packed RGBA8 integer, `source_revision` and optional signed local-space `Rect2i` clip. Godot separately freezes the edit's view transform, 64-bit world anchor, selection mask and layer authorization in its gesture/edit session. **The native API does not yet authorize a source document or own the selection**: native receives layer/revision tokens, and GDScript still checks current revision and source reads. T-148 moves that authority and the mask into the native tile store.
+At most one active stroke per native object. `begin_stroke` freezes layer ID,
+valid `.myb` preset, positive finite width ≤4096, RGBA8 color, nonnegative
+revision, and signed local clip. Godot freezes selection, source identity,
+world anchor and the source revision in the accompanying `DrawingEditSession`.
+Missing native brush/tile classes and invalid brush presets **fail closed**.
 
-The call sequence (GDScript `Object.call` signatures) is:
-
-| Method | Arguments | Return / semantics |
+| Method | Arguments | Result / semantics |
 | --- | --- | --- |
-| `stroke_abi_version` | — | Integer `1`; reject incompatible binaries before accepting a gesture |
-| `begin_stroke` | `layer: String, mode: String, preset_text: String, width: float, rgba: int, source_revision: int, clip: Rect2i` | `Dictionary {ok, handle, abi_version}` or `{ok:false,error}`. `clip=Rect2i()` means unbounded native clip; no existing stroke may be active |
-| `append_samples` | `handle:int, source_revision:int, samples:PackedFloat32Array` | `{ok,samples}` or `{ok:false,error}`. One batch has 1–4096 `(x,y,pressure,delta_seconds)` tuples, each four finite float32 values, pressure `[0,1]`, delta time `(0,1]` seconds; reject a malformed batch **before** native mutation |
-| `preview_changes` | `handle:int, source_revision:int` | `{ok:true,format:"xy"\|"xy_rgba",changes:PackedInt32Array}` for a pending batch; hard `[x,y]` pairs, Hokusai `[x,y,rgba]` triples, coordinates signed local i32; outputs capped at 3,145,728 signed integers (3 × 1,048,576, see Rust constants) |
-| `acknowledge_batch` | `handle:int, source_revision:int, accepted:bool` | bool. Accept after source validation and detached staging; false rewinds native hard cursor/once-only coverage or Hokusai pigment, brush state, RNG and last published export cache. One acknowledgement per batch |
-| `stroke_stats` | `handle:int, source_revision:int` | Dictionary including `ffi_calls`, `batches`, `input_floats`, `exported_ints`, `mode`; counters measure calls *at this Rust API*, not GDScript staging CPU |
-| `commit_stroke` | `handle:int, source_revision:int` | bool. Succeeds only with no pending batch and matching handle/revision, then releases native stroke resources |
-| `abort_stroke` | `handle:int` | bool. Rolls back a pending batch, discards all accepted prior batches and frees native stroke without publishing history |
+| `stroke_abi_version` | — | `1` |
+| `begin_stroke` | `layer:String, preset_text:String, width:float, rgba:int, source_revision:int, clip:Rect2i` | `{ok,handle,abi_version}` or `{ok:false,error}`; no mode argument |
+| `append_samples` | `handle,revision,PackedFloat32Array` | 1–4096 signed `(x,y,pressure,delta_seconds)` tuples with finite values, pressure 0–1, delta time (0,1] seconds; validates whole batch before mutation |
+| `preview_changes` | `handle,revision` | `{ok,format:"xy_rgba",changes:PackedInt32Array}`; signed local `[x,y,RGBA8]` triples for transitional adapters/test probes |
+| `acknowledge_batch` | `handle,revision,accepted:bool` | Accept pending batch, or fully rewind Hokusai stroke state, surface cache/RNG and published pixel cache on rejection |
+| `required_tiles` | `handle,revision,stride,anchor_x:i64,anchor_y:i64` | Source tile IDs needed before atomic batch staging; no per-pixel crossing |
+| `apply_tile_batch` | `tile_store,handle,revision,transaction,anchor_x,anchor_y,erase:bool` | Atomic native tile staging **and** pending batch acknowledgment/rejection |
+| `stroke_stats` | `handle,revision` | `format:"xy_rgba"`, FFI/batch/bytes counters; no renderer mode |
+| `commit_tiles` | `tile_store,handle,revision,transaction` | Publish Rust canonical tile/history token exactly once |
+| `commit_stroke` | `handle,revision` | Transitional whole-stroke commit with no pending batch |
+| `abort_stroke` | `handle` | Discard entire stroke and pending state |
 
-A stroke state is **idle → active → batch pending → active** (accept/reject), then **committed** or **aborted → idle**. Only one batch can be outstanding; out-of-order preview, acknowledge, overlapping begin, commit with pending batch, wrong handles and mismatched revision fail closed. A rejected batch can be resubmitted without consuming cursor/coverage or pigment state. Source read/mask errors are atomic at the batch level in the transitional `DrawingEditSession` adapter, and `DrawingDocument` still commits a gesture as one Undo/Redo transaction. Native hard once-only coverage and hard opacity are unchanged. Hokusai remains pressure-sensitive, multilayered/translucent and **must not** be checked against Legacy red-pixel equality. `0` pressure breaks NativeHard segment continuity. Hard candidate rectangles are prevalidated with an aggregate per-batch pixel budget before any mutation.
+One batch is pending at a time. Invalid handle/revision, overlapping begin,
+malformed samples, missing source or masks, premature commit, and stale
+layer authorization reject without publishing a partial edit. The production
+Canvas uses the **native tile path**, not per-pixel Godot blending or
+`preview_changes`. Tile staging uses Hokusai dab alpha and rebases against
+immutable source; Eraser decreases source alpha using the *same* MyPaint
+pigment alpha and preserves source RGB, including transparent hidden RGB.
+Undo/Redo and Save/Open consume canonical tile history/snapshots as described
+in [native tile ABI](NATIVE_RASTER_TILES_ABI_V1.md).
 
-`DrawingCanvas` buffers/coalesces samples in GDScript; **one** `append_samples`, **one** `preview_changes` and **one** `acknowledge_batch` cross into Rust per gesture slice. There are no per-pixel Rust/Godot calls. The v1 **output** still contains per-pixel packed changes, which GDScript iterates for blend/source/selection and tile staging. Those costs remain in the **production Canvas** until T-148/T-149 consumer cutover; the direct T-148 native tile API has a separate atomic batch path. `Canvas.last_gesture_metrics.native_ffi_stats` reports the native boundary counts/volumes. The separate `Hokusai` and `NativeHard` 96px regression witnesses remain mandatory; only Hokusai is expected to cover every source pixel with translucent pigment.
+## Verification
+
+Rust offline unit tests (22), strict Clippy, `t147_native_stroke_contract`,
+`t148_native_tiles_contract`, graphical Canvas and 96px Hard Round
+100-event witness all pass on the tested Linux x86-64 Godot 4.8-beta3
+software renderer. See [T-153 evidence](evidence/T-153-2026-11-16-hokusai-only.md).
+The T-095 owner hardware gate is untouched.
 
 ## Original planned tile-buffer contract for T-148 (historical design)
 
@@ -29,10 +51,9 @@ A stroke state is **idle → active → batch pending → active** (accept/rejec
 
 Expose immutable `TileBufferHandle` + generation-scoped byte span and `TilePatch {TileId, base_revision:u64, base_generation:u64, new_generation:u64, dirty_bounds:Rect2i [inclusive start, exclusive end], buffer_handle, byte_offset, byte_len, row_stride_bytes, format}`. Dirty rectangles are tile-local and validated within tile extent; tile coordinates remain 64-bit even when Godot `Rect2i` uses i32 for local bounds. The handle/byte span stays valid until explicit release/acknowledgement or owning transaction abort, **not** after disposal or mutation; UI consumes copies/retained readonly spans, never mutable native pointers. Stale revision, mismatched layer/source generation, invalid span/bounds, memory-budget overflow, locked/hidden source, invalid mask or source read failure make a single atomic transaction error: **zero tile publication** and an entirely retryable original source. Keep bounded per-gesture memory, opaque transaction identity, rollback journal, tile-before/after history or COW snapshots, and bulk persistence semantics native-owned. The source revision is singular and shared with `DrawingDocument` (no parallel conflicting revision counters). The independently tested native tile store and its known consumer gaps are documented in [T-148's actual ABI](NATIVE_RASTER_TILES_ABI_V1.md); `.drawing` Save/Open and live UI display migration remain T-149.
 
-## Verified checks
+## Historical contract note
 
-- Rust offline `cargo test --locked --offline` / strict Clippy for both strategies and rollback; Godot `t147_native_stroke_contract.gd` tests invalid handles, revision, batch ordering, pressure, signed coordinates, fail-and-retry, stats.
-- Real native `t095_native_hard_source_atomic.gd` and `t095_native_pigment_atomic.gd` inject failures after source reads, then compare against independent retry/skip references. The 96px graphical witnesses exercise source coverage, Undo/Redo and cancellation. `native_brush_integration.gd` compares Hard vs Legacy only as a **regression oracle**, and exercises four Hokusai presets and selected masking.
-- Test-only old-API adapters under `drawing/tests/t147_*adapter.gd` / `t147_historical_ffi_fixture.gd` keep historical fixture oracles usable; **no production legacy native API is retained**. The GDScript per-pixel source staging and absent-native Legacy fallback are intentionally temporary until T-148 and T-150, respectively.
-
-See [T-147 execution evidence](evidence/T-147-2026-11-15-unified-stroke.md) and [T-146 independent native benchmark](evidence/T-146-2026-11-15-hokusai-benchmark.md). Software-rendered results are not owner hardware/input-to-photon acceptance; T-095 stays open.
+The preceding planned buffer contract is retained as T-147-era design history;
+the actually implemented and tested production ABI is the Rust `TileStore`
+documented in [NATIVE_RASTER_TILES_ABI_V1.md](NATIVE_RASTER_TILES_ABI_V1.md).
+The old two-renderer/opaque-pixel assumptions are not active requirements.

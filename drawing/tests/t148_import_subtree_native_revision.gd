@@ -31,7 +31,7 @@ func stroke(doc: DrawingDocument, layer: String, center: Vector2) -> DrawingResu
 	var brush: Object = ClassDB.instantiate("DrawingNativeBrush")
 	var bounds: Rect2i = Rect2i(-STRIDE, STRIDE, STRIDE, STRIDE) if center.x < 0.0 \
 		else Rect2i(0, 0, STRIDE, STRIDE)
-	var opened: DrawingResult = session.begin_native_stroke(brush, "NativeHard", "",
+	var opened: DrawingResult = session.begin_native_stroke(brush, FileAccess.get_file_as_string("res://addons/drawing/brushes/hard_round.myb"),
 		8.0, 0xff5599cc, bounds, true)
 	if not opened.ok:
 		session.cancel()
