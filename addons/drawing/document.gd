@@ -88,6 +88,21 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 		_native_source_identities.clear()
 
 
+## Public metadata-only operations must acquire the native revision *before*
+## mutating Godot's tree. The older post-mutation bridge is still used by
+## internal semantic paths; it can detach on failure, which must never be the
+## outcome of a rejected public layer command. No callbacks or allocations
+## occur between this checked native step and the deterministic tree write.
+func _advance_checked_layer_metadata() -> DrawingResult:
+	if _native_raster_store != null:
+		if not _attached_native_revision_matches(revision):
+			return DrawingResult.failure("STALE_REVISION", "Native metadata revision diverged")
+		if not bool(_native_raster_store.call("advance_metadata_revision", revision, true)):
+			return DrawingResult.failure("NATIVE_METADATA", "Native metadata revision rejected")
+	revision += 1
+	return DrawingResult.success(null, revision)
+
+
 ## A structural edit may mention raster layers without modifying any Rust-
 ## owned bytes: e.g. a newly created, never-authorized raster child. Ask Rust
 ## to prove that none of the affected IDs has source or Undo/Redo state. A
@@ -311,11 +326,13 @@ func create_layer(kind: String, name: String, parent_id: String = ROOT_ID,
 		return DrawingResult.failure("DUPLICATE_ID", "Layer/group identity already exists")
 	if _native_raster_store != null and bool(_native_raster_store.call("is_layer_parked", new_identifier)):
 		return DrawingResult.failure("LAYER_ID", "Raster ID is reserved by native structural history")
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
 	_nodes[new_identifier] = DrawingLayerNode.new(new_identifier, kind, name, parent_id)
 	var siblings: Array[String] = _nodes[parent_id].children
 	var index: int = siblings.size() if insertion_index < 0 else clampi(insertion_index, 0, siblings.size())
 	siblings.insert(index, new_identifier)
-	_advance_nonraster_revision()
 	_finish_structure(record_history, {"kind": "structure", "op": "create",
 		"id": new_identifier, "parent": parent_id, "index": index,
 		"node": _nodes[new_identifier].detached_copy()})
@@ -328,9 +345,11 @@ func rename_layer(node_id: String, name: String, record_history: bool = false) -
 	if not _editable(node_id):
 		return DrawingResult.failure("LOCKED", "Layer or ancestor is hidden or locked")
 	if _nodes[node_id].name != name:
+		var advanced: DrawingResult = _advance_checked_layer_metadata()
+		if not advanced.ok:
+			return advanced
 		var before: String = _nodes[node_id].name
 		_nodes[node_id].name = name
-		_advance_nonraster_revision()
 		_finish_structure(record_history, {"kind": "structure", "op": "property",
 			"id": node_id, "field": "name", "before": before, "after": name})
 	return DrawingResult.success(null, revision)
@@ -340,9 +359,11 @@ func set_visibility(node_id: String, visible: bool, record_history: bool = false
 	if not _nodes.has(node_id) or node_id == ROOT_ID:
 		return DrawingResult.failure("LAYER", "Cannot change missing/root layer")
 	if _nodes[node_id].visible != visible:
+		var advanced: DrawingResult = _advance_checked_layer_metadata()
+		if not advanced.ok:
+			return advanced
 		var before: bool = _nodes[node_id].visible
 		_nodes[node_id].visible = visible
-		_advance_nonraster_revision()
 		_finish_structure(record_history, {"kind": "structure", "op": "property",
 			"id": node_id, "field": "visible", "before": before, "after": visible})
 	return DrawingResult.success(null, revision)
@@ -352,9 +373,11 @@ func set_locked(node_id: String, locked: bool, record_history: bool = false) -> 
 	if not _nodes.has(node_id) or node_id == ROOT_ID:
 		return DrawingResult.failure("LAYER", "Cannot change missing/root layer")
 	if _nodes[node_id].locked != locked:
+		var advanced: DrawingResult = _advance_checked_layer_metadata()
+		if not advanced.ok:
+			return advanced
 		var before: bool = _nodes[node_id].locked
 		_nodes[node_id].locked = locked
-		_advance_nonraster_revision()
 		_finish_structure(record_history, {"kind": "structure", "op": "property",
 			"id": node_id, "field": "locked", "before": before, "after": locked})
 	return DrawingResult.success(null, revision)
@@ -388,11 +411,13 @@ func reorder(node_id: String, new_parent: String, new_index: int,
 		(1 if current_parent == new_parent else 0))
 	if current_parent == new_parent and target_index == old_index:
 		return DrawingResult.success(null, revision)
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
 	original.erase(node_id)
 	var destination: Array[String] = _nodes[new_parent].children
 	destination.insert(target_index, node_id)
 	_nodes[node_id].parent_id = new_parent
-	_advance_nonraster_revision()
 	_finish_structure(record_history, {"kind": "structure", "op": "reorder",
 		"id": node_id, "old_parent": current_parent, "old_index": old_index,
 		"new_parent": new_parent, "new_index": target_index})

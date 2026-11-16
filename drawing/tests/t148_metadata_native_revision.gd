@@ -324,10 +324,12 @@ func run() -> void:
 	var stale_store: Object = stale_doc._native_raster_store
 	var stale_before: int = int(stale_store.call("stats").get("revision", -1))
 	(stale_doc._nodes[stale_layer].tiles["0,0"] as DrawingRasterTile).set_rgba(0, 0, 0xff332211)
-	check(stale_doc.remove_subtree(stale_layer, true).ok and
+	var rejected_removal: DrawingResult = stale_doc.remove_subtree(stale_layer, true)
+	check(not rejected_removal.ok and
+		stale_doc.has_node(stale_layer) and stale_doc._native_raster_store == stale_store and
 		int(stale_store.call("stats").get("revision", -1)) == stale_before and
 		int(stale_store.call("stats").get("parked_layers", -1)) == 0 and
-		stale_doc.revision == stale_before + 1,
-		"in-place source mutation fails native parking and retains checked rebase")
+		stale_doc.revision == stale_before,
+		"in-place source mutation rejects deletion atomically (T-168)")
 	print("T148_METADATA_RESULT checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)

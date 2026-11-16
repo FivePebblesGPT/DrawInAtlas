@@ -11,13 +11,15 @@ const RED: int = 0xff0000ee
 class FailingSourceDocument extends DrawingDocument:
 	var reject_source: bool = true
 	var lock_during_read: bool = false
+	var lock_result_code: String = ""
 
 	func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 		if reject_source and key == "0,0":
 			return DrawingResult.failure("MISSING_TILE", "Injected lazy source failure")
 		if lock_during_read and key == "0,0":
 			lock_during_read = false
-			set_locked(layer_id, true)
+			var attempt: DrawingResult = set_locked(layer_id, true)
+			lock_result_code = attempt.code
 		return super._resolve_chunk(layer_id, key)
 var checks: int = 0
 var failures: int = 0
@@ -230,8 +232,9 @@ func run() -> void:
 		check(failing_doc.revision == selection_revision and
 			failing_doc.history_length() == 1 and failed_canvas.session == null,
 			"changed selection cannot publish an earlier authorized draft")
-	# An untrusted lazy resolver may reenter the document and lock the layer.
-	# The native batch must not publish against that newly stale authority.
+	# A lazy resolver may attempt to lock the layer during a native edit.
+	# T-173 rejects this metadata mutation while Rust holds the transaction;
+	# since source authority is unchanged, the Brush may commit normally.
 	failed_canvas.set_selection_mask(DrawingSelection.new())
 	var before_lock: PackedByteArray = pixel_bytes(failing_doc)
 	failing_doc.lock_during_read = true
@@ -240,10 +243,13 @@ func run() -> void:
 	failed_canvas.finish_gesture(fault_finish)
 	await drain(failed_canvas)
 	check(failing_doc.revision == before_lock_revision + 1 and
-		failing_doc._nodes[failing_layer].locked and failed_canvas.session == null,
-		"reentrant lazy provider invalidates native authority and aborts")
-	check(pixel_bytes(failing_doc) == before_lock,
-		"reentrant layer lock leaves raster source untouched")
+		not failing_doc._nodes[failing_layer].locked and failed_canvas.session == null and
+		failing_doc.lock_result_code == "NATIVE_METADATA",
+		"reentrant layer lock is rejected before changing native authority")
+	check(pixel_bytes(failing_doc) != before_lock and
+		failing_doc.history_length() == 2 and
+		int(failing_doc._native_raster_store.call("stats").get("revision", -1)) == failing_doc.revision,
+		"unchanged authority allows a second native Brush commit and history step")
 	failed_canvas.queue_free()
 	await frames(2)
 	print("T148_CANVAS_TILES_RESULT checks=%d failures=%d ffi=%s" % [

@@ -331,6 +331,15 @@ jobs:
             2>&1 | tee /tmp/t172-atlas-undo.log
           python3 tools/check_godot_model_log.py /tmp/t172-atlas-undo.log \
             --marker T172_UNDO_PASSED
+      - name: T-173 native-attached public metadata mutation rejection
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t173_native_metadata_preflight.gd \
+            2>&1 | tee /tmp/t173-native-metadata.log
+          python3 tools/check_godot_model_log.py /tmp/t173-native-metadata.log \
+            --marker T173_METADATA_PASSED
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

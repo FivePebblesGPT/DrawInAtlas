@@ -1,0 +1,26 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T173_METADATA_FAILED: busy native rejects group creation
+T173_METADATA_FAILED: busy native rejects rename
+T173_METADATA_FAILED: busy native rejects visibility
+T173_METADATA_FAILED: busy native rejects locking
+T173_METADATA_FAILED: busy native rejects reorder
+T173_METADATA_FAILED: busy native leaves metadata, tree, and revision unchanged
+T173_METADATA_FAILED: busy rejection leaves attached native source, bytes and tokens intact
+T173_METADATA_FAILED: create retries after native unblocks
+T173_METADATA_FAILED: rename retries after native unblocks
+T173_METADATA_FAILED: reorder retries after native unblocks
+T173_METADATA_FAILED: successful commands preserve native bytes and history through revisions
+T173_METADATA_FAILED: no-op metadata call does not advance revision
+T173_METADATA_FAILED: metadata Undo preserves native timeline
+T173_METADATA_FAILED: metadata Redo preserves native timeline
+T173_METADATA_FAILED: later native paint reuses the same store
+T173_METADATA_FAILED: native ahead rejects group creation
+T173_METADATA_FAILED: native ahead rejects rename
+T173_METADATA_FAILED: native ahead rejects visibility
+T173_METADATA_FAILED: native ahead rejects locking
+T173_METADATA_FAILED: native ahead rejects reorder
+T173_METADATA_FAILED: native ahead leaves metadata, tree, and revision unchanged
+T173_METADATA_FAILED: stale rejection keeps native attachment and canonical source
+T173_METADATA_RESULT checks=31 failures=22

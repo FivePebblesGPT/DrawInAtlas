@@ -383,3 +383,16 @@ canonical full-RGBA8 projection check. Rejected native retirement leaves both
 Godot documents, native stores and Atlas Undo cursor unchanged, rather than
 mutating source history and trying a second fallible rollback. This does not
 create a general cross-document two-phase commit; T-148 remains open.
+
+**T-173 checked public layer metadata boundary (2026-11-16):** The five
+`DrawingDocument` operations `create_layer`, `rename_layer`, `set_visibility`,
+`set_locked` and `reorder` call `_advance_checked_layer_metadata()` before
+changing any Godot tree state. If a store is attached, it must accept
+`advance_metadata_revision(revision, true)` first; a stale revision yields
+`STALE_REVISION`, an active Rust edit or other native refusal yields
+`NATIVE_METADATA`. Rejection preserves nodes, revision, canonical RGBA8,
+Undo/Redo and the existing native store attachment. A successful metadata
+transition advances both stores once, retains native Undo but invalidates
+branched native Redo. No-op commands do not advance. Native-absent metadata
+commands remain available until T-150. This is not a universal host-history
+protocol; see [T-173 evidence](evidence/T-173-2026-11-16-native-layer-metadata.md).
