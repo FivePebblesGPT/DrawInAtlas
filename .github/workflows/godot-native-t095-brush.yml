@@ -371,6 +371,19 @@ jobs:
             2>&1 | tee /tmp/t176-structural-native-history.log
           python3 tools/check_godot_model_log.py /tmp/t176-structural-native-history.log \
             --marker T176_STRUCTURAL_PASSED
+      - name: T-177 checked raster-bearing structural Undo/Redo against native history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t177_raster_history_native_fence.gd \
+            2>&1 | tee /tmp/t177-raster-native-history.log
+          python3 tools/check_godot_model_log.py /tmp/t177-raster-native-history.log \
+            --marker T177_RASTER_PASSED
+          grep -Fqx 'T177_RASTER_RESULT checks=89 failures=0' \
+            /tmp/t177-raster-native-history.log
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

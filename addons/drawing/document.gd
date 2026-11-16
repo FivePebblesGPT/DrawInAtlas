@@ -1386,6 +1386,7 @@ func _finish_structure(record_history: bool, event: Dictionary) -> void:
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 	var parked_replay: bool = false
 	var metadata_advanced: bool = false
+	var raster_advanced: bool = false
 	var node_id: String = event["id"]
 	var op: String = event["op"]
 	if op == "property":
@@ -1429,6 +1430,9 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 				if snapshot.kind == DrawingLayerNode.RASTER:
 					affected_raster.append(snapshot.id)
 		var restored: Dictionary = event["nodes"] if op == "remove" else {node_id: event["node"]}
+		var raster_layers: Array[String] = affected_raster.duplicate()
+		if op == "create" and (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER:
+			raster_layers.append(node_id)
 		# All tree preconditions precede the Rust revision update; rejected
 		# structural replays must leave both histories and trees unchanged.
 		if restore:
@@ -1447,16 +1451,30 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 			if not metadata.ok:
 				return metadata
 			metadata_advanced = true
-		if bool(event.get("native_parked", false)) and not affected_raster.is_empty():
-			if restore and not _native_tree_sources_match(restored, true):
-				return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")
-			if not restore:
-				var live_nodes: Dictionary = {}
-				for identifier: String in restored:
-					live_nodes[identifier] = _nodes[identifier]
-				if not _native_tree_sources_match(live_nodes, false):
-					return DrawingResult.failure("STALE_PIXEL", "Structural source identity changed")
-			parked_replay = _advance_parked_structure_revision(affected_raster, restore, false)
+		# Raster-bearing replay must acquire the exact Rust revision *before*
+		# touching Godot's hierarchy. A failed park/unpark or unreferenced-ID
+		# bridge cannot degrade into an unchecked local-only history step.
+		if not raster_layers.is_empty() and _native_raster_store != null:
+			if not _attached_native_revision_matches(revision):
+				return DrawingResult.failure("STALE_REVISION", "Raster history native revision diverged")
+			if bool(event.get("native_parked", false)):
+				if restore and not _native_tree_sources_match(restored, true):
+					return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")
+				if not restore:
+					var live_nodes: Dictionary = {}
+					for identifier: String in restored:
+						live_nodes[identifier] = _nodes[identifier]
+					if not _native_tree_sources_match(live_nodes, false):
+						return DrawingResult.failure("STALE_PIXEL", "Structural source identity changed")
+				if not _advance_parked_structure_revision(raster_layers, restore, false):
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Native parked raster history rejected")
+				parked_replay = true
+			else:
+				if not bool(_native_raster_store.call("advance_unreferenced_layers_revision",
+						revision, PackedStringArray(raster_layers), false)):
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Native unreferenced raster history rejected")
+				revision += 1
+			raster_advanced = true
 		if restore:
 			for identifier: String in restored:
 				_nodes[identifier] = (restored[identifier] as DrawingLayerNode).detached_copy()
@@ -1479,21 +1497,10 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 			_erase_subtree(node_id)
 	else:
 		return DrawingResult.failure("HISTORY_KIND", "Unknown structural operation")
-	# Preserve native tokens for semantic trees and for never-authorized raster
-	# layers. Rust rejects a raster ID referenced by resident source or history.
-	var raster_layers: Array[String] = []
-	if op == "create" and (event["node"] as DrawingLayerNode).kind == DrawingLayerNode.RASTER:
-		raster_layers.append(node_id)
-	elif op == "remove":
-		for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
-			if snapshot.kind == DrawingLayerNode.RASTER:
-				raster_layers.append(snapshot.id)
-	if metadata_advanced or (op == "remove" and parked_replay):
-		pass # Rust and document revisions advanced at structural preflight.
-	elif raster_layers.is_empty():
+	# Metadata and raster-bearing paths already advanced Rust before the tree
+	# change. Only native-absent raster history needs its local revision bump.
+	if not metadata_advanced and not raster_advanced:
 		_advance_nonraster_revision(false)
-	else:
-		_advance_raster_structure_revision(raster_layers, false)
 	return DrawingResult.success(null, revision)
 
 

@@ -438,3 +438,18 @@ than treating the replay as a new branched edit. The same method retains
 history continues to work until T-150. Raster-bearing structural replay,
 text-to-raster transitions and host-owned detached timeline remain separate
 T-148 gates; see [T-176 evidence](evidence/T-176-2026-11-16-semantic-history.md).
+
+**T-177 checked local raster-bearing structural replay (2026-11-16):**
+`DrawingDocument._replay_structure()` now takes the attached native
+`advance_parked_layers_revision(expected, ids, restore, false)` or
+`advance_unreferenced_layers_revision(expected, ids, false)` boundary **before**
+changing Godot membership for recorded raster create/subtree delete/restore.
+The gate requires an exactly matching quiescent native revision; rejection
+returns `STALE_REVISION`, `NATIVE_STRUCTURE`, or `STALE_PIXEL`, preserving
+Godot hierarchy/history cursor and Rust tile/Undo/Redo state. Accepted replay
+advances exactly one native and document revision, retaining native Redo.
+Native-absent history remains supported until T-150. A newly created raster
+that already has retained native tokens cannot be undone via the
+unreferenced-layer bridge; refusal is preferable to silent source loss.
+Host-owned detached history and other unbridged raster mutation paths remain
+T-148 work; see [T-177 evidence](evidence/T-177-2026-11-16-raster-history.md).
