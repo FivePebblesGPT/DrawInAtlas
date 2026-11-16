@@ -1,5 +1,8 @@
 class_name DrawingClipboard
 extends RefCounted
+
+const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
+const MAX_LOCAL_COORD: int = 2147483647
 ## Independent pixel payload. A copied selection has no references to source tiles.
 
 var width: int = 0
@@ -18,6 +21,22 @@ static func capture(document: DrawingDocument, layer_id: String,
 		return DrawingResult.failure("CLIPBOARD_LIMIT", "Clipboard region is invalid or too large")
 	if document.node_metadata(layer_id).get("kind", "") != DrawingLayerNode.RASTER:
 		return DrawingResult.failure("LAYER", "Clipboard source is not a raster layer")
+	# Origins are signed 64-bit while Rect2i/clipboard-local offsets are 32-bit.
+	# Check the origin *before* adding offsets: MAX_I64 + 1 would otherwise
+	# wrap to MIN_I64 and silently copy from an unrelated sparse source.
+	if not TILES.document_anchor_in_range(origin_x, origin_y):
+		return DrawingResult.failure("COORD_RANGE", "Clipboard origin outside Drawing range")
+	var last_local_x: int = int(area.position.x) + int(area.size.x) - 1
+	var last_local_y: int = int(area.position.y) + int(area.size.y) - 1
+	if last_local_x > MAX_LOCAL_COORD or last_local_y > MAX_LOCAL_COORD:
+		return DrawingResult.failure("COORD_RANGE", "Clipboard rectangle exceeds local Vector2i range")
+	var first_x: int = origin_x + int(area.position.x)
+	var first_y: int = origin_y + int(area.position.y)
+	var last_x: int = origin_x + last_local_x
+	var last_y: int = origin_y + last_local_y
+	if not TILES.document_anchor_in_range(first_x, first_y) \
+			or not TILES.document_anchor_in_range(last_x, last_y):
+		return DrawingResult.failure("COORD_RANGE", "Clipboard rectangle exceeds signed Drawing range")
 	var result: DrawingClipboard = DrawingClipboard.new()
 	result.width = area.size.x
 	result.height = area.size.y

@@ -283,7 +283,8 @@ jobs:
             t159_signed_replay_publication_bounds:T159_SIGNED_REPLAY_PASSED \
             t160_direct_raster_publish_bounds:T160_DIRECT_BOUNDS_PASSED \
             t161_signed_public_anchor_bounds:T161_SIGNED_ANCHOR_PASSED \
-            t162_untracked_native_publication:T162_UNTRACKED_PASSED; do
+            t162_untracked_native_publication:T162_UNTRACKED_PASSED \
+            t163_clipboard_capture_signed_bounds:T163_CLIPBOARD_PASSED; do
             name="${entry%%:*}"
             marker="${entry#*:}"
             timeout 150s godot --headless --path drawing --script "res://tests/${name}.gd" \

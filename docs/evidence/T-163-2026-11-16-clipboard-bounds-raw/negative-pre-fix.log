@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T163_CLIPBOARD_FAILED: MAX_I64 + 1 rejected
+T163_CLIPBOARD_FAILED: MIN_I64 - 1 rejected
+T163_CLIPBOARD_FAILED: MAX_I64 y + 1 rejected
+T163_CLIPBOARD_FAILED: MIN_I64 y - 1 rejected
+T163_CLIPBOARD_FAILED: positive anchor outside public limit rejected
+T163_CLIPBOARD_FAILED: negative anchor outside public limit rejected
+T163_CLIPBOARD_FAILED: positive last pixel outside rejected
+T163_CLIPBOARD_FAILED: negative origin outside rejected
+T163_CLIPBOARD_FAILED: local x exceeds Vector2i rejected
+T163_CLIPBOARD_FAILED: local y exceeds Vector2i rejected
+T163_CLIPBOARD_FAILED: native invalid signed capture rejected
+T163_CLIPBOARD_RESULT checks=34 failures=11
