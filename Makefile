@@ -75,5 +75,5 @@ bundle-check: bundle-verify
 	@$(MAKE) test TOOLCHAIN=bundle BUNDLE="$(BUNDLE_OUT)"
 
 clean:
-	@rm -rf .build/target drawing/addons/drawing
+	@rm -rf .build/target native/drawing_brush/target addons/drawing/native drawing/addons/drawing
 	@printf '%s\n' 'Removed generated build outputs; cached toolchains retained.'
