@@ -14,6 +14,7 @@ from tools.toolchain import (
     ROOT,
     ToolchainError,
     download,
+    normalize_uv_cache,
     pins,
     select_tar_path,
     sha256_file,
@@ -43,6 +44,21 @@ class ToolchainTests(unittest.TestCase):
             source.write_bytes(b"changed bytes")
             with self.assertRaisesRegex(ToolchainError, "SHA-256"):
                 download("https://example.invalid/source.zip", digest, destination, str(source))
+
+    def test_uv_cache_links_are_flattened(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            cache = Path(temp) / "uv-cache"
+            archive = cache / "archive-v0/wheel"
+            archive.mkdir(parents=True)
+            (archive / "pkg.py").write_bytes(b"wheel")
+            environments = cache / "environments-v2"
+            environments.mkdir()
+            (environments / "unused").write_text("host venv", encoding="utf-8")
+            (cache / "wheel-pointer").symlink_to(archive, target_is_directory=True)
+            normalize_uv_cache(cache)
+            self.assertFalse(environments.exists())
+            self.assertFalse((cache / "wheel-pointer").is_symlink())
+            self.assertEqual((cache / "wheel-pointer/pkg.py").read_bytes(), b"wheel")
 
     def test_archive_paths_reject_traversal(self) -> None:
         for path in ("../etc/passwd", "/tmp/payload", "a/../../etc/passwd"):
