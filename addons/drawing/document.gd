@@ -1878,6 +1878,23 @@ func _replay_text_tree(event: Dictionary, undo_action: bool) -> DrawingResult:
 	return DrawingResult.success(null, revision)
 
 
+## A detached subtree is another raster-publication boundary: Copy/Atlas
+## consumers must not receive Godot projection bytes that Rust never owned.
+## Check only the selected tree so unrelated non-selected raster state cannot
+## make a valid Copy fail. No lazy provider or native transaction runs here.
+func _preflight_native_subtree_export(ids: Array[String]) -> DrawingResult:
+	if _native_raster_store == null:
+		return DrawingResult.success(null, revision)
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before export")
+	var selected: Dictionary = {}
+	for identifier: String in ids:
+		selected[identifier] = _nodes[identifier]
+	if not _native_tree_sources_match(selected, false):
+		return DrawingResult.failure("STALE_SOURCE", "Native raster bytes differ before export")
+	return DrawingResult.success(null, revision)
+
+
 ## Caller gets a detached hierarchical snapshot. Import cannot alias tile dictionaries.
 func export_subtree(node_id: String) -> DrawingResult:
 	if node_id == ROOT_ID or not _nodes.has(node_id):
@@ -1885,6 +1902,10 @@ func export_subtree(node_id: String) -> DrawingResult:
 	# A detached transfer cannot drop unresolved tile references. Resolve or fail.
 	var ids: Array[String] = []
 	_gather_ids(node_id, ids)
+	var initial_revision: int = revision
+	var authorized: DrawingResult = _preflight_native_subtree_export(ids)
+	if not authorized.ok:
+		return authorized
 	for child_id: String in ids:
 		if _nodes[child_id].kind != DrawingLayerNode.RASTER:
 			continue
@@ -1892,6 +1913,13 @@ func export_subtree(node_id: String) -> DrawingResult:
 			var loaded: DrawingResult = _resolve_chunk(child_id, tile_id)
 			if not loaded.ok:
 				return loaded
+			if revision != initial_revision:
+				return DrawingResult.failure("STALE_REVISION", "Subtree changed during lazy export")
+	# A lazy provider may mutate resident bytes without advancing revision;
+	# recheck full RGBA8 (including hidden RGB) before detaching the tree.
+	authorized = _preflight_native_subtree_export(ids)
+	if not authorized.ok:
+		return authorized
 	var exported: Dictionary[String, DrawingLayerNode] = {}
 	_collect_subtree(node_id, exported)
 	return DrawingResult.success({"root": node_id, "nodes": exported}, revision)
