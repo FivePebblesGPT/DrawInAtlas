@@ -5,11 +5,12 @@ BUNDLE ?=
 GODOT ?= godot
 CARGO ?= cargo
 UV ?= uv
+RUST_BIN ?=
 BUNDLE_OUT ?= .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
 -include local.mk
 
 TOOL = $(PYTHON) tools/toolchain.py
-WITH_TOOL = GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" $(TOOL) exec --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)" --
+WITH_TOOL = GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" RUST_BIN="$(RUST_BIN)" $(TOOL) exec --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)" --
 RUFF_VERSION := $(shell $(PYTHON) tools/toolchain.py pin ruff)
 TY_VERSION := $(shell $(PYTHON) tools/toolchain.py pin ty)
 
@@ -21,7 +22,7 @@ help:
 	  'make atlas / build / test / check / lint / doctor / bundle / bundle-check'
 
 doctor:
-	@GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" $(TOOL) doctor --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)"
+	@GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" RUST_BIN="$(RUST_BIN)" $(TOOL) doctor --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)"
 
 native:
 	@$(WITH_TOOL) bash tools/build_native_brush.sh
@@ -32,10 +33,12 @@ stage-drawing: native
 
 import-drawing: stage-drawing
 	@$(WITH_TOOL) godot --headless --editor --path drawing --import --quit
+	@$(WITH_TOOL) godot --headless --path drawing --script res://tests/native_extension_ready.gd
 
 import-atlas: native
 	@$(PYTHON) tools/prepare_native_project.py .
 	@$(WITH_TOOL) godot --headless --editor --path . --import --quit
+	@$(WITH_TOOL) godot --headless --path . --script res://drawing/tests/native_extension_ready.gd
 
 drawing: import-drawing
 	@$(WITH_TOOL) godot --path drawing
