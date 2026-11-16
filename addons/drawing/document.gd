@@ -1039,7 +1039,7 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 ## Read and compare originals before publication, then detach only touched tiles.
 func _publish_edit(layer_id: String, expected: int,
 		before: Dictionary[String, int], after: Dictionary[String, int],
-		record_history: bool = true) -> DrawingResult:
+		record_history: bool = true, track_unrecorded: bool = true) -> DrawingResult:
 	if revision != expected:
 		return DrawingResult.failure("STALE_REVISION", "Concurrent edit invalidated the gesture")
 	if not _nodes.has(layer_id) or not _editable(layer_id):
@@ -1094,7 +1094,7 @@ func _publish_edit(layer_id: String, expected: int,
 			rect[3] = maxi(int(rect[3]), y)
 
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, false, sources)
+		detached, bounds, record_history, false, sources, track_unrecorded)
 
 
 ## Shared atomic installation, history and dirty-region publication for both
@@ -1104,7 +1104,8 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		detached: Dictionary[String, DrawingRasterTile],
 		bounds: Dictionary[String, Array], record_history: bool,
 		owned_history_maps: bool = false,
-		sources: Dictionary[String, Variant] = {}) -> DrawingResult:
+		sources: Dictionary[String, Variant] = {},
+		track_unrecorded: bool = true) -> DrawingResult:
 	# All source resolution must have finished before the native commit. Do not
 	# call a lazy provider after Rust accepts an external tile transaction.
 	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id):
@@ -1118,10 +1119,10 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		var rect: Array = bounds[key]
 		result.regions.append(DrawingDirtyRegion.new(layer_id, int(rect[0]), int(rect[1]),
 			int(rect[2]) - int(rect[0]) + 1, int(rect[3]) - int(rect[1]) + 1))
-	# Legacy direct-session fixtures without a native store retain their pixel
-	# delta format. Once a persistent store exists, ordinary raster edits join
-	# the same Rust revision/history stack as Brush/Eraser via whole RGBA8 tiles.
-	var adopt: bool = record_history and _native_raster_store != null \
+	# Once Rust owns this document, even a non-historical direct raster edit
+	# must advance its canonical tiles in the same revision. Untracked edits
+	# invalidate native Undo tokens; they never invent a history event.
+	var adopt: bool = _native_raster_store != null \
 		and int(_native_raster_store.call("stats").get("revision", -1)) == expected
 	var originals: Dictionary[String, PackedByteArray] = {}
 	var replacements: Dictionary[String, PackedByteArray] = {}
@@ -1154,11 +1155,13 @@ func _install_prepared_edit(layer_id: String, expected: int,
 			return DrawingResult.failure("NATIVE_TILES", "Native raster layer rejected")
 		# The call is failure-atomic on the Rust side. The document projection
 		# then installs only detached tiles, with no fallible source lookups.
-		var accepted: Dictionary = _native_raster_store.call("adopt_external_edit",
+		var native_method: String = "adopt_external_edit" if record_history else "adopt_untracked_edit"
+		var accepted: Dictionary = _native_raster_store.call(native_method,
 			layer_id, expected, descriptors)
 		if not bool(accepted.get("ok", false)) or int(accepted.get("revision", -1)) != expected + 1:
 			return DrawingResult.failure("NATIVE_TILES", str(accepted.get("error", "Native adoption failed")))
-		result.delta.native_history_token = int(accepted.get("history_token", 0))
+		if record_history:
+			result.delta.native_history_token = int(accepted.get("history_token", 0))
 	else:
 		result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
 			else DrawingDelta.new(layer_id, before, after)
@@ -1178,6 +1181,11 @@ func _install_prepared_edit(layer_id: String, expected: int,
 			_mark_untracked_change()
 		else:
 			_append_event({"kind": "content", "delta": result.delta}, true)
+	elif track_unrecorded:
+		# A new no-history raster edit is still unsaved document content and
+		# must invalidate a branched Redo timeline. Detached Undo/Redo replay
+		# passes track_unrecorded=false to retain the existing history cursor.
+		_mark_untracked_change()
 	_display_changes.append({"revision": revision, "regions": result.regions.duplicate()})
 	if _display_changes.size() > DISPLAY_CHANGE_LIMIT:
 		_display_changes.pop_front()
@@ -1501,7 +1509,7 @@ func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
 	else:
 		result = _publish_edit(delta.layer_id, revision,
 			delta.after if undo_action else delta.before,
-			delta.before if undo_action else delta.after, false)
+			delta.before if undo_action else delta.after, false, false)
 	if result.ok and external_history:
 		_mark_untracked_change()
 	return result

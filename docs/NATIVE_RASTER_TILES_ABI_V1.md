@@ -49,6 +49,23 @@ benchmarks are not current correctness or timing oracles.
   authority or a valid portable manifest. The current guard is not a claim
   that every non-Brush raster producer is universally native-owned.
 
+- **Nonhistorical direct source ownership (T-162):** With an in-sync Rust
+  store, `DrawingDocument._publish_edit` and `_publish_tile_edit` publish full
+  before/after RGBA8 even when `record_history=false` using
+  `DrawingNativeTiles.adopt_untracked_edit`. This accepts the same checked
+  tile descriptors and source identities as `adopt_external_edit`, but returns
+  `history_token=0`; Rust atomically advances the revision and retains all
+  unrelated resident sources while clearing invalidated native Undo/Redo
+  tokens. Godot installs its detached display/save tiles only after Rust
+  succeeds; no local or Atlas history event is synthesized. New untracked
+  content still updates Godot's unsaved-change state and invalidates local
+  Redo, while detached historical `_publish_edit` replay explicitly skips
+  re-marking content dirty so it can preserve the preexisting history cursor.
+  With no attached
+  store, historical nonnative publishing remains unchanged. Rejected native
+  transactions do not modify either source or revision; stale/out-of-sync
+  stores still follow T-148's conservative external rebase boundary.
+
 - **Public signed anchor guard (T-161):** The legacy-compatible
   `DrawingDocument.begin_edit`, `DrawingRenderer.render` and
   `DrawingRasterImport.import_image` entry points reject anchors outside
@@ -87,6 +104,7 @@ The new path uses **the same** `DrawingNativeBrush` object as T-147. In Godot `O
 | `brush.commit_tiles` | `tiles,handle,revision,transaction` | `{ok,dirty_tiles,revision,history_token}`; the positive token names its native history entry for a changed gesture, and validates matching layer/revision and fully acknowledged stroke, then atomically publishes tiles/history and consumes brush handle; a failed validation leaves draft/handle retryable; a no-op returns `{ok:true,no_change:true,dirty_tiles:0,revision:original}` |
 | `tiles.discard_edit` + `brush.abort_stroke` | `transaction` / `handle` | `bool`; discard both halves of a cancelled edit |
 | `tiles.adopt_external_edit` | `layer, revision, Array[Dictionary]([{tile_x:i64,tile_y:i64,before:PackedByteArray,after:PackedByteArray},...])` | `{ok,history_token,tiles,revision}` on success; all-or-nothing, 1–128 distinct tiles, validated preimages and full `stride²*4` replacement spans; empty `before` explicitly denotes a blank source, no change and malformed spans reject; no active native stroke; GDScript must preflight before invoking |
+| `tiles.adopt_untracked_edit` | Same bounded `layer, revision, tiles` descriptors as `adopt_external_edit` | `{ok, history_token:0, tiles, revision}` on success; atomically stores canonical source and advances revision without adding Undo. Clears obsolete native token stacks; GDScript records no local/host history entry. Malformed, stale, repeated, mismatched and active edits reject before mutating Rust canonical tiles |
 | `tiles.undo_edit`, `tiles.redo_edit` | — | `{ok,tiles,revision}`; direct native-only history transactions |
 | `tiles.has_history_token` | `history_token:int, expected_revision:int, undo:bool` | `bool`; side-effect-free history-top identity check before document timeline replay |
 | `tiles.replay_history_token` | `history_token:int, expected_revision:int, undo:bool` | `{ok,token,tiles,revision}`; checked native replay, rejects wrong token/stale revision with no mutation |

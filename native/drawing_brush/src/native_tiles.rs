@@ -1135,9 +1135,8 @@ impl DrawingNativeTiles {
         self.store.parked_layers.contains(&layer.to_string())
     }
 
-    /// One bounded FFI call for a preflighted external raster edit. The
-    /// document installs detached display/save tiles only after this returns.
-    /// Entries: tile_x/y, before/after PackedByteArray (empty before = blank).
+    /// Record a bounded, atomic external raster transaction in Rust history.
+    /// The GDScript projection installs detached tiles only after success.
     #[func]
     fn adopt_external_edit(
         &mut self,
@@ -1145,50 +1144,20 @@ impl DrawingNativeTiles {
         expected_revision: i64,
         tiles: Array<Dictionary<Variant, Variant>>,
     ) -> Dictionary<Variant, Variant> {
-        self.store.ffi_calls += 1;
-        if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
-            return err("Invalid external edit revision or tile count");
-        }
-        let mut changes = Vec::with_capacity(tiles.len());
-        for entry in tiles.iter_shared() {
-            let Some((x, y, before, after)) = (|| {
-                Some((
-                    entry.get("tile_x")?.try_to::<i64>().ok()?,
-                    entry.get("tile_y")?.try_to::<i64>().ok()?,
-                    entry.get("before")?.try_to::<PackedByteArray>().ok()?,
-                    entry.get("after")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed external tile descriptor");
-            };
-            self.store.external_bytes_received = self
-                .store
-                .external_bytes_received
-                .saturating_add(before.len().saturating_add(after.len()) as u64);
-            changes.push((
-                TileId {
-                    layer: layer.to_string(),
-                    x,
-                    y,
-                },
-                before.as_slice().to_vec(),
-                after.as_slice().to_vec(),
-            ));
-        }
-        match self
-            .store
-            .adopt_external(&layer.to_string(), expected_revision as u64, changes)
-        {
-            Ok((token, count)) => {
-                let mut result = Dictionary::new();
-                result.set("ok", true);
-                result.set("history_token", token);
-                result.set("tiles", count as i64);
-                result.set("revision", self.store.revision as i64);
-                result
-            }
-            Err(message) => err(message),
-        }
+        self.commit_external_tiles(layer, expected_revision, tiles, true)
+    }
+
+    /// Update canonical native tiles without inventing an Undo token when the
+    /// document explicitly chooses non-historical publication. Old Rust tokens
+    /// must be invalidated; detached document history remains checkable.
+    #[func]
+    fn adopt_untracked_edit(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+    ) -> Dictionary<Variant, Variant> {
+        self.commit_external_tiles(layer, expected_revision, tiles, false)
     }
 
     #[func]
@@ -1597,6 +1566,67 @@ impl DrawingNativeTiles {
 }
 
 impl DrawingNativeTiles {
+    fn commit_external_tiles(
+        &mut self,
+        layer: GString,
+        expected_revision: i64,
+        tiles: Array<Dictionary<Variant, Variant>>,
+        record_history: bool,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
+            return err("Invalid external edit revision or tile count");
+        }
+        let mut changes = Vec::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let Some((x, y, before, after)) = (|| {
+                Some((
+                    entry.get("tile_x")?.try_to::<i64>().ok()?,
+                    entry.get("tile_y")?.try_to::<i64>().ok()?,
+                    entry.get("before")?.try_to::<PackedByteArray>().ok()?,
+                    entry.get("after")?.try_to::<PackedByteArray>().ok()?,
+                ))
+            })() else {
+                return err("Malformed external tile descriptor");
+            };
+            self.store.external_bytes_received = self
+                .store
+                .external_bytes_received
+                .saturating_add(before.len().saturating_add(after.len()) as u64);
+            changes.push((
+                TileId {
+                    layer: layer.to_string(),
+                    x,
+                    y,
+                },
+                before.as_slice().to_vec(),
+                after.as_slice().to_vec(),
+            ));
+        }
+        let result = if record_history {
+            self.store
+                .adopt_external(&layer.to_string(), expected_revision as u64, changes)
+        } else {
+            self.store.apply_external_tiles(
+                &layer.to_string(),
+                expected_revision as u64,
+                changes,
+                false,
+            )
+        };
+        match result {
+            Ok((token, count)) => {
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("history_token", token);
+                result.set("tiles", count as i64);
+                result.set("revision", self.store.revision as i64);
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+
     fn replay(&mut self, undo: bool) -> Dictionary<Variant, Variant> {
         self.store.ffi_calls += 1;
         match self.store.undo_or_redo(undo) {
@@ -1681,6 +1711,109 @@ mod tests {
         assert_eq!(store.read(&id, false).unwrap().rgba, source);
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.read(&id, false).unwrap().rgba, preview.clone());
+    }
+
+    #[test]
+    fn untracked_external_commit_is_atomic_and_preserves_native_source() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let initial = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let brush = store.begin("ink", 0, false).unwrap();
+        store
+            .stage(
+                brush,
+                0,
+                0,
+                0,
+                &[0, 0],
+                false,
+                0xff443322,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(brush, 0).unwrap();
+        let brush_bytes = store.read(&initial, false).unwrap().rgba.clone();
+        store.editable_layers.insert("overlay".into(), true);
+        let id = TileId {
+            layer: "overlay".into(),
+            x: -1,
+            y: 0,
+        };
+        let mut hidden = vec![0; 16 * 16 * 4];
+        hidden[0..4].copy_from_slice(&0x00123456_u32.to_le_bytes());
+        let good = vec![(id.clone(), vec![], hidden.clone())];
+        for invalid in [
+            vec![(id.clone(), vec![1; 3], hidden.clone())],
+            vec![(id.clone(), vec![], vec![1; 3])],
+            vec![
+                (id.clone(), vec![], hidden.clone()),
+                (id.clone(), vec![], hidden.clone()),
+            ],
+        ] {
+            assert!(
+                store
+                    .apply_external_tiles("overlay", 1, invalid, false)
+                    .is_err()
+            );
+            assert_eq!(store.revision, 1);
+            assert_eq!(store.read(&initial, false).unwrap().rgba, brush_bytes);
+            assert!(!store.authorized.contains(&id));
+            assert!(store.history_matches(brush, true));
+        }
+        assert!(
+            store
+                .apply_external_tiles("overlay", 0, good.clone(), false)
+                .is_err()
+        );
+        let (token, count) = store
+            .apply_external_tiles("overlay", 1, good, false)
+            .unwrap();
+        assert_eq!((token, count), (0, 1));
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&id, false).unwrap().rgba, hidden);
+        assert_eq!(store.read(&initial, false).unwrap().rgba, brush_bytes);
+        assert!(store.undo.is_empty() && store.redo.is_empty());
+        assert!(!store.history_matches(brush, true));
+        assert!(store.authorized.contains(&id));
+        // A newer recorded edit can reuse the retained source, without a
+        // document-only rebase or an invented Undo token for the old one.
+        let next = store.begin("ink", 2, false).unwrap();
+        let mut newer_hidden = hidden.clone();
+        newer_hidden[4..8].copy_from_slice(&0x00112233_u32.to_le_bytes());
+        assert!(
+            store
+                .apply_external_tiles(
+                    "overlay",
+                    2,
+                    vec![(id.clone(), hidden.clone(), newer_hidden)],
+                    false,
+                )
+                .is_err()
+        );
+        assert_eq!(store.revision, 2);
+        assert_eq!(store.read(&id, false).unwrap().rgba, hidden);
+        store
+            .stage(
+                next,
+                2,
+                0,
+                0,
+                &[0, 0],
+                false,
+                0xff332211,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(next, 2).unwrap();
+        assert_eq!(store.revision, 3);
+        assert!(store.history_matches(next, true));
+        assert_eq!(store.read(&id, false).unwrap().rgba, hidden);
     }
 
     #[test]
