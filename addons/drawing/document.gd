@@ -88,11 +88,11 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 		_native_source_identities.clear()
 
 
-## Public metadata-only operations must acquire the native revision *before*
-## mutating Godot's tree. The older post-mutation bridge is still used by
-## internal semantic paths; it can detach on failure, which must never be the
-## outcome of a rejected public layer command. No callbacks or allocations
-## occur between this checked native step and the deterministic tree write.
+## Public metadata and semantic operations acquire the native revision *before*
+## mutating Godot's tree or objects. The older post-mutation bridge remains
+## for internal structural-history and semantic-only detached import paths;
+## public failure must never detach canonical Rust source. No callbacks occur
+## between the checked native step and the deterministic live-state write.
 func _advance_checked_layer_metadata() -> DrawingResult:
 	if _native_raster_store != null:
 		if not _attached_native_revision_matches(revision):
@@ -577,9 +577,11 @@ func set_density(numerator: int, denominator: int) -> DrawingResult:
 	if _content_committed and (numerator != density_numerator or denominator != density_denominator):
 		return DrawingResult.failure("RESAMPLE_REQUIRED", "Density is frozen after the first content commit")
 	if numerator != density_numerator or denominator != density_denominator:
+		var advanced: DrawingResult = _advance_checked_layer_metadata()
+		if not advanced.ok:
+			return advanced
 		density_numerator = numerator
 		density_denominator = denominator
-		_advance_nonraster_revision()
 		_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
@@ -1653,8 +1655,11 @@ func add_object(layer_id: String, data: Dictionary, requested_id: String = "") -
 	var object_id: String = requested_id if not requested_id.is_empty() else new_id()
 	if _nodes[layer_id].objects.has(object_id):
 		return DrawingResult.failure("DUPLICATE_ID", "Object ID already exists")
-	_nodes[layer_id].objects[object_id] = data.duplicate(true)
-	_advance_nonraster_revision()
+	var copied: Dictionary = data.duplicate(true)
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
+	_nodes[layer_id].objects[object_id] = copied
 	_mark_untracked_change()
 	_content_committed = true
 	return DrawingResult.success(object_id, revision)
@@ -1667,8 +1672,10 @@ func move_object(layer_id: String, object_id: String, position: Vector2) -> Draw
 		return DrawingResult.failure("OBJECT", "Missing object or invalid position")
 	var updated: Dictionary = _nodes[layer_id].objects[object_id].duplicate(true)
 	updated["position"] = position
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
 	_nodes[layer_id].objects[object_id] = updated
-	_advance_nonraster_revision()
 	_mark_untracked_change()
 	return DrawingResult.success(null, revision)
 
@@ -1710,12 +1717,16 @@ func commit_text(layer_id: String, draft: DrawingTextElement,
 	after.text_value = draft.content
 	if not created and before.text_element != null and before.text_element.to_record() == draft.to_record():
 		return DrawingResult.success(layer_id, revision)
+	# The entire semantic tree projection is detached and validated. Acquire
+	# the native metadata revision before touching live nodes or local history.
+	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	if not advanced.ok:
+		return advanced
 	if created:
 		_nodes[node.id] = after
 		_nodes[parent_id].children.append(layer_id)
 	else:
 		_nodes[layer_id] = after
-	_advance_nonraster_revision()
 	_content_committed = true
 	if external_history:
 		_mark_untracked_change()

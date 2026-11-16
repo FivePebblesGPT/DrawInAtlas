@@ -396,3 +396,18 @@ transition advances both stores once, retains native Undo but invalidates
 branched native Redo. No-op commands do not advance. Native-absent metadata
 commands remain available until T-150. This is not a universal host-history
 protocol; see [T-173 evidence](evidence/T-173-2026-11-16-native-layer-metadata.md).
+
+**T-174 checked public semantic/density boundary (2026-11-16):**
+`DrawingDocument.add_object`, `move_object`, `commit_text` and `set_density`
+now prepare/validate new semantic values and then call the same
+`_advance_checked_layer_metadata()` bridge as T-173 **before** publishing
+Godot object dictionaries, text layer creation/edits, local text Undo entries
+or density factors. With an attached `DrawingNativeTiles`, it rejects a
+native-ahead revision (`STALE_REVISION`) or active transaction
+(`NATIVE_METADATA`) without changing document state or disconnecting Rust.
+No-op text/density requests bypass the native transition. A successful
+semantic change increments the shared revision once and retains existing
+native source bytes/Undo tokens; new semantic edits discard branched Redo.
+A native-absent document retains the pre-T-150 behavior. Structural-history
+replay and semantic-only detached subtree import are **not** made universal
+by this checkpoint; see [T-174 evidence](evidence/T-174-2026-11-16-native-semantic-preflight.md).

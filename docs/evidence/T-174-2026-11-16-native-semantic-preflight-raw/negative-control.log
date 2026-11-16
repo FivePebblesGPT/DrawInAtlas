@@ -1,0 +1,29 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T174_SEMANTIC_FAILED: busy rejects add object
+T174_SEMANTIC_FAILED: busy rejects move object
+T174_SEMANTIC_FAILED: busy rejects text edit
+T174_SEMANTIC_FAILED: busy rejects text create
+T174_SEMANTIC_FAILED: busy preserves document and host history revisions
+T174_SEMANTIC_FAILED: busy leaves semantic values and node membership unchanged
+T174_SEMANTIC_FAILED: busy retains Rust attachment, RGBA8 and native tokens
+T174_SEMANTIC_FAILED: object addition retries
+T174_SEMANTIC_FAILED: text creation retries
+T174_SEMANTIC_FAILED: all successful semantic writes retain native history and canonical bytes
+T174_SEMANTIC_FAILED: text creation Undo uses shared revision
+T174_SEMANTIC_FAILED: text creation Redo uses shared revision
+T174_SEMANTIC_FAILED: later Hokusai edit reuses existing native store
+T174_SEMANTIC_FAILED: ahead rejects add object
+T174_SEMANTIC_FAILED: ahead rejects move object
+T174_SEMANTIC_FAILED: ahead rejects text edit
+T174_SEMANTIC_FAILED: ahead rejects text create
+T174_SEMANTIC_FAILED: ahead preserves document and host history revisions
+T174_SEMANTIC_FAILED: ahead leaves semantic values and node membership unchanged
+T174_SEMANTIC_FAILED: ahead retains Rust attachment, RGBA8 and native tokens
+T174_SEMANTIC_FAILED: native-ahead rejection leaves both revisions untouched
+T174_SEMANTIC_FAILED: busy density rejects before changing factors
+T174_SEMANTIC_FAILED: density retries with shared revision
+T174_SEMANTIC_FAILED: density native store advanced ahead
+T174_SEMANTIC_FAILED: native-ahead density is failure-atomic
+T174_SEMANTIC_RESULT checks=48 failures=25

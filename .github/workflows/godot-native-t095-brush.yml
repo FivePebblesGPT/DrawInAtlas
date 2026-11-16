@@ -340,6 +340,15 @@ jobs:
             2>&1 | tee /tmp/t173-native-metadata.log
           python3 tools/check_godot_model_log.py /tmp/t173-native-metadata.log \
             --marker T173_METADATA_PASSED
+      - name: T-174 native-attached semantic and density revision rejection
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t174_semantic_native_preflight.gd \
+            2>&1 | tee /tmp/t174-native-semantic.log
+          python3 tools/check_godot_model_log.py /tmp/t174-native-semantic.log \
+            --marker T174_SEMANTIC_PASSED
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail
