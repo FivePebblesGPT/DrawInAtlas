@@ -1,0 +1,32 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T176_STRUCTURAL_FAILED: rename busy native source rejects Undo
+T176_STRUCTURAL_FAILED: rename rejected Undo changes neither tree nor history/source
+T176_STRUCTURAL_FAILED: rename Undo retries with shared native revision
+T176_STRUCTURAL_FAILED: rename holds Redo transaction
+T176_STRUCTURAL_FAILED: visibility busy native source rejects Undo
+T176_STRUCTURAL_FAILED: visibility rejected Undo changes neither tree nor history/source
+T176_STRUCTURAL_FAILED: visibility Undo retries with shared native revision
+T176_STRUCTURAL_FAILED: visibility holds Redo transaction
+T176_STRUCTURAL_FAILED: lock busy native source rejects Undo
+T176_STRUCTURAL_FAILED: lock rejected Undo changes neither tree nor history/source
+T176_STRUCTURAL_FAILED: lock Undo retries with shared native revision
+T176_STRUCTURAL_FAILED: lock holds Redo transaction
+T176_STRUCTURAL_FAILED: reorder busy native source rejects Undo
+T176_STRUCTURAL_FAILED: reorder rejected Undo changes neither tree nor history/source
+T176_STRUCTURAL_FAILED: reorder Undo retries with shared native revision
+T176_STRUCTURAL_FAILED: reorder holds Redo transaction
+T176_STRUCTURAL_FAILED: create busy native source rejects Undo
+T176_STRUCTURAL_FAILED: create rejected Undo changes neither tree nor history/source
+T176_STRUCTURAL_FAILED: create Undo retries with shared native revision
+T176_STRUCTURAL_FAILED: create holds Redo transaction
+T176_STRUCTURAL_FAILED: remove busy native source rejects Undo
+T176_STRUCTURAL_FAILED: remove rejected Undo changes neither tree nor history/source
+T176_STRUCTURAL_FAILED: remove Undo retries with shared native revision
+T176_STRUCTURAL_FAILED: remove holds Redo transaction
+T176_STRUCTURAL_FAILED: native-ahead structural replay rejects without detaching Rust
+T176_STRUCTURAL_RESULT checks=81 failures=25

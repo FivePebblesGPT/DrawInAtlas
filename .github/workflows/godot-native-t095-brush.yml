@@ -360,6 +360,17 @@ jobs:
             2>&1 | tee /tmp/t175-native-semantic-import.log
           python3 tools/check_godot_model_log.py /tmp/t175-native-semantic-import.log \
             --marker T175_SEMANTIC_IMPORT_PASSED
+      - name: T-176 checked semantic structural Undo/Redo against native history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 180s \
+            godot --headless --editor --path drawing --import --quit
+          timeout --signal=TERM --kill-after=5s 120s \
+            godot --headless --audio-driver Dummy --path drawing \
+            --script res://tests/t176_structural_history_native_fence.gd \
+            2>&1 | tee /tmp/t176-structural-native-history.log
+          python3 tools/check_godot_model_log.py /tmp/t176-structural-native-history.log \
+            --marker T176_STRUCTURAL_PASSED
       - name: T-153 graphical native Canvas source/history cutover
         run: |
           set -euo pipefail

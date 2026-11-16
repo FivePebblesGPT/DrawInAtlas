@@ -424,3 +424,17 @@ revision, then installs its prepared group/text/object tree as an untracked
 change. Historical native-absent imports are unchanged. This does **not** fix
 internal structure replay or the host-owned detached history timeline; see
 [T-175 evidence](evidence/T-175-2026-11-16-semantic-import-fence.md).
+
+**T-176 checked semantic structural history replay (2026-11-16):**
+Local `DrawingDocument._replay_structure()` now prevalidates its target and
+acquires the attached Rust `advance_metadata_revision(revision, false)`
+**before** changing property fields, ordering, or semantic-only create/remove
+trees. A busy native edit rejects as `NATIVE_METADATA`, a divergent native
+revision rejects as `STALE_REVISION`, leaving the local Undo/Redo cursor,
+revision, nodes and canonical full RGBA8/Undo tokens unchanged. Successful
+replay increments Rust and Godot exactly once and keeps native Redo rather
+than treating the replay as a new branched edit. The same method retains
+`discard_redo=true` for public new metadata writes. Native-absent structural
+history continues to work until T-150. Raster-bearing structural replay,
+text-to-raster transitions and host-owned detached timeline remain separate
+T-148 gates; see [T-176 evidence](evidence/T-176-2026-11-16-semantic-history.md).

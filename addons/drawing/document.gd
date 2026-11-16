@@ -93,11 +93,11 @@ func _advance_nonraster_revision(discard_redo: bool = true) -> void:
 ## for internal structural-history paths; public and detached-import
 ## failure must never detach canonical Rust source. No callbacks occur
 ## between the checked native step and the deterministic live-state write.
-func _advance_checked_layer_metadata() -> DrawingResult:
+func _advance_checked_layer_metadata(discard_redo: bool = true) -> DrawingResult:
 	if _native_raster_store != null:
 		if not _attached_native_revision_matches(revision):
 			return DrawingResult.failure("STALE_REVISION", "Native metadata revision diverged")
-		if not bool(_native_raster_store.call("advance_metadata_revision", revision, true)):
+		if not bool(_native_raster_store.call("advance_metadata_revision", revision, discard_redo)):
 			return DrawingResult.failure("NATIVE_METADATA", "Native metadata revision rejected")
 	revision += 1
 	return DrawingResult.success(null, revision)
@@ -1385,6 +1385,7 @@ func _finish_structure(record_history: bool, event: Dictionary) -> void:
 ## modifying the tree. Content events are undone first in chronological order.
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 	var parked_replay: bool = false
+	var metadata_advanced: bool = false
 	var node_id: String = event["id"]
 	var op: String = event["op"]
 	if op == "property":
@@ -1395,6 +1396,12 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		var target: Variant = event["before"] if undo_action else event["after"]
 		if _nodes[node_id].get(field) != expected:
 			return DrawingResult.failure("HISTORY_TARGET", "Structural property diverged")
+		# History replay must acquire Rust's metadata revision before touching
+		# the node, without invalidating the native redo timeline.
+		var metadata: DrawingResult = _advance_checked_layer_metadata(false)
+		if not metadata.ok:
+			return metadata
+		metadata_advanced = true
 		_nodes[node_id].set(field, target)
 	elif op == "reorder":
 		var source: String = event["new_parent"] if undo_action else event["old_parent"]
@@ -1404,6 +1411,10 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		if not _nodes.has(node_id) or not _nodes.has(source) or not _nodes.has(dest) or \
 			_nodes[node_id].parent_id != source or _nodes[source].children.find(node_id) != source_index:
 			return DrawingResult.failure("HISTORY_TARGET", "Structural order diverged")
+		var metadata: DrawingResult = _advance_checked_layer_metadata(false)
+		if not metadata.ok:
+			return metadata
+		metadata_advanced = true
 		_nodes[source].children.erase(node_id)
 		_nodes[dest].children.insert(dest_index, node_id)
 		_nodes[node_id].parent_id = dest
@@ -1427,6 +1438,15 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		elif not _nodes.has(node_id) or _nodes[node_id].parent_id != parent_id or \
 				_nodes[parent_id].children.find(node_id) != int(event["index"]):
 			return DrawingResult.failure("HISTORY_TARGET", "Removed subtree diverged")
+		# A semantic-only tree replay is another checked Rust revision boundary.
+		# The detached nodes and parent slot are validated above, so a rejected
+		# native transition cannot publish even a partial subtree.
+		if affected_raster.is_empty() and (op != "create" or
+				(event["node"] as DrawingLayerNode).kind != DrawingLayerNode.RASTER):
+			var metadata: DrawingResult = _advance_checked_layer_metadata(false)
+			if not metadata.ok:
+				return metadata
+			metadata_advanced = true
 		if bool(event.get("native_parked", false)) and not affected_raster.is_empty():
 			if restore and not _native_tree_sources_match(restored, true):
 				return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")
@@ -1468,8 +1488,8 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		for snapshot: DrawingLayerNode in (event["nodes"] as Dictionary).values():
 			if snapshot.kind == DrawingLayerNode.RASTER:
 				raster_layers.append(snapshot.id)
-	if op == "remove" and parked_replay:
-		pass # Native and document revisions already advanced at structural preflight.
+	if metadata_advanced or (op == "remove" and parked_replay):
+		pass # Rust and document revisions advanced at structural preflight.
 	elif raster_layers.is_empty():
 		_advance_nonraster_revision(false)
 	else:
