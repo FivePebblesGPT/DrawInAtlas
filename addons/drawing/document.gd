@@ -1961,7 +1961,17 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 	if imported_rasters.is_empty():
 		_advance_nonraster_revision()
 	else:
-		_advance_raster_structure_revision(imported_rasters)
+		# A rejected native bridge is not permission to publish a Godot-only
+		# subtree. Keep the detached projection uninstalled and allow retry.
+		# Every imported ID is new to this document, so Rust may advance only
+		# after proving that none is resident, parked or referenced in history.
+		if _native_raster_store != null:
+			if not _attached_native_revision_matches(revision):
+				return DrawingResult.failure("STALE_REVISION", "Native raster revision diverged before import")
+			if not bool(_native_raster_store.call("advance_unreferenced_layers_revision",
+					revision, PackedStringArray(imported_rasters), true)):
+				return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster import was rejected")
+		revision += 1
 	for identifier: String in prepared:
 		var imported: DrawingLayerNode = prepared[identifier]
 		_nodes[identifier] = imported

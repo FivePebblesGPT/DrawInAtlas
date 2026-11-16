@@ -1,0 +1,5 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T163_CLIPBOARD_RESULT checks=34 failures=0
+T163_CLIPBOARD_PASSED (34 checks; 0 failed)

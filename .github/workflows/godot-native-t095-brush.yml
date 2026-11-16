@@ -289,7 +289,9 @@ jobs:
             t165_attached_native_revision_fence:T165_FENCE_PASSED \
             t166_native_save_source_fence:T166_SAVE_FENCE_PASSED \
             t167_checked_native_dirty_snapshot:T167_SNAPSHOT_PASSED \
-            t168_native_subtree_removal_fence:T168_SUBTREE_PASSED; do
+            t168_native_subtree_removal_fence:T168_SUBTREE_PASSED \
+            t169_native_import_fence:T169_IMPORT_PASSED \
+            t148_import_subtree_native_revision:T148_IMPORT_RESULT; do
             name="${entry%%:*}"
             marker="${entry#*:}"
             timeout 150s godot --headless --path drawing --script "res://tests/${name}.gd" \

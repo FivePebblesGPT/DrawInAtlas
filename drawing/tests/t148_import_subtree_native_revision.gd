@@ -204,8 +204,8 @@ func run() -> void:
 		int(stale.read_pixel(original_id, 40, 40).value) != 0,
 		"old native bytes cannot bleed into reused source identity")
 	# Native metadata imports are intentionally bounded to 128 layer IDs.
-	# Larger snapshot transfers remain functional, but must take the safe
-	# native history-clearing rebase rather than a partial checked advance.
+	# Over-limit transfers must reject atomically when Rust is attached;
+	# silently publishing Godot-only nodes would discard native history.
 	var oversized: DrawingDocument = DrawingDocument.new("many-rasters", STRIDE)
 	var oversized_group: String = str(oversized.create_layer(
 		DrawingLayerNode.GROUP, "Bulk").value)
@@ -218,14 +218,19 @@ func run() -> void:
 	check(stroke(bulk, bulk_ink, Vector2(8, 8)).ok and too_many.ok,
 		"bounded-fallback fixture has native history and 129 raster layers")
 	var bulk_store: Object = bulk._native_raster_store
+	var bulk_base: int = bulk.revision
+	var bulk_history: int = int(bulk_store.call("stats").get("undo", -1))
+	var bulk_source: PackedByteArray = packed(bulk, bulk_ink, "0,0")
 	var bulk_import: DrawingResult = bulk.import_subtree(too_many.value, "root")
-	check(bulk_import.ok and bulk.list_children(str(bulk_import.value)).size() == 129 and
-		int(bulk_store.call("stats").get("revision", -1)) < bulk.revision,
-		"over-limit native bridge refuses partial advance; Godot import remains complete")
+	check(not bulk_import.ok and bulk_import.code == "NATIVE_STRUCTURE" and
+		bulk.revision == bulk_base and bulk.list_children("root") == [bulk_ink] and
+		int(bulk_store.call("stats").get("revision", -1)) == bulk_base,
+		"over-limit native bridge rejects the entire Godot import")
 	check(stroke(bulk, bulk_ink, Vector2(40, 40)).ok and
 		int(bulk_store.call("stats").get("revision", -1)) == bulk.revision and
-		int(bulk_store.call("stats").get("undo", -1)) == 1,
-		"post-overlimit gesture rebases once, never reuses stale native history")
+		int(bulk_store.call("stats").get("undo", -1)) == bulk_history + 1 and
+		packed(bulk, bulk_ink, "0,0") != bulk_source,
+		"post-rejection gesture preserves earlier native history without rebase")
 
 	print("T148_IMPORT_RESULT checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)
