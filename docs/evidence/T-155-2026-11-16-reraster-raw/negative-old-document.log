@@ -1,0 +1,13 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T155_RERASTER_FAILED: new conversion shares Rust revision without a history-clearing rebase
+T155_RERASTER_FAILED: stale glyph tombstone retired in the same transaction
+T155_RERASTER_FAILED: old native Godot source identity is released
+T155_RERASTER_FAILED: both unrelated Ink and replacement glyph tokens remain in one store
+T155_RERASTER_FAILED: active native transaction rejects replacement without mutating either store
+T155_RERASTER_FAILED: identical conversion retry succeeds after cancellation
+T155_RERASTER_FAILED: retry preserves unrelated ink token and hidden source bytes
+T155_RERASTER_FAILED: inject native-ahead revision without editing document
+T155_RERASTER_FAILED: ahead native authority rejects conversion without partial Godot publication
+T155_RERASTER_PASSED checks=32 failures=9

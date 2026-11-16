@@ -1483,6 +1483,9 @@ func commit_text(layer_id: String, draft: DrawingTextElement,
 		layer_id = requested_id if not requested_id.is_empty() else new_id()
 		if not valid_identifier(layer_id) or layer_id == ROOT_ID or _nodes.has(layer_id):
 			return DrawingResult.failure("LAYER_ID", "Invalid or duplicate text layer identity")
+		if _native_raster_store != null and bool(_native_raster_store.call(
+				"is_layer_parked", layer_id)):
+			return DrawingResult.failure("LAYER_ID", "Text ID is reserved by native structural history")
 		node = DrawingLayerNode.new(layer_id, DrawingLayerNode.TEXT, "Text: " + draft.content.split("\n")[0].left(36), parent_id)
 	else:
 		if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.TEXT or not _editable(layer_id):
@@ -1558,11 +1561,34 @@ func rasterize_text(layer_id: String, expected_revision: int) -> DrawingResult:
 			for channel: int in range(4):
 				rgba |= int(bytes[offset + channel]) << (channel * 8)
 			after.tiles[tile_key].set_rgba(local.x, local.y, rgba)
-	# Conversion creates a raster source at a previously semantic layer ID.
-	# If Rust has never authorized that ID, keep other layers' canonical tiles
-	# and native history. The guarded bridge falls back to a later rebase when
-	# the ID was previously painted/parked or the revision is stale.
-	_advance_raster_structure_revision([layer_id])
+	# A new semantic glyph source may reuse an ID that Rust parked when the
+	# *previous* text-to-raster conversion was undone. Its old canonical tiles
+	# and redo tokens no longer describe this source. Retire only that parked ID
+	# at one checked native revision boundary; preserve all other raster tokens.
+	# A current non-parked ID must still be provably unreferenced in Rust.
+	if _native_raster_store != null:
+		var native_revision: int = int(_native_raster_store.call("stats").get("revision", -1))
+		if native_revision > revision:
+			return DrawingResult.failure("STALE_REVISION", "Text conversion native store is ahead")
+		if native_revision == revision:
+			var ids: PackedStringArray = PackedStringArray([layer_id])
+			if bool(_native_raster_store.call("is_layer_parked", layer_id)):
+				if not bool(_native_raster_store.call(
+						"replace_parked_layers_revision", revision, ids)):
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Parked text source could not be replaced")
+				for identity: String in _native_source_identities.keys():
+					if identity.begins_with(layer_id + ":"):
+						_native_source_identities.erase(identity)
+			else:
+				if not bool(_native_raster_store.call(
+						"advance_unreferenced_layers_revision", revision, ids, true)):
+					return DrawingResult.failure("NATIVE_STRUCTURE", "Text ID has live native ownership")
+			revision += 1
+		else:
+			# An already-behind store is reauthorized on the next native edit.
+			_advance_raster_structure_revision([layer_id])
+	else:
+		_advance_raster_structure_revision([layer_id])
 	_nodes[layer_id] = after
 	for tile_key: String in after.tiles:
 		_dirty_tiles[layer_id + ":" + tile_key] = true

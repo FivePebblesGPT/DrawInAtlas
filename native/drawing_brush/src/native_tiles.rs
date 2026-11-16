@@ -744,6 +744,51 @@ impl TileStore {
         Ok(())
     }
 
+    /// A text raster may be undone to its semantic source and then re-rendered
+    /// with different glyphs. That new source must *replace*, never resurrect,
+    /// the prior parked native raster. Drop only the named layer's canonical
+    /// pixels, authorizations and obsolete history; keep unrelated Undo intact.
+    /// Redo is a branch from the former history and is always invalidated.
+    fn replace_parked_layers(
+        &mut self,
+        expected: u64,
+        layers: &[String],
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing parked replacement revision");
+        }
+        if layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return Err("Invalid replaced raster-layer count");
+        }
+        let mut ids = HashSet::with_capacity(layers.len());
+        if layers
+            .iter()
+            .any(|id| id.is_empty() || !ids.insert(id.as_str()) || !self.parked_layers.contains(id))
+        {
+            return Err("Replacement requires distinct parked raster-layer IDs");
+        }
+        // Full preflight above; no validation, callbacks or fallible allocations
+        // remain between removing the old source and advancing the revision.
+        self.tiles
+            .retain(|tile, _| !ids.contains(tile.layer.as_str()));
+        self.authorized
+            .retain(|tile| !ids.contains(tile.layer.as_str()));
+        self.editable_layers
+            .retain(|id, _| !ids.contains(id.as_str()));
+        self.parked_layers.retain(|id| !ids.contains(id.as_str()));
+        self.undo.retain(|event| {
+            !ids.contains(event.layer.as_str())
+                && !event
+                    .before
+                    .keys()
+                    .chain(event.after.keys())
+                    .any(|tile| ids.contains(tile.layer.as_str()))
+        });
+        self.redo.clear();
+        self.revision = expected + 1;
+        Ok(())
+    }
+
     /// Park or restore a history-backed raster subtree as a reversible tree
     /// mutation. Canonical tile bytes, authorizations and Undo/Redo tokens are
     /// deliberately not released: history can only address a parked layer
@@ -1067,6 +1112,21 @@ impl DrawingNativeTiles {
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
         self.store
             .advance_parked_layers(expected as u64, &ids, restore, discard_redo)
+            .is_ok()
+    }
+
+    /// Checked semantic re-rasterization of previously parked native IDs.
+    /// The next glyph source is produced by Godot and imported lazily only
+    /// after the obsolete Rust source/history is selectively retired.
+    #[func]
+    fn replace_parked_layers_revision(&mut self, expected: i64, layers: PackedStringArray) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0 || layers.is_empty() || layers.len() > MAX_ACTIVE_TILES {
+            return false;
+        }
+        let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
+        self.store
+            .replace_parked_layers(expected as u64, &ids)
             .is_ok()
     }
 
@@ -2030,6 +2090,81 @@ mod tests {
                 .iter()
                 .all(|pixel| *pixel == 0)
         );
+    }
+
+    #[test]
+    fn parked_text_raster_replacement_preserves_unrelated_history_atomically() {
+        let mut store = initialized(16);
+        store.editable_layers.insert("glyph".into(), true);
+        let ink = TileId {
+            layer: "ink".into(),
+            x: -3,
+            y: 0,
+        };
+        let glyph = TileId {
+            layer: "glyph".into(),
+            x: 0,
+            y: 1,
+        };
+        let mut ink_rgba = vec![0; 16 * 16 * 4];
+        ink_rgba[..4].copy_from_slice(&0x00123456_u32.to_le_bytes());
+        let mut glyph_rgba = vec![0; 16 * 16 * 4];
+        glyph_rgba[..4].copy_from_slice(&0xff667788_u32.to_le_bytes());
+        let (ink_token, _) = store
+            .adopt_external("ink", 0, vec![(ink.clone(), Vec::new(), ink_rgba.clone())])
+            .unwrap();
+        let (glyph_token, _) = store
+            .adopt_external("glyph", 1, vec![(glyph.clone(), Vec::new(), glyph_rgba)])
+            .unwrap();
+        store.undo_or_redo(true).unwrap();
+        store
+            .advance_parked_layers(3, &["glyph".into()], false, false)
+            .unwrap();
+        // A history-only metadata bridge may still retain glyph Redo; the
+        // changed-source replacement must clear it independently.
+        store.advance_metadata(4, false).unwrap();
+        assert_eq!(store.redo.len(), 1);
+        let retained = store.read(&ink, false).unwrap().rgba.clone();
+        let baseline = (store.revision, store.bytes_used(), store.undo.len());
+        for (expected, ids) in [
+            (4, vec!["glyph".into()]),
+            (5, vec!["glyph".into(), "glyph".into()]),
+            (5, vec![String::new()]),
+            (5, vec!["glyph".into(), "ink".into()]),
+            (5, vec!["missing".into()]),
+            (5, vec!["glyph".into(); MAX_ACTIVE_TILES + 1]),
+        ] {
+            assert!(store.replace_parked_layers(expected, &ids).is_err());
+            assert_eq!(
+                (store.revision, store.bytes_used(), store.undo.len()),
+                baseline
+            );
+            assert!(store.parked_layers.contains("glyph"));
+            assert!(store.authorized.contains(&glyph));
+        }
+        let active = store.begin("ink", 5, false).unwrap();
+        assert!(store.replace_parked_layers(5, &["glyph".into()]).is_err());
+        assert!(store.transaction_matches(active, 5, "ink"));
+        store.active = None;
+        store.replace_parked_layers(5, &["glyph".into()]).unwrap();
+        assert_eq!(store.revision, 6);
+        assert!(!store.parked_layers.contains("glyph"));
+        assert!(!store.tiles.contains_key(&glyph));
+        assert!(!store.authorized.contains(&glyph));
+        assert!(!store.history_matches(glyph_token, false));
+        assert!(store.redo.is_empty());
+        assert!(store.history_matches(ink_token, true));
+        assert_eq!(store.read(&ink, false).unwrap().rgba, retained);
+        assert!(store.replace_parked_layers(6, &["glyph".into()]).is_err());
+        // The replacement glyph's source can be freshly authorized, while
+        // hidden RGB from the unrelated native Ink survives exact Undo/Redo.
+        let mut replacement = vec![0; 16 * 16 * 4];
+        replacement[..4].copy_from_slice(&0x00a1b2c3_u32.to_le_bytes());
+        store.import(glyph.clone(), 6, &replacement).unwrap();
+        assert_eq!(store.read(&glyph, false).unwrap().rgba, replacement);
+        store.undo_or_redo(true).unwrap();
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.read(&ink, false).unwrap().rgba, retained);
     }
 
     #[test]
