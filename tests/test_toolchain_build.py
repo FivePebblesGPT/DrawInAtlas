@@ -13,6 +13,7 @@ from tools.toolchain import (
     LOCK_PATH,
     ROOT,
     ToolchainError,
+    download,
     pins,
     select_tar_path,
     sha256_file,
@@ -30,6 +31,18 @@ class ToolchainTests(unittest.TestCase):
             self.assertEqual(len(lock[section]["sha256"]), 64)
             int(lock[section]["sha256"], 16)
             self.assertTrue(lock[section]["url"].startswith("https://"))
+
+    def test_pinned_local_archive_without_network(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "source.zip"
+            destination = Path(temp) / "download.zip"
+            source.write_bytes(b"verified bytes")
+            digest = hashlib.sha256(b"verified bytes").hexdigest()
+            download("https://example.invalid/source.zip", digest, destination, str(source))
+            self.assertEqual(destination.read_bytes(), b"verified bytes")
+            source.write_bytes(b"changed bytes")
+            with self.assertRaisesRegex(ToolchainError, "SHA-256"):
+                download("https://example.invalid/source.zip", digest, destination, str(source))
 
     def test_archive_paths_reject_traversal(self) -> None:
         for path in ("../etc/passwd", "/tmp/payload", "a/../../etc/passwd"):
