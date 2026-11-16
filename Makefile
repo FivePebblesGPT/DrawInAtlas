@@ -6,6 +6,8 @@ GODOT ?= godot
 CARGO ?= cargo
 UV ?= uv
 RUST_BIN ?=
+GODOT_ARCHIVE ?=
+UV_ARCHIVE ?=
 BUNDLE_OUT ?= .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
 -include local.mk
 
