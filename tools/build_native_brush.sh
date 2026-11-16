@@ -3,6 +3,11 @@
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "$0")/.." && pwd -P)"
 TRIPLE="x86_64-unknown-linux-gnu"
+COMMAND="build"
+if [[ "${1:-}" == "--test" ]]; then
+  COMMAND="test"
+  shift
+fi
 if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "x86_64" ]]; then
   echo "Required native painting extension currently supports Linux x86-64 only" >&2
   exit 2
@@ -21,7 +26,10 @@ WORKSPACE="$ROOT/native/drawing_brush"
 TARGET_DIR="${CARGO_TARGET_DIR:-$WORKSPACE/target}"
 export CARGO_TARGET_DIR="$TARGET_DIR"
 export CARGO_INCREMENTAL=0
-args=(--locked --release --target "$TRIPLE")
+args=(--locked --target "$TRIPLE")
+if [[ "$COMMAND" == "build" ]]; then
+  args+=(--release)
+fi
 config=""
 if [[ -n "${CARGO_VENDOR_DIR:-}" ]]; then
   [[ -d "$CARGO_VENDOR_DIR" ]] || { echo "Missing Cargo vendor directory: $CARGO_VENDOR_DIR" >&2; exit 2; }
@@ -34,9 +42,12 @@ if [[ -n "${CARGO_VENDOR_DIR:-}" ]]; then
   printf '[source.vendored-sources]\ndirectory = "%s"\n' "$vendor_escaped" >> "$config"
   printf '[net]\noffline = true\n' >> "$config"
   args=(--offline "${args[@]}")
-  "$CARGO" --config "$config" build "${args[@]}" --manifest-path "$WORKSPACE/Cargo.toml"
+  "$CARGO" --config "$config" "$COMMAND" "${args[@]}" --manifest-path "$WORKSPACE/Cargo.toml"
 else
-  "$CARGO" build "${args[@]}" --manifest-path "$WORKSPACE/Cargo.toml"
+  "$CARGO" "$COMMAND" "${args[@]}" --manifest-path "$WORKSPACE/Cargo.toml"
+fi
+if [[ "$COMMAND" == "test" ]]; then
+  exit 0
 fi
 "$CARGO" fmt --manifest-path "$WORKSPACE/Cargo.toml" -- --check
 
