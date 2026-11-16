@@ -174,6 +174,12 @@ static func import_image(document: DrawingDocument, layer_id: String,
 		return DrawingResult.failure("IMPORT_LIMIT", "Import exceeds pixel budget")
 	if not TILES.document_anchor_in_range(left, top):
 		return DrawingResult.failure("COORD_RANGE", "Image anchor exceeds safe signed 64-bit range")
+	# The public anchor is only the first pixel. Check the inclusive opposite
+	# corner before decoding, resolving a lazy source or opening an edit. After
+	# the anchor and pixel-budget checks above, these additions cannot overflow
+	# signed 64-bit; an image must not extend beyond the ±2^60 document range.
+	if not TILES.document_anchor_in_range(left + width - 1, top + height - 1):
+		return DrawingResult.failure("COORD_RANGE", "Image extent exceeds safe signed Drawing range")
 	var image: Image = source.duplicate()
 	if image.is_compressed() and image.decompress() != OK:
 		return DrawingResult.failure("IMPORT", "Cannot decode source image")

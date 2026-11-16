@@ -78,6 +78,18 @@ benchmarks are not current correctness or timing oracles.
   remain permitted; this is **not** a wider Rust native import bound nor
   approval of any T-095 hardware latency gate. See [T-161 evidence](evidence/T-161-2026-11-16-public-anchors.md).
 
+- **Image import extent preflight (T-164):** `DrawingRasterImport.import_image`
+  checks the inclusive last source pixel `(left + width - 1, top + height - 1)`
+  against the same signed `±2^60` public document limit **after** bounding the
+  first anchor and decoded image dimensions, but **before** copying/decoding
+  pixels or opening an edit session. These additions cannot overflow i64
+  after the preceding pixel-budget check. Invalid rectangles fail
+  `COORD_RANGE` without resolving lazy sources, changing revisions or Rust
+  history. Exactly-in-bound positive/negative endpoints remain valid for
+  non-native documents; native-attached publication still obeys its stricter
+  `±2^52` projection. This is a narrow import preflight, not universal
+  native source/history authority. See [T-164](evidence/T-164-2026-11-16-image-extents.md).
+
 - **Read-only clipboard address guard (T-163):** `DrawingClipboard.capture`
   uses the same inclusive signed `±2^60` public-anchor limit as gesture,
   viewport and image import. It validates the caller-provided 64-bit origin
