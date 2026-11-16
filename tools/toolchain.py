@@ -13,7 +13,6 @@ import json
 import os
 import platform
 import shutil
-import stat
 import subprocess
 import sys
 import tarfile
@@ -197,6 +196,8 @@ def tool_paths(mode: str, bundle: str) -> tuple[dict[str, str], Path | None, boo
     use_bundle = mode == "bundle" or (mode == "auto" and bool(bundle))
     env = os.environ.copy()
     if not use_bundle:
+        if env.get("RUST_BIN"):
+            env["PATH"] = env["RUST_BIN"] + os.pathsep + env["PATH"]
         return env, None, False
     root, legacy = resolve_bundle(bundle)
     env["CARGO_NET_OFFLINE"] = "true"
@@ -340,6 +341,7 @@ def bundle(output: Path, python: str) -> None:
         extract_godot(godot_zip, stage / "bin/godot", lock["godot"]["executable"])
         extract_uv(uv_tgz, stage / "bin/uv")
         rust_env = os.environ.copy()
+        rust_env["CARGO_NET_OFFLINE"] = "false"
         rust_env["PATH"] = str(rust_dir / "bin") + os.pathsep + rust_env["PATH"]
         run(["cargo", "vendor", "--locked", "--versioned-dirs", str(stage / "vendor")],
             env=rust_env, cwd=ROOT / "native/drawing_brush")
