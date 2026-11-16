@@ -690,6 +690,13 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		var tile_y: int = int(components[1])
 		if tile_key != "%d,%d" % [tile_x, tile_y]:
 			return DrawingResult.failure("COORD", "Noncanonical storage tile coordinate")
+		# When Rust owns this document, direct/older tile sessions must obey
+		# the same projection as native publication. Keep pre-native historical
+		# signed-64-bit fixtures intact until the Legacy backend is retired.
+		# Validate before tile_x * stride or any lazy source callback.
+		if _native_raster_store != null \
+				and not TILES.tile_coordinates_in_projection_range(tile_x, tile_y, tile_stride):
+			return DrawingResult.failure("COORD", "Storage tile outside safe signed projection bounds")
 		if not session_sources.has(tile_key):
 			return DrawingResult.failure("STALE_PIXEL", "Gesture lacks its verified source tile")
 		var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
@@ -1050,12 +1057,19 @@ func _publish_edit(layer_id: String, expected: int,
 	var sources: Dictionary[String, Variant] = {}
 	for coordinate: String in after:
 		var components: PackedStringArray = coordinate.split(",")
-		if components.size() != 2:
+		if components.size() != 2 or not components[0].is_valid_int() \
+				or not components[1].is_valid_int():
 			return DrawingResult.failure("COORD", "Invalid pixel coordinate")
 		var x: int = int(components[0])
 		var y: int = int(components[1])
 		if coordinate != TILES.pixel_key64(x, y):
 			return DrawingResult.failure("COORD", "Noncanonical signed pixel coordinate")
+		# A native-attached document cannot accept an unprojectable direct
+		# pixel outside Rust's shared signed tile/history boundary. Old
+		# non-native direct sessions retain their historical 64-bit tests.
+		if _native_raster_store != null \
+				and not TILES.pixel_coordinates_in_projection_range(x, y):
+			return DrawingResult.failure("COORD", "Pixel outside safe signed projection bounds")
 		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
 		if not sources.has(tile_key):
 			var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
