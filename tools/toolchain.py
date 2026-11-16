@@ -321,6 +321,24 @@ def extract_uv(archive: Path, destination: Path) -> None:
     destination.chmod(0o755)
 
 
+def normalize_uv_cache(cache: Path) -> None:
+    """Drop host-specific uv virtualenvs and flatten remaining wheel-cache links."""
+    if not cache.is_dir():
+        raise ToolchainError("uv did not populate its dependency cache")
+    for environment in cache.glob("environments-v*"):
+        if environment.is_symlink() or environment.is_file():
+            environment.unlink()
+        elif environment.is_dir():
+            shutil.rmtree(environment)
+    # uv caches wheels using relative links into archive-v*; tar --dereference
+    # would traverse those links but pathlib.rglob would not. Flatten first.
+    with tempfile.TemporaryDirectory(prefix="uv-cache-normalize-", dir=cache.parent) as tmp:
+        normalized = Path(tmp) / "uv-cache"
+        shutil.copytree(cache, normalized, symlinks=False)
+        shutil.rmtree(cache)
+        os.replace(normalized, cache)
+
+
 def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str = "") -> None:
     check_platform()
     lock = pins()
@@ -365,6 +383,7 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
             run([str(stage / "bin/uv"), "run", "--no-project", "--no-managed-python",
                  "--python", python, "--with", f"{name}=={lock['python_tools'][name]}",
                  "--", name, "--version"], env=uv_env, cwd=ROOT)
+        normalize_uv_cache(stage / "uv-cache")
         version_env = rust_env.copy()
         for executable, version in (
             ([str(stage / "rust/bin/rustc"), "--version"], lock["rust"]["version"]),
@@ -375,6 +394,8 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
             if version.lower() not in value.lower():
                 raise ToolchainError(f"Expected {version}, got {value}")
 
+        if any(p.is_symlink() for p in stage.rglob("*")):
+            raise ToolchainError("Toolchain staging contains unexpected symlinks")
         files = {
             p.relative_to(stage).as_posix(): sha256_file(p)
             for p in sorted(stage.rglob("*")) if p.is_file()
