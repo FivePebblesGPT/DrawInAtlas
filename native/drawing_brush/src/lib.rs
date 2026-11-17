@@ -14,6 +14,14 @@ use hokusai::{Brush, BrushSetting, BrushState, TILE_SIZE, TiledSurface};
 
 type TileSnapshot = Option<Box<hokusai::tile::TilePixels>>;
 
+const JOURNAL_HINT_SLOTS: usize = 32;
+
+/// A collision is only a cache miss; snapshots always consult before_batch.
+fn journal_hint_slot((x, y): (i32, i32)) -> usize {
+    ((x as u32).wrapping_mul(0x9e37_79b1) ^ (y as u32).wrapping_mul(0x85eb_ca77)) as usize
+        & (JOURNAL_HINT_SLOTS - 1)
+}
+
 /// Hokusai-compatible sparse tile surface with per-batch dirty tracking.
 /// Unlike the stock MemSurface, the owned tile map can remove a newly created
 /// tile on rollback. Repeated rejected source reads must not retain blank
@@ -24,6 +32,13 @@ struct TrackedSurface {
     changed: HashSet<(i32, i32)>,
     /// Diagnostic-only old per-request dirty set; production reuses rollback keys.
     reference_dirty_tracking: bool,
+    /// T-193 diagnostic-only reference: probe rollback map on every tile request.
+    reference_journal_lookup: bool,
+    /// Direct-mapped batch-local hints: a hit guarantees this tile has a
+    /// rollback snapshot, a collision merely falls back to the HashMap.
+    journal_hints: [Option<(i32, i32)>; JOURNAL_HINT_SLOTS],
+    journal_contains_probes: u64,
+    journal_cache_hits: u64,
     dirty_set_inserts_attempted: u64,
     tile_requests: u64,
     journal_keys_exported: u64,
@@ -38,6 +53,9 @@ impl TrackedSurface {
     fn begin_batch(&mut self) {
         self.reference_dirty_tracking =
             std::env::var_os("DRAWING_T192_DIRTY_SET_COUNTERFACTUAL").is_some();
+        self.reference_journal_lookup =
+            std::env::var_os("DRAWING_T193_JOURNAL_LOOKUP_COUNTERFACTUAL").is_some();
+        self.journal_hints.fill(None);
         self.before_batch = Some(HashMap::new());
     }
 
@@ -59,10 +77,12 @@ impl TrackedSurface {
     }
 
     fn commit_batch(&mut self) {
+        self.journal_hints.fill(None);
         self.before_batch = None;
     }
 
     fn rollback_batch(&mut self) {
+        self.journal_hints.fill(None);
         if let Some(before) = self.before_batch.take() {
             for (position, previous) in before {
                 if let Some(previous) = previous {
@@ -86,16 +106,27 @@ impl TiledSurface for TrackedSurface {
     fn tile_request_start(&mut self, x: i32, y: i32) -> &mut hokusai::tile::TilePixels {
         self.tile_requests += 1;
         let key = (x, y);
-        if self
-            .before_batch
-            .as_ref()
-            .is_some_and(|before| !before.contains_key(&key))
-        {
-            let previous = self.tiles.get(&key).cloned();
-            self.before_batch
-                .as_mut()
-                .expect("active preset transaction")
-                .insert(key, previous);
+        // A dab often alternates between several 64px tiles. A direct-mapped
+        // hint avoids repeated rollback HashMap probes without an O(n) search.
+        // Collisions are safe misses: the journal remains authoritative.
+        if let Some(before) = self.before_batch.as_ref() {
+            let slot = journal_hint_slot(key);
+            let cached = !self.reference_journal_lookup && self.journal_hints[slot] == Some(key);
+            if cached {
+                self.journal_cache_hits += 1;
+            } else {
+                self.journal_contains_probes += 1;
+                if !before.contains_key(&key) {
+                    let previous = self.tiles.get(&key).cloned();
+                    self.before_batch
+                        .as_mut()
+                        .expect("active preset transaction")
+                        .insert(key, previous);
+                }
+                if !self.reference_journal_lookup {
+                    self.journal_hints[slot] = Some(key);
+                }
+            }
         }
         if self.before_batch.is_none() || self.reference_dirty_tracking {
             if self.before_batch.is_some() {
@@ -796,6 +827,14 @@ impl DrawingNativeBrush {
                 stroke.preset.surface.tile_requests as i64,
             );
             result.set(
+                "t193_journal_probes",
+                stroke.preset.surface.journal_contains_probes as i64,
+            );
+            result.set(
+                "t193_journal_cache_hits",
+                stroke.preset.surface.journal_cache_hits as i64,
+            );
+            result.set(
                 "t192_dirty_set_inserts",
                 stroke.preset.surface.dirty_set_inserts_attempted as i64,
             );
@@ -1105,6 +1144,72 @@ mod tests {
             emitted_ints: 0,
             phase_us: [0; 5],
         }
+    }
+
+    #[test]
+    fn t193_alternating_signed_tile_requests_cache_only_batch_local_journal_hits() {
+        fn exercise(reference: bool) -> (Vec<u16>, u64, u64) {
+            let mut surface = TrackedSurface::default();
+            surface.begin_batch();
+            surface.reference_journal_lookup = reference;
+            for (x, y, value) in [
+                (-3, 2, 11),
+                (-3, 2, 17),
+                (-3, 2, 23),
+                (8, -4, 29),
+                (8, -4, 31),
+                (-3, 2, 37),
+            ] {
+                surface.tile_request_start(x, y)[0][0][0] = value;
+            }
+            assert_eq!(surface.before_batch.as_ref().unwrap().len(), 2);
+            assert_eq!(surface.dirty_tiles_for_export().len(), 2);
+            let rgba = [
+                surface.tile(-3, 2).unwrap()[0][0][0],
+                surface.tile(8, -4).unwrap()[0][0][0],
+            ]
+            .to_vec();
+            let probes = surface.journal_contains_probes;
+            let hits = surface.journal_cache_hits;
+            surface.rollback_batch();
+            assert!(surface.tile(-3, 2).is_none());
+            assert!(surface.tile(8, -4).is_none());
+            surface.begin_batch();
+            surface.reference_journal_lookup = reference;
+            surface.tile_request_start(-3, 2)[0][0][0] = 41;
+            assert_eq!(surface.before_batch.as_ref().unwrap().len(), 1);
+            surface.commit_batch();
+            assert_eq!(surface.tile(-3, 2).unwrap()[0][0][0], 41);
+            (rgba, probes, hits)
+        }
+        let (cached, probes, hits) = exercise(false);
+        let (reference, old_probes, old_hits) = exercise(true);
+        assert_eq!(cached, reference);
+        assert_eq!(cached, vec![37, 31]);
+        assert_eq!(probes, 2);
+        assert_eq!(hits, 4);
+        assert_eq!(old_probes, 6);
+        assert_eq!(old_hits, 0);
+    }
+
+    #[test]
+    fn t193_colliding_journal_hint_rechecks_rollback_snapshot() {
+        let a = (-2, -3);
+        let b = (30, -3);
+        assert_eq!(journal_hint_slot(a), journal_hint_slot(b));
+        let mut surface = TrackedSurface::default();
+        surface.tile_request_start(a.0, a.1)[0][0][0] = 17;
+        surface.changed.clear();
+        surface.begin_batch();
+        surface.tile_request_start(a.0, a.1)[0][0][0] = 100;
+        surface.tile_request_start(b.0, b.1)[0][0][0] = 200;
+        surface.tile_request_start(a.0, a.1)[0][0][0] = 222;
+        assert_eq!(surface.before_batch.as_ref().unwrap().len(), 2);
+        assert_eq!(surface.journal_contains_probes, 3);
+        assert_eq!(surface.journal_cache_hits, 0);
+        surface.rollback_batch();
+        assert_eq!(surface.tile(a.0, a.1).unwrap()[0][0][0], 17);
+        assert!(surface.tile(b.0, b.1).is_none());
     }
 
     #[test]
