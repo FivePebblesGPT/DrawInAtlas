@@ -1,0 +1,208 @@
+    Finished `release` profile [optimized] target(s) in 0.01s
+Required native Brush/Eraser: /mnt/data/DrawInAtlas-sprint-2026-11-17/addons/drawing/native/bin/libdrawing_brush.so
+/mnt/data/DrawInAtlas-sprint-2026-11-17/drawing
+/mnt/data/DrawInAtlas-sprint-2026-11-17/drawing/.godot/extension_list.cfg
+WARNING: Missing .uid file for path "res://addons/drawing/native/drawing_brush.gdextension". The file was re-created from cache.
+     at: _process_file_system (editor/file_system/editor_file_system.cpp:1388)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Started Scanning actions... (23 steps)[39m[0m
+[   0% ] [90m[1m_update_scan_actions[22m | airbrush.png[39m[0m
+[   4% ] [90m[1m_update_scan_actions[22m | hard.png[39m[0m
+[   8% ] [90m[1m_update_scan_actions[22m | ink.png[39m[0m
+[  12% ] [90m[1m_update_scan_actions[22m | soft.png[39m[0m
+[  16% ] [90m[1m_update_scan_actions[22m | Lato-Bold.ttf[39m[0m
+[  20% ] [90m[1m_update_scan_actions[22m | Lato-Italic.ttf[39m[0m
+[  25% ] [90m[1m_update_scan_actions[22m | Lato-Regular.ttf[39m[0m
+[  29% ] [90m[1m_update_scan_actions[22m | brush.svg[39m[0m
+[  33% ] [90m[1m_update_scan_actions[22m | dock_brushes.svg[39m[0m
+[  37% ] [90m[1m_update_scan_actions[22m | dock_colors.svg[39m[0m
+[  41% ] [90m[1m_update_scan_actions[22m | dock_history.svg[39m[0m
+[  45% ] [90m[1m_update_scan_actions[22m | dock_layers.svg[39m[0m
+[  50% ] [90m[1m_update_scan_actions[22m | dock_panel.svg[39m[0m
+[  54% ] [90m[1m_update_scan_actions[22m | dock_swatches.svg[39m[0m
+[  58% ] [90m[1m_update_scan_actions[22m | eraser.svg[39m[0m
+[  62% ] [90m[1m_update_scan_actions[22m | layer_hidden.svg[39m[0m
+[  66% ] [90m[1m_update_scan_actions[22m | layer_locked.svg[39m[0m
+[  70% ] [90m[1m_update_scan_actions[22m | layer_unlocked.svg[39m[0m
+[  75% ] [90m[1m_update_scan_actions[22m | layer_visible.svg[39m[0m
+[  79% ] [90m[1m_update_scan_actions[22m | move.svg[39m[0m
+[  83% ] [90m[1m_update_scan_actions[22m | pan.svg[39m[0m
+[  87% ] [90m[1m_update_scan_actions[22m | select.svg[39m[0m
+[  91% ] [90m[1m_update_scan_actions[22m | text.svg[39m[0m
+[92m[ DONE ][39m [1m_update_scan_actions[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (23 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   4% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   8% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  12% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  16% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  20% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  25% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  29% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  33% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  37% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  41% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  45% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  50% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  54% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  58% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  62% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  66% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  70% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  75% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  79% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  83% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  87% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  91% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[   4% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[   8% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  12% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[  16% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  20% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  25% ] [90m[1mreimport[22m | text.svg[39m[0m
+[  29% ] [90m[1mreimport[22m | select.svg[39m[0m
+[  33% ] [90m[1mreimport[22m | pan.svg[39m[0m
+[  37% ] [90m[1mreimport[22m | move.svg[39m[0m
+[  41% ] [90m[1mreimport[22m | layer_visible.svg[39m[0m
+[  45% ] [90m[1mreimport[22m | layer_unlocked.svg[39m[0m
+[  50% ] [90m[1mreimport[22m | layer_locked.svg[39m[0m
+[  54% ] [90m[1mreimport[22m | layer_hidden.svg[39m[0m
+[  58% ] [90m[1mreimport[22m | eraser.svg[39m[0m
+[  62% ] [90m[1mreimport[22m | dock_swatches.svg[39m[0m
+[  66% ] [90m[1mreimport[22m | dock_panel.svg[39m[0m
+[  70% ] [90m[1mreimport[22m | dock_layers.svg[39m[0m
+[  75% ] [90m[1mreimport[22m | dock_history.svg[39m[0m
+[  79% ] [90m[1mreimport[22m | dock_colors.svg[39m[0m
+[  83% ] [90m[1mreimport[22m | dock_brushes.svg[39m[0m
+[  87% ] [90m[1mreimport[22m | brush.svg[39m[0m
+[  91% ] [90m[1mreimport[22m | soft.png[39m[0m
+[  95% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (23 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+NATIVE_EXTENSION_READY
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T181_MOVING frame=1 missing=0 metrics={"bytes_uploaded":262144,"cache_bytes_estimate":1048576,"cache_hits":12,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":278,"draw_cpu_us":952,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4352468,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1002,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4356576,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":19,"preview_index_fallback":0,"preview_index_keys":4,"preview_input_received_us":4328844,"preview_input_to_frame_end_us":23624,"preview_stage_completed_us":4351399,"preview_stage_to_frame_end_us":1069,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":65536,"sparse_draw":1,"submit_us":4352419,"texture_cpu_us":299,"textures_created":0,"textures_transient":0,"textures_updated":4,"tiles_composited":4,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=2 missing=0 metrics={"bytes_uploaded":262144,"cache_bytes_estimate":1048576,"cache_hits":12,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":219,"draw_cpu_us":870,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4376902,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":919,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4381547,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":27,"preview_index_fallback":0,"preview_index_keys":7,"preview_input_received_us":4360805,"preview_input_to_frame_end_us":16097,"preview_stage_completed_us":4375913,"preview_stage_to_frame_end_us":989,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":65536,"sparse_draw":1,"submit_us":4376854,"texture_cpu_us":261,"textures_created":0,"textures_transient":0,"textures_updated":4,"tiles_composited":4,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=3 missing=0 metrics={"bytes_uploaded":262144,"cache_bytes_estimate":1048576,"cache_hits":12,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":191,"draw_cpu_us":877,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4399847,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":974,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4404861,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":33,"preview_index_fallback":0,"preview_index_keys":10,"preview_input_received_us":4385018,"preview_input_to_frame_end_us":14829,"preview_stage_completed_us":4398805,"preview_stage_to_frame_end_us":1042,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":65536,"sparse_draw":1,"submit_us":4399751,"texture_cpu_us":291,"textures_created":0,"textures_transient":0,"textures_updated":4,"tiles_composited":4,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=4 missing=0 metrics={"bytes_uploaded":262144,"cache_bytes_estimate":1048576,"cache_hits":12,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":184,"draw_cpu_us":763,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4414871,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":802,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4419713,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":33,"preview_index_fallback":0,"preview_index_keys":12,"preview_input_received_us":4408112,"preview_input_to_frame_end_us":6759,"preview_stage_completed_us":4414017,"preview_stage_to_frame_end_us":854,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":65536,"sparse_draw":1,"submit_us":4414833,"texture_cpu_us":249,"textures_created":0,"textures_transient":0,"textures_updated":4,"tiles_composited":4,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=5 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":281,"draw_cpu_us":861,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4430054,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":931,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4434377,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":27,"preview_index_fallback":0,"preview_index_keys":14,"preview_input_received_us":4422923,"preview_input_to_frame_end_us":7131,"preview_stage_completed_us":4429076,"preview_stage_to_frame_end_us":978,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4429985,"texture_cpu_us":265,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=6 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":342,"draw_cpu_us":1300,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4444355,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1340,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4448952,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":30,"preview_index_fallback":0,"preview_index_keys":15,"preview_input_received_us":4437593,"preview_input_to_frame_end_us":6762,"preview_stage_completed_us":4442953,"preview_stage_to_frame_end_us":1402,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4444316,"texture_cpu_us":319,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=7 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":290,"draw_cpu_us":944,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4458897,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":982,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4463378,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":32,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4452155,"preview_input_to_frame_end_us":6742,"preview_stage_completed_us":4457864,"preview_stage_to_frame_end_us":1033,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4458859,"texture_cpu_us":275,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=8 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":427,"draw_cpu_us":1091,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4472451,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1132,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4477047,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":35,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4466525,"preview_input_to_frame_end_us":5926,"preview_stage_completed_us":4471270,"preview_stage_to_frame_end_us":1181,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4472411,"texture_cpu_us":330,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=9 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":398,"draw_cpu_us":1039,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4487756,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1088,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4493674,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":36,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4480680,"preview_input_to_frame_end_us":7076,"preview_stage_completed_us":4486602,"preview_stage_to_frame_end_us":1154,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4487708,"texture_cpu_us":267,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=10 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":295,"draw_cpu_us":881,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4502311,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":920,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4507039,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":33,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4497165,"preview_input_to_frame_end_us":5146,"preview_stage_completed_us":4501337,"preview_stage_to_frame_end_us":974,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4502272,"texture_cpu_us":258,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=11 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":274,"draw_cpu_us":803,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4514748,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":836,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4519259,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":31,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4510179,"preview_input_to_frame_end_us":4569,"preview_stage_completed_us":4513868,"preview_stage_to_frame_end_us":880,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4514716,"texture_cpu_us":199,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_PREVIEW_RESULT checks=19 failures=0
+T181_PREVIEW_PASSED checks=19 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T186_PREVIEW_RESULT checks=14 failures=0
+T186_PREVIEW_PASSED checks=14 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T187_DIRECT_RESULT checks=99 failures=0
+T187_DIRECT_PASSED checks=99 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T188_DELTA_RESULT checks=63 failures=0
+T188_DELTA_PASSED checks=63 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T189_SOURCE_LOOKUPS brush_optimized=13 brush_reference=93562 eraser_optimized=26 eraser_reference=187124
+T189_SOURCE_RESULT checks=77 failures=0
+T189_SOURCE_PASSED checks=77 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T190_SRGB_RESULT checks=77 failures=0
+T190_SRGB_PASSED checks=77 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T191_ROW_RESULT checks=77 failures=0
+T191_ROW_PASSED checks=77 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T192_JOURNAL_RESULT checks=81 failures=0
+T192_JOURNAL_PASSED checks=81 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T193_CACHE_RESULT checks=83 failures=0
+T193_CACHE_PASSED checks=83 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T194_BATCH_RESULT checks=79 failures=0
+T194_BATCH_PASSED checks=79 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T195_CATCHUP_RESULT checks=85 failures=0
+T195_CATCHUP_PASSED checks=85 failures=0

@@ -1610,6 +1610,16 @@ func _process(_delta: float) -> void:
 			canvas_error.emit("Stroke cancelled because the document revision changed")
 			return
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
+		# After release, no live pointer-handler is waiting on this stroke.
+		# One additional, independently 6ms-bounded drain can retire queued
+		# samples without an extra frame callback. Never repeat without bound:
+		# at most one extra drain per _process, and none while capturing.
+		if session != null and _finish_requested and (
+				_has_segment_target or _sample_index < _samples.size()) and not OS.has_environment(
+				"DRAWING_T195_RELEASE_CATCHUP_COUNTERFACTUAL"):
+			_metrics["post_release_catchup_calls"] = int(
+					_metrics["post_release_catchup_calls"]) + 1
+			_drain_segments(MAX_SEGMENTS_PER_FRAME)
 	if moving and _move_target != _move_preview_offset:
 		_stage_move_preview(_move_target)
 	if _floating_source_revision >= 0 and (document == null \
@@ -1823,6 +1833,7 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"max_sample_buffer": 0, "sample_compactions": 0,
 		"duplicate_drain_batched": 0, "drain_calls": 0, "max_drain_cpu_us": 0,
+		"post_release_catchup_calls": 0,
 		"sample_to_stage_us": [], "sample_to_stage_total": 0,
 		"max_sample_to_stage_us": 0, "stage_batches_us": [],
 		"stage_batch_total": 0, "max_stage_batch_us": 0,
@@ -1897,11 +1908,8 @@ func _drain_segments(budget: int) -> void:
 	# because an input sample was consumed; actual pixel mutations increment
 	# the session preview generation (including edits that restore old bytes).
 	var preview_before: int = session._preview_epoch
-	# For native Hokusai, group adjacent input segments into bounded atomic
-	# transactions. The 20-segment cap reduced repeated stage/ack transactions
-	# in the strict 96px benchmark; it does not change the 6ms soft deadline
-	# between calls, source input samples, or pressure/selection semantics.
-	# The diagnostic counterfactual uses the previous 16-segment cap.
+	# Native Hokusai keeps the 20-segment atomic cap and 6ms soft deadline
+	# between batches. T-194's 16-segment diagnostic remains available.
 	var batch_limit: int = MAX_SEGMENTS_PER_BATCH
 	if OS.has_environment("DRAWING_T194_BATCH_COUNTERFACTUAL"):
 		batch_limit = 16
@@ -2168,6 +2176,7 @@ func _write_t095_trace(profile: Dictionary, backend: String) -> void:
 			"samples_received", "segments_staged", "stage_cpu_us",
 			"max_pending", "max_sample_buffer", "sample_compactions",
 			"duplicate_drain_batched", "drain_calls", "max_drain_cpu_us",
+			"post_release_catchup_calls",
 			"sample_to_stage_total", "max_sample_to_stage_us",
 			"stage_batch_total", "max_stage_batch_us", "commit_cpu_us",
 			"preview_frames", "compose_cpu_us", "texture_cpu_us",
