@@ -1,0 +1,397 @@
+{
+  "workload": "one rapid 100-event 96px Hokusai hard preset, 512x512 full coverage, exact T146 script",
+  "processes": [
+    {
+      "group": "a",
+      "mode": "cold",
+      "valid": true,
+      "exit": 0,
+      "log": "t146-a/hokusai-cold-0.log",
+      "log_sha256": "2ddce0e0caaae4a51cffd585c153f7fd3f4be56cf46c0195916644b06bb6e9cd"
+    },
+    {
+      "group": "a",
+      "mode": "warm",
+      "valid": true,
+      "exit": 0,
+      "log": "t146-a/hokusai-warm-0.log",
+      "log_sha256": "31c96a69cc96f6a53f467d215ea00df1eb2aa93929fcb0286ba78cc8ba60afcc"
+    },
+    {
+      "group": "b",
+      "mode": "cold",
+      "valid": true,
+      "exit": 0,
+      "log": "t146-b/hokusai-cold-0.log",
+      "log_sha256": "3f4c3abbe61969f2fb059ab175b28838de5092f66337db1e3eac0a68abebfb4a"
+    },
+    {
+      "group": "b",
+      "mode": "warm",
+      "valid": true,
+      "exit": 0,
+      "log": "t146-b/hokusai-warm-0.log",
+      "log_sha256": "c7f82ae816abbb813f4f8a9b53449381c75694ac3dad0a8b47a361ab929da2ce"
+    }
+  ],
+  "observations": {
+    "cold": [
+      {
+        "index": "0",
+        "backend": "Hokusai",
+        "source_pixels": "262144",
+        "width_px": "96",
+        "input_events": "100",
+        "total_to_postdraw_ms": "674.544",
+        "release_to_commit_ms": "621.737",
+        "stage_cpu_ms": "138.773",
+        "drain_frames": "17",
+        "max_pending": "99",
+        "commit_cpu_ms": "1.962",
+        "compose_cpu_ms": "381.918",
+        "texture_cpu_ms": "6.290",
+        "preview_frames": "17",
+        "segments_staged": "296",
+        "drain_calls": "19",
+        "max_batch_ms": "12.308",
+        "max_drain_ms": "12.349",
+        "frame_compose_p95_ms": "31.117",
+        "max_frame_compose_ms": "31.117",
+        "max_frame_draw_ms": "32.206",
+        "retained_texture_bytes": "393216",
+        "first_submit_ms": 18.495,
+        "first_postdraw_ms": 48.68,
+        "native_ffi_calls": 62,
+        "tile_ffi_calls": 64,
+        "tile_bytes_exported": 9961472,
+        "source_coverage": 262144,
+        "source_opaque": 5842,
+        "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+      },
+      {
+        "index": "0",
+        "backend": "Hokusai",
+        "source_pixels": "262144",
+        "width_px": "96",
+        "input_events": "100",
+        "total_to_postdraw_ms": "653.897",
+        "release_to_commit_ms": "603.443",
+        "stage_cpu_ms": "144.616",
+        "drain_frames": "15",
+        "max_pending": "99",
+        "commit_cpu_ms": "0.829",
+        "compose_cpu_ms": "308.754",
+        "texture_cpu_ms": "5.380",
+        "preview_frames": "15",
+        "segments_staged": "296",
+        "drain_calls": "17",
+        "max_batch_ms": "22.600",
+        "max_drain_ms": "22.651",
+        "frame_compose_p95_ms": "39.614",
+        "max_frame_compose_ms": "39.614",
+        "max_frame_draw_ms": "40.521",
+        "retained_texture_bytes": "327680",
+        "first_submit_ms": 23.499,
+        "first_postdraw_ms": 54.786,
+        "native_ffi_calls": 62,
+        "tile_ffi_calls": 60,
+        "tile_bytes_exported": 8912896,
+        "source_coverage": 262144,
+        "source_opaque": 5842,
+        "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+      }
+    ],
+    "warm": [
+      {
+        "index": "0",
+        "backend": "Hokusai",
+        "source_pixels": "262144",
+        "width_px": "96",
+        "input_events": "100",
+        "total_to_postdraw_ms": "831.954",
+        "release_to_commit_ms": "772.114",
+        "stage_cpu_ms": "179.533",
+        "drain_frames": "17",
+        "max_pending": "99",
+        "commit_cpu_ms": "1.314",
+        "compose_cpu_ms": "450.195",
+        "texture_cpu_ms": "8.392",
+        "preview_frames": "17",
+        "segments_staged": "296",
+        "drain_calls": "19",
+        "max_batch_ms": "56.093",
+        "max_drain_ms": "56.144",
+        "frame_compose_p95_ms": "51.861",
+        "max_frame_compose_ms": "51.861",
+        "max_frame_draw_ms": "53.201",
+        "retained_texture_bytes": "393216",
+        "first_submit_ms": 18.184,
+        "first_postdraw_ms": 53.276,
+        "native_ffi_calls": 62,
+        "tile_ffi_calls": 64,
+        "tile_bytes_exported": 9961472,
+        "source_coverage": 262144,
+        "source_opaque": 5842,
+        "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+      },
+      {
+        "index": "1",
+        "backend": "Hokusai",
+        "source_pixels": "262144",
+        "width_px": "96",
+        "input_events": "100",
+        "total_to_postdraw_ms": "733.643",
+        "release_to_commit_ms": "662.598",
+        "stage_cpu_ms": "143.230",
+        "drain_frames": "16",
+        "max_pending": "99",
+        "commit_cpu_ms": "1.113",
+        "compose_cpu_ms": "405.261",
+        "texture_cpu_ms": "6.088",
+        "preview_frames": "16",
+        "segments_staged": "296",
+        "drain_calls": "18",
+        "max_batch_ms": "11.941",
+        "max_drain_ms": "14.045",
+        "frame_compose_p95_ms": "38.650",
+        "max_frame_compose_ms": "38.650",
+        "max_frame_draw_ms": "40.268",
+        "retained_texture_bytes": "393216",
+        "first_submit_ms": 21.905,
+        "first_postdraw_ms": 45.135,
+        "native_ffi_calls": 62,
+        "tile_ffi_calls": 62,
+        "tile_bytes_exported": 9437184,
+        "source_coverage": 262144,
+        "source_opaque": 5842,
+        "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+      },
+      {
+        "index": "0",
+        "backend": "Hokusai",
+        "source_pixels": "262144",
+        "width_px": "96",
+        "input_events": "100",
+        "total_to_postdraw_ms": "680.492",
+        "release_to_commit_ms": "631.060",
+        "stage_cpu_ms": "125.441",
+        "drain_frames": "16",
+        "max_pending": "99",
+        "commit_cpu_ms": "2.008",
+        "compose_cpu_ms": "377.101",
+        "texture_cpu_ms": "7.399",
+        "preview_frames": "16",
+        "segments_staged": "296",
+        "drain_calls": "18",
+        "max_batch_ms": "10.114",
+        "max_drain_ms": "12.174",
+        "frame_compose_p95_ms": "40.869",
+        "max_frame_compose_ms": "40.869",
+        "max_frame_draw_ms": "46.181",
+        "retained_texture_bytes": "393216",
+        "first_submit_ms": 18.396,
+        "first_postdraw_ms": 56.89,
+        "native_ffi_calls": 62,
+        "tile_ffi_calls": 62,
+        "tile_bytes_exported": 9437184,
+        "source_coverage": 262144,
+        "source_opaque": 5842,
+        "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+      },
+      {
+        "index": "1",
+        "backend": "Hokusai",
+        "source_pixels": "262144",
+        "width_px": "96",
+        "input_events": "100",
+        "total_to_postdraw_ms": "672.028",
+        "release_to_commit_ms": "616.479",
+        "stage_cpu_ms": "144.631",
+        "drain_frames": "17",
+        "max_pending": "99",
+        "commit_cpu_ms": "1.050",
+        "compose_cpu_ms": "322.766",
+        "texture_cpu_ms": "7.117",
+        "preview_frames": "17",
+        "segments_staged": "296",
+        "drain_calls": "19",
+        "max_batch_ms": "11.837",
+        "max_drain_ms": "11.900",
+        "frame_compose_p95_ms": "24.258",
+        "max_frame_compose_ms": "24.258",
+        "max_frame_draw_ms": "25.396",
+        "retained_texture_bytes": "327680",
+        "first_submit_ms": 22.077,
+        "first_postdraw_ms": 58.132,
+        "native_ffi_calls": 62,
+        "tile_ffi_calls": 64,
+        "tile_bytes_exported": 9961472,
+        "source_coverage": 262144,
+        "source_opaque": 5842,
+        "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+      }
+    ]
+  },
+  "summary": {
+    "cold": {
+      "total_to_postdraw_ms": {
+        "n": 2,
+        "p50": 653.897,
+        "p95": 674.544,
+        "max": 674.544
+      },
+      "release_to_commit_ms": {
+        "n": 2,
+        "p50": 603.443,
+        "p95": 621.737,
+        "max": 621.737
+      },
+      "stage_cpu_ms": {
+        "n": 2,
+        "p50": 138.773,
+        "p95": 144.616,
+        "max": 144.616
+      },
+      "commit_cpu_ms": {
+        "n": 2,
+        "p50": 0.829,
+        "p95": 1.962,
+        "max": 1.962
+      },
+      "compose_cpu_ms": {
+        "n": 2,
+        "p50": 308.754,
+        "p95": 381.918,
+        "max": 381.918
+      },
+      "texture_cpu_ms": {
+        "n": 2,
+        "p50": 5.38,
+        "p95": 6.29,
+        "max": 6.29
+      },
+      "max_drain_ms": {
+        "n": 2,
+        "p50": 12.349,
+        "p95": 22.651,
+        "max": 22.651
+      },
+      "max_frame_draw_ms": {
+        "n": 2,
+        "p50": 32.206,
+        "p95": 40.521,
+        "max": 40.521
+      },
+      "first_submit_ms": {
+        "n": 2,
+        "p50": 18.495,
+        "p95": 23.499,
+        "max": 23.499
+      },
+      "first_postdraw_ms": {
+        "n": 2,
+        "p50": 48.68,
+        "p95": 54.786,
+        "max": 54.786
+      },
+      "native_ffi_calls": {
+        "n": 2,
+        "p50": 62.0,
+        "p95": 62.0,
+        "max": 62.0
+      },
+      "tile_ffi_calls": {
+        "n": 2,
+        "p50": 60.0,
+        "p95": 64.0,
+        "max": 64.0
+      },
+      "tile_bytes_exported": {
+        "n": 2,
+        "p50": 8912896.0,
+        "p95": 9961472.0,
+        "max": 9961472.0
+      }
+    },
+    "warm": {
+      "total_to_postdraw_ms": {
+        "n": 4,
+        "p50": 680.492,
+        "p95": 831.954,
+        "max": 831.954
+      },
+      "release_to_commit_ms": {
+        "n": 4,
+        "p50": 631.06,
+        "p95": 772.114,
+        "max": 772.114
+      },
+      "stage_cpu_ms": {
+        "n": 4,
+        "p50": 143.23,
+        "p95": 179.533,
+        "max": 179.533
+      },
+      "commit_cpu_ms": {
+        "n": 4,
+        "p50": 1.113,
+        "p95": 2.008,
+        "max": 2.008
+      },
+      "compose_cpu_ms": {
+        "n": 4,
+        "p50": 377.101,
+        "p95": 450.195,
+        "max": 450.195
+      },
+      "texture_cpu_ms": {
+        "n": 4,
+        "p50": 7.117,
+        "p95": 8.392,
+        "max": 8.392
+      },
+      "max_drain_ms": {
+        "n": 4,
+        "p50": 12.174,
+        "p95": 56.144,
+        "max": 56.144
+      },
+      "max_frame_draw_ms": {
+        "n": 4,
+        "p50": 40.268,
+        "p95": 53.201,
+        "max": 53.201
+      },
+      "first_submit_ms": {
+        "n": 4,
+        "p50": 18.396,
+        "p95": 22.077,
+        "max": 22.077
+      },
+      "first_postdraw_ms": {
+        "n": 4,
+        "p50": 53.276,
+        "p95": 58.132,
+        "max": 58.132
+      },
+      "native_ffi_calls": {
+        "n": 4,
+        "p50": 62.0,
+        "p95": 62.0,
+        "max": 62.0
+      },
+      "tile_ffi_calls": {
+        "n": 4,
+        "p50": 62.0,
+        "p95": 64.0,
+        "max": 64.0
+      },
+      "tile_bytes_exported": {
+        "n": 4,
+        "p50": 9437184.0,
+        "p95": 9961472.0,
+        "max": 9961472.0
+      }
+    }
+  }
+}

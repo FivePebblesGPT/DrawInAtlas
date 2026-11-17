@@ -2264,6 +2264,8 @@ func _commit_stroke() -> void:
 	else:
 		active.cancel()
 	_metrics["native_ffi_stats"] = active.native_ffi_stats.duplicate(true)
+	if OS.has_environment("DRAWING_T185_PROFILE"):
+		_metrics["t185_native_stage"] = active.t185_native_stage.duplicate(true)
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	_finalize_stage_latency_window()

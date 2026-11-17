@@ -723,6 +723,13 @@ var _native_stroke: Object
 var _native_handle: int = 0
 var _native_clip_bounds: Rect2i = Rect2i()
 var native_ffi_stats: Dictionary = {}
+## T-185 opt-in diagnostic counters, not part of rendering or persistence.
+## Stage time contains these nested phases; never add both as independent wall time.
+var t185_native_stage: Dictionary = {
+	"authorize_us": 0, "apply_us": 0, "dirty_query_us": 0,
+	"stamp_us": 0, "index_us": 0, "dirty_entries": 0,
+	"revisited_entries": 0, "batch_calls": 0, "unique_tiles": 0,
+}
 ## Native tile batches are optional only for historical direct adapter fixtures.
 ## Production Canvas opts into this Rust-owned staging path.
 var _native_tiles: Object
@@ -840,19 +847,40 @@ func _stage_native_tile_batch(erase: bool, selection: DrawingSelection) -> Drawi
 	if (frozen == null) != (current == null) or \
 			(frozen != null and not frozen.same_as(current)):
 		return DrawingResult.failure("NATIVE_SELECTION", "Gesture selection changed")
+	var profile: bool = OS.has_environment("DRAWING_T185_PROFILE")
+	var began_us: int = Time.get_ticks_usec() if profile else 0
 	var authorized: DrawingResult = _authorize_native_tiles(frozen)
 	if not authorized.ok:
 		return authorized
+	var authorized_us: int = Time.get_ticks_usec() if profile else 0
 	var staged: Dictionary = _native_stroke.call("apply_tile_batch", _native_tiles,
 		_native_handle, expected_revision, _native_transaction, anchor_x, anchor_y, erase)
 	if not bool(staged.get("ok", false)):
 		return DrawingResult.failure("NATIVE_BATCH", str(staged.get("error", "Native tile batch rejected")))
-	for entry: Dictionary in _native_tiles.call("dirty_tiles", _native_transaction):
+	var applied_us: int = Time.get_ticks_usec() if profile else 0
+	var dirty: Array = _native_tiles.call("dirty_tiles", _native_transaction)
+	var queried_us: int = Time.get_ticks_usec() if profile else 0
+	var revisited: int = 0
+	for entry: Dictionary in dirty:
 		var key: String = "%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]
+		if profile and _preview_tile_versions.has(key):
+			revisited += 1
 		_preview_epoch += 1
 		_preview_tile_versions[key] = _preview_epoch
 		_native_preview_cache.erase(key)
+	var stamped_us: int = Time.get_ticks_usec() if profile else 0
 	_invalidate_exact_preview_display_index()
+	if profile:
+		var index_us: int = Time.get_ticks_usec()
+		t185_native_stage["authorize_us"] += authorized_us - began_us
+		t185_native_stage["apply_us"] += applied_us - authorized_us
+		t185_native_stage["dirty_query_us"] += queried_us - applied_us
+		t185_native_stage["stamp_us"] += stamped_us - queried_us
+		t185_native_stage["index_us"] += index_us - stamped_us
+		t185_native_stage["dirty_entries"] += dirty.size()
+		t185_native_stage["revisited_entries"] += revisited
+		t185_native_stage["batch_calls"] += 1
+		t185_native_stage["unique_tiles"] = _preview_tile_versions.size()
 	_native_change_count = _preview_tile_versions.size()
 	return DrawingResult.success(_native_change_count)
 
