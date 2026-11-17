@@ -291,6 +291,44 @@ func preview_rgba8_tile(tile_key: String) -> PackedByteArray:
 	return bytes
 
 
+## Display-only cropped native bytes. Every region is tile-local and cache entries
+## are grouped by storage tile, so a later changed batch invalidates all crops.
+## Cap distinct rectangles per tile: third-party render callers may request many
+## overlapping offsets in one stroke without owning unbounded detached bytes.
+## Commit, history and persistence always read complete canonical native tiles.
+func preview_rgba8_region(tile_key: String, local_rect: Rect2i) -> Dictionary:
+	const MAX_CACHED_REGIONS_PER_TILE: int = 8
+	if _closed or _native_tiles == null or not _preview_tile_versions.has(tile_key) \
+			or document.revision != expected_revision:
+		return {}
+	var stride: int = document.tile_stride
+	if local_rect.position.x < 0 or local_rect.position.y < 0 \
+			or local_rect.size.x <= 0 or local_rect.size.y <= 0 \
+			or local_rect.end.x > stride or local_rect.end.y > stride:
+		return {}
+	var local_key: String = "%d,%d,%d,%d" % [local_rect.position.x,
+		local_rect.position.y, local_rect.size.x, local_rect.size.y]
+	var crops: Dictionary = _native_preview_regions.get(tile_key, {})
+	if crops.has(local_key):
+		return crops[local_key] as Dictionary
+	var coordinates: PackedStringArray = tile_key.split(",")
+	if coordinates.size() != 2:
+		return {}
+	var source: Dictionary = _native_tiles.call("read_tile_region", layer_id,
+		int(coordinates[0]), int(coordinates[1]), true,
+		local_rect.position.x, local_rect.position.y, local_rect.size.x, local_rect.size.y)
+	if not bool(source.get("ok", false)):
+		return {}
+	var bytes: PackedByteArray = source.get("bytes", PackedByteArray())
+	if bytes.size() != local_rect.get_area() * 4:
+		return {}
+	var result: Dictionary = {"bytes": bytes, "hidden_rgb": bool(source.get("hidden_rgb", true))}
+	if crops.size() < MAX_CACHED_REGIONS_PER_TILE:
+		crops[local_key] = result
+		_native_preview_regions[tile_key] = crops
+	return result
+
+
 func preview_stamp_for_area(area: Rect2i) -> int:
 	if _closed or _preview_tile_versions.is_empty() or document.revision != expected_revision:
 		return 0
@@ -464,6 +502,7 @@ func cancel() -> void:
 		_native_transaction = 0
 		_native_change_count = 0
 		_native_preview_cache.clear()
+		_native_preview_regions.clear()
 	_finish_native_stroke(false)
 	_stationary_dab_valid = false
 	_brush_deferred = false
@@ -772,6 +811,7 @@ var _native_tiles: Object
 var _native_transaction: int = 0
 var _native_change_count: int = 0
 var _native_preview_cache: Dictionary[String, PackedByteArray] = {}
+var _native_preview_regions: Dictionary[String, Dictionary] = {}
 var _native_selection: DrawingSelection
 
 
@@ -914,6 +954,7 @@ func _stage_native_tile_batch(erase: bool, selection: DrawingSelection) -> Drawi
 			_preview_epoch += 1
 			_preview_tile_versions[key] = _preview_epoch
 			_native_preview_cache.erase(key)
+			_native_preview_regions.erase(key)
 		_invalidate_exact_preview_display_index()
 	else:
 		# Rust still retains cumulative rectangles for atomic commit/history.
@@ -925,6 +966,7 @@ func _stage_native_tile_batch(erase: bool, selection: DrawingSelection) -> Drawi
 			_preview_epoch += 1
 			_preview_tile_versions[key] = _preview_epoch
 			_native_preview_cache.erase(key)
+			_native_preview_regions.erase(key)
 			_mark_native_preview_display_rect(tile_x, tile_y, entry["dirty"] as Rect2i)
 	var stamped_us: int = Time.get_ticks_usec() if profile else 0
 	if profile:
@@ -1003,6 +1045,7 @@ func _commit_native_tile_stroke() -> DrawingResult:
 	_native_tiles = null
 	_native_transaction = 0
 	_native_preview_cache.clear()
+	_native_preview_regions.clear()
 	_source_tiles.clear()
 	_preview_tile_versions.clear()
 	_native_change_count = 0

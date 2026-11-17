@@ -968,6 +968,37 @@ impl TileStore {
         self.revision += 1;
         Ok(count)
     }
+    /// Copy only the requested tile-local rectangle for a display preview.
+    /// This is a byte-for-byte row crop; it never alters canonical/hidden RGBA.
+    fn read_region(
+        &self,
+        id: &TileId,
+        pending: bool,
+        left: usize,
+        top: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<Vec<u8>, &'static str> {
+        if width == 0
+            || height == 0
+            || left.checked_add(width).is_none_or(|end| end > self.stride)
+            || top.checked_add(height).is_none_or(|end| end > self.stride)
+        {
+            return Err("Invalid tile-local preview rectangle");
+        }
+        let tile = self
+            .read(id, pending)
+            .ok_or("Tile not imported or not resident")?;
+        let row_bytes = width * 4;
+        let mut result = vec![0u8; row_bytes * height];
+        for row in 0..height {
+            let source = ((top + row) * self.stride + left) * 4;
+            result[row * row_bytes..(row + 1) * row_bytes]
+                .copy_from_slice(&tile.rgba[source..source + row_bytes]);
+        }
+        Ok(result)
+    }
+
     fn read(&self, id: &TileId, pending: bool) -> Option<&Tile> {
         if pending
             && let Some(edit) = self.active.as_ref()
@@ -1495,6 +1526,58 @@ impl DrawingNativeTiles {
         result
     }
 
+    /// A bounded tile-local RGBA8 row crop for native live display only.
+    /// Whole-tile read_tile remains the authoritative commit/persistence API.
+    #[allow(clippy::too_many_arguments)]
+    #[func]
+    fn read_tile_region(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+        left: i64,
+        top: i64,
+        width: i64,
+        height: i64,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        let id = TileId {
+            layer: layer.to_string(),
+            x,
+            y,
+        };
+        let (Ok(left), Ok(top), Ok(width), Ok(height)) = (
+            usize::try_from(left),
+            usize::try_from(top),
+            usize::try_from(width),
+            usize::try_from(height),
+        ) else {
+            return err("Invalid negative or oversized tile-local rectangle");
+        };
+        match self
+            .store
+            .read_region(&id, preview, left, top, width, height)
+        {
+            Ok(bytes) => {
+                self.store.bytes_exported += bytes.len() as u64;
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("format", "straight_rgba8");
+                result.set("stride_bytes", (width * 4) as i64);
+                result.set("bytes", &PackedByteArray::from(bytes.as_slice()));
+                result.set(
+                    "hidden_rgb",
+                    bytes
+                        .chunks_exact(4)
+                        .any(|pixel| pixel[3] == 0 && pixel[..3] != [0, 0, 0]),
+                );
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+
     /// Page over canonical layer/tile identities for bulk persistence. The
     /// result omits pixel bytes; read_tile copies exactly one RGBA8 span.
     /// A bounded page size avoids unbounded Godot Array allocations even with
@@ -1709,6 +1792,67 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn t187_preview_region_matches_whole_tile_and_rejects_invalid_bounds() {
+        let mut store = initialized(256);
+        blank(&mut store, -1, 2);
+        let tx = store.begin("ink", 0, false).unwrap();
+        let id = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 2,
+        };
+        store
+            .stage(
+                tx,
+                0,
+                -256,
+                512,
+                &[3, 4, 11, 120, 243, 250],
+                false,
+                0xff123456,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        let full = &store.read(&id, true).unwrap().rgba;
+        let region = store.read_region(&id, true, 0, 0, 128, 128).unwrap();
+        assert_eq!(region.len(), 128 * 128 * 4);
+        for row in 0..128 {
+            assert_eq!(
+                &region[row * 128 * 4..(row + 1) * 128 * 4],
+                &full[row * 256 * 4..row * 256 * 4 + 128 * 4]
+            );
+        }
+        let signed_region = store.read_region(&id, true, 112, 112, 144, 144).unwrap();
+        assert_eq!(signed_region.len(), 144 * 144 * 4);
+        for row in 0..144 {
+            assert_eq!(
+                &signed_region[row * 144 * 4..(row + 1) * 144 * 4],
+                &full[((112 + row) * 256 + 112) * 4..((112 + row) * 256 + 256) * 4]
+            );
+        }
+        for invalid in [
+            (0, 0, 0, 1),
+            (0, 0, 1, 0),
+            (256, 0, 1, 1),
+            (255, 255, 2, 1),
+            (0, 250, 8, 8),
+            (usize::MAX, 0, 1, 1),
+        ] {
+            assert!(
+                store
+                    .read_region(&id, true, invalid.0, invalid.1, invalid.2, invalid.3)
+                    .is_err()
+            );
+        }
+        assert_eq!(store.commit(tx, 0).unwrap(), 1);
+        assert_eq!(
+            store.read_region(&id, false, 112, 112, 144, 144).unwrap(),
+            signed_region
+        );
+    }
+
     #[test]
     fn t186_batch_dirty_tracks_actual_changed_pixels_not_cumulative_history() {
         let mut store = initialized(256);

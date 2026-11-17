@@ -63,6 +63,7 @@ test: build
 test-graphical: import-drawing
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t181_native_preview_retention.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t186_batch_native_preview.gd
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t187_direct_native_preview.gd
 
 python-test:
 	@"$(PYTHON)" -m unittest discover -s tests -p 'test_toolchain_build.py'

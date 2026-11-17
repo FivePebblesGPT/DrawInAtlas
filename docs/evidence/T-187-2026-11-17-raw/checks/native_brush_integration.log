@@ -1,0 +1,12 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T095_HOKUSAI_HARD coverage=10103 translucent=10103 opaque=0 duration_ms=32.868
+T095_HOKUSAI preset=hard stage_ms=3.121
+T095_HOKUSAI preset=soft stage_ms=6.434
+T095_HOKUSAI preset=ink stage_ms=0.476
+T095_HOKUSAI preset=airbrush stage_ms=0.603
+T095_NATIVE_BRUSH_RESULT checks=32 failures=0

@@ -1,0 +1,42 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error[E0599]: no method named `read_region` found for struct `native_tiles::TileStore` in the current scope
+    --> src/native_tiles.rs:1736:28
+     |
+  71 | pub(super) struct TileStore {
+     | --------------------------- method `read_region` not found for this struct
+...
+1736 |         let region = store.read_region(&id, true, 0, 0, 128, 128).unwrap();
+     |                            ^^^^^^^^^^^ method not found in `native_tiles::TileStore`
+
+error[E0599]: no method named `read_region` found for struct `native_tiles::TileStore` in the current scope
+    --> src/native_tiles.rs:1744:35
+     |
+  71 | pub(super) struct TileStore {
+     | --------------------------- method `read_region` not found for this struct
+...
+1744 |         let signed_region = store.read_region(&id, true, 112, 112, 144, 144).unwrap();
+     |                                   ^^^^^^^^^^^ method not found in `native_tiles::TileStore`
+
+error[E0599]: no method named `read_region` found for struct `native_tiles::TileStore` in the current scope
+    --> src/native_tiles.rs:1762:22
+     |
+  71 |   pub(super) struct TileStore {
+     |   --------------------------- method `read_region` not found for this struct
+...
+1761 | /                 store
+1762 | |                     .read_region(&id, true, invalid.0, invalid.1, invalid.2, invalid.3)
+     | |                     -^^^^^^^^^^^ method not found in `native_tiles::TileStore`
+     | |_____________________|
+     |
+
+error[E0599]: no method named `read_region` found for struct `native_tiles::TileStore` in the current scope
+    --> src/native_tiles.rs:1768:19
+     |
+  71 | pub(super) struct TileStore {
+     | --------------------------- method `read_region` not found for this struct
+...
+1768 |             store.read_region(&id, false, 112, 112, 144, 144).unwrap(),
+     |                   ^^^^^^^^^^^ method not found in `native_tiles::TileStore`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `drawing-brush` (lib test) due to 4 previous errors
