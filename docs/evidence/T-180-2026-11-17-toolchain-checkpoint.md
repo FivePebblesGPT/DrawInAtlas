@@ -22,3 +22,9 @@ portability across Python minors, archive file ordering and hash repeatability,
 legacy bundle8 layout discovery, pinned Godot beta registration behavior,
 Cargo vendor configuration path quoting, and any old CI workflow depending
 on native-absent standalone staging.
+
+## Follow-up execution
+
+This initial unexecuted checkpoint is historical. See the
+[local system / identical rebuild / cold offline validation](T-180-2026-11-17-local-validation.md)
+and its raw evidence for the subsequent repairs and actual test results.

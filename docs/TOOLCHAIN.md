@@ -54,8 +54,8 @@ Linux target triple. Rust distribution components are obtained by `rustup`
 for the pinned Rust version; rustup verifies upstream component checksums.
 Crates come from `native/drawing_brush/Cargo.lock` via `cargo vendor --locked`.
 The bundle packages a private Rust installation, Godot executable, uv executable,
-Cargo vendor directory, and checksum-pinned universal Ruff/ty wheels; **it does not package Python or
-compiled DrawInAtlas binaries**.
+Cargo vendor directory, and checksum-pinned universal Ruff/ty wheels;
+**it does not package Python or compiled DrawInAtlas binaries**.
 
 The generator uses **`zstd -19 -T1`** and rejects compressed output larger than
 **500 MiB (524,288,000 bytes)** before publishing it. It writes a per-file
@@ -64,7 +64,7 @@ to the build log; no external checksum sidecar or DrawInAtlas repository is
 packaged or generated. Transfer the source checkout separately.
 A transferred archive is checked before use and checked against both the
 current toolchain lockfile and Cargo.lock after extraction. The output is
-relocatable and built outside the Git tree in ignored `.build/` directories.
+relocatable and built outside tracked source in ignored `.build/` directories.
 The archive itself is a derived, replaceable build artifact; keep a copy in
 releases/backups to survive upstream deletion.
 
@@ -76,11 +76,11 @@ Verify Rust/glibc/runtime requirements on the actual consumer distribution.
 
 ## Use the bundle on a new sandbox
 
-Supply one `.tar.zst` archive and the checked-out source:
-
 The consumer still needs GNU Make, Bash, zstd, system Python >=3.11,<3.16,
 a C linker/toolchain (`cc`), and the distribution's ordinary glibc/graphics
 runtime libraries. Those OS prerequisites are not embedded into the archive.
+
+Supply one `.tar.zst` archive and the checked-out source:
 
     make doctor TOOLCHAIN=bundle BUNDLE=/mnt/data/drawing-toolchain-linux-x86_64.tar.zst
     make drawing TOOLCHAIN=bundle BUNDLE=/mnt/data/drawing-toolchain-linux-x86_64.tar.zst
@@ -92,7 +92,8 @@ into `.build/toolchains/<archive-sha256>/`, and reused. Cargo is then invoked
 with `--offline --locked` and the vendored registry. uv runs with
 `UV_OFFLINE=1`, `UV_NO_INDEX=1`, `--no-managed-python`, and pinned Ruff/ty wheels
 from the bundle. Its writable cache lives separately in `.build/runtime/`;
-repeated linting never mutates the verified archive payload. Python is the local compatible system executable selected by
+repeated linting never mutates the verified archive payload. Python is the local
+compatible system executable selected by
 `PYTHON=/path/to/python3`.
 
 The old `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` remains usable as a
@@ -146,6 +147,12 @@ system Rust 1.100.0, Godot 4.8 beta3, a new source-built Rust 1.99.1 bundle,
 network-isolated cold native compilation and repeated offline Ruff/ty runs.
 The real Wayland GUI/native Canvas test passed 46 checks, including tile FFI,
 Brush/Eraser, Undo/Redo and portable Save/Open. Early archive builds differed
-only in rustup component-list order; the normalization fix is being revalidated.
-T-180 stays In Progress pending the final reproducibility/hosted CI evidence.
+only in rustup component-list order; after normalization two clean builds match
+SHA-256 `3196a30246b27be598eb010c207897045d59d87c65eac967c603baa4b0f135c2`
+and **263,487,525 bytes (251.281285 MiB)**. This is demonstrated local byte
+identity, also matched by the fresh Ubuntu 24.04 / Python 3.12.3
+[green hosted cold-native run](https://github.com/FivePebblesGPT/DrawInAtlas/actions/runs/43984960775),
+not a blanket guarantee for arbitrary hosts. See [raw validation evidence](evidence/T-180-2026-11-17-local-validation.md).
+T-180 stays In Progress for remaining desktop native-transition/export
+coverage (42/46); the dedicated toolchain workflow is green.
 T-095 physical input and T-105 Windows gates remain open.

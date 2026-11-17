@@ -1,5 +1,11 @@
 # T-180 Local-agent handoff — finish and validate toolchain PR
 
+**Execution follow-up (2026-11-17):** Most checks below have now been executed;
+read [the detailed validation and raw evidence](evidence/T-180-2026-11-17-local-validation.md)
+before repeating work. T-180 remains In Progress for the recorded hosted/native
+transition and packaging gates. The delivered toolchain is a single zstd-19
+archive, below 500 MiB, with internal checksums and no repository or external sidecar.
+
 You are the local implementation/validation agent for DrawInAtlas. The user
 squash-merged PR #19 onto `main` at
 `30e68fca7ded6bb2e5c8f4ea12604d3c33713c8c`. Continue on branch
