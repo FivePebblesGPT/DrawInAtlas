@@ -189,6 +189,8 @@ func stroke(app: Control, zoom_value: float, kind: String, index: int) -> void:
 		"commit_cpu_us": stats.get("commit_cpu_us", 0),
 		"bytes_uploaded": stats.get("bytes_uploaded", 0),
 		"max_pending": stats.get("max_pending", 0),
+		"release_pending_samples": stats.get("release_pending_samples", 0),
+		"post_release_deferred_calls": stats.get("post_release_deferred_calls", 0),
 		"native_ffi_stats": stats.get("native_ffi_stats", {}),
 		"native_stage": stats.get("t185_native_stage", {}),
 		"engine_godot": Engine.get_version_info().get("string", "")}

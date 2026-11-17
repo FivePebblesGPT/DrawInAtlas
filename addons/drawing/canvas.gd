@@ -249,6 +249,9 @@ var _reported_render_errors: Dictionary[String, bool] = {}
 const MAX_SEGMENTS_PER_FRAME: int = 256
 const MAX_SEGMENTS_PER_BATCH: int = 20
 const MAX_DRAIN_CPU_US: int = 6000
+# An extra deferred release drain is reserved for deep input backlogs, not
+# ordinary short or held gestures whose paced frames are more sensitive.
+const MIN_RELEASE_DEFERRED_PENDING_SAMPLES: int = 32
 # Preview draw scheduling never changes the 6ms soft raster-stage deadline.
 # During a sustained input backlog a display frame may represent two bounded
 # drain calls; first/last isolated changes remain immediate.
@@ -1833,7 +1836,8 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"max_sample_buffer": 0, "sample_compactions": 0,
 		"duplicate_drain_batched": 0, "drain_calls": 0, "max_drain_cpu_us": 0,
-		"post_release_catchup_calls": 0,
+		"post_release_catchup_calls": 0, "post_release_deferred_calls": 0,
+		"release_pending_samples": 0,
 		"sample_to_stage_us": [], "sample_to_stage_total": 0,
 		"max_sample_to_stage_us": 0, "stage_batches_us": [],
 		"stage_batch_total": 0, "max_stage_batch_us": 0,
@@ -2176,7 +2180,8 @@ func _write_t095_trace(profile: Dictionary, backend: String) -> void:
 			"samples_received", "segments_staged", "stage_cpu_us",
 			"max_pending", "max_sample_buffer", "sample_compactions",
 			"duplicate_drain_batched", "drain_calls", "max_drain_cpu_us",
-			"post_release_catchup_calls",
+			"post_release_catchup_calls", "post_release_deferred_calls",
+			"release_pending_samples",
 			"sample_to_stage_total", "max_sample_to_stage_us",
 			"stage_batch_total", "max_stage_batch_us", "commit_cpu_us",
 			"preview_frames", "compose_cpu_us", "texture_cpu_us",
@@ -2477,12 +2482,38 @@ func finish_gesture(position: Vector2, source_override: Variant = null,
 		# Finish small clicks synchronously; long queued strokes are drained
 		# across frames without blocking the input loop.
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
+		# A deep input backlog can be drained once at idle without extending
+		# the mouse-up callback. Short/held strokes keep the existing T-195
+		# frame cadence. The deferred call also checks its session identity.
+		if session != null and _finish_requested:
+			var outstanding: int = int(_frame_input_backlog(
+					Time.get_ticks_usec())["pending_input_count"])
+			_metrics["release_pending_samples"] = outstanding
+			if outstanding >= MIN_RELEASE_DEFERRED_PENDING_SAMPLES and not OS.has_environment(
+					"DRAWING_T196_DEFERRED_CATCHUP_COUNTERFACTUAL"):
+				call_deferred("_t196_drain_after_release", session)
+
 	dragging = false
 	selecting = false
 	moving = false
 	_marquee_dragged = false
 	_move_target = Vector2i.ZERO
 	queue_redraw()
+
+
+func _t196_drain_after_release(expected: DrawingEditSession) -> void:
+	if session != expected or not _finish_requested:
+		return
+	if document == null or document.revision != session.expected_revision:
+		cancel_gesture()
+		canvas_error.emit("Stroke cancelled because the document revision changed")
+		return
+	if not _has_segment_target and _sample_index >= _samples.size():
+		return
+	_metrics["post_release_deferred_calls"] = int(
+			_metrics["post_release_deferred_calls"]) + 1
+	_drain_segments(MAX_SEGMENTS_PER_FRAME)
+
 
 func _publish(result: DrawingResult) -> void:
 	if result.ok:

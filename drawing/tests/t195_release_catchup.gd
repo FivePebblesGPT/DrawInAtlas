@@ -155,6 +155,12 @@ func run() -> void:
 		check(false, "real graphical X11 renderer required")
 		quit(1)
 		return
+	# T-195 measures only its own process-frame drain cadence. T-196's
+	# independent deferred idle drain can finish the queue before _process,
+	# so disable that newer option for this historical counterfactual.
+	var previous_deferred: String = OS.get_environment(
+		"DRAWING_T196_DEFERRED_CATCHUP_COUNTERFACTUAL")
+	OS.set_environment("DRAWING_T196_DEFERRED_CATCHUP_COUNTERFACTUAL", "1")
 	var previous_profile: String = OS.get_environment("DRAWING_T185_PROFILE")
 	OS.set_environment("DRAWING_T185_PROFILE", "1")
 	root.size = Vector2i(920, 780)
@@ -190,6 +196,10 @@ func run() -> void:
 		OS.unset_environment("DRAWING_T185_PROFILE")
 	else:
 		OS.set_environment("DRAWING_T185_PROFILE", previous_profile)
+	if previous_deferred.is_empty():
+		OS.unset_environment("DRAWING_T196_DEFERRED_CATCHUP_COUNTERFACTUAL")
+	else:
+		OS.set_environment("DRAWING_T196_DEFERRED_CATCHUP_COUNTERFACTUAL", previous_deferred)
 	print("T195_CATCHUP_RESULT checks=%d failures=%d" % [checks, failures])
 	if failures == 0:
 		print("T195_CATCHUP_PASSED checks=%d failures=0" % checks)

@@ -254,7 +254,12 @@ func run() -> void:
 			mouse_motion(canvas, path[i])
 		check(doc.revision == previous_revision,
 			"stroke %d is still an uncommitted gesture at release" % run_index)
+		var mouse_up_start_us: int = Time.get_ticks_usec()
 		mouse_button(canvas, path[path.size() - 1], false)
+		print("T196_MOUSEUP index=%d handler_ms=%.3f deferred_calls=%d queued=%d" % [
+			run_index, float(Time.get_ticks_usec() - mouse_up_start_us) / 1000.0,
+			int(canvas._metrics.get("post_release_deferred_calls", 0)),
+			int(canvas._metrics.get("release_pending_samples", 0))])
 		var drained_frames: int = 0
 		while canvas.session != null and drained_frames < DRAIN_FRAME_LIMIT:
 			await process_frame
