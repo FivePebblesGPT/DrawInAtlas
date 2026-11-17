@@ -21,6 +21,13 @@ Brush/Eraser require the Rust Hokusai GDExtension. Make builds, stages and
 registers it before Godot import. Configure installed executable paths in
 `local.mk` or command-line overrides; see [toolchain setup](../docs/TOOLCHAIN.md).
 
+With **Brush** or **Eraser** active, the top options row contains the native
+**Hard Round / Soft / Ink / Airbrush** selector and **Brush px** width field.
+For the 96px hard-round fill check, choose **Hard Round** and enter **96**.
+On narrow windows, use the option-row chevrons, Shift+wheel or keyboard focus
+to reach controls that overflow. `make test-graphical` runs the moving-stroke
+tile-retention regression under Xvfb; this requires `xvfb-run` on the test host.
+
 Clean/release build omitting all Atlas content:
 
 ```sh
