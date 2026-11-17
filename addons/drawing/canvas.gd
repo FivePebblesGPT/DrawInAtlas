@@ -247,8 +247,7 @@ var _reported_render_errors: Dictionary[String, bool] = {}
 ## after release. Batch consecutive swept segments in one edit transaction call
 ## and stop at a measured CPU budget, including on the release input path.
 const MAX_SEGMENTS_PER_FRAME: int = 256
-const MAX_SEGMENTS_PER_BATCH: int = 16
-const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
+const MAX_SEGMENTS_PER_BATCH: int = 20
 const MAX_DRAIN_CPU_US: int = 6000
 # Preview draw scheduling never changes the 6ms soft raster-stage deadline.
 # During a sustained input backlog a display frame may represent two bounded
@@ -1898,17 +1897,14 @@ func _drain_segments(budget: int) -> void:
 	# because an input sample was consumed; actual pixel mutations increment
 	# the session preview generation (including edits that restore old bytes).
 	var preview_before: int = session._preview_epoch
-	# A wide brush can rasterize more candidates in one segment than a
-	# narrow one does in 16. Limit the atomic batch by swept footprint so
-	# the soft deadline is not defeated by one oversized paint_path call.
-	var estimated_segment_pixels: float = maxf(1.0,
-		_stroke_width * (_stroke_width + MAX_SEGMENT_LENGTH))
-	var batch_limit: int = clampi(int(MAX_BATCH_ESTIMATED_PIXELS / estimated_segment_pixels),
-		1, MAX_SEGMENTS_PER_BATCH)
-	# Hokusai accumulates pigment natively: exporting every intermediate 60px
-	# dab would repeatedly restage the same dirty tiles. Collapse up to sixteen
-	# adjacent source samples into one atomic native call/preview update.
-	batch_limit = MAX_SEGMENTS_PER_BATCH
+	# For native Hokusai, group adjacent input segments into bounded atomic
+	# transactions. The 20-segment cap reduced repeated stage/ack transactions
+	# in the strict 96px benchmark; it does not change the 6ms soft deadline
+	# between calls, source input samples, or pressure/selection semantics.
+	# The diagnostic counterfactual uses the previous 16-segment cap.
+	var batch_limit: int = MAX_SEGMENTS_PER_BATCH
+	if OS.has_environment("DRAWING_T194_BATCH_COUNTERFACTUAL"):
+		batch_limit = 16
 	while segments < budget:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
