@@ -1,0 +1,15 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+    Finished `release` profile [optimized] target(s) in 2.90s
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:796:
+         for &threshold in thresholds {
+             for bits in threshold.saturating_sub(2)..=threshold.saturating_add(2) {
+                 let linear = f32::from_bits(bits);
+-                assert_eq!(srgb_byte_exact(linear, thresholds), srgb_byte_reference(linear));
++                assert_eq!(
++                    srgb_byte_exact(linear, thresholds),
++                    srgb_byte_reference(linear)
++                );
+             }
+         }
+     }
+make: *** [Makefile:32: native] Error 1

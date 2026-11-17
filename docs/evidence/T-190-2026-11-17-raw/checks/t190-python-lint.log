@@ -1,0 +1,16 @@
+.....SCRIPT ERROR: injected error
+.........zstd: /tmp/tmppgbp_n92/corrupt.tar.zst: unsupported format 
+....
+----------------------------------------------------------------------
+Ran 18 tests in 0.431s
+
+OK
+ingested-0: valid=False exit=124
+ingested-1: valid=True exit=0
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.006s
+
+OK
+All checks passed!
+All checks passed!

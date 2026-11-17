@@ -1,0 +1,425 @@
+{
+  "repository_sha": "d59b89466ffdbf0a7fffe383ac68fb6e2efcf192",
+  "native_sha256": "3669d4b0c4c2d38757a9d47a808cfd2edc9b666a5934fa51cad39ce7254b582e",
+  "godot": "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/toolchains/3196a30246b27be598eb010c207897045d59d87c65eac967c603baa4b0f135c2/bin/godot",
+  "runs": [
+    {
+      "backend": "Hokusai",
+      "mode": "cold",
+      "index": 0,
+      "runs": 1,
+      "exit": 0,
+      "checker_exit": 0,
+      "checker_output": "",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-190/buffer/round2/optimized/hokusai-cold-0.time",
+        "timeout",
+        "55s",
+        "xvfb-run",
+        "-a",
+        "-s",
+        "-screen 0 1280x900x24",
+        "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/toolchains/3196a30246b27be598eb010c207897045d59d87c65eac967c603baa4b0f135c2/bin/godot",
+        "--display-driver",
+        "x11",
+        "--rendering-method",
+        "gl_compatibility",
+        "--audio-driver",
+        "Dummy",
+        "--path",
+        "drawing",
+        "--script",
+        "res://tests/t146_hokusai_full_canvas_native.gd"
+      ],
+      "log": "hokusai-cold-0.log",
+      "log_sha256": "efefcb21658b89579716428d44535feecc06c71ce262cc1a6a10de689427c06b",
+      "user_cpu_s": 1.37,
+      "system_cpu_s": 0.27,
+      "peak_rss_kib": 273276,
+      "observations": [
+        {
+          "index": "0",
+          "backend": "Hokusai",
+          "source_pixels": "262144",
+          "width_px": "96",
+          "input_events": "100",
+          "total_to_postdraw_ms": "337.513",
+          "release_to_commit_ms": "176.752",
+          "stage_cpu_ms": "102.601",
+          "drain_frames": "11",
+          "max_pending": "99",
+          "commit_cpu_ms": "0.860",
+          "compose_cpu_ms": "2.285",
+          "texture_cpu_ms": "2.242",
+          "preview_frames": "9",
+          "segments_staged": "296",
+          "drain_calls": "13",
+          "max_batch_ms": "12.368",
+          "max_drain_ms": "12.399",
+          "frame_compose_p95_ms": "0.420",
+          "max_frame_compose_ms": "0.420",
+          "max_frame_draw_ms": "0.985",
+          "retained_texture_bytes": "1048576",
+          "first_submit_ms": 10.13,
+          "first_postdraw_ms": 33.901,
+          "native_ffi_calls": 62,
+          "tile_ffi_calls": 75,
+          "tile_bytes_exported": 3997696,
+          "source_coverage": 262144,
+          "source_opaque": 5842,
+          "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+        }
+      ],
+      "valid": true
+    },
+    {
+      "backend": "Hokusai",
+      "mode": "cold",
+      "index": 1,
+      "runs": 1,
+      "exit": 0,
+      "checker_exit": 0,
+      "checker_output": "",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-190/buffer/round2/optimized/hokusai-cold-1.time",
+        "timeout",
+        "55s",
+        "xvfb-run",
+        "-a",
+        "-s",
+        "-screen 0 1280x900x24",
+        "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/toolchains/3196a30246b27be598eb010c207897045d59d87c65eac967c603baa4b0f135c2/bin/godot",
+        "--display-driver",
+        "x11",
+        "--rendering-method",
+        "gl_compatibility",
+        "--audio-driver",
+        "Dummy",
+        "--path",
+        "drawing",
+        "--script",
+        "res://tests/t146_hokusai_full_canvas_native.gd"
+      ],
+      "log": "hokusai-cold-1.log",
+      "log_sha256": "5b97f84679f26e7acbdeb0b763499274da3c5469e859f1f9c64099652132e96d",
+      "user_cpu_s": 1.24,
+      "system_cpu_s": 0.25,
+      "peak_rss_kib": 270972,
+      "observations": [
+        {
+          "index": "0",
+          "backend": "Hokusai",
+          "source_pixels": "262144",
+          "width_px": "96",
+          "input_events": "100",
+          "total_to_postdraw_ms": "266.852",
+          "release_to_commit_ms": "140.607",
+          "stage_cpu_ms": "89.842",
+          "drain_frames": "9",
+          "max_pending": "99",
+          "commit_cpu_ms": "1.209",
+          "compose_cpu_ms": "1.932",
+          "texture_cpu_ms": "2.243",
+          "preview_frames": "8",
+          "segments_staged": "296",
+          "drain_calls": "11",
+          "max_batch_ms": "6.486",
+          "max_drain_ms": "11.688",
+          "frame_compose_p95_ms": "0.366",
+          "max_frame_compose_ms": "0.366",
+          "max_frame_draw_ms": "0.996",
+          "retained_texture_bytes": "1048576",
+          "first_submit_ms": 10.93,
+          "first_postdraw_ms": 29.741,
+          "native_ffi_calls": 62,
+          "tile_ffi_calls": 69,
+          "tile_bytes_exported": 3604480,
+          "source_coverage": 262144,
+          "source_opaque": 5842,
+          "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+        }
+      ],
+      "valid": true
+    },
+    {
+      "backend": "Hokusai",
+      "mode": "warm",
+      "index": 0,
+      "runs": 2,
+      "exit": 0,
+      "checker_exit": 0,
+      "checker_output": "",
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-190/buffer/round2/optimized/hokusai-warm-0.time",
+        "timeout",
+        "55s",
+        "xvfb-run",
+        "-a",
+        "-s",
+        "-screen 0 1280x900x24",
+        "/mnt/data/DrawInAtlas-sprint-2026-11-17/.build/toolchains/3196a30246b27be598eb010c207897045d59d87c65eac967c603baa4b0f135c2/bin/godot",
+        "--display-driver",
+        "x11",
+        "--rendering-method",
+        "gl_compatibility",
+        "--audio-driver",
+        "Dummy",
+        "--path",
+        "drawing",
+        "--script",
+        "res://tests/t146_hokusai_full_canvas_native.gd"
+      ],
+      "log": "hokusai-warm-0.log",
+      "log_sha256": "7a5a77be48c2bc078573f6dbf82d668baabaf5fa877c682815814c6a51d5c43a",
+      "user_cpu_s": 1.75,
+      "system_cpu_s": 0.21,
+      "peak_rss_kib": 275308,
+      "observations": [
+        {
+          "index": "0",
+          "backend": "Hokusai",
+          "source_pixels": "262144",
+          "width_px": "96",
+          "input_events": "100",
+          "total_to_postdraw_ms": "263.795",
+          "release_to_commit_ms": "140.091",
+          "stage_cpu_ms": "86.151",
+          "drain_frames": "9",
+          "max_pending": "99",
+          "commit_cpu_ms": "1.024",
+          "compose_cpu_ms": "1.946",
+          "texture_cpu_ms": "2.127",
+          "preview_frames": "8",
+          "segments_staged": "296",
+          "drain_calls": "11",
+          "max_batch_ms": "6.022",
+          "max_drain_ms": "11.762",
+          "frame_compose_p95_ms": "0.353",
+          "max_frame_compose_ms": "0.353",
+          "max_frame_draw_ms": "1.139",
+          "retained_texture_bytes": "1048576",
+          "first_submit_ms": 9.381,
+          "first_postdraw_ms": 27.608,
+          "native_ffi_calls": 62,
+          "tile_ffi_calls": 69,
+          "tile_bytes_exported": 3604480,
+          "source_coverage": 262144,
+          "source_opaque": 5842,
+          "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+        },
+        {
+          "index": "1",
+          "backend": "Hokusai",
+          "source_pixels": "262144",
+          "width_px": "96",
+          "input_events": "100",
+          "total_to_postdraw_ms": "293.378",
+          "release_to_commit_ms": "162.693",
+          "stage_cpu_ms": "111.398",
+          "drain_frames": "9",
+          "max_pending": "99",
+          "commit_cpu_ms": "0.997",
+          "compose_cpu_ms": "2.268",
+          "texture_cpu_ms": "2.779",
+          "preview_frames": "8",
+          "segments_staged": "296",
+          "drain_calls": "11",
+          "max_batch_ms": "14.047",
+          "max_drain_ms": "19.353",
+          "frame_compose_p95_ms": "0.443",
+          "max_frame_compose_ms": "0.443",
+          "max_frame_draw_ms": "1.363",
+          "retained_texture_bytes": "1048576",
+          "first_submit_ms": 10.952,
+          "first_postdraw_ms": 24.162,
+          "native_ffi_calls": 62,
+          "tile_ffi_calls": 71,
+          "tile_bytes_exported": 3735552,
+          "source_coverage": 262144,
+          "source_opaque": 5842,
+          "source_sha256": "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+        }
+      ],
+      "valid": true
+    }
+  ],
+  "matrix": {
+    "Hokusai": {
+      "cold": {
+        "stats": {
+          "total_to_postdraw_ms": {
+            "n": 2,
+            "p50": 266.852,
+            "p95": 337.513,
+            "max": 337.513
+          },
+          "release_to_commit_ms": {
+            "n": 2,
+            "p50": 140.607,
+            "p95": 176.752,
+            "max": 176.752
+          },
+          "stage_cpu_ms": {
+            "n": 2,
+            "p50": 89.842,
+            "p95": 102.601,
+            "max": 102.601
+          },
+          "commit_cpu_ms": {
+            "n": 2,
+            "p50": 0.86,
+            "p95": 1.209,
+            "max": 1.209
+          },
+          "compose_cpu_ms": {
+            "n": 2,
+            "p50": 1.932,
+            "p95": 2.285,
+            "max": 2.285
+          },
+          "texture_cpu_ms": {
+            "n": 2,
+            "p50": 2.242,
+            "p95": 2.243,
+            "max": 2.243
+          },
+          "max_drain_ms": {
+            "n": 2,
+            "p50": 11.688,
+            "p95": 12.399,
+            "max": 12.399
+          },
+          "max_frame_draw_ms": {
+            "n": 2,
+            "p50": 0.985,
+            "p95": 0.996,
+            "max": 0.996
+          },
+          "first_submit_ms": {
+            "n": 2,
+            "p50": 10.13,
+            "p95": 10.93,
+            "max": 10.93
+          },
+          "first_postdraw_ms": {
+            "n": 2,
+            "p50": 29.741,
+            "p95": 33.901,
+            "max": 33.901
+          },
+          "native_ffi_calls": {
+            "n": 2,
+            "p50": 62.0,
+            "p95": 62.0,
+            "max": 62.0
+          },
+          "tile_ffi_calls": {
+            "n": 2,
+            "p50": 69.0,
+            "p95": 75.0,
+            "max": 75.0
+          },
+          "tile_bytes_exported": {
+            "n": 2,
+            "p50": 3604480.0,
+            "p95": 3997696.0,
+            "max": 3997696.0
+          }
+        },
+        "n": 2
+      },
+      "warm": {
+        "stats": {
+          "total_to_postdraw_ms": {
+            "n": 2,
+            "p50": 263.795,
+            "p95": 293.378,
+            "max": 293.378
+          },
+          "release_to_commit_ms": {
+            "n": 2,
+            "p50": 140.091,
+            "p95": 162.693,
+            "max": 162.693
+          },
+          "stage_cpu_ms": {
+            "n": 2,
+            "p50": 86.151,
+            "p95": 111.398,
+            "max": 111.398
+          },
+          "commit_cpu_ms": {
+            "n": 2,
+            "p50": 0.997,
+            "p95": 1.024,
+            "max": 1.024
+          },
+          "compose_cpu_ms": {
+            "n": 2,
+            "p50": 1.946,
+            "p95": 2.268,
+            "max": 2.268
+          },
+          "texture_cpu_ms": {
+            "n": 2,
+            "p50": 2.127,
+            "p95": 2.779,
+            "max": 2.779
+          },
+          "max_drain_ms": {
+            "n": 2,
+            "p50": 11.762,
+            "p95": 19.353,
+            "max": 19.353
+          },
+          "max_frame_draw_ms": {
+            "n": 2,
+            "p50": 1.139,
+            "p95": 1.363,
+            "max": 1.363
+          },
+          "first_submit_ms": {
+            "n": 2,
+            "p50": 9.381,
+            "p95": 10.952,
+            "max": 10.952
+          },
+          "first_postdraw_ms": {
+            "n": 2,
+            "p50": 24.162,
+            "p95": 27.608,
+            "max": 27.608
+          },
+          "native_ffi_calls": {
+            "n": 2,
+            "p50": 62.0,
+            "p95": 62.0,
+            "max": 62.0
+          },
+          "tile_ffi_calls": {
+            "n": 2,
+            "p50": 69.0,
+            "p95": 71.0,
+            "max": 71.0
+          },
+          "tile_bytes_exported": {
+            "n": 2,
+            "p50": 3604480.0,
+            "p95": 3735552.0,
+            "max": 3735552.0
+          }
+        },
+        "n": 2
+      }
+    }
+  }
+}

@@ -3,6 +3,7 @@
 //! uses its transitional GDScript source adapter pending the T-149 cutover.
 mod native_tiles;
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
@@ -117,7 +118,47 @@ impl Default for ExportedTile {
     }
 }
 
+// A 64k-bin monotone byte oracle: when both boundaries quantize to the
+// same sRGB8 value, every value inside the bin has exactly that byte.
+// Boundary-crossing bins use the pinned Hokusai powf implementation to
+// preserve its rounding and all hidden-alpha/source contracts.
+static SRGB_BYTE_BINS: OnceLock<Vec<u8>> = OnceLock::new();
+
+fn srgb_byte(linear: f32, reference: bool) -> u32 {
+    fn exact(linear: f32) -> u32 {
+        (hokusai::color::linear_to_srgb(linear).clamp(0.0, 1.0) * 255.0).round() as u32
+    }
+    if reference {
+        return exact(linear);
+    }
+    if linear <= 0.0 {
+        return 0;
+    }
+    if linear >= 1.0 {
+        return 255;
+    }
+    let bins = SRGB_BYTE_BINS.get_or_init(|| {
+        (0..=65536)
+            .map(|i| exact(i as f32 / 65536.0) as u8)
+            .collect()
+    });
+    let index = (linear * 65536.0).floor() as usize;
+    if bins[index] == bins[index + 1] {
+        u32::from(bins[index])
+    } else {
+        exact(linear)
+    }
+}
+
+#[cfg(test)]
 fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
+    quantize_pixel_with_mode(
+        pixel,
+        std::env::var_os("DRAWING_T190_POWF_COUNTERFACTUAL").is_some(),
+    )
+}
+
+fn quantize_pixel_with_mode(pixel: &[u16; 4], reference: bool) -> u32 {
     let alpha = hokusai::fix15::to_f32(pixel[3]).clamp(0.0, 1.0);
     let mut rgba = 0_u32;
     for (index, &channel) in pixel.iter().take(3).enumerate() {
@@ -126,7 +167,7 @@ fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
         } else {
             0.0
         };
-        let value = (hokusai::color::linear_to_srgb(linear).clamp(0.0, 1.0) * 255.0).round() as u32;
+        let value = srgb_byte(linear, reference);
         rgba |= value << (8 * index);
     }
     rgba | (((alpha * 255.0).round() as u32) << 24)
@@ -140,6 +181,7 @@ fn scan_changed_pixels(
     published: &mut ExportedTile,
     mut emit: impl FnMut(usize, u32),
 ) {
+    let reference = std::env::var_os("DRAWING_T190_POWF_COUNTERFACTUAL").is_some();
     for (row, tile_row) in tile.iter().enumerate() {
         for (column, pixel) in tile_row.iter().enumerate() {
             let index = row * TILE_SIZE + column;
@@ -147,7 +189,7 @@ fn scan_changed_pixels(
                 continue;
             }
             published.raw[index] = *pixel;
-            let rgba = quantize_pixel(pixel);
+            let rgba = quantize_pixel_with_mode(pixel, reference);
             if rgba != published.rgba[index] {
                 published.rgba[index] = rgba;
                 emit(index, rgba);
@@ -773,6 +815,43 @@ mod tests {
         surface.commit_batch();
         assert_eq!(surface.tile(3, -2).unwrap()[0][0], [11, 12, 13, 14]);
         assert!(surface.before_batch.is_none());
+    }
+
+    #[test]
+    fn t190_srgb_bins_match_hokusai_at_every_fixedpoint_alpha_sample() {
+        // The exact fallback must cover every 8-bit boundary and the LUT
+        // must not alter even low-alpha premultiplied values or hidden RGB.
+        for alpha in [
+            0_u16, 1, 2, 3, 7, 13, 127, 255, 256, 1024, 4096, 16384, 32768, 32769, 65535,
+        ] {
+            let scale = hokusai::fix15::to_f32(alpha);
+            for channel in 0..=u16::MAX {
+                let linear = if scale == 0.0 {
+                    0.0
+                } else {
+                    hokusai::fix15::to_f32(channel) / scale
+                };
+                assert_eq!(
+                    srgb_byte(linear, false),
+                    srgb_byte(linear, true),
+                    "alpha={alpha}, channel={channel}"
+                );
+            }
+        }
+        for bin in 0..65536_u32 {
+            for offset in [0.0_f32, 0.25, 0.5, 0.75, 0.999] {
+                let linear = (bin as f32 + offset) / 65536.0;
+                assert_eq!(
+                    srgb_byte(linear, false),
+                    srgb_byte(linear, true),
+                    "linear bin={bin}, offset={offset}"
+                );
+            }
+        }
+        assert_eq!(
+            quantize_pixel_with_mode(&[18, 86, 142, 0], false),
+            quantize_pixel_with_mode(&[18, 86, 142, 0], true)
+        );
     }
 
     #[test]

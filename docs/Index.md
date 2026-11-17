@@ -31,9 +31,8 @@ new graphical checks. [T-189](Tickets/T-189.md) is now Done for
 reversed-order same-binary rapid pooled cold full-gesture p50/p95
 339/364→282/390ms, warm 297/337→273/281ms, with 77 graphical and
 29 Rust tests. Tile-stage CPU consistently falls, but cold tail and real
-workspace release/frame pacing remain mixed. The **250ms/200ms unchanged
-full-gesture targets remain open** in [T-190](Tickets/T-190.md) (Ready),
-not T-095 physical owner acceptance.
+workspace release/frame pacing remain mixed. [T-190](Tickets/T-190.md) is now Done for [bounded exact sRGB8 native export](evidence/T-190-2026-11-17-srgb-byte-quantization.md):
+30 native Rust tests and 77 graphical parity checks; final same-binary rapid warm p50/p95 347/423→232/240ms in pair 1 and 297/335→261/282ms in pair 2, while cold pair 2 regressed. Full-workspace frame/release is mixed. The **250ms/200ms unchanged complete-gesture targets remain open** in [T-191](Tickets/T-191.md) (Ready), independent of T-095 physical owner acceptance.
 
 ## Current alpha architecture — Rust-owned raster
 
@@ -111,6 +110,8 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-187 · Residual native Drawing latency after exact preview invalidation](Tickets/T-187.md) | Done | [Same-native repeated pooled cold p50/p95 662/742→343/383ms, warm 553/598→344/358ms; 54% composition CPU 299→2.8ms and 99-check graphical parity/crop cap](evidence/T-187-2026-11-17-direct-native-preview.md); 250/200ms full-gesture targets remain open in T-188 | [T-186](Tickets/T-186.md) |
 | [T-188 · Run-aware native Brush/Eraser staging](Tickets/T-188.md) | Done | [Two matched same-binary A/B rounds](evidence/T-188-2026-11-17-run-aware-native-staging.md), final cold p50/p95 388/494→266/422ms, warm 358/450→286/297ms; 63 graphical checks, 28 Rust tests; frame and release variation retained; 250/200ms continue through T-189 to T-190 | [T-187](Tickets/T-187.md) |
 | [T-189 · Further 96px native full-gesture latency after run grouping](Tickets/T-189.md) | Done | [Per-tile source read vs per-pixel A/B](evidence/T-189-2026-11-17-native-source-read.md), pooled cold p50/p95 339/364→282/390ms and warm 297/337→273/281ms; tile-stage improvement, mixed frame/cold tail, 77 graphical, 29 Rust; targets T-190 | [T-188](Tickets/T-188.md) |
+| [T-190 · Exact native sRGB byte quantization after source lookup hoisting](Tickets/T-190.md) | Done | [Bounded 64KiB sRGB8 LUT with exact powf fallback](evidence/T-190-2026-11-17-srgb-byte-quantization.md), 30 Rust/77 graphical, 2 reversed-order final rapid pairs: warm improved, cold tails mixed; targets continue T-191 | [T-189](Tickets/T-189.md) |
+| [T-191 · Residual complete 96px gesture after exact sRGB8 export](Tickets/T-191.md) | Ready | Re-profile remaining native/queue/postdraw costs, fail-first one bounded improvement; 250/200ms whole-gesture gates and owner hardware acceptance remain open | [T-190](Tickets/T-190.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Required-native Linux/Windows builds, exports and process/VRAM evidence | [T-052](Tickets/T-052.md), [T-150](Tickets/T-150.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | Fresh post-Legacy required-native CI inventory + hosted green | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | New hosted replay and 23-finding owner matrix; preserve historic 46 | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
@@ -141,7 +142,6 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | Completed scope; see ticket evidence | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
 | [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Ready | Completed scope; see ticket evidence | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | Completed scope; see ticket evidence | [T-051](Tickets/T-051.md) |
-| [T-190 · Remaining native full-gesture latency after source-read hoisting](Tickets/T-190.md) | Ready | [T-189 measured faster native tile staging](evidence/T-189-2026-11-17-native-source-read.md) but pooled 282ms cold / 273ms warm full-gesture p50 and mixed frame/settle tails still miss 250/200ms; profile raster/scan/release | [T-189](Tickets/T-189.md) |
 
 ## 5. Blocked by dependencies or future owner review
 

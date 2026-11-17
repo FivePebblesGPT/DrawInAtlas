@@ -267,3 +267,6 @@ docs/evidence/T-107-2026-11-12-replay-capture/logs/*.log whitespace=-trailing-sp
 docs/evidence/T-148-2026-11-15-unreferenced-raster-raw/*.log whitespace=-trailing-space
 # T-189 raw benchmark logs/fixtures are immutable, including whitespace.
 docs/evidence/T-189-2026-11-17-raw/** whitespace=-trailing-space
+
+# Preserve T-190 raw native/Godot evidence exactly, including whitespace.
+docs/evidence/T-190-2026-11-17-raw/** whitespace=-trailing-space

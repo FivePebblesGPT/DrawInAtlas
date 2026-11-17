@@ -1,0 +1,19 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error[E0609]: no field `preview_capacity_growth_batches` on type `NativeStroke`
+   --> src/lib.rs:945:24
+    |
+945 |         assert!(stroke.preview_capacity_growth_batches < stroke.batches);
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `handle`, `layer`, `source_revision`, `rgba`, `clip` ... and 8 others
+
+error[E0609]: no field `preview_peak_bytes` on type `NativeStroke`
+   --> src/lib.rs:946:24
+    |
+946 |         assert!(stroke.preview_peak_bytes <= (MAX_EXPORTED_INTS * 4) as i64);
+    |                        ^^^^^^^^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `handle`, `layer`, `source_revision`, `rgba`, `clip` ... and 8 others
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `drawing-brush` (lib test) due to 2 previous errors
