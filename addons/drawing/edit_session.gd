@@ -804,6 +804,7 @@ var t185_native_stage: Dictionary = {
 	"authorize_us": 0, "apply_us": 0, "dirty_query_us": 0,
 	"stamp_us": 0, "index_us": 0, "dirty_entries": 0,
 	"revisited_entries": 0, "batch_calls": 0, "unique_tiles": 0,
+	"sample_pack_us": 0, "append_us": 0, "total_batch_us": 0,
 }
 ## Native tile batches are optional only for historical direct adapter fixtures.
 ## Production Canvas opts into this Rust-owned staging path.
@@ -1063,6 +1064,7 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 	if _closed or _native_handle == 0 or path.is_empty() \
 			or document.revision != expected_revision:
 		return DrawingResult.failure("NATIVE_STALE", "Native stroke is closed or source revision changed")
+	var pack_start_us: int = Time.get_ticks_usec()
 	var inverse: Transform2D = view_transform.affine_inverse()
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(path.size() * 4)
@@ -1073,12 +1075,19 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 		samples[index * 4 + 2] = pressure
 		samples[index * 4 + 3] = delta_seconds
 	var native_start_us: int = Time.get_ticks_usec()
+	if OS.has_environment("DRAWING_T185_PROFILE"):
+		t185_native_stage["sample_pack_us"] += native_start_us - pack_start_us
 	var accepted: Dictionary = _native_stroke.call("append_samples", _native_handle,
 		expected_revision, samples)
+	if OS.has_environment("DRAWING_T185_PROFILE"):
+		t185_native_stage["append_us"] += Time.get_ticks_usec() - native_start_us
 	if not bool(accepted.get("ok", false)):
 		return DrawingResult.failure("NATIVE_BATCH", str(accepted.get("error", "Sample batch rejected")))
 	if _native_tiles != null:
-		return _stage_native_tile_batch(erase, selection)
+		var result: DrawingResult = _stage_native_tile_batch(erase, selection)
+		if OS.has_environment("DRAWING_T185_PROFILE"):
+			t185_native_stage["total_batch_us"] += Time.get_ticks_usec() - pack_start_us
+		return result
 	var exported: Dictionary = _native_stroke.call("preview_changes", _native_handle, expected_revision)
 	var native_elapsed_us: int = Time.get_ticks_usec() - native_start_us
 	if not bool(exported.get("ok", false)):

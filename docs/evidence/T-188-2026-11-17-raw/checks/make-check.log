@@ -1,0 +1,251 @@
+.....SCRIPT ERROR: injected error
+.........zstd: /tmp/tmp3s9vm_r5/corrupt.tar.zst: unsupported format 
+....
+----------------------------------------------------------------------
+Ran 18 tests in 0.426s
+
+OK
+ingested-0: valid=False exit=124
+ingested-1: valid=True exit=0
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.004s
+
+OK
+All checks passed!
+All checks passed!
+    Finished `release` profile [optimized] target(s) in 0.02s
+Required native Brush/Eraser: /mnt/data/DrawInAtlas-sprint-2026-11-17/addons/drawing/native/bin/libdrawing_brush.so
+/mnt/data/DrawInAtlas-sprint-2026-11-17/drawing
+/mnt/data/DrawInAtlas-sprint-2026-11-17/drawing/.godot/extension_list.cfg
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+WARNING: Missing .uid file for path "res://addons/drawing/native/drawing_brush.gdextension". The file was re-created from cache.
+     at: _process_file_system (editor/file_system/editor_file_system.cpp:1388)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | Started Registering global classes... (5 steps)[39m[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  16% ] [90m[1mupdate_scripts_classes[22m | DrawingEditSession[39m[0m
+[  33% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  50% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  66% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[92m[ DONE ][39m [1mupdate_scripts_classes[22m
+[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Started Scanning actions... (23 steps)[39m[0m
+[   0% ] [90m[1m_update_scan_actions[22m | airbrush.png[39m[0m
+[   4% ] [90m[1m_update_scan_actions[22m | hard.png[39m[0m
+[   8% ] [90m[1m_update_scan_actions[22m | ink.png[39m[0m
+[  12% ] [90m[1m_update_scan_actions[22m | soft.png[39m[0m
+[  16% ] [90m[1m_update_scan_actions[22m | Lato-Bold.ttf[39m[0m
+[  20% ] [90m[1m_update_scan_actions[22m | Lato-Italic.ttf[39m[0m
+[  25% ] [90m[1m_update_scan_actions[22m | Lato-Regular.ttf[39m[0m
+[  29% ] [90m[1m_update_scan_actions[22m | brush.svg[39m[0m
+[  33% ] [90m[1m_update_scan_actions[22m | dock_brushes.svg[39m[0m
+[  37% ] [90m[1m_update_scan_actions[22m | dock_colors.svg[39m[0m
+[  41% ] [90m[1m_update_scan_actions[22m | dock_history.svg[39m[0m
+[  45% ] [90m[1m_update_scan_actions[22m | dock_layers.svg[39m[0m
+[  50% ] [90m[1m_update_scan_actions[22m | dock_panel.svg[39m[0m
+[  54% ] [90m[1m_update_scan_actions[22m | dock_swatches.svg[39m[0m
+[  58% ] [90m[1m_update_scan_actions[22m | eraser.svg[39m[0m
+[  62% ] [90m[1m_update_scan_actions[22m | layer_hidden.svg[39m[0m
+[  66% ] [90m[1m_update_scan_actions[22m | layer_locked.svg[39m[0m
+[  70% ] [90m[1m_update_scan_actions[22m | layer_unlocked.svg[39m[0m
+[  75% ] [90m[1m_update_scan_actions[22m | layer_visible.svg[39m[0m
+[  79% ] [90m[1m_update_scan_actions[22m | move.svg[39m[0m
+[  83% ] [90m[1m_update_scan_actions[22m | pan.svg[39m[0m
+[  87% ] [90m[1m_update_scan_actions[22m | select.svg[39m[0m
+[  91% ] [90m[1m_update_scan_actions[22m | text.svg[39m[0m
+[92m[ DONE ][39m [1m_update_scan_actions[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (23 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   4% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   8% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  12% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  16% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  20% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  25% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  29% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  33% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  37% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  41% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  45% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  50% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  54% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  58% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  62% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  66% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  70% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  75% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  79% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  83% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  87% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  91% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[   4% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[   8% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  12% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[  16% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  20% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  25% ] [90m[1mreimport[22m | text.svg[39m[0m
+[  29% ] [90m[1mreimport[22m | select.svg[39m[0m
+[  33% ] [90m[1mreimport[22m | pan.svg[39m[0m
+[  37% ] [90m[1mreimport[22m | move.svg[39m[0m
+[  41% ] [90m[1mreimport[22m | layer_visible.svg[39m[0m
+[  45% ] [90m[1mreimport[22m | layer_unlocked.svg[39m[0m
+[  50% ] [90m[1mreimport[22m | layer_locked.svg[39m[0m
+[  54% ] [90m[1mreimport[22m | layer_hidden.svg[39m[0m
+[  58% ] [90m[1mreimport[22m | eraser.svg[39m[0m
+[  62% ] [90m[1mreimport[22m | dock_swatches.svg[39m[0m
+[  66% ] [90m[1mreimport[22m | dock_panel.svg[39m[0m
+[  70% ] [90m[1mreimport[22m | dock_layers.svg[39m[0m
+[  75% ] [90m[1mreimport[22m | dock_history.svg[39m[0m
+[  79% ] [90m[1mreimport[22m | dock_colors.svg[39m[0m
+[  83% ] [90m[1mreimport[22m | dock_brushes.svg[39m[0m
+[  87% ] [90m[1mreimport[22m | brush.svg[39m[0m
+[  91% ] [90m[1mreimport[22m | soft.png[39m[0m
+[  95% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (23 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+NATIVE_EXTENSION_READY
+/mnt/data/DrawInAtlas-sprint-2026-11-17/.godot/extension_list.cfg
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+WARNING: Detected another project.godot at res://drawing. The folder will be ignored.
+     at: _should_skip_directory (editor/file_system/editor_file_system.cpp:3484)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[38;2;218;165;32mIt was recognized that GdUnit4 is running in a test environment, therefore the GdUnit4 plugin will not be executed![0m
+MCP | plugin disabled in headless mode
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | Started Registering global classes... (2 steps)[39m[0m
+[   0% ] [90m[1mupdate_scripts_classes[22m | [39m[0m
+[  33% ] [90m[1mupdate_scripts_classes[22m | DrawingEditSession[39m[0m
+[92m[ DONE ][39m [1mupdate_scripts_classes[22m
+[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Started Scanning actions... (6 steps)[39m[0m
+[   0% ] [90m[1m_update_scan_actions[22m | airbrush.png[39m[0m
+[  14% ] [90m[1m_update_scan_actions[22m | hard.png[39m[0m
+[  28% ] [90m[1m_update_scan_actions[22m | ink.png[39m[0m
+[  42% ] [90m[1m_update_scan_actions[22m | soft.png[39m[0m
+[  57% ] [90m[1m_update_scan_actions[22m | T-184-2026-11-17-docked.png[39m[0m
+[  71% ] [90m[1m_update_scan_actions[22m | T-184-2026-11-17-floating.png[39m[0m
+[92m[ DONE ][39m [1m_update_scan_actions[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (6 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  14% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  28% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  42% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  57% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  71% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mreimport[22m | airbrush.png[39m[0m
+[  14% ] [90m[1mreimport[22m | hard.png[39m[0m
+[  28% ] [90m[1mreimport[22m | ink.png[39m[0m
+[  42% ] [90m[1mreimport[22m | soft.png[39m[0m
+[  57% ] [90m[1mreimport[22m | T-184-2026-11-17-docked.png[39m[0m
+[  71% ] [90m[1mreimport[22m | T-184-2026-11-17-floating.png[39m[0m
+[  85% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (6 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+NATIVE_EXTENSION_READY
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error[E0425]: cannot find value `optimized_lookups` in this scope
+    --> src/native_tiles.rs:1864:17
+     |
+1864 |                 optimized_lookups < reference_lookups,
+     |                 ^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `reference_lookups` in this scope
+    --> src/native_tiles.rs:1864:37
+     |
+1864 |                 optimized_lookups < reference_lookups,
+     |                                     ^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `reference_lookups` in this scope
+    --> src/native_tiles.rs:1868:17
+     |
+1868 |                 reference_lookups,
+     |                 ^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0599]: no method named `values` found for tuple `(std::collections::HashMap<(i64, i64), Vec<(usize, usize, u32)>>, usize)` in the current scope
+    --> src/native_tiles.rs:1871:31
+     |
+1871 |             assert!(optimized.values().any(|d| d.len() > 1));
+     |                               ^^^^^^ this is an associated function, not a method
+     |
+     = note: found the following associated functions; to be used as methods, functions must have a `self` parameter
+note: the candidate is defined in the trait `EngineEnum`
+    --> /mnt/data/DrawInAtlas-sprint-2026-11-17/.build/toolchains/3196a30246b27be598eb010c207897045d59d87c65eac967c603baa4b0f135c2/vendor/godot-core-0.5.5/src/obj/traits.rs:230:5
+     |
+ 230 |     fn values() -> &'static [Self];
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: use associated function syntax instead
+     |
+1871 -             assert!(optimized.values().any(|d| d.len() > 1));
+1871 +             assert!((std::collections::HashMap<(i64, i64), Vec<(usize, usize, u32)>>, usize)::values().any(|d| d.len() > 1));
+     |
+help: one of the expressions' fields has a method of the same name
+     |
+1871 |             assert!(optimized.0.values().any(|d| d.len() > 1));
+     |                               ++
+
+Some errors have detailed explanations: E0425, E0599.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `drawing-brush` (lib test) due to 4 previous errors
+make: *** [Makefile:56: test] Error 101

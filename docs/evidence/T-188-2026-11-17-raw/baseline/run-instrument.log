@@ -1,0 +1,3 @@
+hokusai-cold-0: exit=0 checker=0 valid=True rss_kib=270208
+hokusai-warm-0: exit=0 checker=0 valid=True rss_kib=273348
+Summary: /mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-188/baseline/instrument/summary.json all_valid: True

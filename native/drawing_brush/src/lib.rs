@@ -4,6 +4,7 @@
 mod native_tiles;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use godot::classes::IRefCounted;
 use godot::prelude::*;
@@ -227,6 +228,8 @@ struct NativeStroke {
     batches: i64,
     input_floats: i64,
     emitted_ints: i64,
+    // Opt-in T-188 profiling: raster, delta scan, tile store apply, ack, tile discovery.
+    phase_us: [u64; 5],
 }
 
 impl NativeStroke {
@@ -261,6 +264,7 @@ impl NativeStroke {
             published: HashMap::new(),
         });
         self.preset.surface.begin_batch();
+        let raster_start = Instant::now();
         for sample in samples {
             self.preset.brush.stroke_to(
                 &mut self.preset.state,
@@ -273,6 +277,8 @@ impl NativeStroke {
                 sample.delta_seconds as f64,
             );
         }
+        self.phase_us[0] += raster_start.elapsed().as_micros() as u64;
+        let scan_start = Instant::now();
         let mut output = Vec::new();
         let mut dirty: Vec<_> = self.preset.surface.changed.drain().collect();
         dirty.sort_unstable();
@@ -299,6 +305,7 @@ impl NativeStroke {
             self.acknowledge(false);
             return Err("Native sample delta exceeds batch output limit");
         }
+        self.phase_us[1] += scan_start.elapsed().as_micros() as u64;
         self.input_floats += (samples.len() * 4) as i64;
         self.emitted_ints += output.len() as i64;
         self.preview = output;
@@ -401,6 +408,7 @@ impl DrawingNativeBrush {
             batches: 0,
             input_floats: 0,
             emitted_ints: 0,
+            phase_us: [0; 5],
         });
         let mut result = Dictionary::new();
         result.set("ok", true);
@@ -504,8 +512,11 @@ impl DrawingNativeBrush {
             return error_result("Invalid native storage tile stride");
         }
         stroke.ffi_calls += 1;
+        let discovery_start = Instant::now();
         let step = 3;
         let mut coords = HashSet::new();
+        let mut last_coords: Option<(i64, i64)> = None;
+        let per_pixel = std::env::var_os("DRAWING_T188_PIXEL_GROUP_COUNTERFACTUAL").is_some();
         for delta in stroke.preview.chunks_exact(step) {
             if stroke.clip.size.x > 0
                 && stroke.clip.size.y > 0
@@ -524,7 +535,11 @@ impl DrawingNativeBrush {
             if x.unsigned_abs() > (1_u64 << 60) || y.unsigned_abs() > (1_u64 << 60) {
                 return error_result("Signed native tile coordinate outside safe bounds");
             }
-            coords.insert((x.div_euclid(stride), y.div_euclid(stride)));
+            let tile = (x.div_euclid(stride), y.div_euclid(stride));
+            if per_pixel || last_coords != Some(tile) {
+                coords.insert(tile);
+                last_coords = Some(tile);
+            }
             if coords.len() > 128 {
                 return error_result("Native sample batch exceeds touched-tile budget");
             }
@@ -541,6 +556,7 @@ impl DrawingNativeBrush {
         let mut result = Dictionary::new();
         result.set("ok", true);
         result.set("tiles", &tiles);
+        stroke.phase_us[4] += discovery_start.elapsed().as_micros() as u64;
         result
     }
 
@@ -578,6 +594,7 @@ impl DrawingNativeBrush {
             stroke.acknowledge(false);
             return error_result("Brush layer/revision differs from native tile transaction");
         }
+        let stage_start = Instant::now();
         let outcome = tile_store.store.stage(
             transaction,
             revision as u64,
@@ -592,7 +609,10 @@ impl DrawingNativeBrush {
         // A rejected source/mask read must rewind the brush's coverage,
         // pigment RNG and cursor before another batch may be appended.
         // TileStore::stage has already rolled back all tile writes on Err.
+        stroke.phase_us[2] += stage_start.elapsed().as_micros() as u64;
+        let ack_start = Instant::now();
         stroke.acknowledge(outcome.is_ok());
+        stroke.phase_us[3] += ack_start.elapsed().as_micros() as u64;
         match outcome {
             Ok(changed) => {
                 let mut result = Dictionary::new();
@@ -675,6 +695,14 @@ impl DrawingNativeBrush {
         result.set("batches", stroke.batches);
         result.set("input_floats", stroke.input_floats);
         result.set("exported_ints", stroke.emitted_ints);
+        if std::env::var_os("DRAWING_T185_PROFILE").is_some() {
+            for (label, us) in ["raster", "delta_scan", "tile_stage", "ack", "discovery"]
+                .into_iter()
+                .zip(stroke.phase_us)
+            {
+                result.set(format!("t188_{label}_us"), us as i64);
+            }
+        }
         result
     }
 
@@ -877,6 +905,7 @@ mod tests {
             batches: 0,
             input_floats: 0,
             emitted_ints: 0,
+            phase_us: [0; 5],
         }
     }
 

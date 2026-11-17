@@ -23,8 +23,11 @@ retained. The 100-event rapid 96px p50 remains 517ms cold / 613ms warm,
 matched pooled cold rapid p50/p95 662/742→343/383ms, warm 553/598→344/358ms, and full-workspace
 54% cold composition CPU 299→2.8ms with 99/99 final graphical parity/cache
 checks. The pinned 100-event metric still **misses 250/200ms**, now tracked
-by [T-188](Tickets/T-188.md) (Ready). "Seems usable" and software-X11 data are
-not physical owner acceptance.
+by [T-188](Tickets/T-188.md) (Done) for [run-aware native delta grouping](evidence/T-188-2026-11-17-run-aware-native-staging.md):
+final same-native rapid cold p50/p95 388/494→266/422ms, warm
+358/450→286/297ms, with exact native source/history parity and 63/63
+new graphical checks. The 250/200ms full-gesture targets remain open under
+[T-189](Tickets/T-189.md) (Ready), not T-095 physical owner acceptance.
 
 ## Current alpha architecture — Rust-owned raster
 
@@ -100,6 +103,7 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-185 · Re-profile current Drawing frame drops and native path](Tickets/T-185.md) | Done | [Four complete software-X11 processes, 32 scenarios, two unverified exits, 54% p95 118ms cold frames; T-146 rapid p50 654ms cold / 680ms warm, composition dominant](evidence/T-185-2026-11-17-current-workspace-profile.md) | [T-146](Tickets/T-146.md), [T-181](Tickets/T-181.md) |
 | [T-186 · Profile-led optimization toward 250ms / 200ms](Tickets/T-186.md) | Done | [Exact native dirty 128px preview A/B: 54% cold frame p95 123→71ms; 19+14 graphical checks](evidence/T-186-2026-11-17-exact-native-dirty-preview.md); 250/200ms rapid targets continue through T-187 into T-188 | [T-185](Tickets/T-185.md) |
 | [T-187 · Residual native Drawing latency after exact preview invalidation](Tickets/T-187.md) | Done | [Same-native repeated pooled cold p50/p95 662/742→343/383ms, warm 553/598→344/358ms; 54% composition CPU 299→2.8ms and 99-check graphical parity/crop cap](evidence/T-187-2026-11-17-direct-native-preview.md); 250/200ms full-gesture targets remain open in T-188 | [T-186](Tickets/T-186.md) |
+| [T-188 · Run-aware native Brush/Eraser staging](Tickets/T-188.md) | Done | [Two matched same-binary A/B rounds](evidence/T-188-2026-11-17-run-aware-native-staging.md), final cold p50/p95 388/494→266/422ms, warm 358/450→286/297ms; 63 graphical checks, 28 Rust tests; frame and release variation retained; 250/200ms remain T-189 | [T-187](Tickets/T-187.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Required-native Linux/Windows builds, exports and process/VRAM evidence | [T-052](Tickets/T-052.md), [T-150](Tickets/T-150.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | Fresh post-Legacy required-native CI inventory + hosted green | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | New hosted replay and 23-finding owner matrix; preserve historic 46 | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
@@ -130,7 +134,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | Completed scope; see ticket evidence | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
 | [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Ready | Completed scope; see ticket evidence | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | Completed scope; see ticket evidence | [T-051](Tickets/T-051.md) |
-| [T-188 · Remaining native stroke latency after direct preview](Tickets/T-188.md) | Ready | [T-187 direct-preview A/B](evidence/T-187-2026-11-17-direct-native-preview.md) still misses pinned full-gesture 250ms/200ms targets; profile native staging and release critical path | [T-187](Tickets/T-187.md) |
+| [T-189 · Further 96px native full-gesture latency after run grouping](Tickets/T-189.md) | Ready | [T-188 measured native stage reductions](evidence/T-188-2026-11-17-run-aware-native-staging.md) leave pinned 250ms/200ms targets open; isolate remaining raster/scan/release cost | [T-188](Tickets/T-188.md) |
 
 ## 5. Blocked by dependencies or future owner review
 

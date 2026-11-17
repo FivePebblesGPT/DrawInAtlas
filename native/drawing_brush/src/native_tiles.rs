@@ -86,6 +86,82 @@ pub(super) struct TileStore {
     pixel_stream_calls: u64,
 }
 
+/// Collect ordered native pigment deltas by storage tile without probing the
+/// hash map for every pixel in a clustered Hokusai output run. Even if a tile
+/// reappears later, append its runs in input order: alpha and erase semantics
+/// must remain identical to the original per-pixel grouping.
+#[allow(clippy::too_many_arguments)]
+fn group_pigment_deltas(
+    deltas: &[i32],
+    pigment: bool,
+    brush_rgba: u32,
+    clip: Rect2i,
+    anchor_x: i64,
+    anchor_y: i64,
+    stride: i64,
+    per_pixel: bool,
+) -> Result<(PackedTileChanges, usize), &'static str> {
+    if stride <= 0 {
+        return Err("Invalid native tile stride");
+    }
+    let step = if pigment { 3 } else { 2 };
+    let mut grouped: PackedTileChanges = HashMap::new();
+    let mut run_key: Option<(i64, i64)> = None;
+    let mut run = Vec::<(usize, usize, u32)>::new();
+    let mut tile_lookups = 0_usize;
+    for delta in deltas.chunks_exact(step) {
+        if clip.size.x > 0
+            && clip.size.y > 0
+            && !clip.contains_point(Vector2i::new(delta[0], delta[1]))
+        {
+            continue;
+        }
+        let x = anchor_x
+            .checked_add(i64::from(delta[0]))
+            .ok_or("Signed X overflow")?;
+        let y = anchor_y
+            .checked_add(i64::from(delta[1]))
+            .ok_or("Signed Y overflow")?;
+        if x.unsigned_abs() > SAFE_COORD as u64 || y.unsigned_abs() > SAFE_COORD as u64 {
+            return Err("Signed native sample outside tile bounds");
+        }
+        let coords = (x.div_euclid(stride), y.div_euclid(stride));
+        let ix = x.rem_euclid(stride) as usize;
+        let iy = y.rem_euclid(stride) as usize;
+        let pigment_rgba = if pigment { delta[2] as u32 } else { brush_rgba };
+        let rgba = if pigment {
+            let alpha = ((pigment_rgba >> 24) & 255) * ((brush_rgba >> 24) & 255);
+            (pigment_rgba & 0xffffff) | (((alpha + 127) / 255) << 24)
+        } else {
+            pigment_rgba
+        };
+        let pixel = (ix, iy, rgba);
+        if per_pixel {
+            if cfg!(test) {
+                tile_lookups += 1;
+            }
+            grouped.entry(coords).or_default().push(pixel);
+        } else {
+            if run_key != Some(coords) {
+                if let Some(old_key) = run_key.replace(coords) {
+                    if cfg!(test) {
+                        tile_lookups += 1;
+                    }
+                    grouped.entry(old_key).or_default().append(&mut run);
+                }
+            }
+            run.push(pixel);
+        }
+    }
+    if let Some(last_key) = run_key {
+        if cfg!(test) {
+            tile_lookups += 1;
+        }
+        grouped.entry(last_key).or_default().append(&mut run);
+    }
+    Ok((grouped, tile_lookups))
+}
+
 impl TileStore {
     pub(super) fn transaction_matches(&self, transaction: i64, revision: i64, layer: &str) -> bool {
         revision >= 0
@@ -240,36 +316,12 @@ impl TileStore {
         {
             return Err("Stale revision or unavailable tile layer");
         }
-        let mut grouped: PackedTileChanges = HashMap::new();
         let stride = self.stride as i64;
-        for delta in deltas.chunks_exact(step) {
-            if clip.size.x > 0
-                && clip.size.y > 0
-                && !clip.contains_point(Vector2i::new(delta[0], delta[1]))
-            {
-                continue;
-            }
-            let x = anchor_x
-                .checked_add(i64::from(delta[0]))
-                .ok_or("Signed X overflow")?;
-            let y = anchor_y
-                .checked_add(i64::from(delta[1]))
-                .ok_or("Signed Y overflow")?;
-            if x.unsigned_abs() > SAFE_COORD as u64 || y.unsigned_abs() > SAFE_COORD as u64 {
-                return Err("Signed native sample outside tile bounds");
-            }
-            let coords = (x.div_euclid(stride), y.div_euclid(stride));
-            let ix = x.rem_euclid(stride) as usize;
-            let iy = y.rem_euclid(stride) as usize;
-            let pigment_rgba = if pigment { delta[2] as u32 } else { brush_rgba };
-            let rgba = if pigment {
-                let alpha = ((pigment_rgba >> 24) & 255) * ((brush_rgba >> 24) & 255);
-                (pigment_rgba & 0xffffff) | (((alpha + 127) / 255) << 24)
-            } else {
-                pigment_rgba
-            };
-            grouped.entry(coords).or_default().push((ix, iy, rgba));
-        }
+        // Force the unoptimized per-pixel grouping for same-binary A/B only.
+        let per_pixel = std::env::var_os("DRAWING_T188_PIXEL_GROUP_COUNTERFACTUAL").is_some();
+        let (grouped, _lookups) = group_pigment_deltas(
+            deltas, pigment, brush_rgba, clip, anchor_x, anchor_y, stride, per_pixel,
+        )?;
         let active = self.active.as_ref().expect("checked above");
         let new_count = grouped
             .keys()
@@ -1792,6 +1844,77 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn grouped_pigment_runs_match_per_pixel_reference_with_signed_revisits() {
+        // Run across positive/signed tile boundaries, revisit a prior tile,
+        // clip out-of-bounds samples and preserve duplicate pixel ordering.
+        let pixels = [
+            -65,
+            -65,
+            0x30223344,
+            -64,
+            -64,
+            0x40223344,
+            -1,
+            -1,
+            0x50223344,
+            0,
+            0,
+            0x60223344,
+            64,
+            64,
+            0x70223344,
+            -1,
+            -1,
+            0x80223344_u32 as i32,
+            65,
+            -65,
+            0x90223344_u32 as i32,
+            1000,
+            1000,
+            0x10223344,
+        ];
+        for brush in [true, false] {
+            let deltas: Vec<i32> = if brush {
+                pixels.to_vec()
+            } else {
+                pixels.chunks_exact(3).flat_map(|p| [p[0], p[1]]).collect()
+            };
+            let clip = Rect2i::new(Vector2i::new(-500, -500), Vector2i::new(700, 700));
+            let (optimized, optimized_lookups) =
+                group_pigment_deltas(&deltas, brush, 0x8077aa33, clip, -192, 256, 256, false)
+                    .unwrap();
+            let (reference, reference_lookups) =
+                group_pigment_deltas(&deltas, brush, 0x8077aa33, clip, -192, 256, 256, true)
+                    .unwrap();
+            assert_eq!(optimized, reference);
+            assert!(
+                optimized_lookups < reference_lookups,
+                "a native run must not rehash every neighboring pixel"
+            );
+            assert_eq!(
+                reference_lookups,
+                deltas.len() / if brush { 3 } else { 2 } - 1
+            );
+            assert!(optimized.values().any(|d| d.len() > 1));
+        }
+        let invalid = [i32::MAX, 0, 255];
+        assert_eq!(
+            group_pigment_deltas(
+                &invalid,
+                true,
+                0xff00ff00,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                SAFE_COORD,
+                0,
+                256,
+                false
+            )
+            .err(),
+            Some("Signed native sample outside tile bounds")
+        );
+    }
+
     #[test]
     fn t187_preview_region_matches_whole_tile_and_rejects_invalid_bounds() {
         let mut store = initialized(256);

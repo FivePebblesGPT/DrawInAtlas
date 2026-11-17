@@ -1,0 +1,29 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error: literal out of range for `i32`
+    --> src/native_tiles.rs:1847:37
+     |
+1847 |             64, 0x70223344, -1, -1, 0x80223344, 65, -65, 0x90223344, 1000, 1000, 0x10223344,
+     |                                     ^^^^^^^^^^
+     |
+     = note: the literal `0x80223344` (decimal `2149724996`) does not fit into the type `i32` and will become `-2145242300i32`
+     = help: consider using the type `u32` instead
+     = note: `#[deny(overflowing_literals)]` on by default
+help: to use as a negative number (decimal `-2145242300`), consider using the type `u32` for the literal and cast it to `i32`
+     |
+1847 |             64, 0x70223344, -1, -1, 0x80223344u32.cast_signed(), 65, -65, 0x90223344, 1000, 1000, 0x10223344,
+     |                                               +++++++++++++++++
+
+error: literal out of range for `i32`
+    --> src/native_tiles.rs:1847:58
+     |
+1847 |             64, 0x70223344, -1, -1, 0x80223344, 65, -65, 0x90223344, 1000, 1000, 0x10223344,
+     |                                                          ^^^^^^^^^^
+     |
+     = note: the literal `0x90223344` (decimal `2418160452`) does not fit into the type `i32` and will become `-1876806844i32`
+     = help: consider using the type `u32` instead
+help: to use as a negative number (decimal `-1876806844`), consider using the type `u32` for the literal and cast it to `i32`
+     |
+1847 |             64, 0x70223344, -1, -1, 0x80223344, 65, -65, 0x90223344u32.cast_signed(), 1000, 1000, 0x10223344,
+     |                                                                    +++++++++++++++++
+
+error: could not compile `drawing-brush` (lib test) due to 2 previous errors
