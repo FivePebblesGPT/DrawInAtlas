@@ -62,6 +62,21 @@ class ToolchainTests(unittest.TestCase):
             with self.assertRaisesRegex(ToolchainError, "no repo"):
                 write_bundle_archive(stage, output)
 
+    def test_brush_native_previews_staged_from_canonical_assets(self) -> None:
+        from tools.build_drawing_app import stage
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "drawing"
+            staged = stage(output, without_native=True)
+            preview_dir = staged / "addons" / "drawing" / "brushes" / "previews"
+            for name in ("hard", "soft", "ink", "airbrush"):
+                original = ROOT / "addons" / "drawing" / "brushes" / "previews" / f"{name}.png"
+                rendered = preview_dir / f"{name}.png"
+                self.assertEqual(rendered.read_bytes(), original.read_bytes())
+                self.assertEqual(rendered.read_bytes()[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(len(list(preview_dir.iterdir())), 4)
+            self.assertTrue((staged / "addons" / "drawing" / "icons" / "dock_brushes.svg").exists())
+
     def test_godot_zero_exit_does_not_hide_script_errors(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             godot = Path(temp) / "fake Godot"

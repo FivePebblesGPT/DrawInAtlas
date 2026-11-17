@@ -2,15 +2,39 @@ class_name DrawingWorkspacePreferences
 extends RefCounted
 ## App settings only: never stored in `.drawing` or used in content revision checks.
 
-const VERSION: int = 1
+const VERSION: int = 2
 const MAX_BYTES: int = 2048
+const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 
 
 static func decode(value: Variant) -> Dictionary:
-	if not value is Dictionary or value.get("schema") != VERSION or \
-			not value.get("record_selection_history") is bool:
+	if not value is Dictionary or not value.get("record_selection_history") is bool:
 		return {}
-	return {"record_selection_history": value["record_selection_history"]}
+	if value.get("schema") == 1:
+		return {"record_selection_history": value["record_selection_history"]}
+	if value.get("schema") != VERSION or not value.get("brush") is Dictionary:
+		return {}
+	var brush: Dictionary = value["brush"]
+	if not BRUSH_SETTINGS.PRESETS.has(brush.get("preset")) \
+			or not (brush.get("width") is float or brush.get("width") is int) \
+			or not (brush.get("opacity") is float or brush.get("opacity") is int) \
+			or not brush.get("hardness") is Dictionary:
+		return {}
+	var width: float = float(brush["width"])
+	var opacity: float = float(brush["opacity"])
+	if not is_finite(width) or not (1.0 <= width and width <= 96.0) \
+			or not is_finite(opacity) or not (0.0 <= opacity and opacity <= 1.0):
+		return {}
+	var hardness: Dictionary = brush["hardness"]
+	for key: Variant in hardness:
+		if not BRUSH_SETTINGS.PRESETS.has(key) \
+				or not (hardness[key] is float or hardness[key] is int) \
+				or not is_finite(float(hardness[key])) \
+				or not (0.0 <= float(hardness[key]) and float(hardness[key]) <= 1.0):
+			return {}
+	return {"record_selection_history": value["record_selection_history"],
+		"brush": {"preset": brush["preset"], "width": width,
+		"opacity": opacity, "hardness": hardness.duplicate(true)}}
 
 
 static func read_file(path: String) -> Dictionary:
@@ -28,15 +52,20 @@ static func read_file(path: String) -> Dictionary:
 	return {}
 
 
-static func save_file(path: String, enabled: bool) -> bool:
+static func save_file(path: String, enabled: bool, brush: Dictionary = {}) -> bool:
+	if brush.is_empty():
+		brush = {"preset": "hard", "width": 3.0, "opacity": 1.0, "hardness": {}}
+	var document: Dictionary = {"schema": VERSION, "record_selection_history": enabled,
+		"brush": brush}
+	if decode(document).is_empty():
+		return false
 	var destination: String = ProjectSettings.globalize_path(path)
 	var temporary: String = destination + ".tmp"
 	var backup: String = destination + ".bak"
 	var stream: FileAccess = FileAccess.open(temporary, FileAccess.WRITE)
 	if stream == null:
 		return false
-	stream.store_string(JSON.stringify({"schema": VERSION,
-		"record_selection_history": enabled}))
+	stream.store_string(JSON.stringify(document))
 	stream.flush()
 	stream.close()
 	if FileAccess.file_exists(path):

@@ -95,6 +95,11 @@ func run() -> void:
 	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await frames(12)
+	# Isolate the historical three-panel drag fixture; T-184 separately verifies
+	# the new Brushes panel's native previews, ownership and persistence.
+	app.dock_layout.set_panel_visible("brushes", false)
+	app._render_dock()
+	await frames(4)
 	var layout: DrawingDockLayout = app.dock_layout
 	var baseline_revision: int = app.current_document().revision
 	var baseline_dirty: bool = app.current_document().is_dirty()
@@ -148,7 +153,8 @@ func run() -> void:
 	check(app.dock_drop_hint.visible, "before-group insertion hint")
 	await drag_end(target)
 	var detached_group: String = layout.group_of("swatches")
-	check(detached_group != "colors" and layout.container_info("right")["groups"][0]["id"] == detached_group, "top boundary splits panel to new group")
+	check(detached_group != "colors" and layout.container_info("right")["groups"][1]["id"] == detached_group,
+		"top boundary splits panel before first visible group; hidden Brushes stays registered")
 	check(layout.rail_icons("right")[1]["separator_before"], "split creates rail group separator")
 	tab = app.dock_tab_buttons["swatches"]
 	target = (app.dock_tab_buttons["gradients"] as Button).get_global_rect().end - Vector2(4, 18)
@@ -289,7 +295,7 @@ func run() -> void:
 		"rail drag commits panel order into shared group state")
 	var rail_members: Array[Dictionary] = layout.rail_icons("right")
 	check(rail_members.size() == app.dock_rail_buttons.size() and
-		rail_members[0]["panel"] == layout.container_info("right")["groups"][0]["panels"][0],
+		rail_members[0]["panel"] == layout.container_info("right")["groups"][1]["panels"][0],
 		"rail buttons and group entries stay synchronized after native drag")
 	var flyout_button: Button = app.dock_rail_buttons["colors"]
 	var flyout_point: Vector2 = flyout_button.get_global_rect().get_center()
@@ -305,7 +311,9 @@ func run() -> void:
 		var panel: String = entry["panel"]
 		unique[panel] = true
 		check(app.dock_views[panel].get_parent() != null, "source panel Control survives: " + panel)
-	check(unique.size() == app.dock_views.size(), "all panels remain uniquely owned")
+	check(unique.size() + 1 == app.dock_views.size() and
+		layout.owner_of("brushes") == "right" and not unique.has("brushes"),
+		"all fixture-visible panels plus hidden Brushes remain uniquely owned")
 	check(app.current_document().revision == baseline_revision and app.current_document().is_dirty() == baseline_dirty, "dock reorganization never edits drawing history or dirty state")
 	print("T080_DOCK_REORDER_NATIVE: %d checks; %d failed" % [checks, failures])
 	if failures == 0:

@@ -114,7 +114,7 @@ func _run() -> void:
 	var shell_layout: DrawingDockLayout = workspace.get("dock_layout") as DrawingDockLayout
 	_check(shell_layout != null, "standalone workspace installs shared dock model")
 	if shell_layout != null:
-		_check(shell_layout.rail_icons("right").size() == 3, "shell registers three actual dock panels")
+		_check(shell_layout.rail_icons("right").size() == 4, "shell registers Brushes plus three legacy dock panels")
 		_check(shell_layout.group_of("layers") == "layers", "Layers initially separate in T-063 layout")
 		_check(workspace.get("dock_views").has("layers"), "live control mapping retained")
 	_check(workspace.find_child("PanelDock", true, false) != null, "existing dock remains unchanged")

@@ -84,6 +84,11 @@ func run() -> void:
 	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await frames(18)
+	# Isolate the historical three-panel drag fixture; T-184 separately verifies
+	# the new Brushes panel's native previews, ownership and persistence.
+	app.dock_layout.set_panel_visible("brushes", false)
+	app._render_dock()
+	await frames(4)
 	var layout: DrawingDockLayout = app.dock_layout
 	var initial_rev: int = app.current_document().revision
 	var initial_dirty: bool = app.current_document().is_dirty()

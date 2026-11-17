@@ -103,6 +103,11 @@ func run() -> void:
 	app.layout_persistence_enabled = false
 	root.add_child(app)
 	await frames(14)
+	# Isolate the historical three-panel drag fixture; T-184 separately verifies
+	# the new Brushes panel's native previews, ownership and persistence.
+	app.dock_layout.set_panel_visible("brushes", false)
+	app._render_dock()
+	await frames(4)
 	var layout: DrawingDockLayout = app.dock_layout
 	var revision: int = app.current_document().revision
 	var dirty: bool = app.current_document().is_dirty()
@@ -275,8 +280,8 @@ func run() -> void:
 		"HiDPI keyboard focus and grab affordances remain usable")
 	check(app.current_document().revision == revision and app.current_document().is_dirty() == dirty,
 		"dock operations never change Drawing revision or dirty state")
-	check(app.dock_views.size() == 5 and layout.snapshot()["panels"].size() == 5,
-		"five original Control views and model IDs remain unique")
+	check(app.dock_views.size() == 6 and layout.snapshot()["panels"].size() == 6,
+		"six registered Controls (five fixture-visible), unique model IDs")
 	print("T081_FLOAT_NATIVE: %d checks; %d failed" % [checks, failures])
 	if failures == 0:
 		print("T081_FLOAT_NATIVE_PASSED")

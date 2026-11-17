@@ -38,3 +38,44 @@ still non-opaque feathering. Neither preset adds texture, grain or particles.
 See `docs/evidence/T-183-2026-11-17-native-preset-audit.md` for actual 60/96px
 source alpha samples, GUI captures at 100%/50%, native Eraser/Undo/Redo checks,
 and matched old/new 96px full-canvas performance controls.
+
+## T-184 visual Brushes panel and runtime parameters
+
+The separate **Brushes** dock group has one live `DrawingBrushPanel` Control,
+shared by standalone Drawing and the embedded Atlas workspace. A compact
+`OptionButton`/width shortcut remains synchronized, including in Eraser mode.
+Selecting a preset does not alter the current drawing or its history. Every
+Brush/Eraser native stroke captures its settings at pointer-down; pending
+queued gestures capture those same scalar settings and selection mask. Changing
+the panel affects **future** gestures only.
+
+| Parameter | UI range | Native meaning / behavior |
+| --- | --- | --- |
+| Width | 1–96 Drawing px, step 1 | Nominal MyPaint diameter; Rust overrides `radius_logarithmic` at begin-stroke. Preset shaping/pressure curves still apply. |
+| Opacity | 0–100%, step 1% | Multiplies the selected preset's **base** `opaque` setting, retaining its `opaque`/`opaque_multiply` pressure and motion input curves. Not guaranteed to equal linear final pixel alpha after cumulative dabs. |
+| Hardness | 0–100%, step 1% | Overrides the MyPaint `hardness.base_value`, retaining preset pressure/speed curves; affects native dab falloff (including Ink/Airbrush). |
+
+All four presets expose these three controls; the **starting hardness** is read
+from each bundled `.myb` (not copied between presets). Hardness overrides are
+per preset, while width and opacity are shared across presets and Brush/Eraser.
+**Reset selected brush** clears only that preset's hardness override and resets
+shared width to 3 px and opacity to 100%. Default opacity/hardness uses the
+original `.myb` source string byte-for-byte; changed parameters produce a
+MyPaint JSON string with `version` kept an integer for Rust's parser.
+
+The app preferences file uses schema v2 with `brush.preset`, `brush.width`,
+`brush.opacity` and `brush.hardness` keyed by preset ID. Schema v1 (selection
+history only) remains readable with default brush parameters. These values are
+app preferences, not document/save-source data. Dock visibility, tab group,
+and floating owner continue using the existing separate dock layout file.
+
+The four 92×32 transparent PNG buttons in `previews/` are **rendered native
+Hokusai strokes**, not stock icons or manually drawn stand-ins. Reproduce with
+`T184_PREVIEW_OUTPUT=/absolute/output/path godot --headless --path drawing
+--script res://tests/t184_generate_brush_previews.gd` **after** `make
+import-drawing`; this requires both `DrawingNativeBrush` and
+`DrawingNativeTiles`. The generator fails on absent native classes, empty
+native strokes, or failed commit/export. The Drawing staging step copies all
+four previews byte-for-byte; tests verify that no placeholder preview is used.
+Visual/functional evidence and native color/edge samples are in
+`docs/evidence/T-184-2026-11-17-brush-panel.md`.

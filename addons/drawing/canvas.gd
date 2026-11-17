@@ -1,4 +1,6 @@
 extends Control
+
+const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 ## Bounded framebuffer rendering and native mouse gestures, without Atlas UI types.
 
 signal gesture_started()
@@ -43,6 +45,8 @@ var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
 ## Every Brush/Eraser preset uses the required Hokusai native extension.
 var brush_preset: String = "hard"
+var brush_opacity: float = 1.0 # 0..1 multiplier of the preset native opaque base
+var brush_hardness: float = -1.0 # -1 means the bundled preset native default
 const BUNDLED_PRESETS: Dictionary = {
     "hard": "res://addons/drawing/brushes/hard_round.myb",
     "soft": "res://addons/drawing/brushes/soft.myb",
@@ -1644,7 +1648,7 @@ func _capture_deferred_stroke(position: Vector2) -> void:
 	_deferred_times_us.clear()
 	_deferred_stroke = {"capturing": true, "document": document, "layer": layer_id,
 		"tool": tool, "color": color_rgba, "width": brush_width,
-		"preset": brush_preset,
+		"preset": brush_preset, "opacity": brush_opacity, "hardness": brush_hardness,
 		"selection": selection_mask.detached_copy(),
 		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i(),
 		"clip_enabled": clip_strokes_to_image_frame}
@@ -1778,7 +1782,16 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 		canvas_error.emit("Unknown or missing MyPaint brush preset: " + preset_path)
 		cancel_gesture()
 		return
-	var preset_text: String = FileAccess.get_file_as_string(preset_path)
+	var opacity: float = float(configuration.get("opacity", brush_opacity))
+	var hardness: float = float(configuration.get("hardness", brush_hardness))
+	if hardness < 0.0:
+		hardness = BRUSH_SETTINGS.default_hardness(str(configuration.get("preset", brush_preset)))
+	var preset_text: String = BRUSH_SETTINGS.configured_preset(
+		str(configuration.get("preset", brush_preset)), opacity, hardness)
+	if preset_text.is_empty():
+		canvas_error.emit("Invalid native brush opacity/hardness or preset")
+		cancel_gesture()
+		return
 	var started: DrawingResult = session.begin_native_stroke(_native_brush,
 		preset_text, _stroke_width, _stroke_color, _stroke_clip,
 		true, _stroke_selection)

@@ -62,6 +62,11 @@ func run() -> void:
 	app.preferences_settings_path = PREFS
 	root.add_child(app)
 	await frames(14)
+	# T-184 adds Brushes ahead of Colors; this color-only pointer fixture
+	# needs its target at the top of the visible dock viewport.
+	check(app.dock_layout.move_group("colors", "right", 0), "color test panel moved into view")
+	app._render_dock()
+	await frames(6)
 	check(app.color_advanced != null and not app.color_advanced.visible,
 		"advanced picker hidden at launch")
 	check(not app.record_selection_history and app.history_list.item_count == 1,

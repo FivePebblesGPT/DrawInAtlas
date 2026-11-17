@@ -114,9 +114,9 @@ func run() -> void:
 	var panel_names: Array[String] = []
 	for pane: Control in app.dock_panels.get_children():
 		panel_names.append(pane.name)
-	check(panel_names == ["MinimizeDock", "Group_colors", "Group_layers", "Group_history"] and
+	check(panel_names == ["MinimizeDock", "Group_brushes", "Group_colors", "Group_layers", "Group_history"] and
 		app.layers.is_visible_in_tree() and app.history_list.is_visible_in_tree(),
-		"Colors, Layers and compact History render as separate stacked group controls")
+		"Brushes, Colors, Layers and History render as separate stacked dock groups")
 	check(app.status.text.contains("cursor") and app.status.text.contains("zoom"),
 		"status reports pixel coordinates and zoom")
 	var file_popup: PopupMenu = top._menus[0].get_popup()
