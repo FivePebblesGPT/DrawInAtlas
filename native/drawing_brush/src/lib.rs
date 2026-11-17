@@ -179,12 +179,34 @@ fn quantize_pixel_with_mode(pixel: &[u16; 4], reference: bool) -> u32 {
 fn scan_changed_pixels(
     tile: &hokusai::tile::TilePixels,
     published: &mut ExportedTile,
-    mut emit: impl FnMut(usize, u32),
+    emit: impl FnMut(usize, u32),
 ) {
+    scan_changed_pixels_with_mode(
+        tile,
+        published,
+        std::env::var_os("DRAWING_T191_PIXEL_SCAN_COUNTERFACTUAL").is_none(),
+        emit,
+    );
+}
+
+/// Skip unchanged fixed-point rows without converting them. The row comparison
+/// is exact, and changed rows still use the original per-pixel quantizer.
+fn scan_changed_pixels_with_mode(
+    tile: &hokusai::tile::TilePixels,
+    published: &mut ExportedTile,
+    skip_rows: bool,
+    mut emit: impl FnMut(usize, u32),
+) -> usize {
     let reference = std::env::var_os("DRAWING_T190_POWF_COUNTERFACTUAL").is_some();
+    let mut rows_skipped = 0;
     for (row, tile_row) in tile.iter().enumerate() {
+        let start = row * TILE_SIZE;
+        if skip_rows && tile_row.as_slice() == &published.raw[start..start + TILE_SIZE] {
+            rows_skipped += 1;
+            continue;
+        }
         for (column, pixel) in tile_row.iter().enumerate() {
-            let index = row * TILE_SIZE + column;
+            let index = start + column;
             if published.raw[index] == *pixel {
                 continue;
             }
@@ -196,6 +218,7 @@ fn scan_changed_pixels(
             }
         }
     }
+    rows_skipped
 }
 
 struct PresetBatch {
@@ -909,6 +932,36 @@ mod tests {
                 unchanged.is_empty(),
                 "unchanged native tile re-exported pixels"
             );
+        }
+    }
+
+    #[test]
+    fn row_scan_matches_per_pixel_when_pixels_change_and_revert() {
+        let mut tile = [[[0_u16; 4]; TILE_SIZE]; TILE_SIZE];
+        let mut optimized = ExportedTile::default();
+        let mut reference = ExportedTile::default();
+        for frame in 0..24 {
+            let row = (frame * 7) % TILE_SIZE;
+            tile[row][0] = [((frame * 347) % 32769) as u16, 0, 0, 32768];
+            tile[row][TILE_SIZE - 1] = [0, 0, (frame * 79) as u16, 10000];
+            if frame % 4 == 0 {
+                tile[row][0] = [0; 4];
+            }
+            let mut fast = Vec::new();
+            let skipped =
+                scan_changed_pixels_with_mode(&tile, &mut optimized, true, |index, rgba| {
+                    fast.push((index, rgba))
+                });
+            let mut slow = Vec::new();
+            let reference_skips =
+                scan_changed_pixels_with_mode(&tile, &mut reference, false, |index, rgba| {
+                    slow.push((index, rgba))
+                });
+            assert_eq!(reference_skips, 0);
+            assert!(skipped >= TILE_SIZE - 1);
+            assert_eq!(fast, slow, "frame {frame}");
+            assert_eq!(optimized.raw, reference.raw);
+            assert_eq!(optimized.rgba, reference.rgba);
         }
     }
 

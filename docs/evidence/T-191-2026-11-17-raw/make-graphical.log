@@ -1,0 +1,203 @@
+    Finished `release` profile [optimized] target(s) in 0.02s
+Required native Brush/Eraser: /mnt/data/DrawInAtlas-sprint-2026-11-17/addons/drawing/native/bin/libdrawing_brush.so
+/mnt/data/DrawInAtlas-sprint-2026-11-17/drawing
+/mnt/data/DrawInAtlas-sprint-2026-11-17/drawing/.godot/extension_list.cfg
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+WARNING: Missing .uid file for path "res://addons/drawing/native/drawing_brush.gdextension". The file was re-created from cache.
+     at: _process_file_system (editor/file_system/editor_file_system.cpp:1388)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+[   0% ] [90m[1m_update_scan_actions[22m | Started Scanning actions... (23 steps)[39m[0m
+[   0% ] [90m[1m_update_scan_actions[22m | airbrush.png[39m[0m
+[   4% ] [90m[1m_update_scan_actions[22m | hard.png[39m[0m
+[   8% ] [90m[1m_update_scan_actions[22m | ink.png[39m[0m
+[  12% ] [90m[1m_update_scan_actions[22m | soft.png[39m[0m
+[  16% ] [90m[1m_update_scan_actions[22m | Lato-Bold.ttf[39m[0m
+[  20% ] [90m[1m_update_scan_actions[22m | Lato-Italic.ttf[39m[0m
+[  25% ] [90m[1m_update_scan_actions[22m | Lato-Regular.ttf[39m[0m
+[  29% ] [90m[1m_update_scan_actions[22m | brush.svg[39m[0m
+[  33% ] [90m[1m_update_scan_actions[22m | dock_brushes.svg[39m[0m
+[  37% ] [90m[1m_update_scan_actions[22m | dock_colors.svg[39m[0m
+[  41% ] [90m[1m_update_scan_actions[22m | dock_history.svg[39m[0m
+[  45% ] [90m[1m_update_scan_actions[22m | dock_layers.svg[39m[0m
+[  50% ] [90m[1m_update_scan_actions[22m | dock_panel.svg[39m[0m
+[  54% ] [90m[1m_update_scan_actions[22m | dock_swatches.svg[39m[0m
+[  58% ] [90m[1m_update_scan_actions[22m | eraser.svg[39m[0m
+[  62% ] [90m[1m_update_scan_actions[22m | layer_hidden.svg[39m[0m
+[  66% ] [90m[1m_update_scan_actions[22m | layer_locked.svg[39m[0m
+[  70% ] [90m[1m_update_scan_actions[22m | layer_unlocked.svg[39m[0m
+[  75% ] [90m[1m_update_scan_actions[22m | layer_visible.svg[39m[0m
+[  79% ] [90m[1m_update_scan_actions[22m | move.svg[39m[0m
+[  83% ] [90m[1m_update_scan_actions[22m | pan.svg[39m[0m
+[  87% ] [90m[1m_update_scan_actions[22m | select.svg[39m[0m
+[  91% ] [90m[1m_update_scan_actions[22m | text.svg[39m[0m
+[92m[ DONE ][39m [1m_update_scan_actions[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (23 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   4% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   8% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  12% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  16% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  20% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  25% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  29% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  33% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  37% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  41% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  45% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  50% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  54% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  58% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  62% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  66% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  70% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  75% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  79% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  83% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  87% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[  91% ] [90m[1mreimport[22m | Preparing files to reimport...[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing pre-reimport operations...[39m[0m
+[   0% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[   4% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[   8% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  12% ] [90m[1mreimport[22m | Lato-Bold.ttf[39m[0m
+[  16% ] [90m[1mreimport[22m | Lato-Italic.ttf[39m[0m
+[  20% ] [90m[1mreimport[22m | Lato-Regular.ttf[39m[0m
+[  25% ] [90m[1mreimport[22m | text.svg[39m[0m
+[  29% ] [90m[1mreimport[22m | select.svg[39m[0m
+[  33% ] [90m[1mreimport[22m | pan.svg[39m[0m
+[  37% ] [90m[1mreimport[22m | move.svg[39m[0m
+[  41% ] [90m[1mreimport[22m | layer_visible.svg[39m[0m
+[  45% ] [90m[1mreimport[22m | layer_unlocked.svg[39m[0m
+[  50% ] [90m[1mreimport[22m | layer_locked.svg[39m[0m
+[  54% ] [90m[1mreimport[22m | layer_hidden.svg[39m[0m
+[  58% ] [90m[1mreimport[22m | eraser.svg[39m[0m
+[  62% ] [90m[1mreimport[22m | dock_swatches.svg[39m[0m
+[  66% ] [90m[1mreimport[22m | dock_panel.svg[39m[0m
+[  70% ] [90m[1mreimport[22m | dock_layers.svg[39m[0m
+[  75% ] [90m[1mreimport[22m | dock_history.svg[39m[0m
+[  79% ] [90m[1mreimport[22m | dock_colors.svg[39m[0m
+[  83% ] [90m[1mreimport[22m | dock_brushes.svg[39m[0m
+[  87% ] [90m[1mreimport[22m | brush.svg[39m[0m
+[  91% ] [90m[1mreimport[22m | soft.png[39m[0m
+[  95% ] [90m[1mreimport[22m | Finalizing Asset Import...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mreimport[22m | Started (Re)Importing Assets (23 steps)[39m[0m
+[   0% ] [90m[1mreimport[22m | Executing post-reimport operations...[39m[0m
+[92m[ DONE ][39m [1mreimport[22m
+[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Started Loading editor (5 steps)[39m[0m
+[   0% ] [90m[1mloading_editor_layout[22m | Loading editor layout...[39m[0m
+[  16% ] [90m[1mloading_editor_layout[22m | Loading docks...[39m[0m
+[92m[ DONE ][39m [1mloading_editor_layout[22m
+[0m
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+NATIVE_EXTENSION_READY
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T181_MOVING frame=1 missing=0 metrics={"bytes_uploaded":0,"cache_bytes_estimate":1048576,"cache_hits":16,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":0,"cold_tiles_deferred":0,"compose_cpu_us":0,"draw_cpu_us":228,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4487493,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":273,"oldest_pending_age_us":524,"pending_input_count":1,"post_draw_us":4513385,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":8,"preview_index_fallback":0,"preview_index_keys":0,"selection_outline_cpu_us":2,"source_chunks_shared":0,"source_pixels_rendered":0,"sparse_draw":1,"submit_us":4487449,"texture_cpu_us":0,"textures_created":0,"textures_transient":0,"textures_updated":0,"tiles_composited":0,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":0,"zoom":0.54}
+T181_MOVING frame=2 missing=0 metrics={"bytes_uploaded":458752,"cache_bytes_estimate":1048576,"cache_hits":9,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":506,"draw_cpu_us":1292,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4534542,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1347,"oldest_pending_age_us":16749,"pending_input_count":1,"post_draw_us":4538570,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":25,"preview_index_fallback":0,"preview_index_keys":7,"preview_input_received_us":4486969,"preview_input_to_frame_end_us":47573,"preview_stage_completed_us":4508455,"preview_stage_to_frame_end_us":26087,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":114688,"sparse_draw":1,"submit_us":4534488,"texture_cpu_us":304,"textures_created":0,"textures_transient":0,"textures_updated":7,"tiles_composited":7,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=3 missing=0 metrics={"bytes_uploaded":458752,"cache_bytes_estimate":1048576,"cache_hits":9,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":506,"draw_cpu_us":1292,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4534542,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1347,"oldest_pending_age_us":16749,"pending_input_count":1,"post_draw_us":4559922,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":25,"preview_index_fallback":0,"preview_index_keys":7,"preview_input_received_us":4486969,"preview_input_to_frame_end_us":47573,"preview_stage_completed_us":4508455,"preview_stage_to_frame_end_us":26087,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":114688,"sparse_draw":1,"submit_us":4534488,"texture_cpu_us":304,"textures_created":0,"textures_transient":0,"textures_updated":7,"tiles_composited":7,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=4 missing=0 metrics={"bytes_uploaded":655360,"cache_bytes_estimate":1048576,"cache_hits":6,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":464,"draw_cpu_us":1170,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4571465,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1217,"oldest_pending_age_us":8048,"pending_input_count":1,"post_draw_us":4576230,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":34,"preview_index_fallback":0,"preview_index_keys":14,"preview_input_received_us":4517793,"preview_input_to_frame_end_us":53672,"preview_stage_completed_us":4555199,"preview_stage_to_frame_end_us":16266,"selection_outline_cpu_us":4,"source_chunks_shared":0,"source_pixels_rendered":163840,"sparse_draw":1,"submit_us":4571418,"texture_cpu_us":323,"textures_created":0,"textures_transient":0,"textures_updated":10,"tiles_composited":10,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=5 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":299,"draw_cpu_us":937,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4587430,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":982,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4591993,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":32,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4563417,"preview_input_to_frame_end_us":24013,"preview_stage_completed_us":4585579,"preview_stage_to_frame_end_us":1851,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4587385,"texture_cpu_us":273,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=6 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":294,"draw_cpu_us":960,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4601590,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1001,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4605920,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":30,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4595136,"preview_input_to_frame_end_us":6454,"preview_stage_completed_us":4600539,"preview_stage_to_frame_end_us":1051,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4601550,"texture_cpu_us":338,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=7 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":355,"draw_cpu_us":1214,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4616367,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1262,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4621367,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":35,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4609222,"preview_input_to_frame_end_us":7145,"preview_stage_completed_us":4614993,"preview_stage_to_frame_end_us":1374,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4616319,"texture_cpu_us":290,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=8 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":309,"draw_cpu_us":965,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4630879,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1012,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4635661,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":33,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4624630,"preview_input_to_frame_end_us":6249,"preview_stage_completed_us":4629802,"preview_stage_to_frame_end_us":1077,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4630833,"texture_cpu_us":270,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=9 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":295,"draw_cpu_us":929,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4644943,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":970,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4649293,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":31,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4638820,"preview_input_to_frame_end_us":6123,"preview_stage_completed_us":4643912,"preview_stage_to_frame_end_us":1031,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4644902,"texture_cpu_us":224,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=10 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":277,"draw_cpu_us":1027,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4658093,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1086,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4663914,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":59,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4652658,"preview_input_to_frame_end_us":5435,"preview_stage_completed_us":4656953,"preview_stage_to_frame_end_us":1140,"selection_outline_cpu_us":3,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4658034,"texture_cpu_us":410,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_MOVING frame=11 missing=0 metrics={"bytes_uploaded":524288,"cache_bytes_estimate":1048576,"cache_hits":8,"cache_limit_bytes":9437184,"cache_tiles":16,"cold_budgeted":1,"cold_tiles_deferred":0,"compose_cpu_us":335,"draw_cpu_us":1120,"empty_skipped":124,"focal_evictions":0,"focal_plan_tiles":0,"focal_reused_evicted":0,"frame_end_us":4672752,"frame_reference_bytes_upper_bound":1048576,"full_draw_cpu_us":1162,"oldest_pending_age_us":0,"pending_input_count":0,"post_draw_us":4677226,"preview_index_built":1,"preview_index_cache_hit":0,"preview_index_cpu_us":83,"preview_index_fallback":0,"preview_index_keys":16,"preview_input_received_us":4667496,"preview_input_to_frame_end_us":5256,"preview_stage_completed_us":4671536,"preview_stage_to_frame_end_us":1216,"selection_outline_cpu_us":4,"source_chunks_shared":0,"source_pixels_rendered":131072,"sparse_draw":1,"submit_us":4672710,"texture_cpu_us":290,"textures_created":0,"textures_transient":0,"textures_updated":8,"tiles_composited":8,"tiles_examined":16,"tiles_visible":140,"transparent_tiles_culled":0,"visible_layer_plan_builds":1,"zoom":0.54}
+T181_PREVIEW_RESULT checks=19 failures=0
+T181_PREVIEW_PASSED checks=19 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T186_PREVIEW_RESULT checks=14 failures=0
+T186_PREVIEW_PASSED checks=14 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T187_DIRECT_RESULT checks=99 failures=0
+T187_DIRECT_PASSED checks=99 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T188_DELTA_RESULT checks=63 failures=0
+T188_DELTA_PASSED checks=63 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T189_SOURCE_LOOKUPS brush_optimized=15 brush_reference=95225 eraser_optimized=30 eraser_reference=190450
+T189_SOURCE_RESULT checks=77 failures=0
+T189_SOURCE_PASSED checks=77 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T190_SRGB_RESULT checks=77 failures=0
+T190_SRGB_PASSED checks=77 failures=0
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T191_ROW_RESULT checks=77 failures=0
+T191_ROW_PASSED checks=77 failures=0
