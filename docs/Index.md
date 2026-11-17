@@ -6,6 +6,14 @@
 
 **Toolchain implementation T-180:** [System/native GUI, cold offline and identical Arch/Ubuntu bundle builds](evidence/T-180-2026-11-17-local-validation.md) pass; artifact is 251.281285 MiB, zstd-19, internal checksums, no repository or external sidecar. The dedicated hosted toolchain workflow is **green**. **In Progress:** four retained desktop native-transition/export failures (42/46). The upload cap is 500 MiB. T-148/T-149 dependency gates and T-095/T-105 manual/portability acceptance remain open.
 
+**Sprint 2026-11-17:** PR #20 was squash-merged into `main` at
+`8f45f1a84bcc28b87d1b50f4bacfa173de653733`; continue on `sprint/2026-11-17`.
+New owner testing reports mismatched preset hardness, requests a separate visual
+brush/parameter panel, and observes roughly 12 FPS while drawing. [T-183](Tickets/T-183.md),
+[T-184](Tickets/T-184.md) and [T-185](Tickets/T-185.md) are ready; profile-led
+[T-186](Tickets/T-186.md) follows T-185 toward a declared 250ms benchmark milestone
+and 200ms stretch. "Seems usable" is not final physical acceptance.
+
 ## Current alpha architecture — Rust-owned raster
 
 **Owner decision (updated 2026-11-16):** keep the completed 96px Hokusai hard-round benchmark as the baseline, **remove NativeHard entirely** under T-153, and use Hokusai/libmypaint presets as the **only** native Brush/Eraser rasterizer in the existing Rust GDExtension, move canonical raster tiles, blending, masks, staging, rollback and undo data **out of GDScript**, connect Godot through **batched stroke commands → native-owned dirty tile/byte buffers**, and **delete Legacy** (no compatibility, native-free fallback or migration required in alpha). Godot retains workspace, tools/input reception, layer/metadata UI and GPU texture submission; Rust owns painting. Hokusai is **not required to match Legacy pixel geometry**. Only after retiring Legacy should the new pipeline be reprofiled and its measured dominant bottleneck optimized.
@@ -75,6 +83,9 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | Required-native hosted CI and independent owner evidence | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md), [T-106](Tickets/T-106.md), [T-107](Tickets/T-107.md), [T-150](Tickets/T-150.md) |
 | [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | After T-152: reference-device 60/96px responsiveness and owner signoff | [T-053](Tickets/T-053.md), [T-098](Tickets/T-098.md), [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md), [T-152](Tickets/T-152.md) |
 | [T-180 · Rebuildable offline toolchain and Make-first Drawing launch](Tickets/T-180.md) | In Progress | [Identical 251 MiB Arch/Ubuntu builds and hosted cold-native workflow](evidence/T-180-2026-11-17-local-validation.md) pass; four desktop/native-transition/export failures remain | [T-153](Tickets/T-153.md) |
+| [T-183 · Correct native preset identity and edge behavior](Tickets/T-183.md) | Ready | Owner: Hard Round soft; Soft airbrush-like/no spray; Ink hard; Airbrush soft; audit native mapping/settings and verify source/visual behavior | [T-153](Tickets/T-153.md), [T-182](Tickets/T-182.md) |
+| [T-184 · Separate visual Brushes panel and parameters](Tickets/T-184.md) | Ready | Dedicated native-stroke previews and real parameter controls using existing dock/layout model | [T-182](Tickets/T-182.md) |
+| [T-185 · Re-profile current Drawing frame drops and native path](Tickets/T-185.md) | Ready | Measure reported ~12 FPS, frame stalls and current 96px/512² latency; rank bottlenecks before optimization | [T-146](Tickets/T-146.md), [T-181](Tickets/T-181.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Required-native Linux/Windows builds, exports and process/VRAM evidence | [T-052](Tickets/T-052.md), [T-150](Tickets/T-150.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | Fresh post-Legacy required-native CI inventory + hosted green | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | New hosted replay and 23-finding owner matrix; preserve historic 46 | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
@@ -123,6 +134,7 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | [T-047 · Reconnect and resynchronization](Tickets/T-047.md) | Blocked | Completed scope; see ticket evidence | [T-045](Tickets/T-045.md), [T-046](Tickets/T-046.md) |
 | [T-048 · Collaboration acceptance](Tickets/T-048.md) | Blocked | Completed scope; see ticket evidence | [T-046](Tickets/T-046.md), [T-047](Tickets/T-047.md), [T-043](Tickets/T-043.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Blocked | Native source/Move revalidation before physical owner review | [T-053](Tickets/T-053.md), [T-149](Tickets/T-149.md) |
+| [T-186 · Profile-led optimization toward 250ms / 200ms](Tickets/T-186.md) | Blocked | One measured critical-path improvement; report frame times and matched cold/warm latency; preserve visible tiles | [T-185](Tickets/T-185.md) |
 
 ## 6. Previously completed, retained as historical evidence
 
