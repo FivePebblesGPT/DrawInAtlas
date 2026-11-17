@@ -7,6 +7,7 @@ import io
 import json
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -28,6 +29,7 @@ from tools.toolchain import (
     safe_extract_zstd,
     select_tar_path,
     sha256_file,
+    stage_mailbox_tool,
     tool_command,
     tool_paths,
     verify_extracted,
@@ -36,6 +38,63 @@ from tools.toolchain import (
 
 
 class ToolchainTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("zstd"), "zstd required for mailbox bundles")
+    def test_archived_mailbox_tool_round_trips_offline(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            stage = directory / "stage"
+            for name in ("bin", "rust", "vendor", "wheels"):
+                (stage / name).mkdir(parents=True)
+            tool = stage_mailbox_tool(stage)
+            manifest = {
+                "format": 1,
+                "platform": pins()["platform"],
+                "lock_sha256": sha256_file(LOCK_PATH),
+                "cargo_lock_sha256": sha256_file(ROOT / "native/drawing_brush/Cargo.lock"),
+                "files": {"bin/git_lfs_mbox.py": sha256_file(tool)},
+            }
+            (stage / "bundle-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            archive = directory / "toolchain.tar.zst"
+            write_bundle_archive(stage, archive)
+            extracted = directory / "extracted with spaces"
+            safe_extract_zstd(archive, extracted)
+            verify_extracted(extracted)
+            script = extracted / "bin/git_lfs_mbox.py"
+            self.assertEqual(script.read_bytes(), (ROOT / "tools/git_lfs_mbox.py").read_bytes())
+            self.assertTrue(script.stat().st_mode & 0o111)
+
+            # -S bypasses site packages, exercising the system-zstd offline path.
+            command = [sys.executable, "-S", str(script)]
+            payload = b"mailbox LFS payload\n"
+            oid = hashlib.sha256(payload).hexdigest()
+            store = directory / "sender-store"
+            obj = store / oid[:2] / oid[2:4] / oid
+            obj.parent.mkdir(parents=True)
+            obj.write_bytes(payload)
+            mailbox = directory / "changes.mbox"
+            mailbox.write_bytes(
+                b"diff --git a/asset.bin b/asset.bin\n"
+                b"@@ -0,0 +1,3 @@\n"
+                b"+version https://git-lfs.github.com/spec/v1\n"
+                b"+oid sha256:" + oid.encode() + b"\n+size " + str(len(payload)).encode() + b"\n"
+            )
+            packed = directory / "changes.lfsmbox.tar.zst"
+            subprocess.run(
+                [*command, "pack", str(mailbox), "--store", str(store), "-o", str(packed)],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run([*command, "inspect", str(packed)], check=True, capture_output=True)
+            received = directory / "received.mbox"
+            receiver_store = directory / "receiver-store"
+            subprocess.run(
+                [*command, "unpack", str(packed), "--store", str(receiver_store), "-o", str(received)],
+                check=True,
+                capture_output=True,
+            )
+            self.assertEqual(received.read_bytes(), mailbox.read_bytes())
+            self.assertEqual((receiver_store / oid[:2] / oid[2:4] / oid).read_bytes(), payload)
+
     @unittest.skipUnless(shutil.which("zstd"), "zstd required for archive creation")
     def test_single_archive_has_internal_sums_and_rejects_repo_payload(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

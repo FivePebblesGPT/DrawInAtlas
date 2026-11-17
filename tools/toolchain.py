@@ -48,6 +48,14 @@ def normalize_rust_metadata(rust: Path) -> None:
     components.write_text("\n".join(sorted(components.read_text().splitlines())) + "\n", encoding="utf-8")
 
 
+def stage_mailbox_tool(stage: Path) -> Path:
+    """Include the repository's standalone Git LFS mailbox utility."""
+    destination = stage / "bin/git_lfs_mbox.py"
+    shutil.copyfile(ROOT / "tools/git_lfs_mbox.py", destination)
+    destination.chmod(0o755)
+    return destination
+
+
 def write_bundle_archive(stage: Path, output: Path) -> None:
     """Publish one size-bounded toolchain-only archive, with checksums inside it."""
     allowed = {"bin", "rust", "vendor", "wheels", MANIFEST}
@@ -502,6 +510,8 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
         normalize_rust_metadata(stage / "rust")
         extract_godot(godot_zip, stage / "bin/godot", lock["godot"]["executable"])
         extract_uv(uv_tgz, stage / "bin/uv")
+        mailbox_tool = stage_mailbox_tool(stage)
+        run([python, "-S", str(mailbox_tool), "--help"])
         rust_env = os.environ.copy()
         rust_env["CARGO_NET_OFFLINE"] = "false"
         rust_env["CARGO_HOME"] = str(Path(tmp) / "cargo")

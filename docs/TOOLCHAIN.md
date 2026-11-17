@@ -54,7 +54,8 @@ Linux target triple. Rust distribution components are obtained by `rustup`
 for the pinned Rust version; rustup verifies upstream component checksums.
 Crates come from `native/drawing_brush/Cargo.lock` via `cargo vendor --locked`.
 The bundle packages a private Rust installation, Godot executable, uv executable,
-Cargo vendor directory, and checksum-pinned universal Ruff/ty wheels;
+Cargo vendor directory, checksum-pinned universal Ruff/ty wheels, and the
+standalone `bin/git_lfs_mbox.py` mailbox utility from `tools/git_lfs_mbox.py`;
 **it does not package Python or compiled DrawInAtlas binaries**.
 
 The generator uses **`zstd -19 -T1`** and rejects compressed output larger than
@@ -95,6 +96,28 @@ from the bundle. Its writable cache lives separately in `.build/runtime/`;
 repeated linting never mutates the verified archive payload. Python is the local
 compatible system executable selected by
 `PYTHON=/path/to/python3`.
+
+### Exchange patches and Git LFS objects
+
+The bundle includes `bin/git_lfs_mbox.py` for packing, inspecting and unpacking
+offline patch transfers. Invoke it with system Python explicitly so it uses
+the installed `zstd` fallback without resolving its uv script dependencies:
+
+```bash
+python3 /path/to/extracted-toolchain/bin/git_lfs_mbox.py --help
+git format-patch --stdout BASE..HEAD > changes.mbox
+python3 /path/to/extracted-toolchain/bin/git_lfs_mbox.py pack changes.mbox --repo .
+python3 /path/to/extracted-toolchain/bin/git_lfs_mbox.py inspect changes.lfsmbox.tar.zst
+python3 /path/to/extracted-toolchain/bin/git_lfs_mbox.py unpack changes.lfsmbox.tar.zst --repo . --apply
+```
+
+Git and Git LFS must be installed for applying/hydrating LFS patches. The utility
+removes the extracted `.mbox` after a successful `--apply`, preserving it when
+applying fails or when `--apply` is omitted. It also reads alternate DrawInAtlas
+`bundle.json` exports. Its bytes are covered by
+the toolchain archive's internal checksum manifest. The checked-in copy comes
+from the standalone [git_lfs_mbox gist](https://gist.github.com/FivePebblesGPT/f9ac329f8537151441535027758ff5a5)
+and includes the DrawInAtlas compatibility and successful-apply cleanup changes.
 
 The old `Godot_v4.8b3_rust_hokusai_bundle8.tar.zst` remains usable as a
 transition input if its SHA-256 matches the committed historic checksum.
