@@ -1153,7 +1153,11 @@ func _draw() -> void:
 					and entry["preview_owner"] == preview_owner:
 				metrics["cache_hits"] = int(metrics["cache_hits"]) + 1
 			else:
-				if cold_budgeted and (not cold_targets.has(key) \
+				# Cold population may defer a tile that has never been displayed.
+				# An existing texture must be refreshed and submitted every frame:
+				# skipping a warm tile clears its old draw command and creates holes
+				# throughout a moving native stroke, until idle draws catch up.
+				if entry.is_empty() and cold_budgeted and (not cold_targets.has(key) \
 						or (cold_rendered > 0 and Time.get_ticks_usec() - draw_start >= MAX_COLD_COMPOSE_CPU_US)):
 					metrics["cold_tiles_deferred"] = int(metrics["cold_tiles_deferred"]) + 1
 					continue

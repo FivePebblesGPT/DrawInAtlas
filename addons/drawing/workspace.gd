@@ -55,6 +55,7 @@ var tool_buttons: Dictionary = {}
 var layers: Tree
 var status: Label
 var width_spin: SpinBox
+var brush_preset_control: OptionButton
 var snap_toggle: CheckButton
 var grid_dialog: ConfirmationDialog
 var grid_fields: Array[SpinBox] = []
@@ -262,6 +263,19 @@ func _build_interface() -> void:
 	width_spin.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
 	width_spin.gui_input.connect(func(event: InputEvent) -> void:
 		top_bar.consume_option_wheel(event, width_spin))
+	brush_preset_control = OptionButton.new()
+	brush_preset_control.name = "BrushPreset"
+	brush_preset_control.tooltip_text = "Native brush preset (also used by Eraser); width is set in Brush px"
+	brush_preset_control.custom_minimum_size.x = 140
+	var preset_ids: Array[String] = ["hard", "soft", "ink", "airbrush"]
+	var preset_labels: Array[String] = ["Hard Round", "Soft", "Ink", "Airbrush"]
+	for index: int in range(preset_ids.size()):
+		brush_preset_control.add_item(preset_labels[index])
+		brush_preset_control.set_item_metadata(index, preset_ids[index])
+	brush_preset_control.item_selected.connect(func(index: int) -> void:
+		canvas.brush_preset = str(brush_preset_control.get_item_metadata(index)))
+	brush_preset_control.gui_input.connect(func(event: InputEvent) -> void:
+		top_bar.consume_option_wheel(event, brush_preset_control))
 	snap_toggle = CheckButton.new()
 	snap_toggle.text = "Snap (8 px)"
 	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
@@ -272,6 +286,9 @@ func _build_interface() -> void:
 		selection_mode_control.add_item(option)
 	selection_mode_control.item_selected.connect(func(index: int) -> void:
 		_set_selection_mode(selection_mode_control.get_item_text(index)))
+	# Inactive options also need an owner before their tool is first selected.
+	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control]:
+		top_bar._unused_options.add_child(option)
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
 	tabs_line.name = "DocumentTabs"
@@ -2771,6 +2788,7 @@ func _refresh_tool_options() -> void:
 		return
 	var controls: Array[Control] = []
 	if active_tool in ["Brush", "Eraser"]:
+		controls.append(brush_preset_control)
 		controls.append(width_spin)
 	if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]:
 		controls.append(snap_toggle)

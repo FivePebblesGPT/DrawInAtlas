@@ -45,6 +45,14 @@ jobs:
             --path drawing --script res://tests/stroke_navigation_native.gd \
             2>&1 | tee /tmp/t095-stroke-navigation.log
           python3 tools/check_godot_model_log.py /tmp/t095-stroke-navigation.log --marker T095_NAV_PASSED
+      - name: Queued Brush and Eraser graphical history regression
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s xvfb-run -a -s '-screen 0 1280x900x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/t124_queued_brush_native.gd \
+            2>&1 | tee /tmp/t124-queued-native.log
+          python3 tools/check_godot_model_log.py /tmp/t124-queued-native.log --marker T124_NATIVE_PASSED
       - name: Exact 60px Brush/Eraser source oracle and transaction rollback
         run: |
           set -euo pipefail
@@ -482,6 +490,7 @@ jobs:
             /tmp/t095-native-preset-packed-output.log
             /tmp/t095-full-canvas.log
             /tmp/t095-native.log
+            /tmp/t124-queued-native.log
             /tmp/t153-*.log
             /tmp/t153-bench/**
           if-no-files-found: warn

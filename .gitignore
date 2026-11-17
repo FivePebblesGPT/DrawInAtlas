@@ -88,3 +88,10 @@ __pycache__/
 /native/drawing_brush/.cargo/
 /addons/drawing/native/
 /drawing/addons/drawing/native/
+
+# Make-managed reproducible toolchain outputs and local settings.
+/.build/
+/.venv/
+/local.mk
+/.ruff_cache/
+/.ty_cache/

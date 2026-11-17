@@ -11,16 +11,28 @@ Never hand-edit generated `drawing/addons/` or copy it into source control.
 From the repository root:
 
 ```sh
-python3 tools/build_drawing_app.py --in-place
-godot --headless --editor --path drawing --import --quit
-godot --editor --path drawing
-godot --path drawing
+make doctor
+make drawing
+# Or use a generated offline archive:
+make drawing TOOLCHAIN=bundle BUNDLE=/path/to/drawing-toolchain-linux-x86_64.tar.zst
 ```
+
+Brush/Eraser require the Rust Hokusai GDExtension. Make builds, stages and
+registers it before Godot import. Configure installed executable paths in
+`local.mk` or command-line overrides; see [toolchain setup](../docs/TOOLCHAIN.md).
+
+With **Brush** or **Eraser** active, the top options row contains the native
+**Hard Round / Soft / Ink / Airbrush** selector and **Brush px** width field.
+For the 96px hard-round fill check, choose **Hard Round** and enter **96**.
+On narrow windows, use the option-row chevrons, Shift+wheel or keyboard focus
+to reach controls that overflow. `make test-graphical` runs the moving-stroke
+tile-retention regression under Xvfb; this requires `xvfb-run` on the test host.
 
 Clean/release build omitting all Atlas content:
 
 ```sh
 mkdir -p /tmp/drawing-out
+make native
 python3 tools/build_drawing_app.py --output /tmp/drawing-out/drawing
 godot --headless --editor --path /tmp/drawing-out/drawing --import --quit
 godot --headless --path /tmp/drawing-out/drawing --script res://tests/standalone_smoke.gd
@@ -44,7 +56,8 @@ measure physical pointer-to-photon latency or GPU/VRAM usage.
 
 The output directory must be empty and outside the repository. The build copies
 only the standalone `project.godot`, scenes, app scripts, tests, export presets
-and the canonical package's `.gd`, `.gd.uid` and licensed font files. The third generic
+and the canonical package's `.gd`, `.gd.uid`, licensed assets, presets and required
+native extension. The third generic
 consumer is staged through `tools/build_drawing_contract_consumer.py --fixture
 drawing_package_consumer --output /tmp/consumer` and also has no Atlas source.
 Linux/Windows export presets target x86_64 desktop; Windows export requires

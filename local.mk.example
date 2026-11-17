@@ -1,0 +1,9 @@
+# Optional local overrides. Copy to local.mk (which is ignored by Git).
+# Command-line variables always take precedence.
+TOOLCHAIN := system
+GODOT := /absolute/path/to/Godot_v4.8-beta3_linux.x86_64
+RUST_BIN := /home/you/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin
+CARGO := cargo
+UV := uv
+PYTHON := python3
+# BUNDLE := /path/to/drawing-toolchain-linux-x86_64.tar.zst

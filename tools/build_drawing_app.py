@@ -11,6 +11,11 @@ import argparse
 import shutil
 from pathlib import Path
 
+try:
+    from tools.prepare_native_project import prepare
+except ModuleNotFoundError:  # Direct `python tools/build_drawing_app.py` invocation.
+    from prepare_native_project import prepare
+
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "drawing"
 PACKAGE = ROOT / "addons" / "drawing"
@@ -80,20 +85,23 @@ def stage(destination: Path, in_place: bool = False, *, without_native: bool = F
             if source.is_file() and source.suffix in {".myb", ".dep5", ".md"}:
                 shutil.copy2(source, brush_destination / source.name)
 
-    # The optional GDExtension is only registered when its Linux binary was
-    # actually built. Never ship a manifest with a broken missing-library path.
+    # The Hokusai GDExtension is required for runnable Drawing projects.
+    # Only deliberately native-absent negative fixtures may opt out.
     native = PACKAGE / "native"
     manifest = native / "drawing_brush.gdextension"
     binary = native / "bin" / "libdrawing_brush.so"
     if native.is_symlink() or manifest.is_symlink() or binary.is_symlink():
         raise ValueError("Native extension paths cannot be symbolic links")
-    if not without_native and manifest.exists() != binary.exists():
-        raise ValueError("Native extension manifest and library must be staged together")
+    if not without_native and (not manifest.is_file() or not binary.is_file() or binary.stat().st_size == 0):
+        raise ValueError("Required native Brush/Eraser extension missing; run 'make native' first")
     if not without_native and manifest.exists():
         native_destination = staged / "native"
         (native_destination / "bin").mkdir(parents=True, exist_ok=True)
         shutil.copy2(manifest, native_destination / manifest.name)
         shutil.copy2(binary, native_destination / "bin" / binary.name)
+        # External consumers need registration before their very first import,
+        # just like the in-place Make workflow (Godot discovers scripts first).
+        prepare(output)
     return output
 
 
@@ -103,7 +111,7 @@ def main() -> None:
     target.add_argument("--in-place", action="store_true")
     target.add_argument("--output", type=Path)
     parser.add_argument("--without-native", action="store_true",
-                        help="Produce a portable Drawing consumer without optional native binaries")
+                        help="For negative tests only: explicitly stage a native-absent project")
     args = parser.parse_args()
     print(stage(APP if args.in_place else args.output, args.in_place,
                 without_native=args.without_native))

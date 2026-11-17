@@ -1,0 +1,82 @@
+name: T-180 Rebuildable Linux native toolchain
+
+on:
+  pull_request:
+    paths:
+      - Makefile
+      - toolchain.lock.toml
+      - pyproject.toml
+      - .github/workflows/toolchain.yml
+      - tools/toolchain.py
+      - tools/prepare_native_project.py
+      - tools/build_native_brush.sh
+      - tools/build_drawing_app.py
+      - tools/check_offline_toolchain.py
+      - native/drawing_brush/**
+      - drawing/tests/native_extension_ready.gd
+      - drawing/tests/t181_native_preview_retention.gd
+      - drawing/tests/t182_brush_preset_controls.gd
+      - addons/drawing/canvas.gd
+      - addons/drawing/workspace.gd
+      - tests/test_toolchain_build.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clean-linux-x86_64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install archive / software-rendering prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd bubblewrap xvfb libgl1 libgl1-mesa-dri libx11-6
+      - name: Permit and preflight isolated namespaces on the disposable runner
+        run: |
+          # Ubuntu 24.04 AppArmor otherwise denies bubblewrap's loopback setup.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --unshare-net --ro-bind / / -- true
+      - name: Inspect prerequisites
+        run: |
+          python3 --version
+          make --version | head -1
+          rustup --version
+      - name: Bootstrap unit tests
+        run: make python-test
+      - name: Recreate offline toolchain
+        run: make bundle
+      - name: Validate archive manifest
+        run: make bundle-verify
+      - name: Test native-present Drawing/Atlas with offline toolchain
+        run: |
+          python3 tools/check_offline_toolchain.py \
+            --bundle .build/bundles/drawing-toolchain-linux-x86_64.tar.zst \
+            --output /tmp/t180-cold-consumer
+      - name: Verify moving native stroke framebuffer retention
+        run: |
+          set -euo pipefail
+          make test-graphical TOOLCHAIN=bundle \
+            BUNDLE=.build/bundles/drawing-toolchain-linux-x86_64.tar.zst \
+            2>&1 | tee /tmp/t181-native-preview.log
+          python3 tools/check_godot_model_log.py /tmp/t181-native-preview.log --marker T181_PREVIEW_PASSED
+      - name: Keep raw cold-consumer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t180-cold-offline-logs
+          path: |
+            /tmp/t180-cold-consumer/*.log
+            /tmp/t180-cold-consumer/results.json
+            /tmp/t181-native-preview.log
+      - name: Archive digest
+        if: always()
+        run: |
+          if test -f .build/bundles/drawing-toolchain-linux-x86_64.tar.zst; then
+            sha256sum .build/bundles/drawing-toolchain-linux-x86_64.tar.zst >> "$GITHUB_STEP_SUMMARY"
+            stat -c '%s bytes' .build/bundles/drawing-toolchain-linux-x86_64.tar.zst >> "$GITHUB_STEP_SUMMARY"
+          fi

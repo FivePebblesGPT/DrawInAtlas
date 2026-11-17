@@ -5,8 +5,10 @@ import copy
 import hashlib
 import importlib.util
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
+
+from native_test_support import experimental_extensions
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE = ROOT / "tools/benchmarks/t068_bridge"
@@ -44,7 +46,7 @@ class ScalarPublicationContracts(unittest.TestCase):
         self.assertNotIn("push:", workflow)
         self.assertNotIn("pull_request:", workflow)
         self.assertNotIn("ImageTexture", source)
-        self.assertFalse(list(ROOT.rglob("*.gdextension")))
+        self.assertFalse(experimental_extensions(ROOT))
 
     def test_two_live_runs_have_complete_source_pinned_evidence(self) -> None:
         evidence = json.loads(EVIDENCE.read_text(encoding="utf-8"))

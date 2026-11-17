@@ -55,7 +55,7 @@ class GroupedPanelDockRoadmapTests(unittest.TestCase):
                     if line.startswith(f"| [T-{ticket_id:03} ·")
                 )
                 self.assertIn(f" | {status} | ", row)
-        self.assertIn("| 83 |", INDEX)
+        self.assertIn("Tickets/T-083.md", INDEX)
 
     def test_only_final_ticket_has_new_manual_review_gate(self) -> None:
         for ticket_id in TICKETS:
@@ -69,7 +69,7 @@ class GroupedPanelDockRoadmapTests(unittest.TestCase):
                     self.assertTrue(record.approved and record.evidence)
                 if not record.manual_review:
                     self.assertFalse(record.approved)
-        self.assertIn("**Owner**", next(
+        self.assertIn("owner UX validation", next(
             line for line in INDEX.splitlines() if line.startswith("| [T-083 ·")
         ))
         for earlier in (56, 59):
