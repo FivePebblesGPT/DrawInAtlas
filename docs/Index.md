@@ -14,9 +14,13 @@ profiled); [T-184](Tickets/T-184.md) is Done (native-backed visual Brushes dock)
 [T-185](Tickets/T-185.md) is Done: [four valid full-workspace native X11
 processes (32 gestures), two retained incomplete exits, frame p95/long-frame
 and 100-event rapid fill baselines](evidence/T-185-2026-11-17-current-workspace-profile.md).
-[T-186](Tickets/T-186.md) is now Ready for one measured and falsifiable
-optimization toward a declared 250ms benchmark milestone
-and 200ms stretch. "Seems usable" is not final physical acceptance.
+[T-186](Tickets/T-186.md) is Done for [one bounded exact-dirty native preview
+optimization](evidence/T-186-2026-11-17-exact-native-dirty-preview.md):
+54% cold composition 755→270ms, frame p95 123→71ms, warm-tile correctness
+retained. The 100-event rapid 96px p50 remains 517ms cold / 613ms warm,
+**above the 250/200ms target**; [T-187](Tickets/T-187.md) is Ready for
+independent measured next-step work. "Seems usable" and software-X11 data are
+not physical owner acceptance.
 
 ## Current alpha architecture — Rust-owned raster
 
@@ -90,6 +94,7 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-183 · Correct native preset identity and edge behavior](Tickets/T-183.md) | Done | [189-check native workspace/GUI profiles and fresh old/new 96px performance baseline](evidence/T-183-2026-11-17-native-preset-audit.md); tooltips and source presets corrected, no owner hardware claim | [T-153](Tickets/T-153.md), [T-182](Tickets/T-182.md) |
 | [T-184 · Separate visual Brushes panel and parameters](Tickets/T-184.md) | Done | [Native Hokusai previews, 132 UI/pixel checks, frozen gesture and floating layout evidence](evidence/T-184-2026-11-17-brush-panel.md); owner UX gates remain open | [T-182](Tickets/T-182.md) |
 | [T-185 · Re-profile current Drawing frame drops and native path](Tickets/T-185.md) | Done | [Four complete software-X11 processes, 32 scenarios, two unverified exits, 54% p95 118ms cold frames; T-146 rapid p50 654ms cold / 680ms warm, composition dominant](evidence/T-185-2026-11-17-current-workspace-profile.md) | [T-146](Tickets/T-146.md), [T-181](Tickets/T-181.md) |
+| [T-186 · Profile-led optimization toward 250ms / 200ms](Tickets/T-186.md) | Done | [Exact native dirty 128px preview A/B: 54% cold frame p95 123→71ms; 19+14 graphical checks](evidence/T-186-2026-11-17-exact-native-dirty-preview.md); 250/200ms rapid targets remain open in T-187 | [T-185](Tickets/T-185.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Required-native Linux/Windows builds, exports and process/VRAM evidence | [T-052](Tickets/T-052.md), [T-150](Tickets/T-150.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | Fresh post-Legacy required-native CI inventory + hosted green | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | New hosted replay and 23-finding owner matrix; preserve historic 46 | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
@@ -120,6 +125,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | Completed scope; see ticket evidence | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
 | [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Ready | Completed scope; see ticket evidence | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | Completed scope; see ticket evidence | [T-051](Tickets/T-051.md) |
+| [T-187 · Residual native Drawing latency after exact preview invalidation](Tickets/T-187.md) | Ready | [T-186 exact-dirty native improvement verified](evidence/T-186-2026-11-17-exact-native-dirty-preview.md); separately profile 250/200ms remaining rapid-workload gap | [T-186](Tickets/T-186.md) |
 
 ## 5. Blocked by dependencies or future owner review
 
@@ -138,7 +144,7 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | [T-047 · Reconnect and resynchronization](Tickets/T-047.md) | Blocked | Completed scope; see ticket evidence | [T-045](Tickets/T-045.md), [T-046](Tickets/T-046.md) |
 | [T-048 · Collaboration acceptance](Tickets/T-048.md) | Blocked | Completed scope; see ticket evidence | [T-046](Tickets/T-046.md), [T-047](Tickets/T-047.md), [T-043](Tickets/T-043.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Blocked | Native source/Move revalidation before physical owner review | [T-053](Tickets/T-053.md), [T-149](Tickets/T-149.md) |
-| [T-186 · Profile-led optimization toward 250ms / 200ms](Tickets/T-186.md) | Ready | [T-185 measured composition/refresh as first falsifiable candidate](evidence/T-185-2026-11-17-current-workspace-profile.md); target not met; preserve T-181 warm visibility | [T-185](Tickets/T-185.md) |
+
 
 ## 6. Previously completed, retained as historical evidence
 

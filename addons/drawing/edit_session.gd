@@ -85,6 +85,42 @@ func _mark_preview_display_pixel(global_x: int, global_y: int) -> void:
 	_preview_display_last_epoch = _preview_epoch
 
 
+## Record only a native batch's changed local rectangle, not its enclosing
+## cumulative transaction footprint. Signed storage coordinates remain 64-bit;
+## the bounded display map uses string keys instead of Rect2i world positions.
+## If any range cannot fit the exact index, fall back to conservative stamps.
+func _mark_native_preview_display_rect(tile_x: int, tile_y: int,
+		local_dirty: Rect2i) -> void:
+	if not _preview_display_exact:
+		return
+	if not local_dirty.has_area():
+		_invalidate_exact_preview_display_index()
+		return
+	var stride: int = document.tile_stride
+	if local_dirty.position.x < 0 or local_dirty.position.y < 0 \
+			or local_dirty.end.x > stride or local_dirty.end.y > stride:
+		_invalidate_exact_preview_display_index()
+		return
+	var start_x: int = (tile_x * stride + local_dirty.position.x) >> 7
+	var start_y: int = (tile_y * stride + local_dirty.position.y) >> 7
+	var end_x: int = (tile_x * stride + local_dirty.end.x - 1) >> 7
+	var end_y: int = (tile_y * stride + local_dirty.end.y - 1) >> 7
+	var width: int = end_x - start_x + 1
+	var height: int = end_y - start_y + 1
+	if width > MAX_PREVIEW_DISPLAY_KEYS or height > MAX_PREVIEW_DISPLAY_KEYS / width:
+		_invalidate_exact_preview_display_index()
+		return
+	for y: int in range(start_y, end_y + 1):
+		for x: int in range(start_x, end_x + 1):
+			var key: String = "%d,%d" % [x, y]
+			if not _preview_display_versions.has(key) \
+					and _preview_display_versions.size() >= MAX_PREVIEW_DISPLAY_KEYS:
+				_invalidate_exact_preview_display_index()
+				return
+			_preview_display_versions[key] = _preview_epoch
+	_preview_display_last_epoch = _preview_epoch
+
+
 ## Canvas-only refinement: pixels in one 256px storage tile should not dirty
 ## all four 128px display tiles. Preserve the existing public conservative
 ## stamp API and fail back to it for bulk edits, rollbacks, oversized
@@ -858,18 +894,39 @@ func _stage_native_tile_batch(erase: bool, selection: DrawingSelection) -> Drawi
 	if not bool(staged.get("ok", false)):
 		return DrawingResult.failure("NATIVE_BATCH", str(staged.get("error", "Native tile batch rejected")))
 	var applied_us: int = Time.get_ticks_usec() if profile else 0
-	var dirty: Array = _native_tiles.call("dirty_tiles", _native_transaction)
+	# An opt-in, test-only counterfactual replays the original cumulative
+	# invalidation *with the same binary and source hashes* for T-186 A/B runs.
+	# Ordinary users always take the batch-local exact path.
+	var counterfactual: bool = OS.has_environment("DRAWING_T186_CUMULATIVE_COUNTERFACTUAL")
+	var changed: Array = _native_tiles.call("batch_dirty_tiles", _native_transaction)
+	var dirty: Array = _native_tiles.call("dirty_tiles", _native_transaction) \
+		if profile or counterfactual else []
 	var queried_us: int = Time.get_ticks_usec() if profile else 0
 	var revisited: int = 0
-	for entry: Dictionary in dirty:
-		var key: String = "%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]
-		if profile and _preview_tile_versions.has(key):
-			revisited += 1
-		_preview_epoch += 1
-		_preview_tile_versions[key] = _preview_epoch
-		_native_preview_cache.erase(key)
+	if profile:
+		# Count only keys known before this batch, as in T-185's baseline.
+		for entry: Dictionary in dirty:
+			if _preview_tile_versions.has("%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]):
+				revisited += 1
+	if counterfactual:
+		for entry: Dictionary in dirty:
+			var key: String = "%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]
+			_preview_epoch += 1
+			_preview_tile_versions[key] = _preview_epoch
+			_native_preview_cache.erase(key)
+		_invalidate_exact_preview_display_index()
+	else:
+		# Rust still retains cumulative rectangles for atomic commit/history.
+		# Only actually modified native pixels may invalidate a warm texture.
+		for entry: Dictionary in changed:
+			var tile_x: int = int(entry["tile_x"])
+			var tile_y: int = int(entry["tile_y"])
+			var key: String = "%d,%d" % [tile_x, tile_y]
+			_preview_epoch += 1
+			_preview_tile_versions[key] = _preview_epoch
+			_native_preview_cache.erase(key)
+			_mark_native_preview_display_rect(tile_x, tile_y, entry["dirty"] as Rect2i)
 	var stamped_us: int = Time.get_ticks_usec() if profile else 0
-	_invalidate_exact_preview_display_index()
 	if profile:
 		var index_us: int = Time.get_ticks_usec()
 		t185_native_stage["authorize_us"] += authorized_us - began_us

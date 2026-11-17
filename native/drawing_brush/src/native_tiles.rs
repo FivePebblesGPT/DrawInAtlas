@@ -53,6 +53,8 @@ struct Edit {
     before: HashMap<TileId, Tile>,
     draft: HashMap<TileId, Tile>,
     dirty: HashMap<TileId, Dirty>,
+    /// Exactly changed rectangles in the most recently successful stage call.
+    last_dirty: HashMap<TileId, Dirty>,
     batches: u64,
 }
 
@@ -183,6 +185,7 @@ impl TileStore {
             before: HashMap::new(),
             draft: HashMap::new(),
             dirty: HashMap::new(),
+            last_dirty: HashMap::new(),
             batches: 0,
         });
         Ok(id)
@@ -376,6 +379,7 @@ impl TileStore {
                 .or_insert_with(|| self.tiles.get(&id).expect("authorized").clone());
             active.draft.insert(id, tile);
         }
+        active.last_dirty = dirty.clone();
         for (id, area) in dirty {
             active
                 .dirty
@@ -1527,8 +1531,11 @@ impl DrawingNativeTiles {
         result
     }
 
-    #[func]
-    fn dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+    fn dirty_descriptors(
+        &self,
+        transaction: i64,
+        latest_batch: bool,
+    ) -> Array<Dictionary<Variant, Variant>> {
         let mut result = Array::new();
         let Some(edit) = self
             .store
@@ -1538,7 +1545,12 @@ impl DrawingNativeTiles {
         else {
             return result;
         };
-        let mut items = edit.dirty.iter().collect::<Vec<_>>();
+        let selected = if latest_batch {
+            &edit.last_dirty
+        } else {
+            &edit.dirty
+        };
+        let mut items = selected.iter().collect::<Vec<_>>();
         items.sort_by_key(|(id, _)| (&id.layer, id.y, id.x));
         for (id, rect) in items {
             let mut item = Dictionary::new();
@@ -1563,6 +1575,20 @@ impl DrawingNativeTiles {
             result.push(&item);
         }
         result
+    }
+
+    /// The cumulative dirty set is used for history publication and must never
+    /// be replaced by the last-batch set.
+    #[func]
+    fn dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+        self.dirty_descriptors(transaction, false)
+    }
+
+    /// Per-stage *actual pixel changes* for live preview invalidation. A
+    /// no-op batch returns empty; previously modified tiles are not restamped.
+    #[func]
+    fn batch_dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+        self.dirty_descriptors(transaction, true)
     }
 
     #[func]
@@ -1683,6 +1709,70 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn t186_batch_dirty_tracks_actual_changed_pixels_not_cumulative_history() {
+        let mut store = initialized(256);
+        blank(&mut store, -1, 0);
+        let tx = store.begin("ink", 0, false).unwrap();
+        let tile = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let stage = |store: &mut TileStore, x: i32, y: i32, rgba: u32| {
+            store
+                .stage(
+                    tx,
+                    0,
+                    -256,
+                    0,
+                    &[x, y],
+                    false,
+                    rgba,
+                    false,
+                    Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                )
+                .unwrap()
+        };
+        assert_eq!(stage(&mut store, 10, 20, 0xff112233), 1);
+        assert!(
+            store.active.as_ref().unwrap().last_dirty.get(&tile)
+                == Some(&Dirty {
+                    left: 10,
+                    top: 20,
+                    right: 11,
+                    bottom: 21
+                })
+        );
+        // Writing the same opaque pixel again changes neither the batch nor
+        // the preview stamp, but the transaction still owns its first edit.
+        assert_eq!(stage(&mut store, 10, 20, 0xff112233), 0);
+        assert!(store.active.as_ref().unwrap().last_dirty.is_empty());
+        assert_eq!(store.active.as_ref().unwrap().dirty.len(), 1);
+        assert_eq!(stage(&mut store, 220, 230, 0xff445566), 1);
+        assert!(
+            store.active.as_ref().unwrap().last_dirty.get(&tile)
+                == Some(&Dirty {
+                    left: 220,
+                    top: 230,
+                    right: 221,
+                    bottom: 231
+                })
+        );
+        assert!(
+            store.active.as_ref().unwrap().dirty.get(&tile)
+                == Some(&Dirty {
+                    left: 10,
+                    top: 20,
+                    right: 221,
+                    bottom: 231
+                })
+        );
+        assert_eq!(store.commit(tx, 0).unwrap(), 1);
+        assert_eq!(store.undo_or_redo(true).unwrap(), 1);
+        assert_eq!(store.undo_or_redo(false).unwrap(), 1);
+    }
+
     #[test]
     fn t170_retire_preflight_is_read_only_and_matches_commit_gate() {
         let mut store = initialized(16);
