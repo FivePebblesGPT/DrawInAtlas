@@ -32,6 +32,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y zstd bubblewrap xvfb libgl1 libgl1-mesa-dri libx11-6
+      - name: Permit and preflight isolated namespaces on the disposable runner
+        run: |
+          # Ubuntu 24.04 AppArmor otherwise denies bubblewrap's loopback setup.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --unshare-net --ro-bind / / -- true
       - name: Inspect prerequisites
         run: |
           python3 --version
@@ -56,10 +61,10 @@ jobs:
           path: |
             /tmp/t180-cold-consumer/*.log
             /tmp/t180-cold-consumer/results.json
-            .build/bundles/*.sha256
       - name: Archive digest
         if: always()
         run: |
-          if test -f .build/bundles/drawing-toolchain-linux-x86_64.tar.zst.sha256; then
-            cat .build/bundles/drawing-toolchain-linux-x86_64.tar.zst.sha256 >> "$GITHUB_STEP_SUMMARY"
+          if test -f .build/bundles/drawing-toolchain-linux-x86_64.tar.zst; then
+            sha256sum .build/bundles/drawing-toolchain-linux-x86_64.tar.zst >> "$GITHUB_STEP_SUMMARY"
+            stat -c '%s bytes' .build/bundles/drawing-toolchain-linux-x86_64.tar.zst >> "$GITHUB_STEP_SUMMARY"
           fi

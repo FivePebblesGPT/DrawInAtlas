@@ -31,10 +31,37 @@ from tools.toolchain import (
     tool_command,
     tool_paths,
     verify_extracted,
+    write_bundle_archive,
 )
 
 
 class ToolchainTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("zstd"), "zstd required for archive creation")
+    def test_single_archive_has_internal_sums_and_rejects_repo_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            stage = directory / "stage"
+            stage.mkdir()
+            for name in ("bin", "rust", "vendor", "wheels"):
+                (stage / name).mkdir()
+            manifest = '{"files": {"bin/tool": "checksum-fixture"}}\n'
+            (stage / "bundle-manifest.json").write_text(manifest)
+            (stage / "bin/tool").write_bytes(b"tool-fixture")
+            output = directory / "bundle.tar.zst"
+            sidecar = directory / "bundle.tar.zst.sha256"
+            sidecar.write_text("stale")
+            write_bundle_archive(stage, output)
+            self.assertTrue(output.is_file())
+            self.assertFalse(sidecar.exists())
+            unpacked = directory / "unpacked"
+            unpacked.mkdir()
+            safe_extract_zstd(output, unpacked)
+            self.assertEqual((unpacked / "bundle-manifest.json").read_text(), manifest)
+            self.assertEqual((unpacked / "bin/tool").read_bytes(), b"tool-fixture")
+            (stage / "repo").mkdir()
+            with self.assertRaisesRegex(ToolchainError, "no repo"):
+                write_bundle_archive(stage, output)
+
     def test_godot_zero_exit_does_not_hide_script_errors(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             godot = Path(temp) / "fake Godot"
@@ -142,6 +169,16 @@ class ToolchainTests(unittest.TestCase):
                     sidecar.write_text(text)
                     with self.assertRaisesRegex(ToolchainError, "sidecar mismatch"):
                         resolve_bundle(str(archive))
+
+    def test_unsupported_platform_and_malformed_manifest_fail_clearly(self) -> None:
+        with patch("tools.toolchain.sys.platform", "win32"):
+            with self.assertRaisesRegex(ToolchainError, "Linux x86-64 only"):
+                resolve_bundle("fixture.tar.zst")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "bundle-manifest.json").write_text("[]")
+            with self.assertRaisesRegex(ToolchainError, "Malformed bundle manifest"):
+                verify_extracted(root)
 
     def test_manifest_verifies_bytes_and_rejects_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

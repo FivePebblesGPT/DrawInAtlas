@@ -48,6 +48,43 @@ def normalize_rust_metadata(rust: Path) -> None:
     components.write_text("\n".join(sorted(components.read_text().splitlines())) + "\n", encoding="utf-8")
 
 
+def write_bundle_archive(stage: Path, output: Path) -> None:
+    """Publish one size-bounded toolchain-only archive, with checksums inside it."""
+    allowed = {"bin", "rust", "vendor", "wheels", MANIFEST}
+    if {path.name for path in stage.iterdir()} != allowed:
+        raise ToolchainError(
+            "Bundle must contain only tools, vendor, wheels and its internal manifest; no repo"
+        )
+    temporary_archive = output.with_name(output.name + ".part")
+    try:
+        run(
+            [
+                "tar",
+                "--sort=name",
+                "--mtime=@0",
+                "--owner=0",
+                "--group=0",
+                "--hard-dereference",
+                "--numeric-owner",
+                "--dereference",
+                "-I",
+                "zstd -19 -T1",
+                "-cf",
+                str(temporary_archive),
+                "-C",
+                str(stage),
+                ".",
+            ]
+        )
+        check_bundle_size(temporary_archive)
+        os.replace(temporary_archive, output)
+        # Remove only a stale sidecar from older generator versions. Consumers
+        # transfer one archive; the per-file checksum manifest is embedded.
+        output.with_name(output.name + ".sha256").unlink(missing_ok=True)
+    finally:
+        temporary_archive.unlink(missing_ok=True)
+
+
 def sha256_file(path: Path) -> str:
     """Return the SHA-256 of a file without buffering it in memory."""
     digest = hashlib.sha256()
@@ -156,6 +193,8 @@ def verify_extracted(directory: Path, *, legacy: bool = False) -> None:
             return
         raise ToolchainError("Missing bundle-manifest.json; cannot verify unpacked toolchain")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict):
+        raise ToolchainError("Malformed bundle manifest: expected an object")
     if manifest.get("format") != 1 or manifest.get("platform") != pins()["platform"]:
         raise ToolchainError("Unsupported bundle manifest/platform")
     if manifest.get("lock_sha256") != sha256_file(LOCK_PATH):
@@ -534,33 +573,8 @@ def bundle(output: Path, python: str, godot_archive: str = "", uv_archive: str =
         }
         (stage / MANIFEST).write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
         (stage / MANIFEST).chmod(0o644)
-        temporary_archive = output.with_name(output.name + ".part")
-        try:
-            run(
-                [
-                    "tar",
-                    "--sort=name",
-                    "--mtime=@0",
-                    "--owner=0",
-                    "--group=0",
-                    "--hard-dereference",
-                    "--numeric-owner",
-                    "--dereference",
-                    "-I",
-                    "zstd -19 -T1",
-                    "-cf",
-                    str(temporary_archive),
-                    "-C",
-                    str(stage),
-                    ".",
-                ]
-            )
-            check_bundle_size(temporary_archive)
-            os.replace(temporary_archive, output)
-        finally:
-            temporary_archive.unlink(missing_ok=True)
+        write_bundle_archive(stage, output)
     digest = sha256_file(output)
-    output.with_name(output.name + ".sha256").write_text(f"{digest}  {output.name}\n", encoding="ascii")
     print(
         f"Bundle generated: {output}\nSHA-256: {digest}\nSize: {check_bundle_size(output)} bytes (limit 500 MiB)"
     )

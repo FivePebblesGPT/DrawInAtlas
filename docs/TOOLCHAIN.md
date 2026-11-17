@@ -47,7 +47,6 @@ but not silently embedded into the version-locked bundle.
 The output defaults to:
 
     .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
-    .build/bundles/drawing-toolchain-linux-x86_64.tar.zst.sha256
 
 `toolchain.lock.toml` is the version/source manifest. It pins official Godot
 and uv release URLs and SHA-256 hashes, Rust 1.99.1, Ruff/ty versions and the
@@ -60,7 +59,9 @@ compiled DrawInAtlas binaries**.
 
 The generator uses **`zstd -19 -T1`** and rejects compressed output larger than
 **500 MiB (524,288,000 bytes)** before publishing it. It writes a per-file
-SHA-256 manifest and archive SHA-256 sidecar.
+SHA-256 manifest **inside** the archive. It prints the archive-level SHA-256
+to the build log; no external checksum sidecar or DrawInAtlas repository is
+packaged or generated. Transfer the source checkout separately.
 A transferred archive is checked before use and checked against both the
 current toolchain lockfile and Cargo.lock after extraction. The output is
 relocatable and built outside the Git tree in ignored `.build/` directories.
@@ -76,6 +77,10 @@ Verify Rust/glibc/runtime requirements on the actual consumer distribution.
 ## Use the bundle on a new sandbox
 
 Supply one `.tar.zst` archive and the checked-out source:
+
+The consumer still needs GNU Make, Bash, zstd, system Python >=3.11,<3.16,
+a C linker/toolchain (`cc`), and the distribution's ordinary glibc/graphics
+runtime libraries. Those OS prerequisites are not embedded into the archive.
 
     make doctor TOOLCHAIN=bundle BUNDLE=/mnt/data/drawing-toolchain-linux-x86_64.tar.zst
     make drawing TOOLCHAIN=bundle BUNDLE=/mnt/data/drawing-toolchain-linux-x86_64.tar.zst

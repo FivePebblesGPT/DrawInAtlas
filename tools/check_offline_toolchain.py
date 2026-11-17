@@ -46,9 +46,6 @@ def validate(bundle: Path, output: Path) -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / path, target)
     shutil.copy2(bundle, output / "bundle with spaces.tar.zst")
-    sidecar = bundle.with_name(bundle.name + ".sha256")
-    if sidecar.exists():
-        shutil.copy2(sidecar, output / "bundle with spaces.tar.zst.sha256")
     for pattern in ("**/*.so", "**/.godot", "**/target"):
         if list(source.glob(pattern)):
             raise ValueError(f"Consumer was not cold: {pattern}")
