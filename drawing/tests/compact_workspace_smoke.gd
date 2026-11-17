@@ -101,8 +101,8 @@ func run() -> void:
 	check(not top.more_menu.visible and top._menus[8].visible,
 		"full desktop displays all nine application menus")
 	await snapshot("drawing-1280")
-	check(top.options_region.get_child_count() == 2 and top.active_options == "Brush",
-		"brush options show width and generic snap")
+	check(top.options_region.get_child_count() == 3 and top.active_options == "Brush",
+		"brush options show native preset, width and generic snap")
 	check(not app.record_selection_history and app.selection_history_toggle.get_parent() != app.dock_views["history"]
 		and top._menus[2].get_popup().get_item_text(2).contains("Preferences"),
 		"selection-history preference OFF and moved from History to Edit > Preferences")
@@ -231,7 +231,7 @@ func run() -> void:
 		"hidden menus remain represented by live More commands")
 	check(menus.get_child(menus.get_child_count() - 1) == top.more_menu,
 		"More trigger follows the visible File/Edit/View menu group")
-	check(app.get_child(0).size.x <= 570 and top.size.y < 52 and top.options_region.get_child_count() == 2,
+	check(app.get_child(0).size.x <= 570 and top.size.y < 52 and top.options_region.get_child_count() == 3,
 		"narrow options stay on one row with their real controls")
 	var wheel_value: float = app.width_spin.value
 	var wheel: InputEventMouseButton = InputEventMouseButton.new()
@@ -241,6 +241,8 @@ func run() -> void:
 	check(app.width_spin.value == wheel_value - 1.0,
 		"ordinary wheel decrements Brush px by one step")
 	wheel_value = app.width_spin.value
+	top.options_scroll.ensure_control_visible(app.width_spin)
+	await frames(4)
 	var wheel_position: Vector2 = app.width_spin.global_position + Vector2(20, 12)
 	wheel.position = wheel_position
 	wheel.global_position = wheel_position
@@ -318,11 +320,16 @@ func run() -> void:
 	var saved_before: PackedByteArray = FileAccess.get_file_as_bytes(source_path)
 	var current: DrawingDocument = app.current_document()
 	var layer: String = app.current_layer()
+	app.width_spin.value = 96.0
+	app.brush_preset_control.select(0)
+	app.brush_preset_control.item_selected.emit(0)
 	var pixel: Vector2i = Vector2i(5, 6)
 	await motion(app.canvas, pixel)
 	check(app.status.text.contains("cursor 5,6") and not current.is_dirty(),
 		"native pointer motion updates cursor status without dirtying the document")
 	await pointer(app.canvas, pixel, true)
+	# Exercise a real swept Hokusai stroke rather than a sub-dab stationary click.
+	await motion(app.canvas, pixel + Vector2i(64, 0))
 	await pointer(app.canvas, pixel, false)
 	var original_pixel: DrawingResult = current.read_pixel(layer, pixel.x, pixel.y)
 	check(original_pixel.ok and int(original_pixel.value) != 0 and current.is_dirty(),

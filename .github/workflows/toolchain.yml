@@ -14,6 +14,10 @@ on:
       - tools/check_offline_toolchain.py
       - native/drawing_brush/**
       - drawing/tests/native_extension_ready.gd
+      - drawing/tests/t181_native_preview_retention.gd
+      - drawing/tests/t182_brush_preset_controls.gd
+      - addons/drawing/canvas.gd
+      - addons/drawing/workspace.gd
       - tests/test_toolchain_build.py
   workflow_dispatch:
 
@@ -53,6 +57,13 @@ jobs:
           python3 tools/check_offline_toolchain.py \
             --bundle .build/bundles/drawing-toolchain-linux-x86_64.tar.zst \
             --output /tmp/t180-cold-consumer
+      - name: Verify moving native stroke framebuffer retention
+        run: |
+          set -euo pipefail
+          make test-graphical TOOLCHAIN=bundle \
+            BUNDLE=.build/bundles/drawing-toolchain-linux-x86_64.tar.zst \
+            2>&1 | tee /tmp/t181-native-preview.log
+          python3 tools/check_godot_model_log.py /tmp/t181-native-preview.log --marker T181_PREVIEW_PASSED
       - name: Keep raw cold-consumer logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,6 +72,7 @@ jobs:
           path: |
             /tmp/t180-cold-consumer/*.log
             /tmp/t180-cold-consumer/results.json
+            /tmp/t181-native-preview.log
       - name: Archive digest
         if: always()
         run: |
