@@ -1,0 +1,40 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+    Finished `test` profile [unoptimized] target(s) in 1.95s
+     Running unittests src/lib.rs (.build/target/x86_64-unknown-linux-gnu/debug/deps/drawing_brush-b21823bf6265c5fa)
+
+running 32 tests
+test native_tiles::tests::detached_replay_checks_all_tiles_then_retires_old_tokens ... ok
+test native_tiles::tests::external_raster_adoption_is_atomic_and_joins_brush_history ... ok
+test native_tiles::tests::atomic_undo_redo_and_locked_rejection ... ok
+test native_tiles::tests::grouped_pigment_runs_match_per_pixel_reference_with_signed_revisits ... ok
+test native_tiles::tests::hidden_rgb_and_alpha_roundtrip ... ok
+test native_tiles::tests::hokusai_eraser_uses_dab_alpha_and_preserves_hidden_rgb_and_history ... ok
+test native_tiles::tests::large_signed_tile_identity_and_layer_isolation ... ok
+test native_tiles::tests::metadata_revisions_keep_native_history_and_reject_stale_or_active_advances ... ok
+test native_tiles::tests::missing_source_masks_and_budget_fail_closed ... ok
+test native_tiles::tests::no_op_paint_does_not_create_revision_or_history ... ok
+test native_tiles::tests::parked_raster_layers_retain_history_and_reject_mutation_until_restored ... ok
+test native_tiles::tests::parked_text_raster_replacement_preserves_unrelated_history_atomically ... ok
+test native_tiles::tests::signed_seams_mask_hidden_rgb_and_cancel ... ok
+test native_tiles::tests::stale_unauthorized_oversized_and_zero_change_fail_closed ... ok
+test native_tiles::tests::t170_retire_preflight_is_read_only_and_matches_commit_gate ... ok
+test native_tiles::tests::persistent_transactions_rebase_and_history_tokens ... ok
+test native_tiles::tests::t189_per_tile_source_reads_preserve_rgba_masking_history_and_order ... ok
+test native_tiles::tests::token_replay_rejects_detached_payload_tampering_atomically ... ok
+test native_tiles::tests::unrecorded_retirement_preserves_unrelated_tokens_without_leaking_sources ... ok
+test native_tiles::tests::unreferenced_raster_structure_preserves_unrelated_native_history ... ok
+test native_tiles::tests::t187_preview_region_matches_whole_tile_and_rejects_invalid_bounds ... ok
+test native_tiles::tests::t186_batch_dirty_tracks_actual_changed_pixels_not_cumulative_history ... ok
+test native_tiles::tests::untracked_external_commit_is_atomic_and_preserves_native_source ... ok
+test tests::all_bundled_presets_parse ... ok
+test tests::pigment_tile_batch_rolls_back_existing_and_new_surface_tiles ... ok
+test tests::preset_samples_validate_entire_batch_before_state_mutation ... ok
+test tests::hokusai_hard_round_rollback_and_signed_alpha ... ok
+test tests::native_changes_with_identical_rgba_do_not_reenter_script ... ok
+test tests::t192_batch_write_journal_is_exact_dirty_set ... ok
+test tests::row_scan_matches_per_pixel_when_pixels_change_and_revert ... ok
+test tests::cached_native_scan_matches_full_quantized_export ... ok
+test tests::t190_srgb_bins_match_hokusai_at_every_fixedpoint_alpha_sample ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

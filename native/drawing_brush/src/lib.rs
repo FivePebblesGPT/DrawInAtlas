@@ -22,6 +22,11 @@ type TileSnapshot = Option<Box<hokusai::tile::TilePixels>>;
 struct TrackedSurface {
     tiles: HashMap<(i32, i32), Box<hokusai::tile::TilePixels>>,
     changed: HashSet<(i32, i32)>,
+    /// Diagnostic-only old per-request dirty set; production reuses rollback keys.
+    reference_dirty_tracking: bool,
+    dirty_set_inserts_attempted: u64,
+    tile_requests: u64,
+    journal_keys_exported: u64,
     atomic_dirty: HashSet<(i32, i32)>,
     in_atomic: bool,
     /// Copy-on-first-write source tiles for the unacknowledged GDScript batch.
@@ -31,7 +36,26 @@ struct TrackedSurface {
 
 impl TrackedSurface {
     fn begin_batch(&mut self) {
+        self.reference_dirty_tracking =
+            std::env::var_os("DRAWING_T192_DIRTY_SET_COUNTERFACTUAL").is_some();
         self.before_batch = Some(HashMap::new());
+    }
+
+    /// Every tile requested by rasterization is already journaled for atomic
+    /// rollback. Reuse exactly those keys instead of hashing the tile into a
+    /// second dirty set on every dab. Both paths scan tiles in sorted order.
+    fn dirty_tiles_for_export(&mut self) -> Vec<(i32, i32)> {
+        if self.reference_dirty_tracking {
+            self.changed.drain().collect()
+        } else {
+            let keys: Vec<_> = self
+                .before_batch
+                .as_ref()
+                .map(|before| before.keys().copied().collect())
+                .unwrap_or_default();
+            self.journal_keys_exported += keys.len() as u64;
+            keys
+        }
     }
 
     fn commit_batch(&mut self) {
@@ -60,6 +84,7 @@ impl TrackedSurface {
 
 impl TiledSurface for TrackedSurface {
     fn tile_request_start(&mut self, x: i32, y: i32) -> &mut hokusai::tile::TilePixels {
+        self.tile_requests += 1;
         let key = (x, y);
         if self
             .before_batch
@@ -72,7 +97,12 @@ impl TiledSurface for TrackedSurface {
                 .expect("active preset transaction")
                 .insert(key, previous);
         }
-        self.changed.insert(key);
+        if self.before_batch.is_none() || self.reference_dirty_tracking {
+            if self.before_batch.is_some() {
+                self.dirty_set_inserts_attempted += 1;
+            }
+            self.changed.insert(key);
+        }
         if self.in_atomic {
             self.atomic_dirty.insert(key);
         }
@@ -345,7 +375,7 @@ impl NativeStroke {
         self.phase_us[0] += raster_start.elapsed().as_micros() as u64;
         let scan_start = Instant::now();
         let mut output = Vec::new();
-        let mut dirty: Vec<_> = self.preset.surface.changed.drain().collect();
+        let mut dirty = self.preset.surface.dirty_tiles_for_export();
         dirty.sort_unstable();
         for (tx, ty) in dirty {
             let Some(tile) = self.preset.surface.tile(tx, ty) else {
@@ -761,6 +791,18 @@ impl DrawingNativeBrush {
         result.set("input_floats", stroke.input_floats);
         result.set("exported_ints", stroke.emitted_ints);
         if std::env::var_os("DRAWING_T185_PROFILE").is_some() {
+            result.set(
+                "t192_tile_requests",
+                stroke.preset.surface.tile_requests as i64,
+            );
+            result.set(
+                "t192_dirty_set_inserts",
+                stroke.preset.surface.dirty_set_inserts_attempted as i64,
+            );
+            result.set(
+                "t192_journal_keys",
+                stroke.preset.surface.journal_keys_exported as i64,
+            );
             for (label, us) in ["raster", "delta_scan", "tile_stage", "ack", "discovery"]
                 .into_iter()
                 .zip(stroke.phase_us)
@@ -825,7 +867,7 @@ mod tests {
         surface.tile_request_end(-1, 2);
         surface.tile_request_start(3, -2)[0][0] = [900, 800, 700, 600];
         surface.tile_request_end(3, -2);
-        assert_eq!(surface.changed.len(), 2);
+        assert_eq!(surface.dirty_tiles_for_export().len(), 2);
         surface.rollback_batch();
         assert_eq!(surface.tile(-1, 2).unwrap()[3][4], [21, 43, 65, 32768]);
         assert!(surface.tile(3, -2).is_none());
@@ -838,6 +880,30 @@ mod tests {
         surface.commit_batch();
         assert_eq!(surface.tile(3, -2).unwrap()[0][0], [11, 12, 13, 14]);
         assert!(surface.before_batch.is_none());
+    }
+
+    #[test]
+    fn t192_batch_write_journal_is_exact_dirty_set() {
+        let mut surface = TrackedSurface::default();
+        surface.tile_request_start(-1, -2)[0][0] = [1, 2, 3, 4];
+        surface.changed.clear();
+        surface.begin_batch();
+        for _ in 0..48 {
+            surface.tile_request_start(-1, -2)[0][0] = [9, 8, 7, 6];
+            surface.tile_request_start(4, -3)[63][63] = [40, 30, 20, 10];
+        }
+        let mut keys = surface.dirty_tiles_for_export();
+        keys.sort_unstable();
+        assert_eq!(keys, vec![(-1, -2), (4, -3)]);
+        assert!(
+            surface.changed.is_empty(),
+            "journal avoids a redundant dirty HashSet"
+        );
+        assert_eq!(surface.dirty_set_inserts_attempted, 0);
+        assert_eq!(surface.tile_requests, 97);
+        surface.rollback_batch();
+        assert_eq!(surface.tile(-1, -2).unwrap()[0][0], [1, 2, 3, 4]);
+        assert!(surface.tile(4, -3).is_none());
     }
 
     #[test]
