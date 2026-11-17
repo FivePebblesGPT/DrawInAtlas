@@ -269,9 +269,16 @@ func _build_interface() -> void:
 	brush_preset_control.custom_minimum_size.x = 140
 	var preset_ids: Array[String] = ["hard", "soft", "ink", "airbrush"]
 	var preset_labels: Array[String] = ["Hard Round", "Soft", "Ink", "Airbrush"]
+	var preset_descriptions: Array[String] = [
+		"Opaque, hard-edged round tip at mouse pressure; pressure controls size and opacity",
+		"Feathered round tip with translucent buildup; no grain or spray particles",
+		"Firm ink pen with pressure and motion shaping; near-opaque tip",
+		"Smooth, low-opacity airbrush falloff; no grain or spray particles",
+	]
 	for index: int in range(preset_ids.size()):
 		brush_preset_control.add_item(preset_labels[index])
 		brush_preset_control.set_item_metadata(index, preset_ids[index])
+		brush_preset_control.get_popup().set_item_tooltip(index, preset_descriptions[index])
 	brush_preset_control.item_selected.connect(func(index: int) -> void:
 		canvas.brush_preset = str(brush_preset_control.get_item_metadata(index)))
 	brush_preset_control.gui_input.connect(func(event: InputEvent) -> void:

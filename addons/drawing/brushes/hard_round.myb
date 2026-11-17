@@ -1,8 +1,8 @@
 {
     "comment": "MyPaint brush file",
-    "description": "",
+    "description": "Hard-edged opaque round tip; full width and alpha at standard mouse pressure",
     "group": "",
-    "notes": "",
+    "notes": "DrawInAtlas adaptation of MyPaint ramon/Round: stable nominal diameter at full pressure, opaque default mouse dabs, pressure-controllable opacity and size. No random grain or spray.",
     "parent_brush_name": "ramon/Round",
     "settings": {
         "anti_aliasing": {
@@ -138,7 +138,7 @@
                     ],
                     [
                         1.0,
-                        0.52
+                        1.0
                     ]
                 ]
             }
@@ -157,31 +157,11 @@
                 "pressure": [
                     [
                         0.0,
-                        0.326667
+                        -0.69
                     ],
                     [
                         1.0,
-                        -0.49
-                    ]
-                ],
-                "speed1": [
-                    [
-                        0.0,
                         0.0
-                    ],
-                    [
-                        1.0,
-                        0.1
-                    ]
-                ],
-                "speed2": [
-                    [
-                        0.0,
-                        -0.14142857142857138
-                    ],
-                    [
-                        4.0,
-                        0.99
                     ]
                 ]
             }

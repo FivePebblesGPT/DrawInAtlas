@@ -9,8 +9,8 @@
 **Sprint 2026-11-17:** PR #20 was squash-merged into `main` at
 `8f45f1a84bcc28b87d1b50f4bacfa173de653733`; continue on `sprint/2026-11-17`.
 New owner testing reports mismatched preset hardness, requests a separate visual
-brush/parameter panel, and observes roughly 12 FPS while drawing. [T-183](Tickets/T-183.md),
-[T-184](Tickets/T-184.md) and [T-185](Tickets/T-185.md) are ready; profile-led
+brush/parameter panel, and observes roughly 12 FPS while drawing. [T-183](Tickets/T-183.md) is Done (preset edge/opacity behavior corrected and
+profiled); [T-184](Tickets/T-184.md) and [T-185](Tickets/T-185.md) remain ready; profile-led
 [T-186](Tickets/T-186.md) follows T-185 toward a declared 250ms benchmark milestone
 and 200ms stretch. "Seems usable" is not final physical acceptance.
 
@@ -83,7 +83,7 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | Required-native hosted CI and independent owner evidence | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md), [T-106](Tickets/T-106.md), [T-107](Tickets/T-107.md), [T-150](Tickets/T-150.md) |
 | [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | After T-152: reference-device 60/96px responsiveness and owner signoff | [T-053](Tickets/T-053.md), [T-098](Tickets/T-098.md), [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md), [T-152](Tickets/T-152.md) |
 | [T-180 · Rebuildable offline toolchain and Make-first Drawing launch](Tickets/T-180.md) | In Progress | [Identical 251 MiB Arch/Ubuntu builds and hosted cold-native workflow](evidence/T-180-2026-11-17-local-validation.md) pass; four desktop/native-transition/export failures remain | [T-153](Tickets/T-153.md) |
-| [T-183 · Correct native preset identity and edge behavior](Tickets/T-183.md) | Ready | Owner: Hard Round soft; Soft airbrush-like/no spray; Ink hard; Airbrush soft; audit native mapping/settings and verify source/visual behavior | [T-153](Tickets/T-153.md), [T-182](Tickets/T-182.md) |
+| [T-183 · Correct native preset identity and edge behavior](Tickets/T-183.md) | Done | [189-check native workspace/GUI profiles and fresh old/new 96px performance baseline](evidence/T-183-2026-11-17-native-preset-audit.md); tooltips and source presets corrected, no owner hardware claim | [T-153](Tickets/T-153.md), [T-182](Tickets/T-182.md) |
 | [T-184 · Separate visual Brushes panel and parameters](Tickets/T-184.md) | Ready | Dedicated native-stroke previews and real parameter controls using existing dock/layout model | [T-182](Tickets/T-182.md) |
 | [T-185 · Re-profile current Drawing frame drops and native path](Tickets/T-185.md) | Ready | Measure reported ~12 FPS, frame stalls and current 96px/512² latency; rank bottlenecks before optimization | [T-146](Tickets/T-146.md), [T-181](Tickets/T-181.md) |
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Required-native Linux/Windows builds, exports and process/VRAM evidence | [T-052](Tickets/T-052.md), [T-150](Tickets/T-150.md) |
