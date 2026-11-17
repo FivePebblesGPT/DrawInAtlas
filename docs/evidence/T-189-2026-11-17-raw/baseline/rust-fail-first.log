@@ -1,0 +1,21 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error[E0599]: no method named `stage_with_source_mode` found for struct `native_tiles::TileStore` in the current scope
+    --> src/native_tiles.rs:1941:34
+     |
+  71 | pub(super) struct TileStore {
+     | --------------------------- method `stage_with_source_mode` not found for this struct
+...
+1941 |                 assert_eq!(store.stage_with_source_mode(tx, 0, -16, 0, &deltas,
+     |                            ------^^^^^^^^^^^^^^^^^^^^^^ method not found in `native_tiles::TileStore`
+
+error[E0609]: no field `source_lookups` on type `native_tiles::TileStore`
+    --> src/native_tiles.rs:1947:37
+     |
+1947 |                 let lookups = store.source_lookups;
+     |                                     ^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `stride`, `revision`, `tiles`, `authorized`, `parked_layers` ... and 9 others
+
+Some errors have detailed explanations: E0599, E0609.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `drawing-brush` (lib test) due to 2 previous errors

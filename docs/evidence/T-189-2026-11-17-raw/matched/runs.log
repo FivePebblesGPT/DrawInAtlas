@@ -1,0 +1,24 @@
+START round=1 mode=reference 2026-11-17T16:52:05Z
+hokusai-cold-0: exit=0 checker=0 valid=True rss_kib=271872
+hokusai-cold-1: exit=0 checker=0 valid=True rss_kib=269680
+hokusai-warm-0: exit=0 checker=0 valid=True rss_kib=273816
+Summary: /mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-189/matched/round1/reference/summary.json all_valid: True
+END round=1 mode=reference rc=0 2026-11-17T16:52:13Z
+START round=1 mode=optimized 2026-11-17T16:52:13Z
+hokusai-cold-0: exit=0 checker=0 valid=True rss_kib=272152
+hokusai-cold-1: exit=0 checker=0 valid=True rss_kib=269508
+hokusai-warm-0: exit=0 checker=0 valid=True rss_kib=272688
+Summary: /mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-189/matched/round1/optimized/summary.json all_valid: True
+END round=1 mode=optimized rc=0 2026-11-17T16:52:21Z
+START round=2 mode=optimized 2026-11-17T16:52:21Z
+hokusai-cold-0: exit=0 checker=0 valid=True rss_kib=272488
+hokusai-cold-1: exit=0 checker=0 valid=True rss_kib=272680
+hokusai-warm-0: exit=0 checker=0 valid=True rss_kib=272376
+Summary: /mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-189/matched/round2/optimized/summary.json all_valid: True
+END round=2 mode=optimized rc=0 2026-11-17T16:52:29Z
+START round=2 mode=reference 2026-11-17T16:52:29Z
+hokusai-cold-0: exit=0 checker=0 valid=True rss_kib=270332
+hokusai-cold-1: exit=0 checker=0 valid=True rss_kib=270168
+hokusai-warm-0: exit=0 checker=0 valid=True rss_kib=273404
+Summary: /mnt/data/DrawInAtlas-sprint-2026-11-17/.build/evidence/T-189/matched/round2/reference/summary.json all_valid: True
+END round=2 mode=reference rc=0 2026-11-17T16:52:38Z

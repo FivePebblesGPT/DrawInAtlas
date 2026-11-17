@@ -1041,6 +1041,7 @@ func _commit_native_tile_stroke() -> DrawingResult:
 	native_ffi_stats["tile_bytes_imported"] = int(tile_stats.get("bytes_imported", 0))
 	native_ffi_stats["tile_bytes_exported"] = int(tile_stats.get("bytes_exported", 0))
 	native_ffi_stats["tile_pixel_stream_calls"] = int(tile_stats.get("pixel_stream_calls", -1))
+	native_ffi_stats["tile_source_lookups"] = int(tile_stats.get("source_lookups", 0))
 	_native_handle = 0
 	_native_stroke = null
 	_native_tiles = null

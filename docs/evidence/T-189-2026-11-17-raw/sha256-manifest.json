@@ -1,0 +1,290 @@
+{
+  "files": [
+    {
+      "path": "baseline/graphical-fail-first.log",
+      "bytes": 1055,
+      "sha256": "c8bb62bde17f5345a66494969dd85dac99ceb844c662c4a0c62f4da35f829e3c"
+    },
+    {
+      "path": "baseline/rust-fail-first.log",
+      "bytes": 1156,
+      "sha256": "2173ed3658c388d40c31591da9cc359dba2cb9efde55c3b4aa9a7c3d3b45b51c"
+    },
+    {
+      "path": "checks/build-stage-import.log",
+      "bytes": 7933,
+      "sha256": "5b7265fadba5863b9276b1a26e62d4b57f32fd5281f61247dd001de1e99d4485"
+    },
+    {
+      "path": "checks/make-check.exit",
+      "bytes": 7,
+      "sha256": "194ff5bca66278888f0f00be5c7ca523d15098ece958b14952533811089f6106"
+    },
+    {
+      "path": "checks/make-check.log",
+      "bytes": 18192,
+      "sha256": "b612358a819bf9a85076480fdd9aab1a86ec110275e27a41d156909682483c64"
+    },
+    {
+      "path": "checks/make-test-graphical-final.exit",
+      "bytes": 7,
+      "sha256": "194ff5bca66278888f0f00be5c7ca523d15098ece958b14952533811089f6106"
+    },
+    {
+      "path": "checks/make-test-graphical-final.log",
+      "bytes": 23570,
+      "sha256": "0edb35d854e3b05b44d6358fb705f4494e10e88b167d3fac3aa61df3460daf6d"
+    },
+    {
+      "path": "checks/make-test-graphical.log",
+      "bytes": 23569,
+      "sha256": "b9fad0978f0fe44fb58720f023998e976f40ce4c66d898e6589ccf4000ccefd7"
+    },
+    {
+      "path": "checks/run_graphical.sh",
+      "bytes": 330,
+      "sha256": "e0b40fa017d1c102f20794d32217866e084e6582590e3364225b5201c2367feb"
+    },
+    {
+      "path": "checks/rust-initial.log",
+      "bytes": 2904,
+      "sha256": "8939ed1a957d6883f66b69a07d4e2a6121bb58c09c06a18dfcd5a3ec68475d75"
+    },
+    {
+      "path": "checks/t189-graphical-expanded.log",
+      "bytes": 890,
+      "sha256": "36015ee50d123d8d8d25890f6ca12831d28d913fc5689a9fb5a7678628f56d33"
+    },
+    {
+      "path": "checks/t189-graphical-first.log",
+      "bytes": 785,
+      "sha256": "1c99f88aadab0c3ad42aa6090b5b68f9664931f71b9666993f8446ca3efbbd5b"
+    },
+    {
+      "path": "matched/round1/optimized/hokusai-cold-0.log",
+      "bytes": 10884,
+      "sha256": "1bc5319ae0f3965aedaf48ad4fa64299a5aa9f993a4278347a13434c0b16b191"
+    },
+    {
+      "path": "matched/round1/optimized/hokusai-cold-0.time",
+      "bytes": 1055,
+      "sha256": "e00ed50a37fc606f04e926e11bb5636358a21f028101c2f2e88f0402ef6ab1dc"
+    },
+    {
+      "path": "matched/round1/optimized/hokusai-cold-1.log",
+      "bytes": 10352,
+      "sha256": "c61df86820f78c87f24c0e2d9ea8c629acb1ac31c50ab166e8c9cc61b8db9432"
+    },
+    {
+      "path": "matched/round1/optimized/hokusai-cold-1.time",
+      "bytes": 1054,
+      "sha256": "53038331c3a023d0a82be20d1604e93605ba8094a84aeb50d6c2090f0224d719"
+    },
+    {
+      "path": "matched/round1/optimized/hokusai-warm-0.log",
+      "bytes": 17419,
+      "sha256": "509213d8eb7c655e93c26b4b342ff3d04b0fed3a301605426fbb57ab6208d205"
+    },
+    {
+      "path": "matched/round1/optimized/hokusai-warm-0.time",
+      "bytes": 1055,
+      "sha256": "cb5c569ffe69aa51d6fa74dac5d41f5afe55c86b8ea631388e29b24bb71381ca"
+    },
+    {
+      "path": "matched/round1/optimized/summary.json",
+      "bytes": 12319,
+      "sha256": "2b84442c12ce3da3a46913fe25c43f69c99539a64bae677100836aad764e9626"
+    },
+    {
+      "path": "matched/round1/reference/hokusai-cold-0.log",
+      "bytes": 10423,
+      "sha256": "3ca1962452330c3b7dc9a0639e2f87b89df82d49d594b3a6875eb74282b349ab"
+    },
+    {
+      "path": "matched/round1/reference/hokusai-cold-0.time",
+      "bytes": 1054,
+      "sha256": "2d6e0f5a3b67a03e319bd7cdc23466743fe8bd663d516d99dcb202b0653d2553"
+    },
+    {
+      "path": "matched/round1/reference/hokusai-cold-1.log",
+      "bytes": 11361,
+      "sha256": "879a148ee4c6c12b8f86ca5dfb608eea8656ec50fbc5335b024495c239deaac2"
+    },
+    {
+      "path": "matched/round1/reference/hokusai-cold-1.time",
+      "bytes": 1054,
+      "sha256": "9b3723535348b77dffa464be992887235203d6a1fe0640fd917b6abbef4dbff1"
+    },
+    {
+      "path": "matched/round1/reference/hokusai-warm-0.log",
+      "bytes": 17950,
+      "sha256": "e0fe7338b12f50aa4f2f3141f9901001747c5b8cdf0819ab3df44d5cb8742e3e"
+    },
+    {
+      "path": "matched/round1/reference/hokusai-warm-0.time",
+      "bytes": 1055,
+      "sha256": "de7f4f1ef56f602d5b658b996b9245abac60c80150db7958f54b37db1b81994c"
+    },
+    {
+      "path": "matched/round1/reference/summary.json",
+      "bytes": 12333,
+      "sha256": "a2cc74793297aa5f180850cf8da58298b190805cf49180c5758be7a634b89c8e"
+    },
+    {
+      "path": "matched/round2/optimized/hokusai-cold-0.log",
+      "bytes": 10364,
+      "sha256": "5b3d2e1788c1a006dc1f5a9386ac56332b6b638ea5f5cbb6069e4eebcbcb4612"
+    },
+    {
+      "path": "matched/round2/optimized/hokusai-cold-0.time",
+      "bytes": 1055,
+      "sha256": "454ba6dbfb18a60ff087de0777f6bcac5f5b577d7e7d41a69b4b52510cad3911"
+    },
+    {
+      "path": "matched/round2/optimized/hokusai-cold-1.log",
+      "bytes": 10853,
+      "sha256": "281719254f80cba009df5d8d7428e296136d1b65ee6386653f0fc285bf1a7b77"
+    },
+    {
+      "path": "matched/round2/optimized/hokusai-cold-1.time",
+      "bytes": 1054,
+      "sha256": "06511fa331c38fcf51128b7a514d419c23b8de413e29f8f91762876322940359"
+    },
+    {
+      "path": "matched/round2/optimized/hokusai-warm-0.log",
+      "bytes": 17429,
+      "sha256": "a6e34bb776036dc9bf013c5b1ced8ef65214523c4389fd54f65aa96b303e8edc"
+    },
+    {
+      "path": "matched/round2/optimized/hokusai-warm-0.time",
+      "bytes": 1055,
+      "sha256": "a1e5c2c800246d310b98d9cfb1d26194c4285c519387da7b4f12be782f2fc159"
+    },
+    {
+      "path": "matched/round2/optimized/summary.json",
+      "bytes": 12322,
+      "sha256": "02a3b4898ad2598d198e16883cd4f5467db977473db46106636de16ef7001628"
+    },
+    {
+      "path": "matched/round2/reference/hokusai-cold-0.log",
+      "bytes": 10880,
+      "sha256": "cc0795594c0a68f3407fa477c6e582e639b464a4854a62a3dbe8c0bfa2089332"
+    },
+    {
+      "path": "matched/round2/reference/hokusai-cold-0.time",
+      "bytes": 1055,
+      "sha256": "e715afe16b2ff9e17975bd2835cdbb4e8f0b559faf420f738a4b6dd1fd9aa42d"
+    },
+    {
+      "path": "matched/round2/reference/hokusai-cold-1.log",
+      "bytes": 11396,
+      "sha256": "b5b378a2744cb09b9fef39ea5cdc7daf3d1dc93369f4ca3b1fe851a483a4c201"
+    },
+    {
+      "path": "matched/round2/reference/hokusai-cold-1.time",
+      "bytes": 1054,
+      "sha256": "dc1d73eb1c711c579e3d8b3d8dbaef22bf15c0288c3d99f69cedb18ec1f225b2"
+    },
+    {
+      "path": "matched/round2/reference/hokusai-warm-0.log",
+      "bytes": 17963,
+      "sha256": "9e25a3dfeb310eb85b22c352f7ea90f053bc8f575c9d92331cfa973ad26457e2"
+    },
+    {
+      "path": "matched/round2/reference/hokusai-warm-0.time",
+      "bytes": 1055,
+      "sha256": "4a3d19789832bc7a476a7f38c0707fbb53d5d9e6ed97083a679a53d8bebff9db"
+    },
+    {
+      "path": "matched/round2/reference/summary.json",
+      "bytes": 12339,
+      "sha256": "8c920ba3ab41e406ae410dd88d6e15c7741c64d08b8c3210aadb7bc163f606f3"
+    },
+    {
+      "path": "matched/run_pairs.sh",
+      "bytes": 839,
+      "sha256": "00c5eb0a2009aba3e7e8c7ad8e81a849cf05b4aa4dacaf304cdf4548cc7573f3"
+    },
+    {
+      "path": "matched/runs.log",
+      "bytes": 1620,
+      "sha256": "0c6bb739f215799508fe9e5d66da392bdd24b53bc686d0cadb1ffddaea6a1426"
+    },
+    {
+      "path": "workspace/round1/optimized/summary.json",
+      "bytes": 184143,
+      "sha256": "3c60cca8ed8144dde63eba7bb6fb6a832a264acb40ad3f86f88e2dd1936d4a93"
+    },
+    {
+      "path": "workspace/round1/optimized/workspace-0.log",
+      "bytes": 87030,
+      "sha256": "da0723a6b8eca86d7803b195901f5fdff7b026db13e1a7b8080a19fbe7dd44a9"
+    },
+    {
+      "path": "workspace/round1/optimized/workspace-0.time",
+      "bytes": 1057,
+      "sha256": "a64ca6147d323a6c225d92ca08597f86e13334cb825980442ab4a782faeb256d"
+    },
+    {
+      "path": "workspace/round1/reference/summary.json",
+      "bytes": 177697,
+      "sha256": "1edc7ddb21cf853493e954d8228c182fd84629dcd41b7a3f06a578f4ac2a59e1"
+    },
+    {
+      "path": "workspace/round1/reference/workspace-0.log",
+      "bytes": 83213,
+      "sha256": "5d8693a19c8af8de2c9b32551fbbdbb6e9fe0f93889f01e33d25b88a15afab00"
+    },
+    {
+      "path": "workspace/round1/reference/workspace-0.time",
+      "bytes": 1052,
+      "sha256": "6d56118b5ae825426f9ba30a07858094817d9ee00c9b2d41bd4a9f890df914ab"
+    },
+    {
+      "path": "workspace/round2/optimized/summary.json",
+      "bytes": 186560,
+      "sha256": "932d57c11028759e3539d27339db2099557e5db04ab034f8a70f7841fd3d5aff"
+    },
+    {
+      "path": "workspace/round2/optimized/workspace-0.log",
+      "bytes": 88379,
+      "sha256": "5d76858c4a96887c06dffd0792219d6309766a6753cdb7732fbe214bd697d413"
+    },
+    {
+      "path": "workspace/round2/optimized/workspace-0.time",
+      "bytes": 1052,
+      "sha256": "b7ab5a4f37d5a15b8fd44d60fcfb0eb09bebf559eff53e9aeed5593d08f30b67"
+    },
+    {
+      "path": "workspace/round2/reference/summary.json",
+      "bytes": 183215,
+      "sha256": "8578d3aa7c1a736f4e9846750977788d2f425a21710ff5502eca495e052b018e"
+    },
+    {
+      "path": "workspace/round2/reference/workspace-0.log",
+      "bytes": 86478,
+      "sha256": "849f3d588a665644139b3487ed66f71fa9eb941d90750a0a1dc598a760d60168"
+    },
+    {
+      "path": "workspace/round2/reference/workspace-0.time",
+      "bytes": 1052,
+      "sha256": "46576934f35bbeaa3d0474b77c15302461e81c127b6bc2e05745e2132541100d"
+    },
+    {
+      "path": "workspace/run_pairs.sh",
+      "bytes": 828,
+      "sha256": "1c9e0042cab9b746fca27c4296e4b0588f7a5fc9bcb2880b11b1223bd26d1a96"
+    },
+    {
+      "path": "workspace/runs.log",
+      "bytes": 596,
+      "sha256": "aec8af47da06f88cdfb47971cb9484532f7d4b8039791fa9ee8e7187efc06661"
+    }
+  ],
+  "source_identity": {
+    "native/drawing_brush/src/native_tiles.rs": "264d6c322bb072b28d2de7f0237cdf153e1fd27ea6a4dfd03b28cae8074216c3",
+    "addons/drawing/edit_session.gd": "fff99193ae0376ff84541db619d454da03e0e65037a4787e47ad26cc8ab67d4a",
+    "addons/drawing/native/bin/libdrawing_brush.so": "cad9b15b8e1c84e03c866ec0b098cb56752466a2135dce5143557cf2e7379160",
+    "drawing/tests/t189_native_source_lookup.gd": "9870768fee62ad8b364290b8f9de92a76f667679b4e008e8c9543bd7ab15c9ed"
+  }
+}

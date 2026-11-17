@@ -84,6 +84,8 @@ pub(super) struct TileStore {
     bytes_exported: u64,
     external_bytes_received: u64,
     pixel_stream_calls: u64,
+    /// T-189: successful-stage immutable source hash probes (not pixels).
+    source_lookups: u64,
 }
 
 /// Collect ordered native pigment deltas by storage tile without probing the
@@ -304,6 +306,39 @@ impl TileStore {
         erase: bool,
         clip: Rect2i,
     ) -> Result<usize, &'static str> {
+        let source_per_pixel =
+            std::env::var_os("DRAWING_T189_SOURCE_PER_PIXEL_COUNTERFACTUAL").is_some();
+        self.stage_with_source_mode(
+            transaction,
+            revision,
+            anchor_x,
+            anchor_y,
+            deltas,
+            pigment,
+            brush_rgba,
+            erase,
+            clip,
+            source_per_pixel,
+        )
+    }
+
+    /// Same-pixel source semantics in both paths; the production path resolves
+    /// the immutable source once for a whole native storage-tile group.
+    /// Only the test/diagnostic counterfactual hashes by TileId per pixel.
+    #[allow(clippy::too_many_arguments)]
+    fn stage_with_source_mode(
+        &mut self,
+        transaction: i64,
+        revision: u64,
+        anchor_x: i64,
+        anchor_y: i64,
+        deltas: &[i32],
+        pigment: bool,
+        brush_rgba: u32,
+        erase: bool,
+        clip: Rect2i,
+        source_per_pixel: bool,
+    ) -> Result<usize, &'static str> {
         let step = if pigment { 3 } else { 2 };
         if !deltas.len().is_multiple_of(step) || deltas.len() > 3 * 1_048_576 {
             return Err("Invalid native sample output");
@@ -346,6 +381,7 @@ impl TileStore {
         }
         let mut updated: HashMap<TileId, Tile> = HashMap::new();
         let mut dirty: HashMap<TileId, Dirty> = HashMap::new();
+        let mut source_reads = 0_u64;
         for ((tx, ty), changes) in grouped {
             let id = TileId {
                 layer: active.layer.clone(),
@@ -366,6 +402,21 @@ impl TileStore {
                 .or_else(|| self.tiles.get(&id))
                 .ok_or("Source tile not resident")?
                 .clone();
+            // The source is frozen for the whole transaction. Referencing its
+            // bytes once per tile avoids repeated TileId hashing during each
+            // pigment pixel, without changing alpha or hidden-RGB semantics.
+            let source_once = if pigment && !source_per_pixel {
+                source_reads += 1;
+                Some(
+                    self.tiles
+                        .get(&id)
+                        .expect("authorized source")
+                        .rgba
+                        .as_slice(),
+                )
+            } else {
+                None
+            };
             let mut tile_dirty: Option<Dirty> = None;
             for (x, y, rgba) in changes {
                 if mask.is_some_and(|selection| selection[y * self.stride + x] == 0) {
@@ -377,12 +428,26 @@ impl TileStore {
                         .try_into()
                         .expect("RGBA8 offset"),
                 );
+                let source_rgba = if pigment {
+                    if let Some(source) = source_once {
+                        source
+                    } else {
+                        source_reads += 1;
+                        self.tiles
+                            .get(&id)
+                            .expect("authorized source")
+                            .rgba
+                            .as_slice()
+                    }
+                } else {
+                    &[]
+                };
                 let next = if erase && pigment {
                     // Erase using the same MyPaint dab alpha as Brush, rebased
                     // onto immutable source across successive preview batches.
                     // Keep hidden RGB when the source was already transparent.
                     let original = u32::from_le_bytes(
-                        self.tiles.get(&id).expect("authorized source").rgba[offset..offset + 4]
+                        source_rgba[offset..offset + 4]
                             .try_into()
                             .expect("source RGBA8"),
                     );
@@ -395,9 +460,10 @@ impl TileStore {
                 } else if pigment {
                     // Hokusai's pigment is rebased against immutable source,
                     // not repeatedly blended over the previous preview.
-                    let source = &self.tiles.get(&id).expect("authorized source").rgba;
                     let original = u32::from_le_bytes(
-                        source[offset..offset + 4].try_into().expect("source RGBA8"),
+                        source_rgba[offset..offset + 4]
+                            .try_into()
+                            .expect("source RGBA8"),
                     );
                     blend(rgba, original)
                 } else {
@@ -443,6 +509,7 @@ impl TileStore {
                 .or_insert(area);
         }
         active.batches += 1;
+        self.source_lookups += source_reads;
         Ok(touched)
     }
     /// A no-op gesture does not advance the canonical revision or create
@@ -1742,6 +1809,7 @@ impl DrawingNativeTiles {
             self.store.external_bytes_received as i64,
         );
         result.set("pixel_stream_calls", self.store.pixel_stream_calls as i64);
+        result.set("source_lookups", self.store.source_lookups as i64);
         result.set("undo", self.store.undo.len() as i64);
         result.set("redo", self.store.redo.len() as i64);
         result
@@ -1913,6 +1981,128 @@ mod tests {
             .err(),
             Some("Signed native sample outside tile bounds")
         );
+    }
+
+    #[test]
+    fn t189_per_tile_source_reads_preserve_rgba_masking_history_and_order() {
+        // A signed tile is revisited after touching its neighbor; successive
+        // alpha pigments must rebase on the original source, not the draft.
+        for erase in [false, true] {
+            let mut variants = Vec::new();
+            for source_per_pixel in [true, false] {
+                let mut store = initialized(16);
+                for tile_x in [-1, 0] {
+                    let id = TileId {
+                        layer: "ink".into(),
+                        x: tile_x,
+                        y: 0,
+                    };
+                    let mut rgba = vec![0; 16 * 16 * 4];
+                    for pixel in rgba.chunks_exact_mut(4) {
+                        pixel.copy_from_slice(&0x80448822_u32.to_le_bytes());
+                    }
+                    rgba[0..4].copy_from_slice(&0x00332211_u32.to_le_bytes());
+                    store.import(id, 0, &rgba).unwrap();
+                }
+                let tx = store.begin("ink", 0, true).unwrap();
+                for tile_x in [-1, 0] {
+                    let mut mask = vec![1; 16 * 16];
+                    mask[0] = 0; // Guard the source's hidden-RGB pixel.
+                    store
+                        .mask(
+                            tx,
+                            TileId {
+                                layer: "ink".into(),
+                                x: tile_x,
+                                y: 0,
+                            },
+                            &mask,
+                        )
+                        .unwrap();
+                }
+                let deltas = [
+                    0,
+                    0,
+                    0xa0336699_u32 as i32,
+                    1,
+                    0,
+                    0x80224466_u32 as i32,
+                    18,
+                    1,
+                    0x902255aa_u32 as i32,
+                    0,
+                    0,
+                    0xc0336699_u32 as i32,
+                    2,
+                    0,
+                    0xff115588_u32 as i32,
+                ];
+                assert_eq!(
+                    store
+                        .stage_with_source_mode(
+                            tx,
+                            0,
+                            -16,
+                            0,
+                            &deltas,
+                            true,
+                            0xff008855,
+                            erase,
+                            Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                            source_per_pixel
+                        )
+                        .unwrap(),
+                    2
+                );
+                let before = [-1, 0].map(|x| {
+                    store
+                        .read(
+                            &TileId {
+                                layer: "ink".into(),
+                                x,
+                                y: 0,
+                            },
+                            true,
+                        )
+                        .unwrap()
+                        .rgba
+                        .clone()
+                });
+                let lookups = store.source_lookups;
+                assert_eq!(store.commit(tx, 0).unwrap(), 2);
+                assert_eq!(store.undo_or_redo(true).unwrap(), 2);
+                assert_eq!(store.undo_or_redo(false).unwrap(), 2);
+                for (idx, x) in [-1, 0].iter().enumerate() {
+                    assert_eq!(
+                        &store
+                            .read(
+                                &TileId {
+                                    layer: "ink".into(),
+                                    x: *x,
+                                    y: 0
+                                },
+                                false
+                            )
+                            .unwrap()
+                            .rgba,
+                        &before[idx]
+                    );
+                }
+                variants.push((before, lookups));
+            }
+            assert_eq!(
+                variants[0].0, variants[1].0,
+                "per-tile source lookups must preserve every RGBA8 byte"
+            );
+            assert!(
+                variants[0].1 > variants[1].1,
+                "per-tile source caching must reduce source hash probes"
+            );
+            assert_eq!(
+                variants[1].1, 2,
+                "exactly one immutable source lookup per touched tile"
+            );
+        }
     }
 
     #[test]
