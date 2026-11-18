@@ -275,3 +275,6 @@ docs/evidence/T-197-2026-11-18-preview-callback-raw/** whitespace=-trailing-spac
 docs/evidence/T-197-2026-11-18-native-display-raw/** whitespace=-trailing-space
 # T-198 native integration and timeout witnesses are immutable raw process logs.
 docs/evidence/T-198-2026-11-19-validation/*.log whitespace=-trailing-space,-blank-at-eof
+# T-199 fresh native process output and fail-first/regression logs are byte-exact.
+docs/evidence/T-199-2026-11-19-fresh-workspace/*.log whitespace=-trailing-space,-blank-at-eof
+docs/evidence/T-199-2026-11-19-validation/*.txt whitespace=-trailing-space,-blank-at-eof

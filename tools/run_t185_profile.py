@@ -112,6 +112,77 @@ def callback_gap_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+
+def canvas_draw_cadence_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Report gaps between consecutive Canvas *draw ends* in one gesture.
+
+    Unlike renderer callbacks, Canvas draw ends exist even when a callback is
+    missing. They describe observed redraw cadence only: no draw means no
+    sample, and neither missing frames nor physical scanout can be inferred.
+    """
+    periods_ms: list[float] = []
+    long_events: list[dict[str, int | float | bool]] = []
+    callback_pairs = 0
+    without_callbacks = 0
+    missing_end = 0
+    nonmonotonic_end = 0
+    long_33 = 0
+    long_83 = 0
+    for row_index, row in enumerate(rows):
+        phases = row["frame_phases_us"]
+        for frame_index in range(1, len(phases)):
+            previous = phases[frame_index - 1]
+            current = phases[frame_index]
+            before = int(previous.get("frame_end_us", 0))
+            after = int(current.get("frame_end_us", 0))
+            if before <= 0 or after <= 0:
+                missing_end += 1
+                continue
+            if after <= before:
+                nonmonotonic_end += 1
+                continue
+            elapsed_us = after - before
+            periods_ms.append(elapsed_us / 1000.0)
+            before_callback = int(previous.get("frame_post_draw_callback_us", 0))
+            after_callback = int(current.get("frame_post_draw_callback_us", 0))
+            paired = before_callback > 0 and after_callback > before_callback
+            if paired:
+                callback_pairs += 1
+            else:
+                without_callbacks += 1
+            long_33 += elapsed_us >= FRAME_THRESHOLDS_US[0]
+            if elapsed_us >= FRAME_THRESHOLDS_US[1]:
+                long_83 += 1
+                long_events.append({
+                    "row_index": row_index,
+                    "frame_index": frame_index,
+                    "gap_ms": round(elapsed_us / 1000, 3),
+                    "canvas_draw_cpu_ms": round(int(current.get(
+                        "full_draw_cpu_us", 0)) / 1000, 3),
+                    "previous_canvas_draw_cpu_ms": round(int(previous.get(
+                        "full_draw_cpu_us", 0)) / 1000, 3),
+                    "pending_input_count": int(current.get("pending_input_count", 0)),
+                    "oldest_pending_age_ms": round(int(current.get(
+                        "oldest_pending_age_us", 0)) / 1000, 3),
+                    "adjacent_callback_pair": paired,
+                })
+                if len(long_events) > MAX_RETAINED_SLOW_CALLBACK_EVENTS:
+                    long_events.pop(0)
+    return {
+        "frame_end_pairs": len(periods_ms),
+        "with_adjacent_callback_pair": callback_pairs,
+        "without_adjacent_callback_pair": without_callbacks,
+        "rejected_missing_end_pairs": missing_end,
+        "rejected_nonmonotonic_end_pairs": nonmonotonic_end,
+        "frame_end_period_ms": distribution(periods_ms) if periods_ms else None,
+        "long_33ms": long_33,
+        "long_83ms": long_83,
+        "retained_long_events": len(long_events),
+        "omitted_long_events": long_83 - len(long_events),
+        "long_events": long_events,
+    }
+
+
 def extract(text: str) -> list[dict[str, Any]]:
     """Reject any missing/inconsistent native gesture, not just a marker."""
     lines = [line for line in text.splitlines() if line.startswith("T185_RUN ")]
@@ -284,6 +355,9 @@ def summarize(trials: list[dict[str, Any]]) -> dict[str, Any]:
         # actual Canvas frames with matched, increasing callback timestamps
         # contribute, and gesture boundaries are never bridged.
         stats["matched_canvas_callback_gaps"] = callback_gap_diagnostics(group)
+        # A separate engine-side witness includes redraws without renderer
+        # callback pairing. It is not a display FPS or scanout measurement.
+        stats["canvas_draw_cadence"] = canvas_draw_cadence_diagnostics(group)
         for source in ("post_draw_intervals_us", "process_frame_intervals_us", "input_delivery_intervals_us"):
             values = [float(v) / 1000.0 for row in group for v in row[source]]
             if not values:

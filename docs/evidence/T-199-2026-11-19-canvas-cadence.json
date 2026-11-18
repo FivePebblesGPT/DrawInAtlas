@@ -1,0 +1,296 @@
+{
+  "disclaimer": "Only consecutive Canvas draw-end timestamps within each gesture; not render frame FPS, device input, dropped screen frames or scanout.",
+  "fresh_one": {
+    "canvas_draw_pairs": 198,
+    "pairs_lacking_adjacent_renderer_callbacks": 92,
+    "process_exit": 0,
+    "slow_draw_gaps_at_least_83ms": 0
+  },
+  "original_four": {
+    "canvas_draw_pairs": 792,
+    "long_global_callback_gaps": 19,
+    "pairs_lacking_adjacent_renderer_callbacks": 251,
+    "slow_draw_gaps_at_least_83ms": 0
+  },
+  "provenance": "Four previously confirmed T-197 runs and one newly executed T-199 software-X11 process; see original logs for whole-frame instrumentation.",
+  "runs": [
+    {
+      "canvas_draw_cadence": {
+        "frame_end_pairs": 198,
+        "frame_end_period_ms": {
+          "max": 36.092,
+          "n": 198,
+          "p50": 9.846,
+          "p95": 26.165
+        },
+        "long_33ms": 2,
+        "long_83ms": 0,
+        "long_events": [],
+        "omitted_long_events": 0,
+        "rejected_missing_end_pairs": 0,
+        "rejected_nonmonotonic_end_pairs": 0,
+        "retained_long_events": 0,
+        "with_adjacent_callback_pair": 115,
+        "without_adjacent_callback_pair": 83
+      },
+      "cases": 8,
+      "global_callback_intervals_over_83ms": 5,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-0-reference/workspace-0.log",
+      "log_sha256": "9c52775926e5d327d7ce2683d7982db21a506468517565de40634aa257074951",
+      "matched_canvas_callback_gaps": {
+        "long_33ms": 1,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 115,
+        "matched_period_ms": {
+          "max": 37.531,
+          "n": 115,
+          "p50": 11.062,
+          "p95": 21.456
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 83
+      },
+      "mode": "reference",
+      "process": 0,
+      "process_exit": 0,
+      "source_after_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "time": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-0-reference/workspace-0.time",
+      "time_sha256": "6775d419c8887bcf2335b8938243ad54391fb781da9a43220c7d36b388b6f3db"
+    },
+    {
+      "canvas_draw_cadence": {
+        "frame_end_pairs": 198,
+        "frame_end_period_ms": {
+          "max": 24.731,
+          "n": 198,
+          "p50": 9.099,
+          "p95": 18.415
+        },
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "omitted_long_events": 0,
+        "rejected_missing_end_pairs": 0,
+        "rejected_nonmonotonic_end_pairs": 0,
+        "retained_long_events": 0,
+        "with_adjacent_callback_pair": 156,
+        "without_adjacent_callback_pair": 42
+      },
+      "cases": 8,
+      "global_callback_intervals_over_83ms": 5,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-1-optimized/workspace-0.log",
+      "log_sha256": "9c0c2e213d18d45452b2ca08dbdf079a15a3a766e33fc1db0a69eca1a3b329ed",
+      "matched_canvas_callback_gaps": {
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 156,
+        "matched_period_ms": {
+          "max": 23.602,
+          "n": 156,
+          "p50": 9.342,
+          "p95": 19.676
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 42
+      },
+      "mode": "optimized",
+      "process": 1,
+      "process_exit": 0,
+      "source_after_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "time": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-1-optimized/workspace-0.time",
+      "time_sha256": "90572aeedd1b72b38cae7c8a1b1cb98ce0e41b72e0fbd0deaf5b21bfe2fdaec3"
+    },
+    {
+      "canvas_draw_cadence": {
+        "frame_end_pairs": 198,
+        "frame_end_period_ms": {
+          "max": 30.964,
+          "n": 198,
+          "p50": 9.558,
+          "p95": 19.215
+        },
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "omitted_long_events": 0,
+        "rejected_missing_end_pairs": 0,
+        "rejected_nonmonotonic_end_pairs": 0,
+        "retained_long_events": 0,
+        "with_adjacent_callback_pair": 136,
+        "without_adjacent_callback_pair": 62
+      },
+      "cases": 8,
+      "global_callback_intervals_over_83ms": 5,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-2-optimized/workspace-0.log",
+      "log_sha256": "af3a178362dc44295b9a8c0b4429addeccfce09d28bca2a6ac49536706e764f1",
+      "matched_canvas_callback_gaps": {
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 136,
+        "matched_period_ms": {
+          "max": 22.13,
+          "n": 136,
+          "p50": 9.701,
+          "p95": 19.588
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 62
+      },
+      "mode": "optimized",
+      "process": 2,
+      "process_exit": 0,
+      "source_after_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "time": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-2-optimized/workspace-0.time",
+      "time_sha256": "9646dcd2ecf8795c35cab98054d63eda1139402218847af88129859993e57ec3"
+    },
+    {
+      "canvas_draw_cadence": {
+        "frame_end_pairs": 198,
+        "frame_end_period_ms": {
+          "max": 30.822,
+          "n": 198,
+          "p50": 9.159,
+          "p95": 23.209
+        },
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "omitted_long_events": 0,
+        "rejected_missing_end_pairs": 0,
+        "rejected_nonmonotonic_end_pairs": 0,
+        "retained_long_events": 0,
+        "with_adjacent_callback_pair": 134,
+        "without_adjacent_callback_pair": 64
+      },
+      "cases": 8,
+      "global_callback_intervals_over_83ms": 4,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-3-reference/workspace-0.log",
+      "log_sha256": "6844c3aa9456d827ea74d66b9ddcb343a6e16b0060a2c1cb26c74226d1266cb3",
+      "matched_canvas_callback_gaps": {
+        "long_33ms": 1,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 134,
+        "matched_period_ms": {
+          "max": 34.495,
+          "n": 134,
+          "p50": 9.556,
+          "p95": 23.235
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 64
+      },
+      "mode": "reference",
+      "process": 3,
+      "process_exit": 0,
+      "source_after_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "time": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-3-reference/workspace-0.time",
+      "time_sha256": "ef2152703eb0124435b637b4d4b303fa1e4b43fe752887c552c9ed5d4db6537c"
+    },
+    {
+      "canvas_draw_cadence": {
+        "frame_end_pairs": 198,
+        "frame_end_period_ms": {
+          "max": 33.139,
+          "n": 198,
+          "p50": 11.594,
+          "p95": 22.429
+        },
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "omitted_long_events": 0,
+        "rejected_missing_end_pairs": 0,
+        "rejected_nonmonotonic_end_pairs": 0,
+        "retained_long_events": 0,
+        "with_adjacent_callback_pair": 106,
+        "without_adjacent_callback_pair": 92
+      },
+      "cases": 8,
+      "global_callback_intervals_over_83ms": 8,
+      "log": "docs/evidence/T-199-2026-11-19-fresh-workspace/workspace-0.log",
+      "log_sha256": "83152cdf7df7f145c00a27b93d26c51d31bef49a16aa4fb970ca4cb2ec004ee2",
+      "matched_canvas_callback_gaps": {
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 106,
+        "matched_period_ms": {
+          "max": 30.414,
+          "n": 106,
+          "p50": 12.264,
+          "p95": 23.479
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 92
+      },
+      "mode": "fresh-optimized",
+      "process": 4,
+      "process_exit": 0,
+      "source_after_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "time": "docs/evidence/T-199-2026-11-19-fresh-workspace/workspace-0.time",
+      "time_sha256": "ec534013743234d4b7b75f66064b78e02cda2b938267ee2ff93532bc059c0b17"
+    }
+  ],
+  "threshold_us": 83333,
+  "ticket": "T-199",
+  "timestamp": "2026-11-19"
+}
