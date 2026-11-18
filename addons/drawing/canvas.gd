@@ -407,9 +407,6 @@ func _on_frame_post_draw() -> void:
 	var callback_us: int = Time.get_ticks_usec()
 	last_frame_metrics["post_draw_us"] = callback_us
 	_finish_pending_frame_post_draw(callback_us)
-	if session != null and int(_metrics.get("first_preview_submit_us", 0)) > 0 \
-			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0:
-		_metrics["first_frame_post_draw_us"] = Time.get_ticks_usec()
 
 
 ## Godot's frame_post_draw callback is a renderer-side timing witness, NOT a
@@ -430,6 +427,13 @@ func _finish_pending_frame_post_draw(callback_us: int) -> void:
 		return
 	var recorded_us: int = maxi(end_us, callback_us)
 	var delay_us: int = recorded_us - end_us
+	# The first renderer callback must belong to a Canvas frame submitted
+	# after native preview changes, not an unrelated redraw or stale session.
+	if bool(sample.get("first_preview_frame", false)) \
+			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0 \
+			and end_us >= int(_metrics.get("first_preview_submit_us", 0)) \
+			and int(_metrics.get("first_preview_submit_us", 0)) > 0:
+		_metrics["first_frame_post_draw_us"] = recorded_us
 	sample["frame_post_draw_callback_us"] = recorded_us
 	sample["frame_end_to_post_draw_us"] = delay_us
 	_metrics["frame_post_draw_matches"] = int(_metrics.get("frame_post_draw_matches", 0)) + 1
@@ -2053,6 +2057,12 @@ func _record_frame_phase(frame: Dictionary) -> void:
 		_metrics["max_frame_preview_stage_to_frame_end_us"] = maxi(
 			int(_metrics.get("max_frame_preview_stage_to_frame_end_us", 0)),
 			submit_delay_us)
+	# A matching renderer callback can be credited to first preview only
+	# when this actual Canvas frame was submitted after first pixel changes.
+	var submitted_us: int = int(_metrics.get("first_preview_submit_us", 0))
+	if submitted_us > 0 and int(_metrics.get("first_frame_post_draw_us", 0)) == 0 \
+			and int(frame.get("frame_end_us", 0)) >= submitted_us:
+		sample["first_preview_frame"] = true
 	# Monotonic engine time allows phase and backlog spikes to be correlated
 	# without pretending to measure physical input-to-photon latency.
 	sample["frame_end_us"] = maxi(0, int(frame.get("frame_end_us", 0)))
