@@ -1,4 +1,7 @@
 extends SceneTree
+
+const NATIVE_REFERENCE = preload("res://tests/t200_native_stroke_reference.gd")
+
 ## T-085: canonical document stays unchanged until publication; preview respects
 ## layer order, erase, cancellation, rollback, RGBA8 and one-step history.
 
@@ -137,11 +140,11 @@ func run() -> void:
 
 	# Exercise the actual canvas queue in fast headless CI, not just the edit
 	# session. Each zoom maps source floats through the same view transform
-	# as a delivered motion; a single-call reference is the pixel oracle.
+	# as a delivered motion; a second native Hokusai transaction is the pixel oracle.
 	var queued_canvas: Control = Control.new()
 	queued_canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	queued_canvas.size = Vector2(270, 230)
-	queued_canvas.brush_width = 2.0
+	queued_canvas.brush_width = 6.0
 	queued_canvas.color_rgba = 0x8044d9ff
 	root.add_child(queued_canvas)
 	for zoom_value: float in [1.0, 0.5, 0.25]:
@@ -154,19 +157,28 @@ func run() -> void:
 		var first: Vector2 = Vector2(12.5, 12.5)
 		var path: PackedVector2Array = PackedVector2Array()
 		path.append(queued_canvas.source_position(queued_canvas.pixel_to_position(first)))
-		queued_canvas.start_gesture(queued_canvas.pixel_to_position(first))
+		var press_us: int = Time.get_ticks_usec()
+		var receipts: PackedInt64Array = PackedInt64Array([press_us])
+		queued_canvas.start_gesture(queued_canvas.pixel_to_position(first), first,
+			{"press_us": press_us})
+		check(queued_canvas._active_brush_backend == "Hokusai" and
+			queued_canvas._native_brush != null,
+			"zoom %s queued pointer uses mandatory native Hokusai" % zoom_value)
 		for i: int in range(600):
 			var t: float = float(i) / 599.0
 			var point: Vector2 = Vector2(35.5 + 21.0 * cos(t * TAU * 9.0),
 				27.5 + 12.0 * sin(t * TAU * 13.0))
 			path.append(queued_canvas.source_position(queued_canvas.pixel_to_position(point)))
 			queued_canvas.update_gesture(queued_canvas.pixel_to_position(point))
+			receipts.append(queued_canvas._sample_times_us.back())
 		var finish: Vector2 = Vector2(59.5, 23.5)
 		path.append(queued_canvas.source_position(queued_canvas.pixel_to_position(finish)))
 		check(queued_doc.revision == original_revision and queued_canvas.session != null and
 			int(queued_canvas._metrics["samples_received"]) == 601,
 			"zoom %s queue accepts entire 600-point stroke without early publication" % zoom_value)
-		queued_canvas.finish_gesture(queued_canvas.pixel_to_position(finish))
+		var release_us: int = Time.get_ticks_usec()
+		receipts.append(release_us)
+		queued_canvas.finish_gesture(queued_canvas.pixel_to_position(finish), finish, release_us)
 		for drain: int in range(80):
 			if queued_canvas.session == null:
 				break
@@ -178,22 +190,28 @@ func run() -> void:
 			(stats.get("sample_to_stage_us", []) as Array).size() == 602 and
 			int(stats.get("drain_calls", 100)) < 50,
 			"zoom %s bulk stage retains all arrivals and avoids fixed-cap backlog" % zoom_value)
-		var reference: DrawingDocument = DrawingDocument.new("t085-queue-reference")
-		var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
-		var ref_session: DrawingEditSession = reference.begin_edit(reference_layer, reference.revision).value as DrawingEditSession
-		check(ref_session.paint_path(path, queued_canvas.color_rgba, queued_canvas.brush_width).ok and
-			ref_session.commit().ok, "zoom %s single-path oracle paints" % zoom_value)
 		var region: Rect2i = Rect2i(10, 9, 55, 38)
 		var staged_image: DrawingResult = DrawingRenderer.render(queued_doc, region)
-		var oracle_image: DrawingResult = DrawingRenderer.render(reference, region)
-		check(staged_image.ok and oracle_image.ok and staged_image.value.get_data() == oracle_image.value.get_data(),
-			"zoom %s batched queue exactly matches full source path bytes" % zoom_value)
+		var native_control: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+			region, path, receipts, queued_canvas.color_rgba, queued_canvas.brush_width)
+		check(bool(native_control.get("ok", false)) and
+			int(native_control.get("frame_phase_total", -1)) == 0,
+			"zoom %s independent native Hokusai reference commits without Canvas frames" % zoom_value)
+		check(staged_image.ok and
+			staged_image.value.get_data() == native_control.get("pixels", PackedByteArray()),
+			"zoom %s queued Hokusai bytes match source/timestamp-identical native transaction" % zoom_value)
+		if zoom_value == 1.0:
+			var altered: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+				region, path, receipts, queued_canvas.color_rgba, queued_canvas.brush_width + 8.0)
+			check(bool(altered.get("ok", false)) and staged_image.ok and
+				staged_image.value.get_data() != altered.get("pixels", PackedByteArray()),
+				"native queue reference detects changed brush width")
 		check(queued_doc.undo().ok and queued_doc.read_pixel(queued_layer, 59, 23).value == 0,
 			"zoom %s one Undo reverses completed long queue" % zoom_value)
 	# Selection is an edit-authorization boundary. A long queued stroke must
 	# never combine source pixels from two masks if a host/shortcut changes it.
 	queued_canvas.zoom = 1.0
-	queued_canvas.brush_width = 1.0
+	queued_canvas.brush_width = 8.0
 	queued_canvas.tool = "Brush"
 	var guarded: DrawingDocument = DrawingDocument.new("t085-selection-authorization")
 	var guarded_layer: String = String(guarded.create_layer(DrawingLayerNode.RASTER, "Masked", "root").value)
@@ -207,10 +225,12 @@ func run() -> void:
 	var original_revision: int = guarded.revision
 	var old_global_accumulation: bool = Input.use_accumulated_input
 	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	queued_canvas.paint_to(Vector2i(8, 8))
+	queued_canvas._drain_segments(64)
 	for i: int in range(120):
 		queued_canvas.paint_to(Vector2i(6 + (i % 18), 7 + (i % 16)))
 	check(queued_canvas.session != null and queued_canvas.session.change_count() > 0 and
-		int(queued_canvas._metrics["samples_received"]) == 121,
+		int(queued_canvas._metrics["samples_received"]) == 122,
 		"complex-mask Brush has a staged dab and a long pending sample backlog")
 	var same_mask: DrawingSelection = original_mask.detached_copy()
 	queued_canvas.set_selection_mask(same_mask)
@@ -277,6 +297,8 @@ func run() -> void:
 	var erase_revision: int = guarded.revision
 	queued_canvas.tool = "Eraser"
 	queued_canvas.start_gesture(queued_canvas.pixel_to_position(Vector2(5.5, 5.5)))
+	queued_canvas.paint_to(Vector2i(8, 8))
+	queued_canvas._drain_segments(64)
 	check(queued_canvas.session != null and queued_canvas.session.change_count() > 0,
 		"masked Eraser stages real source deletion")
 	queued_canvas.clear_selection()

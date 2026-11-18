@@ -286,3 +286,5 @@ docs/evidence/T-201-2026-11-19-linux-native-export-raw/*.txt whitespace=-trailin
 docs/evidence/T-202-2026-11-19-signed-save-fixture-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-203 fail-first and final native Godot/Python/Rust logs are byte-exact.
 docs/evidence/T-203-2026-11-19-native-image-frame-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-204 native live-stroke fail-first and validation output is byte-exact.
+docs/evidence/T-204-2026-11-19-native-live-stroke-raw/*.log whitespace=-trailing-space,-blank-at-eof

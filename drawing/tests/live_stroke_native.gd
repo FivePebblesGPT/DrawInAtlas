@@ -1,4 +1,7 @@
 extends SceneTree
+
+const NATIVE_REFERENCE = preload("res://tests/t200_native_stroke_reference.gd")
+
 ## T-085: real Godot Control mouse routing and live GPU/software framebuffer
 ## readback with left button still depressed. Offscreen/headless cannot pass.
 
@@ -59,35 +62,48 @@ func percentile(values: Array[float], fraction: float) -> float:
 
 func exercise_long_backlog(canvas: Control, zoom_value: float) -> float:
 	# Queue a continuous, long looping stroke in a single input burst. The
-	# independent oracle paints the exact delivered source-space samples in a
-	# single edit, so a fast but simplified path cannot satisfy the test.
+	# independent native Hokusai control replays the same receipt timestamps,
+	# so lost or altered source samples cannot silently pass the comparison.
 	canvas.zoom = zoom_value
 	canvas.brush_width = 2.0
 	canvas.color_rgba = 0x8044d9ff
 	canvas.tool = "Brush"
 	var long_doc: DrawingDocument = DrawingDocument.new("t085-backlog")
-	var long_layer: String = String(long_doc.create_layer(DrawingLayerNode.RASTER, "Long", "root").value)
+	var long_layer: String = str(long_doc.create_layer(DrawingLayerNode.RASTER, "Long", "root").value)
 	canvas.document = long_doc
 	canvas.layer_id = long_layer
 	await frames(4)
 	var revision_before_long: int = long_doc.revision
 	var source_path: PackedVector2Array = PackedVector2Array()
 	var start_long: Vector2 = Vector2(14.5, 13.5)
-	source_path.append(canvas.source_position(canvas.pixel_to_position(start_long)))
 	button(canvas, start_long, true)
+	source_path.append(canvas._staged_position)
+	var receipts: PackedInt64Array = PackedInt64Array([int(canvas._metrics.get("down_us", 0))])
+	verify(canvas._active_brush_backend == "Hokusai" and canvas._native_brush != null,
+		"long looping pointer burst uses native Hokusai")
 	var delivered: int = 840
 	for i: int in range(delivered):
 		var t: float = float(i) / float(delivered - 1)
 		var target: Vector2 = Vector2(38.5 + cos(t * TAU * 13.0) * 24.0,
 			26.5 + sin(t * TAU * 19.0) * 13.0)
-		source_path.append(canvas.source_position(canvas.pixel_to_position(target)))
 		motion(canvas, target)
+		if int(canvas._metrics.get("samples_received", -1)) != i + 2:
+			verify(false, "each raw pointer motion must be routed exactly once")
+			canvas.cancel_gesture()
+			return -1.0
+		source_path.append(canvas._samples.back())
+		receipts.append(canvas._sample_times_us.back())
 	var finish_long: Vector2 = Vector2(60.5, 31.5)
-	source_path.append(canvas.source_position(canvas.pixel_to_position(finish_long)))
+	source_path.append(Vector2.ZERO)  # Read the actual routed release after draining.
 	verify(canvas.session != null and long_doc.revision == revision_before_long and
 		int(canvas._metrics["samples_received"]) == delivered + 1,
 		"long looping pointer burst queued completely without history publication")
 	button(canvas, finish_long, false)
+	var release_at_us: int = int(canvas._metrics.get("release_us", 0)) if canvas.session != null \
+		else int(canvas.last_gesture_metrics.get("release_us", 0))
+	receipts.append(release_at_us)
+	verify(release_at_us >= receipts[receipts.size() - 2],
+		"routed release timestamp does not precede raw motion receipts")
 	var release_long_us: int = Time.get_ticks_usec()
 	var drain_frames: int = 0
 	while canvas.session != null and drain_frames < 180:
@@ -95,22 +111,25 @@ func exercise_long_backlog(canvas: Control, zoom_value: float) -> float:
 		drain_frames += 1
 	verify(canvas.session == null and drain_frames < 50,
 		"long release drains faster than the previous fixed 12/frame cap at %s" % zoom_value)
+	# Raw viewport input may differ slightly from a synthetic round-trip through
+	# pixel_to_position; compare what the native batch actually received.
+	source_path[-1] = canvas._staged_position
 	verify(long_doc.revision == revision_before_long + 1,
 		"long burst commits once, including every trailing point")
 	var stats_long: Dictionary = canvas.last_gesture_metrics
 	verify(int(stats_long.get("samples_received", 0)) == delivered + 2 and
 		(stats_long.get("sample_to_stage_us", []) as Array).size() == delivered + 2,
 		"long burst preserves every timestamped sample through stage")
-	var reference_doc: DrawingDocument = DrawingDocument.new("t085-backlog-oracle")
-	var reference_layer: String = String(reference_doc.create_layer(DrawingLayerNode.RASTER, "Long", "root").value)
-	var ref_edit: DrawingEditSession = reference_doc.begin_edit(reference_layer, reference_doc.revision).value as DrawingEditSession
-	var staged_ref: DrawingResult = ref_edit.paint_path(source_path, canvas.color_rgba, canvas.brush_width)
-	verify(staged_ref.ok and ref_edit.commit().ok, "single-call oracle paints all long-loop samples")
 	var area_long: Rect2i = Rect2i(8, 8, 62, 44)
 	var actual_long: DrawingResult = DrawingRenderer.render(long_doc, area_long)
-	var expected_long: DrawingResult = DrawingRenderer.render(reference_doc, area_long)
-	verify(actual_long.ok and expected_long.ok and actual_long.value.get_data() == expected_long.value.get_data(),
-		"long batched stroke is byte-identical to original path, including crossings")
+	var native_control: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		area_long, source_path, receipts, canvas.color_rgba, canvas.brush_width)
+	verify(bool(native_control.get("ok", false)) and
+		int(native_control.get("frame_phase_total", -1)) == 0,
+		"separate Hokusai control commits without rendered Canvas frames")
+	verify(actual_long.ok and
+		actual_long.value.get_data() == native_control.get("pixels", PackedByteArray()),
+		"long batched stroke exactly matches timestamp-identical native Hokusai, including crossings")
 	verify(long_doc.undo().ok and long_doc.read_pixel(long_layer, 60, 31).value == 0,
 		"long looping stroke is one reversible history operation")
 	var release_to_commit_ms: float = float(int(stats_long.get("commit_us", 0)) - int(stats_long.get("release_us", 0))) / 1000.0
@@ -147,7 +166,7 @@ func run() -> void:
 	for zoom_value: float in zoom_levels:
 		canvas.zoom = zoom_value
 		var document: DrawingDocument = DrawingDocument.new("t085-native")
-		var layer: String = String(document.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
+		var layer: String = str(document.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
 		canvas.document = document
 		canvas.layer_id = layer
 		canvas.tool = "Brush"
@@ -161,8 +180,9 @@ func run() -> void:
 		button(canvas, start, true)
 		verify(not Input.use_accumulated_input,
 			"zoom %s OS motion coalescing disabled while painting" % zoom_value)
-		verify(canvas.session != null and canvas.session.change_count() > 0,
-			"zoom %s first stationary dab staged on press" % zoom_value)
+		verify(canvas.session != null and canvas._active_brush_backend == "Hokusai" and
+			canvas._native_brush != null and int(canvas._metrics.get("samples_received", 0)) == 1,
+			"zoom %s first press opens required-native Hokusai session" % zoom_value)
 		verify(document.revision == revision and document.read_pixel(layer, 0, 0).value == 0,
 			"zoom %s no committed pixel before release" % zoom_value)
 		motion(canvas, moved)
@@ -221,7 +241,7 @@ func run() -> void:
 	# not silently wait for mouse-up. Test fully opaque source and cancel.
 	canvas.zoom = 1.0
 	var image_doc: DrawingDocument = DrawingDocument.new("t085-erase")
-	var image_layer: String = String(image_doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
+	var image_layer: String = str(image_doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
 	canvas.document = image_doc
 	canvas.layer_id = image_layer
 	var edit: DrawingEditSession = image_doc.begin_edit(image_layer, image_doc.revision).value as DrawingEditSession
@@ -259,9 +279,12 @@ func run() -> void:
 	canvas.zoom = 0.5
 	verify(canvas.session == null and image_doc.revision == saved_revision,
 		"zoom change cancels pending path without content changes")
+	var new_layer_result: DrawingResult = image_doc.create_layer(
+		DrawingLayerNode.RASTER, "New", "root")
+	verify(new_layer_result.ok, "prepare a valid target before changing layers mid-stroke")
+	var replacement_layer: String = str(new_layer_result.value)
 	button(canvas, Vector2(4.5, 4.5), true)
 	verify(canvas.session != null, "begin layer-switch cancellation witness")
-	var replacement_layer: String = String(image_doc.create_layer(DrawingLayerNode.RASTER, "New", "root").value)
 	canvas.layer_id = replacement_layer
 	verify(canvas.session == null and image_doc.read_pixel(image_layer, 4, 4).value == 0,
 		"layer switch drops a transient edit rather than mispublishing")
@@ -290,7 +313,7 @@ func run() -> void:
 	# A physical pointer gesture must not silently switch its pixel edit
 	# authorization when a host changes the selection during mouse-down.
 	var masked_doc: DrawingDocument = DrawingDocument.new("t085-native-mask-change")
-	var masked_layer: String = String(masked_doc.create_layer(DrawingLayerNode.RASTER, "Masked", "root").value)
+	var masked_layer: String = str(masked_doc.create_layer(DrawingLayerNode.RASTER, "Masked", "root").value)
 	canvas.document = masked_doc
 	canvas.layer_id = masked_layer
 	canvas.zoom = 1.0

@@ -1,0 +1,44 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T085_NATIVE_ZOOM zoom=1.00 samples=31 max_queued=29 down_to_stage_ms=0.128 down_to_frame_ms=12.355 release_to_commit_ms=1.783
+T085_NATIVE_ZOOM zoom=0.50 samples=31 max_queued=29 down_to_stage_ms=0.071 down_to_frame_ms=2.791 release_to_commit_ms=2.173
+T085_NATIVE_ZOOM zoom=0.25 samples=31 max_queued=29 down_to_stage_ms=0.091 down_to_frame_ms=5.955 release_to_commit_ms=2.812
+T085_NATIVE_FAILED: leaving canvas and releasing over window background commits full sparse path
+T204_DEBUG outside result={ "ok": false, "code": "LAYER", "value": <null> } inside={ "ok": false, "code": "LAYER", "value": <null> } revision=2 previous=2 session=<null>
+T085_NATIVE_FAILED: outside-canvas path is still a single undo operation
+T204_DEBUG mapped_mismatch=365 bytes=10912 control_bytes=10912 live_hash=184732732 control_hash=1981739350
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=1.00 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=6.217 stage_cpu_ms=19.731 release_to_commit_ms=21.395 wall_ms=38.620
+T204_DEBUG mapped_mismatch=365 bytes=10912 control_bytes=10912 live_hash=184732732 control_hash=1981739350
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=1.00 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.956 stage_cpu_ms=13.397 release_to_commit_ms=15.476 wall_ms=31.477
+T204_DEBUG mapped_mismatch=365 bytes=10912 control_bytes=10912 live_hash=184732732 control_hash=1981739350
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=1.00 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=5.107 stage_cpu_ms=14.367 release_to_commit_ms=15.875 wall_ms=35.245
+T085_NATIVE_LONG_SUMMARY zoom=1.00 trials=3 release_to_commit_p50_ms=15.875 release_to_commit_p95_ms=21.395
+T204_DEBUG mapped_mismatch=424 bytes=10912 control_bytes=10912 live_hash=548303630 control_hash=1408535067
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=0.50 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=5.699 stage_cpu_ms=13.953 release_to_commit_ms=15.466 wall_ms=34.002
+T204_DEBUG mapped_mismatch=424 bytes=10912 control_bytes=10912 live_hash=548303630 control_hash=1408535067
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=0.50 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.780 stage_cpu_ms=12.490 release_to_commit_ms=14.128 wall_ms=31.075
+T204_DEBUG mapped_mismatch=424 bytes=10912 control_bytes=10912 live_hash=548303630 control_hash=1408535067
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=0.50 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=3.932 stage_cpu_ms=11.634 release_to_commit_ms=13.045 wall_ms=30.008
+T085_NATIVE_LONG_SUMMARY zoom=0.50 trials=3 release_to_commit_p50_ms=14.128 release_to_commit_p95_ms=15.466
+T204_DEBUG mapped_mismatch=464 bytes=10912 control_bytes=10912 live_hash=3466508057 control_hash=3223683289
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=0.25 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=5.003 stage_cpu_ms=13.689 release_to_commit_ms=15.417 wall_ms=35.794
+T204_DEBUG mapped_mismatch=464 bytes=10912 control_bytes=10912 live_hash=3466508057 control_hash=3223683289
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=0.25 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=6.093 stage_cpu_ms=15.058 release_to_commit_ms=16.609 wall_ms=32.563
+T204_DEBUG mapped_mismatch=464 bytes=10912 control_bytes=10912 live_hash=3466508057 control_hash=3223683289
+T085_NATIVE_FAILED: long batched stroke exactly matches timestamp-identical native Hokusai, including crossings
+T085_NATIVE_LONG zoom=0.25 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.084 stage_cpu_ms=12.010 release_to_commit_ms=13.720 wall_ms=33.736
+T085_NATIVE_LONG_SUMMARY zoom=0.25 trials=3 release_to_commit_p50_ms=15.417 release_to_commit_p95_ms=16.609
+T085_NATIVE_METRICS ms: preview_frame_p50=5.955 preview_frame_p95=12.355 sample_to_stage_p50=0.867 sample_to_stage_p95=1.588 stage_cpu_p50=2.104 stage_cpu_p95=3.314
+T085_NATIVE: 134 checks; 11 failed

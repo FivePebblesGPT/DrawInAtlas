@@ -1,0 +1,10 @@
+BEFORE T-204 (HEAD)
+c69435eb3d3d4fbf20dbb6eff7dd6d4f7af65dd5ce3c090f06d2361b9f20903d  drawing/tests/live_stroke_smoke.gd
+c00971a8462d46b66a1161a01df0641796aea41c58e99381d974a306bc2c5e3c  drawing/tests/live_stroke_native.gd
+
+FINAL T-204
+611e355d84b209cd0643cd84f7d984b985a12b8107bd4ce50573b2271fad4632  drawing/tests/live_stroke_smoke.gd
+0e369463e8c51c80390f063d907d3a455aa6f18d831ba2ad50b48a6cbc60d583  drawing/tests/live_stroke_native.gd
+
+NATIVE LIBRARY USED FOR FINAL TESTS
+222a010ec3744d7dcbd3425579cb43cc29eb9b892997d4f319dd951a4a344a63  drawing/addons/drawing/native/bin/libdrawing_brush.so

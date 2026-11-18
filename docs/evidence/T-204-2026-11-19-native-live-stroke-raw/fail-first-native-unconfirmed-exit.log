@@ -1,0 +1,17 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T085_NATIVE_FAILED: zoom 1.0 first stationary dab staged on press
+T085_NATIVE_ZOOM zoom=1.00 samples=31 max_queued=29 down_to_stage_ms=0.078 down_to_frame_ms=9.057 release_to_commit_ms=2.487
+T085_NATIVE_FAILED: zoom 0.5 first stationary dab staged on press
+T085_NATIVE_ZOOM zoom=0.50 samples=31 max_queued=29 down_to_stage_ms=0.065 down_to_frame_ms=3.679 release_to_commit_ms=2.669
+T085_NATIVE_FAILED: zoom 0.25 first stationary dab staged on press
+T085_NATIVE_ZOOM zoom=0.25 samples=31 max_queued=29 down_to_stage_ms=0.091 down_to_frame_ms=5.617 release_to_commit_ms=1.806
+SCRIPT ERROR: Invalid call 'String' constructor: drawing-52621016503d8cbea26a27c72504c2a7
+          at: run (res://tests/live_stroke_native.gd:264)
+          GDScript backtrace (most recent call first):
+              [0] run (res://tests/live_stroke_native.gd:264)
+Terminated
