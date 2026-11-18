@@ -56,9 +56,10 @@ static func render(document: DrawingDocument, view: Rect2i,
 		return DrawingResult.failure("COORD_RANGE", "Viewport anchor outside Drawing range")
 	# One visible native raster layer over a transparent destination needs no
 	# per-pixel GDScript blending. Rust returns exactly the draft RGBA8 crop;
-	# zero-alpha hidden RGB would differ from the original compositor (which
-	# skips those pixels), so it strictly falls back to the original path.
-	# Multilayer, text, mixed tile boundaries and arbitrary viewports also
+	# zero-alpha hidden RGB is stripped only from the detached *display crop*
+	# by Rust, exactly matching the original compositor's alpha-zero skip;
+	# canonical source, preview history and persistence retain those bytes.
+	# Multilayer, text, mixed tile boundaries and arbitrary viewports still
 	# retain the existing renderer and its source-alpha/history semantics.
 	if preview != null and leaf_layers.size() == 1 \
 			and preview.layer_id == leaf_layers[0] \
@@ -77,8 +78,12 @@ static func render(document: DrawingDocument, view: Rect2i,
 			if document.revision != preview.expected_revision:
 				return DrawingResult.failure("PREVIEW_REVISION",
 					"Preview source revision changed during lazy resolution")
+			# T-197 same-binary reference recreates T-187's previous
+			# hidden-RGB rejection, without forcing every Brush tile through
+			# the slow path as the older full-tile counterfactual does.
+			var display: bool = not OS.has_environment("DRAWING_T197_RAW_HIDDEN_COUNTERFACTUAL")
 			var region: Dictionary = preview.preview_rgba8_region(key,
-				Rect2i(local_x, local_y, view.size.x, view.size.y))
+				Rect2i(local_x, local_y, view.size.x, view.size.y), display)
 			if not bool(region.get("hidden_rgb", true)):
 				var packed: PackedByteArray = region.get("bytes", PackedByteArray())
 				if packed.size() == view.size.x * view.size.y * 4:

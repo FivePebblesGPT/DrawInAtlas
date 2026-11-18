@@ -1,0 +1,168 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+ERROR: No loader found for resource: res://addons/drawing/icons/brush.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/eraser.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/select.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/move.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/text.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/pan.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_visible.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_hidden.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_unlocked.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_locked.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] run (res://tests/t182_brush_preset_controls.gd:23)
+T182_PRESETS_RESULT checks=16 failures=0
+T182_PRESETS_PASSED checks=16 failures=0

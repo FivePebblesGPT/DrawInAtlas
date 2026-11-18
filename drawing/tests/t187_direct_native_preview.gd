@@ -23,8 +23,9 @@ func _initialize() -> void:
 	call_deferred("run")
 
 
-func trial(hidden_rgb: bool, extra_layer: bool) -> void:
-	var doc: DrawingDocument = DrawingDocument.new("t187-preview-%s-%s" % [hidden_rgb, extra_layer], 256)
+func trial(hidden_rgb: bool, extra_layer: bool, eraser: bool = false) -> void:
+	var doc: DrawingDocument = DrawingDocument.new(
+		"t187-preview-%s-%s-%s" % [hidden_rgb, extra_layer, eraser], 256)
 	var layer: String = str(doc.create_layer(DrawingLayerNode.RASTER, "Native", "root").value)
 	var source: Image = Image.create(256, 256, false, Image.FORMAT_RGBA8)
 	source.fill(Color(0.1, 0.6, 0.3, 0.7))
@@ -54,6 +55,7 @@ func trial(hidden_rgb: bool, extra_layer: bool) -> void:
 	canvas.zoom = 1.0
 	canvas.brush_width = 22
 	canvas.brush_preset = "hard"
+	canvas.tool = "Eraser" if eraser else "Brush"
 	canvas.color_rgba = 0xff2211ee
 	canvas.document = doc
 	canvas.layer_id = layer
@@ -92,17 +94,53 @@ func trial(hidden_rgb: bool, extra_layer: bool) -> void:
 			check((optimized.value as Image).get_data().decode_u32(0) == 0,
 				"hidden RGB at alpha zero is not displayed as source color")
 	var after_fallback: Dictionary = active._native_tiles.call("stats")
-	if hidden_rgb or extra_layer:
-		check(crop_count == (0 if extra_layer else 1),
-			"multilayer skips direct read; hidden case probes then falls back")
+	active._native_preview_cache.clear()
+	active._native_preview_regions.clear()
+	OS.set_environment("DRAWING_T197_RAW_HIDDEN_COUNTERFACTUAL", "1")
+	var original_gate: DrawingResult = DrawingRenderer.render(doc, view, 0, 0, 1048576, active)
+	OS.unset_environment("DRAWING_T197_RAW_HIDDEN_COUNTERFACTUAL")
+	check(original_gate.ok and optimized.ok and
+		(original_gate.value as Image).get_data() == (optimized.value as Image).get_data(),
+		"same-binary historical hidden-RGB fallback retains exact framebuffer parity")
+
+	if extra_layer:
+		check(crop_count == 0, "multilayer still skips direct read")
 		check(int(after_direct["bytes_exported"]) - int(before_stats["bytes_exported"]) >= 262144,
-			"fallback exports a complete tile")
+			"multilayer fallback exports a complete native tile")
 	else:
-		check(crop_count == 1, "fast path caches one signed 128px RGBA crop")
+		check(crop_count == 1, "fast path caches one signed 128px RGBA display crop")
 		check(int(after_direct["bytes_exported"]) - int(before_stats["bytes_exported"]) == 65536,
-			"fast path exports only 128 x 128 RGBA8 pixels")
+			"hidden RGB and Eraser export only 128 x 128 display RGBA8 pixels")
 	check(int(after_fallback["bytes_exported"]) > int(after_direct["bytes_exported"]),
 		"same-binary forced fallback reads native full tile")
+	if not extra_layer:
+		var signed_key: String = DrawingDocument.TILES.tile_key64(-256, 0, doc.tile_stride)
+		var crop: Rect2i = Rect2i(0, 0, 128, 128)
+		var source_crop: Dictionary = active.preview_rgba8_region(signed_key, crop)
+		var display_crop: Dictionary = active.preview_rgba8_region(signed_key, crop, true)
+		var source_bytes: PackedByteArray = source_crop.get("bytes", PackedByteArray())
+		var display_bytes: PackedByteArray = display_crop.get("bytes", PackedByteArray())
+		check(source_bytes.size() == 65536 and display_bytes.size() == 65536,
+			"native canonical and display crops have identical dimensions")
+		if hidden_rgb and source_bytes.size() == 65536:
+			check(source_bytes.decode_u32(0) == 0x00eba358 and
+				display_bytes.decode_u32(0) == 0,
+				"hidden RGB is preserved in native draft but discarded in display only")
+		var actual_hidden: bool = false
+		for byte_index: int in range(0, source_bytes.size(), 4):
+			if source_bytes[byte_index + 3] == 0 and (
+					source_bytes[byte_index] != 0 or source_bytes[byte_index + 1] != 0
+					or source_bytes[byte_index + 2] != 0):
+				actual_hidden = true
+				break
+		check(bool(source_crop.get("hidden_rgb", false)) == actual_hidden and
+			not bool(display_crop.get("hidden_rgb", true)),
+			"native source and display crop caches track hidden RGB independently")
+		active._native_preview_regions.clear()
+		var source_after_display: Dictionary = active.preview_rgba8_region(signed_key, crop)
+		check(source_bytes == source_after_display.get("bytes", PackedByteArray()),
+			"display conversion never changes the live native draft source")
+
 	# Arbitrary repeated tile-local viewport crops must not accumulate an
 	# unbounded per-tile detached RGBA cache during a long native gesture.
 	var storage_key: String = DrawingDocument.TILES.tile_key64(-256, 0, doc.tile_stride)
@@ -139,6 +177,8 @@ func run() -> void:
 	await trial(false, false)
 	await trial(true, false)
 	await trial(false, true)
+	await trial(true, false, true)
+	await trial(false, false, true)
 	print("T187_DIRECT_RESULT checks=%d failures=%d" % [checks, failures])
 	if failures == 0:
 		print("T187_DIRECT_PASSED checks=%d failures=0" % checks)

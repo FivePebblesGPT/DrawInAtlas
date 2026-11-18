@@ -296,7 +296,8 @@ func preview_rgba8_tile(tile_key: String) -> PackedByteArray:
 ## Cap distinct rectangles per tile: third-party render callers may request many
 ## overlapping offsets in one stroke without owning unbounded detached bytes.
 ## Commit, history and persistence always read complete canonical native tiles.
-func preview_rgba8_region(tile_key: String, local_rect: Rect2i) -> Dictionary:
+func preview_rgba8_region(tile_key: String, local_rect: Rect2i,
+		display: bool = false) -> Dictionary:
 	const MAX_CACHED_REGIONS_PER_TILE: int = 8
 	if _closed or _native_tiles == null or not _preview_tile_versions.has(tile_key) \
 			or document.revision != expected_revision:
@@ -306,15 +307,16 @@ func preview_rgba8_region(tile_key: String, local_rect: Rect2i) -> Dictionary:
 			or local_rect.size.x <= 0 or local_rect.size.y <= 0 \
 			or local_rect.end.x > stride or local_rect.end.y > stride:
 		return {}
-	var local_key: String = "%d,%d,%d,%d" % [local_rect.position.x,
-		local_rect.position.y, local_rect.size.x, local_rect.size.y]
+	var local_key: String = "%s:%d,%d,%d,%d" % ["display" if display else "source",
+		local_rect.position.x, local_rect.position.y, local_rect.size.x, local_rect.size.y]
 	var crops: Dictionary = _native_preview_regions.get(tile_key, {})
 	if crops.has(local_key):
 		return crops[local_key] as Dictionary
 	var coordinates: PackedStringArray = tile_key.split(",")
 	if coordinates.size() != 2:
 		return {}
-	var source: Dictionary = _native_tiles.call("read_tile_region", layer_id,
+	var method: String = "read_tile_region_display" if display else "read_tile_region"
+	var source: Dictionary = _native_tiles.call(method, layer_id,
 		int(coordinates[0]), int(coordinates[1]), true,
 		local_rect.position.x, local_rect.position.y, local_rect.size.x, local_rect.size.y)
 	if not bool(source.get("ok", false)):

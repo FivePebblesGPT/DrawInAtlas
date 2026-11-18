@@ -1129,6 +1129,17 @@ impl TileStore {
     }
 }
 
+/// Mirror the zero-alpha skip in DrawingRenderer._composite_raster for
+/// a single layer over an initially transparent display buffer. Mutate only
+/// the owned crop, never the canonical source or detached draft.
+fn clear_invisible_rgb(crop: &mut [u8]) {
+    for pixel in crop.chunks_exact_mut(4) {
+        if pixel[3] == 0 {
+            pixel[..3].fill(0);
+        }
+    }
+}
+
 fn blend(source: u32, dest: u32) -> u32 {
     let a = ((source >> 24) & 255) as f64;
     if a == 0.0 {
@@ -1645,8 +1656,7 @@ impl DrawingNativeTiles {
         result
     }
 
-    /// A bounded tile-local RGBA8 row crop for native live display only.
-    /// Whole-tile read_tile remains the authoritative commit/persistence API.
+    /// Source-exact crop for edit/serialization callers: retain hidden RGB.
     #[allow(clippy::too_many_arguments)]
     #[func]
     fn read_tile_region(
@@ -1659,6 +1669,41 @@ impl DrawingNativeTiles {
         top: i64,
         width: i64,
         height: i64,
+    ) -> Dictionary<Variant, Variant> {
+        self.read_tile_region_impl(layer, x, y, preview, left, top, width, height, false)
+    }
+
+    /// Display-only source-over-transparent crop. Zero-alpha pixels must not
+    /// expose hidden RGB in the composited output, but *must* retain their
+    /// canonical bytes in source, draft, history and persisted tiles.
+    #[allow(clippy::too_many_arguments)]
+    #[func]
+    fn read_tile_region_display(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+        left: i64,
+        top: i64,
+        width: i64,
+        height: i64,
+    ) -> Dictionary<Variant, Variant> {
+        self.read_tile_region_impl(layer, x, y, preview, left, top, width, height, true)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn read_tile_region_impl(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+        left: i64,
+        top: i64,
+        width: i64,
+        height: i64,
+        display: bool,
     ) -> Dictionary<Variant, Variant> {
         self.store.ffi_calls += 1;
         let id = TileId {
@@ -1678,7 +1723,10 @@ impl DrawingNativeTiles {
             .store
             .read_region(&id, preview, left, top, width, height)
         {
-            Ok(bytes) => {
+            Ok(mut bytes) => {
+                if display {
+                    clear_invisible_rgb(&mut bytes);
+                }
                 self.store.bytes_exported += bytes.len() as u64;
                 let mut result = Dictionary::new();
                 result.set("ok", true);
@@ -3226,6 +3274,24 @@ mod tests {
             8
         );
     }
+    #[test]
+    fn display_crop_clears_only_zero_alpha_rgb_without_mutating_source() {
+        let original = vec![
+            0x58, 0xa3, 0xeb, 0, // fully transparent with hidden RGB
+            0xff, 0x08, 0x12, 1, // low alpha must retain exact bytes
+            0x72, 0x81, 0x23, 128, // translucent, no premultiplication
+            0x11, 0x22, 0x33, 255, // opaque
+            0, 0, 0, 0,
+        ];
+        let mut display = original.clone();
+        clear_invisible_rgb(&mut display);
+        assert_eq!(&display[..4], &[0, 0, 0, 0]);
+        assert_eq!(&display[4..], &original[4..]);
+        assert_eq!(&original[..4], &[0x58, 0xa3, 0xeb, 0]);
+        clear_invisible_rgb(&mut display);
+        assert_eq!(&display[..4], &[0, 0, 0, 0]);
+    }
+
     #[test]
     fn hidden_rgb_and_alpha_roundtrip() {
         let mut s = initialized(16);
