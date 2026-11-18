@@ -3,6 +3,7 @@ extends SceneTree
 
 const INK: int = 0x9050d7b9
 const AREA: Rect2i = Rect2i(-48, -48, 96, 96)
+const NATIVE_REFERENCE = preload("res://tests/t200_native_stroke_reference.gd")
 
 var checks: int = 0
 var failures: int = 0
@@ -146,8 +147,10 @@ func test_live_brush_frames() -> void:
 	var original: PackedByteArray = snapshot(document)
 	var first: Vector2 = Vector2(-15.5, -9.5)
 	var last: Vector2 = Vector2(18.5, 12.5)
-	canvas.start_gesture(canvas.pixel_to_position(first))
+	var press_us: int = Time.get_ticks_usec()
+	canvas.start_gesture(canvas.pixel_to_position(first), first, {"press_us": press_us})
 	canvas.paint_to(Vector2i(18, 12))
+	var motion_us: int = canvas._sample_times_us.back()
 	var probe_us: int = Time.get_ticks_usec()
 	var pending: Dictionary = canvas._frame_input_backlog(probe_us)
 	check(int(pending.get("pending_input_count", -1)) >= 1 and
@@ -170,7 +173,8 @@ func test_live_brush_frames() -> void:
 		last_at_us = int(frame.get("frame_end_us", 0))
 	check(fields_ok and last_at_us > 0,
 		"real Canvas frames align monotonic timestamps, pending age/depth and CPU phases")
-	canvas.finish_gesture(canvas.pixel_to_position(last))
+	var release_us: int = Time.get_ticks_usec()
+	canvas.finish_gesture(canvas.pixel_to_position(last), last, release_us)
 	var guard: int = 0
 	while canvas.session != null and guard < 500:
 		canvas._drain_segments(256)
@@ -183,18 +187,14 @@ func test_live_brush_frames() -> void:
 		int(published.get("frame_phase_total", -1)) == completed.size(),
 		"committed profile retains every short-gesture frame")
 	var committed: PackedByteArray = snapshot(document)
-	var reference: DrawingDocument = DrawingDocument.new("frame-backlog-control", 64)
-	var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
-		"Paint", "root").value)
-	var edit: DrawingEditSession = reference.begin_edit(reference_layer,
-		reference.revision).value
-	var source_first: Vector2 = canvas.source_position(canvas.pixel_to_position(first))
-	var source_last: Vector2 = canvas.source_position(canvas.pixel_to_position(last))
-	check(edit.paint_path(PackedVector2Array([source_first, source_last]),
-		INK, 60.0).ok and edit.commit().ok,
-		"independent reference Brush stroke commits")
-	check(committed == snapshot(reference),
-		"queue profiling does not mutate RGBA8 Brush output")
+	var native_control: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		AREA, PackedVector2Array([first, Vector2(18.5, 12.5), last]),
+		PackedInt64Array([press_us, motion_us, release_us]), INK, 60.0)
+	check(bool(native_control.get("ok", false)) and
+		int(native_control.get("frame_phase_total", -1)) == 0,
+		"matching Hokusai reference commits without a rendered Canvas")
+	check(committed != original and committed == native_control.get("pixels", PackedByteArray()),
+		"backlog instrumentation retains nonempty native RGBA8 output")
 	check(document.undo().ok and snapshot(document) == original and
 		document.redo().ok and snapshot(document) == committed,
 		"queue profiling preserves single-step Undo/Redo")

@@ -1,0 +1,9 @@
+Using CPython 3.13.5 interpreter at: /opt/pyvenv/bin/python3
+Creating virtual environment at: /mnt/data/work/t200-venv
+Activate with: source /mnt/data/work/t200-venv/bin/activate
+Using Python 3.13.5 environment at: /mnt/data/work/t200-venv
+Resolved 2 packages in 3ms
+Prepared 2 packages in 210ms
+Installed 2 packages in 1ms
+ + ruff==0.17.5 (from file:///mnt/data/toolchain/wheels/ruff-0.17.5-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl)
+ + ty==0.0.104 (from file:///mnt/data/toolchain/wheels/ty-0.0.104-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl)

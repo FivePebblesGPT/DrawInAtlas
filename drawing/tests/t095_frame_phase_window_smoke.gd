@@ -4,6 +4,7 @@ extends SceneTree
 
 const INK: int = 0x9d43a1d7
 const AREA: Rect2i = Rect2i(-35, -35, 70, 70)
+const NATIVE_REFERENCE = preload("res://tests/t200_native_stroke_reference.gd")
 
 var checks: int = 0
 var failures: int = 0
@@ -122,10 +123,12 @@ func test_live_preview() -> void:
 	var original: PackedByteArray = snapshot(document)
 	var start: Vector2 = Vector2(-12.5, -5.5)
 	var end: Vector2 = Vector2(14.5, 8.5)
-	canvas.start_gesture(canvas.pixel_to_position(start))
+	var press_us: int = Time.get_ticks_usec()
+	canvas.start_gesture(canvas.pixel_to_position(start), start, {"press_us": press_us})
 	await process_frame
 	await process_frame
 	canvas.paint_to(Vector2i(14, 8))
+	var motion_us: int = canvas._sample_times_us.back()
 	canvas._drain_segments(256)
 	canvas.queue_redraw()
 	await process_frame
@@ -143,7 +146,8 @@ func test_live_preview() -> void:
 			if not sample.has(key) or int(sample[key]) < 0:
 				valid = false
 	check(valid, "every real preview frame reports all nonnegative CPU phases")
-	canvas.finish_gesture(canvas.pixel_to_position(end))
+	var release_us: int = Time.get_ticks_usec()
+	canvas.finish_gesture(canvas.pixel_to_position(end), end, release_us)
 	var guard: int = 0
 	while canvas.session != null and guard < 300:
 		canvas._drain_segments(256)
@@ -161,18 +165,20 @@ func test_live_preview() -> void:
 		int(published.get("frame_phase_total", -1)) >= actual_frames,
 		"final snapshot retains the real short-stroke chronological distribution")
 	var committed: PackedByteArray = snapshot(document)
-	var reference: DrawingDocument = DrawingDocument.new("frame-phase-control", 64)
-	var reference_layer: String = String(reference.create_layer(
-		DrawingLayerNode.RASTER, "Paint", "root").value)
-	var reference_edit: DrawingEditSession = reference.begin_edit(reference_layer,
-		reference.revision).value
-	var source_start: Vector2 = canvas.source_position(canvas.pixel_to_position(start))
-	var source_end: Vector2 = canvas.source_position(canvas.pixel_to_position(end))
-	check(reference_edit.paint_path(PackedVector2Array([source_start, source_end]),
-		INK, 12.0).ok and reference_edit.commit().ok,
-		"independent Brush reference stroke commits")
-	check(committed == snapshot(reference),
-		"profiling does not alter the RGBA8 rendered Brush result")
+	var native_control: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		AREA, PackedVector2Array([start, Vector2(14.5, 8.5), end]),
+		PackedInt64Array([press_us, motion_us, release_us]), INK, 12.0)
+	check(bool(native_control.get("ok", false)) and
+		int(native_control.get("frame_phase_total", -1)) == 0,
+		"equivalent native Hokusai stroke commits with no rendered preview frames")
+	check(committed != original and committed == native_control.get("pixels", PackedByteArray()),
+		"frame profiling preserves nonempty native Hokusai RGBA8 output")
+	var changed_width: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		AREA, PackedVector2Array([start, Vector2(14.5, 8.5), end]),
+		PackedInt64Array([press_us, motion_us, release_us]), INK, 20.0)
+	check(bool(changed_width.get("ok", false)) and
+		changed_width.get("pixels", PackedByteArray()) != committed,
+		"native reference detects a different brush width instead of always matching")
 	check(document.undo().ok and snapshot(document) == original and
 		document.redo().ok and snapshot(document) == committed,
 		"profiling preserves one-step Undo and Redo")

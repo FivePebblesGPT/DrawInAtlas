@@ -278,3 +278,5 @@ docs/evidence/T-198-2026-11-19-validation/*.log whitespace=-trailing-space,-blan
 # T-199 fresh native process output and fail-first/regression logs are byte-exact.
 docs/evidence/T-199-2026-11-19-fresh-workspace/*.log whitespace=-trailing-space,-blank-at-eof
 docs/evidence/T-199-2026-11-19-validation/*.txt whitespace=-trailing-space,-blank-at-eof
+# T-200 raw validation output is byte-exact, including test runner whitespace.
+docs/evidence/T-200-2026-11-19-validation/*.txt whitespace=-trailing-space,-blank-at-eof
