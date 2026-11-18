@@ -273,3 +273,5 @@ docs/evidence/T-190-2026-11-17-raw/** whitespace=-trailing-space
 # T-197 checkpoint and A/B native profile logs are immutable raw process output.
 docs/evidence/T-197-2026-11-18-preview-callback-raw/** whitespace=-trailing-space
 docs/evidence/T-197-2026-11-18-native-display-raw/** whitespace=-trailing-space
+# T-198 native integration and timeout witnesses are immutable raw process logs.
+docs/evidence/T-198-2026-11-19-validation/*.log whitespace=-trailing-space,-blank-at-eof

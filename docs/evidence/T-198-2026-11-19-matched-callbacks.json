@@ -1,0 +1,161 @@
+{
+  "interpretation": "Only adjacent valid Canvas frame callback pairs; incomplete coverage, no scanout, no physical FPS or performance win",
+  "source": "T-197 retained same-native binary X11 R-O-O-R raw logs, no fresh performance execution",
+  "ticket": "T-198",
+  "totals": {
+    "confirmed_trials": 4,
+    "cross_trial_source_hash_sets": 1,
+    "long_global_callback_intervals_83ms": 19,
+    "matched_adjacent_canvas_callback_periods": 541,
+    "matched_periods_over_83ms": 0,
+    "rejected_nonmonotonic_pairs": 0,
+    "source_gestures": 32,
+    "unmatched_canvas_adjacencies": 251
+  },
+  "trials": [
+    {
+      "after_source_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "confirmed_exit": 0,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-0-reference/workspace-0.log",
+      "log_sha256": "9c52775926e5d327d7ce2683d7982db21a506468517565de40634aa257074951",
+      "long_global_postdraw_intervals_83ms": 5,
+      "matched_canvas": {
+        "long_33ms": 1,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 115,
+        "matched_period_ms": {
+          "max": 37.531,
+          "n": 115,
+          "p50": 11.062,
+          "p95": 21.456
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 83
+      },
+      "mode": "reference",
+      "native_cases": 8,
+      "run": 0,
+      "time_sha256": "6775d419c8887bcf2335b8938243ad54391fb781da9a43220c7d36b388b6f3db"
+    },
+    {
+      "after_source_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "confirmed_exit": 0,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-1-optimized/workspace-0.log",
+      "log_sha256": "9c0c2e213d18d45452b2ca08dbdf079a15a3a766e33fc1db0a69eca1a3b329ed",
+      "long_global_postdraw_intervals_83ms": 5,
+      "matched_canvas": {
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 156,
+        "matched_period_ms": {
+          "max": 23.602,
+          "n": 156,
+          "p50": 9.342,
+          "p95": 19.676
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 42
+      },
+      "mode": "optimized",
+      "native_cases": 8,
+      "run": 1,
+      "time_sha256": "90572aeedd1b72b38cae7c8a1b1cb98ce0e41b72e0fbd0deaf5b21bfe2fdaec3"
+    },
+    {
+      "after_source_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "confirmed_exit": 0,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-2-optimized/workspace-0.log",
+      "log_sha256": "af3a178362dc44295b9a8c0b4429addeccfce09d28bca2a6ac49536706e764f1",
+      "long_global_postdraw_intervals_83ms": 5,
+      "matched_canvas": {
+        "long_33ms": 0,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 136,
+        "matched_period_ms": {
+          "max": 22.13,
+          "n": 136,
+          "p50": 9.701,
+          "p95": 19.588
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 62
+      },
+      "mode": "optimized",
+      "native_cases": 8,
+      "run": 2,
+      "time_sha256": "9646dcd2ecf8795c35cab98054d63eda1139402218847af88129859993e57ec3"
+    },
+    {
+      "after_source_sha256": [
+        "42d32d4ae7dc27b6d15a347f83a17b09ddff919c4ede1e745d00e26f08645800",
+        "f123fb38e8f12abd066e28d141c0f9e952eae3cfb09eae2813eff0ae598ce0d2",
+        "3d55ce57ef09d48ff3116be6d86bb0fec1ac53ac8f1cfe40d10c236e40e1233c",
+        "9e044528e936538fc94dbbbc92e35904cace3d09925e3d2a8c880b899a194e71",
+        "0a7722303842f585d05dbfbe5c2dd9356a6a59b1626a8c5db354c3ad7041cb72",
+        "99a5bcde3edbfef85e16a07aacff97e3965f02d51f7b8635fea2306a24bd6470",
+        "ed56fe839fee577654b4269a032780ac754df08d6bf22a8deb84ec567c40ce45",
+        "f978f2d32553094910171f2bad9ec619f575eaf5224983b8555e90129d12729c"
+      ],
+      "confirmed_exit": 0,
+      "log": "docs/evidence/T-197-2026-11-18-native-display-raw/exact-round-3-reference/workspace-0.log",
+      "log_sha256": "6844c3aa9456d827ea74d66b9ddcb343a6e16b0060a2c1cb26c74226d1266cb3",
+      "long_global_postdraw_intervals_83ms": 4,
+      "matched_canvas": {
+        "long_33ms": 1,
+        "long_83ms": 0,
+        "long_events": [],
+        "matched_pairs": 134,
+        "matched_period_ms": {
+          "max": 34.495,
+          "n": 134,
+          "p50": 9.556,
+          "p95": 23.235
+        },
+        "omitted_long_events": 0,
+        "rejected_nonmonotonic_pairs": 0,
+        "retained_long_events": 0,
+        "unmatched_pairs": 64
+      },
+      "mode": "reference",
+      "native_cases": 8,
+      "run": 3,
+      "time_sha256": "ef2152703eb0124435b637b4d4b303fa1e4b43fe752887c552c9ed5d4db6537c"
+    }
+  ]
+}

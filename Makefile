@@ -16,7 +16,7 @@ TOOL = "$(PYTHON)" tools/toolchain.py
 WITH_TOOL = env GODOT="$(GODOT)" CARGO="$(CARGO)" UV="$(UV)" RUST_BIN="$(RUST_BIN)" $(TOOL) exec --mode "$(TOOLCHAIN)" --bundle "$(BUNDLE)" --
 RUFF_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ruff)
 TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
-PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tests/test_t185_profile.py
+PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
         test test-graphical check lint format clean bundle bundle-check bundle-verify python-test
@@ -78,6 +78,7 @@ test-graphical: import-drawing
 python-test:
 	@"$(PYTHON)" -m unittest discover -s tests -p 'test_toolchain_build.py'
 	@"$(PYTHON)" -m unittest discover -s tests -p 'test_t185_profile.py'
+	@"$(PYTHON)" -m unittest discover -s tests -p 'test_t198_matched_callbacks.py'
 
 lint:
 	@$(WITH_TOOL) uv run --no-project --no-managed-python --python "$(PYTHON)" --with "ruff==$(RUFF_VERSION)" --with "ty==$(TY_VERSION)" -- ruff check $(PYTHON_CHECKS) tests/test_toolchain_build.py

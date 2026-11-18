@@ -44,6 +44,74 @@ def distribution(values: list[float]) -> dict[str, float | int]:
             "max": round(max(values), 3)}
 
 
+# Keep diagnostic evidence bounded without losing counts for retained frame records.
+MAX_RETAINED_SLOW_CALLBACK_EVENTS = 32
+
+
+def callback_gap_diagnostics(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pair only consecutive Canvas frames with distinct renderer callbacks.
+
+    A callback belongs to a Canvas frame only if it was stamped by that
+    frame's matched session. Missing callbacks break continuity; gestures
+    never share a pair. These are CPU/renderer callback periods, **not** FPS,
+    physical frame scanout or a causal attribution of any long gap.
+    """
+    periods_ms: list[float] = []
+    long_events: list[dict[str, int | float]] = []
+    unmatched = 0
+    nonmonotonic = 0
+    long_33 = 0
+    long_83 = 0
+    for row_index, row in enumerate(rows):
+        phases = row["frame_phases_us"]
+        for frame_index in range(1, len(phases)):
+            previous = phases[frame_index - 1]
+            current = phases[frame_index]
+            if ("frame_post_draw_callback_us" not in previous or
+                    "frame_post_draw_callback_us" not in current):
+                unmatched += 1
+                continue
+            previous_us = int(previous["frame_post_draw_callback_us"])
+            current_us = int(current["frame_post_draw_callback_us"])
+            if previous_us <= 0 or current_us <= previous_us:
+                nonmonotonic += 1
+                continue
+            period_us = current_us - previous_us
+            periods_ms.append(period_us / 1000)
+            if period_us >= FRAME_THRESHOLDS_US[0]:
+                long_33 += 1
+            if period_us >= FRAME_THRESHOLDS_US[1]:
+                long_83 += 1
+                # Retain the most recent outliers, without hiding earlier ones
+                # from counts or the complete-period distribution in this window.
+                event: dict[str, int | float] = {
+                    "row_index": row_index,
+                    "frame_index": frame_index,
+                    "callback_period_ms": round(period_us / 1000, 3),
+                    "canvas_draw_ms": round(int(current.get("full_draw_cpu_us", 0)) / 1000, 3),
+                    "previous_canvas_draw_ms": round(int(previous.get("full_draw_cpu_us", 0)) / 1000, 3),
+                    "postdraw_delay_ms": round(int(current.get(
+                        "frame_end_to_post_draw_us", 0)) / 1000, 3),
+                    "pending_input_count": int(current.get("pending_input_count", 0)),
+                    "oldest_pending_age_ms": round(int(current.get(
+                        "oldest_pending_age_us", 0)) / 1000, 3),
+                }
+                long_events.append(event)
+                if len(long_events) > MAX_RETAINED_SLOW_CALLBACK_EVENTS:
+                    long_events.pop(0)
+    return {
+        "matched_pairs": len(periods_ms),
+        "unmatched_pairs": unmatched,
+        "rejected_nonmonotonic_pairs": nonmonotonic,
+        "matched_period_ms": distribution(periods_ms) if periods_ms else None,
+        "long_33ms": long_33,
+        "long_83ms": long_83,
+        "retained_long_events": len(long_events),
+        "omitted_long_events": long_83 - len(long_events),
+        "long_events": long_events,
+    }
+
+
 def extract(text: str) -> list[dict[str, Any]]:
     """Reject any missing/inconsistent native gesture, not just a marker."""
     lines = [line for line in text.splitlines() if line.startswith("T185_RUN ")]
@@ -212,6 +280,10 @@ def summarize(trials: list[dict[str, Any]]) -> dict[str, Any]:
         for metric in metrics:
             values = [float(row[metric]) for row in group]
             stats[metric] = distribution(values)
+        # This differs from the global postdraw series above: only adjacent
+        # actual Canvas frames with matched, increasing callback timestamps
+        # contribute, and gesture boundaries are never bridged.
+        stats["matched_canvas_callback_gaps"] = callback_gap_diagnostics(group)
         for source in ("post_draw_intervals_us", "process_frame_intervals_us", "input_delivery_intervals_us"):
             values = [float(v) / 1000.0 for row in group for v in row[source]]
             if not values:
