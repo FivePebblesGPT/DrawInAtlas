@@ -28,31 +28,39 @@ On narrow windows, use the option-row chevrons, Shift+wheel or keyboard focus
 to reach controls that overflow. `make test-graphical` runs the moving-stroke
 tile-retention regression under Xvfb; this requires `xvfb-run` on the test host.
 
-Clean/release build omitting all Atlas content:
+Standalone Linux export (requires the matching official Godot export templates
+and a built native extension; **not** a native-absent release):
 
 ```sh
-mkdir -p /tmp/drawing-out
 make native
-python3 tools/build_drawing_app.py --output /tmp/drawing-out/drawing
-godot --headless --editor --path /tmp/drawing-out/drawing --import --quit
-godot --headless --path /tmp/drawing-out/drawing --script res://tests/standalone_smoke.gd
-godot --headless --path /tmp/drawing-out/drawing --export-release Linux /tmp/drawing-release.x86_64
-```
-
-Optional T-068 distribution gate after an export into `/tmp/drawing-dist`
-containing `Drawing.x86_64` and `Drawing.pck`:
-
-```sh
+mkdir -p /tmp/drawing-release
+python3 tools/build_drawing_app.py --output /tmp/drawing-release/project
+# Use the same Godot beta3 executable selected for building the extension.
+godot --headless --editor --path /tmp/drawing-release/project --import --quit
+godot --headless --path /tmp/drawing-release/project --export-release Linux \
+  /tmp/drawing-release/Drawing.x86_64
+python3 tools/package_linux_export.py \
+  --stage /tmp/drawing-release/project --linux /tmp/drawing-release
 python3 tools/benchmarks/t068_release_gate.py \
-  --stage /tmp/drawing-out/drawing --linux /tmp/drawing-dist \
-  --launch-linux --output /tmp/drawing-release-validation.json
+  --stage /tmp/drawing-release/project --linux /tmp/drawing-release \
+  --launch-linux --output /tmp/drawing-release/verification.json
 ```
 
-This requires Godot export templates. The Linux check runs the exported
-executable from a clean working directory and user profile, not the source
-project. A Windows `.exe`/`.pck` may be structurally checked with `--windows`
-but requires an actual Windows runtime pass for acceptance. This tool does not
-measure physical pointer-to-photon latency or GPU/VRAM usage.
+The pack contains the `.gdextension` manifest, but the loadable Rust ELF must
+be distributed alongside the PCK at
+`addons/drawing/native/bin/libdrawing_brush.so`. Packaging refuses unexpected,
+missing, mismatched or symlinked native files; the release gate copies only
+the exported artifacts into an unrelated temporary directory, verifies the
+**actual native classes and stroke ABI** from the exported PCK, and boots the
+app with a disposable profile. Invocations use `--path` to make external
+library resolution independent of the caller's working directory. Do not ship
+only `Drawing.x86_64` and `Drawing.pck`.
+
+The historical Windows `.exe`/`.pck` structural inspection is **not** a
+required-native Windows release: its DLL, native portability and runtime
+acceptance remain under T-105. This Linux validation measures neither physical
+pointer-to-photon timing nor GPU/VRAM. The offline toolchain archive supplies
+the development engine, not export templates.
 
 The output directory must be empty and outside the repository. The build copies
 only the standalone `project.godot`, scenes, app scripts, tests, export presets

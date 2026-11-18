@@ -1,12 +1,12 @@
 """T-068: portable Drawing release inspection cannot be passed by editor-only files."""
 from __future__ import annotations
 
-from pathlib import Path
 import stat
 import struct
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +22,7 @@ def write_binary(directory: Path, platform: str) -> Path:
     if platform == "linux":
         data[:6] = b"\x7fELF\x02\x01"
         struct.pack_into("<H", data, 18, 62)
+        struct.pack_into("<H", data, 16, 2)
     else:
         data[:2] = b"MZ"
         struct.pack_into("<I", data, 0x3C, 256)
@@ -38,17 +39,40 @@ class PortableReleaseGateTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.base = Path(self.temporary.name)
+        # Fixtures are explicit native-absent stages until synthetic ELF and
+        # manifest are installed. Do not require a prebuilt Rust toolchain for
+        # the isolated release-gate unit tests.
         self.stage = stage(self.base / "project", without_native=True)
+        native = self.stage / release.NATIVE_LIBRARY
+        native.parent.mkdir(parents=True)
+        payload = bytearray(4096)
+        payload[:6] = b"\x7fELF\x02\x01"
+        struct.pack_into("<H", payload, 16, 3)
+        struct.pack_into("<H", payload, 18, 62)
+        native.write_bytes(payload)
+        manifest = self.stage / release.NATIVE_MANIFEST
+        manifest.write_text(
+            '[configuration]\nentry_symbol = "gdext_rust_init"\n'
+            '[libraries]\n'
+            f'linux.debug.x86_64 = "{release.NATIVE_RESOURCE}"\n'
+            f'linux.release.x86_64 = "{release.NATIVE_RESOURCE}"\n',
+            encoding="utf-8",
+        )
         self.linux = self.base / "linux"
         self.linux.mkdir()
         self.windows = self.base / "windows"
         self.windows.mkdir()
         write_binary(self.linux, "linux")
+        shipped = self.linux / release.NATIVE_LIBRARY
+        shipped.parent.mkdir(parents=True)
+        shipped.write_bytes(native.read_bytes())
         write_binary(self.windows, "windows")
 
     def test_standalone_staging_and_static_artifact_fingerprints(self) -> None:
         report = release.inspect_release(self.stage, self.linux, self.windows)
-        self.assertEqual(report["schema"], "t068-portable-export-v1")
+        self.assertEqual(report["schema"], "t068-required-native-export-v2")
+        self.assertTrue(report["linux"]["native_extension_shipped"])
+        self.assertFalse(report["windows"]["native_extension_shipped"])
         self.assertEqual(report["linux"]["architecture"], "x86_64")
         self.assertEqual(report["windows"]["architecture"], "x86_64")
         self.assertNotIn("runtime", report["windows"])
@@ -129,17 +153,25 @@ class PortableReleaseGateTests(unittest.TestCase):
                 self.stderr = ""
 
         def checked(command: list[str], **kwargs: object) -> Completed:
-            self.assertEqual(command[1:], ["--headless", "--quit-after", "5"])
-            self.assertNotEqual(kwargs["cwd"], self.stage)
             exported = Path(command[0])
+            self.assertEqual(command[1:3], ["--path", str(exported.parent)])
+            if "--script" in command:
+                self.assertEqual(command[3:], ["--headless", "--script",
+                                               "res://tests/native_extension_ready.gd"])
+            else:
+                self.assertEqual(command[3:], ["--headless", "--quit-after", "5"])
+            self.assertNotEqual(kwargs["cwd"], self.stage)
             self.assertNotEqual(exported.parent, self.linux)
             self.assertTrue((exported.parent / "Drawing.pck").is_file())
+            self.assertEqual((exported.parent / release.NATIVE_LIBRARY).read_bytes(),
+                             (self.stage / release.NATIVE_LIBRARY).read_bytes())
             self.assertFalse((exported.parent / "project").exists())
             env = kwargs["env"]
             assert isinstance(env, dict)
             self.assertNotIn("GODOT_PROJECT_PATH", env)
             self.assertNotEqual(env["HOME"], str(Path.home()))
-            return Completed(0, "Godot Engine v4.8.beta2\n")
+            return Completed(0, "Godot Engine v4.8.beta3\n" +
+                             ("NATIVE_EXTENSION_READY\n" if "--script" in command else ""))
 
         with patch.object(release.subprocess, "run", side_effect=checked):
             success = release.inspect_release(self.stage, self.linux, None, launch=True)

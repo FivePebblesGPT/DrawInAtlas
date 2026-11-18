@@ -1,0 +1,46 @@
+{
+  "limitations": [
+    "Windows runtime and physical GPU verification are separate",
+    "No measured input-to-visible latency or VRAM",
+    "Windows package is not native-certified by Linux-only manifest"
+  ],
+  "linux": {
+    "architecture": "x86_64",
+    "binary": {
+      "name": "Drawing.x86_64",
+      "sha256": "746a2bc89508d07801fe9ba9bbeaad5be0c74e05f13867977b314f2457f42701",
+      "size": 135178832
+    },
+    "inspection": "structure_and_required_native",
+    "native_extension_shipped": true,
+    "native_library": {
+      "name": "addons/drawing/native/bin/libdrawing_brush.so",
+      "sha256": "222a010ec3744d7dcbd3425579cb43cc29eb9b892997d4f319dd951a4a344a63",
+      "size": 2650048
+    },
+    "pack": {
+      "name": "Drawing.pck",
+      "sha256": "e899dab2c61bdbb1102282eedda6cd592b2e8568d78d504cca46ec0cc32f8753",
+      "size": 3130656
+    },
+    "platform": "linux",
+    "runtime": {
+      "isolated_user_profile": true,
+      "isolated_working_directory": true,
+      "native_abi_verified": true,
+      "post_exit_leak_diagnostics": 0,
+      "source_project_loaded": false,
+      "status": "passed"
+    }
+  },
+  "schema": "t068-required-native-export-v2",
+  "stage": {
+    "file_count": 610,
+    "font_license_sha256": "5004fe34082ed15d8276d2f7992bfb130830e5bc0306a2e96ddf6eb6263f476b",
+    "native_library_sha256": "222a010ec3744d7dcbd3425579cb43cc29eb9b892997d4f319dd951a4a344a63",
+    "native_required": true
+  },
+  "windows": {
+    "status": "not_tested"
+  }
+}

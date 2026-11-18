@@ -1,0 +1,21 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Started Project initialization (5 steps)[39m[0m
+[   0% ] [90m[1mfirst_scan_filesystem[22m | Scanning file structure...[39m[0m
+[  16% ] [90m[1mfirst_scan_filesystem[22m | Loading global class names...[39m[0m
+[  33% ] [90m[1mfirst_scan_filesystem[22m | Verifying GDExtensions...[39m[0m
+[  50% ] [90m[1mfirst_scan_filesystem[22m | Creating autoload scripts...[39m[0m
+[  66% ] [90m[1mfirst_scan_filesystem[22m | Initializing plugins...[39m[0m
+[  83% ] [90m[1mfirst_scan_filesystem[22m | Starting file scan...[39m[0m
+[92m[ DONE ][39m [1mfirst_scan_filesystem[22m
+[0m
+ERROR: Cannot export project with preset "Linux" due to configuration errors:
+No export template found at the expected path:
+/home/oai/.local/share/godot/export_templates/4.8.beta3/linux_debug.x86_64
+No export template found at the expected path:
+/home/oai/.local/share/godot/export_templates/4.8.beta3/linux_release.x86_64
+
+   at: _fs_changed (editor/editor_node.cpp:1471)
+ERROR: Project export for preset "Linux" failed.
+   at: _fs_changed (editor/editor_node.cpp:1487)

@@ -371,6 +371,11 @@ jobs:
           godot --headless --path "$release_root/project" --export-release Linux "$release_root/Drawing.x86_64"
           test -s "$release_root/Drawing.x86_64"
           test -s "$release_root/Drawing.pck"
+          # The .gdextension manifest is packed, but its ELF must be beside the PCK.
+          # Fail closed on missing, unexpected or mismatched native export bytes.
+          python3 tools/package_linux_export.py \
+            --stage "$release_root/project" --linux "$release_root"
+          python3 -m unittest discover -s tests -p 'test_t201_linux_native_package.py' -v
           # Font bytes ship as imported .fontdata, not raw .ttf.
           # Probe the exported PCK rather than editor source files.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root" --main-pack "$release_root/Drawing.pck" \

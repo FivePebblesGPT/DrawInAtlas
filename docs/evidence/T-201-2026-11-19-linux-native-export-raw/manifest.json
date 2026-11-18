@@ -1,0 +1,70 @@
+{
+  "baseline-missing-library.txt": {
+    "sha256": "b1363bb23712e92f6dbea39c0a56d1e892de5fa7b2e475edff7284c73586f34e",
+    "size": 875
+  },
+  "baseline-with-library.txt": {
+    "sha256": "e628b1b4d1b1bcac858564d0c47ce85c543f5fffae1d9afb054130b94fe83fe2",
+    "size": 192
+  },
+  "clean-stage-import.txt": {
+    "sha256": "67a2dfdd46159518c868611982cbf7772a9c9db31b58c73ba3c410b1cbebf1ef",
+    "size": 21019
+  },
+  "drawing-native-integration.txt": {
+    "sha256": "68ebf7019a0ebe73b290a2ab624a6628af634dd0c4fc244c54653bd4eb084f60",
+    "size": 457
+  },
+  "export-pack.txt": {
+    "sha256": "722a7444a0adcb470f90c6edc0e9c967b0decd319b67830dfaf396ffc501b82c",
+    "size": 56050
+  },
+  "make-lint.txt": {
+    "sha256": "d63ab3df51a50c66f9c57056288c7d4faf9dce413552d89215714320ac2b748e",
+    "size": 38
+  },
+  "make-python-test.txt": {
+    "sha256": "9b3b14ae7865cb7127ca1bc67540310a6ea5642fd473f6540a15d47a0af4033d",
+    "size": 896
+  },
+  "native-abi.txt": {
+    "sha256": "e628b1b4d1b1bcac858564d0c47ce85c543f5fffae1d9afb054130b94fe83fe2",
+    "size": 192
+  },
+  "official-export-template-missing.txt": {
+    "sha256": "649e8978121d64d796e8deaa07851215bebf5419e2239b61798ea53e073d4a74",
+    "size": 1287
+  },
+  "required-native-release-gate.json": {
+    "sha256": "296f5ac8e9d23fa2530045a374ba58ac96d254a819ac8bbbd0fd8fb79cf8fb68",
+    "size": 1488
+  },
+  "rust-tests.txt": {
+    "sha256": "1be26fdb9eea929ee2de678d5d4f08e08874bfad84bc9b86253a285b112fd574",
+    "size": 3291
+  },
+  "t068-unit-tests.txt": {
+    "sha256": "5ed58a0b526a45b7209b68c8a2d3c2e3e573bc36a831f2d15a0c582758cc4e3c",
+    "size": 919
+  },
+  "t105-live-measure.txt": {
+    "sha256": "e7327f957a027215127e216b32255f8ea04431fbb7da2590d17d93bf26fd5e66",
+    "size": 80
+  },
+  "t105-two-run-residency.json": {
+    "sha256": "d4b7752b0a3cb297f49edd7432dcd413779a0cb4e26d7285f8c40b619d598db1",
+    "size": 2850
+  },
+  "t105-unit-tests.txt": {
+    "sha256": "8f93626e5f34f09a59a99e72cfdcab005bd28dc5ed0c28c71b7918302f10e4f3",
+    "size": 1673
+  },
+  "t201-fail-first.txt": {
+    "sha256": "a86b63cfdb3f14d2391fcf847a6dbaf791e32902f5df14556aaecb5a18288856",
+    "size": 1092
+  },
+  "t201-unit-tests.txt": {
+    "sha256": "7719e162eab9844b878ec8856029807af1dd465a50d769c8c3da152df005c2ed",
+    "size": 1005
+  }
+}

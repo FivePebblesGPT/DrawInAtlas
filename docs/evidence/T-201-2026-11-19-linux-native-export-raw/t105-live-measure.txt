@@ -1,0 +1,1 @@
+T105_LINUX_RELEASE_PASSED: isolated standalone CPU/RSS, Windows/VRAM not tested

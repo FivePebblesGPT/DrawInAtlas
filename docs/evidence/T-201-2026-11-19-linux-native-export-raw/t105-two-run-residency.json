@@ -1,0 +1,100 @@
+{
+  "complete": false,
+  "engine": "4.8.beta3.official.c51ff06e8",
+  "frames": 30,
+  "limitations": [
+    "Linux /proc VmRSS/VmHWM of isolated exported Godot process, not detached native worker",
+    "OS CPU includes startup and idle --quit-after frames, NOT a 96px Brush gesture",
+    "Xvfb/Dummy/headless process memory cannot determine physical GPU VRAM residency",
+    "Windows/MSVC and real Windows exported launch remain NOT TESTED until separately run"
+  ],
+  "platform": "linux-x86_64",
+  "release": {
+    "architecture": "x86_64",
+    "binary": {
+      "name": "Drawing.x86_64",
+      "sha256": "746a2bc89508d07801fe9ba9bbeaad5be0c74e05f13867977b314f2457f42701",
+      "size": 135178832
+    },
+    "inspection": "structure_and_required_native",
+    "native_extension_shipped": true,
+    "native_library": {
+      "name": "addons/drawing/native/bin/libdrawing_brush.so",
+      "sha256": "222a010ec3744d7dcbd3425579cb43cc29eb9b892997d4f319dd951a4a344a63",
+      "size": 2650048
+    },
+    "pack": {
+      "name": "Drawing.pck",
+      "sha256": "e899dab2c61bdbb1102282eedda6cd592b2e8568d78d504cca46ec0cc32f8753",
+      "size": 3130656
+    },
+    "platform": "linux"
+  },
+  "runs": [
+    {
+      "cpu_system_ms": 248.592,
+      "cpu_user_ms": 811.636,
+      "elapsed_ms": 1295.678,
+      "hwm_peak_kib": 199300,
+      "recognized_godot_shutdown_leaks": 0,
+      "returncode": 0,
+      "rss_peak_kib": 199300,
+      "sample_count": 250
+    },
+    {
+      "cpu_system_ms": 136.398,
+      "cpu_user_ms": 795.685,
+      "elapsed_ms": 1188.01,
+      "hwm_peak_kib": 199332,
+      "recognized_godot_shutdown_leaks": 0,
+      "returncode": 0,
+      "rss_peak_kib": 199332,
+      "sample_count": 229
+    }
+  ],
+  "schema": 1,
+  "source_sha256": {
+    "tools/benchmarks/t068_release_gate.py": "19ef6f1dca7730aad13c6d6efdfc27fe2b17ced1b64a9f8a51fda47cb920b00b",
+    "tools/benchmarks/t105_release_residency.py": "608afc7c11e29e3371e21cca2520f8046e18a7bf5ffa07e39ca3228404af5f7b"
+  },
+  "stage": {
+    "file_count": 610,
+    "font_license_sha256": "5004fe34082ed15d8276d2f7992bfb130830e5bc0306a2e96ddf6eb6263f476b",
+    "native_library_sha256": "222a010ec3744d7dcbd3425579cb43cc29eb9b892997d4f319dd951a4a344a63",
+    "native_required": true
+  },
+  "summary": {
+    "cpu_system_ms": {
+      "max": 248.592,
+      "p50": 136.398,
+      "p95": 248.592
+    },
+    "cpu_user_ms": {
+      "max": 811.636,
+      "p50": 795.685,
+      "p95": 811.636
+    },
+    "elapsed_ms": {
+      "max": 1295.678,
+      "p50": 1188.01,
+      "p95": 1295.678
+    },
+    "hwm_peak_kib": {
+      "max": 199332.0,
+      "p50": 199300.0,
+      "p95": 199332.0
+    },
+    "rss_peak_kib": {
+      "max": 199332.0,
+      "p50": 199300.0,
+      "p95": 199332.0
+    }
+  },
+  "ticket": "T-105",
+  "vram": {
+    "status": "not_measured"
+  },
+  "windows": {
+    "status": "not_tested"
+  }
+}

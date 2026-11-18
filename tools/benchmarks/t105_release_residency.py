@@ -11,7 +11,6 @@ import hashlib
 import json
 import math
 import os
-from pathlib import Path
 import platform
 import resource
 import shutil
@@ -19,9 +18,10 @@ import subprocess
 import tempfile
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
-from t068_release_gate import check_launch_log, inspect_distribution, inspect_stage
+from t068_release_gate import NATIVE_LIBRARY, check_launch_log, inspect_distribution, inspect_stage
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "tools/benchmarks/t105_release_residency.py"
@@ -84,8 +84,10 @@ def launch_once(distribution: Path, *, frames: int = 120, timeout: int = 45) -> 
         base = Path(temporary)
         for name in ("home", "data", "config", "cache", "work", "distribution"):
             (base / name).mkdir()
-        for name in ("Drawing.x86_64", "Drawing.pck"):
-            shutil.copy2(distribution / name, base / "distribution" / name)
+        for name in ("Drawing.x86_64", "Drawing.pck", NATIVE_LIBRARY.as_posix()):
+            destination = base / "distribution" / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(distribution / name, destination)
         env = {**os.environ, "HOME": str(base / "home"),
                "XDG_DATA_HOME": str(base / "data"),
                "XDG_CONFIG_HOME": str(base / "config"),
@@ -95,6 +97,7 @@ def launch_once(distribution: Path, *, frames: int = 120, timeout: int = 45) -> 
         before = resource.getrusage(resource.RUSAGE_CHILDREN)
         start = time.perf_counter()
         proc = subprocess.Popen([str(base / "distribution" / "Drawing.x86_64"),
+                                 "--path", str(base / "distribution"),
                                  "--headless", "--quit-after", str(frames)],
                                 cwd=base / "work", env=env,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -185,20 +188,28 @@ def validate(result: Any) -> None:
         type(result["stage"].get("font_license_sha256")) is not str or
         len(result["stage"]["font_license_sha256"]) != 64 or
         result["release"].get("platform") != "linux" or
-        result["release"].get("native_extension_shipped") is not False or
-        result["release"].get("inspection") != "structure_only" or
+        result["stage"].get("native_required") is not True or
+        not isinstance(result["stage"].get("native_library_sha256"), str) or
+        result["release"].get("native_extension_shipped") is not True or
+        result["release"].get("inspection") != "structure_and_required_native" or
         type(result["frames"]) is not int or result["frames"] < 5 or
         not isinstance(result["runs"], list) or not 2 <= len(result["runs"]) <= 10):
         raise ValueError("Incomplete or falsified Linux-only T-105 report")
-    for item in ("binary", "pack"):
+    for item in ("binary", "pack", "native_library"):
         record = result["release"].get(item, {})
         if (not isinstance(record, dict) or type(record.get("size")) is not int or
-            record["size"] < (4096 if item == "binary" else 64) or
-            record.get("name") != ("Drawing.x86_64" if item == "binary" else "Drawing.pck") or
+            record["size"] < (64 if item == "pack" else 4096) or
+            record.get("name") != {"binary": "Drawing.x86_64", "pack": "Drawing.pck",
+                                   "native_library": NATIVE_LIBRARY.as_posix()}[item] or
             not isinstance(record.get("sha256"), str) or
             len(record["sha256"]) != 64 or
             any(c not in "0123456789abcdef" for c in record["sha256"])):
             raise ValueError("Missing exact release binary/pack digest")
+    stage_native_sha = result["stage"]["native_library_sha256"]
+    released_native_sha = result["release"].get("native_library", {}).get("sha256")
+    if (len(stage_native_sha) != 64 or released_native_sha != stage_native_sha or
+            any(c not in "0123456789abcdef" for c in stage_native_sha)):
+        raise ValueError("Release native ELF does not match the staged source")
     keys = ("elapsed_ms", "cpu_user_ms", "cpu_system_ms", "rss_peak_kib", "hwm_peak_kib")
     for row in result["runs"]:
         if (not isinstance(row, dict) or set(row) != {
