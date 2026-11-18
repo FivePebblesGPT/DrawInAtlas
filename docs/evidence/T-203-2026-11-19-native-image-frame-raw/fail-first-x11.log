@@ -1,0 +1,24 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T087_NATIVE_FAILED: native delivered click commits to configured snapped grid intersection
+T087_NATIVE_FAILED: snapped pointer paints one normal reversible edit
+T087_NATIVE_FAILED: held Brush has a detached preview before changing snap_to_grid
+T087_NATIVE_FAILED: held Brush has a detached preview before changing grid_spacing
+T087_NATIVE_FAILED: held Brush has a detached preview before changing grid_origin
+T087_NATIVE_FAILED: unchanged grid mapping commits a normal snapped Brush
+T087_NATIVE_FAILED: unchanged grid mapping preserves one-step Undo
+T087_NATIVE_FAILED: raw Brush commits unchanged coordinates after inactive grid adjustments
+T087_NATIVE_FAILED: unsnapped grid adjustments preserve one-step Undo
+T087_NATIVE_FAILED: inside-frame held stroke has detached preview without source publication
+T087_NATIVE_FAILED: Eraser clears inside frame but preserves existing off-frame sparse art
+T087_NATIVE_FAILED: normal unbounded Brush after policy change publishes once
+T087_NATIVE_FAILED: embedded/Atlas opt-out can paint outside a visible image guide
+T087_NATIVE_FAILED: real held Brush has a visible framebuffer preview before camera pan
+T087_NATIVE_FAILED: normal Brush after pan commits one history edit
+T087_NATIVE_FAILED: normal post-pan Brush remains undoable
+T087_NATIVE_FAILED: camera pan cancels marquee with no selection publication
+T087_NATIVE: 104 checks; 17 failed | Godot 4.8-beta3 (official) | display X11 | viewport (560, 460)

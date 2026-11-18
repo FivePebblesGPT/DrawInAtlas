@@ -1,0 +1,2 @@
+db79fe13663cbea8a815a0e371f764ad6ea9213718a7aaa86c5f0793caa38e65  drawing/tests/image_frame_smoke.gd
+6e915bd5df7d70adce557601ad50483fa370937fdb08b4da7a874364d46b0c4b  drawing/tests/image_frame_native.gd

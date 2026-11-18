@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+T085_MODEL_FAILED: zoom 1.0 batched queue exactly matches full source path bytes
+T085_MODEL_FAILED: zoom 0.5 batched queue exactly matches full source path bytes
+T085_MODEL_FAILED: zoom 0.25 batched queue exactly matches full source path bytes
+T085_MODEL_FAILED: complex-mask Brush has a staged dab and a long pending sample backlog
+T085_MODEL_FAILED: unchanged hole mask commits in one history step with precise clipping
+T085_MODEL_FAILED: one Undo reverses every allowed pixel after a complex-mask stroke
+T085_MODEL_FAILED: masked Eraser stages real source deletion
+T085_MODEL_FAILED: inverted selection permits only outside pixels throughout queued path
+T085_MODEL: 77 checks; 8 failed
