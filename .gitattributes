@@ -282,3 +282,5 @@ docs/evidence/T-199-2026-11-19-validation/*.txt whitespace=-trailing-space,-blan
 docs/evidence/T-200-2026-11-19-validation/*.txt whitespace=-trailing-space,-blank-at-eof
 # T-201 raw native export/toolchain logs retain exact captured whitespace.
 docs/evidence/T-201-2026-11-19-linux-native-export-raw/*.txt whitespace=-trailing-space,-blank-at-eof
+# T-202 raw Godot and Python process logs remain byte-for-byte unchanged.
+docs/evidence/T-202-2026-11-19-signed-save-fixture-raw/*.log whitespace=-trailing-space,-blank-at-eof

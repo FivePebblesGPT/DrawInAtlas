@@ -1,4 +1,6 @@
 extends SceneTree
+
+const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 ## T-066 sparse multi-file generation save, reload and fault recovery witness.
 
 var checks: int = 0
@@ -275,21 +277,46 @@ func _corruption_and_precision() -> void:
 	var registry: AtlasDrawingRegistry = AtlasDrawingRegistry.new()
 	_check(registry.attach_campaign(campaign).ok, "precision registry initialized")
 	var doc: DrawingDocument = registry.document_at("world", "ground", 0, true).value
-	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Beyond JSON float").value)
-	var x: int = 9007199254740993
-	var y: int = -9007199254740993
+	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Signed projection edge").value)
+	# The historical >2^53 persistence fixture is no longer a legal tile
+	# source: T-158/T-159 bound persisted raster projection to +/-2^52.
+	# Stay near both signed ends without crossing the tile-origin boundary.
+	var edge: int = TILES.MAX_PROJECTION_PIXEL_COORD - doc.tile_stride * 2 - 1
+	var x: int = edge
+	var y: int = -edge
 	_check(_paint(doc, layer, x, y, PackedByteArray([23, 99, 177, 0])),
-		"edit at signed coordinate beyond IEEE-754 exact-integer limit")
+		"edit at opposite signed projection edges")
 	var saved: DrawingResult = AtlasCampaignBundle.save(campaign, registry, null, campaign_file)
-	_check(saved.ok, "generation stores 64-bit signed chunk coordinate strings: " + saved.message)
+	_check(saved.ok, "generation stores valid signed chunk coordinate strings: " + saved.message)
 	if not saved.ok:
 		return
 	var loaded: AtlasStoreResult = AtlasCampaignBundle.load(campaign_file)
-	_check(loaded.error == OK, "signed-large generation reopens")
+	_check(loaded.error == OK, "signed-edge generation reopens")
 	if loaded.error == OK:
 		var reopened: DrawingResult = loaded.registry.document_at("world", "ground", 0)
 		_check(reopened.ok and reopened.value.read_pixel(layer, x, y).value == 0x00b16317,
-			"exact positive/negative signed 64-bit coordinate survives JSON")
+			"exact positive/negative signed projection-edge pixel survives JSON")
+	# Public in-memory pixel edits may still be represented as signed int64,
+	# but a save must fail closed before exposing tiles outside the native-safe
+	# projection. Prove the previously published generation remains readable.
+	var root_path: String = AtlasCampaignBundle.root_path(campaign_file)
+	var published_root: String = FileAccess.get_file_as_string(root_path)
+	var unsafe_x: int = 9007199254740993
+	var unsafe_y: int = -9007199254740993
+	_check(_paint(doc, layer, unsafe_x, unsafe_y, PackedByteArray([99, 88, 77, 0])),
+		"historical >2^53 coordinates remain representable in unbound pixel edits")
+	var rejected: DrawingResult = AtlasCampaignBundle.save(campaign, registry, null, campaign_file)
+	_check(not rejected.ok and rejected.code == "COORD_RANGE",
+		"save rejects native-unsafe signed source: %s %s" % [rejected.code, rejected.message])
+	_check(doc.is_dirty() and FileAccess.get_file_as_string(root_path) == published_root,
+		"rejected save cannot publish or acknowledge the unsafe revision")
+	var unchanged: AtlasStoreResult = AtlasCampaignBundle.load(campaign_file)
+	_check(unchanged.error == OK and unchanged.registry != null,
+		"old signed-edge generation still opens after rejected save")
+	if unchanged.error == OK and unchanged.registry != null:
+		var surviving: DrawingResult = unchanged.registry.document_at("world", "ground", 0)
+		_check(surviving.ok and surviving.value.read_pixel(layer, x, y).value == 0x00b16317,
+			"unsafe edit cannot alter published signed-edge bytes")
 	var root_record: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(AtlasCampaignBundle.root_path(campaign_file)))
 	var gen_path: String = directory.path_join(root_record["index"]["path"])
 	var generation: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(gen_path))
