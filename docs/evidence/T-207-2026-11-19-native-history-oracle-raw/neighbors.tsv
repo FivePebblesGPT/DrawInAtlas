@@ -1,0 +1,7 @@
+t124_queued_brush_smoke	0	T124_QUEUED_PASSED checks=78 failures=0
+t125_pending_persistence_smoke	0	T125_PENDING_PASSED checks=29 failures=0
+t126_pending_tab_switch_smoke	0	T126_TAB_SWITCH_PASSED checks=34 failures=0
+t128_history_list_pending_smoke	1	T128_HISTORY_LIST_FAILED checks=37 failures=8
+t129_pending_content_edit_smoke	1	T129_PENDING_EDIT_FAILED checks=35 failures=2
+t130_pending_source_context_smoke	0	T130_CONTEXT_PASSED checks=34 failures=0
+native_brush_integration	0	T095_NATIVE_BRUSH_RESULT checks=32 failures=0

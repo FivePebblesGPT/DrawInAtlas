@@ -1,0 +1,6 @@
+headless-1	0	T127_HISTORY_PASSED checks=40 failures=0
+headless-2	0	T127_HISTORY_PASSED checks=40 failures=0
+headless-3	0	T127_HISTORY_PASSED checks=40 failures=0
+headless-4	0	T127_HISTORY_PASSED checks=40 failures=0
+x11-1	0	T127_HISTORY_PASSED checks=40 failures=0
+x11-2	0	T127_HISTORY_PASSED checks=40 failures=0

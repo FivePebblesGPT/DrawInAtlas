@@ -292,3 +292,5 @@ docs/evidence/T-204-2026-11-19-native-live-stroke-raw/*.log whitespace=-trailing
 docs/evidence/T-205-2026-11-19-source-context-timing-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-206 native queued input regression raw process logs are byte-preserved.
 docs/evidence/T-206-2026-11-19-native-queue-oracle-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-207 original native history fail-first and runtime logs are byte-exact.
+docs/evidence/T-207-2026-11-19-native-history-oracle-raw/*.log whitespace=-trailing-space,-blank-at-eof
