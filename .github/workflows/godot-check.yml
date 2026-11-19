@@ -387,6 +387,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_t201_linux_native_package.py' -v
           python3 -m unittest discover -s tests -p 'test_t217_pck_index.py' -v
           python3 -m unittest discover -s tests -p 'test_t218_pck_payload_integrity.py' -v
+          python3 -m unittest discover -s tests -p 'test_t219_pck_resource_names.py' -v
           # Font bytes ship as imported .fontdata, not raw .ttf.
           # Probe the exported PCK rather than editor source files.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root" --main-pack "$release_root/Drawing.pck" \
@@ -676,6 +677,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_release_gate.py
           python3 -m unittest discover -s tests -p test_t217_pck_index.py
           python3 -m unittest discover -s tests -p test_t218_pck_payload_integrity.py
+          python3 -m unittest discover -s tests -p test_t219_pck_resource_names.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_scale.py
           python3 -m unittest discover -s tests -p test_t068_blend2d_large_parity.py
           python3 -m unittest discover -s tests -p test_t068_scalar_hard_brush.py

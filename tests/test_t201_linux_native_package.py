@@ -107,6 +107,32 @@ class LinuxNativeExportTests(unittest.TestCase):
         self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
         self.assertFalse(any(self.output.glob(".native-preflight-*")))
 
+    def test_noncanonical_resource_name_rejects_without_native_publication(self) -> None:
+        """Invalid PCK names must fail during preflight, not after .so installation."""
+        pack = self.output / "Drawing.pck"
+        pack.write_bytes(make_pck({
+            "project.binary": b"ECFG\0Drawing",
+            "main.tscn": b"[gd_scene format=3]\n",
+            "addons/drawing/native/drawing_brush.gdextension": self.manifest.read_bytes(),
+            "tests/native_extension_ready.gd": b"extends SceneTree\n",
+            "assets/brush\x00alias.png": b"ambiguous path",
+        }))
+        before = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        with self.assertRaisesRegex(package.PackageError, "resource name"):
+            package.package(self.stage, self.output)
+        after = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after, before)
+        self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+        self.assertFalse(any(self.output.glob(".native-preflight-*")))
+
     def test_noncritical_resource_corruption_rejects_without_native_publication(self) -> None:
         """A bad packed asset cannot install a valid native ELF or mutate the export."""
         asset = b"unrelated packed source, still required intact"

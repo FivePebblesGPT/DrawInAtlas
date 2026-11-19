@@ -1,0 +1,50 @@
+{
+  "processes": {
+    "fail-first.log": {
+      "command": "python3 -m unittest discover -s tests -p test_t219_pck_resource_names.py -v (pre-fix)",
+      "exit_code": 1
+    },
+    "format-check.log": {
+      "command": "ruff format --check tests/test_t219_pck_resource_names.py",
+      "exit_code": 0
+    },
+    "name-regression.log": {
+      "command": "python3 -m unittest discover -s tests -p test_t219_pck_resource_names.py -v",
+      "exit_code": 0
+    },
+    "native-packaging.log": {
+      "command": "python3 -m unittest discover -s tests -p test_t201_linux_native_package.py -v",
+      "exit_code": 0
+    },
+    "python-final.log": {
+      "command": "make python-test",
+      "exit_code": 0
+    },
+    "real-export-launch.log": {
+      "command": "inspect_distribution('/mnt/data/t214-release','linux'); launch_linux('/mnt/data/t214-release')",
+      "exit_code": 0
+    },
+    "ruff-final.log": {
+      "command": "ruff check configured PYTHON_CHECKS, tests/test_toolchain_build.py, and tools/benchmarks/t068_release_gate.py (0.17.5)",
+      "exit_code": 0
+    },
+    "rust-final.log": {
+      "command": "CARGO_VENDOR_DIR=/mnt/data/toolchain/vendor CARGO_NET_OFFLINE=true bash tools/build_native_brush.sh --test (bundled Rust 1.99.1)",
+      "exit_code": 0
+    },
+    "ticket-validator.log": {
+      "command": "python3 tools/validate_ticket_store.py",
+      "exit_code": 0
+    },
+    "ty-configured-final.log": {
+      "command": "ty check configured PYTHON_CHECKS (0.0.104)",
+      "exit_code": 0
+    },
+    "ty-standalone-existing.log": {
+      "command": "ty check tools/benchmarks/t068_release_gate.py (exploratory)",
+      "exit_code": 1
+    }
+  },
+  "remote_pr_head": "9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9",
+  "ticket": "T-219"
+}

@@ -1,0 +1,68 @@
+test_embedded_nul_in_index_name_is_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_embedded_nul_in_index_name_is_rejected) ... FAIL
+test_four_extra_nul_padding_bytes_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_four_extra_nul_padding_bytes_are_rejected) ... FAIL
+test_newline_and_carriage_return_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_newline_and_carriage_return_names_are_rejected) ... 
+  test_newline_and_carriage_return_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_newline_and_carriage_return_names_are_rejected) (char="'\\n'") ... FAIL
+  test_newline_and_carriage_return_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_newline_and_carriage_return_names_are_rejected) (char="'\\r'") ... FAIL
+test_other_control_and_delete_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_other_control_and_delete_names_are_rejected) ... 
+  test_other_control_and_delete_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_other_control_and_delete_names_are_rejected) (char="'\\x1f'") ... FAIL
+  test_other_control_and_delete_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_other_control_and_delete_names_are_rejected) (char="'\\x7f'") ... FAIL
+test_valid_utf8_optional_resource_remains_supported (test_t219_pck_resource_names.CanonicalPckNamesTests.test_valid_utf8_optional_resource_remains_supported) ... ok
+
+======================================================================
+FAIL: test_embedded_nul_in_index_name_is_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_embedded_nul_in_index_name_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t219_pck_resource_names.py", line 30, in test_embedded_nul_in_index_name_is_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "resource name|padding"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_four_extra_nul_padding_bytes_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_four_extra_nul_padding_bytes_are_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t219_pck_resource_names.py", line 34, in test_four_extra_nul_padding_bytes_are_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "resource name|padding"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_newline_and_carriage_return_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_newline_and_carriage_return_names_are_rejected) (char="'\\n'")
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t219_pck_resource_names.py", line 40, in test_newline_and_carriage_return_names_are_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "resource name"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_newline_and_carriage_return_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_newline_and_carriage_return_names_are_rejected) (char="'\\r'")
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t219_pck_resource_names.py", line 40, in test_newline_and_carriage_return_names_are_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "resource name"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_other_control_and_delete_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_other_control_and_delete_names_are_rejected) (char="'\\x1f'")
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t219_pck_resource_names.py", line 46, in test_other_control_and_delete_names_are_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "resource name"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_other_control_and_delete_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_other_control_and_delete_names_are_rejected) (char="'\\x7f'")
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t219_pck_resource_names.py", line 46, in test_other_control_and_delete_names_are_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "resource name"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.006s
+
+FAILED (failures=6)

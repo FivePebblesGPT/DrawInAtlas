@@ -250,10 +250,20 @@ def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
                 name = name_bytes.rstrip(b"\x00").decode("utf-8")
             except UnicodeError as exc:
                 raise ReleaseError("Invalid UTF-8 in Godot PCK directory") from exc
+            # Godot stores a UTF-8 name followed by *only* the zero padding
+            # needed for 4-byte alignment. rstrip() alone accepts embedded
+            # NUL aliases and surplus whole alignment blocks, which are not
+            # canonical resource names and may be interpreted differently by
+            # consumers of the packed directory.
+            encoded = name.encode("utf-8")
+            canonical = encoded + b"\x00" * (-len(encoded) % 4)
+            if name_bytes != canonical:
+                raise ReleaseError("Invalid Godot PCK resource name padding or NUL bytes")
             if (
                 not name
                 or name.startswith("/")
                 or "\\" in name
+                or any(ord(char) < 32 or ord(char) == 127 for char in name)
                 or any(part in ("", ".", "..") for part in name.split("/"))
             ):
                 raise ReleaseError("Unsafe Godot PCK resource name")
