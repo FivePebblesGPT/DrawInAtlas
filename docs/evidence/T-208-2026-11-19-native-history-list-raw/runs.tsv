@@ -1,0 +1,7 @@
+run	exit	marker	strict
+headless-1	0	True	0
+headless-2	0	True	0
+headless-3	0	True	0
+headless-4	0	True	0
+x11-1	0	True	0
+x11-2	0	True	0

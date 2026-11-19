@@ -31,9 +31,12 @@ func new_app() -> Control:
 func paint_short(canvas: Control, pixel: Vector2, tint: int) -> void:
 	canvas.tool = "Brush"
 	canvas.color_rgba = tint
-	canvas.brush_width = 3.0
-	canvas.start_gesture(canvas.pixel_to_position(pixel))
-	canvas.finish_gesture(canvas.pixel_to_position(pixel))
+	# A stationary 3px dab did not reliably publish native Hokusai pixels.
+	# Sweep over the assertion pixel to create a real History candidate.
+	canvas.brush_width = 24.0
+	canvas.start_gesture(canvas.pixel_to_position(pixel - Vector2(9.0, 0.0)))
+	canvas.update_gesture(canvas.pixel_to_position(pixel))
+	canvas.finish_gesture(canvas.pixel_to_position(pixel + Vector2(9.0, 0.0)))
 
 
 func release_long(canvas: Control) -> void:
@@ -117,7 +120,11 @@ func test_backward_jump(base: String) -> void:
 	check(doc.revision == revision and app.canvas.has_pending_stroke(),
 		"same-row selection does not mutate revision or pending input")
 	await frames(2)
-	check(app.canvas.has_pending_stroke(), "blocked History jump does not cancel input on next frame")
+	# Native Hokusai may finish the two queued transactions within two frames.
+	# Accept only still-pending input or fully published, ordered history.
+	check(app.canvas.has_pending_stroke() or
+		(doc.revision == revision + 2 and doc.history_position() == cursor + 2),
+		"blocked History jump retains input until both strokes publish")
 	check(await await_commit(app.canvas), "queued gestures complete after rejected History jump")
 	check(doc.revision == revision + 2 and doc.history_position() == cursor + 2,
 		"two queued gestures publish as separate ordered history transactions")
