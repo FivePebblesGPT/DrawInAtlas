@@ -208,8 +208,8 @@ def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
     """Verify the pinned Godot 4.8 PCK v4 index and native startup witnesses.
 
     A GDPC magic prefix alone does not prove that a PCK can load Drawing. This
-    bounded index parser deliberately does not attempt to execute scripts or
-    certify all packed resources; isolated Godot launch remains a separate gate.
+    bounded index parser verifies every indexed payload but does not execute
+    scripts or establish runtime correctness; isolated launch is separate.
     """
     if platform not in BINARY:
         raise ReleaseError("Unsupported PCK platform")
@@ -272,6 +272,16 @@ def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
             records[name] = (absolute_offset, length, metadata[16:32])
         if stream.tell() != size:
             raise ReleaseError("Trailing or truncated Godot PCK directory")
+        # Nonempty resource extents must be disjoint, even if two records have
+        # identical checksums. Empty files are valid and consume no extent.
+        spans = sorted(
+            (start, start + length, name)
+            for name, (start, length, _) in records.items()
+            if length
+        )
+        for previous, current in zip(spans, spans[1:]):
+            if current[0] < previous[1]:
+                raise ReleaseError(f"overlapping PCK resource payloads: {previous[2]} and {current[2]}")
         if not required.issubset(records):
             raise ReleaseError("PCK missing required native Drawing project resources")
         selected: list[str] = sorted(required)
@@ -302,10 +312,14 @@ def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
         if stream.read(4) != b"ECFG":
             raise ReleaseError("Missing packed Godot project configuration")
 
-        for name in set(selected):
-            start, length, checksum = records[name]
-            if length == 0:
+        for name in selected:
+            if records[name][1] == 0:
                 raise ReleaseError(f"Empty required packed resource: {name}")
+
+        # Check all indexed bytes, not only the startup/ABI subset. Otherwise a
+        # corrupt font, script, or other non-critical resource may still pass
+        # export preflight even though its stored Godot MD5 no longer matches.
+        for name, (start, length, checksum) in records.items():
             stream.seek(start)
             remaining = length
             digest_value = hashlib.md5()  # noqa: S324 - Godot PCK uses MD5 as a file-integrity field.
@@ -337,6 +351,7 @@ def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
         return {
             "format_version": version,
             "file_count": count,
+            "resources_verified": len(records),
             "startup_scene": next(name for name in choices[0] if name in records),
         }
 

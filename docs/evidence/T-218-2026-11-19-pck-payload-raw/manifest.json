@@ -1,0 +1,92 @@
+{
+  "evidence": {
+    "fail-first.log": {
+      "bytes": 4563,
+      "sha256": "c18ea1350226205eb45dd54520ba2c33b6e8cb9c6a0f4177d2d46663d6e279ad"
+    },
+    "focused-final.log": {
+      "bytes": 1024,
+      "sha256": "1e45906c423a223190d85b5db7ebb6dcc7019f24908aa840555ebc22c1efe9e0"
+    },
+    "make-lint.log": {
+      "bytes": 38,
+      "sha256": "d63ab3df51a50c66f9c57056288c7d4faf9dce413552d89215714320ac2b748e"
+    },
+    "package-final.log": {
+      "bytes": 4756,
+      "sha256": "7434b35d55ad6031e700550ce9ad5bdaa9335676bb4be85170459bd81167486a"
+    },
+    "previous-pck-final.log": {
+      "bytes": 1613,
+      "sha256": "607738aa443479975b426ad080ac942c94c7ccf3f8f19ce8b4b077c202ce8aad"
+    },
+    "python-final.log": {
+      "bytes": 1126,
+      "sha256": "01263949571a4e1e6e361be2c2506b303138c6f7b0f5e4ecdbc65cf20f6abd19"
+    },
+    "real-pck-launch.log": {
+      "bytes": 457,
+      "sha256": "27dd3314df0014d72862c4ee950760560b62c7aae21b0704505c82d1a45ef740"
+    },
+    "ruff-scoped.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "rust-tests.log": {
+      "bytes": 3305,
+      "sha256": "f5ba8ab61ef3b5c5385a98fa741df4d1c057bc634715c95ea8f1bd1e92509312"
+    },
+    "ticket-validator.log": {
+      "bytes": 58,
+      "sha256": "a09de96b0060adc3b10520c2b3769850caaf03c79497755f4d37d8519d35e769"
+    },
+    "ty-legacy-release-module.log": {
+      "bytes": 506,
+      "sha256": "2c3aeab24b842638f96d77894c65cc19d8746235208fd9b7505cd8321e21472b"
+    },
+    "ty-scoped.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    }
+  },
+  "remote_pr_head": "9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9",
+  "src": {
+    ".github/workflows/godot-check.yml": {
+      "bytes": 77430,
+      "sha256": "4efc529a05611b9ffdfb629dd9b51f0a2d434748d66ac895b7decc0f8ed98012"
+    },
+    ".github/workflows/godot-native-t105-portability.yml": {
+      "bytes": 5654,
+      "sha256": "2d57fb28807718efac91518d9e5e74cf5635f0afa9b347d97303bc0f1411df16"
+    },
+    "Makefile": {
+      "bytes": 6968,
+      "sha256": "ac1e742cb85bcbed7aedff8256220bdd8ddfa7ca2da663b2135c8f4b7186c0e0"
+    },
+    "tests/t217_pck_fixture.py": {
+      "bytes": 1664,
+      "sha256": "2e41f59b46be8a6007e49d8490d6eca3d5392c593bf366d0d3fe4d2237fd80b1"
+    },
+    "tests/test_t201_linux_native_package.py": {
+      "bytes": 22349,
+      "sha256": "620b55e5a838a92c4cfb8413ba44fcb7ead6a6e68056bb0e75933965d5436001"
+    },
+    "tests/test_t217_pck_index.py": {
+      "bytes": 4873,
+      "sha256": "b3896969d9a7d4c8d9f213309eabf160d5ebd8423587ce1bf36586c6b1e5b066"
+    },
+    "tests/test_t218_pck_payload_integrity.py": {
+      "bytes": 3503,
+      "sha256": "d2d75bbd9bea5fcbb1695aa6e09b8b9eb7a89474312d7ca07e5f846e831e13b7"
+    },
+    "tools/benchmarks/t068_release_gate.py": {
+      "bytes": 24994,
+      "sha256": "49f1aace70de995c7ff9da8eafd6463968333b4f0fd86bdf79b680ca2b2e519e"
+    },
+    "tools/package_linux_export.py": {
+      "bytes": 6383,
+      "sha256": "484d78c92c33e50784aa43585484ae83b3e55767310362a0f320f7327a2f090d"
+    }
+  },
+  "ticket": "T-218"
+}

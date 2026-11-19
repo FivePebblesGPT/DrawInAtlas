@@ -1,0 +1,15 @@
+test_duplicate_pack_index_resource_is_rejected (test_t217_pck_index.RequiredNativePckTests.test_duplicate_pack_index_resource_is_rejected) ... ok
+test_magic_only_and_unrelated_pack_are_rejected (test_t217_pck_index.RequiredNativePckTests.test_magic_only_and_unrelated_pack_are_rejected) ... ok
+test_malformed_or_out_of_range_pack_index_is_rejected (test_t217_pck_index.RequiredNativePckTests.test_malformed_or_out_of_range_pack_index_is_rejected) ... ok
+test_missing_required_resource_is_rejected (test_t217_pck_index.RequiredNativePckTests.test_missing_required_resource_is_rejected) ... ok
+test_non_project_configuration_is_rejected (test_t217_pck_index.RequiredNativePckTests.test_non_project_configuration_is_rejected) ... ok
+test_packed_native_manifest_mapping_is_checked (test_t217_pck_index.RequiredNativePckTests.test_packed_native_manifest_mapping_is_checked) ... ok
+test_remapped_startup_requires_packed_target (test_t217_pck_index.RequiredNativePckTests.test_remapped_startup_requires_packed_target) ... ok
+test_required_payload_checksum_mismatch_is_rejected (test_t217_pck_index.RequiredNativePckTests.test_required_payload_checksum_mismatch_is_rejected) ... ok
+test_valid_minimal_pack_has_native_and_startup_resources (test_t217_pck_index.RequiredNativePckTests.test_valid_minimal_pack_has_native_and_startup_resources) ... ok
+test_windows_structural_pack_need_not_claim_linux_native_abi (test_t217_pck_index.RequiredNativePckTests.test_windows_structural_pack_need_not_claim_linux_native_abi) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.008s
+
+OK

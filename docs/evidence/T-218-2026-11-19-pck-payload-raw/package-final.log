@@ -1,0 +1,40 @@
+test_exported_launch_rejects_unregistered_abi_even_when_main_loads (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_launch_rejects_unregistered_abi_even_when_main_loads) ... ok
+test_exported_native_symlink_rejected_even_when_target_matches (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_native_symlink_rejected_even_when_target_matches) ... ok
+test_interrupted_copy_removes_only_owned_temporary (test_t201_linux_native_package.LinuxNativeExportTests.test_interrupted_copy_removes_only_owned_temporary)
+A failed native copy leaves no partial library or staging files. ... ok
+test_late_distribution_rejection_rolls_back_new_native (test_t201_linux_native_package.LinuxNativeExportTests.test_late_distribution_rejection_rolls_back_new_native) ... ok
+test_missing_mismatched_and_extra_native_files_fail_closed (test_t201_linux_native_package.LinuxNativeExportTests.test_missing_mismatched_and_extra_native_files_fail_closed) ... ok
+test_noncritical_resource_corruption_rejects_without_native_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_noncritical_resource_corruption_rejects_without_native_publication)
+A bad packed asset cannot install a valid native ELF or mutate the export. ... ok
+test_package_rejected_stage_preserves_export (test_t201_linux_native_package.LinuxNativeExportTests.test_package_rejected_stage_preserves_export)
+Pre-packaging rejection must not publish the native library. ... ok
+test_package_release_keeps_native_bytes_and_launch_isolation (test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation) ... ok
+test_preflight_cross_filesystem_native_fallback (test_t201_linux_native_package.LinuxNativeExportTests.test_preflight_cross_filesystem_native_fallback)
+The native source can be on another filesystem than the export. ... ok
+test_rejected_export_does_not_leave_partially_installed_library (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_export_does_not_leave_partially_installed_library)
+Invalid ELF/PCK and unexpected files must fail without any publication. ... ok
+test_rejected_package_preserves_foreign_temporary_directory (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_directory)
+Unexpected directories must not hide the original validation error. ... ok
+test_rejected_package_preserves_foreign_temporary_file (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_file)
+Cleanup cannot unlink a temp-looking file owned by another process. ... ok
+test_rejected_package_preserves_foreign_temporary_symlink (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_symlink)
+An unexpected symlink must be refused without being removed. ... ok
+test_rejected_special_entries_leave_export_unchanged (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_special_entries_leave_export_unchanged)
+A complete native projection must not authorize extra filesystem nodes. ... ok
+test_stage_identity_cannot_be_spoofed_by_comments_or_other_sections (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_identity_cannot_be_spoofed_by_comments_or_other_sections)
+Only effective [application] settings authorize standalone packaging. ... ok
+test_stage_permits_generated_godot_and_drawing_subdirectories (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_permits_generated_godot_and_drawing_subdirectories)
+Allowed empty source and Godot cache folders remain supported. ... ok
+test_stage_rejects_special_files_even_in_allowed_subtrees (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_rejects_special_files_even_in_allowed_subtrees)
+is_file-only inventory silently ignored FIFOs and Unix sockets. ... ok
+test_stage_rejects_undeclared_directories (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_rejects_undeclared_directories)
+No source-stage entry can escape the Drawing allowlisted hierarchy. ... ok
+test_stage_rejects_unix_sockets_in_allowed_subtrees (test_t201_linux_native_package.LinuxNativeExportTests.test_stage_rejects_unix_sockets_in_allowed_subtrees)
+Unix sockets are not staged resources, even under cache directories. ... ok
+test_symlinks_and_unregistered_stage_rejected (test_t201_linux_native_package.LinuxNativeExportTests.test_symlinks_and_unregistered_stage_rejected) ... ok
+test_unrelated_pack_is_rejected_before_native_publication (test_t201_linux_native_package.LinuxNativeExportTests.test_unrelated_pack_is_rejected_before_native_publication) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 2.772s
+
+OK

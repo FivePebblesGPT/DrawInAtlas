@@ -1,0 +1,10 @@
+test_empty_optional_resource_does_not_count_as_overlap (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_empty_optional_resource_does_not_count_as_overlap) ... ok
+test_optional_index_checksum_corruption_is_rejected (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_optional_index_checksum_corruption_is_rejected) ... ok
+test_optional_payload_byte_corruption_is_rejected (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_optional_payload_byte_corruption_is_rejected) ... ok
+test_two_distinct_resources_may_not_overlap_even_with_matching_checksums (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_two_distinct_resources_may_not_overlap_even_with_matching_checksums) ... ok
+test_valid_pack_verifies_every_indexed_resource (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_valid_pack_verifies_every_indexed_resource) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.003s
+
+OK

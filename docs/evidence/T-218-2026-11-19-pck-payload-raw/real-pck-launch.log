@@ -1,0 +1,17 @@
+{
+  "pack": {
+    "format_version": 4,
+    "file_count": 528,
+    "resources_verified": 528,
+    "startup_scene": "main.tscn.remap"
+  },
+  "native_library_sha256": "dcaf73fa6e0b113f76aa12d6072a598406dea19e5a12a026db47334df2e45074",
+  "runtime": {
+    "status": "passed",
+    "isolated_working_directory": true,
+    "isolated_user_profile": true,
+    "source_project_loaded": false,
+    "native_abi_verified": true,
+    "post_exit_leak_diagnostics": 0
+  }
+}

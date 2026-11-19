@@ -314,3 +314,6 @@ docs/evidence/T-215-2026-11-19-stage-inventory-raw/*.log whitespace=-trailing-sp
 docs/evidence/T-216-2026-11-19-project-identity-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-217 raw PCK-index validation and native launch logs are byte-exact.
 docs/evidence/T-217-2026-11-19-pck-index-raw/*.log whitespace=-trailing-space,-blank-at-eof
+
+# T-218 exported PCK full-resource integrity evidence is byte-exact.
+docs/evidence/T-218-2026-11-19-pck-payload-raw/*.log whitespace=-trailing-space,-blank-at-eof

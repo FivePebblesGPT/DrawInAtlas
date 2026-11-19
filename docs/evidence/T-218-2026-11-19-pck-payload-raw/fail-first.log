@@ -1,0 +1,55 @@
+test_empty_optional_resource_does_not_count_as_overlap (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_empty_optional_resource_does_not_count_as_overlap) ... ERROR
+test_optional_index_checksum_corruption_is_rejected (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_optional_index_checksum_corruption_is_rejected) ... FAIL
+test_optional_payload_byte_corruption_is_rejected (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_optional_payload_byte_corruption_is_rejected) ... FAIL
+test_two_distinct_resources_may_not_overlap_even_with_matching_checksums (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_two_distinct_resources_may_not_overlap_even_with_matching_checksums) ... FAIL
+test_valid_pack_verifies_every_indexed_resource (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_valid_pack_verifies_every_indexed_resource) ... ERROR
+
+======================================================================
+ERROR: test_empty_optional_resource_does_not_count_as_overlap (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_empty_optional_resource_does_not_count_as_overlap)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t218_pck_payload_integrity.py", line 73, in test_empty_optional_resource_does_not_count_as_overlap
+    self.assertEqual(self.inspect(make_pck(files))["resources_verified"], len(files))
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'resources_verified'
+
+======================================================================
+ERROR: test_valid_pack_verifies_every_indexed_resource (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_valid_pack_verifies_every_indexed_resource)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t218_pck_payload_integrity.py", line 43, in test_valid_pack_verifies_every_indexed_resource
+    self.assertEqual(result["resources_verified"], len(files))
+                     ~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'resources_verified'
+
+======================================================================
+FAIL: test_optional_index_checksum_corruption_is_rejected (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_optional_index_checksum_corruption_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t218_pck_payload_integrity.py", line 57, in test_optional_index_checksum_corruption_is_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "checksum mismatch"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_optional_payload_byte_corruption_is_rejected (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_optional_payload_byte_corruption_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t218_pck_payload_integrity.py", line 50, in test_optional_payload_byte_corruption_is_rejected
+    with self.assertRaisesRegex(gate.ReleaseError, "checksum mismatch"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_two_distinct_resources_may_not_overlap_even_with_matching_checksums (test_t218_pck_payload_integrity.CompletePckPayloadIntegrityTests.test_two_distinct_resources_may_not_overlap_even_with_matching_checksums)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t218_pck_payload_integrity.py", line 68, in test_two_distinct_resources_may_not_overlap_even_with_matching_checksums
+    with self.assertRaisesRegex(gate.ReleaseError, "overlap"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.005s
+
+FAILED (failures=3, errors=2)
