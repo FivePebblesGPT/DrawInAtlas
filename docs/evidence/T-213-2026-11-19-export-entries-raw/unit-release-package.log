@@ -1,0 +1,23 @@
+test_distribution_rejects_extra_directories_and_nonregular_entries (tests.test_t068_release_gate.PortableReleaseGateTests.test_distribution_rejects_extra_directories_and_nonregular_entries) ... ok
+test_isolated_launch_accepts_only_named_post_exit_rids (tests.test_t068_release_gate.PortableReleaseGateTests.test_isolated_launch_accepts_only_named_post_exit_rids) ... ok
+test_linux_runtime_isolated_and_must_identify_godot (tests.test_t068_release_gate.PortableReleaseGateTests.test_linux_runtime_isolated_and_must_identify_godot) ... ok
+test_nonportable_or_corrupt_artifacts_fail_closed (tests.test_t068_release_gate.PortableReleaseGateTests.test_nonportable_or_corrupt_artifacts_fail_closed) ... ok
+test_stage_rejects_native_extensions_and_bad_identity (tests.test_t068_release_gate.PortableReleaseGateTests.test_stage_rejects_native_extensions_and_bad_identity) ... ok
+test_standalone_staging_and_static_artifact_fingerprints (tests.test_t068_release_gate.PortableReleaseGateTests.test_standalone_staging_and_static_artifact_fingerprints) ... ok
+test_exported_launch_rejects_unregistered_abi_even_when_main_loads (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_exported_launch_rejects_unregistered_abi_even_when_main_loads) ... ok
+test_exported_native_symlink_rejected_even_when_target_matches (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_exported_native_symlink_rejected_even_when_target_matches) ... ok
+test_late_distribution_rejection_rolls_back_new_native (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_late_distribution_rejection_rolls_back_new_native) ... ok
+test_missing_mismatched_and_extra_native_files_fail_closed (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_missing_mismatched_and_extra_native_files_fail_closed) ... ok
+test_package_release_keeps_native_bytes_and_launch_isolation (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation) ... ok
+test_preflight_cross_filesystem_native_fallback (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_preflight_cross_filesystem_native_fallback)
+The native source can be on another filesystem than the export. ... ok
+test_rejected_export_does_not_leave_partially_installed_library (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_export_does_not_leave_partially_installed_library)
+Invalid ELF/PCK and unexpected files must fail without any publication. ... ok
+test_rejected_special_entries_leave_export_unchanged (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_special_entries_leave_export_unchanged)
+A complete native projection must not authorize extra filesystem nodes. ... ok
+test_symlinks_and_unregistered_stage_rejected (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_symlinks_and_unregistered_stage_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 1.706s
+
+OK

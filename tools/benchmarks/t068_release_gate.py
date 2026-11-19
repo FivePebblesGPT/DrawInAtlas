@@ -110,18 +110,50 @@ def _inspect_binary(path: Path, platform: str, *, shared: bool = False) -> None:
             raise ReleaseError("Unsupported export platform")
 
 
-def inspect_distribution(directory: Path, platform: str) -> dict[str, Any]:
-    """Require separate, native x86_64 Godot executable and packed resources."""
+def inspect_distribution_entries(
+    directory: Path, platform: str, *, allow_missing_native: bool = False,
+) -> dict[str, Path]:
+    """Require an exact regular-file export tree, including directory entries.
+
+    An omitted native ELF is allowed only for the pre-package Linux projection.
+    FIFOs, sockets and unexpected empty directories are not distributable files.
+    """
     if platform not in BINARY or not directory.is_dir() or directory.is_symlink():
         raise ReleaseError("Missing or unsupported distribution")
-    if any(p.is_symlink() for p in directory.rglob("*")):
-        raise ReleaseError("Distribution contains a symlink")
-    files = {p.relative_to(directory).as_posix(): p for p in directory.rglob("*") if p.is_file()}
     expected = {BINARY[platform], "Drawing.pck"}
     if platform == "linux":
         expected.add(NATIVE_LIBRARY.as_posix())
-    if set(files) != expected:
+    if allow_missing_native and platform != "linux":
+        raise ReleaseError("Only Linux may stage an unpackaged native export")
+    required = expected - ({NATIVE_LIBRARY.as_posix()} if allow_missing_native else set())
+    expected_directories = {
+        parent.as_posix()
+        for name in expected
+        for parent in Path(name).parents
+        if parent != Path(".")
+    }
+    actual: dict[str, Path] = {}
+    for entry in directory.rglob("*"):
+        name = entry.relative_to(directory).as_posix()
+        if entry.is_symlink():
+            raise ReleaseError("Distribution contains a symlink")
+        if entry.is_dir():
+            if name not in expected_directories:
+                raise ReleaseError(f"Unexpected export directory: {name}")
+        elif entry.is_file():
+            if name not in expected:
+                raise ReleaseError(f"Unexpected export file: {name}")
+            actual[name] = entry
+        else:
+            raise ReleaseError(f"Non-regular export entry: {name}")
+    if set(actual) != required:
         raise ReleaseError("Distribution contains missing or unexpected exported artifacts")
+    return actual
+
+
+def inspect_distribution(directory: Path, platform: str) -> dict[str, Any]:
+    """Require separate, native x86_64 Godot executable and packed resources."""
+    files = inspect_distribution_entries(directory, platform)
     exe = directory / BINARY[platform]
     pack = directory / "Drawing.pck"
     if not exe.is_file() or not pack.is_file() or exe.stat().st_size < 4096 or pack.stat().st_size < 64:

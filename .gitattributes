@@ -303,3 +303,5 @@ docs/evidence/T-209-2026-11-19-native-content-edit-raw/*.log whitespace=-trailin
 docs/evidence/T-210-2026-11-19-native-selection-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-212 fail-first and native Linux release evidence retain captured bytes.
 docs/evidence/T-212-2026-11-19-native-export-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-213 raw release-inventory evidence keeps original runner whitespace.
+docs/evidence/T-213-2026-11-19-export-entries-raw/*.log whitespace=-trailing-space,-blank-at-eof

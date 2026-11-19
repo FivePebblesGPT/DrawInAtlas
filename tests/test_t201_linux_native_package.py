@@ -138,6 +138,32 @@ class LinuxNativeExportTests(unittest.TestCase):
             pack.write_bytes(b"GDPC" + bytes(128))
             executable.write_bytes(elf(kind=2))
 
+    def test_rejected_special_entries_leave_export_unchanged(self) -> None:
+        """A complete native projection must not authorize extra filesystem nodes."""
+        native = self.output / gate.NATIVE_LIBRARY
+        for kind in ("extra_directory", "fifo"):
+            if kind == "extra_directory":
+                unexpected = self.output / "unrelated"
+                unexpected.mkdir()
+            else:
+                if not hasattr(os, "mkfifo"):
+                    continue
+                unexpected = self.output / "not-a-file.pipe"
+                os.mkfifo(unexpected)
+            try:
+                with self.subTest(kind=kind):
+                    with self.assertRaises(package.PackageError):
+                        package.package(self.stage, self.output)
+                    self.assertFalse(native.exists())
+                    self.assertFalse(native.parent.exists())
+                    self.assertFalse(any(self.output.glob(".native-preflight-*")))
+                    self.assertTrue(unexpected.exists())
+            finally:
+                if unexpected.is_dir():
+                    unexpected.rmdir()
+                else:
+                    unexpected.unlink()
+
     def test_preflight_cross_filesystem_native_fallback(self) -> None:
         """The native source can be on another filesystem than the export."""
         real_link = os.link

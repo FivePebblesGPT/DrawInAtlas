@@ -27,6 +27,7 @@ from tools.benchmarks.t068_release_gate import (  # noqa: E402
     ReleaseError,
     digest,
     inspect_distribution,
+    inspect_distribution_entries,
     inspect_stage,
 )
 
@@ -42,12 +43,13 @@ def _preflight_unpacked_export(distribution: Path, source: Path) -> None:
     filesystem so even very large packs do not need another full copy.
     The required library is linked only into this disposable projection.
     """
-    if any(path.is_symlink() for path in distribution.rglob("*")):
-        raise PackageError("Export distribution contains a symlink")
+    # Inspect every entry (including empty directories and special nodes),
+    # not only regular files. This is the same exact-tree rule as the final gate.
+    try:
+        inspect_distribution_entries(distribution, "linux", allow_missing_native=True)
+    except ReleaseError as exc:
+        raise PackageError(f"Invalid pre-package export layout: {exc}") from exc
     expected = {BINARY["linux"], "Drawing.pck"}
-    actual = {path.relative_to(distribution).as_posix() for path in distribution.rglob("*") if path.is_file()}
-    if actual != expected:
-        raise PackageError("Export contains missing or unexpected artifacts before packaging")
     with tempfile.TemporaryDirectory(prefix=".native-preflight-", dir=distribution) as work:
         temporary_distribution = Path(work)
         for filename in sorted(expected):

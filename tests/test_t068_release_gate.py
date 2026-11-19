@@ -1,6 +1,7 @@
 """T-068: portable Drawing release inspection cannot be passed by editor-only files."""
 from __future__ import annotations
 
+import os
 import stat
 import struct
 import sys
@@ -120,6 +121,27 @@ class PortableReleaseGateTests(unittest.TestCase):
             (self.linux / "Drawing.pck").unlink()
             with self.assertRaises(release.ReleaseError):
                 release.inspect_release(self.stage, self.linux, self.windows)
+
+    def test_distribution_rejects_extra_directories_and_nonregular_entries(self) -> None:
+        for platform, directory in (("linux", self.linux), ("windows", self.windows)):
+            with self.subTest(platform=platform, entry="empty_directory"):
+                extra = directory / "unexpected-empty"
+                extra.mkdir()
+                try:
+                    with self.assertRaises(release.ReleaseError):
+                        release.inspect_distribution(directory, platform)
+                finally:
+                    extra.rmdir()
+            with self.subTest(platform=platform, entry="fifo"):
+                if not hasattr(os, "mkfifo"):
+                    continue
+                fifo = directory / "unexpected.pipe"
+                try:
+                    os.mkfifo(fifo)
+                    with self.assertRaises(release.ReleaseError):
+                        release.inspect_distribution(directory, platform)
+                finally:
+                    fifo.unlink(missing_ok=True)
 
     def test_stage_rejects_native_extensions_and_bad_identity(self) -> None:
         illegal = self.stage / "addons/drawing/scalar.gdextension"
