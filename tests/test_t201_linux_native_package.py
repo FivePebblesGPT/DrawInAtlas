@@ -9,6 +9,7 @@ import struct
 import tempfile
 import unittest
 from pathlib import Path
+from typing import BinaryIO
 from unittest.mock import patch
 
 from tools import package_linux_export as package
@@ -50,6 +51,8 @@ class LinuxNativeExportTests(unittest.TestCase):
     def test_package_release_keeps_native_bytes_and_launch_isolation(self) -> None:
         self.assertTrue(gate.inspect_stage(self.stage)["native_required"])
         package.package(self.stage, self.output)
+        shipped = self.output / gate.NATIVE_LIBRARY
+        self.assertEqual(stat.S_IMODE(shipped.stat().st_mode), stat.S_IMODE(self.native.stat().st_mode))
         report = gate.inspect_distribution(self.output, "linux")
         self.assertTrue(report["native_extension_shipped"])
         self.assertEqual(report["native_library"]["sha256"], gate.digest(self.native))
@@ -121,14 +124,16 @@ class LinuxNativeExportTests(unittest.TestCase):
                 executable.write_bytes(bytes(4096))
             before = {
                 item.relative_to(self.output).as_posix(): item.read_bytes()
-                for item in self.output.rglob("*") if item.is_file()
+                for item in self.output.rglob("*")
+                if item.is_file()
             }
             with self.subTest(tamper=tamper):
                 with self.assertRaises(package.PackageError):
                     package.package(self.stage, self.output)
                 after = {
                     item.relative_to(self.output).as_posix(): item.read_bytes()
-                    for item in self.output.rglob("*") if item.is_file()
+                    for item in self.output.rglob("*")
+                    if item.is_file()
                 }
                 self.assertEqual(after, before)
                 self.assertFalse(native.exists())
@@ -163,6 +168,61 @@ class LinuxNativeExportTests(unittest.TestCase):
                     unexpected.rmdir()
                 else:
                     unexpected.unlink()
+
+    def test_rejected_package_preserves_foreign_temporary_file(self) -> None:
+        """Cleanup cannot unlink a temp-looking file owned by another process."""
+        native = self.output / gate.NATIVE_LIBRARY
+        native.parent.mkdir(parents=True)
+        foreign = native.with_name(native.name + ".tmp")
+        payload = b"foreign export diagnostic; not created by the packager"
+        foreign.write_bytes(payload)
+        with self.assertRaises(package.PackageError):
+            package.package(self.stage, self.output)
+        self.assertEqual(foreign.read_bytes(), payload)
+        self.assertFalse(native.exists())
+
+    def test_rejected_package_preserves_foreign_temporary_symlink(self) -> None:
+        """An unexpected symlink must be refused without being removed."""
+        native = self.output / gate.NATIVE_LIBRARY
+        native.parent.mkdir(parents=True)
+        foreign = native.with_name(native.name + ".tmp")
+        target = self.root / "external-sentinel"
+        target.write_bytes(b"do not touch")
+        foreign.symlink_to(target)
+        with self.assertRaises(package.PackageError):
+            package.package(self.stage, self.output)
+        self.assertTrue(foreign.is_symlink())
+        self.assertEqual(foreign.readlink(), target)
+        self.assertEqual(target.read_bytes(), b"do not touch")
+        self.assertFalse(native.exists())
+
+    def test_rejected_package_preserves_foreign_temporary_directory(self) -> None:
+        """Unexpected directories must not hide the original validation error."""
+        native = self.output / gate.NATIVE_LIBRARY
+        native.parent.mkdir(parents=True)
+        foreign = native.with_name(native.name + ".tmp")
+        foreign.mkdir()
+        with self.assertRaisesRegex(package.PackageError, "Invalid pre-package export layout"):
+            package.package(self.stage, self.output)
+        self.assertTrue(foreign.is_dir())
+        self.assertFalse(native.exists())
+
+    def test_interrupted_copy_removes_only_owned_temporary(self) -> None:
+        """A failed native copy leaves no partial library or staging files."""
+        native = self.output / gate.NATIVE_LIBRARY
+
+        def partial_copy(input_stream: BinaryIO, output_stream: BinaryIO) -> None:
+            del input_stream
+            output_stream.write(b"partial native bytes")
+            raise OSError(errno.EIO, "interrupted native copy")
+
+        with patch.object(package.shutil, "copyfileobj", side_effect=partial_copy):
+            with self.assertRaisesRegex(package.PackageError, "interrupted native copy"):
+                package.package(self.stage, self.output)
+        self.assertFalse(native.exists())
+        self.assertFalse(native.parent.exists())
+        self.assertFalse(any(self.output.rglob("*.tmp")))
+        self.assertFalse(any(self.output.glob(".native-preflight-*")))
 
     def test_preflight_cross_filesystem_native_fallback(self) -> None:
         """The native source can be on another filesystem than the export."""

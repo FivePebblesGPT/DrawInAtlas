@@ -1,0 +1,73 @@
+test_rejected_package_preserves_foreign_temporary_file (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_file)
+Cleanup cannot unlink a temp-looking file owned by another process. ... ERROR
+test_rejected_package_preserves_foreign_temporary_symlink (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_symlink)
+An unexpected symlink must be refused without being removed. ... FAIL
+test_rejected_package_preserves_foreign_temporary_directory (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_directory)
+Unexpected directories must not hide the original validation error. ... ERROR
+
+======================================================================
+ERROR: test_rejected_package_preserves_foreign_temporary_file (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_file)
+Cleanup cannot unlink a temp-looking file owned by another process.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 176, in test_rejected_package_preserves_foreign_temporary_file
+    self.assertEqual(foreign.read_bytes(), payload)
+                     ~~~~~~~~~~~~~~~~~~^^
+  File "/usr/lib/python3.13/pathlib/_abc.py", line 625, in read_bytes
+    with self.open(mode='rb') as f:
+         ~~~~~~~~~^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 539, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/tmpjomx3y3v/release/addons/drawing/native/bin/libdrawing_brush.so.tmp'
+
+======================================================================
+ERROR: test_rejected_package_preserves_foreign_temporary_directory (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_directory)
+Unexpected directories must not hide the original validation error.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tools/package_linux_export.py", line 49, in _preflight_unpacked_export
+    inspect_distribution_entries(distribution, "linux", allow_missing_native=True)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tools/benchmarks/t068_release_gate.py", line 142, in inspect_distribution_entries
+    raise ReleaseError(f"Unexpected export directory: {name}")
+tools.benchmarks.t068_release_gate.ReleaseError: Unexpected export directory: addons/drawing/native/bin/libdrawing_brush.so.tmp
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tools/package_linux_export.py", line 104, in package
+    _preflight_unpacked_export(distribution, source)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tools/package_linux_export.py", line 51, in _preflight_unpacked_export
+    raise PackageError(f"Invalid pre-package export layout: {exc}") from exc
+tools.package_linux_export.PackageError: Invalid pre-package export layout: Unexpected export directory: addons/drawing/native/bin/libdrawing_brush.so.tmp
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 201, in test_rejected_package_preserves_foreign_temporary_directory
+    package.package(self.stage, self.output)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tools/package_linux_export.py", line 124, in package
+    temporary.unlink(missing_ok=True)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/pathlib/_local.py", line 748, in unlink
+    os.unlink(self)
+    ~~~~~~~~~^^^^^^
+IsADirectoryError: [Errno 21] Is a directory: '/tmp/tmpafijzz9j/release/addons/drawing/native/bin/libdrawing_brush.so.tmp'
+
+======================================================================
+FAIL: test_rejected_package_preserves_foreign_temporary_symlink (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_package_preserves_foreign_temporary_symlink)
+An unexpected symlink must be refused without being removed.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 189, in test_rejected_package_preserves_foreign_temporary_symlink
+    self.assertTrue(foreign.is_symlink())
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.329s
+
+FAILED (failures=1, errors=2)

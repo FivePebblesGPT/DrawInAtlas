@@ -1,0 +1,36 @@
+{
+  "baseline": "PR21 remote head 9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9 + 18 local commits",
+  "date": "2026-11-19",
+  "log_sha256": {
+    "fail-first.log": "ba9c13f50c6292dfa9ca3046c24c3dbabd43e08ec75583ff8a54026cb0316344",
+    "format-final.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938",
+    "mode-fail-first.log": "7da61131e97566ac750ddd18e863ab830d89f6cae4e6af0391749caa8a2482a6",
+    "package.log": "235f088cb3215aec66ca2dda4b819b1517ea448bca95b146b760d3b006db89c8",
+    "python-final.log": "2a0c04b7411f294e175ebb57373706aa6185201389d592eb0daa8496a6942fcc",
+    "real-release-report.json": "a80ff8de594c68b52938c4e5f991a49cd968b6a33319aa70123e19cf49f0c5cc",
+    "real-release-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ruff-final.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "rust.log": "56cc89d50385b2a6b527ec0b35a10f3e93a1fe2e219af3117a8a910a4dbcd34e",
+    "ty-final.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "validator.log": "8c3224cfbe91008c53a8479b88470590e465641ffd304cb438e49608f436e118"
+  },
+  "purpose": "T-214 foreign temporary entry ownership during rejected Linux native packaging",
+  "source_sha256": {
+    "tests/test_t201_linux_native_package.py": "936e31bbf066ed343e88bb1bb15dcfe7207f4ec54ebba119e1789530219928d8",
+    "tools/package_linux_export.py": "484d78c92c33e50784aa43585484ae83b3e55767310362a0f320f7327a2f090d"
+  },
+  "test_exit_codes": {
+    "exclusive_tmp_mode_negative_control": 1,
+    "fail_first_three_negative_cases": 1,
+    "focused_packaging_13_tests": 0,
+    "format_check": 0,
+    "isolated_real_native_abi_launch": 0,
+    "mode_preserving_real_pck_repackage": 0,
+    "package_real_existing_pck": 0,
+    "python_all_configured_suites_65_tests": 0,
+    "ruff": 0,
+    "rust_35_tests": 0,
+    "ticket_validator_214_tickets": 0,
+    "ty": 0
+  }
+}

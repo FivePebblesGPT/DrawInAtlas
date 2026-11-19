@@ -99,14 +99,23 @@ def package(stage: Path, distribution: Path) -> Path:
             created_dirs.append(parent)
         parent = parent.parent
     installed = False
-    temporary = destination.with_name(destination.name + ".tmp")
+    temporary: Path | None = None
     try:
         _preflight_unpacked_export(distribution, source)
         for directory in reversed(created_dirs):
             directory.mkdir()
-        if temporary.exists() or temporary.is_symlink():
-            raise PackageError("Temporary exported native destination already exists")
-        shutil.copyfile(source, temporary)
+        # Reserve a fresh, exclusive temporary file. A fixed .so.tmp name
+        # could belong to another process or be an invalid pre-existing export
+        # entry; failed packaging must never remove someone else's bytes.
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+        )
+        temporary = Path(temporary_name)
+        with os.fdopen(descriptor, "wb") as output_stream, source.open("rb") as input_stream:
+            shutil.copyfileobj(input_stream, output_stream)
+        # mkstemp starts at 0600; restore the staged library's permissions so
+        # a valid export remains readable by consumers running as other users.
+        shutil.copymode(source, temporary)
         if digest(temporary) != stage_info["native_library_sha256"]:
             raise PackageError("Exported library checksum mismatch after copy")
         os.replace(temporary, destination)
@@ -121,7 +130,8 @@ def package(stage: Path, distribution: Path) -> Path:
             raise
         raise PackageError(f"Invalid Linux distribution after packaging: {exc}") from exc
     finally:
-        temporary.unlink(missing_ok=True)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
         # Only remove directories this invocation created.
         for directory in created_dirs:
             try:
