@@ -1,0 +1,16 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T124_QUEUED_FAILED: two Brush paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: two Brush paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: two Brush paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED: two Brush paths retain exact canonical bytes
+T124_QUEUED_FAILED: first Undo leaves first stroke intact
+T124_QUEUED_FAILED: both Redo transactions match original pixels
+T124_QUEUED_FAILED checks=69 failures=12

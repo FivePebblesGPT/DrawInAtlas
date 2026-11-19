@@ -1,0 +1,58 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+WARNING: Drawing: Stroke still processing; Save after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _save (res://addons/drawing/workspace.gd:3559)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:71)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save As after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _ask_save (res://addons/drawing/workspace.gd:3539)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:76)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _save_file (res://addons/drawing/workspace.gd:3602)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:78)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _save_file (res://addons/drawing/workspace.gd:3602)
+         [3] test_save_during_backlog (res://tests/t125_pending_persistence_smoke.gd:88)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Close Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _request_close_tab (res://addons/drawing/workspace.gd:2231)
+         [3] test_close_during_backlog (res://tests/t125_pending_persistence_smoke.gd:116)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Save Object after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _publish_object (res://addons/drawing/workspace.gd:3585)
+         [3] test_object_publish_during_backlog (res://tests/t125_pending_persistence_smoke.gd:149)
+         [4] new_app (res://tests/t125_pending_persistence_smoke.gd:28)
+         [5] frames (res://tests/t125_pending_persistence_smoke.gd:17)
+T125_PENDING_PASSED checks=29 failures=0

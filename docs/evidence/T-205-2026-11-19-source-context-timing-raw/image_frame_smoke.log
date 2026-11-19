@@ -1,0 +1,37 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+WARNING: Drawing: Gesture cancelled because grid snapping changed
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _cancel_on_effective_snap_change (res://addons/drawing/canvas.gd:368)
+         [2] @grid_spacing_setter (res://addons/drawing/canvas.gd:94)
+         [3] _apply_grid_settings (res://addons/drawing/workspace.gd:3273)
+         [4] run (res://tests/image_frame_smoke.gd:238)
+WARNING: Drawing: Stroke cancelled because image clipping changed
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @clip_strokes_to_image_frame_setter (res://addons/drawing/canvas.gd:73)
+         [2] run (res://tests/image_frame_smoke.gd:263)
+WARNING: Drawing: Stroke cancelled because image clipping changed
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @clip_strokes_to_image_frame_setter (res://addons/drawing/canvas.gd:73)
+         [2] run (res://tests/image_frame_smoke.gd:274)
+WARNING: Drawing: Gesture cancelled because the camera moved during capture
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @camera_setter (res://addons/drawing/canvas.gd:125)
+         [2] run (res://tests/image_frame_smoke.gd:312)
+WARNING: Drawing: Gesture cancelled because the camera moved during capture
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @camera_setter (res://addons/drawing/canvas.gd:125)
+         [2] run (res://tests/image_frame_smoke.gd:348)
+T087_MODEL: 82 checks; 0 failed
+T087_MODEL_PASSED

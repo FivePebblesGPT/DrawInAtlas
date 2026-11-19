@@ -288,3 +288,5 @@ docs/evidence/T-202-2026-11-19-signed-save-fixture-raw/*.log whitespace=-trailin
 docs/evidence/T-203-2026-11-19-native-image-frame-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-204 native live-stroke fail-first and validation output is byte-exact.
 docs/evidence/T-204-2026-11-19-native-live-stroke-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-205 native timing/control logs retain original captured process bytes.
+docs/evidence/T-205-2026-11-19-source-context-timing-raw/*.log whitespace=-trailing-space,-blank-at-eof
