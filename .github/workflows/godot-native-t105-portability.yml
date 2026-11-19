@@ -24,6 +24,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t068_release_gate.py -v
           python3 -m unittest discover -s tests -p test_t068_scalar_strict_fp.py -v
           python3 -m unittest discover -s tests -p test_t201_linux_native_package.py -v
+          python3 -m unittest discover -s tests -p test_t217_pck_index.py -v
           # The old native-absent 2026-11-12 report is historical; the new
           # required-native source hash is verified from the live run below.
       - name: Build required-native Drawing export from canonical sources

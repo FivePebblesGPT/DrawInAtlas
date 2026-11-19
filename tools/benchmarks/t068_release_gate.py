@@ -204,6 +204,143 @@ def inspect_distribution_entries(
     return actual
 
 
+def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
+    """Verify the pinned Godot 4.8 PCK v4 index and native startup witnesses.
+
+    A GDPC magic prefix alone does not prove that a PCK can load Drawing. This
+    bounded index parser deliberately does not attempt to execute scripts or
+    certify all packed resources; isolated Godot launch remains a separate gate.
+    """
+    if platform not in BINARY:
+        raise ReleaseError("Unsupported PCK platform")
+    required = {"project.binary"}
+    choices = [("main.tscn", "main.tscn.remap")]
+    if platform == "linux":
+        required.add(NATIVE_MANIFEST.as_posix())
+        choices.append(("tests/native_extension_ready.gd", "tests/native_extension_ready.gd.remap"))
+    size = pack.stat().st_size
+    if size < 116:
+        raise ReleaseError("Truncated Godot PCK index")
+    with pack.open("rb") as stream:
+        header = stream.read(112)
+        magic, version, major, minor, _patch, flags, file_base, directory = struct.unpack_from(
+            "<4sIIIIIQQ", header
+        )
+        if magic != b"GDPC" or version != 4 or (major, minor) != (4, 8):
+            raise ReleaseError("Expected Godot 4.8 PCK v4")
+        if flags & ~2 or file_base < 112 or not file_base < directory <= size - 4:
+            raise ReleaseError("Unsupported or invalid Godot PCK index layout")
+        stream.seek(directory)
+        count = struct.unpack("<I", stream.read(4))[0]
+        if count == 0 or count > 100_000 or count * 40 > size - directory - 4:
+            raise ReleaseError("Invalid Godot PCK directory count")
+        records: dict[str, tuple[int, int, bytes]] = {}
+        for _ in range(count):
+            raw_length = stream.read(4)
+            if len(raw_length) != 4:
+                raise ReleaseError("Truncated Godot PCK resource name")
+            name_length = struct.unpack("<I", raw_length)[0]
+            if name_length == 0 or name_length > 4096 or name_length % 4:
+                raise ReleaseError("Invalid Godot PCK resource name length")
+            name_bytes = stream.read(name_length)
+            metadata = stream.read(36)
+            if len(name_bytes) != name_length or len(metadata) != 36:
+                raise ReleaseError("Truncated Godot PCK directory entry")
+            try:
+                name = name_bytes.rstrip(b"\x00").decode("utf-8")
+            except UnicodeError as exc:
+                raise ReleaseError("Invalid UTF-8 in Godot PCK directory") from exc
+            if (
+                not name
+                or name.startswith("/")
+                or "\\" in name
+                or any(part in ("", ".", "..") for part in name.split("/"))
+            ):
+                raise ReleaseError("Unsafe Godot PCK resource name")
+            if name in records:
+                raise ReleaseError(f"Duplicate Godot PCK resource: {name}")
+            offset, length = struct.unpack_from("<QQ", metadata)
+            resource_flags = struct.unpack_from("<I", metadata, 32)[0]
+            absolute_offset = offset + file_base if flags & 2 else offset
+            if (
+                resource_flags != 0
+                or absolute_offset < file_base
+                or absolute_offset > directory
+                or length > directory - absolute_offset
+            ):
+                raise ReleaseError(f"Invalid Godot PCK resource bounds: {name}")
+            records[name] = (absolute_offset, length, metadata[16:32])
+        if stream.tell() != size:
+            raise ReleaseError("Trailing or truncated Godot PCK directory")
+        if not required.issubset(records):
+            raise ReleaseError("PCK missing required native Drawing project resources")
+        selected: list[str] = sorted(required)
+        for options in choices:
+            found = [name for name in options if name in records]
+            if not found:
+                raise ReleaseError(f"PCK missing required Drawing resource: {options[0]}")
+            selected.extend(found)
+        # Godot release exports replace source scripts/scenes with remaps. A
+        # present remap is insufficient if its compiled target is absent.
+        for name in ("main.tscn.remap", "tests/native_extension_ready.gd.remap"):
+            if name not in records:
+                continue
+            start, length, _ = records[name]
+            if not 0 < length <= 64 * 1024:
+                raise ReleaseError(f"Invalid packed remap: {name}")
+            stream.seek(start)
+            remap = configparser.ConfigParser(interpolation=None)
+            try:
+                remap.read_string(stream.read(length).decode("utf-8"))
+            except (UnicodeError, configparser.Error) as exc:
+                raise ReleaseError(f"Malformed packed remap: {name}") from exc
+            target = remap.get("remap", "path", fallback="").strip('"')
+            if not target.startswith("res://") or target[6:] not in records:
+                raise ReleaseError(f"Packed remap target missing: {name}")
+            selected.append(target[6:])
+        stream.seek(records["project.binary"][0])
+        if stream.read(4) != b"ECFG":
+            raise ReleaseError("Missing packed Godot project configuration")
+
+        for name in set(selected):
+            start, length, checksum = records[name]
+            if length == 0:
+                raise ReleaseError(f"Empty required packed resource: {name}")
+            stream.seek(start)
+            remaining = length
+            digest_value = hashlib.md5()  # noqa: S324 - Godot PCK uses MD5 as a file-integrity field.
+            while remaining:
+                chunk = stream.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    raise ReleaseError(f"Truncated packed resource: {name}")
+                digest_value.update(chunk)
+                remaining -= len(chunk)
+            if digest_value.digest() != checksum:
+                raise ReleaseError(f"Packed resource checksum mismatch: {name}")
+        if platform == "linux":
+            manifest_start, manifest_length, _ = records[NATIVE_MANIFEST.as_posix()]
+            if manifest_length > 64 * 1024:
+                raise ReleaseError("Oversized packed native manifest")
+            stream.seek(manifest_start)
+            manifest = configparser.ConfigParser(interpolation=None)
+            try:
+                manifest.read_string(stream.read(manifest_length).decode("utf-8"))
+            except (UnicodeError, configparser.Error) as exc:
+                raise ReleaseError("Malformed packed native manifest") from exc
+            if manifest.get("configuration", "entry_symbol", fallback="").strip(
+                '"'
+            ) != "gdext_rust_init" or any(
+                manifest.get("libraries", key, fallback="").strip('"') != NATIVE_RESOURCE
+                for key in ("linux.release.x86_64", "linux.debug.x86_64")
+            ):
+                raise ReleaseError("Packed native manifest does not match required Rust ABI")
+        return {
+            "format_version": version,
+            "file_count": count,
+            "startup_scene": next(name for name in choices[0] if name in records),
+        }
+
+
 def inspect_distribution(directory: Path, platform: str) -> dict[str, Any]:
     """Require separate, native x86_64 Godot executable and packed resources."""
     files = inspect_distribution_entries(directory, platform)
@@ -212,25 +349,28 @@ def inspect_distribution(directory: Path, platform: str) -> dict[str, Any]:
     if not exe.is_file() or not pack.is_file() or exe.stat().st_size < 4096 or pack.stat().st_size < 64:
         raise ReleaseError("Missing or truncated executable or PCK")
     _inspect_binary(exe, platform)
-    with pack.open("rb") as stream:
-        if stream.read(4) != b"GDPC":
-            raise ReleaseError("Invalid Godot PCK header")
+    pack_info = inspect_pck(pack, platform=platform)
     native_info: dict[str, str | int] | None = None
     if platform == "linux":
         native = files[NATIVE_LIBRARY.as_posix()]
         if native.stat().st_size < 4096:
             raise ReleaseError("Missing or truncated required native library")
         _inspect_binary(native, "linux", shared=True)
-        native_info = {"name": NATIVE_LIBRARY.as_posix(), "size": native.stat().st_size,
-                       "sha256": digest(native)}
+        native_info = {
+            "name": NATIVE_LIBRARY.as_posix(),
+            "size": native.stat().st_size,
+            "sha256": digest(native),
+        }
     return {
         "platform": platform,
         "architecture": "x86_64",
         "binary": {"name": exe.name, "size": exe.stat().st_size, "sha256": digest(exe)},
-        "pack": {"name": pack.name, "size": pack.stat().st_size, "sha256": digest(pack)},
+        "pack": {"name": pack.name, "size": pack.stat().st_size, "sha256": digest(pack), "index": pack_info},
         "native_extension_shipped": platform == "linux",
         "native_library": native_info,
-        "inspection": "structure_and_required_native" if platform == "linux" else "structure_only_no_windows_native",
+        "inspection": "structure_and_required_native"
+        if platform == "linux"
+        else "structure_only_no_windows_native",
     }
 
 

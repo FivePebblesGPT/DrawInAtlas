@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import BinaryIO
 from unittest.mock import patch
 
+from t217_pck_fixture import make_pck
+
 from tools import package_linux_export as package
 from tools.benchmarks import t068_release_gate as gate
 from tools.build_drawing_app import stage
@@ -47,7 +49,7 @@ class LinuxNativeExportTests(unittest.TestCase):
         executable = self.output / "Drawing.x86_64"
         executable.write_bytes(elf(kind=2))
         executable.chmod(executable.stat().st_mode | stat.S_IXUSR)
-        (self.output / "Drawing.pck").write_bytes(b"GDPC" + bytes(128))
+        (self.output / "Drawing.pck").write_bytes(make_pck())
 
     def test_package_release_keeps_native_bytes_and_launch_isolation(self) -> None:
         self.assertTrue(gate.inspect_stage(self.stage)["native_required"])
@@ -85,6 +87,25 @@ class LinuxNativeExportTests(unittest.TestCase):
             result = gate.launch_linux(self.output)
         self.assertEqual(mocked.call_count, 2)
         self.assertTrue(result["native_abi_verified"])
+
+    def test_unrelated_pack_is_rejected_before_native_publication(self) -> None:
+        pack = self.output / "Drawing.pck"
+        pack.write_bytes(make_pck({"unrelated.txt": b"not Drawing"}))
+        before = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        with self.assertRaisesRegex(package.PackageError, "PCK missing required"):
+            package.package(self.stage, self.output)
+        after = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after, before)
+        self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+        self.assertFalse(any(self.output.glob(".native-preflight-*")))
 
     def test_missing_mismatched_and_extra_native_files_fail_closed(self) -> None:
         with self.assertRaises(gate.ReleaseError):
@@ -141,7 +162,7 @@ class LinuxNativeExportTests(unittest.TestCase):
                 self.assertFalse(native.parent.exists())
                 self.assertFalse(any(self.output.glob(".native-preflight-*")))
             (self.output / "unexpected.so").unlink(missing_ok=True)
-            pack.write_bytes(b"GDPC" + bytes(128))
+            pack.write_bytes(make_pck())
             executable.write_bytes(elf(kind=2))
 
     def test_rejected_special_entries_leave_export_unchanged(self) -> None:

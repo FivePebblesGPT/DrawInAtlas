@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "tools/benchmarks"))
 sys.path.insert(0, str(ROOT / "tools"))
 import t068_release_gate as release  # noqa: E402
 from build_drawing_app import stage  # noqa: E402
+from t217_pck_fixture import make_pck  # noqa: E402
 
 
 def write_binary(directory: Path, platform: str) -> Path:
@@ -31,7 +32,7 @@ def write_binary(directory: Path, platform: str) -> Path:
         data[260:262] = b"\x64\x86"
     result.write_bytes(data)
     result.chmod(result.stat().st_mode | stat.S_IXUSR)
-    (directory / "Drawing.pck").write_bytes(b"GDPC" + bytes(128))
+    (directory / "Drawing.pck").write_bytes(make_pck())
     return result
 
 
@@ -96,7 +97,7 @@ class PortableReleaseGateTests(unittest.TestCase):
             (self.linux / "Drawing.pck").write_bytes(b"PCK?" + bytes(128))
             with self.assertRaises(release.ReleaseError):
                 release.inspect_distribution(self.linux, "linux")
-        (self.linux / "Drawing.pck").write_bytes(b"GDPC" + bytes(128))
+        (self.linux / "Drawing.pck").write_bytes(make_pck())
         with self.subTest("native_library"):
             (self.linux / "experimental.so").write_bytes(b"native")
             with self.assertRaises(release.ReleaseError):

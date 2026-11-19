@@ -1,0 +1,91 @@
+{
+  "evidence": {
+    "t217-baseline-regression.log": {
+      "bytes": 175,
+      "sha256": "886b57ea8c68c282523d173b990f8545a1da01bb572ca8fbfd5f408e7be11964"
+    },
+    "t217-format-final.log": {
+      "bytes": 26,
+      "sha256": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938"
+    },
+    "t217-format-range.log": {
+      "bytes": 19,
+      "sha256": "413a709001976657cb743636fd34e48fc41d8d302d665460d3f874b3313da127"
+    },
+    "t217-gate-final.log": {
+      "bytes": 104,
+      "sha256": "fd7ddfa721700b26edb8ac3daeb3bd8ba5266d17fd158f6f78141fc95dc7b168"
+    },
+    "t217-gate.log": {
+      "bytes": 104,
+      "sha256": "b860a92035520c48339a3c066925a70bb2107697ffd4b48867a0488b36e1d69e"
+    },
+    "t217-make-lint.log": {
+      "bytes": 64,
+      "sha256": "f445954501340811b59ec04440e2da2bc30cef6eea6f7dbe8ec42433f01f4592"
+    },
+    "t217-package-final.log": {
+      "bytes": 119,
+      "sha256": "897b2de9abe28b791ff6d1b1e0fc10425460a63b1e5cbbfe64486a03e753ce2f"
+    },
+    "t217-python-final.log": {
+      "bytes": 1022,
+      "sha256": "45327d56372a45237e27a6e19f1807005dd3847bfb02c2a9ebec52b71b2a0a0e"
+    },
+    "t217-real-final.log": {
+      "bytes": 1613,
+      "sha256": "e74b658ec08ef1b90482baeaba63fc8f5746ab011461a324e02f4a12c45dfe80"
+    },
+    "t217-ruff-final.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "t217-rust-final.log": {
+      "bytes": 3305,
+      "sha256": "2311fdd0739d5ddb3a2bfd74fec7bf4e1f30717e98c9170f356a23814e40332c"
+    },
+    "t217-ticket-final.log": {
+      "bytes": 58,
+      "sha256": "900bb2f12990de3778c78ba2b04b03d6b743de1124d98239562f68e1b7b8438d"
+    },
+    "t217-ty-final.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "t217-unit-final.log": {
+      "bytes": 109,
+      "sha256": "40e6a3053d86436d6aa245501343227a2e81436f4f14da71a21257468605aff6"
+    }
+  },
+  "limitations": [
+    "Godot beta3 executable surrogate, not official Linux release-template",
+    "Windows native runtime and hosted CI unverified",
+    "No physical responsiveness or manual owner acceptance"
+  ],
+  "pre_fix_commit": "e375136c6269d19323f469a78685e9e2d5775d96",
+  "real_export_pck_sha256": "19ccf70f362399f5b191373c19c41bfca63c04352f6f9853228815de642e398f",
+  "remote_baseline": "9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9",
+  "source_sha256": {
+    ".github/workflows/godot-check.yml": "b1d6744677b0a23f8d4c2bb3adfbdfdec14bccdf5056d5a8efb20da31d4b9382",
+    ".github/workflows/godot-native-t105-portability.yml": "b037e87f95354b630b3e465e5a633abed85d66f10f8ae0f18a0df423a57bb7a3",
+    "Makefile": "51fb708e80e26a1c38280c85bd47f5ba4a2ef0ca1679dc113cb076b0c40bbf2e",
+    "tests/t217_pck_fixture.py": "2e41f59b46be8a6007e49d8490d6eca3d5392c593bf366d0d3fe4d2237fd80b1",
+    "tests/test_t068_release_gate.py": "8963110b4a7061ead36460a16a49b2f6d6bc8e91691a8536a26b6eb4ff7fb1be",
+    "tests/test_t201_linux_native_package.py": "71d6028b6e1c0694c22b47de400f825ed063ca08e8ec741d003105dda61d1384",
+    "tests/test_t217_pck_index.py": "b3896969d9a7d4c8d9f213309eabf160d5ebd8423587ce1bf36586c6b1e5b066",
+    "tools/benchmarks/t068_release_gate.py": "0ecec99a3b82ae42c037c79daf8879e23d267fbd5c7b2e4db75a185c7f1040ca",
+    "tools/package_linux_export.py": "484d78c92c33e50784aa43585484ae83b3e55767310362a0f320f7327a2f090d"
+  },
+  "ticket": "T-217",
+  "validation": {
+    "configured_ruff_ty": "passed",
+    "make_python_test": "82 passed",
+    "new_pck_index_tests": "10 passed",
+    "packaging_tests": "20 passed",
+    "real_native_launch": "passed, 0 post-exit leak diagnostics",
+    "real_pck_resources": 528,
+    "release_gate_tests": "6 passed",
+    "rust": "35 passed",
+    "ticket_validation": "217 tickets validated"
+  }
+}

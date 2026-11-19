@@ -179,3 +179,17 @@ not a blanket guarantee for arbitrary hosts. See [raw validation evidence](evide
 T-180 stays In Progress for remaining desktop native-transition/export
 coverage (42/46); the dedicated toolchain workflow is green.
 T-095 physical input and T-105 Windows gates remain open.
+
+## Standalone Linux release inspection (T-201 through T-217)
+
+`python3 tools/package_linux_export.py --stage STAGE --linux EXPORT` requires
+an actual native-registered Drawing stage and a separate Godot 4.8 Linux
+ELF/PCK export. Packaging preflights an isolated candidate distribution and
+must not modify the export on rejection. The release inspector
+`tools/benchmarks/t068_release_gate.py` now examines the PCK v4 resource
+index, not just its `GDPC` prefix: the startup scene (or valid compiled remap),
+`project.binary`, native Rust `.gdextension` mapping and native ABI smoke must
+be packed with matching payload hashes. Run with `--launch-linux` to verify
+native class registration and an isolated application boot. The index check
+is structural only; it cannot establish physical latency or certify Windows
+native packaging, official release-template operation, or hosted CI.
