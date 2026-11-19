@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import BinaryIO
 from unittest.mock import patch
 
-from t217_pck_fixture import make_pck
+from t217_pck_fixture import DEFAULT_FILES, make_pck, project_binary
 
 from tools import package_linux_export as package
 from tools.benchmarks import t068_release_gate as gate
@@ -110,13 +110,17 @@ class LinuxNativeExportTests(unittest.TestCase):
     def test_noncanonical_resource_name_rejects_without_native_publication(self) -> None:
         """Invalid PCK names must fail during preflight, not after .so installation."""
         pack = self.output / "Drawing.pck"
-        pack.write_bytes(make_pck({
-            "project.binary": b"ECFG\0Drawing",
-            "main.tscn": b"[gd_scene format=3]\n",
-            "addons/drawing/native/drawing_brush.gdextension": self.manifest.read_bytes(),
-            "tests/native_extension_ready.gd": b"extends SceneTree\n",
-            "assets/brush\x00alias.png": b"ambiguous path",
-        }))
+        pack.write_bytes(
+            make_pck(
+                {
+                    "project.binary": project_binary(),
+                    "main.tscn": b"[gd_scene format=3]\n",
+                    "addons/drawing/native/drawing_brush.gdextension": self.manifest.read_bytes(),
+                    "tests/native_extension_ready.gd": b"extends SceneTree\n",
+                    "assets/brush\x00alias.png": b"ambiguous path",
+                }
+            )
+        )
         before = {
             path.relative_to(self.output).as_posix(): path.read_bytes()
             for path in self.output.rglob("*")
@@ -137,13 +141,17 @@ class LinuxNativeExportTests(unittest.TestCase):
         """A bad packed asset cannot install a valid native ELF or mutate the export."""
         asset = b"unrelated packed source, still required intact"
         pack = self.output / "Drawing.pck"
-        content = bytearray(make_pck({
-            "project.binary": b"ECFG\0Drawing",
-            "main.tscn": b"[gd_scene format=3]\n",
-            "addons/drawing/native/drawing_brush.gdextension": self.manifest.read_bytes(),
-            "tests/native_extension_ready.gd": b"extends SceneTree\n",
-            "assets/corrupted.bin": asset,
-        }))
+        content = bytearray(
+            make_pck(
+                {
+                    "project.binary": project_binary(),
+                    "main.tscn": b"[gd_scene format=3]\n",
+                    "addons/drawing/native/drawing_brush.gdextension": self.manifest.read_bytes(),
+                    "tests/native_extension_ready.gd": b"extends SceneTree\n",
+                    "assets/corrupted.bin": asset,
+                }
+            )
+        )
         content[content.index(asset) + 3] ^= 1
         pack.write_bytes(content)
         before = {
@@ -152,6 +160,33 @@ class LinuxNativeExportTests(unittest.TestCase):
             if path.is_file()
         }
         with self.assertRaisesRegex(package.PackageError, "checksum mismatch"):
+            package.package(self.stage, self.output)
+        after = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after, before)
+        self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+        self.assertFalse(any(self.output.glob(".native-preflight-*")))
+
+    def test_wrong_packed_project_rejects_before_native_publication(self) -> None:
+        """The staged Drawing project cannot authorize an unrelated exported ECFG."""
+        pack = self.output / "Drawing.pck"
+        pack.write_bytes(
+            make_pck(
+                {
+                    **DEFAULT_FILES,
+                    "project.binary": project_binary(**{"application/config/name": "Unrelated"}),
+                }
+            )
+        )
+        before = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        with self.assertRaisesRegex(package.PackageError, "project identity"):
             package.package(self.stage, self.output)
         after = {
             path.relative_to(self.output).as_posix(): path.read_bytes()

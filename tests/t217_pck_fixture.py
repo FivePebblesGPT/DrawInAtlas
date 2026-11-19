@@ -5,8 +5,31 @@ from __future__ import annotations
 import hashlib
 import struct
 
+
+def project_binary(*, entries: list[tuple[str, str]] | None = None, **overrides: str) -> bytes:
+    """Minimal Godot ECFG with length-prefixed setting names and Variant strings."""
+    effective = (
+        entries
+        if entries is not None
+        else [
+            ("application/config/name", "Drawing"),
+            ("application/run/main_scene", "res://main.tscn"),
+        ]
+    )
+    effective = [(key, overrides.get(key, value)) for key, value in effective]
+    result = bytearray(b"ECFG" + struct.pack("<I", len(effective)))
+    for key, value in effective:
+        encoded_key = key.encode("utf-8")
+        encoded_value = value.encode("utf-8")
+        variant = struct.pack("<II", 4, len(encoded_value)) + encoded_value
+        variant += b"\x00" * (-len(encoded_value) % 4)
+        result += struct.pack("<I", len(encoded_key)) + encoded_key
+        result += struct.pack("<I", len(variant)) + variant
+    return bytes(result)
+
+
 DEFAULT_FILES = {
-    "project.binary": b"ECFG\x00Drawing",
+    "project.binary": project_binary(),
     "main.tscn": b"[gd_scene format=3]\n",
     "addons/drawing/native/drawing_brush.gdextension": (
         b'[configuration]\nentry_symbol = "gdext_rust_init"\n'

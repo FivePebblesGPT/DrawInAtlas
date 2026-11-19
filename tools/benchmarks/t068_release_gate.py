@@ -204,6 +204,68 @@ def inspect_distribution_entries(
     return actual
 
 
+def _inspect_packed_project_config(stream: Any, start: int, length: int) -> None:
+    """Read the bounded ECFG setting table emitted by Godot 4.8 export.
+
+    Each entry is a byte-length-prefixed UTF-8 setting name followed by a
+    byte-length-prefixed Variant. Only the required String values are decoded;
+    other Godot Variant types remain opaque, but all entry boundaries and the
+    complete table must be accounted for.
+    """
+    if not 8 <= length <= 8 * 1024 * 1024:
+        raise ReleaseError("Invalid packed project configuration length")
+    stream.seek(start)
+    config = stream.read(length)
+    if len(config) != length or config[:4] != b"ECFG":
+        raise ReleaseError("Missing packed Godot project configuration")
+    count = struct.unpack_from("<I", config, 4)[0]
+    if not 1 <= count <= 65_536 or count * 12 > len(config) - 8:
+        raise ReleaseError("Invalid packed project configuration count")
+    required = {
+        "application/config/name": "Drawing",
+        "application/run/main_scene": "res://main.tscn",
+    }
+    seen: set[str] = set()
+    position = 8
+    for _ in range(count):
+        if position + 4 > len(config):
+            raise ReleaseError("Truncated packed project setting name")
+        key_size = struct.unpack_from("<I", config, position)[0]
+        position += 4
+        if not 0 < key_size <= 4096 or position + key_size + 4 > len(config):
+            raise ReleaseError("Invalid packed project setting name")
+        try:
+            key = config[position : position + key_size].decode("utf-8")
+        except UnicodeError as exc:
+            raise ReleaseError("Invalid packed project setting UTF-8") from exc
+        position += key_size
+        if key in seen or "\x00" in key or not key:
+            raise ReleaseError("Duplicate or invalid packed project setting")
+        seen.add(key)
+        value_size = struct.unpack_from("<I", config, position)[0]
+        position += 4
+        if value_size < 4 or value_size > len(config) - position:
+            raise ReleaseError("Truncated packed project setting value")
+        if key in required:
+            value = config[position : position + value_size]
+            if len(value) < 8 or struct.unpack_from("<I", value)[0] != 4:
+                raise ReleaseError(f"Invalid packed project String setting: {key}")
+            text_size = struct.unpack_from("<I", value, 4)[0]
+            if text_size > len(value) - 8:
+                raise ReleaseError(f"Invalid packed project String length: {key}")
+            try:
+                text_value = value[8 : 8 + text_size].decode("utf-8")
+            except UnicodeError as exc:
+                raise ReleaseError(f"Invalid packed project String UTF-8: {key}") from exc
+            canonical = struct.pack("<II", 4, text_size) + text_value.encode("utf-8")
+            canonical += b"\x00" * (-text_size % 4)
+            if value != canonical or text_value != required[key]:
+                raise ReleaseError(f"Wrong packed Drawing project identity or startup: {key}")
+        position += value_size
+    if position != len(config) or not required.keys() <= seen:
+        raise ReleaseError("Invalid packed Drawing project settings or trailing bytes")
+
+
 def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
     """Verify the pinned Godot 4.8 PCK v4 index and native startup witnesses.
 
@@ -318,9 +380,8 @@ def inspect_pck(pack: Path, platform: str = "linux") -> dict[str, int | str]:
             if not target.startswith("res://") or target[6:] not in records:
                 raise ReleaseError(f"Packed remap target missing: {name}")
             selected.append(target[6:])
-        stream.seek(records["project.binary"][0])
-        if stream.read(4) != b"ECFG":
-            raise ReleaseError("Missing packed Godot project configuration")
+        project_start, project_length, _ = records["project.binary"]
+        _inspect_packed_project_config(stream, project_start, project_length)
 
         for name in selected:
             if records[name][1] == 0:

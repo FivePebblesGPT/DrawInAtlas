@@ -27,6 +27,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_t217_pck_index.py -v
           python3 -m unittest discover -s tests -p test_t218_pck_payload_integrity.py -v
           python3 -m unittest discover -s tests -p test_t219_pck_resource_names.py -v
+          python3 -m unittest discover -s tests -p test_t220_pck_project_identity.py -v
           # The old native-absent 2026-11-12 report is historical; the new
           # required-native source hash is verified from the live run below.
       - name: Build required-native Drawing export from canonical sources

@@ -320,3 +320,5 @@ docs/evidence/T-218-2026-11-19-pck-payload-raw/*.log whitespace=-trailing-space,
 
 # T-219 PCK resource-name integrity evidence retains exact runner output.
 docs/evidence/T-219-2026-11-19-pck-names-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-220 PCK ECFG fail-first and validation logs retain original runner whitespace.
+docs/evidence/T-220-2026-11-19-packed-project-raw/*.log whitespace=-trailing-space,-blank-at-eof
