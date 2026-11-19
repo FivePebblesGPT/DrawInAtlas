@@ -48,6 +48,45 @@ def digest(path: Path) -> str:
     return h.hexdigest()
 
 
+def _inspect_project_application(project: Path) -> None:
+    """Require effective Drawing identity and launch scene in Godot's application section.
+
+    A substring search accepts comment text, settings in unrelated sections,
+    and a later conflicting assignment. Godot project files have sectioned
+    key/value records, so examine only active [application] settings and reject
+    duplicate or ambiguous declarations before packaging a standalone app.
+    """
+    try:
+        contents = project.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ReleaseError("Cannot read standalone Drawing project settings") from exc
+    in_application = False
+    seen_application = False
+    settings: dict[str, str] = {}
+    for line in contents.splitlines():
+        entry = line.strip()
+        if not entry or entry.startswith(("#", ";")):
+            continue
+        if entry.startswith("[") and entry.endswith("]"):
+            in_application = entry == "[application]"
+            if in_application:
+                if seen_application:
+                    raise ReleaseError("Duplicate standalone Drawing application section")
+                seen_application = True
+            continue
+        if not in_application:
+            continue
+        key, separator, value = entry.partition("=")
+        key = key.strip()
+        if separator and key in ("config/name", "run/main_scene"):
+            if key in settings:
+                raise ReleaseError(f"Duplicate standalone Drawing application setting: {key}")
+            settings[key] = value.strip()
+    if (not seen_application or settings.get("config/name") != '"Drawing"'
+            or settings.get("run/main_scene") != '"res://main.tscn"'):
+        raise ReleaseError("Wrong standalone Drawing project identity or startup scene")
+
+
 def inspect_stage(stage: Path, *, require_native: bool = True) -> dict[str, Any]:
     """Verify the separate source project is a Drawing-only staged consumer."""
     if not stage.is_dir() or stage.is_symlink():
@@ -97,8 +136,7 @@ def inspect_stage(stage: Path, *, require_native: bool = True) -> dict[str, Any]
         raise ReleaseError("Unexpected non-Drawing content in standalone project")
     if not any(k.startswith("addons/drawing/") and k.endswith(".gd") for k in files):
         raise ReleaseError("Missing canonical Drawing GDScript sources")
-    if 'config/name="Drawing"' not in files["project.godot"].read_text(encoding="utf-8"):
-        raise ReleaseError("Wrong project identity")
+    _inspect_project_application(files["project.godot"])
     return {"file_count": len(files), "font_license_sha256": digest(files[REQUIRED_FONT_LICENSE]),
             "native_required": require_native,
             "native_library_sha256": digest(files[NATIVE_LIBRARY.as_posix()]) if require_native else None}

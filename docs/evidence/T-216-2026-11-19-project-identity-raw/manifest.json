@@ -1,0 +1,65 @@
+{
+  "base_local_commit": "c9c04afc5c91c4c8fc51432c17ec404082579bab",
+  "branch": "sprint/2026-11-17",
+  "date": "2026-11-19",
+  "raw_files": {
+    "fail-first.log": {
+      "bytes": 11392,
+      "sha256": "aef2685e4ab3fb73d34732fccc18f1031ba65313b0627fa916f650153f2927de"
+    },
+    "format-final.log": {
+      "bytes": 25,
+      "sha256": "fd2299c9f1c6dc869070883e281051bfe93aacf66c1a3b0069f45b4aa410ca50"
+    },
+    "native-launch.json": {
+      "bytes": 1175,
+      "sha256": "8d60b5774a65af1755ca67b280171c0f406f9ac8a7b247324fa16e41c7b1c811"
+    },
+    "package-final.log": {
+      "bytes": 4295,
+      "sha256": "e50837515acb12869b6048f28e45679b4b9994f12587a9c832ba5ea800095c56"
+    },
+    "python-final.log": {
+      "bytes": 912,
+      "sha256": "e32ec1b5619e5948e32555bbf1f14e44aba73e30439251972e082aa89e8ab95e"
+    },
+    "release-gate-final.log": {
+      "bytes": 1110,
+      "sha256": "39600c972b2619e8e33c586346f57d4a81813e63e74e68ce7b2b548574eff736"
+    },
+    "ruff-final.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "rust-final.log": {
+      "bytes": 3305,
+      "sha256": "70248475d4fe8b837ac5f2948c7ce32477b34c8c1094e8507aca1844d974d7d1"
+    },
+    "ticket-validator.log": {
+      "bytes": 58,
+      "sha256": "08f39ed9dac518dbf7f71daca595f63275a15e094a68e6df77804bdc1aa1008a"
+    },
+    "ty-final.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    }
+  },
+  "remote_pr21_head": "9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9",
+  "sources_sha256": {
+    "docs/Index.md": "652a1918ad14c5c23589aee9fa22023d955511b5e5575303efd8dfd7e8703adb",
+    "docs/Tickets/T-216.md": "a63f733d4d395eaca320935fe90338433505e5d2176d22b7b6909fb12e8bc2ec",
+    "tests/test_t201_linux_native_package.py": "1b2169e8db1ddd773a08ffa081251939e2eee82abd06d47d0b7a52bc2a7a372e",
+    "tools/benchmarks/t068_release_gate.py": "e62313ac11da3914fecb6ace0b3a3ad598bfc1220e18eff05e1be1bd6ad7cb32"
+  },
+  "tests": {
+    "configured_python": "exit 0, 71 tests",
+    "fail_first": "exit 1, 6 failed subtests of 19 tests",
+    "format": "exit 0, modified fixture",
+    "kanban": "exit 0, 216 tickets validated",
+    "lint": "exit 0, Ruff and configured ty",
+    "native_rust": "exit 0, 35 tests",
+    "native_stage_and_app": "exit 0, 522 files and isolated ABI/boot",
+    "package_final": "exit 0, 19 tests",
+    "release_gate_final": "exit 0, 6 tests"
+  }
+}

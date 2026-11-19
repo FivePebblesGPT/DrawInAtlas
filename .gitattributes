@@ -309,3 +309,6 @@ docs/evidence/T-213-2026-11-19-export-entries-raw/*.log whitespace=-trailing-spa
 docs/evidence/T-214-2026-11-19-temp-ownership-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-215 source-stage inventory failure and validation logs retain raw bytes.
 docs/evidence/T-215-2026-11-19-stage-inventory-raw/*.log whitespace=-trailing-space,-blank-at-eof
+
+# T-216 native project identity fail-first and final process logs are byte-exact.
+docs/evidence/T-216-2026-11-19-project-identity-raw/*.log whitespace=-trailing-space,-blank-at-eof

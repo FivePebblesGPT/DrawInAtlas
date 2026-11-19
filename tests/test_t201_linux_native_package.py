@@ -294,6 +294,53 @@ class LinuxNativeExportTests(unittest.TestCase):
         with self.assertRaises(package.PackageError):
             package.package(self.stage, self.output)
 
+    def test_stage_identity_cannot_be_spoofed_by_comments_or_other_sections(self) -> None:
+        """Only effective [application] settings authorize standalone packaging."""
+        project = self.stage / "project.godot"
+        original = project.read_text(encoding="utf-8")
+        before = {
+            path.relative_to(self.output).as_posix(): path.read_bytes()
+            for path in self.output.rglob("*")
+            if path.is_file()
+        }
+        cases = {
+            "commented_identity": original.replace(
+                'config/name="Drawing"', 'config/name="Atlas"\n; config/name="Drawing"'
+            ),
+            "other_section_identity": original.replace('config/name="Drawing"', 'config/name="Atlas"')
+            + '\n[diagnostics]\nconfig/name="Drawing"\n',
+            "duplicate_identity": original.replace(
+                'config/name="Drawing"', 'config/name="Drawing"\nconfig/name="Atlas"'
+            ),
+            "duplicate_application": original + '\n[application]\nconfig/name="Drawing"\n',
+            "wrong_startup_scene": original.replace(
+                'run/main_scene="res://main.tscn"', 'run/main_scene="res://tests/native_extension_ready.gd"'
+            ),
+            "commented_startup_scene": original.replace(
+                'run/main_scene="res://main.tscn"',
+                'run/main_scene="res://tests/native_extension_ready.gd"\n# run/main_scene="res://main.tscn"',
+            ),
+        }
+        for label, content in cases.items():
+            with self.subTest(label=label):
+                project.write_text(content, encoding="utf-8")
+                with self.assertRaisesRegex(gate.ReleaseError, "project|application|identity|startup"):
+                    gate.inspect_stage(self.stage)
+                with self.assertRaises(package.PackageError):
+                    package.package(self.stage, self.output)
+                self.assertEqual(
+                    before,
+                    {
+                        path.relative_to(self.output).as_posix(): path.read_bytes()
+                        for path in self.output.rglob("*")
+                        if path.is_file()
+                    },
+                )
+                self.assertFalse(any(self.output.glob(".native-preflight-*")))
+        project.write_text(original, encoding="utf-8")
+        self.assertTrue(gate.inspect_stage(self.stage)["native_required"])
+        package.package(self.stage, self.output)
+
     def test_stage_rejects_undeclared_directories(self) -> None:
         """No source-stage entry can escape the Drawing allowlisted hierarchy."""
         for relative in ("unrelated", "addons/other"):
