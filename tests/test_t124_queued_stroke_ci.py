@@ -28,10 +28,29 @@ class QueuedStrokeContracts(unittest.TestCase):
         for contract in ("DrawingRenderer.render", "doc.undo()", "doc.redo()",
                          "T124_QUEUED_PASSED", "first_path()", "overflow_scenario()"):
             self.assertIn(contract, headless)
+        # The mandatory native engine is not byte-identical to the retired
+        # paint_path rasterizer. Exact queue parity requires accepted source
+        # coordinates and their original per-event receipt timestamps.
+        for contract in ("capture_native_receipts", "captured_deferred",
+                         "_deferred_times_us", "NATIVE_REFERENCE.commit",
+                         "native reference detects a changed queued brush width",
+                         "first Undo leaves first stroke intact"):
+            self.assertIn(contract, headless)
+        helper = (ROOT / "drawing/tests/t206_native_queued_reference.gd").read_text()
+        self.assertIn("_enqueue_sample_at_time", helper)
+        self.assertIn('"press_us": times[0]', helper)
+        self.assertIn("document", helper)
+        self.assertNotIn("paint_path(", helper)
+        self.assertNotIn("edit1.paint_path(", headless)
+        self.assertNotIn("edit2.paint_path(", headless)
         for contract in ("root.push_input", "RenderingServer.frame_post_draw",
                          "root.get_texture().get_image()", "T124_NATIVE_PASSED",
-                         "doc.undo()", "doc.redo()"):
+                         "doc.undo()", "doc.redo()", "NATIVE_REFERENCE.commit",
+                         "canvas._deferred_times_us", "accepted_first",
+                         "range(840)"):
             self.assertIn(contract, native)
+        self.assertNotIn("first.paint_path(", native)
+        self.assertNotIn("second.paint_path(", native)
 
     def test_required_ci_uses_existing_check_and_strict_verifier(self) -> None:
         ci = CI.read_text()

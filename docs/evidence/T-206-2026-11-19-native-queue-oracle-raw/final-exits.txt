@@ -1,0 +1,10 @@
+final-headless-1 exit=0 T124_QUEUED_PASSED checks=78 failures=0
+final-headless-2 exit=0 T124_QUEUED_PASSED checks=78 failures=0
+final-headless-3 exit=0 T124_QUEUED_PASSED checks=78 failures=0
+final-headless-4 exit=0 T124_QUEUED_PASSED checks=78 failures=0
+final-x11-1 exit=0 T124_NATIVE_PASSED checks=20 failures=0
+final-x11-2 exit=0 T124_NATIVE_PASSED checks=20 failures=0
+final-x11-3 exit=0 T124_NATIVE_PASSED checks=20 failures=0
+python-t124 exit=1
+strict-headless exit=0
+strict-x11 exit=0

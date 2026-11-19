@@ -1,0 +1,1514 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/check_explicit_types.py:8:1
+   |
+ 6 |   """
+ 7 |
+ 8 | / from pathlib import Path
+ 9 | | import re
+   | |_________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parent.parent
+   |
+help: Organize imports
+   |
+7  |
+8  + import re
+9  | from pathlib import Path
+   - import re
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_chunk_geometry.py:2:1
+   |
+ 1 |   """T-067 benchmark reproducibility, geometry invariants and pack fault probes."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import importlib.util
+ 5 | | import json
+ 6 | | from pathlib import Path
+ 7 | | import tempfile
+ 8 | | import unittest
+   | |_______________^
+ 9 |
+10 |   MODULE = Path(__file__).resolve().parents[1] / 'tools' / 'benchmarks' / 'chunk_geometry.py'
+   |
+help: Organize imports
+  |
+5 | import json
+  - from pathlib import Path
+6 | import tempfile
+7 | import unittest
+8 + from pathlib import Path
+9 |
+  |
+
+E402 Module level import not at top of file
+  --> tests/test_chunk_geometry.py:13:1
+   |
+11 | SPEC = importlib.util.spec_from_file_location('chunk_geometry', MODULE)
+12 | assert SPEC and SPEC.loader
+13 | import sys
+   | ^^^^^^^^^^
+14 | LIB = importlib.util.module_from_spec(SPEC)
+15 | sys.modules[SPEC.name] = LIB
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_chunk_geometry.py:13:1
+   |
+11 | SPEC = importlib.util.spec_from_file_location('chunk_geometry', MODULE)
+12 | assert SPEC and SPEC.loader
+13 | import sys
+   | ^^^^^^^^^^
+14 | LIB = importlib.util.module_from_spec(SPEC)
+15 | sys.modules[SPEC.name] = LIB
+   |
+help: Organize imports
+   |
+13 | import sys
+14 +
+15 | LIB = importlib.util.module_from_spec(SPEC)
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_drawing_app.py:2:1
+   |
+ 1 |   """T-053: independent Drawing app/third consumer packaging and executable tests."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import os
+ 5 | | import re
+ 6 | | from pathlib import Path
+ 7 | | import shutil
+ 8 | | import subprocess
+ 9 | | import tempfile
+10 | | import unittest
+11 | |
+12 | | from test_drawing_contract import BUILDER, ROOT
+13 | | from importlib.util import module_from_spec, spec_from_file_location
+   | |____________________________________________________________________^
+14 |
+15 |   BUILDER_SPEC = spec_from_file_location("build_drawing_app", ROOT / "tools" / "build_drawing_app.py")
+   |
+help: Organize imports
+   |
+5  | import re
+   - from pathlib import Path
+6  | import shutil
+7  | import subprocess
+8  | import tempfile
+9  | import unittest
+10 + from importlib.util import module_from_spec, spec_from_file_location
+11 + from pathlib import Path
+12 |
+13 | from test_drawing_contract import BUILDER, ROOT
+   - from importlib.util import module_from_spec, spec_from_file_location
+14 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_drawing_contract.py:7:1
+   |
+ 5 |   """
+ 6 |
+ 7 | / from __future__ import annotations
+ 8 | |
+ 9 | | import json
+10 | | import shutil
+11 | | import subprocess
+12 | | import tempfile
+13 | | import unittest
+14 | | from pathlib import Path
+15 | |
+16 | | from importlib.util import module_from_spec, spec_from_file_location
+   | |____________________________________________________________________^
+17 |
+18 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+13 | import unittest
+   - from pathlib import Path
+   -
+14 | from importlib.util import module_from_spec, spec_from_file_location
+15 + from pathlib import Path
+16 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_drawing_core.py:3:1
+   |
+ 1 |   """T-052: exercise real generic Drawing source in a clean Atlas-free Godot project."""
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | import re
+ 6 | | import os
+ 7 | | import shutil
+ 8 | | import subprocess
+ 9 | | import tempfile
+10 | | import unittest
+11 | | from pathlib import Path
+12 | |
+13 | | from test_drawing_contract import BUILDER, ROOT
+   | |_______________________________________________^
+14 |
+15 |   PACKAGE = ROOT / "addons" / "drawing"
+   |
+help: Organize imports
+  |
+4 |
+5 + import os
+6 | import re
+  - import os
+7 | import shutil
+  |
+
+F401 [*] `os` imported but unused
+ --> tests/test_godot_ci_fail_late.py:5:8
+  |
+3 | from __future__ import annotations
+4 |
+5 | import os
+  |        ^^
+6 | import re
+7 | import subprocess
+  |
+help: Remove unused import: `os`
+  |
+4 |
+  - import os
+5 | import re
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_blend2d_quad.py:18:1
+   |
+16 |   ROOT = Path(__file__).resolve().parents[1]
+17 |   sys.path.insert(0, str(ROOT / "tools/benchmarks"))
+18 | / import t068_blend2d_quad as QUAD  # noqa: E402
+19 | | from t068_blend2d_brush import NativeBrush  # noqa: E402
+20 | | from t068_blend2d_cpu import verify_archive  # noqa: E402
+21 | | from t068_skia_brush import canonical_pixels  # noqa: E402
+22 | | from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2  # noqa: E402
+   | |________________________________________________________________________^
+23 |
+24 |   EVIDENCE = ROOT / "docs/benchmarks/T068_2026-11-04_blend2d_quad.json"
+   |
+help: Organize imports
+   |
+20 | from t068_blend2d_cpu import verify_archive  # noqa: E402
+21 + from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2  # noqa: E402
+22 | from t068_skia_brush import canonical_pixels  # noqa: E402
+   - from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2  # noqa: E402
+23 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t068_cairo_cpu.py:3:1
+  |
+1 |   """Deterministic contracts for the opt-in Cairo CPU benchmark and pixel loss."""
+2 |
+3 | / from __future__ import annotations
+4 | |
+5 | | import importlib.util
+6 | | import sys
+7 | | import unittest
+8 | | from pathlib import Path
+  | |________________________^
+help: Organize imports
+   |
+9  |
+   -
+10 | ROOT = Path(__file__).resolve().parents[1]
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_checked_abi.py:2:1
+   |
+ 1 |   """T-068: bounded native C ABI and failure-atomicity witness (not Godot integration)."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import ctypes
+ 5 | | from pathlib import Path
+ 6 | | import random
+ 7 | | import subprocess
+ 8 | | import tempfile
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+4  | import ctypes
+   - from pathlib import Path
+5  | import random
+6  | import subprocess
+7  | import tempfile
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t068_fill_process_profile.py:2:1
+  |
+1 |   """Unit contracts for the Linux T-068 native process/memory sampler."""
+2 | / from __future__ import annotations
+3 | |
+4 | | import json
+5 | | from pathlib import Path
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+4 | import json
+  - from pathlib import Path
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_kernel.py:2:1
+   |
+ 1 |   """Correctness gates for the optional T-068 C++ raster-kernel candidate."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import random
+ 5 | | import tempfile
+ 6 | | from pathlib import Path
+ 7 | | import sys
+ 8 | | import unittest
+   | |_______________^
+ 9 |
+10 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+  |
+4 | import random
+5 + import sys
+6 | import tempfile
+7 + import unittest
+8 | from pathlib import Path
+  - import sys
+  - import unittest
+9 |
+  |
+
+E402 Module level import not at top of file
+  --> tests/test_t068_kernel.py:12:1
+   |
+10 |   ROOT = Path(__file__).resolve().parents[1]
+11 |   sys.path.insert(0, str(ROOT / "tools" / "benchmarks"))
+12 | / from t068_native import (baseline_blend, build, call_batch, call_delta_batch,
+13 | |                          materialize_deltas, open_kernel)  # noqa: E402
+   | |_________________________________________________________^
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_kernel.py:12:1
+   |
+10 |   ROOT = Path(__file__).resolve().parents[1]
+11 |   sys.path.insert(0, str(ROOT / "tools" / "benchmarks"))
+12 | / from t068_native import (baseline_blend, build, call_batch, call_delta_batch,
+13 | |                          materialize_deltas, open_kernel)  # noqa: E402
+   | |_________________________________________________________^
+help: Organize imports
+   |
+11 | sys.path.insert(0, str(ROOT / "tools" / "benchmarks"))
+   - from t068_native import (baseline_blend, build, call_batch, call_delta_batch,
+   -                          materialize_deltas, open_kernel)  # noqa: E402
+12 + from t068_native import (
+13 +     baseline_blend,
+14 +     build,
+15 +     call_batch,
+16 +     call_delta_batch,
+17 +     materialize_deltas,  # noqa: E402
+18 +     open_kernel,
+19 + )
+20 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests/test_t068_kernel.py:132:9
+    |
+130 |           self.assertEqual((count, delta), (-2, []))
+131 |           # The native API must not even touch output memory on failure.
+132 | /         import ctypes
+133 | |         from t068_native import Delta
+    | |_____________________________________^
+134 |           src = (ctypes.c_uint8 * len(raw)).from_buffer_copy(raw)
+135 |           candidate = (ctypes.c_int32 * 4)(1, 1, 2, 2)
+    |
+help: Organize imports
+    |
+132 |         import ctypes
+133 +
+134 |         from t068_native import Delta
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_matched_brush.py:2:1
+   |
+ 1 |   """Pinned, counterbalanced T-068 native brush timing / parity contracts."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import copy
+ 5 | | import importlib.util
+ 6 | | import json
+ 7 | | import os
+ 8 | | from pathlib import Path
+ 9 | | import tempfile
+10 | | import unittest
+   | |_______________^
+11 |
+12 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+7  | import os
+   - from pathlib import Path
+8  | import tempfile
+9  | import unittest
+10 + from pathlib import Path
+11 |
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_t068_matched_brush.py:16:1
+   |
+14 |     "t068_matched_brush", ROOT / "tools/benchmarks/t068_matched_brush.py")
+15 | assert SPEC is not None and SPEC.loader is not None
+16 | import sys
+   | ^^^^^^^^^^
+17 | sys.path.insert(0, str(ROOT / "tools/benchmarks"))
+18 | # dataclasses resolves __module__ through sys.modules.
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_matched_brush.py:16:1
+   |
+14 |     "t068_matched_brush", ROOT / "tools/benchmarks/t068_matched_brush.py")
+15 | assert SPEC is not None and SPEC.loader is not None
+16 | import sys
+   | ^^^^^^^^^^
+17 | sys.path.insert(0, str(ROOT / "tools/benchmarks"))
+18 | # dataclasses resolves __module__ through sys.modules.
+   |
+help: Organize imports
+   |
+16 | import sys
+17 +
+18 | sys.path.insert(0, str(ROOT / "tools/benchmarks"))
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_t068_native_memory.py:14:1
+   |
+12 | sys.path.insert(0, str(ROOT / "tools/benchmarks"))
+13 |
+14 | from t068_native_memory import EVIDENCE, SIDES, validate
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_native_sanitizer.py:2:1
+   |
+ 1 |   """Pinned C++ native sanitizer and ABI failure-atomicity regression for T-068."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import copy
+ 5 | | import importlib.util
+ 6 | | import json
+ 7 | | from pathlib import Path
+ 8 | | import shutil
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+6  | import json
+   - from pathlib import Path
+7  | import shutil
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_native_thread_jitter.py:2:1
+   |
+ 1 |   """T-068 concurrency witness contracts (isolated native C++, not Godot UX)."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import json
+ 5 | | from pathlib import Path
+ 6 | | import shutil
+ 7 | | import sys
+ 8 | | import tempfile
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+4  | import json
+   - from pathlib import Path
+5  | import shutil
+6  | import sys
+7  | import tempfile
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+F401 [*] `json` imported but unused
+ --> tests/test_t068_native_thread_jitter.py:4:8
+  |
+2 | from __future__ import annotations
+3 |
+4 | import json
+  |        ^^^^
+5 | from pathlib import Path
+6 | import shutil
+  |
+help: Remove unused import: `json`
+  |
+3 |
+  - import json
+4 | from pathlib import Path
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_native_thread_jitter.py:13:1
+   |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+12 |   sys.path.insert(0, str(ROOT / "tools" / "benchmarks"))
+13 | / from t068_native_thread_jitter import (  # noqa: E402
+14 | |     compile_benchmark, parse_tsv, run,
+15 | | )
+   | |_^
+help: Organize imports
+   |
+13 | from t068_native_thread_jitter import (  # noqa: E402
+   -     compile_benchmark, parse_tsv, run,
+14 +     compile_benchmark,
+15 +     parse_tsv,
+16 +     run,
+17 | )
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_quad_compiler_matrix.py:2:1
+   |
+ 1 |   """Pinned, fail-closed T-068 GCC/Clang selection ABI/compiler contract."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import copy
+ 5 | | import importlib.util
+ 6 | | import json
+ 7 | | from pathlib import Path
+ 8 | | import shutil
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+6  | import json
+   - from pathlib import Path
+7  | import shutil
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+E402 Module level import not at top of file
+  --> tests/test_t068_quad_compiler_matrix.py:16:1
+   |
+14 | spec = importlib.util.spec_from_file_location('t068_quad_compiler_matrix', SCRIPT)
+15 | assert spec is not None and spec.loader is not None
+16 | import sys
+   | ^^^^^^^^^^
+17 | sys.path.insert(0, str(SCRIPT.parent))
+18 | compiler_matrix = importlib.util.module_from_spec(spec)
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_quad_compiler_matrix.py:16:1
+   |
+14 | spec = importlib.util.spec_from_file_location('t068_quad_compiler_matrix', SCRIPT)
+15 | assert spec is not None and spec.loader is not None
+16 | import sys
+   | ^^^^^^^^^^
+17 | sys.path.insert(0, str(SCRIPT.parent))
+18 | compiler_matrix = importlib.util.module_from_spec(spec)
+   |
+help: Organize imports
+   |
+16 | import sys
+17 +
+18 | sys.path.insert(0, str(SCRIPT.parent))
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_quad_differential.py:2:1
+   |
+ 1 |   """Deterministic T-068 Godot/C++ polygon boundary differential contracts."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import copy
+ 5 | | import hashlib
+ 6 | | import importlib.util
+ 7 | | import json
+ 8 | | import os
+ 9 | | from pathlib import Path
+10 | |
+11 | | from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2
+12 | | import subprocess
+13 | | import tempfile
+14 | | import unittest
+   | |_______________^
+15 |
+16 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+8  | import os
+9  + import subprocess
+10 + import tempfile
+11 + import unittest
+12 | from pathlib import Path
+13 |
+14 | from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2
+   - import subprocess
+   - import tempfile
+   - import unittest
+15 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_quad_stress.py:2:1
+   |
+ 1 |   """Pinned Godot Atlas polygon/mask stress parity and native ABI contracts."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import base64
+ 5 | | import copy
+ 6 | | import ctypes
+ 7 | | import hashlib
+ 8 | | import importlib.util
+ 9 | | import json
+10 | | import math
+11 | | import os
+12 | | import platform
+13 | | from pathlib import Path
+14 | |
+15 | | from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2
+16 | | import subprocess
+17 | | import tempfile
+18 | | import unittest
+   | |_______________^
+19 |
+20 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+12 | import platform
+13 + import subprocess
+14 + import tempfile
+15 + import unittest
+16 | from pathlib import Path
+17 |
+18 | from t068_oracle_engine_compat import require_beta3_matches_pinned_beta2
+   - import subprocess
+   - import tempfile
+   - import unittest
+19 |
+   |
+
+F401 [*] `hashlib` imported but unused
+ --> tests/test_t068_quad_stress.py:7:8
+  |
+5 | import copy
+6 | import ctypes
+7 | import hashlib
+  |        ^^^^^^^
+8 | import importlib.util
+9 | import json
+  |
+help: Remove unused import: `hashlib`
+  |
+6 | import ctypes
+  - import hashlib
+7 | import importlib.util
+  |
+
+E402 Module level import not at top of file
+  --> tests/test_t068_quad_stress.py:26:1
+   |
+24 | assert spec is not None and spec.loader is not None
+25 | # The sibling native C ABI facade is shared with the pinned 48-case corpus.
+26 | import sys
+   | ^^^^^^^^^^
+27 | sys.path.insert(0, str(SCRIPT.parent))
+28 | stress = importlib.util.module_from_spec(spec)
+   |
+help: Move module level imports to top of file
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_quad_stress.py:26:1
+   |
+24 | assert spec is not None and spec.loader is not None
+25 | # The sibling native C ABI facade is shared with the pinned 48-case corpus.
+26 | import sys
+   | ^^^^^^^^^^
+27 | sys.path.insert(0, str(SCRIPT.parent))
+28 | stress = importlib.util.module_from_spec(spec)
+   |
+help: Organize imports
+   |
+26 | import sys
+27 +
+28 | sys.path.insert(0, str(SCRIPT.parent))
+   |
+
+F841 Local variable `side` is assigned to but never used
+  --> tests/test_t068_scalar_deltas.py:77:9
+   |
+75 |     def test_native_rejection_is_atomic_even_with_partial_valid_changes(self) -> None:
+76 |         fn = self.brush.delta_function
+77 |         side = 8
+   |         ^^^^
+78 |         payload = (ctypes.c_uint8 * 772)(*([0xA7] * 772))
+79 |         original = (ctypes.c_uint8 * 256)(*([19, 27, 45, 86] * 64))
+   |
+help: Remove assignment to unused variable `side`
+   |
+76 |         fn = self.brush.delta_function
+   -         side = 8
+77 |         payload = (ctypes.c_uint8 * 772)(*([0xA7] * 772))
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_scalar_strict_fp.py:2:1
+   |
+ 1 |   """T-068 detached scalar ABI must reject fast-math and invalid NaN inputs."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import ctypes
+ 5 | | from pathlib import Path
+ 6 | | import shutil
+ 7 | | import subprocess
+ 8 | | import tempfile
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+4  | import ctypes
+   - from pathlib import Path
+5  | import shutil
+6  | import subprocess
+7  | import tempfile
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_visual_contention.py:2:1
+   |
+ 1 |   """Offline, fail-closed T-068 Linux software visual-contention evidence contracts."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import copy
+ 5 | | import json
+ 6 | | import os
+ 7 | | from pathlib import Path
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+6  | import os
+   - from pathlib import Path
+7  | import sys
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t068_visual_counterbalanced.py:2:1
+   |
+ 1 |   """Fail-closed replay of T-068 ABBA synthetic-frame load comparisons."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import copy
+ 5 | | import json
+ 6 | | import os
+ 7 | | from pathlib import Path
+ 8 | | import sys
+ 9 | | import unittest
+   | |_______________^
+10 |
+11 |   ROOT = Path(__file__).resolve().parents[1]
+   |
+help: Organize imports
+   |
+6  | import os
+   - from pathlib import Path
+7  | import sys
+8  | import unittest
+9  + from pathlib import Path
+10 |
+   |
+
+F401 [*] `re` imported but unused
+  --> tests/test_t090_responsive_workspace.py:9:8
+   |
+ 7 | from __future__ import annotations
+ 8 |
+ 9 | import re
+   |        ^^
+10 | import sys
+11 | import unittest
+   |
+help: Remove unused import: `re`
+  |
+8 |
+  - import re
+9 | import sys
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t094_ci_replay.py:15:1
+   |
+13 |   ROOT = Path(__file__).resolve().parents[1]
+14 |   sys.path.insert(0, str(ROOT / "tools"))
+15 | / from replay_godot_ci import Check, WORKFLOW, extract_checks, revision_identity, run_checks  # noqa: E402
+16 | | from report_godot_ci import expected_check_ids  # noqa: E402
+   | |______________________________________________^
+help: Organize imports
+   |
+14 | sys.path.insert(0, str(ROOT / "tools"))
+   - from replay_godot_ci import Check, WORKFLOW, extract_checks, revision_identity, run_checks  # noqa: E402
+15 + from replay_godot_ci import WORKFLOW, Check, extract_checks, revision_identity, run_checks  # noqa: E402
+16 | from report_godot_ci import expected_check_ids  # noqa: E402
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests/test_t094_ci_replay.py:146:9
+    |
+144 |       @staticmethod
+145 |       def create_sample(root: Path) -> tuple[Path, str, str]:
+146 | /         from verify_godot_ci_replay import PREFIX
+147 | |         from report_godot_ci import summarize
+    | |_____________________________________________^
+148 |           workflow = fixture("printf 'ok\\n'")
+149 |           checks = extract_checks(workflow)
+    |
+help: Organize imports
+    |
+145 |     def create_sample(root: Path) -> tuple[Path, str, str]:
+146 +         from report_godot_ci import summarize
+147 |         from verify_godot_ci_replay import PREFIX
+    -         from report_godot_ci import summarize
+148 |         workflow = fixture("printf 'ok\\n'")
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests/test_t094_godot_model_log.py:323:9
+    |
+322 |       def test_new_source_pixel_oracles_are_required_without_new_check_ids(self) -> None:
+323 | /         from replay_godot_ci import extract_checks, WORKFLOW
+324 | |         from report_godot_ci import expected_check_ids
+    | |______________________________________________________^
+325 |
+326 |           workflow = WORKFLOW.read_text()
+    |
+help: Organize imports
+    |
+322 |     def test_new_source_pixel_oracles_are_required_without_new_check_ids(self) -> None:
+    -         from replay_godot_ci import extract_checks, WORKFLOW
+323 +         from replay_godot_ci import WORKFLOW, extract_checks
+324 |         from report_godot_ci import expected_check_ids
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests/test_t094_godot_model_log.py:364:9
+    |
+363 |     def test_fast_ci_affected_smokes_call_shared_strict_verifier(self) -> None:
+364 |         from replay_godot_ci import extract_checks, WORKFLOW
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+365 |         scripts = {check.identifier: check.script for check in extract_checks(WORKFLOW.read_text())}
+366 |         self.assertIn("mktemp -d", scripts["ci_07_verify_t_053_standalone_linux_release_package"])
+    |
+help: Organize imports
+    |
+363 |     def test_fast_ci_affected_smokes_call_shared_strict_verifier(self) -> None:
+    -         from replay_godot_ci import extract_checks, WORKFLOW
+364 +         from replay_godot_ci import WORKFLOW, extract_checks
+365 |         scripts = {check.identifier: check.script for check in extract_checks(WORKFLOW.read_text())}
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests/test_t094_godot_model_log.py:384:9
+    |
+382 |     def test_every_drawing_model_uses_one_strict_log_check(self) -> None:
+383 |         """Prevent a future loose substring grep from becoming a false-green gate."""
+384 |         from replay_godot_ci import extract_checks, WORKFLOW
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+385 |
+386 |         scripts = {check.identifier: check.script for check in extract_checks(WORKFLOW.read_text())}
+    |
+help: Organize imports
+    |
+383 |         """Prevent a future loose substring grep from becoming a false-green gate."""
+    -         from replay_godot_ci import extract_checks, WORKFLOW
+384 +         from replay_godot_ci import WORKFLOW, extract_checks
+385 |
+    |
+
+F541 [*] f-string without any placeholders
+   --> tests/test_t094_godot_model_log.py:410:13
+    |
+408 |         # for T-089/T-092/T-093 (or any unrecognized ERROR: diagnostic).
+409 |         examples = (
+410 |             f"Bootstrap T089_MODEL_PASSED in unrelated text\n",
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+411 |             f"{MARKER}\nSCRIPT ERROR: Invalid call in deferred renderer\n",
+412 |             f"{MARKER}\nERROR: Unexpected storage corruption\n",
+    |
+help: Remove extraneous `f` prefix
+    |
+409 |         examples = (
+    -             f"Bootstrap T089_MODEL_PASSED in unrelated text\n",
+410 +             "Bootstrap T089_MODEL_PASSED in unrelated text\n",
+411 |             f"{MARKER}\nSCRIPT ERROR: Invalid call in deferred renderer\n",
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t094_owner_evidence.py:16:1
+   |
+14 |   ROOT = Path(__file__).resolve().parents[1]
+15 |   sys.path.insert(0, str(ROOT / "tools"))
+16 | / from drawing_owner_evidence import (  # noqa: E402
+17 | |     blank_manifest, check_cohort, findings, percentile_ms, timing_summary, validate,
+18 | | )
+   | |_^
+help: Organize imports
+   |
+16 | from drawing_owner_evidence import (  # noqa: E402
+   -     blank_manifest, check_cohort, findings, percentile_ms, timing_summary, validate,
+17 +     blank_manifest,
+18 +     check_cohort,
+19 +     findings,
+20 +     percentile_ms,
+21 +     timing_summary,
+22 +     validate,
+23 | )
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> tests/test_t107_evidence_audit.py:14:1
+   |
+12 |   ROOT = Path(__file__).resolve().parents[1]
+13 |   sys.path.insert(0, str(ROOT / "tools"))
+14 | / from t107_evidence_audit import (  # noqa: E402
+15 | |     AuditError, _read_rows, audit, copy_replay, manual_gates, owner_actions,
+16 | |     replay_inventory, runtime_inventory,
+17 | | )
+   | |_^
+18 |
+19 |   EXTERNAL = ROOT / "docs/evidence/T-107-2026-11-12-replay-capture"
+   |
+help: Organize imports
+   |
+14 | from t107_evidence_audit import (  # noqa: E402
+   -     AuditError, _read_rows, audit, copy_replay, manual_gates, owner_actions,
+   -     replay_inventory, runtime_inventory,
+15 +     AuditError,
+16 +     _read_rows,
+17 +     audit,
+18 +     copy_replay,
+19 +     manual_gates,
+20 +     owner_actions,
+21 +     replay_inventory,
+22 +     runtime_inventory,
+23 | )
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+   --> tests/test_t107_evidence_audit.py:109:9
+    |
+108 |       def test_original_workflow_is_pinned_and_independent_of_later_script_changes(self) -> None:
+109 | /         from hashlib import sha256
+110 | |         from t107_evidence_audit import REPLAY_WORKFLOW_SHA256
+111 | |         from report_godot_ci import WORKFLOW
+    | |____________________________________________^
+112 |
+113 |           archived = (EXTERNAL / "workflow.yml").read_bytes()
+    |
+help: Organize imports
+    |
+109 |         from hashlib import sha256
+    -         from t107_evidence_audit import REPLAY_WORKFLOW_SHA256
+110 +
+111 |         from report_godot_ci import WORKFLOW
+112 +         from t107_evidence_audit import REPLAY_WORKFLOW_SHA256
+113 |
+    |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t121_raster_snapshot.py:3:1
+  |
+1 |   """T-121 raster Open must decode the capped bytes it validated, not reopen a path."""
+2 |
+3 | / from pathlib import Path
+4 | | import unittest
+  | |_______________^
+5 |
+6 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+3 + import unittest
+4 | from pathlib import Path
+  - import unittest
+5 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t123_raster_predecode_bounds.py:3:1
+  |
+1 |   """T-123: source/CI contracts for predecoder raster dimensions and one snapshot."""
+2 |
+3 | / from pathlib import Path
+4 | | import unittest
+  | |_______________^
+5 |
+6 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+3 + import unittest
+4 | from pathlib import Path
+  - import unittest
+5 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t124_queued_stroke_ci.py:3:1
+  |
+1 |   """CI contracts for bounded, chronological input while another stroke drains."""
+2 |
+3 | / from pathlib import Path
+4 | | import unittest
+  | |_______________^
+5 |
+6 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+3 + import unittest
+4 | from pathlib import Path
+  - import unittest
+5 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t125_pending_persistence.py:3:1
+  |
+1 |   """Source-routing and CI contracts for release-backlog persistence safety."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t126_pending_tab_switch.py:3:1
+  |
+1 |   """Contract checks for preserving unpublished Brush edits across tab changes."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t127_pending_history.py:3:1
+  |
+1 |   """Regression contracts for Undo/Redo during unpublished Brush transactions."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t128_history_list_pending.py:3:1
+  |
+1 |   """Guard History list row navigation from unpublished Brush history conflicts."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t129_pending_content_edit.py:3:1
+  |
+1 |   """Pending Brush source ownership across layer and clipboard commands."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t130_pending_source_context.py:3:1
+  |
+1 |   """Fail-closed source-context guards for unpublished Brush transactions."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t131_object_pending_metadata.py:3:1
+  |
+1 |   """Fail-closed Object rename and Save As variant target invariants."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t132_dialog_document_identity.py:3:1
+  |
+1 |   """Asynchronous Save As callbacks must not target a different document."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t133_window_quit.py:3:1
+  |
+1 |   """Standalone OS close must not bypass document or Brush publication gates."""
+2 |
+3 | / from pathlib import Path
+4 | | import re
+5 | | import sys
+6 | | import unittest
+  | |_______________^
+7 |
+8 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import re
+4 | import sys
+5 | import unittest
+6 + from pathlib import Path
+7 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t134_authoring_dialog_identity.py:3:1
+  |
+1 |   """Authoring modal completions belong to their originating document and row."""
+2 |
+3 | / from pathlib import Path
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t135_sparse_viewport.py:3:1
+  |
+1 |   """Wide sparse viewport traversal: bounded exact source and CI contracts."""
+2 |
+3 | / from pathlib import Path
+4 | | import re
+5 | | import sys
+6 | | import unittest
+  | |_______________^
+7 |
+8 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import re
+4 | import sys
+5 | import unittest
+6 + from pathlib import Path
+7 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t136_preview_sparse_union.py:3:1
+  |
+1 |   """T-136: bounded preview/committed sparse draw union and CI contracts."""
+2 |
+3 | / from pathlib import Path
+4 | | import re
+5 | | import sys
+6 | | import unittest
+  | |_______________^
+7 |
+8 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+2 |
+  - from pathlib import Path
+3 | import re
+4 | import sys
+5 | import unittest
+6 + from pathlib import Path
+7 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t137_preview_cold_population.py:2:1
+  |
+1 |   """Contracts for bounded cold population of complete detached drawing previews."""
+2 | / from pathlib import Path
+3 | | import re
+4 | | import sys
+5 | | import unittest
+  | |_______________^
+6 |
+7 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+1 | """Contracts for bounded cold population of complete detached drawing previews."""
+  - from pathlib import Path
+2 | import re
+3 | import sys
+4 | import unittest
+5 + from pathlib import Path
+6 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t138_preview_focal_plan.py:2:1
+  |
+1 |   """Fail-closed contracts for focal cache retention with detached previews."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t140_focal_selection_outline.py:2:1
+  |
+1 |   """Fail-closed regression contracts for bounded focal-first outline overflow."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t141_sparse_mask_overflow.py:2:1
+  |
+1 |   """Bounded exact sparse-selection overflow and fail-closed CI contracts."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t142_outline_cache_reuse.py:2:1
+  |
+1 |   """Fail-closed tests for retained saturated selection contour caches."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t143_contour_clip_reconcile.py:2:1
+  |
+1 |   """Fail-closed contracts for saturated selection contour plans after sub-tile pans."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t144_outline_plan_cache.py:2:1
+  |
+1 |   """Fail-closed exact selection-outline planning reuse and native CI contracts."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+I001 [*] Import block is un-sorted or un-formatted
+ --> tests/test_t145_outline_window_shift.py:2:1
+  |
+1 |   """Regression contracts for contour continuity across visible tile-window pans."""
+2 | / from __future__ import annotations
+3 | |
+4 | | from pathlib import Path
+5 | | import re
+6 | | import sys
+7 | | import unittest
+  | |_______________^
+8 |
+9 |   ROOT = Path(__file__).resolve().parents[1]
+  |
+help: Organize imports
+  |
+3 |
+  - from pathlib import Path
+4 | import re
+5 | import sys
+6 | import unittest
+7 + from pathlib import Path
+8 |
+  |
+
+Found 69 errors.
+[*] 62 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
