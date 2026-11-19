@@ -1,12 +1,12 @@
 """Pending Brush source ownership across layer and clipboard commands."""
 
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-from check_godot_model_log import verify_log  # noqa: E402
+sys.path.insert(0, str(ROOT))
+from tools.check_godot_model_log import verify_log  # noqa: E402
 
 
 class PendingContentEditContracts(unittest.TestCase):
@@ -48,6 +48,19 @@ class PendingContentEditContracts(unittest.TestCase):
         self.assertIn('not _can_persist_or_close("Change Layer")', selection)
         self.assertIn("item.select(0)", selection)
         self.assertIn("node_id == selected_layer_node() and canvas.has_pending_stroke()", selection)
+
+    def test_native_drain_checkpoint_accepts_complete_publication(self) -> None:
+        witness = (ROOT / "drawing/tests/t129_pending_content_edit_smoke.gd").read_text()
+        # Native Hokusai may finish both queued transactions before two
+        # process frames elapse. Do not mistake completed paint for loss.
+        self.assertNotIn('check(app.canvas.has_pending_stroke(), "layer commands cannot cancel strokes on next frame")', witness)
+        self.assertNotIn('check(app.canvas.has_pending_stroke(), "clipboard commands do not invalidate session next frame")', witness)
+        self.assertIn('doc.revision == revision + 2', witness)
+        self.assertIn('doc.history_position() == initial_history + 2', witness)
+        self.assertIn('doc.history_position() == history + 2', witness)
+        self.assertIn('check(await await_commit(app.canvas)', witness)
+        self.assertIn('app.canvas.has_pending_stroke() or', witness)
+        self.assertIn('T129_PENDING_EDIT_PASSED checks=%d failures=0', witness)
 
     def test_ci_runs_strict_witness_and_preserves_legacy_layer_contract(self) -> None:
         ci = (ROOT / ".github/workflows/godot-check.yml").read_text()

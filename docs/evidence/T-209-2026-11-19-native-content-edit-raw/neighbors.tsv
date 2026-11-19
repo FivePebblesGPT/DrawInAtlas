@@ -1,0 +1,12 @@
+suite	exit	marker
+t124_queued_brush_smoke	0	T124_QUEUED_PASSED checks=78 failures=0
+t125_pending_persistence_smoke	0	T125_PENDING_PASSED checks=29 failures=0
+t126_pending_tab_switch_smoke	0	T126_TAB_SWITCH_PASSED checks=34 failures=0
+t127_pending_history_smoke	0	T127_HISTORY_PASSED checks=40 failures=0
+t128_history_list_pending_smoke	0	T128_HISTORY_LIST_PASSED checks=37 failures=0
+t130_pending_source_context_smoke	0	T130_CONTEXT_PASSED checks=34 failures=0
+t124_native_x11	0	T124_NATIVE_PASSED checks=20 failures=0
+layer_structure_smoke	0	T089_MODEL_PASSED: 63 checks
+selection_clipboard_smoke	0	T088_MODEL_PASSED
+layer_structure_native	0	T089_NATIVE_PASSED: 36 checks
+selection_clipboard_native	1	T088_NATIVE_FAILED: native Ctrl+V/Undo content survives file reopen

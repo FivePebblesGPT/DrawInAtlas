@@ -1,0 +1,8 @@
+test_ci_runs_strict_witness_and_preserves_legacy_layer_contract (test_t129_pending_content_edit.PendingContentEditContracts.test_ci_runs_strict_witness_and_preserves_legacy_layer_contract) ... ok
+test_mutators_refuse_revision_changes_before_document_writes (test_t129_pending_content_edit.PendingContentEditContracts.test_mutators_refuse_revision_changes_before_document_writes) ... ok
+test_native_drain_checkpoint_accepts_complete_publication (test_t129_pending_content_edit.PendingContentEditContracts.test_native_drain_checkpoint_accepts_complete_publication) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.004s
+
+OK

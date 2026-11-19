@@ -1,0 +1,2 @@
+baseline_strict_exit=1
+baseline_godot_exit=1

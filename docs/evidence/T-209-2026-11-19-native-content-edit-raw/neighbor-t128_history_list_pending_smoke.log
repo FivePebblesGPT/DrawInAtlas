@@ -1,0 +1,24 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+WARNING: Drawing: Stroke still processing; History navigation after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _history_item_selected (res://addons/drawing/workspace.gd:1866)
+         [3] jump (res://tests/t128_history_list_pending_smoke.gd:77)
+         [4] test_backward_jump (res://tests/t128_history_list_pending_smoke.gd:108)
+         [5] new_app (res://tests/t128_history_list_pending_smoke.gd:28)
+         [6] frames (res://tests/t128_history_list_pending_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; History navigation after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _history_item_selected (res://addons/drawing/workspace.gd:1866)
+         [3] jump (res://tests/t128_history_list_pending_smoke.gd:77)
+         [4] test_forward_jump_during_pending (res://tests/t128_history_list_pending_smoke.gd:171)
+         [5] new_app (res://tests/t128_history_list_pending_smoke.gd:28)
+         [6] frames (res://tests/t128_history_list_pending_smoke.gd:17)
+T128_HISTORY_LIST_PASSED checks=37 failures=0
