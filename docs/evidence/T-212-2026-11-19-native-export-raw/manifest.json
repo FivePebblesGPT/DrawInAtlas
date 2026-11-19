@@ -1,0 +1,44 @@
+{
+  "environment": {
+    "export_runtime": "Godot editor executable paired with exported PCK, NOT official Linux release template",
+    "godot": "4.8.beta3.official.c51ff06e8",
+    "python": "3.13.5",
+    "rust": "1.99.1 bundled"
+  },
+  "process_exits": {
+    "Godot editor import": 0,
+    "Godot export-pack": 0,
+    "Ruff": 0,
+    "drawing stage": 0,
+    "final unit tests": 0,
+    "format": 0,
+    "initial unit tests": "1 (2 failures out of 7)",
+    "make python-test": 0,
+    "native Rust tests": 0,
+    "package CLI": 0,
+    "portability": 0,
+    "release gate": 0,
+    "strict release inspector + isolated ABI/main boot": 0,
+    "ty": 0
+  },
+  "raw_sha256": {
+    "all-python-tests.log": "566747f7a80a1387d1ea21cb3a63d19d781e7d26d3de366b3b3c42d8876eb1b5",
+    "fail-first.log": "ab5129ee9c88177b10dc8791c669bbbf880d90b4879354a06fc12a7122d20cd0",
+    "format-check.log": "3bc53bf3e981a98a34a852e175bf9b77af841edea74fca595d9aedcbaf9a4938",
+    "godot-import.log": "1505860c444e58814dfe3b7cb5e88d2d5b1b799313b15ea829c6c6b1c5a12660",
+    "native-package.log": "5e43c96f2833202b7ceb07ce6491e53833ae428a79e52495e6f2fe7115f91e60",
+    "packaging-tests.log": "b334e859ee0b8a0aca5e2bf8906fb4cb5653ea7fa36dcc4ff3ecc4be06ac83ab",
+    "pck-export.log": "b4bdb2e63a4188273ef79cfadf3a88e2a5ef969ac94c91f8896743eccefc5b6d",
+    "portability-tests.log": "620a2eefeffe367ed49210e575327c4e2454b4d07afb6d0034be88cede057b59",
+    "release-gate-tests.log": "4a88db2c87793899655fdaa84118aecd9c21cfc69f5d7c94caa1d0b1926bac14",
+    "release-report.json": "a80ff8de594c68b52938c4e5f991a49cd968b6a33319aa70123e19cf49f0c5cc",
+    "ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "rust-tests.log": "21348b19ab6e0d34a6b203cf8915f8fa65285c6d28fa228f72f72d21eb72596b",
+    "stage.log": "70b3ec70e7fc8b458255fa45439bed61411674124d2b468da158e92613c29ea0",
+    "ty.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+  },
+  "source_sha256": {
+    "tests/test_t201_linux_native_package.py": "c8cfebca909d711470d2d25178462c6e54acaa54e48fa868ed6eedaad575c581",
+    "tools/package_linux_export.py": "f531317d01bdc2f10c5806f904af818279c9f94736ad86784a28c7fc897bc3b7"
+  }
+}

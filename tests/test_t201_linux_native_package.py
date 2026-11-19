@@ -1,6 +1,9 @@
 """The standalone Linux release must ship exactly its required Rust extension."""
+
 from __future__ import annotations
 
+import errno
+import os
 import stat
 import struct
 import tempfile
@@ -104,6 +107,74 @@ class LinuxNativeExportTests(unittest.TestCase):
         with self.assertRaises(gate.ReleaseError):
             gate.inspect_distribution(self.output, "linux")
 
+    def test_rejected_export_does_not_leave_partially_installed_library(self) -> None:
+        """Invalid ELF/PCK and unexpected files must fail without any publication."""
+        native = self.output / gate.NATIVE_LIBRARY
+        for tamper in ("extra", "pack", "elf"):
+            executable = self.output / "Drawing.x86_64"
+            pack = self.output / "Drawing.pck"
+            if tamper == "extra":
+                (self.output / "unexpected.so").write_bytes(elf())
+            elif tamper == "pack":
+                pack.write_bytes(b"BAD!" + bytes(128))
+            else:
+                executable.write_bytes(bytes(4096))
+            before = {
+                item.relative_to(self.output).as_posix(): item.read_bytes()
+                for item in self.output.rglob("*") if item.is_file()
+            }
+            with self.subTest(tamper=tamper):
+                with self.assertRaises(package.PackageError):
+                    package.package(self.stage, self.output)
+                after = {
+                    item.relative_to(self.output).as_posix(): item.read_bytes()
+                    for item in self.output.rglob("*") if item.is_file()
+                }
+                self.assertEqual(after, before)
+                self.assertFalse(native.exists())
+                self.assertFalse(native.parent.exists())
+                self.assertFalse(any(self.output.glob(".native-preflight-*")))
+            (self.output / "unexpected.so").unlink(missing_ok=True)
+            pack.write_bytes(b"GDPC" + bytes(128))
+            executable.write_bytes(elf(kind=2))
+
+    def test_preflight_cross_filesystem_native_fallback(self) -> None:
+        """The native source can be on another filesystem than the export."""
+        real_link = os.link
+
+        def emulate_cross_device(source: Path, destination: Path) -> None:
+            if source == self.native:
+                raise OSError(errno.EXDEV, "cross-device link")
+            real_link(source, destination)
+
+        with patch.object(package.os, "link", side_effect=emulate_cross_device):
+            shipped = package.package(self.stage, self.output)
+        self.assertEqual(shipped.read_bytes(), self.native.read_bytes())
+        self.assertEqual(
+            gate.inspect_distribution(self.output, "linux")["native_library"]["sha256"],
+            gate.digest(self.native),
+        )
+        self.assertFalse(any(self.output.glob(".native-preflight-*")))
+
+    def test_late_distribution_rejection_rolls_back_new_native(self) -> None:
+        native = self.output / gate.NATIVE_LIBRARY
+        inspect = package.inspect_distribution
+        inspections = 0
+
+        def reject_after_install(distribution: Path, platform: str) -> dict[str, object]:
+            nonlocal inspections
+            inspections += 1
+            if inspections == 2:
+                raise gate.ReleaseError("late failure")
+            return inspect(distribution, platform)
+
+        with patch.object(package, "inspect_distribution", side_effect=reject_after_install):
+            with self.assertRaisesRegex(package.PackageError, "late failure"):
+                package.package(self.stage, self.output)
+        self.assertEqual(inspections, 2)
+        self.assertFalse(native.exists())
+        self.assertFalse(native.parent.exists())
+
     def test_exported_native_symlink_rejected_even_when_target_matches(self) -> None:
         package.package(self.stage, self.output)
         shipped = self.output / gate.NATIVE_LIBRARY
@@ -126,8 +197,8 @@ class LinuxNativeExportTests(unittest.TestCase):
         self.manifest.unlink()
         # A bad manifest cannot silently authorize a different library.
         self.manifest.write_text(
-            '[configuration]\nentry_symbol = "wrong"\n'
-            '[libraries]\nlinux.release.x86_64 = "res://other.so"\n', encoding="utf-8",
+            '[configuration]\nentry_symbol = "wrong"\n[libraries]\nlinux.release.x86_64 = "res://other.so"\n',
+            encoding="utf-8",
         )
         with self.assertRaises(gate.ReleaseError):
             gate.inspect_stage(self.stage)

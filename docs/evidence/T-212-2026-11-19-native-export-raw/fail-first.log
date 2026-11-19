@@ -1,0 +1,32 @@
+test_exported_launch_rejects_unregistered_abi_even_when_main_loads (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_launch_rejects_unregistered_abi_even_when_main_loads) ... ok
+test_exported_native_symlink_rejected_even_when_target_matches (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_native_symlink_rejected_even_when_target_matches) ... ok
+test_late_distribution_rejection_rolls_back_new_native (test_t201_linux_native_package.LinuxNativeExportTests.test_late_distribution_rejection_rolls_back_new_native) ... FAIL
+test_missing_mismatched_and_extra_native_files_fail_closed (test_t201_linux_native_package.LinuxNativeExportTests.test_missing_mismatched_and_extra_native_files_fail_closed) ... ok
+test_package_release_keeps_native_bytes_and_launch_isolation (test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation) ... ok
+test_rejected_export_does_not_leave_partially_installed_library (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_export_does_not_leave_partially_installed_library)
+Invalid ELF/PCK and unexpected files must fail before native publication. ... FAIL
+test_symlinks_and_unregistered_stage_rejected (test_t201_linux_native_package.LinuxNativeExportTests.test_symlinks_and_unregistered_stage_rejected) ... ok
+
+======================================================================
+FAIL: test_late_distribution_rejection_rolls_back_new_native (test_t201_linux_native_package.LinuxNativeExportTests.test_late_distribution_rejection_rolls_back_new_native)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 127, in test_late_distribution_rejection_rolls_back_new_native
+    self.assertFalse(native.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_rejected_export_does_not_leave_partially_installed_library (test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_export_does_not_leave_partially_installed_library)
+Invalid ELF/PCK and unexpected files must fail before native publication.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 113, in test_rejected_export_does_not_leave_partially_installed_library
+    self.assertFalse(native.exists())
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.832s
+
+FAILED (failures=2)
