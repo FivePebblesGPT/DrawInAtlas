@@ -1,0 +1,25 @@
+T088_NATIVE_LOG_REJECTED: expected exactly one native summary and one success marker
+T088_NATIVE_LOG_REJECTED: line 7: T088_NATIVE_FAILED: selected brush pixel visibly updates in framebuffer before release
+T088_NATIVE_LOG_REJECTED: line 8: T088_NATIVE_FAILED: masked stroke commits only selected pixels; hole unchanged
+T088_NATIVE_LOG_REJECTED: line 9: T088_NATIVE_FAILED: stroke is one undo step and revision stays monotonic
+T088_NATIVE_LOG_REJECTED: line 10: T088_NATIVE_FAILED: redo restores masked paint
+T088_NATIVE_LOG_REJECTED: line 11: T088_NATIVE_FAILED: held-button Eraser previews masked source removal without commit
+T088_NATIVE_LOG_REJECTED: line 12: T088_NATIVE_FAILED: Eraser clears selected pixels but not channel hole
+T088_NATIVE_LOG_REJECTED: line 13: T088_NATIVE_FAILED: Eraser is one undoable mask-constrained content operation
+T088_NATIVE_LOG_REJECTED: line 14: T088_NATIVE_FAILED: held-button Move clears source and draws destination at layer depth
+T088_NATIVE_LOG_REJECTED: line 15: T088_NATIVE_FAILED: Escape cancels Move with no document publication
+T088_NATIVE_LOG_REJECTED: line 16: T088_NATIVE_FAILED: mouse-up retains detached floating pixels without source publication
+T088_NATIVE_LOG_REJECTED: line 17: T088_NATIVE_FAILED: floating pixels stay visible in framebuffer after mouse release
+T088_NATIVE_LOG_REJECTED: line 18: T088_NATIVE_FAILED: second drag accumulates without publishing or resampling the source
+T088_NATIVE_LOG_REJECTED: line 19: T088_NATIVE_FAILED: Enter commits one exact source-to-final-target transaction
+T088_NATIVE_LOG_REJECTED: line 27: T088_NATIVE_FAILED: Move undo restores original pixels and mask context
+T088_NATIVE_LOG_REJECTED: line 28: T088_NATIVE_FAILED: Move redo restores pixel destination and selection context
+T088_NATIVE_LOG_REJECTED: line 29: T088_NATIVE_FAILED: Escape after mouse-up restores original pixels and mask without history
+T088_NATIVE_LOG_REJECTED: line 30: T088_NATIVE_FAILED: Ctrl+X cuts selected pixels in one transaction
+T088_NATIVE_LOG_REJECTED: line 31: T088_NATIVE_FAILED: Ctrl+V places and selects translated active-layer paste
+T088_NATIVE_LOG_REJECTED: line 32: T088_NATIVE_FAILED: Undo restores keyboard Delete
+T088_NATIVE_LOG_REJECTED: line 33: T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 0.50
+T088_NATIVE_LOG_REJECTED: line 34: T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 1.00
+T088_NATIVE_LOG_REJECTED: line 35: T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 2.00
+T088_NATIVE_LOG_REJECTED: line 36: T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 4.00
+T088_NATIVE_LOG_REJECTED: line 37: T088_NATIVE_FAILED: native Ctrl+V/Undo content survives file reopen

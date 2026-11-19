@@ -1,0 +1,39 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T088_NATIVE_FAILED: selected brush pixel visibly updates in framebuffer before release
+T088_NATIVE_FAILED: masked stroke commits only selected pixels; hole unchanged
+T088_NATIVE_FAILED: stroke is one undo step and revision stays monotonic
+T088_NATIVE_FAILED: redo restores masked paint
+T088_NATIVE_FAILED: held-button Eraser previews masked source removal without commit
+T088_NATIVE_FAILED: Eraser clears selected pixels but not channel hole
+T088_NATIVE_FAILED: Eraser is one undoable mask-constrained content operation
+T088_NATIVE_FAILED: held-button Move clears source and draws destination at layer depth
+T088_NATIVE_FAILED: Escape cancels Move with no document publication
+T088_NATIVE_FAILED: mouse-up retains detached floating pixels without source publication
+T088_NATIVE_FAILED: floating pixels stay visible in framebuffer after mouse release
+T088_NATIVE_FAILED: second drag accumulates without publishing or resampling the source
+T088_NATIVE_FAILED: Enter commits one exact source-to-final-target transaction
+WARNING: Drawing: No locally owned undo step
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _undo (res://addons/drawing/workspace.gd:3348)
+         [2] run (res://tests/selection_clipboard_native.gd:267)
+         [3] frames (res://tests/selection_clipboard_native.gd:18)
+T088_NATIVE_FAILED: Move undo restores original pixels and mask context
+T088_NATIVE_FAILED: Move redo restores pixel destination and selection context
+T088_NATIVE_FAILED: Escape after mouse-up restores original pixels and mask without history
+T088_NATIVE_FAILED: Ctrl+X cuts selected pixels in one transaction
+T088_NATIVE_FAILED: Ctrl+V places and selects translated active-layer paste
+T088_NATIVE_FAILED: Undo restores keyboard Delete
+T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 0.50
+T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 1.00
+T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 2.00
+T088_NATIVE_FAILED: held-button Move publishes no pixels at zoom 4.00
+T088_NATIVE_FAILED: native Ctrl+V/Undo content survives file reopen
+T088_NATIVE_PREVIEW_TO_FRAME_POST_DRAW_MS p50=5.045 p95=6.167 n=4 (software upper-bound, not input-to-photon)
+T088_NATIVE: 51 checks; 24 failed (Godot 4.8-beta3 (official), display X11, 1010x740, zoom 50/100/200/400%)

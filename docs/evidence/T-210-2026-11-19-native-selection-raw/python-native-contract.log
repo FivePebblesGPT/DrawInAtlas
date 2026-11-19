@@ -1,0 +1,13 @@
+test_duplicate_or_early_marker (test_t088_floating_log.NativeFloatingSelectionLogTests.test_duplicate_or_early_marker) ... ok
+test_known_post_exit_leak_is_explicit (test_t088_floating_log.NativeFloatingSelectionLogTests.test_known_post_exit_leak_is_explicit) ... ok
+test_leak_before_success_is_fatal (test_t088_floating_log.NativeFloatingSelectionLogTests.test_leak_before_success_is_fatal) ... ok
+test_script_and_runtime_errors_never_allowed (test_t088_floating_log.NativeFloatingSelectionLogTests.test_script_and_runtime_errors_never_allowed) ... ok
+test_under_count_and_failures (test_t088_floating_log.NativeFloatingSelectionLogTests.test_under_count_and_failures) ... ok
+test_valid_complete_witness (test_t088_floating_log.NativeFloatingSelectionLogTests.test_valid_complete_witness) ... ok
+test_eraser_and_move_check_native_source_semantics (test_t088_floating_log.RequiredNativeSelectionFixtureTests.test_eraser_and_move_check_native_source_semantics) ... ok
+test_native_stroke_has_real_masked_footprint (test_t088_floating_log.RequiredNativeSelectionFixtureTests.test_native_stroke_has_real_masked_footprint) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.001s
+
+OK

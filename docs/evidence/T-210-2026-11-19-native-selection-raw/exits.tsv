@@ -1,0 +1,11 @@
+case	exit	strict_exit	marker
+original	1	1	24/51 failed
+native-x11-1	0	0	52/52
+native-x11-2	0	0	52 checks; 0 failed (Godot 4.8-beta3 (official), display X11, 1010x740, zoom 50/100/200/400%)
+native-x11-3	0	0	52 checks; 0 failed (Godot 4.8-beta3 (official), display X11, 1010x740, zoom 50/100/200/400%)
+native-x11-4	0	0	52 checks; 0 failed (Godot 4.8-beta3 (official), display X11, 1010x740, zoom 50/100/200/400%)
+neighbor-selection_clipboard_smoke	0	-	T088_MODEL: 131 checks; 0 failed|T088_MODEL_PASSED|
+neighbor-t129_pending_content_edit_smoke	0	-	T129_PENDING_EDIT_PASSED checks=35 failures=0|
+neighbor-t124_queued_brush_smoke	0	-	T124_QUEUED_PASSED checks=78 failures=0|
+neighbor-t139_sparse_selection_outline_native	0	-	T139_NATIVE_PASSED checks=7 failures=0|
+neighbor-t140_focal_mask_overflow_native	0	-	T140_NATIVE_PASSED checks=9 failures=0|

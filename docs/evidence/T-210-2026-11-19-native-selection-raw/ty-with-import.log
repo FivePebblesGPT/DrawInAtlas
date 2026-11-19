@@ -1,0 +1,13 @@
+error[import-not-found]: Cannot resolve imported module `check_native_t088_log`
+  --> tests/test_t088_floating_log.py:10:6
+   |
+10 | from check_native_t088_log import verify_log
+   |      ^^^^^^^^^^^^^^^^^^^^^
+info: Searched in the following paths during module resolution:
+info:   1. /mnt/data/work/DrawInAtlas-sprint-2026-11-17 (first-party code)
+info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+info:   3. /opt/pyvenv/lib/python3.13/site-packages (site-packages)
+info:   4. /opt/pyvenv/lib64/python3.13/site-packages (site-packages)
+info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+
+Found 1 diagnostic

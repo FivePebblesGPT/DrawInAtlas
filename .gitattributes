@@ -299,3 +299,5 @@ docs/evidence/T-207-2026-11-19-native-history-oracle-raw/*.log whitespace=-trail
 docs/evidence/T-208-2026-11-19-native-history-list-raw/*.log whitespace=-trailing-space,-blank-at-eof
 # T-209 native content-edit fail-first and validation logs are immutable raw evidence.
 docs/evidence/T-209-2026-11-19-native-content-edit-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-210 native-X11 selection/clipboard witness logs retain captured bytes.
+docs/evidence/T-210-2026-11-19-native-selection-raw/*.log whitespace=-trailing-space,-blank-at-eof
