@@ -1,0 +1,10 @@
+test_ci_script_paths_and_success_markers_exist (test_t211_native_ci_contract.RequiredNativeCIContracts.test_ci_script_paths_and_success_markers_exist) ... ok
+test_optional_native_ci_retains_tile_publication_and_rollback (test_t211_native_ci_contract.RequiredNativeCIContracts.test_optional_native_ci_retains_tile_publication_and_rollback) ... ok
+test_required_fast_step_checks_actual_native_pigment_rollback (test_t211_native_ci_contract.RequiredNativeCIContracts.test_required_fast_step_checks_actual_native_pigment_rollback) ... ok
+test_required_fast_step_checks_signed_native_boundaries (test_t211_native_ci_contract.RequiredNativeCIContracts.test_required_fast_step_checks_signed_native_boundaries) ... ok
+test_retired_scripted_bridge_tests_are_not_runnable_ci (test_t211_native_ci_contract.RequiredNativeCIContracts.test_retired_scripted_bridge_tests_are_not_runnable_ci) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.006s
+
+OK

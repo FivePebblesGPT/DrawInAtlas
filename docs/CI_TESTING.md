@@ -1,3 +1,18 @@
+## 2026-11-19 — T-211 current required-native CI coverage
+
+The three historical **scripted-delta** tests below were written for a
+simulated producer deleted by T-153 and no longer parse. T-211 removes their
+active files and workflow invocations (the older descriptions remain as
+historical evidence). The existing fast-desktop T-085 check ID now requires
+`T095_NATIVE_PIGMENT_ATOMIC_PASSED` **57/57**, `T158_TILE_BOUNDS_PASSED`
+**24/24**, `T159_SIGNED_REPLAY_PASSED` **39/39**, and a five-test Python
+contract, with exact-count and fail-closed error checks. The optional native
+workflow already runs those native suites; its old tile-commit script is
+replaced with `T148_DOCUMENT_TILES_PASSED` **56/56**, preserving the original
+`T148_DOCUMENT_TILES_RESULT` output. No hosted run is claimed; T-106 must
+still verify required-native inventory and an exact-SHA hosted result after
+T-150. See [T-211 evidence](evidence/T-211-2026-11-19-required-native-ci.md).
+
 ## T-153 Hokusai-only native Brush/Eraser cutover (2026-11-16)
 
 **Current implementation:** NativeHard dispatch and old hard-only fixtures

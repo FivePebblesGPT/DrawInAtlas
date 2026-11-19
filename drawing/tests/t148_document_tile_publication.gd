@@ -225,4 +225,6 @@ func run() -> void:
 	test_packed_sources_and_authority()
 	test_native_publication()
 	print("T148_DOCUMENT_TILES_RESULT checks=%d failures=%d" % [checks, failures])
+	if failures == 0:
+		print("T148_DOCUMENT_TILES_PASSED checks=%d failures=0" % checks)
 	quit(0 if failures == 0 else 1)

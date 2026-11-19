@@ -1,0 +1,21 @@
+command_or_suite	exit	strict_exit	result
+original_hokusai_bulk_delta_smoke	1	n/a	missing T-147 bridge; parse failure
+original_t095_tile_shift_smoke	1	n/a	missing T-147 bridge; parse failure
+original_t095_tile_commit_smoke	1	n/a	missing T-147 bridge; parse failure
+original_t211_Python_contract	1	n/a	5 fail-first assertions
+final_t211_Python_contract	0	n/a	5 passed
+native_pigment_run_1	0	0	57/57
+native_pigment_run_2	0	0	57/57
+signed_lazy_run_1	0	0	24/24
+signed_lazy_run_2	0	0	24/24
+signed_replay_run_1	0	0	39/39
+signed_replay_run_2	0	0	39/39
+native_document_publication_original_marker	0	1	missing strict PASSED marker
+native_document_publication_final_3	0	0	56/56
+native_document_publication_final_4	0	0	56/56
+Python_make_python-test	0	n/a	56 passed
+Python_CI_fail_late_and_order	0	n/a	9 passed
+native_Rust	0	n/a	35 passed
+GDScript_explicit_type_audit	0	n/a	518 owned scripts, 33 skills
+Ruff_changed_test	0	n/a	pass
+Ty_project_targets	0	n/a	pass

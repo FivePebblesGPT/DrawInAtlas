@@ -1,0 +1,16 @@
+# Run from repository root with source at T-211 final version, in the supplied Godot 4.8 beta3 toolchain.
+# The archived *.baseline.log files are from the pre-change tree; all three processes exited 1.
+for s in t095_native_pigment_atomic t158_signed_lazy_tile_bounds t159_signed_replay_publication_bounds t148_document_tile_publication; do
+    GODOT_SILENCE_ROOT_WARNING=1 /mnt/data/toolchain/bin/godot --headless --audio-driver Dummy \
+      --path drawing --script "res://tests/$s.gd"
+done
+python3 tools/check_godot_model_log.py /path/to/process.log --marker T095_NATIVE_PIGMENT_ATOMIC_PASSED
+python3 tools/check_godot_model_log.py /path/to/process.log --marker T158_TILE_BOUNDS_PASSED
+python3 tools/check_godot_model_log.py /path/to/process.log --marker T159_SIGNED_REPLAY_PASSED
+python3 tools/check_godot_model_log.py /path/to/process.log --marker T148_DOCUMENT_TILES_PASSED
+python3 -m unittest discover -s tests -p 'test_t211_native_ci_contract.py' -v
+python3 -m unittest discover -s tests -p 'test_godot_ci*.py' -v
+make python-test
+PATH=/mnt/data/toolchain/rust/bin:$PATH CARGO=/mnt/data/toolchain/rust/bin/cargo CARGO_VENDOR_DIR=/mnt/data/toolchain/vendor CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/mnt/data/work/target bash tools/build_native_brush.sh --test
+python3 tests/check_explicit_types.py
+python3 tools/validate_ticket_store.py

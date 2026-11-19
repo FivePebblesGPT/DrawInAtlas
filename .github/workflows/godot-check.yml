@@ -141,10 +141,19 @@ jobs:
           # its pointer/framebuffer timing witness stays opt-in and software-only.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/brush_coverage_smoke.gd 2>&1 | tee /tmp/godot-t095-oracle.log
           python3 tools/check_godot_model_log.py /tmp/godot-t095-oracle.log --marker T095_ORACLE_PASSED || ci_fail_marker 'T095 Brush/Eraser independent pixel oracle rejected'
-          # T-095 Hokusai batch delta staging must match the original pixel
-          # transaction path even when no optional Rust binary is installed.
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/godot-t095-hokusai-delta.log
-          python3 tools/check_godot_model_log.py /tmp/godot-t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED || ci_fail_marker 'T095 Hokusai bulk delta model log rejected'
+          # T-211: native Hokusai is mandatory. The old scripted pigment ABI
+          # bridge was deleted in T-153; require actual native rollback/retry,
+          # hidden-RGB and signed publication instead of its un-runnable stub.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t095_native_pigment_atomic.gd 2>&1 | tee /tmp/godot-t095-native-pigment.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t095-native-pigment.log --marker T095_NATIVE_PIGMENT_ATOMIC_PASSED || ci_fail_marker 'T095 native pigment rollback rejected'
+          grep -Fqx 'T095_NATIVE_PIGMENT_ATOMIC_RESULT checks=57 failures=0' /tmp/godot-t095-native-pigment.log || ci_fail_marker 'T095 native pigment assertion count changed'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t158_signed_lazy_tile_bounds.gd 2>&1 | tee /tmp/godot-t158-signed-bounds.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t158-signed-bounds.log --marker T158_TILE_BOUNDS_PASSED || ci_fail_marker 'T158 native signed tile bounds rejected'
+          grep -Fqx 'T158_TILE_BOUNDS_PASSED checks=24 failures=0' /tmp/godot-t158-signed-bounds.log || ci_fail_marker 'T158 signed tile assertion count changed'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t159_signed_replay_publication_bounds.gd 2>&1 | tee /tmp/godot-t159-signed-replay.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t159-signed-replay.log --marker T159_SIGNED_REPLAY_PASSED || ci_fail_marker 'T159 native signed replay rejected'
+          grep -Fqx 'T159_SIGNED_REPLAY_PASSED checks=39 failures=0' /tmp/godot-t159-signed-replay.log || ci_fail_marker 'T159 signed replay assertion count changed'
+          python3 -m unittest discover -s tests -p 'test_t211_native_ci_contract.py' -v || ci_fail_marker 'T211 required-native CI source contract rejected'
           ci_finish
       - name: Verify T-086 source-space dirty-display tile invalidation
         id: ci_t086_viewport_cache_model

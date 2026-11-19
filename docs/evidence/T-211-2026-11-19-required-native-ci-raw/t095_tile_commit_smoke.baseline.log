@@ -1,0 +1,7 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+SCRIPT ERROR: Parse Error: Preload file "res://tests/t147_scripted_session_bridge.gd" does not exist.
+          at: GDScript::reload (res://tests/t095_tile_commit_smoke.gd:2)
+ERROR: Failed to load script "res://tests/t095_tile_commit_smoke.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:50)
