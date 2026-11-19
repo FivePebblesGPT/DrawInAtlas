@@ -1,0 +1,66 @@
+{
+  "baseline": "PR21 remote 9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9",
+  "limitations": [
+    "No official Godot export-template executable",
+    "No Windows native runtime",
+    "No hosted CI run",
+    "No physical display/owner acceptance"
+  ],
+  "logs": {
+    "fail-first.log": {
+      "bytes": 8718,
+      "exit_status": 1,
+      "sha256": "46ded7dd3e6a27ff9187c1a122aed801c07b77a2ccd2c8c3f9dfa977c0e2a089"
+    },
+    "format-final.log": {
+      "bytes": 25,
+      "exit_status": 0,
+      "sha256": "fd2299c9f1c6dc869070883e281051bfe93aacf66c1a3b0069f45b4aa410ca50"
+    },
+    "package-final.log": {
+      "bytes": 4026,
+      "exit_status": 0,
+      "sha256": "8faf7540aaecbb8e229863fe68ce2c196a85269c5a9b203fadb6b732f99f6354"
+    },
+    "python-final.log": {
+      "bytes": 911,
+      "exit_status": 0,
+      "sha256": "9aa139a1341d31f968a2c22bdcc1d6cbddf50679e10bb90fd9cca9a5202dd46b"
+    },
+    "real-launch.log": {
+      "bytes": 1001,
+      "exit_status": 0,
+      "sha256": "498736637d312beca272889570b9ec2f0c6741941701b0a21252a31caab7e956"
+    },
+    "real-stage.log": {
+      "bytes": 86,
+      "exit_status": 0,
+      "sha256": "257f878750558a51ddabcb22c348fbd66a8fc5dbaee530d8041677f96198b5c1"
+    },
+    "ruff-final.log": {
+      "bytes": 19,
+      "exit_status": 0,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "rust-final.log": {
+      "bytes": 3305,
+      "exit_status": 0,
+      "sha256": "7cc558bc1b818e959ffa34da35dfd430d62301a9bff4c2f2ac3a7059192a4cc5"
+    },
+    "ticket-validate.log": {
+      "bytes": 58,
+      "exit_status": 0,
+      "sha256": "315a1470665332ca5e63fbb7eb4be34b4d7e756e41b3269ebd60dd4acd17d24c"
+    },
+    "ty-final.log": {
+      "bytes": 19,
+      "exit_status": 0,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    }
+  },
+  "source_sha256": {
+    "tests/test_t201_linux_native_package.py": "ddffea98dddb7e4b3b7d283fc83c71be30bebcb85112dd47b8efa15974ac495f",
+    "tools/benchmarks/t068_release_gate.py": "85909d3f79e3a3d0708fd41cfcaed2b274515e0c9fe70335ec86da675cccd9c1"
+  },
+  "ticket": "T-215"
+}

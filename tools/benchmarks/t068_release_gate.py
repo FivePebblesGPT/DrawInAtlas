@@ -52,9 +52,24 @@ def inspect_stage(stage: Path, *, require_native: bool = True) -> dict[str, Any]
     """Verify the separate source project is a Drawing-only staged consumer."""
     if not stage.is_dir() or stage.is_symlink():
         raise ReleaseError("Missing independent Drawing staging directory")
-    files = {p.relative_to(stage).as_posix(): p for p in stage.rglob("*") if p.is_file()}
-    if any(p.is_symlink() for p in stage.rglob("*")):
-        raise ReleaseError("Staged project contains symbolic links")
+    # Inspect *every* staged entry, not just regular files. Release staging
+    # may contain generated Godot caches and nested Drawing scripts, but an
+    # undeclared sibling directory or special node must never be silently
+    # accepted by the native packager.
+    allowed_directories = {"addons", "addons/drawing", "scripts", "tests", ".godot"}
+    allowed_subtrees = ("addons/drawing/", "scripts/", "tests/", ".godot/")
+    files: dict[str, Path] = {}
+    for path in stage.rglob("*"):
+        relative = path.relative_to(stage).as_posix()
+        if path.is_symlink():
+            raise ReleaseError("Staged project contains symbolic links")
+        if path.is_dir():
+            if relative not in allowed_directories and not relative.startswith(allowed_subtrees):
+                raise ReleaseError(f"Unexpected stage directory: {relative}")
+        elif path.is_file():
+            files[relative] = path
+        else:
+            raise ReleaseError(f"Non-regular stage entry: {relative}")
     required_files = ["project.godot", "main.tscn", "export_presets.cfg", REQUIRED_FONT_LICENSE]
     if require_native:
         required_files.extend((NATIVE_MANIFEST.as_posix(), NATIVE_LIBRARY.as_posix()))

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import os
+import socket
 import stat
 import struct
 import tempfile
@@ -292,6 +293,64 @@ class LinuxNativeExportTests(unittest.TestCase):
         self.native.symlink_to(self.root / "somewhere")
         with self.assertRaises(package.PackageError):
             package.package(self.stage, self.output)
+
+    def test_stage_rejects_undeclared_directories(self) -> None:
+        """No source-stage entry can escape the Drawing allowlisted hierarchy."""
+        for relative in ("unrelated", "addons/other"):
+            extra = self.stage / relative
+            extra.mkdir(parents=True)
+            try:
+                with self.subTest(relative=relative):
+                    with self.assertRaisesRegex(gate.ReleaseError, "Unexpected stage directory"):
+                        gate.inspect_stage(self.stage)
+            finally:
+                extra.rmdir()
+
+    def test_stage_rejects_special_files_even_in_allowed_subtrees(self) -> None:
+        """is_file-only inventory silently ignored FIFOs and Unix sockets."""
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("Requires POSIX FIFO nodes")
+        for relative in ("tests/native.pipe", ".godot/imported/native.pipe"):
+            special = self.stage / relative
+            special.parent.mkdir(parents=True, exist_ok=True)
+            os.mkfifo(special)
+            try:
+                with self.subTest(relative=relative):
+                    with self.assertRaisesRegex(gate.ReleaseError, "Non-regular stage entry"):
+                        gate.inspect_stage(self.stage)
+            finally:
+                special.unlink()
+
+    def test_stage_rejects_unix_sockets_in_allowed_subtrees(self) -> None:
+        """Unix sockets are not staged resources, even under cache directories."""
+        if not hasattr(socket, "AF_UNIX"):
+            self.skipTest("Requires Unix-domain sockets")
+        path = self.stage / ".godot/stale.sock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+            server.bind(str(path))
+            with self.assertRaisesRegex(gate.ReleaseError, "Non-regular stage entry"):
+                gate.inspect_stage(self.stage)
+
+    def test_package_rejected_stage_preserves_export(self) -> None:
+        """Pre-packaging rejection must not publish the native library."""
+        extra = self.stage / "unrelated"
+        extra.mkdir()
+        before = {p.relative_to(self.output): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}
+        with self.assertRaises(package.PackageError):
+            package.package(self.stage, self.output)
+        after = {p.relative_to(self.output): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}
+        self.assertEqual(after, before)
+        self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+        self.assertFalse(any(self.output.glob(".native-preflight-*")))
+
+    def test_stage_permits_generated_godot_and_drawing_subdirectories(self) -> None:
+        """Allowed empty source and Godot cache folders remain supported."""
+        (self.stage / ".godot/imported").mkdir(parents=True, exist_ok=True)
+        (self.stage / "scripts/nested").mkdir(parents=True, exist_ok=True)
+        self.assertTrue(gate.inspect_stage(self.stage)["native_required"])
+        package.package(self.stage, self.output)
+        self.assertTrue(gate.inspect_distribution(self.output, "linux")["native_extension_shipped"])
 
     def test_exported_launch_rejects_unregistered_abi_even_when_main_loads(self) -> None:
         package.package(self.stage, self.output)
