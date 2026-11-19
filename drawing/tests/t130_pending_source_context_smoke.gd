@@ -79,7 +79,12 @@ func test_deselect(base: String) -> void:
 		"clearing selection leaves both Brush gestures intact")
 	check(app.status.text.contains("Stroke"), "Deselect refusal is actionable")
 	await frames(2)
-	check(app.canvas.has_pending_stroke(), "Deselect cannot invalidate source on later frame")
+	# A fast native transaction may publish within these two frames. The
+	# rejected Deselect must never mutate its source mask in either state.
+	var still_pending: bool = app.canvas.has_pending_stroke()
+	check(app.canvas.selection_mask.same_as(mask) and (still_pending or
+		(doc.revision == revision + 2 and doc.history_position() == history + 2)),
+		"Deselect retains source mask until both native gestures publish")
 	check(await await_commit(app.canvas), "both Brush gestures complete after Deselect refusal")
 	check(doc.revision == revision + 2 and doc.history_position() == history + 2,
 		"both strokes create separate transactions")

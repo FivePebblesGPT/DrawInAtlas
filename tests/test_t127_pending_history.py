@@ -1,8 +1,8 @@
 """Regression contracts for Undo/Redo during unpublished Brush transactions."""
 
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -31,6 +31,18 @@ class PendingBrushHistoryContracts(unittest.TestCase):
         keyboard = source.split("func _unhandled_key_input(", 1)[1].split("\nfunc ", 1)[0]
         for excerpt in ("KEY_Z:", "KEY_Y: _redo()", "_undo()", "_redo()"):
             self.assertIn(excerpt, keyboard)
+
+    def test_native_history_witness_is_completion_safe(self) -> None:
+        witness = (ROOT / "drawing/tests/t127_pending_history_smoke.gd").read_text()
+        # A stationary 3px Legacy dab may produce no native paint, and
+        # two frame ticks cannot define the native transaction's lifetime.
+        self.assertIn("canvas.brush_width = 24.0", witness)
+        self.assertIn("canvas.update_gesture(canvas.pixel_to_position(pixel))", witness)
+        self.assertIn("doc.history_position() == prior_history + 2", witness)
+        self.assertIn("doc.history_position() == prior_history + 1", witness)
+        self.assertIn("check(await await_commit(app.canvas)", witness)
+        self.assertNotIn('check(app.canvas.has_pending_stroke(), "revision remains stable', witness)
+        self.assertNotIn('check(app.canvas.has_pending_stroke(), "redo refusal preserves', witness)
 
     def test_real_document_queued_history_witness_and_strict_ci(self) -> None:
         witness = (ROOT / "drawing/tests/t127_pending_history_smoke.gd").read_text()

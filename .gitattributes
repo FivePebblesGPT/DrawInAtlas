@@ -265,3 +265,60 @@ LightingData.asset     binary
 docs/evidence/T-107-2026-11-12-replay-capture/logs/*.log whitespace=-trailing-space
 # T-148 raw Godot/Rust process output is retained byte-exact.
 docs/evidence/T-148-2026-11-15-unreferenced-raster-raw/*.log whitespace=-trailing-space
+# T-189 raw benchmark logs/fixtures are immutable, including whitespace.
+docs/evidence/T-189-2026-11-17-raw/** whitespace=-trailing-space
+
+# Preserve T-190 raw native/Godot evidence exactly, including whitespace.
+docs/evidence/T-190-2026-11-17-raw/** whitespace=-trailing-space
+# T-197 checkpoint and A/B native profile logs are immutable raw process output.
+docs/evidence/T-197-2026-11-18-preview-callback-raw/** whitespace=-trailing-space
+docs/evidence/T-197-2026-11-18-native-display-raw/** whitespace=-trailing-space
+# T-198 native integration and timeout witnesses are immutable raw process logs.
+docs/evidence/T-198-2026-11-19-validation/*.log whitespace=-trailing-space,-blank-at-eof
+# T-199 fresh native process output and fail-first/regression logs are byte-exact.
+docs/evidence/T-199-2026-11-19-fresh-workspace/*.log whitespace=-trailing-space,-blank-at-eof
+docs/evidence/T-199-2026-11-19-validation/*.txt whitespace=-trailing-space,-blank-at-eof
+# T-200 raw validation output is byte-exact, including test runner whitespace.
+docs/evidence/T-200-2026-11-19-validation/*.txt whitespace=-trailing-space,-blank-at-eof
+# T-201 raw native export/toolchain logs retain exact captured whitespace.
+docs/evidence/T-201-2026-11-19-linux-native-export-raw/*.txt whitespace=-trailing-space,-blank-at-eof
+# T-202 raw Godot and Python process logs remain byte-for-byte unchanged.
+docs/evidence/T-202-2026-11-19-signed-save-fixture-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-203 fail-first and final native Godot/Python/Rust logs are byte-exact.
+docs/evidence/T-203-2026-11-19-native-image-frame-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-204 native live-stroke fail-first and validation output is byte-exact.
+docs/evidence/T-204-2026-11-19-native-live-stroke-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-205 native timing/control logs retain original captured process bytes.
+docs/evidence/T-205-2026-11-19-source-context-timing-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-206 native queued input regression raw process logs are byte-preserved.
+docs/evidence/T-206-2026-11-19-native-queue-oracle-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-207 original native history fail-first and runtime logs are byte-exact.
+docs/evidence/T-207-2026-11-19-native-history-oracle-raw/*.log whitespace=-trailing-space,-blank-at-eof
+
+# T-208 raw History-list Godot/Rust/Python process output is byte-exact.
+docs/evidence/T-208-2026-11-19-native-history-list-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-209 native content-edit fail-first and validation logs are immutable raw evidence.
+docs/evidence/T-209-2026-11-19-native-content-edit-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-210 native-X11 selection/clipboard witness logs retain captured bytes.
+docs/evidence/T-210-2026-11-19-native-selection-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-212 fail-first and native Linux release evidence retain captured bytes.
+docs/evidence/T-212-2026-11-19-native-export-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-213 raw release-inventory evidence keeps original runner whitespace.
+docs/evidence/T-213-2026-11-19-export-entries-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-214 immutable raw export-temp cleanup failures and validation logs.
+docs/evidence/T-214-2026-11-19-temp-ownership-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-215 source-stage inventory failure and validation logs retain raw bytes.
+docs/evidence/T-215-2026-11-19-stage-inventory-raw/*.log whitespace=-trailing-space,-blank-at-eof
+
+# T-216 native project identity fail-first and final process logs are byte-exact.
+docs/evidence/T-216-2026-11-19-project-identity-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-217 raw PCK-index validation and native launch logs are byte-exact.
+docs/evidence/T-217-2026-11-19-pck-index-raw/*.log whitespace=-trailing-space,-blank-at-eof
+
+# T-218 exported PCK full-resource integrity evidence is byte-exact.
+docs/evidence/T-218-2026-11-19-pck-payload-raw/*.log whitespace=-trailing-space,-blank-at-eof
+
+# T-219 PCK resource-name integrity evidence retains exact runner output.
+docs/evidence/T-219-2026-11-19-pck-names-raw/*.log whitespace=-trailing-space,-blank-at-eof
+# T-220 PCK ECFG fail-first and validation logs retain original runner whitespace.
+docs/evidence/T-220-2026-11-19-packed-project-raw/*.log whitespace=-trailing-space,-blank-at-eof

@@ -1,0 +1,22 @@
+test_t201_linux_native_package (unittest.loader._FailedTest.test_t201_linux_native_package) ... ERROR
+
+======================================================================
+ERROR: test_t201_linux_native_package (unittest.loader._FailedTest.test_t201_linux_native_package)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_t201_linux_native_package
+Traceback (most recent call last):
+  File "/usr/lib/python3.13/unittest/loader.py", line 396, in _find_test_path
+    module = self._get_module_from_name(name)
+  File "/usr/lib/python3.13/unittest/loader.py", line 339, in _get_module_from_name
+    __import__(name)
+    ~~~~~~~~~~^^^^^^
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 16, in <module>
+    import package_linux_export as package  # noqa: E402
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ModuleNotFoundError: No module named 'package_linux_export'
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.000s
+
+FAILED (errors=1)

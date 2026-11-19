@@ -1,0 +1,14 @@
+WARN Retry attempt #0. Sleeping 1.377669963s before the next attempt
+WARN Retry attempt #0. Sleeping 1.204243852s before the next attempt
+WARN Retry attempt #1. Sleeping 3.505448968s before the next attempt
+WARN Retry attempt #1. Sleeping 1.17863342s before the next attempt
+WARN Retry attempt #2. Sleeping 6.701463306s before the next attempt
+WARN Retry attempt #2. Sleeping 6.680496242s before the next attempt
+error: Request failed after 3 retries in 19.3s
+  cause: Failed to fetch: https://pypi.org/simple/ty/
+  cause: error sending request for url (https://pypi.org/simple/ty/)
+  cause: client error (Connect)
+  cause: dns error
+  cause: error resolving DNS
+  cause: failed to lookup address information: Temporary failure in name resolution
+make: *** [Makefile:88: lint] Error 2

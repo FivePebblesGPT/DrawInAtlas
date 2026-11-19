@@ -1,0 +1,260 @@
+unformatted: File would be reformatted
+   --> mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t068_release_gate.py:2:1
+    |
+1   | """T-068: portable Drawing release inspection cannot be passed by editor-only files."""
+2   +
+3   | from __future__ import annotations
+--------------------------------------------------------------------------------
+57  |             '[configuration]\nentry_symbol = "gdext_rust_init"\n'
+    -             '[libraries]\n'
+58  +             "[libraries]\n"
+59  |             f'linux.debug.x86_64 = "{release.NATIVE_RESOURCE}"\n'
+--------------------------------------------------------------------------------
+81  |         self.assertTrue(report["stage"]["file_count"] > 20)
+    -         self.assertEqual(report["linux"]["pack"]["sha256"],
+    -                          release.digest(self.linux / "Drawing.pck"))
+82  +         self.assertEqual(report["linux"]["pack"]["sha256"], release.digest(self.linux / "Drawing.pck"))
+83  |
+--------------------------------------------------------------------------------
+161 |         self.assertEqual(release.check_launch_log(version, 0), 0)
+    -         for log, code in ((version + "\nERROR: Native renderer crashed", 0),
+    -                           (version + "\nSCRIPT ERROR: bad source", 0),
+    -                           (version + "\nParse Error: invalid code", 0),
+    -                           (leak, 0), (version + "\n" + leak, 2)):
+162 +         for log, code in (
+163 +             (version + "\nERROR: Native renderer crashed", 0),
+164 +             (version + "\nSCRIPT ERROR: bad source", 0),
+165 +             (version + "\nParse Error: invalid code", 0),
+166 +             (leak, 0),
+167 +             (version + "\n" + leak, 2),
+168 +         ):
+169 |             with self.subTest(log=log, code=code):
+--------------------------------------------------------------------------------
+183 |             if "--script" in command:
+    -                 self.assertEqual(command[3:], ["--headless", "--script",
+    -                                                "res://tests/native_extension_ready.gd"])
+184 +                 self.assertEqual(
+185 +                     command[3:], ["--headless", "--script", "res://tests/native_extension_ready.gd"]
+186 +                 )
+187 |             else:
+--------------------------------------------------------------------------------
+191 |             self.assertTrue((exported.parent / "Drawing.pck").is_file())
+    -             self.assertEqual((exported.parent / release.NATIVE_LIBRARY).read_bytes(),
+    -                              (self.stage / release.NATIVE_LIBRARY).read_bytes())
+192 +             self.assertEqual(
+193 +                 (exported.parent / release.NATIVE_LIBRARY).read_bytes(),
+194 +                 (self.stage / release.NATIVE_LIBRARY).read_bytes(),
+195 +             )
+196 |             self.assertFalse((exported.parent / "project").exists())
+--------------------------------------------------------------------------------
+200 |             self.assertNotEqual(env["HOME"], str(Path.home()))
+    -             return Completed(0, "Godot Engine v4.8.beta3\n" +
+    -                              ("NATIVE_EXTENSION_READY\n" if "--script" in command else ""))
+201 +             return Completed(
+202 +                 0, "Godot Engine v4.8.beta3\n" + ("NATIVE_EXTENSION_READY\n" if "--script" in command else "")
+203 +             )
+204 |
+--------------------------------------------------------------------------------
+208 |             self.assertEqual(success["windows"]["status"], "not_tested")
+    -         for code, log in ((1, "Godot Engine"), (0, "SCRIPT ERROR: problem"),
+    -                           (0, "nothing ran")):
+209 +         for code, log in ((1, "Godot Engine"), (0, "SCRIPT ERROR: problem"), (0, "nothing ran")):
+210 |             with self.subTest(code=code, log=log):
+    |
+
+unformatted: File would be reformatted
+   --> mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py:124:51
+    |
+123 |                 item.relative_to(self.output).as_posix(): item.read_bytes()
+    -                 for item in self.output.rglob("*") if item.is_file()
+124 +                 for item in self.output.rglob("*")
+125 +                 if item.is_file()
+126 |             }
+--------------------------------------------------------------------------------
+131 |                     item.relative_to(self.output).as_posix(): item.read_bytes()
+    -                     for item in self.output.rglob("*") if item.is_file()
+132 +                     for item in self.output.rglob("*")
+133 +                     if item.is_file()
+134 |                 }
+    |
+
+unformatted: File would be reformatted
+   --> mnt/data/work/DrawInAtlas-sprint-2026-11-17/tools/benchmarks/t068_release_gate.py:9:1
+    |
+8   | """
+9   +
+10  | from __future__ import annotations
+--------------------------------------------------------------------------------
+40  | NATIVE_RESOURCE = "res://" + NATIVE_LIBRARY.as_posix()
+    -
+41  |
+--------------------------------------------------------------------------------
+64  |     allowed_native = {NATIVE_MANIFEST.as_posix(), NATIVE_LIBRARY.as_posix()}
+    -     if any(p.suffix.lower() in FORBIDDEN_EXTENSIONS and k not in allowed_native
+    -            for k, p in files.items()):
+65  +     if any(p.suffix.lower() in FORBIDDEN_EXTENSIONS and k not in allowed_native for k, p in files.items()):
+66  |         raise ReleaseError("Stage includes an unexpected native extension or library")
+--------------------------------------------------------------------------------
+72  |             raise ReleaseError("Malformed GDExtension manifest") from exc
+    -         if (manifest.get("configuration", "entry_symbol", fallback="").strip('"') != "gdext_rust_init" or
+    -                 any(manifest.get("libraries", key, fallback="").strip('"') != NATIVE_RESOURCE
+    -                     for key in ("linux.release.x86_64", "linux.debug.x86_64"))):
+73  +         if manifest.get("configuration", "entry_symbol", fallback="").strip('"') != "gdext_rust_init" or any(
+74  +             manifest.get("libraries", key, fallback="").strip('"') != NATIVE_RESOURCE
+75  +             for key in ("linux.release.x86_64", "linux.debug.x86_64")
+76  +         ):
+77  |             raise ReleaseError("GDExtension ABI/library mapping does not match required Rust export")
+--------------------------------------------------------------------------------
+86  |         raise ReleaseError("Wrong project identity")
+    -     return {"file_count": len(files), "font_license_sha256": digest(files[REQUIRED_FONT_LICENSE]),
+    -             "native_required": require_native,
+    -             "native_library_sha256": digest(files[NATIVE_LIBRARY.as_posix()]) if require_native else None}
+87  +     return {
+88  +         "file_count": len(files),
+89  +         "font_license_sha256": digest(files[REQUIRED_FONT_LICENSE]),
+90  +         "native_required": require_native,
+91  +         "native_library_sha256": digest(files[NATIVE_LIBRARY.as_posix()]) if require_native else None,
+92  +     }
+93  |
+--------------------------------------------------------------------------------
+98  |         if platform == "linux":
+    -             if (len(header) < 64 or header[:4] != b"\x7fELF" or header[4:6] != b"\x02\x01"
+    -                     or struct.unpack_from("<H", header, 18)[0] != 62
+    -                     or struct.unpack_from("<H", header, 16)[0] not in ((3,) if shared else (2, 3))):
+99  +             if (
+100 +                 len(header) < 64
+101 +                 or header[:4] != b"\x7fELF"
+102 +                 or header[4:6] != b"\x02\x01"
+103 +                 or struct.unpack_from("<H", header, 18)[0] != 62
+104 +                 or struct.unpack_from("<H", header, 16)[0] not in ((3,) if shared else (2, 3))
+105 +             ):
+106 |                 raise ReleaseError("Expected x86_64 little-endian ELF executable")
+--------------------------------------------------------------------------------
+120 | def inspect_distribution_entries(
+    -     directory: Path, platform: str, *, allow_missing_native: bool = False,
+121 +     directory: Path,
+122 +     platform: str,
+123 +     *,
+124 +     allow_missing_native: bool = False,
+125 | ) -> dict[str, Path]:
+--------------------------------------------------------------------------------
+139 |     expected_directories = {
+    -         parent.as_posix()
+    -         for name in expected
+    -         for parent in Path(name).parents
+    -         if parent != Path(".")
+140 +         parent.as_posix() for name in expected for parent in Path(name).parents if parent != Path(".")
+141 |     }
+--------------------------------------------------------------------------------
+177 |         _inspect_binary(native, "linux", shared=True)
+    -         native_info = {"name": NATIVE_LIBRARY.as_posix(), "size": native.stat().st_size,
+    -                        "sha256": digest(native)}
+178 +         native_info = {
+179 +             "name": NATIVE_LIBRARY.as_posix(),
+180 +             "size": native.stat().st_size,
+181 +             "sha256": digest(native),
+182 +         }
+183 |     return {
+--------------------------------------------------------------------------------
+189 |         "native_library": native_info,
+    -         "inspection": "structure_and_required_native" if platform == "linux" else "structure_only_no_windows_native",
+190 +         "inspection": "structure_and_required_native"
+191 +         if platform == "linux"
+192 +         else "structure_only_no_windows_native",
+193 |     }
+--------------------------------------------------------------------------------
+223 |         executable = base / "distribution" / BINARY["linux"]
+    -         environment = {**os.environ, "HOME": str(base / "home"),
+    -                        "XDG_DATA_HOME": str(base / "data"),
+    -                        "XDG_CONFIG_HOME": str(base / "config"),
+    -                        "XDG_CACHE_HOME": str(base / "cache"),
+    -                        "GODOT_SILENCE_ROOT_WARNING": "1"}
+224 +         environment = {
+225 +             **os.environ,
+226 +             "HOME": str(base / "home"),
+227 +             "XDG_DATA_HOME": str(base / "data"),
+228 +             "XDG_CONFIG_HOME": str(base / "config"),
+229 +             "XDG_CACHE_HOME": str(base / "cache"),
+230 +             "GODOT_SILENCE_ROOT_WARNING": "1",
+231 +         }
+232 |         environment.pop("GODOT_PROJECT_PATH", None)
+233 |         leaks = 0
+    -         for arguments in (("--path", str(base / "distribution"), "--headless", "--script",
+    -                            "res://tests/native_extension_ready.gd"),
+    -                           ("--path", str(base / "distribution"), "--headless", "--quit-after", "5")):
+234 +         for arguments in (
+235 +             (
+236 +                 "--path",
+237 +                 str(base / "distribution"),
+238 +                 "--headless",
+239 +                 "--script",
+240 +                 "res://tests/native_extension_ready.gd",
+241 +             ),
+242 +             ("--path", str(base / "distribution"), "--headless", "--quit-after", "5"),
+243 +         ):
+244 |             try:
+245 |                 result = subprocess.run(
+    -                     [str(executable), *arguments], cwd=base / "work", env=environment,
+    -                     text=True, capture_output=True, timeout=timeout, check=False,
+246 +                     [str(executable), *arguments],
+247 +                     cwd=base / "work",
+248 +                     env=environment,
+249 +                     text=True,
+250 +                     capture_output=True,
+251 +                     timeout=timeout,
+252 +                     check=False,
+253 |                 )
+--------------------------------------------------------------------------------
+259 |                 raise ReleaseError("Exported GDExtension classes or ABI were not verified")
+    -         return {"status": "passed", "isolated_working_directory": True,
+    -                 "isolated_user_profile": True, "source_project_loaded": False,
+    -                 "native_abi_verified": True, "post_exit_leak_diagnostics": leaks}
+260 +         return {
+261 +             "status": "passed",
+262 +             "isolated_working_directory": True,
+263 +             "isolated_user_profile": True,
+264 +             "source_project_loaded": False,
+265 +             "native_abi_verified": True,
+266 +             "post_exit_leak_diagnostics": leaks,
+267 +         }
+268 |
+269 |
+    - def inspect_release(stage: Path, linux: Path | None, windows: Path | None,
+    -                     *, launch: bool = False) -> dict[str, Any]:
+270 + def inspect_release(
+271 +     stage: Path, linux: Path | None, windows: Path | None, *, launch: bool = False
+272 + ) -> dict[str, Any]:
+273 |     if launch and linux is None:
+274 |         raise ReleaseError("Cannot run a Linux smoke without a Linux export")
+275 |     # The Windows-only path is a historical structural diagnostic; the package
+276 |     # has no Windows-native manifest yet. Never treat it as a verified build.
+    -     report: dict[str, Any] = {"schema": "t068-required-native-export-v2",
+    -                               "stage": inspect_stage(stage, require_native=linux is not None),
+    -                               "linux": {"status": "not_tested"},
+    -                               "windows": {"status": "not_tested"},
+    -                               "limitations": ["Windows runtime and physical GPU verification are separate",
+    -                                               "No measured input-to-visible latency or VRAM",
+    -                                               "Windows package is not native-certified by Linux-only manifest"]}
+277 +     report: dict[str, Any] = {
+278 +         "schema": "t068-required-native-export-v2",
+279 +         "stage": inspect_stage(stage, require_native=linux is not None),
+280 +         "linux": {"status": "not_tested"},
+281 +         "windows": {"status": "not_tested"},
+282 +         "limitations": [
+283 +             "Windows runtime and physical GPU verification are separate",
+284 +             "No measured input-to-visible latency or VRAM",
+285 +             "Windows package is not native-certified by Linux-only manifest",
+286 +         ],
+287 +     }
+288 |     for platform, directory in (("linux", linux), ("windows", windows)):
+--------------------------------------------------------------------------------
+307 |     try:
+    -         result = inspect_release(arguments.stage, arguments.linux, arguments.windows,
+    -                                  launch=arguments.launch_linux)
+308 +         result = inspect_release(
+309 +             arguments.stage, arguments.linux, arguments.windows, launch=arguments.launch_linux
+310 +         )
+311 |     except ReleaseError as exc:
+    |
+
+3 files would be reformatted, 1 file already formatted

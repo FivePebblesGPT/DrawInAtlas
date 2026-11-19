@@ -84,6 +84,18 @@ def stage(destination: Path, in_place: bool = False, *, without_native: bool = F
                 raise ValueError("Bundled brushes cannot be symbolic links")
             if source.is_file() and source.suffix in {".myb", ".dep5", ".md"}:
                 shutil.copy2(source, brush_destination / source.name)
+        # Small, native-rendered brush examples are part of the functional UI.
+        # Copy only the four explicit PNGs, not arbitrary generated test images.
+        preview_dir = brushes / "previews"
+        if preview_dir.is_symlink() or not preview_dir.is_dir():
+            raise ValueError("Native brush preview directory is missing or unsafe")
+        dest_previews = brush_destination / "previews"
+        dest_previews.mkdir(exist_ok=True)
+        for preset in ("hard", "soft", "ink", "airbrush"):
+            preview = preview_dir / f"{preset}.png"
+            if preview.is_symlink() or not preview.is_file():
+                raise ValueError(f"Native brush preview is missing or unsafe: {preset}")
+            shutil.copy2(preview, dest_previews / preview.name)
 
     # The Hokusai GDExtension is required for runnable Drawing projects.
     # Only deliberately native-absent negative fixtures may opt out.

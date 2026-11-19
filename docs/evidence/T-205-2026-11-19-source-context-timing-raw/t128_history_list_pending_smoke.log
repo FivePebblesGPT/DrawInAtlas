@@ -1,0 +1,20 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T128_HISTORY_LIST_FAILED: two separately committed source pixels exist for History navigation
+T128_HISTORY_LIST_FAILED: older History row exists
+T128_HISTORY_LIST_FAILED: History-list older row is selectable
+T128_HISTORY_LIST_FAILED: refused History jump retains earlier committed pixel source
+T128_HISTORY_LIST_FAILED: refused History navigation gives a visible reason
+T128_HISTORY_LIST_FAILED: blocked History jump does not cancel input on next frame
+T128_HISTORY_LIST_FAILED: History jump retains older committed strokes
+WARNING: Drawing: No locally owned undo step
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _undo (res://addons/drawing/workspace.gd:3348)
+         [2] test_forward_jump_during_pending (res://tests/t128_history_list_pending_smoke.gd:157)
+         [3] new_app (res://tests/t128_history_list_pending_smoke.gd:28)
+         [4] frames (res://tests/t128_history_list_pending_smoke.gd:17)
+T128_HISTORY_LIST_FAILED: Redo test has an existing later History row
+T128_HISTORY_LIST_FAILED checks=37 failures=8

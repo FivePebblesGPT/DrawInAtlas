@@ -1,0 +1,10 @@
+test_embedded_nul_in_index_name_is_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_embedded_nul_in_index_name_is_rejected) ... ok
+test_four_extra_nul_padding_bytes_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_four_extra_nul_padding_bytes_are_rejected) ... ok
+test_newline_and_carriage_return_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_newline_and_carriage_return_names_are_rejected) ... ok
+test_other_control_and_delete_names_are_rejected (test_t219_pck_resource_names.CanonicalPckNamesTests.test_other_control_and_delete_names_are_rejected) ... ok
+test_valid_utf8_optional_resource_remains_supported (test_t219_pck_resource_names.CanonicalPckNamesTests.test_valid_utf8_optional_resource_remains_supported) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.004s
+
+OK

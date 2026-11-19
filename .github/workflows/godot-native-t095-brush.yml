@@ -236,18 +236,8 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/brush_blend_math_smoke.gd 2>&1 | tee /tmp/t095-blend.log
           python3 tools/check_godot_model_log.py /tmp/t095-blend.log --marker T095_BLEND_PASSED
-      - name: Hokusai batch-delta source/preview parity (native binary not required)
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
-            --script res://tests/hokusai_bulk_delta_smoke.gd 2>&1 | tee /tmp/t095-hokusai-delta.log
-          python3 tools/check_godot_model_log.py /tmp/t095-hokusai-delta.log --marker T095_BULK_DELTA_PASSED
-      - name: T-095 signed native tile arithmetic and original-pixel parity
-        run: |
-          set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
-            --script res://tests/t095_tile_shift_smoke.gd 2>&1 | tee /tmp/t095-tile-shift.log
-          python3 tools/check_godot_model_log.py /tmp/t095-tile-shift.log --marker T095_TILE_SHIFT_PASSED
+      # T-211: real native pigment rollback, signed bounds and replay are
+      # exercised by the T-095 and T-153 steps below, not a deleted stub ABI.
       - name: T-095 Legacy Brush-only tile-commit and history parity
         run: |
           set -euo pipefail
@@ -266,12 +256,13 @@ jobs:
           timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/t095_mixed_edit_rollback_smoke.gd 2>&1 | tee /tmp/t095-mixed-rollback.log
           python3 tools/check_godot_model_log.py /tmp/t095-mixed-rollback.log --marker T095_MIXED_ROLLBACK_PASSED
-      - name: T-095 native tile-commit and history parity (native binary not required)
+      - name: T-211 required-native atomic document tile publication and history
         run: |
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing \
-            --script res://tests/t095_tile_commit_smoke.gd 2>&1 | tee /tmp/t095-tile-commit.log
-          python3 tools/check_godot_model_log.py /tmp/t095-tile-commit.log --marker T095_TILE_COMMIT_PASSED
+            --script res://tests/t148_document_tile_publication.gd 2>&1 | tee /tmp/t211-native-tile-publication.log
+          python3 tools/check_godot_model_log.py /tmp/t211-native-tile-publication.log --marker T148_DOCUMENT_TILES_PASSED
+          grep -Fqx 'T148_DOCUMENT_TILES_RESULT checks=56 failures=0' /tmp/t211-native-tile-publication.log
       - name: T-095 independent sparse detached-preview compositor oracle
         run: |
           set -euo pipefail
@@ -476,9 +467,6 @@ jobs:
             /tmp/t095-preview-input-postdraw.log
             /tmp/t095-trace-analyzer.log
             /tmp/t095-owner-trace.log
-            /tmp/t095-hokusai-delta.log
-            /tmp/t095-tile-shift.log
-            /tmp/t095-tile-commit.log
             /tmp/t095-legacy-tile-commit.log
             /tmp/t095-sparse-preview.log
             /tmp/t095-blend.log
@@ -487,6 +475,7 @@ jobs:
             /tmp/t095-native-hard-packed-output.log
             /tmp/t095-native-hard-source-atomic.log
             /tmp/t095-native-pigment-atomic.log
+            /tmp/t211-native-tile-publication.log
             /tmp/t095-native-preset-packed-output.log
             /tmp/t095-full-canvas.log
             /tmp/t095-native.log

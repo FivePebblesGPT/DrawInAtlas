@@ -25,6 +25,10 @@ func open_app() -> Control:
 	gradients.add_child(Label.new())
 	app.initial_extra_panels = {"swatches": swatches, "gradients": gradients}
 	root.add_child(app)
+	# Preserve the pre-T184 three-panel fixture's rail geometry; the new
+	# Brushes dock is tested independently in t184_native_brush_panel.gd.
+	app.dock_layout.set_panel_visible("brushes", false)
+	app._render_dock()
 	return app
 
 func stop_app(app: Control) -> void:
@@ -62,7 +66,7 @@ func run() -> void:
 	check(app.layout_recovery_status == "defaults", "missing settings migrate T-063 defaults")
 	check(app.dock_layout.rail_icons("right").map(func(e: Dictionary) -> String: return e["panel"]) ==
 		["colors", "layers", "history", "swatches", "gradients"], "default 3 built-in panels and two dynamically registered peers")
-	check(app.dock_views.size() == 5, "one unique view per registered panel")
+	check(app.dock_views.size() == 6, "six unique views, five fixture-visible panels")
 	check(app.dock_layout.merge_groups("layers", "colors", 1), "group colors/layers")
 	check(app.dock_layout.merge_groups("gradients", "swatches", 1), "group swatches/gradients")
 	check(app.dock_layout.select_panel("layers"), "select nested panel")
@@ -174,7 +178,7 @@ func run() -> void:
 	await frames(7)
 	check(not app.dock_layout.container_info("right")["minimized"] and app.floating_hosts.is_empty(), "reset expands dock and removes float hosts")
 	check(app.dock_layout.rail_icons("right").map(func(e: Dictionary) -> String: return e["panel"]) ==
-		["colors", "layers", "history", "swatches", "gradients"], "reset restores default registered panel order")
+		["brushes", "colors", "layers", "history", "swatches", "gradients"], "reset restores the four built-in panels and peer order")
 	check(app.current_document() != null and app.current_document().revision == initial_revision and app.current_document().is_dirty() == initial_dirty, "reset preserves drawing document state")
 	# Rely on _exit_tree rather than explicit save for reset durability.
 	await stop_app(app)

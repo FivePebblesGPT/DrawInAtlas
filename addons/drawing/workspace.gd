@@ -12,6 +12,8 @@ const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persi
 const WORKSPACE_PREFERENCES: Script = preload("res://addons/drawing/workspace_preferences.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
+const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
+const BRUSH_PANEL_SCRIPT: Script = preload("res://addons/drawing/brush_panel.gd")
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
 # Largest compact built-in panel (Colors/History plus scrollbar) needs
@@ -56,6 +58,11 @@ var layers: Tree
 var status: Label
 var width_spin: SpinBox
 var brush_preset_control: OptionButton
+var brush_panel: DrawingBrushPanel
+var selected_brush_preset: String = "hard"
+var brush_width_value: float = 3.0
+var brush_opacity_value: float = 1.0
+var brush_hardness_overrides: Dictionary = {} # preset -> native hardness 0..1
 var snap_toggle: CheckButton
 var grid_dialog: ConfirmationDialog
 var grid_fields: Array[SpinBox] = []
@@ -256,24 +263,23 @@ func _build_interface() -> void:
 	width_spin = SpinBox.new()
 	width_spin.min_value = 1
 	width_spin.max_value = 96
-	width_spin.value = 3
+	width_spin.value = brush_width_value
 	width_spin.prefix = "Brush px"
 	width_spin.tooltip_text = "Stroke width in Drawing pixels (wheel or [ / ] keys; Shift+wheel scrolls options)"
 	width_spin.custom_minimum_size.x = 170
-	width_spin.value_changed.connect(func(value: float) -> void: canvas.brush_width = value)
+	width_spin.value_changed.connect(_set_brush_width)
 	width_spin.gui_input.connect(func(event: InputEvent) -> void:
 		top_bar.consume_option_wheel(event, width_spin))
 	brush_preset_control = OptionButton.new()
 	brush_preset_control.name = "BrushPreset"
 	brush_preset_control.tooltip_text = "Native brush preset (also used by Eraser); width is set in Brush px"
 	brush_preset_control.custom_minimum_size.x = 140
-	var preset_ids: Array[String] = ["hard", "soft", "ink", "airbrush"]
-	var preset_labels: Array[String] = ["Hard Round", "Soft", "Ink", "Airbrush"]
-	for index: int in range(preset_ids.size()):
-		brush_preset_control.add_item(preset_labels[index])
-		brush_preset_control.set_item_metadata(index, preset_ids[index])
+	for index: int in range(BRUSH_SETTINGS.PRESETS.size()):
+		brush_preset_control.add_item(BRUSH_SETTINGS.NAMES[index])
+		brush_preset_control.set_item_metadata(index, BRUSH_SETTINGS.PRESETS[index])
+		brush_preset_control.get_popup().set_item_tooltip(index, BRUSH_SETTINGS.DESCRIPTIONS[index])
 	brush_preset_control.item_selected.connect(func(index: int) -> void:
-		canvas.brush_preset = str(brush_preset_control.get_item_metadata(index)))
+		_select_brush_preset(str(brush_preset_control.get_item_metadata(index))))
 	brush_preset_control.gui_input.connect(func(event: InputEvent) -> void:
 		top_bar.consume_option_wheel(event, brush_preset_control))
 	snap_toggle = CheckButton.new()
@@ -360,6 +366,11 @@ func _build_interface() -> void:
 			_update_status())
 	editor_column.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
+	canvas.brush_width = brush_width_value
+	canvas.brush_preset = selected_brush_preset
+	canvas.brush_opacity = brush_opacity_value
+	canvas.brush_hardness = _selected_brush_hardness()
+	brush_preset_control.select(BRUSH_SETTINGS.PRESETS.find(selected_brush_preset))
 	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
 	inspector.custom_minimum_size.x = EXPANDED_DOCK_MIN_WIDTH
@@ -386,6 +397,18 @@ func _build_interface() -> void:
 	dock_rail.visible = false
 	inspector.add_child(dock_rail)
 	_make_dock_flyout()
+	brush_panel = BRUSH_PANEL_SCRIPT.new() as DrawingBrushPanel
+	assert(dock_layout.register_panel("brushes"))
+	assert(dock_layout.attach_panel("brushes", "right", "brushes"))
+	dock_views["brushes"] = brush_panel
+	dock_stash.add_child(brush_panel)
+	brush_panel.preset_selected.connect(_select_brush_preset)
+	brush_panel.width_changed.connect(_set_brush_width)
+	brush_panel.opacity_changed.connect(_set_brush_opacity)
+	brush_panel.hardness_changed.connect(_set_brush_hardness)
+	brush_panel.reset_requested.connect(_reset_selected_brush)
+	brush_panel.display(selected_brush_preset, brush_width_value,
+		brush_opacity_value, _selected_brush_hardness())
 	var color_pane: VBoxContainer = _add_dock_section("Colors")
 	_build_color_controls(color_pane)
 	var layer_pane: VBoxContainer = _add_dock_section("Layers")
@@ -2783,6 +2806,76 @@ func _refresh_tool_buttons() -> void:
 		(tool_buttons[name] as Button).set_pressed_no_signal(name == active_tool)
 
 
+## One brush settings authority for panel, compact toolbar and Canvas. Changing
+## these is application state, not a document edit or a mutation to an active
+## native/queued stroke (those settings are captured at pointer-down).
+func _selected_brush_hardness() -> float:
+	return float(brush_hardness_overrides.get(selected_brush_preset,
+		BRUSH_SETTINGS.default_hardness(selected_brush_preset)))
+
+
+func _show_brush_settings() -> void:
+	if brush_panel != null:
+		brush_panel.display(selected_brush_preset, brush_width_value,
+			brush_opacity_value, _selected_brush_hardness())
+
+
+func _save_workspace_preferences() -> void:
+	if preferences_persistence_enabled and _layout_booted:
+		WORKSPACE_PREFERENCES.save_file(preferences_settings_path, record_selection_history,
+			{"preset": selected_brush_preset, "width": brush_width_value,
+			"opacity": brush_opacity_value, "hardness": brush_hardness_overrides})
+
+
+func _select_brush_preset(preset: String) -> void:
+	if not BRUSH_SETTINGS.PRESETS.has(preset):
+		return
+	selected_brush_preset = preset
+	if canvas != null:
+		canvas.brush_preset = preset
+		canvas.brush_hardness = _selected_brush_hardness()
+	if brush_preset_control != null:
+		brush_preset_control.select(BRUSH_SETTINGS.PRESETS.find(preset))
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
+func _set_brush_width(px: float) -> void:
+	brush_width_value = clampf(px, 1.0, 96.0)
+	if canvas != null:
+		canvas.brush_width = brush_width_value
+	if width_spin != null:
+		width_spin.set_value_no_signal(brush_width_value)
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
+func _set_brush_opacity(ratio: float) -> void:
+	brush_opacity_value = clampf(ratio, 0.0, 1.0)
+	if canvas != null:
+		canvas.brush_opacity = brush_opacity_value
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
+func _set_brush_hardness(ratio: float) -> void:
+	brush_hardness_overrides[selected_brush_preset] = clampf(ratio, 0.0, 1.0)
+	if canvas != null:
+		canvas.brush_hardness = _selected_brush_hardness()
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
+func _reset_selected_brush() -> void:
+	brush_hardness_overrides.erase(selected_brush_preset)
+	_set_brush_width(3.0)
+	_set_brush_opacity(1.0)
+	if canvas != null:
+		canvas.brush_hardness = _selected_brush_hardness()
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
 func _refresh_tool_options() -> void:
 	if top_bar == null:
 		return
@@ -2957,6 +3050,12 @@ func _load_preferences() -> void:
 	var saved: Dictionary = WORKSPACE_PREFERENCES.read_file(preferences_settings_path)
 	if not saved.is_empty():
 		record_selection_history = saved["record_selection_history"]
+		var brush: Dictionary = saved.get("brush", {})
+		if not brush.is_empty():
+			selected_brush_preset = brush["preset"]
+			brush_width_value = float(brush["width"])
+			brush_opacity_value = float(brush["opacity"])
+			brush_hardness_overrides = brush["hardness"].duplicate(true)
 
 
 func _toggle_selection_history() -> void:
@@ -3040,8 +3139,7 @@ func _selection_history_preference_changed(enabled: bool) -> void:
 		(tab["document"] as DrawingDocument).record_selection_history = enabled
 	if selection_history_toggle != null and selection_history_toggle.button_pressed != enabled:
 		selection_history_toggle.set_pressed_no_signal(enabled)
-	if preferences_persistence_enabled and _layout_booted:
-		WORKSPACE_PREFERENCES.save_file(preferences_settings_path, enabled)
+	_save_workspace_preferences()
 
 
 func _gesture_started() -> void:

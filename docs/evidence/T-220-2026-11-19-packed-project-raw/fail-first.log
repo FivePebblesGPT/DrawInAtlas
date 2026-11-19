@@ -1,0 +1,121 @@
+FF.FFFFFFFFFF
+======================================================================
+FAIL: test_ambiguous_duplicate_identity_or_scene_is_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_ambiguous_duplicate_identity_or_scene_is_rejected) (key='application/config/name')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 49, in test_ambiguous_duplicate_identity_or_scene_is_rejected
+    with self.subTest(key=key), self.assertRaises(gate.ReleaseError):
+                                ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_ambiguous_duplicate_identity_or_scene_is_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_ambiguous_duplicate_identity_or_scene_is_rejected) (key='application/run/main_scene')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 49, in test_ambiguous_duplicate_identity_or_scene_is_rejected
+    with self.subTest(key=key), self.assertRaises(gate.ReleaseError):
+                                ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_spoofed_magic_only_and_missing_keys_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_spoofed_magic_only_and_missing_keys_are_rejected) (content=b'ECFGDrawing')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 40, in test_spoofed_magic_only_and_missing_keys_are_rejected
+    with self.subTest(content=bad[:32]), self.assertRaises(gate.ReleaseError):
+                                         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_spoofed_magic_only_and_missing_keys_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_spoofed_magic_only_and_missing_keys_are_rejected) (content=b'ECFG\x00\x00\x00\x00')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 40, in test_spoofed_magic_only_and_missing_keys_are_rejected
+    with self.subTest(content=bad[:32]), self.assertRaises(gate.ReleaseError):
+                                         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_spoofed_magic_only_and_missing_keys_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_spoofed_magic_only_and_missing_keys_are_rejected) (content=b'ECFG\x01\x00\x00\x00\r\x00\x00\x00unrelated/key\x10\x00\x00\x00\x04\x00\x00')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 40, in test_spoofed_magic_only_and_missing_keys_are_rejected
+    with self.subTest(content=bad[:32]), self.assertRaises(gate.ReleaseError):
+                                         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_truncated_or_trailing_binary_settings_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_truncated_or_trailing_binary_settings_are_rejected) (length=122)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 58, in test_truncated_or_trailing_binary_settings_are_rejected
+    with self.subTest(length=len(bad)), self.assertRaises(gate.ReleaseError):
+                                        ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_truncated_or_trailing_binary_settings_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_truncated_or_trailing_binary_settings_are_rejected) (length=112)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 58, in test_truncated_or_trailing_binary_settings_are_rejected
+    with self.subTest(length=len(bad)), self.assertRaises(gate.ReleaseError):
+                                        ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_truncated_or_trailing_binary_settings_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_truncated_or_trailing_binary_settings_are_rejected) (length=113)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 58, in test_truncated_or_trailing_binary_settings_are_rejected
+    with self.subTest(length=len(bad)), self.assertRaises(gate.ReleaseError):
+                                        ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_unrelated_project_name_and_scene_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_unrelated_project_name_and_scene_are_rejected) (settings={'application/config/name': 'Unrelated'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 32, in test_unrelated_project_name_and_scene_are_rejected
+    with self.subTest(settings=settings), self.assertRaisesRegex(
+                                          ~~~~~~~~~~~~~~~~~~~~~~^
+        gate.ReleaseError, "project|identity|startup"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_unrelated_project_name_and_scene_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_unrelated_project_name_and_scene_are_rejected) (settings={'application/run/main_scene': 'res://another.tscn'})
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 32, in test_unrelated_project_name_and_scene_are_rejected
+    with self.subTest(settings=settings), self.assertRaisesRegex(
+                                          ~~~~~~~~~~~~~~~~~~~~~~^
+        gate.ReleaseError, "project|identity|startup"
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_wrong_value_type_and_noncanonical_string_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_wrong_value_type_and_noncanonical_string_are_rejected) (content=b'ECFG\x02\x00\x00\x00\x17\x00\x00\x00application/config/name\x10\x00\x00\x00\x02\x00\x00\x00\x07\x00\x00\x00Dra')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 74, in test_wrong_value_type_and_noncanonical_string_are_rejected
+    with self.subTest(content=bad[:50]), self.assertRaises(gate.ReleaseError):
+                                         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_wrong_value_type_and_noncanonical_string_are_rejected (test_t220_pck_project_identity.PackedProjectIdentityTests.test_wrong_value_type_and_noncanonical_string_are_rejected) (content=b'ECFG\x02\x00\x00\x00\x17\x00\x00\x00application/config/name\x10\x00\x00\x00\x04\x00\x00\x00\x07\x00\x00\x00Dra')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t220_pck_project_identity.py", line 74, in test_wrong_value_type_and_noncanonical_string_are_rejected
+    with self.subTest(content=bad[:50]), self.assertRaises(gate.ReleaseError):
+                                         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.008s
+
+FAILED (failures=12)

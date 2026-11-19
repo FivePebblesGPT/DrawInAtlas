@@ -1,0 +1,85 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T127_HISTORY_FAILED: prior Undo candidate exists
+WARNING: Drawing: Stroke still processing; Undo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _undo (res://addons/drawing/workspace.gd:3338)
+         [3] test_undo_while_queued (res://tests/t127_pending_history_smoke.gd:86)
+         [4] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [5] frames (res://tests/t127_pending_history_smoke.gd:18)
+T127_HISTORY_FAILED: Undo does not remove previous committed paint
+WARNING: Drawing: Stroke still processing; Undo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _undo (res://addons/drawing/workspace.gd:3338)
+         [3] _unhandled_key_input (res://addons/drawing/workspace.gd:3711)
+         [4] test_undo_while_queued (res://tests/t127_pending_history_smoke.gd:97)
+         [5] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [6] frames (res://tests/t127_pending_history_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Undo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _undo (res://addons/drawing/workspace.gd:3338)
+         [3] test_undo_while_queued (res://tests/t127_pending_history_smoke.gd:98)
+         [4] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [5] frames (res://tests/t127_pending_history_smoke.gd:18)
+T127_HISTORY_FAILED: revision remains stable through subsequent drain frames
+T127_HISTORY_FAILED: prior paint survived both new transactions
+T127_HISTORY_FAILED: two Undos preserve the earlier stroke
+T127_HISTORY_FAILED: redo does not corrupt earlier paint
+WARNING: Drawing: No locally owned undo step
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _undo (res://addons/drawing/workspace.gd:3348)
+         [2] test_redo_while_pending (res://tests/t127_pending_history_smoke.gd:142)
+         [3] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [4] frames (res://tests/t127_pending_history_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Redo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _redo (res://addons/drawing/workspace.gd:3354)
+         [3] test_redo_while_pending (res://tests/t127_pending_history_smoke.gd:147)
+         [4] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [5] frames (res://tests/t127_pending_history_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Redo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _redo (res://addons/drawing/workspace.gd:3354)
+         [3] _unhandled_key_input (res://addons/drawing/workspace.gd:3712)
+         [4] test_redo_while_pending (res://tests/t127_pending_history_smoke.gd:157)
+         [5] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [6] frames (res://tests/t127_pending_history_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Redo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _redo (res://addons/drawing/workspace.gd:3354)
+         [3] _unhandled_key_input (res://addons/drawing/workspace.gd:3709)
+         [4] test_redo_while_pending (res://tests/t127_pending_history_smoke.gd:160)
+         [5] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [6] frames (res://tests/t127_pending_history_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Redo after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _redo (res://addons/drawing/workspace.gd:3354)
+         [3] test_redo_while_pending (res://tests/t127_pending_history_smoke.gd:161)
+         [4] new_app (res://tests/t127_pending_history_smoke.gd:29)
+         [5] frames (res://tests/t127_pending_history_smoke.gd:18)
+T127_HISTORY_FAILED: redo refusal preserves the session across frame drains
+T127_HISTORY_FAILED checks=40 failures=7

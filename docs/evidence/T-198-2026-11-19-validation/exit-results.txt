@@ -1,0 +1,16 @@
+2026-11-19 T-198 validation, Linux x86-64, offline provided toolchain
+python unittest: exit 0 (19 + 5 + 6 = 30 tests, with expected negative-test diagnostics)
+Ruff and ty: exit 0
+Rust native cargo tests: exit 0, 35/35
+Godot Drawing T-197 graphical: exit 0, 9 checks
+Godot Drawing T-187 graphical: exit 0, 183 checks
+Godot Drawing T-196 graphical: exit 0, 99 checks
+Godot Drawing native Brush headless: exit 0, 32 checks
+Godot Drawing native tile contract headless: exit 0, 312 checks
+Godot Drawing standalone headless: exit 0
+Godot Drawing preset controls headless: exit 0, 16 checks
+Godot Atlas native history first attempt: exit 1, missing root editor-import/class registry; retained failure
+Godot root editor import: exit 0
+Godot Atlas native history after root import: exit 0, 43 checks
+Aggregate make test: timed out/terminated while in Drawing editor import; NOT A PASS, no confirmed process exit (see make-test.log)
+Ticket validator: 198 tickets valid, zero review-gate violations

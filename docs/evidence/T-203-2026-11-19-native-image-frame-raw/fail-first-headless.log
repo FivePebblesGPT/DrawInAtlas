@@ -1,0 +1,44 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+WARNING: Drawing: Gesture cancelled because grid snapping changed
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _cancel_on_effective_snap_change (res://addons/drawing/canvas.gd:368)
+         [2] @grid_spacing_setter (res://addons/drawing/canvas.gd:94)
+         [3] _apply_grid_settings (res://addons/drawing/workspace.gd:3273)
+         [4] run (res://tests/image_frame_smoke.gd:228)
+WARNING: Drawing: Stroke cancelled because image clipping changed
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @clip_strokes_to_image_frame_setter (res://addons/drawing/canvas.gd:73)
+         [2] run (res://tests/image_frame_smoke.gd:251)
+WARNING: Drawing: Stroke cancelled because image clipping changed
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @clip_strokes_to_image_frame_setter (res://addons/drawing/canvas.gd:73)
+         [2] run (res://tests/image_frame_smoke.gd:262)
+T087_MODEL_FAILED: unchanged clipping policy publishes exactly one normal history edit
+T087_MODEL_FAILED: ordinary post-policy-change Brush remains undoable
+WARNING: Drawing: Gesture cancelled because the camera moved during capture
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @camera_setter (res://addons/drawing/canvas.gd:125)
+         [2] run (res://tests/image_frame_smoke.gd:292)
+T087_MODEL_FAILED: unchanged camera commits a Brush at the original source coordinate
+T087_MODEL_FAILED: unchanged camera retains one-step Undo
+WARNING: Drawing: Gesture cancelled because the camera moved during capture
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] @camera_setter (res://addons/drawing/canvas.gd:125)
+         [2] run (res://tests/image_frame_smoke.gd:320)
+T087_MODEL_FAILED: camera change aborts unpublished marquee without selection/history
+T087_MODEL: 78 checks; 5 failed

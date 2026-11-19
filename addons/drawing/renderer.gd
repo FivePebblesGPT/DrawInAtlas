@@ -44,8 +44,6 @@ static func render(document: DrawingDocument, view: Rect2i,
 		if not visible_plan.get("source_chunks") is Dictionary:
 			return DrawingResult.failure("RENDER_PLAN_INVALID", "Source cache must be a dictionary")
 	var shared_source_chunks: Dictionary = visible_plan.get("source_chunks", {})
-	var bytes: PackedByteArray = PackedByteArray()
-	bytes.resize(view.size.x * view.size.y * 4)
 	# Guard the origin before adding the signed viewport offset. Checking only
 	# the sum allows MAX_I64 + 1 to wrap to MIN_I64, which abs() also misses.
 	# These bounded origins plus 32-bit Rect2i offsets cannot overflow int64.
@@ -56,6 +54,43 @@ static func render(document: DrawingDocument, view: Rect2i,
 	var world_y: int = origin_y + int(view.position.y)
 	if not TILES.document_anchor_in_range(world_x, world_y):
 		return DrawingResult.failure("COORD_RANGE", "Viewport anchor outside Drawing range")
+	# One visible native raster layer over a transparent destination needs no
+	# per-pixel GDScript blending. Rust returns exactly the draft RGBA8 crop;
+	# zero-alpha hidden RGB is stripped only from the detached *display crop*
+	# by Rust, exactly matching the original compositor's alpha-zero skip;
+	# canonical source, preview history and persistence retain those bytes.
+	# Multilayer, text, mixed tile boundaries and arbitrary viewports still
+	# retain the existing renderer and its source-alpha/history semantics.
+	if preview != null and leaf_layers.size() == 1 \
+			and preview.layer_id == leaf_layers[0] \
+			and not OS.has_environment("DRAWING_T187_FULL_TILE_COUNTERFACTUAL") \
+			and document.node_metadata(leaf_layers[0]).get("kind") == DrawingLayerNode.RASTER:
+		var stride: int = document.tile_stride
+		var local_x: int = posmod(world_x, stride)
+		var local_y: int = posmod(world_y, stride)
+		if local_x + view.size.x <= stride and local_y + view.size.y <= stride:
+			var key: String = TILES.tile_key64(world_x, world_y, stride)
+			# Preserve the ordinary renderer's lazy-source resolution and its
+			# reentrancy/revision error boundary before using Rust's detached draft.
+			var source: DrawingResult = document._resolve_chunk(leaf_layers[0], key)
+			if not source.ok:
+				return source
+			if document.revision != preview.expected_revision:
+				return DrawingResult.failure("PREVIEW_REVISION",
+					"Preview source revision changed during lazy resolution")
+			# T-197 same-binary reference recreates T-187's previous
+			# hidden-RGB rejection, without forcing every Brush tile through
+			# the slow path as the older full-tile counterfactual does.
+			var display: bool = not OS.has_environment("DRAWING_T197_RAW_HIDDEN_COUNTERFACTUAL")
+			var region: Dictionary = preview.preview_rgba8_region(key,
+				Rect2i(local_x, local_y, view.size.x, view.size.y), display)
+			if not bool(region.get("hidden_rgb", true)):
+				var packed: PackedByteArray = region.get("bytes", PackedByteArray())
+				if packed.size() == view.size.x * view.size.y * 4:
+					return DrawingResult.success(Image.create_from_data(view.size.x,
+						view.size.y, false, Image.FORMAT_RGBA8, packed), document.revision)
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(view.size.x * view.size.y * 4)
 	var font_warnings: Array[String] = []
 	for layer_id: String in leaf_layers:
 		if document.node_metadata(layer_id)["kind"] == DrawingLayerNode.TEXT:

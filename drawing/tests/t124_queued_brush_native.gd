@@ -1,4 +1,6 @@
 extends SceneTree
+
+const NATIVE_REFERENCE = preload("res://tests/t206_native_queued_reference.gd")
 ## Real X11 canvas pointer dispatch and framebuffer readback. This checks the
 ## new press is not discarded during the preceding released Brush backlog;
 ## all dimensions and colors are source-space canonical, not GPU timing data.
@@ -36,8 +38,11 @@ func move(canvas: Control, source: Vector2) -> void:
 
 func first_path() -> PackedVector2Array:
 	var path: PackedVector2Array = PackedVector2Array()
-	for i: int in range(190):
-		var t: float = float(i) / 189.0
+	# The current 256-segment mouse-up drain finishes 190 short samples
+	# synchronously. A longer real-event burst must still exercise the
+	# intentionally deferred second pointer-down and its atomic promotion.
+	for i: int in range(840):
+		var t: float = float(i) / 839.0
 		path.append(Vector2(-40.5 + 75.0 * t, -30.5 + 18.0 * sin(t * TAU * 8.0)))
 	return path
 
@@ -56,8 +61,6 @@ func run() -> void:
 	root.size = Vector2i(1000, 800)
 	var doc: DrawingDocument = DrawingDocument.new("t124-native")
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
-	var oracle: DrawingDocument = DrawingDocument.new("t124-native-reference")
-	var ref_layer: String = String(oracle.create_layer(DrawingLayerNode.RASTER, "Ink", "root").value)
 	var canvas: Control = Control.new()
 	canvas.set_script(load("res://addons/drawing/canvas.gd"))
 	canvas.size = Vector2(650, 540)
@@ -72,20 +75,57 @@ func run() -> void:
 	await RenderingServer.frame_post_draw
 	var revision: int = doc.revision
 	var path: PackedVector2Array = first_path()
+	var accepted_first: PackedVector2Array = PackedVector2Array()
+	var first_times: PackedInt64Array = PackedInt64Array()
 	button(canvas, path[0], true)
+	if canvas.session == null:
+		check(false, "first routed pointer-down starts a native edit")
+		quit(1)
+		return
+	accepted_first.append(canvas._staged_position)
+	first_times.append(int(canvas._metrics.get("down_us", 0)))
+	var routed_ok: bool = true
 	for i: int in range(1, path.size()):
 		move(canvas, path[i])
-	button(canvas, path[path.size() - 1], false)
+		if int(canvas._metrics.get("samples_received", 0)) != i + 1:
+			routed_ok = false
+			break
+		accepted_first.append(canvas._samples.back())
+		first_times.append(canvas._sample_times_us.back())
+	check(routed_ok, "every raw first-stroke mouse event reaches the native queue")
+	if not routed_ok:
+		canvas.cancel_gesture()
+		quit(1)
+		return
+	button(canvas, path[-1], false)
+	if canvas.session == null:
+		check(false, "first pointer release retains native backlog")
+		quit(1)
+		return
+	accepted_first.append(canvas._samples.back())
+	first_times.append(canvas._sample_times_us.back())
 	check(canvas.session != null and canvas._stroke_phase == canvas.StrokePhase.DRAINING,
 		"first pointer-released stroke has queued input")
 	canvas.color_rgba = SECOND
 	canvas.brush_width = 9.0
+	var sample_screen: Vector2 = canvas.global_position + canvas.pixel_to_position(Vector2(-12.5, 49.5))
+	var before: Color = root.get_texture().get_image().get_pixelv(Vector2i(sample_screen))
 	var next: PackedVector2Array = PackedVector2Array([Vector2(-25.5, 48.5),
 		Vector2(-12.5, 49.5), Vector2(2.5, 48.5), Vector2(20.5, 49.5)])
 	button(canvas, next[0], true)
 	for i: int in range(1, next.size()):
 		move(canvas, next[i])
 	button(canvas, next[next.size() - 1], false)
+	var captured_second: Dictionary = {"points": PackedVector2Array(canvas._deferred_points),
+		"times": PackedInt64Array(canvas._deferred_times_us)}
+	var reference_first: Dictionary = {"points": accepted_first, "times": first_times}
+	# Godot may send a final routed motion before the button release; the
+	# actual deferred arrays, not the synthetic target count, are the oracle.
+	var second_size: int = (captured_second["points"] as PackedVector2Array).size()
+	check(accepted_first.size() == path.size() + 1 and
+		second_size >= next.size() and second_size <= next.size() + 1 and
+		(captured_second["times"] as PackedInt64Array).size() == second_size,
+		"reference retains every raw press/motion/release sample and timestamp")
 	check(doc.revision == revision and not canvas._deferred_stroke.is_empty(),
 		"second complete GUI pointer stroke is retained before first publishes")
 	var frames: int = 0
@@ -94,22 +134,21 @@ func run() -> void:
 		frames += 1
 	check(frames < 500 and doc.revision == revision + 2,
 		"two real-input strokes publish in order, each with one revision")
-	var first: DrawingEditSession = oracle.begin_edit(ref_layer, oracle.revision).value
-	check(first.paint_path(path, FIRST, 30.0).ok and first.commit().ok,
-		"reference first stroke commits")
-	var second: DrawingEditSession = oracle.begin_edit(ref_layer, oracle.revision).value
-	check(second.paint_path(next, SECOND, 9.0).ok and second.commit().ok,
-		"reference second stroke commits")
+	var reference: Dictionary = NATIVE_REFERENCE.commit(root, reference_first,
+		captured_second, FIRST, 30.0, SECOND, 9.0)
+	var oracle: DrawingDocument = reference["document"]
+	check(bool(reference["ok"]) and oracle.history_length() == 2,
+		"separate timestamp-identical native Hokusai control commits two strokes")
 	check(render_bytes(doc) == render_bytes(oracle),
-		"native pointer output matches independent exact RGBA8 reference")
+		"real pointer queue matches canonical native reference bytes")
 	await process_frame
 	await RenderingServer.frame_post_draw
 	var snapshot: Image = root.get_texture().get_image()
-	var sample_screen: Vector2 = canvas.global_position + canvas.pixel_to_position(Vector2(-12.5, 49.5))
 	var pixel: Color = snapshot.get_pixelv(Vector2i(sample_screen))
-	var expected: Color = Color8(0x45, 0xd0, 0x9a, 0xff)
-	check(pixel.is_equal_approx(expected),
-		"software GL framebuffer contains second stroke's opaque pigment")
+	var source: int = int(doc.read_pixel(layer, -12, 49).value)
+	check(source != 0 and Vector3(pixel.r, pixel.g, pixel.b).distance_to(
+			Vector3(before.r, before.g, before.b)) > 0.1,
+		"software GL framebuffer displays changed second-stroke pigment")
 	check(doc.undo().ok and oracle.undo().ok and render_bytes(doc) == render_bytes(oracle),
 		"first Undo removes only the second pointer stroke")
 	check(doc.undo().ok and oracle.undo().ok and render_bytes(doc) == render_bytes(oracle),

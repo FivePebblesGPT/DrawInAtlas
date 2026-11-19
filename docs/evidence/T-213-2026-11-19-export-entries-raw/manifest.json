@@ -1,0 +1,35 @@
+{
+  "logs_sha256": {
+    "fail-first.log": "75974cae4c43fd2241cc02169f3cf85945c5d48ae3a578e845b2d8af88c1fed0",
+    "format-baseline.log": "83db7d3c82fa4fbd69e53a4a6c15d70fb871ec88f844f5744b5cc29e6269dada",
+    "portability.log": "04245fdf78ec99113f3221d3c5f9d9a19167788806484e77696de451b387108b",
+    "python-all.log": "75589daedfbeb0a452c7debcb8cd60daf7b6145bfde60c46f36e31a4768d44f4",
+    "real-release-exit.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "real-release-report.json": "a80ff8de594c68b52938c4e5f991a49cd968b6a33319aa70123e19cf49f0c5cc",
+    "ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "rust.log": "d9521cc42e3d380c66b66d9e4a52bf0507d1d982f503730b80bc1f31a916b762",
+    "ty-configured.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "ty-standalone.log": "b28dd91ae335915ed803455ab776ad4822a7dd70c8e4f5f92098c5ecffe7e17e",
+    "unit-release-package.log": "6778f1da243f035351c0fa5ddfe45d170eb7f1074e674e5bc076a5e859143245"
+  },
+  "processes": {
+    "configured_ty": 0,
+    "fail_first": 1,
+    "format_all_touched": 1,
+    "native_rust": 0,
+    "portability": 0,
+    "python_test": 0,
+    "real_release": 0,
+    "release_and_package": 0,
+    "ruff": 0,
+    "standalone_ty": 1
+  },
+  "purpose": "T-213 exact export filesystem inventory",
+  "source_sha256": {
+    "tests/test_t068_release_gate.py": "290a586d1d825a38ff85c26eae0b25a4cf4cb592a91f60f053c17148947e0179",
+    "tests/test_t201_linux_native_package.py": "75bee17079af369fe63dfe8ff7af8ed7279189a327fc8fe48d80128dbf8cc3d6",
+    "tools/benchmarks/t068_release_gate.py": "0747e1815426a2dae0a31404bb275b99690e4c7e84af647cb619e5ffce073c39",
+    "tools/package_linux_export.py": "3c6b1cf82e8626eeffd15f2c1636825b03373586a475d1925bc57ddf5fdad9b9"
+  },
+  "timestamp": "2026-11-19"
+}

@@ -32,9 +32,12 @@ func new_app() -> Control:
 func paint_short(canvas: Control, pixel: Vector2, tint: int = 0xff3377b8) -> void:
 	canvas.tool = "Brush"
 	canvas.color_rgba = tint
-	canvas.brush_width = 3.0
-	canvas.start_gesture(canvas.pixel_to_position(pixel))
-	canvas.finish_gesture(canvas.pixel_to_position(pixel))
+	# A 1px stationary Legacy dab is not a reliable Hokusai stroke.
+	# Cross the assertion pixel with a native-sized, moving Brush.
+	canvas.brush_width = 24.0
+	canvas.start_gesture(canvas.pixel_to_position(pixel - Vector2(9.0, 0.0)))
+	canvas.update_gesture(canvas.pixel_to_position(pixel))
+	canvas.finish_gesture(canvas.pixel_to_position(pixel + Vector2(9.0, 0.0)))
 
 
 func release_long(canvas: Control) -> void:
@@ -75,6 +78,7 @@ func test_undo_while_queued(base: String) -> void:
 	app._save_file(base.path_join("undo-baseline.drawing"))
 	check(not doc.is_dirty(), "document is clean before unpublished input")
 	var prior_revision: int = doc.revision
+	var prior_history: int = doc.history_position()
 	release_long(app.canvas)
 	app.canvas.brush_width = 5.0
 	app.canvas.color_rgba = 0xff11ab84
@@ -84,7 +88,8 @@ func test_undo_while_queued(base: String) -> void:
 	check(app.canvas.has_pending_stroke() and not app.canvas._deferred_stroke.is_empty(),
 		"release backlog owns both current and queued strokes")
 	app._undo()
-	check(doc.revision == prior_revision, "Undo cannot mutate the revision under unpublished input")
+	check(doc.revision == prior_revision and doc.history_position() == prior_history,
+		"Undo cannot mutate document revision or cursor under unpublished input")
 	check(app.canvas.has_pending_stroke(), "Undo preserves active and queued Brush edits")
 	check(not app.canvas._deferred_stroke.is_empty(), "Undo retains the ordered successor")
 	check(alpha_at(doc, Vector2i(30, 35)) > 0, "Undo does not remove previous committed paint")
@@ -96,12 +101,19 @@ func test_undo_while_queued(base: String) -> void:
 	undo_key.keycode = KEY_Z
 	app._unhandled_key_input(undo_key)
 	app.history_undo.pressed.emit()
-	check(doc.revision == prior_revision and app.canvas.has_pending_stroke(),
+	check(doc.revision == prior_revision and doc.history_position() == prior_history and
+		app.canvas.has_pending_stroke(),
 		"Ctrl+Z and History Undo button share the pending-transaction guard")
 	await frames(2)
-	check(app.canvas.has_pending_stroke(), "revision remains stable through subsequent drain frames")
+	# Native staging may complete both gestures within two frames. Either
+	# they are still pending, or both have published in order: never a
+	# revision change that cancels only part of delivered input.
+	check(app.canvas.has_pending_stroke() or
+		(doc.revision == prior_revision + 2 and doc.history_position() == prior_history + 2),
+		"revision and cursor remain guarded or both queued strokes publish during drain")
 	check(await await_commit(app.canvas), "both strokes complete after rejected Undo")
-	check(doc.revision == prior_revision + 2, "pending and queued strokes commit as separate transactions")
+	check(doc.revision == prior_revision + 2 and doc.history_position() == prior_history + 2,
+		"pending and queued strokes commit as separate transactions")
 	check(alpha_at(doc, Vector2i(30, 35)) > 0, "prior paint survived both new transactions")
 	check(alpha_at(doc, Vector2i(80, 170)) > 0, "first pending stroke actually publishes paint")
 	check(alpha_at(doc, Vector2i(44, 233)) > 0, "queued successor publishes an independent painted region")
@@ -142,10 +154,12 @@ func test_redo_while_pending() -> void:
 	app._undo()
 	check(alpha_at(doc, Vector2i(30, 35)) == 0, "redo setup leaves undone prior paint")
 	var prior_revision: int = doc.revision
+	var prior_history: int = doc.history_position()
 	release_long(app.canvas)
 	check(app.canvas.has_pending_stroke(), "redo scenario has pending stroke")
 	app._redo()
-	check(doc.revision == prior_revision, "Redo cannot revise document while a stroke is pending")
+	check(doc.revision == prior_revision and doc.history_position() == prior_history,
+		"Redo cannot revise document or history cursor while a stroke is pending")
 	check(alpha_at(doc, Vector2i(30, 35)) == 0, "Redo does not publish older paint under pending edit")
 	check(app.canvas.has_pending_stroke(), "Redo does not cancel the uncommitted stroke")
 	check(app.status.text.contains("Stroke") and app.status.text.contains("Redo"),
@@ -159,12 +173,16 @@ func test_redo_while_pending() -> void:
 	redo_key.shift_pressed = true
 	app._unhandled_key_input(redo_key)
 	app.history_redo.pressed.emit()
-	check(doc.revision == prior_revision and app.canvas.has_pending_stroke(),
+	check(doc.revision == prior_revision and doc.history_position() == prior_history and
+		app.canvas.has_pending_stroke(),
 		"Ctrl+Y, Ctrl+Shift+Z and History Redo button cannot bypass the guard")
 	await frames(2)
-	check(app.canvas.has_pending_stroke(), "redo refusal preserves the session across frame drains")
+	check(app.canvas.has_pending_stroke() or
+		(doc.revision == prior_revision + 1 and doc.history_position() == prior_history + 1),
+		"redo refusal preserves input until the new edit publishes")
 	check(await await_commit(app.canvas), "new paint commits despite denied Redo")
-	check(doc.revision == prior_revision + 1, "new edit publishes exactly once")
+	check(doc.revision == prior_revision + 1 and doc.history_position() == prior_history + 1,
+		"new edit publishes exactly once")
 	check(alpha_at(doc, Vector2i(30, 35)) == 0, "normal history branch replacement drops old Redo")
 	var new_paint_alpha: int = alpha_at(doc, Vector2i(80, 170))
 	check(new_paint_alpha > 0, "new stroke has actual committed pixels")

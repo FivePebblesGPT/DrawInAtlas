@@ -1,0 +1,31 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+    Finished `release` profile [optimized] target(s) in 3.09s
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:1140:
+             surface.begin_batch();
+             surface.reference_journal_lookup = reference;
+             for (x, y, value) in [
+-                (-3, 2, 11), (-3, 2, 17), (-3, 2, 23),
+-                (8, -4, 29), (8, -4, 31), (-3, 2, 37),
++                (-3, 2, 11),
++                (-3, 2, 17),
++                (-3, 2, 23),
++                (8, -4, 29),
++                (8, -4, 31),
++                (-3, 2, 37),
+             ] {
+                 surface.tile_request_start(x, y)[0][0][0] = value;
+             }
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:1148:
+             assert_eq!(surface.before_batch.as_ref().unwrap().len(), 2);
+             assert_eq!(surface.dirty_tiles_for_export().len(), 2);
+-            let rgba = [surface.tile(-3, 2).unwrap()[0][0][0],
+-                surface.tile(8, -4).unwrap()[0][0][0]].to_vec();
++            let rgba = [
++                surface.tile(-3, 2).unwrap()[0][0][0],
++                surface.tile(8, -4).unwrap()[0][0][0],
++            ]
++            .to_vec();
+             let probes = surface.journal_contains_probes;
+             let hits = surface.journal_cache_hits;
+             surface.rollback_batch();
+make: *** [Makefile:32: native] Error 1

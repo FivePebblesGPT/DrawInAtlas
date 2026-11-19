@@ -1,0 +1,35 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error[E0609]: no field `reference_journal_lookup` on type `TrackedSurface`
+    --> src/lib.rs:1115:21
+     |
+1115 |             surface.reference_journal_lookup = reference;
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `tiles`, `changed`, `reference_dirty_tracking`, `dirty_set_inserts_attempted`, `tile_requests` ... and 4 others
+
+error[E0609]: no field `journal_contains_probes` on type `TrackedSurface`
+    --> src/lib.rs:1126:34
+     |
+1126 |             let probes = surface.journal_contains_probes;
+     |                                  ^^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `tiles`, `changed`, `reference_dirty_tracking`, `dirty_set_inserts_attempted`, `tile_requests` ... and 4 others
+
+error[E0609]: no field `journal_cache_hits` on type `TrackedSurface`
+    --> src/lib.rs:1127:32
+     |
+1127 |             let hits = surface.journal_cache_hits;
+     |                                ^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `tiles`, `changed`, `reference_dirty_tracking`, `dirty_set_inserts_attempted`, `tile_requests` ... and 4 others
+
+error[E0609]: no field `reference_journal_lookup` on type `TrackedSurface`
+    --> src/lib.rs:1132:21
+     |
+1132 |             surface.reference_journal_lookup = reference;
+     |                     ^^^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `tiles`, `changed`, `reference_dirty_tracking`, `dirty_set_inserts_attempted`, `tile_requests` ... and 4 others
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `drawing-brush` (lib test) due to 4 previous errors

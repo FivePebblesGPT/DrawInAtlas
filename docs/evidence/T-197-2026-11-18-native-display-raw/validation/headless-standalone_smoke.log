@@ -1,0 +1,376 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3623)
+
+ERROR: No loader found for resource: res://addons/drawing/icons/brush.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/eraser.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/select.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/move.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/text.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/pan.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:325)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_visible.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_hidden.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_unlocked.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/layer_locked.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _build_interface (res://addons/drawing/workspace.gd:448)
+       [1] _ready (res://addons/drawing/workspace.gd:184)
+       [2] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] _run (res://tests/standalone_smoke.gd:51)
+ERROR: No loader found for resource: res://addons/drawing/icons/dock_panel.svg (expected type: unknown)
+   at: _load (core/io/resource_loader.cpp:332)
+   GDScript backtrace (most recent call first):
+       [0] _dock_icon (res://addons/drawing/workspace.gd:715)
+       [1] _panel_button (res://addons/drawing/workspace.gd:721)
+       [2] _render_dock (res://addons/drawing/workspace.gd:872)
+       [3] _build_interface (res://addons/drawing/workspace.gd:503)
+       [4] _ready (res://addons/drawing/workspace.gd:184)
+       [5] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1924)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] new_drawing (res://addons/drawing/workspace.gd:1925)
+       [3] _ready (res://addons/drawing/workspace.gd:189)
+       [4] _run (res://tests/standalone_smoke.gd:51)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:63)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:63)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:63)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:63)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:67)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:67)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:67)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] _commit_stroke (res://addons/drawing/canvas.gd:2283)
+       [5] _drain_segments (res://addons/drawing/canvas.gd:2008)
+       [6] finish_gesture (res://addons/drawing/canvas.gd:2494)
+       [7] _gui_input (res://addons/drawing/canvas.gd:1559)
+       [8] mouse (res://tests/standalone_smoke.gd:31)
+       [9] gesture (res://tests/standalone_smoke.gd:40)
+       [10] _run (res://tests/standalone_smoke.gd:67)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] confirm_floating_move (res://addons/drawing/canvas.gd:2394)
+       [5] _run (res://tests/standalone_smoke.gd:83)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] confirm_floating_move (res://addons/drawing/canvas.gd:2394)
+       [5] _run (res://tests/standalone_smoke.gd:83)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] confirm_floating_move (res://addons/drawing/canvas.gd:2394)
+       [5] _run (res://tests/standalone_smoke.gd:83)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _after_edit (res://addons/drawing/workspace.gd:3196)
+       [2] _canvas_changed (res://addons/drawing/workspace.gd:3192)
+       [3] _publish (res://addons/drawing/canvas.gd:2530)
+       [4] confirm_floating_move (res://addons/drawing/canvas.gd:2394)
+       [5] _run (res://tests/standalone_smoke.gd:83)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _activate (res://addons/drawing/workspace.gd:2335)
+       [3] _open_file (res://addons/drawing/workspace.gd:3654)
+       [4] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _activate (res://addons/drawing/workspace.gd:2335)
+       [3] _open_file (res://addons/drawing/workspace.gd:3654)
+       [4] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _activate (res://addons/drawing/workspace.gd:2335)
+       [3] _open_file (res://addons/drawing/workspace.gd:3654)
+       [4] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _activate (res://addons/drawing/workspace.gd:2335)
+       [3] _open_file (res://addons/drawing/workspace.gd:3654)
+       [4] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _open_file (res://addons/drawing/workspace.gd:3654)
+       [3] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _open_file (res://addons/drawing/workspace.gd:3654)
+       [3] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2404)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _open_file (res://addons/drawing/workspace.gd:3654)
+       [3] _run (res://tests/standalone_smoke.gd:99)
+ERROR: Condition "p_button.is_null()" is true.
+   at: add_button (scene/gui/tree.cpp:1399)
+   GDScript backtrace (most recent call first):
+       [0] _refresh_layers (res://addons/drawing/workspace.gd:2406)
+       [1] _activate (res://addons/drawing/workspace.gd:2359)
+       [2] _open_file (res://addons/drawing/workspace.gd:3654)
+       [3] _run (res://tests/standalone_smoke.gd:99)
+DRAWING_STANDALONE: 42 passed; 0 failed
+DRAWING_STANDALONE_PASSED

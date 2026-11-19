@@ -152,7 +152,9 @@ func run() -> void:
 	# Masked brush edits exact source pixels before release, but not committed
 	# document bytes. The live preview respects deselected pixels.
 	workspace._change_tool("Brush")
-	canvas.brush_width = 1.0
+	# Native Hokusai does not guarantee pigment from a stationary/narrow 1px dab.
+	# Keep the mask-hole and signed-seam oracle, but use a real brush footprint.
+	canvas.brush_width = 24.0
 	canvas.color_rgba = 0xffffbb22
 	var original: int = pixel(doc, layer, -17, 0)
 	var untouched: int = pixel(doc, layer, -15, 0)
@@ -169,7 +171,7 @@ func run() -> void:
 	button(canvas, Vector2(-14.5, 0.5), false)
 	await frames(6)
 	check(canvas.session == null and pixel(doc, layer, -17, 0) != original and
-		pixel(doc, layer, -15, 0) == untouched,
+		pixel(doc, layer, -15, 0) == untouched and pixel(doc, layer, -10, 0) == 0,
 		"masked stroke commits only selected pixels; hole unchanged")
 	var post_stroke_revision: int = doc.revision
 	workspace._undo()
@@ -193,8 +195,14 @@ func run() -> void:
 		"held-button Eraser previews masked source removal without commit")
 	button(canvas, Vector2(-14.5, 0.5), false)
 	await frames(4)
-	check(pixel(doc, layer, -17, 0) == 0 and pixel(doc, layer, -15, 0) == protected_hole,
-		"Eraser clears selected pixels but not channel hole")
+	# Native Eraser may leave hidden RGB and a sub-1% alpha tail. Do not
+	# mistake nonzero canonical RGB for visible paint or relax the mask guard.
+	var eraser_after: int = pixel(doc, layer, -17, 0)
+	check(((eraser_after >> 24) & 0xff) <= 2 and
+		((eraser_after >> 24) & 0xff) < ((eraser_old >> 24) & 0xff) and
+		pixel(doc, layer, -15, 0) == protected_hole and
+		pixel(doc, layer, -10, 0) == 0,
+		"Eraser removes selected alpha without changing channel hole or outside")
 	workspace._undo()
 	check(pixel(doc, layer, -17, 0) == eraser_old,
 		"Eraser is one undoable mask-constrained content operation")
@@ -204,6 +212,9 @@ func run() -> void:
 	var src: Vector2 = Vector2(-17.5, 0.5)
 	var dest: Vector2 = Vector2(-8.5, 0.5)
 	var before_move_source: Color = color(canvas, src)
+	var move_edge_source: int = pixel(doc, layer, -19, 0)
+	check(move_edge_source != 0 and canvas.selection_mask.allows(Vector2i(-19, 0)),
+		"wider native Brush provides an additional selected edge pixel for Move")
 	var before_move_dest: Color = color(canvas, dest)
 	var move_rev: int = doc.revision
 	button(canvas, src, true)
@@ -259,8 +270,9 @@ func run() -> void:
 	await frames(5)
 	check(not canvas.has_floating_move() and canvas._move_preview == null and
 		doc.revision == move_rev + 1 and pixel(doc, layer, -17, 0) == 0 and
-		pixel(doc, layer, -8, 0) != 0 and pixel(doc, layer, -10, 0) == 0,
-		"Enter commits one exact source-to-final-target transaction")
+		pixel(doc, layer, -8, 0) != 0 and pixel(doc, layer, -10, 0) == move_edge_source and
+		pixel(doc, layer, -6, 0) == 0,
+		"Enter commits selected edge pixels but no subtracted-hole destination")
 	check(canvas.selected.has_point(Vector2i(-8, 0)) and
 		canvas.selection_mask.allows(Vector2i(11, 0)),
 		"confirmed Move retains complete translated mask")

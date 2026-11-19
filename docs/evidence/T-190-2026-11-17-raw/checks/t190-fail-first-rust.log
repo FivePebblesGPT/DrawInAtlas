@@ -1,0 +1,36 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+error[E0425]: cannot find function `srgb_byte_thresholds` in this scope
+   --> src/lib.rs:783:26
+    |
+783 |         let thresholds = srgb_byte_thresholds();
+    |                          ^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `quantize_pixel_exact` in this scope
+   --> src/lib.rs:789:21
+    |
+120 | fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
+    | ------------------------------------------ similarly named function `quantize_pixel` defined here
+...
+789 |                     quantize_pixel_exact(&pixel, thresholds),
+    |                     ^^^^^^^^^^^^^^^^^^^^
+    |
+help: a function with a similar name exists
+    |
+789 -                     quantize_pixel_exact(&pixel, thresholds),
+789 +                     quantize_pixel(&pixel, thresholds),
+    |
+
+error[E0425]: cannot find function `srgb_byte_exact` in this scope
+   --> src/lib.rs:800:21
+    |
+800 |                     srgb_byte_exact(linear, thresholds),
+    |                     ^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `srgb_byte_reference` in this scope
+   --> src/lib.rs:801:21
+    |
+801 |                     srgb_byte_reference(linear)
+    |                     ^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `drawing-brush` (lib test) due to 4 previous errors

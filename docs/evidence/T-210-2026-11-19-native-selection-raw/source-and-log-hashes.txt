@@ -1,0 +1,34 @@
+# SHA256 evidence (2026-11-19)
+0a42092d9c5e29db875083b872905f508ae3baa985d88e11f37dd00014b3f93a  drawing/tests/selection_clipboard_native.gd
+0dd9ae806ea3c6e624cff5a0f2c557932123617b8dbeac04cfa4b48d765c4dc7  tests/test_t088_floating_log.py
+dcaf73fa6e0b113f76aa12d6072a598406dea19e5a12a026db47334df2e45074  addons/drawing/native/bin/libdrawing_brush.so
+6687c3808e102e0939406b76f4b082b82518805b692706dd04cf97ea99482d23  original historical T-088 test fixture
+f51aff4f4806189f3dc88f47943dd43bea4c5e88e6815647ba0ca4939d23acff  docs/evidence/T-210-2026-11-19-native-selection-raw/baseline-original.log
+c44c18359681a774b891e236f2c2c78a94e6efc08afcdbd29a875596b15d6682  docs/evidence/T-210-2026-11-19-native-selection-raw/diagnostic-width24.log
+17e21ffdc77878e2787adcc6840549e15d0e6439ab545c9bc716cf6fd73483cb  docs/evidence/T-210-2026-11-19-native-selection-raw/explicit-types.log
+ec96b6a0e6016d824c222f822a2b205dd4c21c23ecf655699bc24df1700fe99e  docs/evidence/T-210-2026-11-19-native-selection-raw/native-rust.log
+70cd9eca69b1ed65fbab8934ca627e308cf2f68f09e09690e133e055f3979c0e  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-1.log
+acf0c7d7cfe925ef2f715421362921f0edee357e196c7282d22d124d6605a151  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-2.log
+df82cf6826222cc0b39f39080207e009f9ea9de8ebc14776964bf0cdace4984e  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-3.log
+082cf0979a5de339d53aacc847fe414758930e29f1f724d769ab8a3baa30600d  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-4.log
+7a7c63791c50bb1f6027c1a72386409741d1f8169a23c9221300acbabeafe185  docs/evidence/T-210-2026-11-19-native-selection-raw/neighbor-selection_clipboard_smoke.log
+c15f08d6be1b1a3e6478e5170b679acfe07dbb2c9adf74f3fb94c9d608e7d5c0  docs/evidence/T-210-2026-11-19-native-selection-raw/neighbor-t124_queued_brush_smoke.log
+c0b86b5cf2cb9096b32cd43afbc6aae7c25f30b3f90683844214b2e4cd2bb6e6  docs/evidence/T-210-2026-11-19-native-selection-raw/neighbor-t129_pending_content_edit_smoke.log
+6361d9dcee75c74f574d565ddd1a1c092c8b8955f9386fb77b8f067f1c444510  docs/evidence/T-210-2026-11-19-native-selection-raw/neighbor-t139_sparse_selection_outline_native.log
+6171416e87c3d3078c1e067f09ce4e06c787685019771f8f5c6bf01abdfe79b4  docs/evidence/T-210-2026-11-19-native-selection-raw/neighbor-t140_focal_mask_overflow_native.log
+89e93b0226f79e3bcd0a62658b23420573563f2a6657370706ae57b6b09ad4f5  docs/evidence/T-210-2026-11-19-native-selection-raw/python-contract-fail-first.log
+f8f7b0ac7f2b53ac4e96000f166430c488f2c37e059ad5502b09d60f29d363b8  docs/evidence/T-210-2026-11-19-native-selection-raw/python-contract-final.log
+c8ee2a9c369fa74cce39a94702feccc6113e5139ad20208954d8b3c653c7e266  docs/evidence/T-210-2026-11-19-native-selection-raw/python-native-contract.log
+6e36af850110365c85831d5427dafe0f77cffe781d84608a52d2334a8b5fcaa5  docs/evidence/T-210-2026-11-19-native-selection-raw/python-toolchain.log
+82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18  docs/evidence/T-210-2026-11-19-native-selection-raw/ruff-defined.log
+82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18  docs/evidence/T-210-2026-11-19-native-selection-raw/ruff-focused.log
+82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18  docs/evidence/T-210-2026-11-19-native-selection-raw/ty-defined.log
+839f51e1aa1df35af518f1cf516faf32de7f7d3a596e36f5d2bc83e3d3806b40  docs/evidence/T-210-2026-11-19-native-selection-raw/ty-focused.log
+839f51e1aa1df35af518f1cf516faf32de7f7d3a596e36f5d2bc83e3d3806b40  docs/evidence/T-210-2026-11-19-native-selection-raw/ty-with-import.log
+c2dca838c9615e105df0fbf0b5272f46d50a6e980f4a36f0e7f05548dc8b50cc  docs/evidence/T-210-2026-11-19-native-selection-raw/baseline.strict.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-1.strict.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-2.strict.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-3.strict.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/T-210-2026-11-19-native-selection-raw/native-x11-4.strict.txt
+a02c352e94fd728d3c940e46ac16da3e0d32d92d732ddb021742c26b521c2003  docs/evidence/T-210-2026-11-19-native-selection-raw/source-and-log-hashes.txt
+579825b71478b8a264d67fd7cd934e8d3b4004c9a02597880782653c2e3686d8  docs/evidence/T-210-2026-11-19-native-selection-raw/exits.tsv

@@ -50,5 +50,26 @@ class NativeFloatingSelectionLogTests(unittest.TestCase):
         self.assertTrue(verify_log(text)[0])
 
 
+class RequiredNativeSelectionFixtureTests(unittest.TestCase):
+    """Keep the T-088 source oracle meaningful for required native Hokusai."""
+
+    SOURCE = (Path(__file__).resolve().parents[1] /
+              "drawing/tests/selection_clipboard_native.gd")
+
+    def test_native_stroke_has_real_masked_footprint(self) -> None:
+        source = self.SOURCE.read_text(encoding="utf-8")
+        self.assertIn("canvas.brush_width = 24.0", source)
+        self.assertNotIn("canvas.brush_width = 1.0", source)
+        self.assertIn("pixel(doc, layer, -10, 0) == 0", source)
+        self.assertIn("pixel(doc, layer, -15, 0) == untouched", source)
+
+    def test_eraser_and_move_check_native_source_semantics(self) -> None:
+        source = self.SOURCE.read_text(encoding="utf-8")
+        self.assertIn("var eraser_after: int", source)
+        self.assertIn("pixel(doc, layer, -15, 0) == protected_hole", source)
+        self.assertIn("pixel(doc, layer, -10, 0) == move_edge_source", source)
+        self.assertIn("pixel(doc, layer, -6, 0) == 0", source)
+        self.assertNotIn("pixel(doc, layer, -10, 0) == 0,\n\t\t\"Enter commits", source)
+
 if __name__ == "__main__":
     unittest.main()

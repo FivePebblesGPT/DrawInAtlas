@@ -1,0 +1,117 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+SCRIPT ERROR: Parse Error: Could not find type "DrawingDocument" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:23)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingHistoryContext" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:23)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingDocument" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:35)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingDocument" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:42)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasEditHistory" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:42)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:43)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingHistoryContext" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:24)
+SCRIPT ERROR: Parse Error: Identifier "DrawingHistoryContext" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:24)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:36)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingRasterTile" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:39)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:44)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingEditSession" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:47)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingEditSession" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:47)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:49)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:54)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingHistoryContext" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:59)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasCampaign" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:78)
+SCRIPT ERROR: Parse Error: Identifier "AtlasCampaign" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:78)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasDrawingRegistry" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:79)
+SCRIPT ERROR: Parse Error: Identifier "AtlasDrawingRegistry" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:79)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:83)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingDocument" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:88)
+SCRIPT ERROR: Parse Error: Identifier "DrawingLayerNode" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:91)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasEditHistory" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:92)
+SCRIPT ERROR: Parse Error: Identifier "AtlasEditHistory" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:92)
+SCRIPT ERROR: Parse Error: Identifier "DrawingRasterTile" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:98)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:99)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasDrawingEdit" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:107)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasDrawingEdit" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:107)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasGrid" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:120)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasGrid" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:121)
+SCRIPT ERROR: Parse Error: Identifier "AtlasGridEdit" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:123)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:125)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasDrawingEdit" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:133)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasDrawingEdit" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:133)
+SCRIPT ERROR: Parse Error: Identifier "DrawingRasterTile" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:141)
+SCRIPT ERROR: Parse Error: Identifier "DrawingRasterTile" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:145)
+SCRIPT ERROR: Parse Error: Identifier "DrawingDocument" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:172)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:176)
+SCRIPT ERROR: Parse Error: Identifier "AtlasCampaignBundle" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:176)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasStoreResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:179)
+SCRIPT ERROR: Parse Error: Identifier "AtlasCampaignBundle" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:179)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:185)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingDocument" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:190)
+SCRIPT ERROR: Parse Error: Identifier "DrawingDocument" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:200)
+SCRIPT ERROR: Parse Error: Identifier "DrawingFileIO" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:201)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:202)
+SCRIPT ERROR: Parse Error: Identifier "DrawingFileIO" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:202)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingDocument" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:206)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:210)
+SCRIPT ERROR: Parse Error: Identifier "AtlasDrawingRegistry" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:210)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasDrawingRegistry" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:214)
+SCRIPT ERROR: Parse Error: Could not find type "AtlasEditHistory" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:219)
+SCRIPT ERROR: Parse Error: Identifier "AtlasEditHistory" not declared in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:219)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:221)
+SCRIPT ERROR: Parse Error: Could not find type "DrawingResult" in the current scope.
+          at: GDScript::reload (res://tests/t148_atlas_native_tile_history.gd:237)
+ERROR: Failed to load script "res://tests/t148_atlas_native_tile_history.gd" with error "Parse error".
+   at: load (modules/gdscript/gdscript_resource_format.cpp:50)

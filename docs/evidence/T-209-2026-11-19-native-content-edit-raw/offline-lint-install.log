@@ -1,0 +1,5 @@
+Using Python 3.13.5 environment at: /mnt/data/work/t209-lint-venv
+Resolved 2 packages in 1ms
+Installed 2 packages in 3ms
+ + ruff==0.17.5
+ + ty==0.0.104

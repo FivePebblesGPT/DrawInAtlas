@@ -1,0 +1,5 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+DRAWING_STANDALONE: 42 passed; 0 failed
+DRAWING_STANDALONE_PASSED

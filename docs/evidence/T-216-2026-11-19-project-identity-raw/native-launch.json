@@ -1,0 +1,37 @@
+{
+  "distribution": {
+    "architecture": "x86_64",
+    "binary": {
+      "name": "Drawing.x86_64",
+      "sha256": "746a2bc89508d07801fe9ba9bbeaad5be0c74e05f13867977b314f2457f42701",
+      "size": 135178832
+    },
+    "inspection": "structure_and_required_native",
+    "native_extension_shipped": true,
+    "native_library": {
+      "name": "addons/drawing/native/bin/libdrawing_brush.so",
+      "sha256": "dcaf73fa6e0b113f76aa12d6072a598406dea19e5a12a026db47334df2e45074",
+      "size": 2649984
+    },
+    "pack": {
+      "name": "Drawing.pck",
+      "sha256": "19ccf70f362399f5b191373c19c41bfca63c04352f6f9853228815de642e398f",
+      "size": 3112860
+    },
+    "platform": "linux"
+  },
+  "runtime": {
+    "isolated_user_profile": true,
+    "isolated_working_directory": true,
+    "native_abi_verified": true,
+    "post_exit_leak_diagnostics": 0,
+    "source_project_loaded": false,
+    "status": "passed"
+  },
+  "stage": {
+    "file_count": 522,
+    "font_license_sha256": "5004fe34082ed15d8276d2f7992bfb130830e5bc0306a2e96ddf6eb6263f476b",
+    "native_library_sha256": "dcaf73fa6e0b113f76aa12d6072a598406dea19e5a12a026db47334df2e45074",
+    "native_required": true
+  }
+}

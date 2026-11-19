@@ -1,12 +1,12 @@
 """Guard History list row navigation from unpublished Brush history conflicts."""
 
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-from check_godot_model_log import verify_log  # noqa: E402
+sys.path.insert(0, str(ROOT))
+from tools.check_godot_model_log import verify_log  # noqa: E402
 
 
 class PendingHistoryListContracts(unittest.TestCase):
@@ -27,6 +27,21 @@ class PendingHistoryListContracts(unittest.TestCase):
         self.assertIn("_rendering_history = true", body)
         self.assertIn("_rendering_history = false", body)
         self.assertIn("history_list.item_selected.connect(_history_item_selected)", source)
+
+    def test_native_history_witness_has_real_pixels_and_safe_drain(self) -> None:
+        witness = (ROOT / "drawing/tests/t128_history_list_pending_smoke.gd").read_text()
+        # Native Hokusai need not paint a stationary 3px dab or remain
+        # queued for an arbitrary number of process-frame callbacks.
+        self.assertIn("canvas.brush_width = 24.0", witness)
+        self.assertIn("canvas.update_gesture(canvas.pixel_to_position(pixel))", witness)
+        self.assertIn("doc.history_position() == cursor + 2", witness)
+        self.assertIn("doc.revision == revision + 2", witness)
+        self.assertIn("check(await await_commit(app.canvas)", witness)
+        self.assertNotIn("canvas.brush_width = 3.0", witness)
+        self.assertNotIn(
+            'check(app.canvas.has_pending_stroke(), "blocked History jump does not cancel input on next frame")',
+            witness,
+        )
 
     def test_godot_witness_is_required_under_existing_ci_id(self) -> None:
         witness = (ROOT / "drawing/tests/t128_history_list_pending_smoke.gd").read_text()

@@ -1,0 +1,96 @@
+{
+  "evidence": {
+    "fail-first.log": {
+      "bytes": 5731,
+      "sha256": "9c108bef6f03662c6cb53c3ad52aa51cc8fec916321fdb598b9b0ca8d1bba608"
+    },
+    "format-check.log": {
+      "bytes": 25,
+      "sha256": "fd2299c9f1c6dc869070883e281051bfe93aacf66c1a3b0069f45b4aa410ca50"
+    },
+    "name-regression.log": {
+      "bytes": 891,
+      "sha256": "f0c318b55e7ddb30fa7965369b89a6115fce02610ed306161aa1e8d29cd133d8"
+    },
+    "native-packaging.log": {
+      "bytes": 5027,
+      "sha256": "b9e27495c34fbb2c8ab96ce9906707d729cf1131289aa8bc7aa94e0b08c54024"
+    },
+    "process-exits.json": {
+      "bytes": 1753,
+      "sha256": "fa67920734c8d865be0647abda0a5d99b42d9988ca6c9100b6b131cd02c40855"
+    },
+    "python-final.log": {
+      "bytes": 1230,
+      "sha256": "15f7bffe9007eecf542d2d4fd15928f5dacfc652ec0702f541b248437789eb5f"
+    },
+    "real-export-launch.log": {
+      "bytes": 457,
+      "sha256": "27dd3314df0014d72862c4ee950760560b62c7aae21b0704505c82d1a45ef740"
+    },
+    "ruff-final.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "rust-final.log": {
+      "bytes": 3305,
+      "sha256": "f64c204825601c7b8ca0372bb6187478cedae4b0fe00792cdf3260e1abc4ac03"
+    },
+    "ticket-validator.log": {
+      "bytes": 58,
+      "sha256": "7c93c815cb350d2ba4164a209d535ca60875cc19a05506d6ec2e6d4be7404893"
+    },
+    "ty-configured-final.log": {
+      "bytes": 19,
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    "ty-standalone-existing.log": {
+      "bytes": 506,
+      "sha256": "c24e8141b41fbd2ff91c6a6919cd158433bcb58a4ef06f01ca6f80b8b92212d9"
+    }
+  },
+  "remote_pr_head": "9aa1cbe0028d7f6cc64044051ef1c2f4a2ebc5d9",
+  "source": {
+    ".gitattributes": {
+      "bytes": 11209,
+      "sha256": "356f741efe7baa393357a04792d2a5224badbe156e0969d894ee1dc78bfe7bdf"
+    },
+    ".github/workflows/godot-check.yml": {
+      "bytes": 77601,
+      "sha256": "4c62e4e1493d351662120027c9f167ed385239e1ebb1b83e0f23070892f73a04"
+    },
+    ".github/workflows/godot-native-t105-portability.yml": {
+      "bytes": 5740,
+      "sha256": "cf00c79f1ddbddc72b27c0a69ab57c285f1e1be2042896525a7f4453678e21e8"
+    },
+    "Makefile": {
+      "bytes": 7087,
+      "sha256": "25d03e82fcbe2d1b8a9d3c338726d4f8106dd12c1f4be87b09c48a9074176c1b"
+    },
+    "docs/Index.md": {
+      "bytes": 78183,
+      "sha256": "353fe0b4860ba99509893d741c75298d10087d4615f992b73745cb11f7e0b49b"
+    },
+    "docs/Tickets/T-219.md": {
+      "bytes": 2300,
+      "sha256": "c6c856ab6962b358ec1046adf7a951d4fc0af34a37977d9bab4abfcc179192b1"
+    },
+    "docs/evidence/T-219-2026-11-19-pck-names.md": {
+      "bytes": 3475,
+      "sha256": "be06fd5fe5acbce0f25233c05eb77e3a4d1eadeb693a1b655ff4b7da3a46db55"
+    },
+    "tests/test_t201_linux_native_package.py": {
+      "bytes": 23606,
+      "sha256": "73991ffd575b19c00bdf24357ed5f3e0473a4140f2b7b64ab70c6eca0b476bf3"
+    },
+    "tests/test_t219_pck_resource_names.py": {
+      "bytes": 2052,
+      "sha256": "5e55a462db304bac6231c48f53818728dbc49d8090042925fdd254c0b842c9a3"
+    },
+    "tools/benchmarks/t068_release_gate.py": {
+      "bytes": 25661,
+      "sha256": "f251f263dc827e11fabcd915a0d64dc0f3a0afb28e4ab3c1fb655247a0910d7e"
+    }
+  },
+  "ticket": "T-219"
+}

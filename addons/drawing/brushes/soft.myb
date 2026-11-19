@@ -1,8 +1,8 @@
 {
     "comment": "MyPaint brush file",
-    "description": "",
+    "description": "Soft round tip with feathered edge and responsive opacity (no spray)",
     "group": "",
-    "notes": "",
+    "notes": "DrawInAtlas adaptation of MyPaint experimental/soft: raise default full-pressure opacity so ordinary mouse strokes and Eraser are useful; retain softness and pressure response. No random grain or spray.",
     "parent_brush_name": "experimental/soft",
     "settings": {
         "anti_aliasing": {
@@ -118,24 +118,20 @@
                         0.0
                     ],
                     [
-                        0.175926,
-                        0.167917
+                        0.25,
+                        0.3
                     ],
                     [
-                        0.354938,
-                        0.226042
+                        0.5,
+                        0.5
                     ],
                     [
-                        0.546296,
-                        0.238958
-                    ],
-                    [
-                        0.753086,
-                        0.167917
+                        0.75,
+                        0.7
                     ],
                     [
                         1.0,
-                        0.064583
+                        0.8
                     ]
                 ]
             }

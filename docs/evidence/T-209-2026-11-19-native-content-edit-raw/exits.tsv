@@ -1,0 +1,7 @@
+mode	exit	strict_exit	marker
+headless-1	0	0	T129_PENDING_EDIT_PASSED checks=35 failures=0
+headless-2	0	0	T129_PENDING_EDIT_PASSED checks=35 failures=0
+headless-3	0	0	T129_PENDING_EDIT_PASSED checks=35 failures=0
+headless-4	0	0	T129_PENDING_EDIT_PASSED checks=35 failures=0
+x11-1	0	0	T129_PENDING_EDIT_PASSED checks=35 failures=0
+x11-2	0	0	T129_PENDING_EDIT_PASSED checks=35 failures=0

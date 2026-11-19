@@ -1,0 +1,106 @@
+.....SCRIPT ERROR: injected error
+.........zstd: /tmp/tmp6idxlf4o/corrupt.tar.zst: unsupported format 
+....
+----------------------------------------------------------------------
+Ran 18 tests in 0.248s
+
+OK
+ingested-0: valid=False exit=124
+ingested-1: valid=True exit=0
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.007s
+
+OK
+All checks passed!
+All checks passed!
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling godot-bindings v0.5.5
+   Compiling gdextension-api v0.5.1
+   Compiling nanoserde-derive v0.2.1
+   Compiling heck v0.5.0
+   Compiling thiserror v2.0.21
+   Compiling serde_core v1.0.229
+   Compiling syn v3.0.9
+   Compiling zmij v1.0.23
+   Compiling nanoserde v0.2.1
+   Compiling libc v0.2.191
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling godot-codegen v0.5.5
+   Compiling godot-macros v0.5.5
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling hokusai-core v0.3.0
+   Compiling venial v0.6.1
+   Compiling godot-ffi v0.5.5
+   Compiling godot-core v0.5.5
+   Compiling godot-cell v0.5.5
+   Compiling glam v0.32.1
+   Compiling hokusai-brush v0.3.0
+   Compiling hokusai-tile-mem v0.3.0
+   Compiling hokusai v0.3.0
+   Compiling godot v0.5.5
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+warning: function `quantize_pixel` is never used
+   --> src/lib.rs:153:4
+    |
+153 | fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
+    |    ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `drawing-brush` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 34.37s
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:820:
+     fn t190_srgb_bins_match_hokusai_at_every_fixedpoint_alpha_sample() {
+         // The exact fallback must cover every 8-bit boundary and the LUT
+         // must not alter even low-alpha premultiplied values or hidden RGB.
+-        for alpha in [0_u16, 1, 2, 3, 7, 13, 127, 255, 256, 1024, 4096,
+-                      16384, 32768, 32769, 65535] {
++        for alpha in [
++            0_u16, 1, 2, 3, 7, 13, 127, 255, 256, 1024, 4096, 16384, 32768, 32769, 65535,
++        ] {
+             let scale = hokusai::fix15::to_f32(alpha);
+             for channel in 0..=u16::MAX {
+                 let linear = if scale == 0.0 {
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:829:
+                 } else {
+                     hokusai::fix15::to_f32(channel) / scale
+                 };
+-                assert_eq!(srgb_byte(linear, false), srgb_byte(linear, true),
+-                           "alpha={alpha}, channel={channel}");
++                assert_eq!(
++                    srgb_byte(linear, false),
++                    srgb_byte(linear, true),
++                    "alpha={alpha}, channel={channel}"
++                );
+             }
+         }
+         for bin in 0..65536_u32 {
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:837:
+             for offset in [0.0_f32, 0.25, 0.5, 0.75, 0.999] {
+                 let linear = (bin as f32 + offset) / 65536.0;
+-                assert_eq!(srgb_byte(linear, false), srgb_byte(linear, true),
+-                           "linear bin={bin}, offset={offset}");
++                assert_eq!(
++                    srgb_byte(linear, false),
++                    srgb_byte(linear, true),
++                    "linear bin={bin}, offset={offset}"
++                );
+             }
+         }
+-        assert_eq!(quantize_pixel_with_mode(&[18, 86, 142, 0], false),
+-                   quantize_pixel_with_mode(&[18, 86, 142, 0], true));
++        assert_eq!(
++            quantize_pixel_with_mode(&[18, 86, 142, 0], false),
++            quantize_pixel_with_mode(&[18, 86, 142, 0], true)
++        );
+     }
+ 
+     #[test]
+make: *** [Makefile:32: native] Error 1

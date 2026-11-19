@@ -116,7 +116,11 @@ func test_layer_commands(base: String) -> void:
 		"real Tree event also restores the painted source row")
 	check(app.status.text.contains("Stroke"), "source edits show pending-stroke warning")
 	await frames(2)
-	check(app.canvas.has_pending_stroke(), "layer commands cannot cancel strokes on next frame")
+	# Native Hokusai may finish both transactions in these two frames. A
+	# completed pair is valid; a missing or partially published pair is not.
+	check(app.canvas.has_pending_stroke() or
+		(doc.revision == revision + 2 and doc.history_position() == initial_history + 2),
+		"layer commands preserve pending input or both ordered commits")
 	check(await await_commit(app.canvas), "both strokes finish after denied layer commands")
 	check(doc.history_position() == initial_history + 2 and doc.revision == revision + 2,
 		"exactly two paint transactions commit in their original order")
@@ -161,7 +165,9 @@ func test_clipboard_and_text() -> void:
 	check(app.canvas.has_pending_stroke() and not app.canvas._deferred_stroke.is_empty(),
 		"concurrent content commands retain both in-flight gestures")
 	await frames(2)
-	check(app.canvas.has_pending_stroke(), "clipboard commands do not invalidate session next frame")
+	check(app.canvas.has_pending_stroke() or
+		(doc.revision == revision + 2 and doc.history_position() == history + 2),
+		"clipboard commands preserve pending input or both ordered commits")
 	check(await await_commit(app.canvas), "queued strokes still publish after denied content edits")
 	check(doc.history_position() == history + 2 and doc.revision == revision + 2,
 		"content commands add no unexpected history before two paints")

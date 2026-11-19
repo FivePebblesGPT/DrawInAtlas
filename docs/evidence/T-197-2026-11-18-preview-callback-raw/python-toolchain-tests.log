@@ -1,0 +1,7 @@
+......SCRIPT ERROR: injected error
+.........zstd: /tmp/tmp0z87n19q/corrupt.tar.zst: unsupported format 
+....
+----------------------------------------------------------------------
+Ran 19 tests in 0.791s
+
+OK

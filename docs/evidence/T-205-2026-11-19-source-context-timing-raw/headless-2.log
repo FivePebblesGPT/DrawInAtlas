@@ -1,0 +1,31 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+WARNING: Drawing: Stroke still processing; Clear Selection after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _deselect (res://addons/drawing/workspace.gd:2920)
+         [3] test_deselect (res://tests/t130_pending_source_context_smoke.gd:74)
+         [4] new_app (res://tests/t130_pending_source_context_smoke.gd:28)
+         [5] frames (res://tests/t130_pending_source_context_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Change Image Frame after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _apply_image_frame (res://addons/drawing/workspace.gd:3309)
+         [3] test_image_frame (res://tests/t130_pending_source_context_smoke.gd:117)
+         [4] new_app (res://tests/t130_pending_source_context_smoke.gd:28)
+         [5] frames (res://tests/t130_pending_source_context_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Change Object Frame after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _change_object_frame (res://addons/drawing/workspace.gd:2155)
+         [3] test_object_frame (res://tests/t130_pending_source_context_smoke.gd:161)
+         [4] new_app (res://tests/t130_pending_source_context_smoke.gd:28)
+         [5] frames (res://tests/t130_pending_source_context_smoke.gd:17)
+T130_CONTEXT_PASSED checks=34 failures=0

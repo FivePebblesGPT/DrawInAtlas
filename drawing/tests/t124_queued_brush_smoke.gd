@@ -1,7 +1,9 @@
 extends SceneTree
+
+const NATIVE_REFERENCE = preload("res://tests/t206_native_queued_reference.gd")
 ## Released strokes may drain asynchronously without dropping the next
 ## chronological Brush/Eraser press. Compare both complete source paths with
-## an independent two-transaction document, including undo boundaries.
+## a separate same-source/time native Hokusai replay, including undo boundaries.
 
 const AREA: Rect2i = Rect2i(-85, -80, 180, 160)
 const FIRST: int = 0xb44183e9
@@ -44,6 +46,34 @@ func capture(canvas: Control, path: PackedVector2Array) -> void:
 	canvas.finish_gesture(canvas.pixel_to_position(path[path.size() - 1]))
 
 
+## Store the *accepted* input, not an idealized path reconstructed later.
+## Hokusai's stroke clock affects its paint, so the native reference must
+## receive exactly the same press, motion, and release timestamps.
+func capture_native_receipts(canvas: Control, path: PackedVector2Array) -> Dictionary:
+	var points: PackedVector2Array = PackedVector2Array()
+	var times: PackedInt64Array = PackedInt64Array()
+	var first: Vector2 = canvas.source_position(canvas.pixel_to_position(path[0]))
+	var press_us: int = Time.get_ticks_usec()
+	canvas.start_gesture(Vector2.ZERO, first, {"press_us": press_us})
+	points.append(first)
+	times.append(press_us)
+	for i: int in range(1, path.size()):
+		canvas.update_gesture(canvas.pixel_to_position(path[i]))
+		points.append(canvas._samples.back())
+		times.append(canvas._sample_times_us.back())
+	var release_at: int = Time.get_ticks_usec()
+	var finish: Vector2 = canvas.source_position(canvas.pixel_to_position(path[-1]))
+	canvas.finish_gesture(Vector2.ZERO, finish, release_at)
+	points.append(finish)
+	times.append(release_at)
+	return {"points": points, "times": times}
+
+
+func captured_deferred(canvas: Control) -> Dictionary:
+	return {"points": PackedVector2Array(canvas._deferred_points),
+		"times": PackedInt64Array(canvas._deferred_times_us)}
+
+
 func deferred(canvas: Control) -> Dictionary:
 	var value: Variant = canvas.get("_deferred_stroke")
 	return value if value is Dictionary else {}
@@ -84,7 +114,7 @@ func scenario(release_before_promotion: bool, erase_second: bool = false) -> voi
 	check(mask.combine_rectangle(Rect2i(4, -5, 6, 10), "Subtract"),
 		"selection hole prepared for both transactions")
 	canvas.set_selection_mask(mask)
-	capture(canvas, one)
+	var first_receipts: Dictionary = capture_native_receipts(canvas, one)
 	check(canvas.session != null and canvas._stroke_phase == canvas.StrokePhase.DRAINING,
 		"long first stroke leaves an unfinished release backlog")
 	canvas.brush_width = 9.0
@@ -95,8 +125,10 @@ func scenario(release_before_promotion: bool, erase_second: bool = false) -> voi
 		"second press is buffered without publishing or replacing the first edit")
 	for i: int in range(1, two.size() - 1):
 		canvas.update_gesture(canvas.pixel_to_position(two[i]))
+	var second_receipts: Dictionary = {}
 	if release_before_promotion:
 		canvas.finish_gesture(canvas.pixel_to_position(two[two.size() - 1]))
+		second_receipts = captured_deferred(canvas)
 		check(not bool(deferred(canvas).get("capturing", true)),
 			"second mouse-up is retained before the first commit")
 		# Navigation and future tool settings must not rewrite either source path.
@@ -108,6 +140,7 @@ func scenario(release_before_promotion: bool, erase_second: bool = false) -> voi
 		check(not deferred(canvas).is_empty(),
 			"released queued source samples survive zoom, pan and toolbar changes")
 	else:
+		second_receipts = captured_deferred(canvas)
 		var count: int = 0
 		while not deferred(canvas).is_empty() and count < 550:
 			await process_frame
@@ -115,20 +148,46 @@ func scenario(release_before_promotion: bool, erase_second: bool = false) -> voi
 		check(canvas.session != null and canvas._stroke_phase == canvas.StrokePhase.CAPTURING,
 			"held second press is promoted when first commit finishes")
 		canvas.update_gesture(canvas.pixel_to_position(two[two.size() - 1]))
-		canvas.finish_gesture(canvas.pixel_to_position(two[two.size() - 1]))
+		var delivered_points: PackedVector2Array = second_receipts["points"]
+		var delivered_times: PackedInt64Array = second_receipts["times"]
+		delivered_points.append(canvas._samples.back())
+		delivered_times.append(canvas._sample_times_us.back())
+		var finish: Vector2 = canvas.source_position(canvas.pixel_to_position(two[-1]))
+		var release_us: int = Time.get_ticks_usec()
+		canvas.finish_gesture(Vector2.ZERO, finish, release_us)
+		delivered_points.append(finish)
+		delivered_times.append(release_us)
+		second_receipts = {"points": delivered_points, "times": delivered_times}
 	check(await wait_until_finished(canvas), "both strokes drain in bounded frames")
 	check(doc.revision == revision + 2, "two independent edits publish chronologically")
-	var ref_setup: Dictionary = make_target("queued-reference")
-	var oracle: DrawingDocument = ref_setup["document"]
-	var edit1: DrawingEditSession = oracle.begin_edit(ref_setup["layer"], oracle.revision).value
-	check(edit1.paint_path(one, FIRST, 40.0, false, mask).ok and edit1.commit().ok,
-		"independent first edit oracle")
-	var edit2: DrawingEditSession = oracle.begin_edit(ref_setup["layer"], oracle.revision).value
-	check(edit2.paint_path(two, SECOND, 9.0, erase_second, mask).ok and edit2.commit().ok,
-		"independent second edit oracle")
-	compare_pixels(doc, oracle, "two Brush paths retain exact canonical bytes")
+	var ref_result: Dictionary = NATIVE_REFERENCE.commit(root, first_receipts,
+		second_receipts, FIRST, 40.0, SECOND, 9.0, erase_second, mask)
+	var oracle: DrawingDocument = ref_result["document"]
+	check(bool(ref_result["ok"]),
+		"sequential native reference commits exactly two transactions")
+	var captured_first: PackedVector2Array = first_receipts["points"]
+	var captured_second: PackedVector2Array = second_receipts["points"]
+	check(captured_first.size() == one.size() + 1 and
+		captured_second.size() == two.size() + (1 if not release_before_promotion else 0),
+		"reference captures every actual press, motion and release without omission")
+	check(doc.history_length() == 2 and oracle.history_length() == 2,
+		"queued and direct native history each contain two transactions")
+	compare_pixels(doc, oracle, "two native paths retain exact canonical bytes")
+	var published: DrawingResult = DrawingRenderer.render(doc, AREA)
+	if release_before_promotion and not erase_second:
+		var divergent: Dictionary = NATIVE_REFERENCE.commit(root, first_receipts,
+			second_receipts, FIRST, 40.0, SECOND, 19.0, false, mask)
+		var changed: DrawingResult = DrawingRenderer.render(divergent["document"], AREA)
+		check(bool(divergent["ok"]) and published.ok and changed.ok and
+			published.value.get_data() != changed.value.get_data(),
+			"native reference detects a changed queued brush width")
 	check(doc.undo().ok and oracle.undo().ok, "first Undo removes only second stroke")
 	compare_pixels(doc, oracle, "first Undo leaves first stroke intact")
+	var first_only: DrawingResult = DrawingRenderer.render(doc, AREA)
+	check(published.ok and first_only.ok and
+		published.value.get_data() != first_only.value.get_data(),
+		"second %s gesture changes canonical pixels before Undo" % (
+			"Eraser" if erase_second else "Brush"))
 	check(doc.undo().ok and oracle.undo().ok, "second Undo removes first stroke")
 	compare_pixels(doc, oracle, "both Undo transactions match oracle")
 	check(doc.redo().ok and oracle.redo().ok and doc.redo().ok and oracle.redo().ok,

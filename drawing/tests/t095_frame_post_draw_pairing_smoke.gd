@@ -3,6 +3,7 @@ extends SceneTree
 
 const INK: int = 0x9050d7b9
 const AREA: Rect2i = Rect2i(-48, -48, 96, 96)
+const NATIVE_REFERENCE = preload("res://tests/t200_native_stroke_reference.gd")
 var checks: int = 0
 var failures: int = 0
 
@@ -146,8 +147,10 @@ func test_live_brush() -> void:
 	var before: PackedByteArray = snapshot(document)
 	var a: Vector2 = Vector2(-15.5, -9.5)
 	var b: Vector2 = Vector2(18.5, 12.5)
-	canvas.start_gesture(canvas.pixel_to_position(a))
+	var press_us: int = Time.get_ticks_usec()
+	canvas.start_gesture(canvas.pixel_to_position(a), a, {"press_us": press_us})
 	canvas.paint_to(Vector2i(18, 12))
+	var motion_us: int = canvas._sample_times_us.back()
 	canvas.queue_redraw()
 	await process_frame
 	canvas._on_frame_post_draw()
@@ -165,7 +168,8 @@ func test_live_brush() -> void:
 		"actual Canvas draw receives a paired monotonic post-draw callback")
 	check(int(canvas._metrics.get("frame_post_draw_matches", -1)) == matched,
 		"live callback count matches paired retained frame samples")
-	canvas.finish_gesture(canvas.pixel_to_position(b))
+	var release_us: int = Time.get_ticks_usec()
+	canvas.finish_gesture(canvas.pixel_to_position(b), b, release_us)
 	var attempts: int = 0
 	while canvas.session != null and attempts < 400:
 		canvas._drain_segments(256)
@@ -176,14 +180,20 @@ func test_live_brush() -> void:
 	check(int(published.get("frame_post_draw_matches", -1)) >= 1,
 		"completed gesture retains callback matching evidence")
 	var after: PackedByteArray = snapshot(document)
-	var reference: DrawingDocument = DrawingDocument.new("callback-reference", 64)
-	var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
-		"Paint", "root").value)
-	var edit: DrawingEditSession = reference.begin_edit(reference_layer,
-		reference.revision).value
-	check(edit.paint_path(PackedVector2Array([a, b]), INK, 60.0).ok and edit.commit().ok,
-		"independent Brush reference commits")
-	check(snapshot(reference) == after, "postdraw timing does not alter RGBA8 pixels")
+	var native_control: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		AREA, PackedVector2Array([a, Vector2(18.5, 12.5), b]),
+		PackedInt64Array([press_us, motion_us, release_us]), INK, 60.0)
+	check(bool(native_control.get("ok", false)) and
+		int(native_control.get("post_draw_matches", -1)) == 0,
+		"equivalent native Hokusai stroke commits without renderer callbacks")
+	check(after != before and after == native_control.get("pixels", PackedByteArray()),
+		"paired postdraw instrumentation preserves nonempty native RGBA8 source")
+	var changed_ink: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		AREA, PackedVector2Array([a, Vector2(18.5, 12.5), b]),
+		PackedInt64Array([press_us, motion_us, release_us]), INK ^ 0x0000ff00, 60.0)
+	check(bool(changed_ink.get("ok", false)) and
+		changed_ink.get("pixels", PackedByteArray()) != after,
+		"native reference detects actual changed pigment instead of always matching")
 	check(document.undo().ok and snapshot(document) == before and
 		document.redo().ok and snapshot(document) == after,
 		"single-step Undo/Redo retains exact source pixels")

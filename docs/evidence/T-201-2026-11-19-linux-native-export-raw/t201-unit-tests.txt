@@ -1,0 +1,10 @@
+test_exported_launch_rejects_unregistered_abi_even_when_main_loads (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_launch_rejects_unregistered_abi_even_when_main_loads) ... ok
+test_exported_native_symlink_rejected_even_when_target_matches (test_t201_linux_native_package.LinuxNativeExportTests.test_exported_native_symlink_rejected_even_when_target_matches) ... ok
+test_missing_mismatched_and_extra_native_files_fail_closed (test_t201_linux_native_package.LinuxNativeExportTests.test_missing_mismatched_and_extra_native_files_fail_closed) ... ok
+test_package_release_keeps_native_bytes_and_launch_isolation (test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation) ... ok
+test_symlinks_and_unregistered_stage_rejected (test_t201_linux_native_package.LinuxNativeExportTests.test_symlinks_and_unregistered_stage_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.852s
+
+OK

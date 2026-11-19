@@ -1,0 +1,12 @@
+START round=1 mode=optimized 2026-11-17T16:53:15Z
+workspace-0: valid=True exit=0 rss_kib=324264
+END round=1 mode=optimized rc=0 2026-11-17T16:53:25Z
+START round=1 mode=reference 2026-11-17T16:53:25Z
+workspace-0: valid=True exit=0 rss_kib=326188
+END round=1 mode=reference rc=0 2026-11-17T16:53:33Z
+START round=2 mode=reference 2026-11-17T16:53:33Z
+workspace-0: valid=True exit=0 rss_kib=327040
+END round=2 mode=reference rc=0 2026-11-17T16:53:42Z
+START round=2 mode=optimized 2026-11-17T16:53:42Z
+workspace-0: valid=True exit=0 rss_kib=326636
+END round=2 mode=optimized rc=0 2026-11-17T16:53:50Z

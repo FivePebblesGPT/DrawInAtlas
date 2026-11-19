@@ -4,6 +4,7 @@ extends SceneTree
 
 const INK: int = 0x9050d7b9
 const AREA: Rect2i = Rect2i(-48, -48, 96, 96)
+const NATIVE_REFERENCE = preload("res://tests/t200_native_stroke_reference.gd")
 var checks: int = 0
 var failures: int = 0
 
@@ -161,10 +162,17 @@ func test_real_brush_and_history() -> void:
 	var before: PackedByteArray = snapshot(document)
 	var a: Vector2 = Vector2(-15.5, -9.5)
 	var b: Vector2 = Vector2(18.5, 12.5)
-	canvas.start_gesture(canvas.pixel_to_position(a))
-	canvas.queue_redraw()
-	await process_frame
-	canvas._on_frame_post_draw()
+	var press_us: int = Time.get_ticks_usec()
+	canvas.start_gesture(canvas.pixel_to_position(a), a, {"press_us": press_us})
+	canvas.paint_to(Vector2i(0, 0))
+	var motion_us: int = canvas._sample_times_us.back()
+	# Wait for an actual native changed-preview draw and *matching* engine
+	# callback; invoking _on_frame_post_draw manually is not evidence.
+	var frames: int = 0
+	while canvas.session != null and int(canvas._metrics.get(
+			"preview_stage_post_draw_matches", 0)) == 0 and frames < 45:
+		await process_frame
+		frames += 1
 	var live: Array = canvas._metrics.get("frame_phases_us", []) as Array
 	var match_count: int = 0
 	var consistent: bool = true
@@ -178,7 +186,8 @@ func test_real_brush_and_history() -> void:
 				consistent = false
 	check(match_count > 0 and consistent,
 		"real changed 60px Brush preview has stage/draw/callback timestamps")
-	canvas.finish_gesture(canvas.pixel_to_position(b))
+	var release_us: int = Time.get_ticks_usec()
+	canvas.finish_gesture(canvas.pixel_to_position(b), b, release_us)
 	var guard: int = 0
 	while canvas.session != null and guard < 400:
 		canvas._drain_segments(256)
@@ -189,15 +198,14 @@ func test_real_brush_and_history() -> void:
 	check(int(published.get("preview_stage_post_draw_matches", 0)) >= 1,
 		"completed gesture retains preview stage/callback evidence")
 	var actual: PackedByteArray = snapshot(document)
-	var reference: DrawingDocument = DrawingDocument.new("stage-postdraw-reference", 64)
-	var reference_layer: String = String(reference.create_layer(DrawingLayerNode.RASTER,
-		"Paint", "root").value)
-	var edit: DrawingEditSession = reference.begin_edit(reference_layer,
-		reference.revision).value
-	check(edit.paint_path(PackedVector2Array([a, b]), INK, 60.0).ok and
-		edit.commit().ok, "independent 60px stroke reference commits")
-	check(snapshot(reference) == actual,
-		"stage-to-callback instrumentation preserves exact RGBA8 pixels")
+	var native_control: Dictionary = NATIVE_REFERENCE.commit_without_frame_callbacks(root,
+		AREA, PackedVector2Array([a, Vector2(0.5, 0.5), b]),
+		PackedInt64Array([press_us, motion_us, release_us]), INK, 60.0)
+	check(bool(native_control.get("ok", false)) and
+		int(native_control.get("post_draw_matches", -1)) == 0,
+		"Hokusai reference without renderer callbacks commits one stroke")
+	check(actual != before and actual == native_control.get("pixels", PackedByteArray()),
+		"matched stage-to-callback evidence preserves native RGBA8 pixels")
 	check(document.undo().ok and snapshot(document) == before and
 		document.redo().ok and snapshot(document) == actual,
 		"single-step Undo/Redo preserves original and committed source")

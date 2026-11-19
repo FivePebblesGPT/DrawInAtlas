@@ -1,0 +1,6 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+
+T148_FULL_CANVAS side=512 width_px=96 covered=262144 native_stage_ms=111.116 dirty=4 stats={ "revision": 3, "stride": 256, "tiles": 4, "parked_layers": 0, "bytes_used": 3145728, "ffi_calls": 45, "bytes_imported": 0, "bytes_exported": 2621440, "external_bytes_received": 0, "pixel_stream_calls": 0, "source_lookups": 40, "undo": 1, "redo": 0 }
+T148_NATIVE_TILES_RESULT checks=312 failures=0
+T148_NATIVE_TILES_PASSED checks=312 failures=0

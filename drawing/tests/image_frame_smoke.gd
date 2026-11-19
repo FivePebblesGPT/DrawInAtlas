@@ -12,6 +12,16 @@ func check(condition: bool, label: String) -> void:
 		printerr("T087_MODEL_FAILED: " + label)
 
 
+## T-203: a native Brush may continue staging after mouse-up. Check its
+## publication only after the exact active transaction has settled.
+func await_native_stroke(canvas: Control) -> bool:
+	for _frame: int in range(180):
+		if canvas.session == null:
+			return true
+		await process_frame
+	return canvas.session == null
+
+
 func _initialize() -> void:
 	call_deferred("run")
 
@@ -239,7 +249,9 @@ func run() -> void:
 	# is queued. Neither direction may publish a stroke authorized by the
 	# old policy. Identical policy writes must not interrupt the gesture.
 	workspace.canvas.tool = "Brush"
-	workspace.canvas.brush_width = 1.0
+	# The required native Hokusai preset does not promise a deposited pixel
+	# from a historical 1px stationary dab. Use a real swept Brush gesture.
+	workspace.canvas.brush_width = 16.0
 	workspace.canvas.clip_strokes_to_image_frame = false
 	var clip_canvas: Control = workspace.canvas
 	var clip_document: DrawingDocument = workspace.current_document()
@@ -270,17 +282,25 @@ func run() -> void:
 	clip_canvas.clip_strokes_to_image_frame = false
 	check(clip_canvas.session != null and clip_canvas.dragging,
 		"equivalent clipping assignment preserves an active unbounded Brush")
-	clip_canvas.finish_gesture(outside_point)
-	check(clip_canvas.session == null and clip_document.revision == clip_revision + 1,
-		"unchanged clipping policy publishes exactly one normal history edit")
-	check(clip_document.undo().ok and clip_document.revision == clip_revision + 2,
-		"ordinary post-policy-change Brush remains undoable")
+	var outside_end: Vector2 = clip_canvas.pixel_to_position(Vector2(5.5, 40.5))
+	clip_canvas.update_gesture(outside_end)
+	clip_canvas.finish_gesture(outside_end)
+	check(await await_native_stroke(clip_canvas), "unchanged policy native Brush finishes within bounded frames")
+	var outside_pixel: int = int(clip_document.read_pixel(clip_canvas.layer_id, -50, 40).value)
+	check(clip_canvas.session == null and clip_document.revision == clip_revision + 1
+		and outside_pixel != 0,
+		"unchanged clipping policy publishes native paint outside the frame in one history edit")
+	check(int(clip_canvas.last_gesture_metrics.get("native_ffi_stats", {}).get("batches", 0)) > 0,
+		"unbounded post-policy-change Brush used the native engine")
+	check(clip_document.undo().ok and clip_document.revision == clip_revision + 2
+		and int(clip_document.read_pixel(clip_canvas.layer_id, -50, 40).value) == 0,
+		"ordinary post-policy-change native Brush restores outside pixels on Undo")
 	# An embedded host may reposition the source camera between captured
 	# events. It must not reinterpret the remainder of one pending edit or
 	# selection under a different source transform.
 	clip_canvas.clip_strokes_to_image_frame = false
 	clip_canvas.tool = "Brush"
-	clip_canvas.brush_width = 1.0
+	clip_canvas.brush_width = 8.0
 	clip_canvas.snap_to_grid = false
 	clip_canvas.camera = Vector2.ZERO
 	var camera_revision: int = clip_document.revision
@@ -302,15 +322,23 @@ func run() -> void:
 	clip_canvas.camera = Vector2(9, -7)
 	check(clip_canvas.session != null and clip_canvas.dragging,
 		"equivalent camera assignment preserves a queued stroke")
-	clip_canvas.finish_gesture(same_camera_probe)
+	var same_camera_end: Vector2 = clip_canvas.pixel_to_position(Vector2(52.5, 42.5))
+	clip_canvas.update_gesture(same_camera_end)
+	clip_canvas.finish_gesture(same_camera_end)
+	check(await await_native_stroke(clip_canvas), "unchanged camera native Brush finishes within bounded frames")
 	check(clip_document.revision == camera_revision + 1 and
-		clip_document.read_pixel(clip_canvas.layer_id, 36, 42).value != 0,
+		clip_document.read_pixel(clip_canvas.layer_id, 45, 42).value != 0,
 		"unchanged camera commits a Brush at the original source coordinate")
 	check(clip_document.undo().ok and
-		clip_document.read_pixel(clip_canvas.layer_id, 36, 42).value == 0,
+		clip_document.read_pixel(clip_canvas.layer_id, 45, 42).value == 0,
 		"unchanged camera retains one-step Undo")
+	check(clip_document.redo().ok and
+		clip_document.read_pixel(clip_canvas.layer_id, 45, 42).value != 0 and
+		clip_document.undo().ok,
+		"native camera-stable Brush Redo and Undo preserve exactly one stroke")
 	clip_canvas.tool = "Select"
 	clip_canvas.clear_selection()
+	var marquee_revision: int = clip_document.revision
 	var marquee_start: Vector2 = clip_canvas.pixel_to_position(Vector2(20, 20))
 	var marquee_end: Vector2 = clip_canvas.pixel_to_position(Vector2(30, 30))
 	clip_canvas.start_gesture(marquee_start)
@@ -320,7 +348,7 @@ func run() -> void:
 	clip_canvas.camera = Vector2(-3, 12)
 	clip_canvas.finish_gesture(marquee_end)
 	check(not clip_canvas.dragging and not clip_canvas.selecting and
-		not clip_canvas.selection_mask.enabled and clip_document.revision == camera_revision + 2,
+		not clip_canvas.selection_mask.enabled and clip_document.revision == marquee_revision,
 		"camera change aborts unpublished marquee without selection/history")
 	workspace.queue_free()
 	DirAccess.remove_absolute(path)

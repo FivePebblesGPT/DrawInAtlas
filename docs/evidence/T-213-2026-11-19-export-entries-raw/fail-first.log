@@ -1,0 +1,61 @@
+FFFFFF
+======================================================================
+FAIL: test_distribution_rejects_extra_directories_and_nonregular_entries (tests.test_t068_release_gate.PortableReleaseGateTests.test_distribution_rejects_extra_directories_and_nonregular_entries) (platform='linux', entry='empty_directory')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t068_release_gate.py", line 130, in test_distribution_rejects_extra_directories_and_nonregular_entries
+    with self.assertRaises(release.ReleaseError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_distribution_rejects_extra_directories_and_nonregular_entries (tests.test_t068_release_gate.PortableReleaseGateTests.test_distribution_rejects_extra_directories_and_nonregular_entries) (platform='linux', entry='fifo')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t068_release_gate.py", line 139, in test_distribution_rejects_extra_directories_and_nonregular_entries
+    with self.assertRaises(release.ReleaseError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_distribution_rejects_extra_directories_and_nonregular_entries (tests.test_t068_release_gate.PortableReleaseGateTests.test_distribution_rejects_extra_directories_and_nonregular_entries) (platform='windows', entry='empty_directory')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t068_release_gate.py", line 130, in test_distribution_rejects_extra_directories_and_nonregular_entries
+    with self.assertRaises(release.ReleaseError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_distribution_rejects_extra_directories_and_nonregular_entries (tests.test_t068_release_gate.PortableReleaseGateTests.test_distribution_rejects_extra_directories_and_nonregular_entries) (platform='windows', entry='fifo')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t068_release_gate.py", line 139, in test_distribution_rejects_extra_directories_and_nonregular_entries
+    with self.assertRaises(release.ReleaseError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ReleaseError not raised
+
+======================================================================
+FAIL: test_rejected_special_entries_leave_export_unchanged (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_special_entries_leave_export_unchanged) (kind='extra_directory')
+A complete native projection must not authorize extra filesystem nodes.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 153, in test_rejected_special_entries_leave_export_unchanged
+    with self.assertRaises(package.PackageError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: PackageError not raised
+
+======================================================================
+FAIL: test_rejected_special_entries_leave_export_unchanged (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_rejected_special_entries_leave_export_unchanged) (kind='fifo')
+A complete native projection must not authorize extra filesystem nodes.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 153, in test_rejected_special_entries_leave_export_unchanged
+    with self.assertRaises(package.PackageError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: PackageError not raised
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.249s
+
+FAILED (failures=6)

@@ -1,0 +1,35 @@
+    Blocking waiting for file lock on build directory
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling godot-bindings v0.5.5
+   Compiling gdextension-api v0.5.1
+   Compiling nanoserde-derive v0.2.1
+   Compiling heck v0.5.0
+   Compiling serde_core v1.0.229
+   Compiling thiserror v2.0.21
+   Compiling syn v3.0.9
+   Compiling libc v0.2.191
+   Compiling nanoserde v0.2.1
+   Compiling zmij v1.0.23
+   Compiling serde v1.0.229
+   Compiling godot-codegen v0.5.5
+   Compiling serde_json v1.0.154
+   Compiling godot-macros v0.5.5
+   Compiling thiserror-impl v2.0.21
+   Compiling serde_derive v1.0.229
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling hokusai-core v0.3.0
+   Compiling godot-ffi v0.5.5
+   Compiling godot-core v0.5.5
+   Compiling venial v0.6.1
+   Compiling godot-cell v0.5.5
+   Compiling glam v0.32.1
+   Compiling hokusai-brush v0.3.0
+   Compiling hokusai-tile-mem v0.3.0
+   Compiling hokusai v0.3.0
+make: *** wait: No child processes.  Stop.
+make: *** Waiting for unfinished jobs....
+make: *** wait: No child processes.  Stop.
+Terminated

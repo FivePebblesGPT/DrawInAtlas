@@ -1,0 +1,8 @@
+test_godot_witness_is_required_under_existing_ci_id (test_t128_history_list_pending.PendingHistoryListContracts.test_godot_witness_is_required_under_existing_ci_id) ... ok
+test_list_jump_refuses_pending_revisions_and_restores_cursor (test_t128_history_list_pending.PendingHistoryListContracts.test_list_jump_refuses_pending_revisions_and_restores_cursor) ... ok
+test_native_history_witness_has_real_pixels_and_safe_drain (test_t128_history_list_pending.PendingHistoryListContracts.test_native_history_witness_has_real_pixels_and_safe_drain) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.003s
+
+OK

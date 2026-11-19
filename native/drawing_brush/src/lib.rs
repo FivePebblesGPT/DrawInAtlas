@@ -3,7 +3,9 @@
 //! uses its transitional GDScript source adapter pending the T-149 cutover.
 mod native_tiles;
 use std::collections::{HashMap, HashSet};
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use godot::classes::IRefCounted;
 use godot::prelude::*;
@@ -11,6 +13,14 @@ use hokusai::mapping::SettingValue;
 use hokusai::{Brush, BrushSetting, BrushState, TILE_SIZE, TiledSurface};
 
 type TileSnapshot = Option<Box<hokusai::tile::TilePixels>>;
+
+const JOURNAL_HINT_SLOTS: usize = 32;
+
+/// A collision is only a cache miss; snapshots always consult before_batch.
+fn journal_hint_slot((x, y): (i32, i32)) -> usize {
+    ((x as u32).wrapping_mul(0x9e37_79b1) ^ (y as u32).wrapping_mul(0x85eb_ca77)) as usize
+        & (JOURNAL_HINT_SLOTS - 1)
+}
 
 /// Hokusai-compatible sparse tile surface with per-batch dirty tracking.
 /// Unlike the stock MemSurface, the owned tile map can remove a newly created
@@ -20,6 +30,18 @@ type TileSnapshot = Option<Box<hokusai::tile::TilePixels>>;
 struct TrackedSurface {
     tiles: HashMap<(i32, i32), Box<hokusai::tile::TilePixels>>,
     changed: HashSet<(i32, i32)>,
+    /// Diagnostic-only old per-request dirty set; production reuses rollback keys.
+    reference_dirty_tracking: bool,
+    /// T-193 diagnostic-only reference: probe rollback map on every tile request.
+    reference_journal_lookup: bool,
+    /// Direct-mapped batch-local hints: a hit guarantees this tile has a
+    /// rollback snapshot, a collision merely falls back to the HashMap.
+    journal_hints: [Option<(i32, i32)>; JOURNAL_HINT_SLOTS],
+    journal_contains_probes: u64,
+    journal_cache_hits: u64,
+    dirty_set_inserts_attempted: u64,
+    tile_requests: u64,
+    journal_keys_exported: u64,
     atomic_dirty: HashSet<(i32, i32)>,
     in_atomic: bool,
     /// Copy-on-first-write source tiles for the unacknowledged GDScript batch.
@@ -29,14 +51,38 @@ struct TrackedSurface {
 
 impl TrackedSurface {
     fn begin_batch(&mut self) {
+        self.reference_dirty_tracking =
+            std::env::var_os("DRAWING_T192_DIRTY_SET_COUNTERFACTUAL").is_some();
+        self.reference_journal_lookup =
+            std::env::var_os("DRAWING_T193_JOURNAL_LOOKUP_COUNTERFACTUAL").is_some();
+        self.journal_hints.fill(None);
         self.before_batch = Some(HashMap::new());
     }
 
+    /// Every tile requested by rasterization is already journaled for atomic
+    /// rollback. Reuse exactly those keys instead of hashing the tile into a
+    /// second dirty set on every dab. Both paths scan tiles in sorted order.
+    fn dirty_tiles_for_export(&mut self) -> Vec<(i32, i32)> {
+        if self.reference_dirty_tracking {
+            self.changed.drain().collect()
+        } else {
+            let keys: Vec<_> = self
+                .before_batch
+                .as_ref()
+                .map(|before| before.keys().copied().collect())
+                .unwrap_or_default();
+            self.journal_keys_exported += keys.len() as u64;
+            keys
+        }
+    }
+
     fn commit_batch(&mut self) {
+        self.journal_hints.fill(None);
         self.before_batch = None;
     }
 
     fn rollback_batch(&mut self) {
+        self.journal_hints.fill(None);
         if let Some(before) = self.before_batch.take() {
             for (position, previous) in before {
                 if let Some(previous) = previous {
@@ -58,19 +104,36 @@ impl TrackedSurface {
 
 impl TiledSurface for TrackedSurface {
     fn tile_request_start(&mut self, x: i32, y: i32) -> &mut hokusai::tile::TilePixels {
+        self.tile_requests += 1;
         let key = (x, y);
-        if self
-            .before_batch
-            .as_ref()
-            .is_some_and(|before| !before.contains_key(&key))
-        {
-            let previous = self.tiles.get(&key).cloned();
-            self.before_batch
-                .as_mut()
-                .expect("active preset transaction")
-                .insert(key, previous);
+        // A dab often alternates between several 64px tiles. A direct-mapped
+        // hint avoids repeated rollback HashMap probes without an O(n) search.
+        // Collisions are safe misses: the journal remains authoritative.
+        if let Some(before) = self.before_batch.as_ref() {
+            let slot = journal_hint_slot(key);
+            let cached = !self.reference_journal_lookup && self.journal_hints[slot] == Some(key);
+            if cached {
+                self.journal_cache_hits += 1;
+            } else {
+                self.journal_contains_probes += 1;
+                if !before.contains_key(&key) {
+                    let previous = self.tiles.get(&key).cloned();
+                    self.before_batch
+                        .as_mut()
+                        .expect("active preset transaction")
+                        .insert(key, previous);
+                }
+                if !self.reference_journal_lookup {
+                    self.journal_hints[slot] = Some(key);
+                }
+            }
         }
-        self.changed.insert(key);
+        if self.before_batch.is_none() || self.reference_dirty_tracking {
+            if self.before_batch.is_some() {
+                self.dirty_set_inserts_attempted += 1;
+            }
+            self.changed.insert(key);
+        }
         if self.in_atomic {
             self.atomic_dirty.insert(key);
         }
@@ -116,7 +179,47 @@ impl Default for ExportedTile {
     }
 }
 
+// A 64k-bin monotone byte oracle: when both boundaries quantize to the
+// same sRGB8 value, every value inside the bin has exactly that byte.
+// Boundary-crossing bins use the pinned Hokusai powf implementation to
+// preserve its rounding and all hidden-alpha/source contracts.
+static SRGB_BYTE_BINS: OnceLock<Vec<u8>> = OnceLock::new();
+
+fn srgb_byte(linear: f32, reference: bool) -> u32 {
+    fn exact(linear: f32) -> u32 {
+        (hokusai::color::linear_to_srgb(linear).clamp(0.0, 1.0) * 255.0).round() as u32
+    }
+    if reference {
+        return exact(linear);
+    }
+    if linear <= 0.0 {
+        return 0;
+    }
+    if linear >= 1.0 {
+        return 255;
+    }
+    let bins = SRGB_BYTE_BINS.get_or_init(|| {
+        (0..=65536)
+            .map(|i| exact(i as f32 / 65536.0) as u8)
+            .collect()
+    });
+    let index = (linear * 65536.0).floor() as usize;
+    if bins[index] == bins[index + 1] {
+        u32::from(bins[index])
+    } else {
+        exact(linear)
+    }
+}
+
+#[cfg(test)]
 fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
+    quantize_pixel_with_mode(
+        pixel,
+        std::env::var_os("DRAWING_T190_POWF_COUNTERFACTUAL").is_some(),
+    )
+}
+
+fn quantize_pixel_with_mode(pixel: &[u16; 4], reference: bool) -> u32 {
     let alpha = hokusai::fix15::to_f32(pixel[3]).clamp(0.0, 1.0);
     let mut rgba = 0_u32;
     for (index, &channel) in pixel.iter().take(3).enumerate() {
@@ -125,7 +228,7 @@ fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
         } else {
             0.0
         };
-        let value = (hokusai::color::linear_to_srgb(linear).clamp(0.0, 1.0) * 255.0).round() as u32;
+        let value = srgb_byte(linear, reference);
         rgba |= value << (8 * index);
     }
     rgba | (((alpha * 255.0).round() as u32) << 24)
@@ -137,22 +240,46 @@ fn quantize_pixel(pixel: &[u16; 4]) -> u32 {
 fn scan_changed_pixels(
     tile: &hokusai::tile::TilePixels,
     published: &mut ExportedTile,
-    mut emit: impl FnMut(usize, u32),
+    emit: impl FnMut(usize, u32),
 ) {
+    scan_changed_pixels_with_mode(
+        tile,
+        published,
+        std::env::var_os("DRAWING_T191_PIXEL_SCAN_COUNTERFACTUAL").is_none(),
+        emit,
+    );
+}
+
+/// Skip unchanged fixed-point rows without converting them. The row comparison
+/// is exact, and changed rows still use the original per-pixel quantizer.
+fn scan_changed_pixels_with_mode(
+    tile: &hokusai::tile::TilePixels,
+    published: &mut ExportedTile,
+    skip_rows: bool,
+    mut emit: impl FnMut(usize, u32),
+) -> usize {
+    let reference = std::env::var_os("DRAWING_T190_POWF_COUNTERFACTUAL").is_some();
+    let mut rows_skipped = 0;
     for (row, tile_row) in tile.iter().enumerate() {
+        let start = row * TILE_SIZE;
+        if skip_rows && tile_row.as_slice() == &published.raw[start..start + TILE_SIZE] {
+            rows_skipped += 1;
+            continue;
+        }
         for (column, pixel) in tile_row.iter().enumerate() {
-            let index = row * TILE_SIZE + column;
+            let index = start + column;
             if published.raw[index] == *pixel {
                 continue;
             }
             published.raw[index] = *pixel;
-            let rgba = quantize_pixel(pixel);
+            let rgba = quantize_pixel_with_mode(pixel, reference);
             if rgba != published.rgba[index] {
                 published.rgba[index] = rgba;
                 emit(index, rgba);
             }
         }
     }
+    rows_skipped
 }
 
 struct PresetBatch {
@@ -227,6 +354,8 @@ struct NativeStroke {
     batches: i64,
     input_floats: i64,
     emitted_ints: i64,
+    // Opt-in T-188 profiling: raster, delta scan, tile store apply, ack, tile discovery.
+    phase_us: [u64; 5],
 }
 
 impl NativeStroke {
@@ -261,6 +390,7 @@ impl NativeStroke {
             published: HashMap::new(),
         });
         self.preset.surface.begin_batch();
+        let raster_start = Instant::now();
         for sample in samples {
             self.preset.brush.stroke_to(
                 &mut self.preset.state,
@@ -273,8 +403,10 @@ impl NativeStroke {
                 sample.delta_seconds as f64,
             );
         }
+        self.phase_us[0] += raster_start.elapsed().as_micros() as u64;
+        let scan_start = Instant::now();
         let mut output = Vec::new();
-        let mut dirty: Vec<_> = self.preset.surface.changed.drain().collect();
+        let mut dirty = self.preset.surface.dirty_tiles_for_export();
         dirty.sort_unstable();
         for (tx, ty) in dirty {
             let Some(tile) = self.preset.surface.tile(tx, ty) else {
@@ -299,6 +431,7 @@ impl NativeStroke {
             self.acknowledge(false);
             return Err("Native sample delta exceeds batch output limit");
         }
+        self.phase_us[1] += scan_start.elapsed().as_micros() as u64;
         self.input_floats += (samples.len() * 4) as i64;
         self.emitted_ints += output.len() as i64;
         self.preview = output;
@@ -401,6 +534,7 @@ impl DrawingNativeBrush {
             batches: 0,
             input_floats: 0,
             emitted_ints: 0,
+            phase_us: [0; 5],
         });
         let mut result = Dictionary::new();
         result.set("ok", true);
@@ -504,8 +638,11 @@ impl DrawingNativeBrush {
             return error_result("Invalid native storage tile stride");
         }
         stroke.ffi_calls += 1;
+        let discovery_start = Instant::now();
         let step = 3;
         let mut coords = HashSet::new();
+        let mut last_coords: Option<(i64, i64)> = None;
+        let per_pixel = std::env::var_os("DRAWING_T188_PIXEL_GROUP_COUNTERFACTUAL").is_some();
         for delta in stroke.preview.chunks_exact(step) {
             if stroke.clip.size.x > 0
                 && stroke.clip.size.y > 0
@@ -524,7 +661,11 @@ impl DrawingNativeBrush {
             if x.unsigned_abs() > (1_u64 << 60) || y.unsigned_abs() > (1_u64 << 60) {
                 return error_result("Signed native tile coordinate outside safe bounds");
             }
-            coords.insert((x.div_euclid(stride), y.div_euclid(stride)));
+            let tile = (x.div_euclid(stride), y.div_euclid(stride));
+            if per_pixel || last_coords != Some(tile) {
+                coords.insert(tile);
+                last_coords = Some(tile);
+            }
             if coords.len() > 128 {
                 return error_result("Native sample batch exceeds touched-tile budget");
             }
@@ -541,6 +682,7 @@ impl DrawingNativeBrush {
         let mut result = Dictionary::new();
         result.set("ok", true);
         result.set("tiles", &tiles);
+        stroke.phase_us[4] += discovery_start.elapsed().as_micros() as u64;
         result
     }
 
@@ -578,6 +720,7 @@ impl DrawingNativeBrush {
             stroke.acknowledge(false);
             return error_result("Brush layer/revision differs from native tile transaction");
         }
+        let stage_start = Instant::now();
         let outcome = tile_store.store.stage(
             transaction,
             revision as u64,
@@ -592,7 +735,10 @@ impl DrawingNativeBrush {
         // A rejected source/mask read must rewind the brush's coverage,
         // pigment RNG and cursor before another batch may be appended.
         // TileStore::stage has already rolled back all tile writes on Err.
+        stroke.phase_us[2] += stage_start.elapsed().as_micros() as u64;
+        let ack_start = Instant::now();
         stroke.acknowledge(outcome.is_ok());
+        stroke.phase_us[3] += ack_start.elapsed().as_micros() as u64;
         match outcome {
             Ok(changed) => {
                 let mut result = Dictionary::new();
@@ -675,6 +821,34 @@ impl DrawingNativeBrush {
         result.set("batches", stroke.batches);
         result.set("input_floats", stroke.input_floats);
         result.set("exported_ints", stroke.emitted_ints);
+        if std::env::var_os("DRAWING_T185_PROFILE").is_some() {
+            result.set(
+                "t192_tile_requests",
+                stroke.preset.surface.tile_requests as i64,
+            );
+            result.set(
+                "t193_journal_probes",
+                stroke.preset.surface.journal_contains_probes as i64,
+            );
+            result.set(
+                "t193_journal_cache_hits",
+                stroke.preset.surface.journal_cache_hits as i64,
+            );
+            result.set(
+                "t192_dirty_set_inserts",
+                stroke.preset.surface.dirty_set_inserts_attempted as i64,
+            );
+            result.set(
+                "t192_journal_keys",
+                stroke.preset.surface.journal_keys_exported as i64,
+            );
+            for (label, us) in ["raster", "delta_scan", "tile_stage", "ack", "discovery"]
+                .into_iter()
+                .zip(stroke.phase_us)
+            {
+                result.set(format!("t188_{label}_us"), us as i64);
+            }
+        }
         result
     }
 
@@ -732,7 +906,7 @@ mod tests {
         surface.tile_request_end(-1, 2);
         surface.tile_request_start(3, -2)[0][0] = [900, 800, 700, 600];
         surface.tile_request_end(3, -2);
-        assert_eq!(surface.changed.len(), 2);
+        assert_eq!(surface.dirty_tiles_for_export().len(), 2);
         surface.rollback_batch();
         assert_eq!(surface.tile(-1, 2).unwrap()[3][4], [21, 43, 65, 32768]);
         assert!(surface.tile(3, -2).is_none());
@@ -745,6 +919,67 @@ mod tests {
         surface.commit_batch();
         assert_eq!(surface.tile(3, -2).unwrap()[0][0], [11, 12, 13, 14]);
         assert!(surface.before_batch.is_none());
+    }
+
+    #[test]
+    fn t192_batch_write_journal_is_exact_dirty_set() {
+        let mut surface = TrackedSurface::default();
+        surface.tile_request_start(-1, -2)[0][0] = [1, 2, 3, 4];
+        surface.changed.clear();
+        surface.begin_batch();
+        for _ in 0..48 {
+            surface.tile_request_start(-1, -2)[0][0] = [9, 8, 7, 6];
+            surface.tile_request_start(4, -3)[63][63] = [40, 30, 20, 10];
+        }
+        let mut keys = surface.dirty_tiles_for_export();
+        keys.sort_unstable();
+        assert_eq!(keys, vec![(-1, -2), (4, -3)]);
+        assert!(
+            surface.changed.is_empty(),
+            "journal avoids a redundant dirty HashSet"
+        );
+        assert_eq!(surface.dirty_set_inserts_attempted, 0);
+        assert_eq!(surface.tile_requests, 97);
+        surface.rollback_batch();
+        assert_eq!(surface.tile(-1, -2).unwrap()[0][0], [1, 2, 3, 4]);
+        assert!(surface.tile(4, -3).is_none());
+    }
+
+    #[test]
+    fn t190_srgb_bins_match_hokusai_at_every_fixedpoint_alpha_sample() {
+        // The exact fallback must cover every 8-bit boundary and the LUT
+        // must not alter even low-alpha premultiplied values or hidden RGB.
+        for alpha in [
+            0_u16, 1, 2, 3, 7, 13, 127, 255, 256, 1024, 4096, 16384, 32768, 32769, 65535,
+        ] {
+            let scale = hokusai::fix15::to_f32(alpha);
+            for channel in 0..=u16::MAX {
+                let linear = if scale == 0.0 {
+                    0.0
+                } else {
+                    hokusai::fix15::to_f32(channel) / scale
+                };
+                assert_eq!(
+                    srgb_byte(linear, false),
+                    srgb_byte(linear, true),
+                    "alpha={alpha}, channel={channel}"
+                );
+            }
+        }
+        for bin in 0..65536_u32 {
+            for offset in [0.0_f32, 0.25, 0.5, 0.75, 0.999] {
+                let linear = (bin as f32 + offset) / 65536.0;
+                assert_eq!(
+                    srgb_byte(linear, false),
+                    srgb_byte(linear, true),
+                    "linear bin={bin}, offset={offset}"
+                );
+            }
+        }
+        assert_eq!(
+            quantize_pixel_with_mode(&[18, 86, 142, 0], false),
+            quantize_pixel_with_mode(&[18, 86, 142, 0], true)
+        );
     }
 
     #[test]
@@ -802,6 +1037,36 @@ mod tests {
                 unchanged.is_empty(),
                 "unchanged native tile re-exported pixels"
             );
+        }
+    }
+
+    #[test]
+    fn row_scan_matches_per_pixel_when_pixels_change_and_revert() {
+        let mut tile = [[[0_u16; 4]; TILE_SIZE]; TILE_SIZE];
+        let mut optimized = ExportedTile::default();
+        let mut reference = ExportedTile::default();
+        for frame in 0..24 {
+            let row = (frame * 7) % TILE_SIZE;
+            tile[row][0] = [((frame * 347) % 32769) as u16, 0, 0, 32768];
+            tile[row][TILE_SIZE - 1] = [0, 0, (frame * 79) as u16, 10000];
+            if frame % 4 == 0 {
+                tile[row][0] = [0; 4];
+            }
+            let mut fast = Vec::new();
+            let skipped =
+                scan_changed_pixels_with_mode(&tile, &mut optimized, true, |index, rgba| {
+                    fast.push((index, rgba))
+                });
+            let mut slow = Vec::new();
+            let reference_skips =
+                scan_changed_pixels_with_mode(&tile, &mut reference, false, |index, rgba| {
+                    slow.push((index, rgba))
+                });
+            assert_eq!(reference_skips, 0);
+            assert!(skipped >= TILE_SIZE - 1);
+            assert_eq!(fast, slow, "frame {frame}");
+            assert_eq!(optimized.raw, reference.raw);
+            assert_eq!(optimized.rgba, reference.rgba);
         }
     }
 
@@ -877,7 +1142,74 @@ mod tests {
             batches: 0,
             input_floats: 0,
             emitted_ints: 0,
+            phase_us: [0; 5],
         }
+    }
+
+    #[test]
+    fn t193_alternating_signed_tile_requests_cache_only_batch_local_journal_hits() {
+        fn exercise(reference: bool) -> (Vec<u16>, u64, u64) {
+            let mut surface = TrackedSurface::default();
+            surface.begin_batch();
+            surface.reference_journal_lookup = reference;
+            for (x, y, value) in [
+                (-3, 2, 11),
+                (-3, 2, 17),
+                (-3, 2, 23),
+                (8, -4, 29),
+                (8, -4, 31),
+                (-3, 2, 37),
+            ] {
+                surface.tile_request_start(x, y)[0][0][0] = value;
+            }
+            assert_eq!(surface.before_batch.as_ref().unwrap().len(), 2);
+            assert_eq!(surface.dirty_tiles_for_export().len(), 2);
+            let rgba = [
+                surface.tile(-3, 2).unwrap()[0][0][0],
+                surface.tile(8, -4).unwrap()[0][0][0],
+            ]
+            .to_vec();
+            let probes = surface.journal_contains_probes;
+            let hits = surface.journal_cache_hits;
+            surface.rollback_batch();
+            assert!(surface.tile(-3, 2).is_none());
+            assert!(surface.tile(8, -4).is_none());
+            surface.begin_batch();
+            surface.reference_journal_lookup = reference;
+            surface.tile_request_start(-3, 2)[0][0][0] = 41;
+            assert_eq!(surface.before_batch.as_ref().unwrap().len(), 1);
+            surface.commit_batch();
+            assert_eq!(surface.tile(-3, 2).unwrap()[0][0][0], 41);
+            (rgba, probes, hits)
+        }
+        let (cached, probes, hits) = exercise(false);
+        let (reference, old_probes, old_hits) = exercise(true);
+        assert_eq!(cached, reference);
+        assert_eq!(cached, vec![37, 31]);
+        assert_eq!(probes, 2);
+        assert_eq!(hits, 4);
+        assert_eq!(old_probes, 6);
+        assert_eq!(old_hits, 0);
+    }
+
+    #[test]
+    fn t193_colliding_journal_hint_rechecks_rollback_snapshot() {
+        let a = (-2, -3);
+        let b = (30, -3);
+        assert_eq!(journal_hint_slot(a), journal_hint_slot(b));
+        let mut surface = TrackedSurface::default();
+        surface.tile_request_start(a.0, a.1)[0][0][0] = 17;
+        surface.changed.clear();
+        surface.begin_batch();
+        surface.tile_request_start(a.0, a.1)[0][0][0] = 100;
+        surface.tile_request_start(b.0, b.1)[0][0][0] = 200;
+        surface.tile_request_start(a.0, a.1)[0][0][0] = 222;
+        assert_eq!(surface.before_batch.as_ref().unwrap().len(), 2);
+        assert_eq!(surface.journal_contains_probes, 3);
+        assert_eq!(surface.journal_cache_hits, 0);
+        surface.rollback_batch();
+        assert_eq!(surface.tile(a.0, a.1).unwrap()[0][0][0], 17);
+        assert!(surface.tile(b.0, b.1).is_none());
     }
 
     #[test]

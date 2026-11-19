@@ -1,0 +1,59 @@
+EEEEEE
+======================================================================
+ERROR: test_all_canvas_submissions_count_even_without_callbacks (test_t199_canvas_draw_cadence.TestCanvasDrawCadence.test_all_canvas_submissions_count_even_without_callbacks)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t199_canvas_draw_cadence.py", line 31, in test_all_canvas_submissions_count_even_without_callbacks
+    stats = profile.canvas_draw_cadence_diagnostics([row])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 't185_profile_t199' has no attribute 'canvas_draw_cadence_diagnostics'
+
+======================================================================
+ERROR: test_bad_timestamps_are_never_clamped_or_interpolated (test_t199_canvas_draw_cadence.TestCanvasDrawCadence.test_bad_timestamps_are_never_clamped_or_interpolated)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t199_canvas_draw_cadence.py", line 54, in test_bad_timestamps_are_never_clamped_or_interpolated
+    stats = profile.canvas_draw_cadence_diagnostics(rows)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 't185_profile_t199' has no attribute 'canvas_draw_cadence_diagnostics'
+
+======================================================================
+ERROR: test_does_not_join_gestures_or_fill_callback_gaps (test_t199_canvas_draw_cadence.TestCanvasDrawCadence.test_does_not_join_gestures_or_fill_callback_gaps)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t199_canvas_draw_cadence.py", line 44, in test_does_not_join_gestures_or_fill_callback_gaps
+    stats = profile.canvas_draw_cadence_diagnostics(rows)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 't185_profile_t199' has no attribute 'canvas_draw_cadence_diagnostics'
+
+======================================================================
+ERROR: test_empty_or_singleton_frames_never_invent_a_period (test_t199_canvas_draw_cadence.TestCanvasDrawCadence.test_empty_or_singleton_frames_never_invent_a_period)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t199_canvas_draw_cadence.py", line 61, in test_empty_or_singleton_frames_never_invent_a_period
+    stats = profile.canvas_draw_cadence_diagnostics([
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 't185_profile_t199' has no attribute 'canvas_draw_cadence_diagnostics'
+
+======================================================================
+ERROR: test_exact_long_counts_outlive_bounded_detail (test_t199_canvas_draw_cadence.TestCanvasDrawCadence.test_exact_long_counts_outlive_bounded_detail)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t199_canvas_draw_cadence.py", line 69, in test_exact_long_counts_outlive_bounded_detail
+    stats = profile.canvas_draw_cadence_diagnostics(rows)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 't185_profile_t199' has no attribute 'canvas_draw_cadence_diagnostics'
+
+======================================================================
+ERROR: test_four_retained_native_workspace_processes (test_t199_canvas_draw_cadence.TestCanvasDrawCadence.test_four_retained_native_workspace_processes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t199_canvas_draw_cadence.py", line 87, in test_four_retained_native_workspace_processes
+    stats = profile.canvas_draw_cadence_diagnostics(runs)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 't185_profile_t199' has no attribute 'canvas_draw_cadence_diagnostics'
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.004s
+
+FAILED (errors=6)

@@ -1,0 +1,9 @@
+case	exit	marker	comment
+fail-first	1	ATLAS_BUNDLE_FAILED (74 checks, 1 failures)	unmodified T-201 test; out-of-range committed source could not publish
+final-bundle	0	ATLAS_BUNDLE_PASSED (91 checks, 0 failures)	repaired test; same native-backed root project
+editor	0	ATLAS_BUNDLE_EDITOR_PASSED (23 checks, 0 failures)	root Godot model
+storage	0	ATLAS_STORAGE_PASSED (77 checks, 0 failures)	root Godot model
+t158	0	T158_TILE_BOUNDS_PASSED checks=24 failures=0	standalone native Godot
+t159	0	T159_SIGNED_REPLAY_PASSED checks=39 failures=0	standalone native Godot
+python	0	56 tests across seven suites	make python-test
+storage-docs	0	8 tests	T-071 storage contract Python

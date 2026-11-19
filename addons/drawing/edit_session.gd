@@ -85,6 +85,42 @@ func _mark_preview_display_pixel(global_x: int, global_y: int) -> void:
 	_preview_display_last_epoch = _preview_epoch
 
 
+## Record only a native batch's changed local rectangle, not its enclosing
+## cumulative transaction footprint. Signed storage coordinates remain 64-bit;
+## the bounded display map uses string keys instead of Rect2i world positions.
+## If any range cannot fit the exact index, fall back to conservative stamps.
+func _mark_native_preview_display_rect(tile_x: int, tile_y: int,
+		local_dirty: Rect2i) -> void:
+	if not _preview_display_exact:
+		return
+	if not local_dirty.has_area():
+		_invalidate_exact_preview_display_index()
+		return
+	var stride: int = document.tile_stride
+	if local_dirty.position.x < 0 or local_dirty.position.y < 0 \
+			or local_dirty.end.x > stride or local_dirty.end.y > stride:
+		_invalidate_exact_preview_display_index()
+		return
+	var start_x: int = (tile_x * stride + local_dirty.position.x) >> 7
+	var start_y: int = (tile_y * stride + local_dirty.position.y) >> 7
+	var end_x: int = (tile_x * stride + local_dirty.end.x - 1) >> 7
+	var end_y: int = (tile_y * stride + local_dirty.end.y - 1) >> 7
+	var width: int = end_x - start_x + 1
+	var height: int = end_y - start_y + 1
+	if width > MAX_PREVIEW_DISPLAY_KEYS or height > MAX_PREVIEW_DISPLAY_KEYS / width:
+		_invalidate_exact_preview_display_index()
+		return
+	for y: int in range(start_y, end_y + 1):
+		for x: int in range(start_x, end_x + 1):
+			var key: String = "%d,%d" % [x, y]
+			if not _preview_display_versions.has(key) \
+					and _preview_display_versions.size() >= MAX_PREVIEW_DISPLAY_KEYS:
+				_invalidate_exact_preview_display_index()
+				return
+			_preview_display_versions[key] = _preview_epoch
+	_preview_display_last_epoch = _preview_epoch
+
+
 ## Canvas-only refinement: pixels in one 256px storage tile should not dirty
 ## all four 128px display tiles. Preserve the existing public conservative
 ## stamp API and fail back to it for bulk edits, rollbacks, oversized
@@ -253,6 +289,46 @@ func preview_rgba8_tile(tile_key: String) -> PackedByteArray:
 	var bytes: PackedByteArray = source.get("bytes", PackedByteArray())
 	_native_preview_cache[tile_key] = bytes
 	return bytes
+
+
+## Display-only cropped native bytes. Every region is tile-local and cache entries
+## are grouped by storage tile, so a later changed batch invalidates all crops.
+## Cap distinct rectangles per tile: third-party render callers may request many
+## overlapping offsets in one stroke without owning unbounded detached bytes.
+## Commit, history and persistence always read complete canonical native tiles.
+func preview_rgba8_region(tile_key: String, local_rect: Rect2i,
+		display: bool = false) -> Dictionary:
+	const MAX_CACHED_REGIONS_PER_TILE: int = 8
+	if _closed or _native_tiles == null or not _preview_tile_versions.has(tile_key) \
+			or document.revision != expected_revision:
+		return {}
+	var stride: int = document.tile_stride
+	if local_rect.position.x < 0 or local_rect.position.y < 0 \
+			or local_rect.size.x <= 0 or local_rect.size.y <= 0 \
+			or local_rect.end.x > stride or local_rect.end.y > stride:
+		return {}
+	var local_key: String = "%s:%d,%d,%d,%d" % ["display" if display else "source",
+		local_rect.position.x, local_rect.position.y, local_rect.size.x, local_rect.size.y]
+	var crops: Dictionary = _native_preview_regions.get(tile_key, {})
+	if crops.has(local_key):
+		return crops[local_key] as Dictionary
+	var coordinates: PackedStringArray = tile_key.split(",")
+	if coordinates.size() != 2:
+		return {}
+	var method: String = "read_tile_region_display" if display else "read_tile_region"
+	var source: Dictionary = _native_tiles.call(method, layer_id,
+		int(coordinates[0]), int(coordinates[1]), true,
+		local_rect.position.x, local_rect.position.y, local_rect.size.x, local_rect.size.y)
+	if not bool(source.get("ok", false)):
+		return {}
+	var bytes: PackedByteArray = source.get("bytes", PackedByteArray())
+	if bytes.size() != local_rect.get_area() * 4:
+		return {}
+	var result: Dictionary = {"bytes": bytes, "hidden_rgb": bool(source.get("hidden_rgb", true))}
+	if crops.size() < MAX_CACHED_REGIONS_PER_TILE:
+		crops[local_key] = result
+		_native_preview_regions[tile_key] = crops
+	return result
 
 
 func preview_stamp_for_area(area: Rect2i) -> int:
@@ -428,6 +504,7 @@ func cancel() -> void:
 		_native_transaction = 0
 		_native_change_count = 0
 		_native_preview_cache.clear()
+		_native_preview_regions.clear()
 	_finish_native_stroke(false)
 	_stationary_dab_valid = false
 	_brush_deferred = false
@@ -723,12 +800,21 @@ var _native_stroke: Object
 var _native_handle: int = 0
 var _native_clip_bounds: Rect2i = Rect2i()
 var native_ffi_stats: Dictionary = {}
+## T-185 opt-in diagnostic counters, not part of rendering or persistence.
+## Stage time contains these nested phases; never add both as independent wall time.
+var t185_native_stage: Dictionary = {
+	"authorize_us": 0, "apply_us": 0, "dirty_query_us": 0,
+	"stamp_us": 0, "index_us": 0, "dirty_entries": 0,
+	"revisited_entries": 0, "batch_calls": 0, "unique_tiles": 0,
+	"sample_pack_us": 0, "append_us": 0, "total_batch_us": 0,
+}
 ## Native tile batches are optional only for historical direct adapter fixtures.
 ## Production Canvas opts into this Rust-owned staging path.
 var _native_tiles: Object
 var _native_transaction: int = 0
 var _native_change_count: int = 0
 var _native_preview_cache: Dictionary[String, PackedByteArray] = {}
+var _native_preview_regions: Dictionary[String, Dictionary] = {}
 var _native_selection: DrawingSelection
 
 
@@ -840,19 +926,63 @@ func _stage_native_tile_batch(erase: bool, selection: DrawingSelection) -> Drawi
 	if (frozen == null) != (current == null) or \
 			(frozen != null and not frozen.same_as(current)):
 		return DrawingResult.failure("NATIVE_SELECTION", "Gesture selection changed")
+	var profile: bool = OS.has_environment("DRAWING_T185_PROFILE")
+	var began_us: int = Time.get_ticks_usec() if profile else 0
 	var authorized: DrawingResult = _authorize_native_tiles(frozen)
 	if not authorized.ok:
 		return authorized
+	var authorized_us: int = Time.get_ticks_usec() if profile else 0
 	var staged: Dictionary = _native_stroke.call("apply_tile_batch", _native_tiles,
 		_native_handle, expected_revision, _native_transaction, anchor_x, anchor_y, erase)
 	if not bool(staged.get("ok", false)):
 		return DrawingResult.failure("NATIVE_BATCH", str(staged.get("error", "Native tile batch rejected")))
-	for entry: Dictionary in _native_tiles.call("dirty_tiles", _native_transaction):
-		var key: String = "%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]
-		_preview_epoch += 1
-		_preview_tile_versions[key] = _preview_epoch
-		_native_preview_cache.erase(key)
-	_invalidate_exact_preview_display_index()
+	var applied_us: int = Time.get_ticks_usec() if profile else 0
+	# An opt-in, test-only counterfactual replays the original cumulative
+	# invalidation *with the same binary and source hashes* for T-186 A/B runs.
+	# Ordinary users always take the batch-local exact path.
+	var counterfactual: bool = OS.has_environment("DRAWING_T186_CUMULATIVE_COUNTERFACTUAL")
+	var changed: Array = _native_tiles.call("batch_dirty_tiles", _native_transaction)
+	var dirty: Array = _native_tiles.call("dirty_tiles", _native_transaction) \
+		if profile or counterfactual else []
+	var queried_us: int = Time.get_ticks_usec() if profile else 0
+	var revisited: int = 0
+	if profile:
+		# Count only keys known before this batch, as in T-185's baseline.
+		for entry: Dictionary in dirty:
+			if _preview_tile_versions.has("%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]):
+				revisited += 1
+	if counterfactual:
+		for entry: Dictionary in dirty:
+			var key: String = "%d,%d" % [int(entry["tile_x"]), int(entry["tile_y"])]
+			_preview_epoch += 1
+			_preview_tile_versions[key] = _preview_epoch
+			_native_preview_cache.erase(key)
+			_native_preview_regions.erase(key)
+		_invalidate_exact_preview_display_index()
+	else:
+		# Rust still retains cumulative rectangles for atomic commit/history.
+		# Only actually modified native pixels may invalidate a warm texture.
+		for entry: Dictionary in changed:
+			var tile_x: int = int(entry["tile_x"])
+			var tile_y: int = int(entry["tile_y"])
+			var key: String = "%d,%d" % [tile_x, tile_y]
+			_preview_epoch += 1
+			_preview_tile_versions[key] = _preview_epoch
+			_native_preview_cache.erase(key)
+			_native_preview_regions.erase(key)
+			_mark_native_preview_display_rect(tile_x, tile_y, entry["dirty"] as Rect2i)
+	var stamped_us: int = Time.get_ticks_usec() if profile else 0
+	if profile:
+		var index_us: int = Time.get_ticks_usec()
+		t185_native_stage["authorize_us"] += authorized_us - began_us
+		t185_native_stage["apply_us"] += applied_us - authorized_us
+		t185_native_stage["dirty_query_us"] += queried_us - applied_us
+		t185_native_stage["stamp_us"] += stamped_us - queried_us
+		t185_native_stage["index_us"] += index_us - stamped_us
+		t185_native_stage["dirty_entries"] += dirty.size()
+		t185_native_stage["revisited_entries"] += revisited
+		t185_native_stage["batch_calls"] += 1
+		t185_native_stage["unique_tiles"] = _preview_tile_versions.size()
 	_native_change_count = _preview_tile_versions.size()
 	return DrawingResult.success(_native_change_count)
 
@@ -913,11 +1043,13 @@ func _commit_native_tile_stroke() -> DrawingResult:
 	native_ffi_stats["tile_bytes_imported"] = int(tile_stats.get("bytes_imported", 0))
 	native_ffi_stats["tile_bytes_exported"] = int(tile_stats.get("bytes_exported", 0))
 	native_ffi_stats["tile_pixel_stream_calls"] = int(tile_stats.get("pixel_stream_calls", -1))
+	native_ffi_stats["tile_source_lookups"] = int(tile_stats.get("source_lookups", 0))
 	_native_handle = 0
 	_native_stroke = null
 	_native_tiles = null
 	_native_transaction = 0
 	_native_preview_cache.clear()
+	_native_preview_regions.clear()
 	_source_tiles.clear()
 	_preview_tile_versions.clear()
 	_native_change_count = 0
@@ -935,6 +1067,7 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 	if _closed or _native_handle == 0 or path.is_empty() \
 			or document.revision != expected_revision:
 		return DrawingResult.failure("NATIVE_STALE", "Native stroke is closed or source revision changed")
+	var pack_start_us: int = Time.get_ticks_usec()
 	var inverse: Transform2D = view_transform.affine_inverse()
 	var samples: PackedFloat32Array = PackedFloat32Array()
 	samples.resize(path.size() * 4)
@@ -945,12 +1078,19 @@ func paint_path_native(path: PackedVector2Array, rgba: int, erase: bool,
 		samples[index * 4 + 2] = pressure
 		samples[index * 4 + 3] = delta_seconds
 	var native_start_us: int = Time.get_ticks_usec()
+	if OS.has_environment("DRAWING_T185_PROFILE"):
+		t185_native_stage["sample_pack_us"] += native_start_us - pack_start_us
 	var accepted: Dictionary = _native_stroke.call("append_samples", _native_handle,
 		expected_revision, samples)
+	if OS.has_environment("DRAWING_T185_PROFILE"):
+		t185_native_stage["append_us"] += Time.get_ticks_usec() - native_start_us
 	if not bool(accepted.get("ok", false)):
 		return DrawingResult.failure("NATIVE_BATCH", str(accepted.get("error", "Sample batch rejected")))
 	if _native_tiles != null:
-		return _stage_native_tile_batch(erase, selection)
+		var result: DrawingResult = _stage_native_tile_batch(erase, selection)
+		if OS.has_environment("DRAWING_T185_PROFILE"):
+			t185_native_stage["total_batch_us"] += Time.get_ticks_usec() - pack_start_us
+		return result
 	var exported: Dictionary = _native_stroke.call("preview_changes", _native_handle, expected_revision)
 	var native_elapsed_us: int = Time.get_ticks_usec() - native_start_us
 	if not bool(exported.get("ok", false)):

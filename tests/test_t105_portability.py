@@ -1,20 +1,20 @@
 """T-105 fail-closed portable-export evidence and Windows strict-FP guards."""
 from __future__ import annotations
 
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools/benchmarks"))
 
-from build_drawing_app import stage  # noqa: E402
 import t105_release_residency as release  # noqa: E402
 import t105_windows_msvc as msvc  # noqa: E402
+from build_drawing_app import stage  # noqa: E402
 
 
 def fixture() -> dict:
@@ -31,9 +31,12 @@ def fixture() -> dict:
     ]
     keys = ("elapsed_ms", "cpu_user_ms", "cpu_system_ms", "rss_peak_kib", "hwm_peak_kib")
     return {"schema": 1, "ticket": "T-105", "platform": "linux-x86_64",
-            "source_sha256": source_sha, "stage": {"file_count": 37, "font_license_sha256": "c" * 64},
-            "release": {"platform": "linux", "native_extension_shipped": False,
-                        "inspection": "structure_only",
+            "source_sha256": source_sha, "stage": {"file_count": 37, "font_license_sha256": "c" * 64,
+                      "native_required": True, "native_library_sha256": "d" * 64},
+            "release": {"platform": "linux", "native_extension_shipped": True,
+                        "inspection": "structure_and_required_native",
+                        "native_library": {"name": "addons/drawing/native/bin/libdrawing_brush.so",
+                                           "size": 4096, "sha256": "d" * 64},
                         "binary": {"name": "Drawing.x86_64", "size": 4096,
                                    "sha256": "a" * 64},
                         "pack": {"name": "Drawing.pck", "size": 96,
@@ -77,7 +80,9 @@ class T105EvidenceTests(unittest.TestCase):
             lambda r: r["summary"]["elapsed_ms"].update(p95=0),
             lambda r: r["summary"]["hwm_peak_kib"].update(p50=123),
             lambda r: r["release"]["binary"].update(sha256="0" * 31),
-            lambda r: r["release"].update(native_extension_shipped=True),
+            lambda r: r["release"].update(native_extension_shipped=False),
+            lambda r: r["release"]["native_library"].update(sha256="0" * 31),
+            lambda r: r["release"]["native_library"].update(sha256="f" * 64),
             lambda r: r["stage"].pop("font_license_sha256"),
             lambda r: r["release"]["binary"].update(name="fake.x86_64"),
             lambda r: r["source_sha256"].update({"bad": "123"}),

@@ -1,0 +1,136 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+WARNING: Drawing: Stroke still processing; Add Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _create_selected_layer (res://addons/drawing/workspace.gd:2507)
+         [3] _add_layer (res://addons/drawing/workspace.gd:2529)
+         [4] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:82)
+         [5] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [6] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Add Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _create_selected_layer (res://addons/drawing/workspace.gd:2507)
+         [3] _add_group (res://addons/drawing/workspace.gd:2525)
+         [4] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:84)
+         [5] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [6] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Change Layer Visibility after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _set_row_visibility (res://addons/drawing/workspace.gd:2561)
+         [3] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:86)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Change Layer Lock after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _set_row_lock (res://addons/drawing/workspace.gd:2571)
+         [3] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:89)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Reorder Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _move_selected_layer (res://addons/drawing/workspace.gd:2585)
+         [3] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:92)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Rename Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _commit_layer_rename (res://addons/drawing/workspace.gd:2645)
+         [3] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:96)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Remove Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _remove_layer (res://addons/drawing/workspace.gd:2763)
+         [3] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:99)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Change Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _select_layer_node (res://addons/drawing/workspace.gd:2427)
+         [3] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:101)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Change Layer after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _select_layer_node (res://addons/drawing/workspace.gd:2427)
+         [3] _layer_selected (res://addons/drawing/workspace.gd:2448)
+         [4] test_layer_commands (res://tests/t129_pending_content_edit_smoke.gd:112)
+         [5] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [6] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Delete Pixels after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _delete_selection (res://addons/drawing/workspace.gd:2967)
+         [3] test_clipboard_and_text (res://tests/t129_pending_content_edit_smoke.gd:154)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Cut Pixels after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _cut_selection (res://addons/drawing/workspace.gd:2989)
+         [3] test_clipboard_and_text (res://tests/t129_pending_content_edit_smoke.gd:156)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Paste Pixels after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _paste_selection (res://addons/drawing/workspace.gd:3015)
+         [3] test_clipboard_and_text (res://tests/t129_pending_content_edit_smoke.gd:158)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Commit Text after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _commit_text_dialog (res://addons/drawing/workspace.gd:2723)
+         [3] test_clipboard_and_text (res://tests/t129_pending_content_edit_smoke.gd:161)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+WARNING: Drawing: Stroke still processing; Rasterize Text after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:3671)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2194)
+         [2] _rasterize_text (res://addons/drawing/workspace.gd:2751)
+         [3] test_clipboard_and_text (res://tests/t129_pending_content_edit_smoke.gd:163)
+         [4] new_app (res://tests/t129_pending_content_edit_smoke.gd:28)
+         [5] frames (res://tests/t129_pending_content_edit_smoke.gd:17)
+T129_PENDING_EDIT_PASSED checks=35 failures=0

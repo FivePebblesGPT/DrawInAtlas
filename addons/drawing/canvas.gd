@@ -1,4 +1,6 @@
 extends Control
+
+const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 ## Bounded framebuffer rendering and native mouse gestures, without Atlas UI types.
 
 signal gesture_started()
@@ -43,6 +45,8 @@ var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
 ## Every Brush/Eraser preset uses the required Hokusai native extension.
 var brush_preset: String = "hard"
+var brush_opacity: float = 1.0 # 0..1 multiplier of the preset native opaque base
+var brush_hardness: float = -1.0 # -1 means the bundled preset native default
 const BUNDLED_PRESETS: Dictionary = {
     "hard": "res://addons/drawing/brushes/hard_round.myb",
     "soft": "res://addons/drawing/brushes/soft.myb",
@@ -243,9 +247,11 @@ var _reported_render_errors: Dictionary[String, bool] = {}
 ## after release. Batch consecutive swept segments in one edit transaction call
 ## and stop at a measured CPU budget, including on the release input path.
 const MAX_SEGMENTS_PER_FRAME: int = 256
-const MAX_SEGMENTS_PER_BATCH: int = 16
-const MAX_BATCH_ESTIMATED_PIXELS: float = 8192.0
+const MAX_SEGMENTS_PER_BATCH: int = 20
 const MAX_DRAIN_CPU_US: int = 6000
+# An extra deferred release drain is reserved for deep input backlogs, not
+# ordinary short or held gestures whose paced frames are more sensitive.
+const MIN_RELEASE_DEFERRED_PENDING_SAMPLES: int = 32
 # Preview draw scheduling never changes the 6ms soft raster-stage deadline.
 # During a sustained input backlog a display frame may represent two bounded
 # drain calls; first/last isolated changes remain immediate.
@@ -401,9 +407,6 @@ func _on_frame_post_draw() -> void:
 	var callback_us: int = Time.get_ticks_usec()
 	last_frame_metrics["post_draw_us"] = callback_us
 	_finish_pending_frame_post_draw(callback_us)
-	if session != null and int(_metrics.get("first_preview_submit_us", 0)) > 0 \
-			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0:
-		_metrics["first_frame_post_draw_us"] = Time.get_ticks_usec()
 
 
 ## Godot's frame_post_draw callback is a renderer-side timing witness, NOT a
@@ -424,6 +427,13 @@ func _finish_pending_frame_post_draw(callback_us: int) -> void:
 		return
 	var recorded_us: int = maxi(end_us, callback_us)
 	var delay_us: int = recorded_us - end_us
+	# The first renderer callback must belong to a Canvas frame submitted
+	# after native preview changes, not an unrelated redraw or stale session.
+	if bool(sample.get("first_preview_frame", false)) \
+			and int(_metrics.get("first_frame_post_draw_us", 0)) == 0 \
+			and end_us >= int(_metrics.get("first_preview_submit_us", 0)) \
+			and int(_metrics.get("first_preview_submit_us", 0)) > 0:
+		_metrics["first_frame_post_draw_us"] = recorded_us
 	sample["frame_post_draw_callback_us"] = recorded_us
 	sample["frame_end_to_post_draw_us"] = delay_us
 	_metrics["frame_post_draw_matches"] = int(_metrics.get("frame_post_draw_matches", 0)) + 1
@@ -1607,6 +1617,16 @@ func _process(_delta: float) -> void:
 			canvas_error.emit("Stroke cancelled because the document revision changed")
 			return
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
+		# After release, no live pointer-handler is waiting on this stroke.
+		# One additional, independently 6ms-bounded drain can retire queued
+		# samples without an extra frame callback. Never repeat without bound:
+		# at most one extra drain per _process, and none while capturing.
+		if session != null and _finish_requested and (
+				_has_segment_target or _sample_index < _samples.size()) and not OS.has_environment(
+				"DRAWING_T195_RELEASE_CATCHUP_COUNTERFACTUAL"):
+			_metrics["post_release_catchup_calls"] = int(
+					_metrics["post_release_catchup_calls"]) + 1
+			_drain_segments(MAX_SEGMENTS_PER_FRAME)
 	if moving and _move_target != _move_preview_offset:
 		_stage_move_preview(_move_target)
 	if _floating_source_revision >= 0 and (document == null \
@@ -1644,7 +1664,7 @@ func _capture_deferred_stroke(position: Vector2) -> void:
 	_deferred_times_us.clear()
 	_deferred_stroke = {"capturing": true, "document": document, "layer": layer_id,
 		"tool": tool, "color": color_rgba, "width": brush_width,
-		"preset": brush_preset,
+		"preset": brush_preset, "opacity": brush_opacity, "hardness": brush_hardness,
 		"selection": selection_mask.detached_copy(),
 		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i(),
 		"clip_enabled": clip_strokes_to_image_frame}
@@ -1778,7 +1798,16 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 		canvas_error.emit("Unknown or missing MyPaint brush preset: " + preset_path)
 		cancel_gesture()
 		return
-	var preset_text: String = FileAccess.get_file_as_string(preset_path)
+	var opacity: float = float(configuration.get("opacity", brush_opacity))
+	var hardness: float = float(configuration.get("hardness", brush_hardness))
+	if hardness < 0.0:
+		hardness = BRUSH_SETTINGS.default_hardness(str(configuration.get("preset", brush_preset)))
+	var preset_text: String = BRUSH_SETTINGS.configured_preset(
+		str(configuration.get("preset", brush_preset)), opacity, hardness)
+	if preset_text.is_empty():
+		canvas_error.emit("Invalid native brush opacity/hardness or preset")
+		cancel_gesture()
+		return
 	var started: DrawingResult = session.begin_native_stroke(_native_brush,
 		preset_text, _stroke_width, _stroke_color, _stroke_clip,
 		true, _stroke_selection)
@@ -1811,6 +1840,8 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 		"segments_staged": 0, "stage_cpu_us": 0, "max_pending": 0,
 		"max_sample_buffer": 0, "sample_compactions": 0,
 		"duplicate_drain_batched": 0, "drain_calls": 0, "max_drain_cpu_us": 0,
+		"post_release_catchup_calls": 0, "post_release_deferred_calls": 0,
+		"release_pending_samples": 0,
 		"sample_to_stage_us": [], "sample_to_stage_total": 0,
 		"max_sample_to_stage_us": 0, "stage_batches_us": [],
 		"stage_batch_total": 0, "max_stage_batch_us": 0,
@@ -1885,17 +1916,11 @@ func _drain_segments(budget: int) -> void:
 	# because an input sample was consumed; actual pixel mutations increment
 	# the session preview generation (including edits that restore old bytes).
 	var preview_before: int = session._preview_epoch
-	# A wide brush can rasterize more candidates in one segment than a
-	# narrow one does in 16. Limit the atomic batch by swept footprint so
-	# the soft deadline is not defeated by one oversized paint_path call.
-	var estimated_segment_pixels: float = maxf(1.0,
-		_stroke_width * (_stroke_width + MAX_SEGMENT_LENGTH))
-	var batch_limit: int = clampi(int(MAX_BATCH_ESTIMATED_PIXELS / estimated_segment_pixels),
-		1, MAX_SEGMENTS_PER_BATCH)
-	# Hokusai accumulates pigment natively: exporting every intermediate 60px
-	# dab would repeatedly restage the same dirty tiles. Collapse up to sixteen
-	# adjacent source samples into one atomic native call/preview update.
-	batch_limit = MAX_SEGMENTS_PER_BATCH
+	# Native Hokusai keeps the 20-segment atomic cap and 6ms soft deadline
+	# between batches. T-194's 16-segment diagnostic remains available.
+	var batch_limit: int = MAX_SEGMENTS_PER_BATCH
+	if OS.has_environment("DRAWING_T194_BATCH_COUNTERFACTUAL"):
+		batch_limit = 16
 	while segments < budget:
 		var batch: PackedVector2Array = PackedVector2Array()
 		var completed_arrivals: Array[int] = []
@@ -2032,6 +2057,12 @@ func _record_frame_phase(frame: Dictionary) -> void:
 		_metrics["max_frame_preview_stage_to_frame_end_us"] = maxi(
 			int(_metrics.get("max_frame_preview_stage_to_frame_end_us", 0)),
 			submit_delay_us)
+	# A matching renderer callback can be credited to first preview only
+	# when this actual Canvas frame was submitted after first pixel changes.
+	var submitted_us: int = int(_metrics.get("first_preview_submit_us", 0))
+	if submitted_us > 0 and int(_metrics.get("first_frame_post_draw_us", 0)) == 0 \
+			and int(frame.get("frame_end_us", 0)) >= submitted_us:
+		sample["first_preview_frame"] = true
 	# Monotonic engine time allows phase and backlog spikes to be correlated
 	# without pretending to measure physical input-to-photon latency.
 	sample["frame_end_us"] = maxi(0, int(frame.get("frame_end_us", 0)))
@@ -2159,6 +2190,8 @@ func _write_t095_trace(profile: Dictionary, backend: String) -> void:
 			"samples_received", "segments_staged", "stage_cpu_us",
 			"max_pending", "max_sample_buffer", "sample_compactions",
 			"duplicate_drain_batched", "drain_calls", "max_drain_cpu_us",
+			"post_release_catchup_calls", "post_release_deferred_calls",
+			"release_pending_samples",
 			"sample_to_stage_total", "max_sample_to_stage_us",
 			"stage_batch_total", "max_stage_batch_us", "commit_cpu_us",
 			"preview_frames", "compose_cpu_us", "texture_cpu_us",
@@ -2251,6 +2284,8 @@ func _commit_stroke() -> void:
 	else:
 		active.cancel()
 	_metrics["native_ffi_stats"] = active.native_ffi_stats.duplicate(true)
+	if OS.has_environment("DRAWING_T185_PROFILE"):
+		_metrics["t185_native_stage"] = active.t185_native_stage.duplicate(true)
 	_metrics["commit_cpu_us"] = Time.get_ticks_usec() - commit_start_us
 	_metrics["commit_us"] = Time.get_ticks_usec()
 	_finalize_stage_latency_window()
@@ -2457,12 +2492,38 @@ func finish_gesture(position: Vector2, source_override: Variant = null,
 		# Finish small clicks synchronously; long queued strokes are drained
 		# across frames without blocking the input loop.
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
+		# A deep input backlog can be drained once at idle without extending
+		# the mouse-up callback. Short/held strokes keep the existing T-195
+		# frame cadence. The deferred call also checks its session identity.
+		if session != null and _finish_requested:
+			var outstanding: int = int(_frame_input_backlog(
+					Time.get_ticks_usec())["pending_input_count"])
+			_metrics["release_pending_samples"] = outstanding
+			if outstanding >= MIN_RELEASE_DEFERRED_PENDING_SAMPLES and not OS.has_environment(
+					"DRAWING_T196_DEFERRED_CATCHUP_COUNTERFACTUAL"):
+				call_deferred("_t196_drain_after_release", session)
+
 	dragging = false
 	selecting = false
 	moving = false
 	_marquee_dragged = false
 	_move_target = Vector2i.ZERO
 	queue_redraw()
+
+
+func _t196_drain_after_release(expected: DrawingEditSession) -> void:
+	if session != expected or not _finish_requested:
+		return
+	if document == null or document.revision != session.expected_revision:
+		cancel_gesture()
+		canvas_error.emit("Stroke cancelled because the document revision changed")
+		return
+	if not _has_segment_target and _sample_index >= _samples.size():
+		return
+	_metrics["post_release_deferred_calls"] = int(
+			_metrics["post_release_deferred_calls"]) + 1
+	_drain_segments(MAX_SEGMENTS_PER_FRAME)
+
 
 func _publish(result: DrawingResult) -> void:
 	if result.ok:

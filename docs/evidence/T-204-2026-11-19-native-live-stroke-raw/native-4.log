@@ -1,0 +1,24 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta3.official, safeguards balanced)
+Godot Engine v4.8.beta3.official.c51ff06e8 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+T085_NATIVE_ZOOM zoom=1.00 samples=31 max_queued=29 down_to_stage_ms=0.081 down_to_frame_ms=11.296 release_to_commit_ms=1.896
+T085_NATIVE_ZOOM zoom=0.50 samples=31 max_queued=29 down_to_stage_ms=0.058 down_to_frame_ms=2.632 release_to_commit_ms=1.557
+T085_NATIVE_ZOOM zoom=0.25 samples=31 max_queued=29 down_to_stage_ms=0.061 down_to_frame_ms=2.694 release_to_commit_ms=2.099
+T085_NATIVE_LONG zoom=1.00 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.303 stage_cpu_ms=12.389 release_to_commit_ms=13.774 wall_ms=29.546
+T085_NATIVE_LONG zoom=1.00 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.261 stage_cpu_ms=11.922 release_to_commit_ms=13.471 wall_ms=29.788
+T085_NATIVE_LONG zoom=1.00 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.692 stage_cpu_ms=12.938 release_to_commit_ms=14.565 wall_ms=30.092
+T085_NATIVE_LONG_SUMMARY zoom=1.00 trials=3 release_to_commit_p50_ms=13.774 release_to_commit_p95_ms=14.565
+T085_NATIVE_LONG zoom=0.50 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.579 stage_cpu_ms=12.202 release_to_commit_ms=13.752 wall_ms=29.090
+T085_NATIVE_LONG zoom=0.50 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.361 stage_cpu_ms=12.132 release_to_commit_ms=13.448 wall_ms=30.429
+T085_NATIVE_LONG zoom=0.50 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=3.899 stage_cpu_ms=11.274 release_to_commit_ms=12.535 wall_ms=29.339
+T085_NATIVE_LONG_SUMMARY zoom=0.50 trials=3 release_to_commit_p50_ms=13.448 release_to_commit_p95_ms=13.752
+T085_NATIVE_LONG zoom=0.25 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.353 stage_cpu_ms=12.178 release_to_commit_ms=13.770 wall_ms=35.888
+T085_NATIVE_LONG zoom=0.25 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.302 stage_cpu_ms=11.919 release_to_commit_ms=13.610 wall_ms=30.639
+T085_NATIVE_LONG zoom=0.25 delivered=840 segments=844 drain_calls=5 drain_frames=1 max_drain_cpu_ms=4.106 stage_cpu_ms=11.774 release_to_commit_ms=13.182 wall_ms=30.081
+T085_NATIVE_LONG_SUMMARY zoom=0.25 trials=3 release_to_commit_p50_ms=13.610 release_to_commit_p95_ms=13.770
+T085_NATIVE_METRICS ms: preview_frame_p50=2.694 preview_frame_p95=11.296 sample_to_stage_p50=0.843 sample_to_stage_p95=1.482 stage_cpu_p50=1.734 stage_cpu_p95=2.339
+T085_NATIVE: 144 checks; 0 failed
+T085_NATIVE_PASSED

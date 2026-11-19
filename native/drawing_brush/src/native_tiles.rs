@@ -53,6 +53,8 @@ struct Edit {
     before: HashMap<TileId, Tile>,
     draft: HashMap<TileId, Tile>,
     dirty: HashMap<TileId, Dirty>,
+    /// Exactly changed rectangles in the most recently successful stage call.
+    last_dirty: HashMap<TileId, Dirty>,
     batches: u64,
 }
 
@@ -82,6 +84,84 @@ pub(super) struct TileStore {
     bytes_exported: u64,
     external_bytes_received: u64,
     pixel_stream_calls: u64,
+    /// T-189: successful-stage immutable source hash probes (not pixels).
+    source_lookups: u64,
+}
+
+/// Collect ordered native pigment deltas by storage tile without probing the
+/// hash map for every pixel in a clustered Hokusai output run. Even if a tile
+/// reappears later, append its runs in input order: alpha and erase semantics
+/// must remain identical to the original per-pixel grouping.
+#[allow(clippy::too_many_arguments)]
+fn group_pigment_deltas(
+    deltas: &[i32],
+    pigment: bool,
+    brush_rgba: u32,
+    clip: Rect2i,
+    anchor_x: i64,
+    anchor_y: i64,
+    stride: i64,
+    per_pixel: bool,
+) -> Result<(PackedTileChanges, usize), &'static str> {
+    if stride <= 0 {
+        return Err("Invalid native tile stride");
+    }
+    let step = if pigment { 3 } else { 2 };
+    let mut grouped: PackedTileChanges = HashMap::new();
+    let mut run_key: Option<(i64, i64)> = None;
+    let mut run = Vec::<(usize, usize, u32)>::new();
+    let mut tile_lookups = 0_usize;
+    for delta in deltas.chunks_exact(step) {
+        if clip.size.x > 0
+            && clip.size.y > 0
+            && !clip.contains_point(Vector2i::new(delta[0], delta[1]))
+        {
+            continue;
+        }
+        let x = anchor_x
+            .checked_add(i64::from(delta[0]))
+            .ok_or("Signed X overflow")?;
+        let y = anchor_y
+            .checked_add(i64::from(delta[1]))
+            .ok_or("Signed Y overflow")?;
+        if x.unsigned_abs() > SAFE_COORD as u64 || y.unsigned_abs() > SAFE_COORD as u64 {
+            return Err("Signed native sample outside tile bounds");
+        }
+        let coords = (x.div_euclid(stride), y.div_euclid(stride));
+        let ix = x.rem_euclid(stride) as usize;
+        let iy = y.rem_euclid(stride) as usize;
+        let pigment_rgba = if pigment { delta[2] as u32 } else { brush_rgba };
+        let rgba = if pigment {
+            let alpha = ((pigment_rgba >> 24) & 255) * ((brush_rgba >> 24) & 255);
+            (pigment_rgba & 0xffffff) | (((alpha + 127) / 255) << 24)
+        } else {
+            pigment_rgba
+        };
+        let pixel = (ix, iy, rgba);
+        if per_pixel {
+            if cfg!(test) {
+                tile_lookups += 1;
+            }
+            grouped.entry(coords).or_default().push(pixel);
+        } else {
+            if run_key != Some(coords) {
+                if let Some(old_key) = run_key.replace(coords) {
+                    if cfg!(test) {
+                        tile_lookups += 1;
+                    }
+                    grouped.entry(old_key).or_default().append(&mut run);
+                }
+            }
+            run.push(pixel);
+        }
+    }
+    if let Some(last_key) = run_key {
+        if cfg!(test) {
+            tile_lookups += 1;
+        }
+        grouped.entry(last_key).or_default().append(&mut run);
+    }
+    Ok((grouped, tile_lookups))
 }
 
 impl TileStore {
@@ -183,6 +263,7 @@ impl TileStore {
             before: HashMap::new(),
             draft: HashMap::new(),
             dirty: HashMap::new(),
+            last_dirty: HashMap::new(),
             batches: 0,
         });
         Ok(id)
@@ -225,6 +306,39 @@ impl TileStore {
         erase: bool,
         clip: Rect2i,
     ) -> Result<usize, &'static str> {
+        let source_per_pixel =
+            std::env::var_os("DRAWING_T189_SOURCE_PER_PIXEL_COUNTERFACTUAL").is_some();
+        self.stage_with_source_mode(
+            transaction,
+            revision,
+            anchor_x,
+            anchor_y,
+            deltas,
+            pigment,
+            brush_rgba,
+            erase,
+            clip,
+            source_per_pixel,
+        )
+    }
+
+    /// Same-pixel source semantics in both paths; the production path resolves
+    /// the immutable source once for a whole native storage-tile group.
+    /// Only the test/diagnostic counterfactual hashes by TileId per pixel.
+    #[allow(clippy::too_many_arguments)]
+    fn stage_with_source_mode(
+        &mut self,
+        transaction: i64,
+        revision: u64,
+        anchor_x: i64,
+        anchor_y: i64,
+        deltas: &[i32],
+        pigment: bool,
+        brush_rgba: u32,
+        erase: bool,
+        clip: Rect2i,
+        source_per_pixel: bool,
+    ) -> Result<usize, &'static str> {
         let step = if pigment { 3 } else { 2 };
         if !deltas.len().is_multiple_of(step) || deltas.len() > 3 * 1_048_576 {
             return Err("Invalid native sample output");
@@ -237,36 +351,12 @@ impl TileStore {
         {
             return Err("Stale revision or unavailable tile layer");
         }
-        let mut grouped: PackedTileChanges = HashMap::new();
         let stride = self.stride as i64;
-        for delta in deltas.chunks_exact(step) {
-            if clip.size.x > 0
-                && clip.size.y > 0
-                && !clip.contains_point(Vector2i::new(delta[0], delta[1]))
-            {
-                continue;
-            }
-            let x = anchor_x
-                .checked_add(i64::from(delta[0]))
-                .ok_or("Signed X overflow")?;
-            let y = anchor_y
-                .checked_add(i64::from(delta[1]))
-                .ok_or("Signed Y overflow")?;
-            if x.unsigned_abs() > SAFE_COORD as u64 || y.unsigned_abs() > SAFE_COORD as u64 {
-                return Err("Signed native sample outside tile bounds");
-            }
-            let coords = (x.div_euclid(stride), y.div_euclid(stride));
-            let ix = x.rem_euclid(stride) as usize;
-            let iy = y.rem_euclid(stride) as usize;
-            let pigment_rgba = if pigment { delta[2] as u32 } else { brush_rgba };
-            let rgba = if pigment {
-                let alpha = ((pigment_rgba >> 24) & 255) * ((brush_rgba >> 24) & 255);
-                (pigment_rgba & 0xffffff) | (((alpha + 127) / 255) << 24)
-            } else {
-                pigment_rgba
-            };
-            grouped.entry(coords).or_default().push((ix, iy, rgba));
-        }
+        // Force the unoptimized per-pixel grouping for same-binary A/B only.
+        let per_pixel = std::env::var_os("DRAWING_T188_PIXEL_GROUP_COUNTERFACTUAL").is_some();
+        let (grouped, _lookups) = group_pigment_deltas(
+            deltas, pigment, brush_rgba, clip, anchor_x, anchor_y, stride, per_pixel,
+        )?;
         let active = self.active.as_ref().expect("checked above");
         let new_count = grouped
             .keys()
@@ -291,6 +381,7 @@ impl TileStore {
         }
         let mut updated: HashMap<TileId, Tile> = HashMap::new();
         let mut dirty: HashMap<TileId, Dirty> = HashMap::new();
+        let mut source_reads = 0_u64;
         for ((tx, ty), changes) in grouped {
             let id = TileId {
                 layer: active.layer.clone(),
@@ -311,6 +402,21 @@ impl TileStore {
                 .or_else(|| self.tiles.get(&id))
                 .ok_or("Source tile not resident")?
                 .clone();
+            // The source is frozen for the whole transaction. Referencing its
+            // bytes once per tile avoids repeated TileId hashing during each
+            // pigment pixel, without changing alpha or hidden-RGB semantics.
+            let source_once = if pigment && !source_per_pixel {
+                source_reads += 1;
+                Some(
+                    self.tiles
+                        .get(&id)
+                        .expect("authorized source")
+                        .rgba
+                        .as_slice(),
+                )
+            } else {
+                None
+            };
             let mut tile_dirty: Option<Dirty> = None;
             for (x, y, rgba) in changes {
                 if mask.is_some_and(|selection| selection[y * self.stride + x] == 0) {
@@ -322,12 +428,26 @@ impl TileStore {
                         .try_into()
                         .expect("RGBA8 offset"),
                 );
+                let source_rgba = if pigment {
+                    if let Some(source) = source_once {
+                        source
+                    } else {
+                        source_reads += 1;
+                        self.tiles
+                            .get(&id)
+                            .expect("authorized source")
+                            .rgba
+                            .as_slice()
+                    }
+                } else {
+                    &[]
+                };
                 let next = if erase && pigment {
                     // Erase using the same MyPaint dab alpha as Brush, rebased
                     // onto immutable source across successive preview batches.
                     // Keep hidden RGB when the source was already transparent.
                     let original = u32::from_le_bytes(
-                        self.tiles.get(&id).expect("authorized source").rgba[offset..offset + 4]
+                        source_rgba[offset..offset + 4]
                             .try_into()
                             .expect("source RGBA8"),
                     );
@@ -340,9 +460,10 @@ impl TileStore {
                 } else if pigment {
                     // Hokusai's pigment is rebased against immutable source,
                     // not repeatedly blended over the previous preview.
-                    let source = &self.tiles.get(&id).expect("authorized source").rgba;
                     let original = u32::from_le_bytes(
-                        source[offset..offset + 4].try_into().expect("source RGBA8"),
+                        source_rgba[offset..offset + 4]
+                            .try_into()
+                            .expect("source RGBA8"),
                     );
                     blend(rgba, original)
                 } else {
@@ -376,6 +497,7 @@ impl TileStore {
                 .or_insert_with(|| self.tiles.get(&id).expect("authorized").clone());
             active.draft.insert(id, tile);
         }
+        active.last_dirty = dirty.clone();
         for (id, area) in dirty {
             active
                 .dirty
@@ -387,6 +509,7 @@ impl TileStore {
                 .or_insert(area);
         }
         active.batches += 1;
+        self.source_lookups += source_reads;
         Ok(touched)
     }
     /// A no-op gesture does not advance the canonical revision or create
@@ -964,6 +1087,37 @@ impl TileStore {
         self.revision += 1;
         Ok(count)
     }
+    /// Copy only the requested tile-local rectangle for a display preview.
+    /// This is a byte-for-byte row crop; it never alters canonical/hidden RGBA.
+    fn read_region(
+        &self,
+        id: &TileId,
+        pending: bool,
+        left: usize,
+        top: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<Vec<u8>, &'static str> {
+        if width == 0
+            || height == 0
+            || left.checked_add(width).is_none_or(|end| end > self.stride)
+            || top.checked_add(height).is_none_or(|end| end > self.stride)
+        {
+            return Err("Invalid tile-local preview rectangle");
+        }
+        let tile = self
+            .read(id, pending)
+            .ok_or("Tile not imported or not resident")?;
+        let row_bytes = width * 4;
+        let mut result = vec![0u8; row_bytes * height];
+        for row in 0..height {
+            let source = ((top + row) * self.stride + left) * 4;
+            result[row * row_bytes..(row + 1) * row_bytes]
+                .copy_from_slice(&tile.rgba[source..source + row_bytes]);
+        }
+        Ok(result)
+    }
+
     fn read(&self, id: &TileId, pending: bool) -> Option<&Tile> {
         if pending
             && let Some(edit) = self.active.as_ref()
@@ -972,6 +1126,17 @@ impl TileStore {
             return Some(tile);
         }
         self.tiles.get(id)
+    }
+}
+
+/// Mirror the zero-alpha skip in DrawingRenderer._composite_raster for
+/// a single layer over an initially transparent display buffer. Mutate only
+/// the owned crop, never the canonical source or detached draft.
+fn clear_invisible_rgb(crop: &mut [u8]) {
+    for pixel in crop.chunks_exact_mut(4) {
+        if pixel[3] == 0 {
+            pixel[..3].fill(0);
+        }
     }
 }
 
@@ -1491,6 +1656,95 @@ impl DrawingNativeTiles {
         result
     }
 
+    /// Source-exact crop for edit/serialization callers: retain hidden RGB.
+    #[allow(clippy::too_many_arguments)]
+    #[func]
+    fn read_tile_region(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+        left: i64,
+        top: i64,
+        width: i64,
+        height: i64,
+    ) -> Dictionary<Variant, Variant> {
+        self.read_tile_region_impl(layer, x, y, preview, left, top, width, height, false)
+    }
+
+    /// Display-only source-over-transparent crop. Zero-alpha pixels must not
+    /// expose hidden RGB in the composited output, but *must* retain their
+    /// canonical bytes in source, draft, history and persisted tiles.
+    #[allow(clippy::too_many_arguments)]
+    #[func]
+    fn read_tile_region_display(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+        left: i64,
+        top: i64,
+        width: i64,
+        height: i64,
+    ) -> Dictionary<Variant, Variant> {
+        self.read_tile_region_impl(layer, x, y, preview, left, top, width, height, true)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn read_tile_region_impl(
+        &mut self,
+        layer: GString,
+        x: i64,
+        y: i64,
+        preview: bool,
+        left: i64,
+        top: i64,
+        width: i64,
+        height: i64,
+        display: bool,
+    ) -> Dictionary<Variant, Variant> {
+        self.store.ffi_calls += 1;
+        let id = TileId {
+            layer: layer.to_string(),
+            x,
+            y,
+        };
+        let (Ok(left), Ok(top), Ok(width), Ok(height)) = (
+            usize::try_from(left),
+            usize::try_from(top),
+            usize::try_from(width),
+            usize::try_from(height),
+        ) else {
+            return err("Invalid negative or oversized tile-local rectangle");
+        };
+        match self
+            .store
+            .read_region(&id, preview, left, top, width, height)
+        {
+            Ok(mut bytes) => {
+                if display {
+                    clear_invisible_rgb(&mut bytes);
+                }
+                self.store.bytes_exported += bytes.len() as u64;
+                let mut result = Dictionary::new();
+                result.set("ok", true);
+                result.set("format", "straight_rgba8");
+                result.set("stride_bytes", (width * 4) as i64);
+                result.set("bytes", &PackedByteArray::from(bytes.as_slice()));
+                result.set(
+                    "hidden_rgb",
+                    bytes
+                        .chunks_exact(4)
+                        .any(|pixel| pixel[3] == 0 && pixel[..3] != [0, 0, 0]),
+                );
+                result
+            }
+            Err(message) => err(message),
+        }
+    }
+
     /// Page over canonical layer/tile identities for bulk persistence. The
     /// result omits pixel bytes; read_tile copies exactly one RGBA8 span.
     /// A bounded page size avoids unbounded Godot Array allocations even with
@@ -1527,8 +1781,11 @@ impl DrawingNativeTiles {
         result
     }
 
-    #[func]
-    fn dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+    fn dirty_descriptors(
+        &self,
+        transaction: i64,
+        latest_batch: bool,
+    ) -> Array<Dictionary<Variant, Variant>> {
         let mut result = Array::new();
         let Some(edit) = self
             .store
@@ -1538,7 +1795,12 @@ impl DrawingNativeTiles {
         else {
             return result;
         };
-        let mut items = edit.dirty.iter().collect::<Vec<_>>();
+        let selected = if latest_batch {
+            &edit.last_dirty
+        } else {
+            &edit.dirty
+        };
+        let mut items = selected.iter().collect::<Vec<_>>();
         items.sort_by_key(|(id, _)| (&id.layer, id.y, id.x));
         for (id, rect) in items {
             let mut item = Dictionary::new();
@@ -1565,6 +1827,20 @@ impl DrawingNativeTiles {
         result
     }
 
+    /// The cumulative dirty set is used for history publication and must never
+    /// be replaced by the last-batch set.
+    #[func]
+    fn dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+        self.dirty_descriptors(transaction, false)
+    }
+
+    /// Per-stage *actual pixel changes* for live preview invalidation. A
+    /// no-op batch returns empty; previously modified tiles are not restamped.
+    #[func]
+    fn batch_dirty_tiles(&self, transaction: i64) -> Array<Dictionary<Variant, Variant>> {
+        self.dirty_descriptors(transaction, true)
+    }
+
     #[func]
     fn stats(&self) -> Dictionary<Variant, Variant> {
         let mut result = Dictionary::new();
@@ -1581,6 +1857,7 @@ impl DrawingNativeTiles {
             self.store.external_bytes_received as i64,
         );
         result.set("pixel_stream_calls", self.store.pixel_stream_calls as i64);
+        result.set("source_lookups", self.store.source_lookups as i64);
         result.set("undo", self.store.undo.len() as i64);
         result.set("redo", self.store.redo.len() as i64);
         result
@@ -1683,6 +1960,324 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn grouped_pigment_runs_match_per_pixel_reference_with_signed_revisits() {
+        // Run across positive/signed tile boundaries, revisit a prior tile,
+        // clip out-of-bounds samples and preserve duplicate pixel ordering.
+        let pixels = [
+            -65,
+            -65,
+            0x30223344,
+            -64,
+            -64,
+            0x40223344,
+            -1,
+            -1,
+            0x50223344,
+            0,
+            0,
+            0x60223344,
+            64,
+            64,
+            0x70223344,
+            -1,
+            -1,
+            0x80223344_u32 as i32,
+            65,
+            -65,
+            0x90223344_u32 as i32,
+            1000,
+            1000,
+            0x10223344,
+        ];
+        for brush in [true, false] {
+            let deltas: Vec<i32> = if brush {
+                pixels.to_vec()
+            } else {
+                pixels.chunks_exact(3).flat_map(|p| [p[0], p[1]]).collect()
+            };
+            let clip = Rect2i::new(Vector2i::new(-500, -500), Vector2i::new(700, 700));
+            let (optimized, optimized_lookups) =
+                group_pigment_deltas(&deltas, brush, 0x8077aa33, clip, -192, 256, 256, false)
+                    .unwrap();
+            let (reference, reference_lookups) =
+                group_pigment_deltas(&deltas, brush, 0x8077aa33, clip, -192, 256, 256, true)
+                    .unwrap();
+            assert_eq!(optimized, reference);
+            assert!(
+                optimized_lookups < reference_lookups,
+                "a native run must not rehash every neighboring pixel"
+            );
+            assert_eq!(
+                reference_lookups,
+                deltas.len() / if brush { 3 } else { 2 } - 1
+            );
+            assert!(optimized.values().any(|d| d.len() > 1));
+        }
+        let invalid = [i32::MAX, 0, 255];
+        assert_eq!(
+            group_pigment_deltas(
+                &invalid,
+                true,
+                0xff00ff00,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                SAFE_COORD,
+                0,
+                256,
+                false
+            )
+            .err(),
+            Some("Signed native sample outside tile bounds")
+        );
+    }
+
+    #[test]
+    fn t189_per_tile_source_reads_preserve_rgba_masking_history_and_order() {
+        // A signed tile is revisited after touching its neighbor; successive
+        // alpha pigments must rebase on the original source, not the draft.
+        for erase in [false, true] {
+            let mut variants = Vec::new();
+            for source_per_pixel in [true, false] {
+                let mut store = initialized(16);
+                for tile_x in [-1, 0] {
+                    let id = TileId {
+                        layer: "ink".into(),
+                        x: tile_x,
+                        y: 0,
+                    };
+                    let mut rgba = vec![0; 16 * 16 * 4];
+                    for pixel in rgba.chunks_exact_mut(4) {
+                        pixel.copy_from_slice(&0x80448822_u32.to_le_bytes());
+                    }
+                    rgba[0..4].copy_from_slice(&0x00332211_u32.to_le_bytes());
+                    store.import(id, 0, &rgba).unwrap();
+                }
+                let tx = store.begin("ink", 0, true).unwrap();
+                for tile_x in [-1, 0] {
+                    let mut mask = vec![1; 16 * 16];
+                    mask[0] = 0; // Guard the source's hidden-RGB pixel.
+                    store
+                        .mask(
+                            tx,
+                            TileId {
+                                layer: "ink".into(),
+                                x: tile_x,
+                                y: 0,
+                            },
+                            &mask,
+                        )
+                        .unwrap();
+                }
+                let deltas = [
+                    0,
+                    0,
+                    0xa0336699_u32 as i32,
+                    1,
+                    0,
+                    0x80224466_u32 as i32,
+                    18,
+                    1,
+                    0x902255aa_u32 as i32,
+                    0,
+                    0,
+                    0xc0336699_u32 as i32,
+                    2,
+                    0,
+                    0xff115588_u32 as i32,
+                ];
+                assert_eq!(
+                    store
+                        .stage_with_source_mode(
+                            tx,
+                            0,
+                            -16,
+                            0,
+                            &deltas,
+                            true,
+                            0xff008855,
+                            erase,
+                            Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                            source_per_pixel
+                        )
+                        .unwrap(),
+                    2
+                );
+                let before = [-1, 0].map(|x| {
+                    store
+                        .read(
+                            &TileId {
+                                layer: "ink".into(),
+                                x,
+                                y: 0,
+                            },
+                            true,
+                        )
+                        .unwrap()
+                        .rgba
+                        .clone()
+                });
+                let lookups = store.source_lookups;
+                assert_eq!(store.commit(tx, 0).unwrap(), 2);
+                assert_eq!(store.undo_or_redo(true).unwrap(), 2);
+                assert_eq!(store.undo_or_redo(false).unwrap(), 2);
+                for (idx, x) in [-1, 0].iter().enumerate() {
+                    assert_eq!(
+                        &store
+                            .read(
+                                &TileId {
+                                    layer: "ink".into(),
+                                    x: *x,
+                                    y: 0
+                                },
+                                false
+                            )
+                            .unwrap()
+                            .rgba,
+                        &before[idx]
+                    );
+                }
+                variants.push((before, lookups));
+            }
+            assert_eq!(
+                variants[0].0, variants[1].0,
+                "per-tile source lookups must preserve every RGBA8 byte"
+            );
+            assert!(
+                variants[0].1 > variants[1].1,
+                "per-tile source caching must reduce source hash probes"
+            );
+            assert_eq!(
+                variants[1].1, 2,
+                "exactly one immutable source lookup per touched tile"
+            );
+        }
+    }
+
+    #[test]
+    fn t187_preview_region_matches_whole_tile_and_rejects_invalid_bounds() {
+        let mut store = initialized(256);
+        blank(&mut store, -1, 2);
+        let tx = store.begin("ink", 0, false).unwrap();
+        let id = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 2,
+        };
+        store
+            .stage(
+                tx,
+                0,
+                -256,
+                512,
+                &[3, 4, 11, 120, 243, 250],
+                false,
+                0xff123456,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        let full = &store.read(&id, true).unwrap().rgba;
+        let region = store.read_region(&id, true, 0, 0, 128, 128).unwrap();
+        assert_eq!(region.len(), 128 * 128 * 4);
+        for row in 0..128 {
+            assert_eq!(
+                &region[row * 128 * 4..(row + 1) * 128 * 4],
+                &full[row * 256 * 4..row * 256 * 4 + 128 * 4]
+            );
+        }
+        let signed_region = store.read_region(&id, true, 112, 112, 144, 144).unwrap();
+        assert_eq!(signed_region.len(), 144 * 144 * 4);
+        for row in 0..144 {
+            assert_eq!(
+                &signed_region[row * 144 * 4..(row + 1) * 144 * 4],
+                &full[((112 + row) * 256 + 112) * 4..((112 + row) * 256 + 256) * 4]
+            );
+        }
+        for invalid in [
+            (0, 0, 0, 1),
+            (0, 0, 1, 0),
+            (256, 0, 1, 1),
+            (255, 255, 2, 1),
+            (0, 250, 8, 8),
+            (usize::MAX, 0, 1, 1),
+        ] {
+            assert!(
+                store
+                    .read_region(&id, true, invalid.0, invalid.1, invalid.2, invalid.3)
+                    .is_err()
+            );
+        }
+        assert_eq!(store.commit(tx, 0).unwrap(), 1);
+        assert_eq!(
+            store.read_region(&id, false, 112, 112, 144, 144).unwrap(),
+            signed_region
+        );
+    }
+
+    #[test]
+    fn t186_batch_dirty_tracks_actual_changed_pixels_not_cumulative_history() {
+        let mut store = initialized(256);
+        blank(&mut store, -1, 0);
+        let tx = store.begin("ink", 0, false).unwrap();
+        let tile = TileId {
+            layer: "ink".into(),
+            x: -1,
+            y: 0,
+        };
+        let stage = |store: &mut TileStore, x: i32, y: i32, rgba: u32| {
+            store
+                .stage(
+                    tx,
+                    0,
+                    -256,
+                    0,
+                    &[x, y],
+                    false,
+                    rgba,
+                    false,
+                    Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                )
+                .unwrap()
+        };
+        assert_eq!(stage(&mut store, 10, 20, 0xff112233), 1);
+        assert!(
+            store.active.as_ref().unwrap().last_dirty.get(&tile)
+                == Some(&Dirty {
+                    left: 10,
+                    top: 20,
+                    right: 11,
+                    bottom: 21
+                })
+        );
+        // Writing the same opaque pixel again changes neither the batch nor
+        // the preview stamp, but the transaction still owns its first edit.
+        assert_eq!(stage(&mut store, 10, 20, 0xff112233), 0);
+        assert!(store.active.as_ref().unwrap().last_dirty.is_empty());
+        assert_eq!(store.active.as_ref().unwrap().dirty.len(), 1);
+        assert_eq!(stage(&mut store, 220, 230, 0xff445566), 1);
+        assert!(
+            store.active.as_ref().unwrap().last_dirty.get(&tile)
+                == Some(&Dirty {
+                    left: 220,
+                    top: 230,
+                    right: 221,
+                    bottom: 231
+                })
+        );
+        assert!(
+            store.active.as_ref().unwrap().dirty.get(&tile)
+                == Some(&Dirty {
+                    left: 10,
+                    top: 20,
+                    right: 221,
+                    bottom: 231
+                })
+        );
+        assert_eq!(store.commit(tx, 0).unwrap(), 1);
+        assert_eq!(store.undo_or_redo(true).unwrap(), 1);
+        assert_eq!(store.undo_or_redo(false).unwrap(), 1);
+    }
+
     #[test]
     fn t170_retire_preflight_is_read_only_and_matches_commit_gate() {
         let mut store = initialized(16);
@@ -2679,6 +3274,24 @@ mod tests {
             8
         );
     }
+    #[test]
+    fn display_crop_clears_only_zero_alpha_rgb_without_mutating_source() {
+        let original = vec![
+            0x58, 0xa3, 0xeb, 0, // fully transparent with hidden RGB
+            0xff, 0x08, 0x12, 1, // low alpha must retain exact bytes
+            0x72, 0x81, 0x23, 128, // translucent, no premultiplication
+            0x11, 0x22, 0x33, 255, // opaque
+            0, 0, 0, 0,
+        ];
+        let mut display = original.clone();
+        clear_invisible_rgb(&mut display);
+        assert_eq!(&display[..4], &[0, 0, 0, 0]);
+        assert_eq!(&display[4..], &original[4..]);
+        assert_eq!(&original[..4], &[0x58, 0xa3, 0xeb, 0]);
+        clear_invisible_rgb(&mut display);
+        assert_eq!(&display[..4], &[0, 0, 0, 0]);
+    }
+
     #[test]
     fn hidden_rgb_and_alpha_roundtrip() {
         let mut s = initialized(16);

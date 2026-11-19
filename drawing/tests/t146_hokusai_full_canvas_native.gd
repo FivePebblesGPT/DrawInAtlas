@@ -254,7 +254,12 @@ func run() -> void:
 			mouse_motion(canvas, path[i])
 		check(doc.revision == previous_revision,
 			"stroke %d is still an uncommitted gesture at release" % run_index)
+		var mouse_up_start_us: int = Time.get_ticks_usec()
 		mouse_button(canvas, path[path.size() - 1], false)
+		print("T196_MOUSEUP index=%d handler_ms=%.3f deferred_calls=%d queued=%d" % [
+			run_index, float(Time.get_ticks_usec() - mouse_up_start_us) / 1000.0,
+			int(canvas._metrics.get("post_release_deferred_calls", 0)),
+			int(canvas._metrics.get("release_pending_samples", 0))])
 		var drained_frames: int = 0
 		while canvas.session != null and drained_frames < DRAIN_FRAME_LIMIT:
 			await process_frame
@@ -300,6 +305,15 @@ func run() -> void:
 			float(stats.get("max_frame_full_draw_cpu_us", 0)) / 1000.0,
 			canvas._display_tiles.size() * canvas.DISPLAY_TILE_SIZE *
 			canvas.DISPLAY_TILE_SIZE * 4])
+		if OS.has_environment("DRAWING_T185_PROFILE"):
+			var split: Dictionary = stats.get("t185_native_stage", {})
+			print("T188_STAGE index=%d profile=%s release_to_commit_ms=%.3f " % [
+				run_index, JSON.stringify(split), release] +
+				"native_phases=%s " % JSON.stringify(stats.get("native_ffi_stats", {})) +
+				"first_submit_ms=%.3f first_postdraw_ms=%.3f " % [
+					float(int(stats.get("first_preview_submit_us", 0)) - int(stats.get("down_us", 0))) / 1000.0,
+					float(int(stats.get("first_frame_post_draw_us", 0)) - int(stats.get("down_us", 0))) / 1000.0] +
+				"frame_phases=%s" % JSON.stringify(stats.get("frame_phases_us", [])))
 		print("T100_POINTER_MEMORY index=%d static_before_bytes=%d " % [
 			run_index, memory_before] +
 			"static_after_bytes=%d peak_before_bytes=%d peak_after_bytes=%d" % [

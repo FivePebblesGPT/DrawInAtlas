@@ -1,0 +1,19 @@
+test_package_release_keeps_native_bytes_and_launch_isolation (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation) ... FAIL
+
+======================================================================
+FAIL: test_package_release_keeps_native_bytes_and_launch_isolation (tests.test_t201_linux_native_package.LinuxNativeExportTests.test_package_release_keeps_native_bytes_and_launch_isolation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/work/DrawInAtlas-sprint-2026-11-17/tests/test_t201_linux_native_package.py", line 55, in test_package_release_keeps_native_bytes_and_launch_isolation
+    self.assertEqual(
+    ~~~~~~~~~~~~~~~~^
+        stat.S_IMODE(shipped.stat().st_mode), stat.S_IMODE(self.native.stat().st_mode)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: 384 != 420
+
+----------------------------------------------------------------------
+Ran 1 test in 0.160s
+
+FAILED (failures=1)

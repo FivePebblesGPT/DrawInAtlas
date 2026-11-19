@@ -1,0 +1,15 @@
+   Compiling drawing-brush v0.1.0 (/mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush)
+    Finished `release` profile [optimized] target(s) in 2.63s
+Diff in /mnt/data/DrawInAtlas-sprint-2026-11-17/native/drawing_brush/src/lib.rs:853:
+         let mut keys = surface.dirty_tiles_for_export();
+         keys.sort_unstable();
+         assert_eq!(keys, vec![(-1, -2), (4, -3)]);
+-        assert!(surface.changed.is_empty(), "journal avoids a redundant dirty HashSet");
++        assert!(
++            surface.changed.is_empty(),
++            "journal avoids a redundant dirty HashSet"
++        );
+         surface.rollback_batch();
+         assert_eq!(surface.tile(-1, -2).unwrap()[0][0], [1, 2, 3, 4]);
+         assert!(surface.tile(4, -3).is_none());
+make: *** [Makefile:32: native] Error 1

@@ -1,0 +1,1437 @@
+{
+  "identities": {
+    "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+    "source_sha256": [
+      "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+    ]
+  },
+  "rapid": {
+    "final": {
+      "grouped": {
+        "identity": {
+          "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+          "repository_sha": "cd29f99f58030192f9edf6c6fd7269964d348518"
+        },
+        "metrics": {
+          "cold": {
+            "authorize_ms": {
+              "max": 3.5,
+              "n": 2,
+              "p50": 2.52,
+              "p95": 3.5
+            },
+            "delta_scan_ms": {
+              "max": 24.133,
+              "n": 2,
+              "p50": 18.085,
+              "p95": 24.133
+            },
+            "discovery_ms": {
+              "max": 2.464,
+              "n": 2,
+              "p50": 2.0,
+              "p95": 2.464
+            },
+            "first_postdraw_ms": {
+              "max": 35.575,
+              "n": 2,
+              "p50": 33.314,
+              "p95": 35.575
+            },
+            "first_submit_ms": {
+              "max": 12.02,
+              "n": 2,
+              "p50": 7.747,
+              "p95": 12.02
+            },
+            "max_batch_ms": {
+              "max": 13.617,
+              "n": 2,
+              "p50": 6.609,
+              "p95": 13.617
+            },
+            "max_drain_ms": {
+              "max": 15.755,
+              "n": 2,
+              "p50": 11.61,
+              "p95": 15.755
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 56.312,
+              "n": 2,
+              "p50": 29.624,
+              "p95": 56.312
+            },
+            "raster_ms": {
+              "max": 62.337,
+              "n": 2,
+              "p50": 48.651,
+              "p95": 62.337
+            },
+            "release_to_commit_ms": {
+              "max": 286.055,
+              "n": 2,
+              "p50": 152.617,
+              "p95": 286.055
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 149.669,
+              "n": 2,
+              "p50": 100.653,
+              "p95": 149.669
+            },
+            "tile_bytes_exported": {
+              "max": 3932160.0,
+              "n": 2,
+              "p50": 3604480.0,
+              "p95": 3932160.0
+            },
+            "tile_stage_ms": {
+              "max": 55.602,
+              "n": 2,
+              "p50": 29.271,
+              "p95": 55.602
+            },
+            "total_to_postdraw_ms": {
+              "max": 421.54,
+              "n": 2,
+              "p50": 266.402,
+              "p95": 421.54
+            }
+          },
+          "warm": {
+            "authorize_ms": {
+              "max": 2.827,
+              "n": 2,
+              "p50": 2.532,
+              "p95": 2.827
+            },
+            "delta_scan_ms": {
+              "max": 21.159,
+              "n": 2,
+              "p50": 19.191,
+              "p95": 21.159
+            },
+            "discovery_ms": {
+              "max": 2.136,
+              "n": 2,
+              "p50": 1.97,
+              "p95": 2.136
+            },
+            "first_postdraw_ms": {
+              "max": 27.267,
+              "n": 2,
+              "p50": 23.782,
+              "p95": 27.267
+            },
+            "first_submit_ms": {
+              "max": 11.188,
+              "n": 2,
+              "p50": 9.256,
+              "p95": 11.188
+            },
+            "max_batch_ms": {
+              "max": 8.035,
+              "n": 2,
+              "p50": 8.024,
+              "p95": 8.035
+            },
+            "max_drain_ms": {
+              "max": 11.875,
+              "n": 2,
+              "p50": 11.669,
+              "p95": 11.875
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 29.36,
+              "n": 2,
+              "p50": 28.283,
+              "p95": 29.36
+            },
+            "raster_ms": {
+              "max": 51.827,
+              "n": 2,
+              "p50": 51.57,
+              "p95": 51.827
+            },
+            "release_to_commit_ms": {
+              "max": 176.906,
+              "n": 2,
+              "p50": 162.281,
+              "p95": 176.906
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 106.956,
+              "n": 2,
+              "p50": 103.728,
+              "p95": 106.956
+            },
+            "tile_bytes_exported": {
+              "max": 4521984.0,
+              "n": 2,
+              "p50": 3932160.0,
+              "p95": 4521984.0
+            },
+            "tile_stage_ms": {
+              "max": 28.99,
+              "n": 2,
+              "p50": 28.008,
+              "p95": 28.99
+            },
+            "total_to_postdraw_ms": {
+              "max": 296.657,
+              "n": 2,
+              "p50": 285.658,
+              "p95": 296.657
+            }
+          }
+        },
+        "rss_kib": {
+          "max": 273852.0,
+          "n": 3,
+          "p50": 270084.0,
+          "p95": 273852.0
+        },
+        "valid_processes": 3
+      },
+      "per-cell": {
+        "identity": {
+          "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+          "repository_sha": "cd29f99f58030192f9edf6c6fd7269964d348518"
+        },
+        "metrics": {
+          "cold": {
+            "authorize_ms": {
+              "max": 13.085,
+              "n": 2,
+              "p50": 12.495,
+              "p95": 13.085
+            },
+            "delta_scan_ms": {
+              "max": 24.564,
+              "n": 2,
+              "p50": 22.379,
+              "p95": 24.564
+            },
+            "discovery_ms": {
+              "max": 11.648,
+              "n": 2,
+              "p50": 11.552,
+              "p95": 11.648
+            },
+            "first_postdraw_ms": {
+              "max": 36.905,
+              "n": 2,
+              "p50": 25.411,
+              "p95": 36.905
+            },
+            "first_submit_ms": {
+              "max": 7.857,
+              "n": 2,
+              "p50": 7.791,
+              "p95": 7.857
+            },
+            "max_batch_ms": {
+              "max": 12.914,
+              "n": 2,
+              "p50": 12.59,
+              "p95": 12.914
+            },
+            "max_drain_ms": {
+              "max": 15.446,
+              "n": 2,
+              "p50": 12.955,
+              "p95": 15.446
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 45.78,
+              "n": 2,
+              "p50": 44.837,
+              "p95": 45.78
+            },
+            "raster_ms": {
+              "max": 59.884,
+              "n": 2,
+              "p50": 58.734,
+              "p95": 59.884
+            },
+            "release_to_commit_ms": {
+              "max": 291.105,
+              "n": 2,
+              "p50": 253.92,
+              "p95": 291.105
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 148.84,
+              "n": 2,
+              "p50": 142.609,
+              "p95": 148.84
+            },
+            "tile_bytes_exported": {
+              "max": 4194304.0,
+              "n": 2,
+              "p50": 3932160.0,
+              "p95": 4194304.0
+            },
+            "tile_stage_ms": {
+              "max": 45.259,
+              "n": 2,
+              "p50": 44.064,
+              "p95": 45.259
+            },
+            "total_to_postdraw_ms": {
+              "max": 494.112,
+              "n": 2,
+              "p50": 388.056,
+              "p95": 494.112
+            }
+          },
+          "warm": {
+            "authorize_ms": {
+              "max": 14.531,
+              "n": 2,
+              "p50": 11.257,
+              "p95": 14.531
+            },
+            "delta_scan_ms": {
+              "max": 32.552,
+              "n": 2,
+              "p50": 20.058,
+              "p95": 32.552
+            },
+            "discovery_ms": {
+              "max": 11.069,
+              "n": 2,
+              "p50": 10.431,
+              "p95": 11.069
+            },
+            "first_postdraw_ms": {
+              "max": 28.912,
+              "n": 2,
+              "p50": 26.478,
+              "p95": 28.912
+            },
+            "first_submit_ms": {
+              "max": 13.357,
+              "n": 2,
+              "p50": 12.334,
+              "p95": 13.357
+            },
+            "max_batch_ms": {
+              "max": 53.654,
+              "n": 2,
+              "p50": 8.314,
+              "p95": 53.654
+            },
+            "max_drain_ms": {
+              "max": 54.202,
+              "n": 2,
+              "p50": 11.305,
+              "p95": 54.202
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 64.916,
+              "n": 2,
+              "p50": 38.952,
+              "p95": 64.916
+            },
+            "raster_ms": {
+              "max": 55.439,
+              "n": 2,
+              "p50": 52.299,
+              "p95": 55.439
+            },
+            "release_to_commit_ms": {
+              "max": 321.806,
+              "n": 2,
+              "p50": 231.7,
+              "p95": 321.806
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 181.743,
+              "n": 2,
+              "p50": 125.335,
+              "p95": 181.743
+            },
+            "tile_bytes_exported": {
+              "max": 4259840.0,
+              "n": 2,
+              "p50": 4259840.0,
+              "p95": 4259840.0
+            },
+            "tile_stage_ms": {
+              "max": 59.828,
+              "n": 2,
+              "p50": 38.529,
+              "p95": 59.828
+            },
+            "total_to_postdraw_ms": {
+              "max": 449.695,
+              "n": 2,
+              "p50": 357.836,
+              "p95": 449.695
+            }
+          }
+        },
+        "rss_kib": {
+          "max": 272768.0,
+          "n": 3,
+          "p50": 271976.0,
+          "p95": 272768.0
+        },
+        "valid_processes": 3
+      }
+    },
+    "repeat": {
+      "per-cell": {
+        "identity": {
+          "native_sha256": "67418f8759f0c62edf0067ed2182f7a18c47f53b943dda9e6a6afe530fc33116",
+          "repository_sha": "cd29f99f58030192f9edf6c6fd7269964d348518"
+        },
+        "metrics": {
+          "cold": {
+            "authorize_ms": {
+              "max": 11.339,
+              "n": 2,
+              "p50": 10.513,
+              "p95": 11.339
+            },
+            "delta_scan_ms": {
+              "max": 22.34,
+              "n": 2,
+              "p50": 19.699,
+              "p95": 22.34
+            },
+            "discovery_ms": {
+              "max": 10.338,
+              "n": 2,
+              "p50": 9.918,
+              "p95": 10.338
+            },
+            "first_postdraw_ms": {
+              "max": 28.955,
+              "n": 2,
+              "p50": 28.807,
+              "p95": 28.955
+            },
+            "first_submit_ms": {
+              "max": 13.15,
+              "n": 2,
+              "p50": 11.972,
+              "p95": 13.15
+            },
+            "max_batch_ms": {
+              "max": 10.918,
+              "n": 2,
+              "p50": 7.752,
+              "p95": 10.918
+            },
+            "max_drain_ms": {
+              "max": 13.646,
+              "n": 2,
+              "p50": 11.021,
+              "p95": 13.646
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 42.514,
+              "n": 2,
+              "p50": 37.888,
+              "p95": 42.514
+            },
+            "raster_ms": {
+              "max": 56.262,
+              "n": 2,
+              "p50": 50.389,
+              "p95": 56.262
+            },
+            "release_to_commit_ms": {
+              "max": 246.296,
+              "n": 2,
+              "p50": 194.65,
+              "p95": 246.296
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 135.706,
+              "n": 2,
+              "p50": 120.601,
+              "p95": 135.706
+            },
+            "tile_bytes_exported": {
+              "max": 4259840.0,
+              "n": 2,
+              "p50": 4128768.0,
+              "p95": 4259840.0
+            },
+            "tile_stage_ms": {
+              "max": 41.872,
+              "n": 2,
+              "p50": 37.567,
+              "p95": 41.872
+            },
+            "total_to_postdraw_ms": {
+              "max": 379.088,
+              "n": 2,
+              "p50": 324.036,
+              "p95": 379.088
+            }
+          },
+          "warm": {
+            "authorize_ms": {
+              "max": 15.48,
+              "n": 2,
+              "p50": 10.186,
+              "p95": 15.48
+            },
+            "delta_scan_ms": {
+              "max": 22.587,
+              "n": 2,
+              "p50": 17.591,
+              "p95": 22.587
+            },
+            "discovery_ms": {
+              "max": 12.862,
+              "n": 2,
+              "p50": 9.499,
+              "p95": 12.862
+            },
+            "first_postdraw_ms": {
+              "max": 31.358,
+              "n": 2,
+              "p50": 27.405,
+              "p95": 31.358
+            },
+            "first_submit_ms": {
+              "max": 10.996,
+              "n": 2,
+              "p50": 7.955,
+              "p95": 10.996
+            },
+            "max_batch_ms": {
+              "max": 13.859,
+              "n": 2,
+              "p50": 7.261,
+              "p95": 13.859
+            },
+            "max_drain_ms": {
+              "max": 13.911,
+              "n": 2,
+              "p50": 13.205,
+              "p95": 13.911
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 45.649,
+              "n": 2,
+              "p50": 34.584,
+              "p95": 45.649
+            },
+            "raster_ms": {
+              "max": 53.434,
+              "n": 2,
+              "p50": 48.076,
+              "p95": 53.434
+            },
+            "release_to_commit_ms": {
+              "max": 227.582,
+              "n": 2,
+              "p50": 174.779,
+              "p95": 227.582
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 139.839,
+              "n": 2,
+              "p50": 112.293,
+              "p95": 139.839
+            },
+            "tile_bytes_exported": {
+              "max": 3997696.0,
+              "n": 2,
+              "p50": 3932160.0,
+              "p95": 3997696.0
+            },
+            "tile_stage_ms": {
+              "max": 45.15,
+              "n": 2,
+              "p50": 34.305,
+              "p95": 45.15
+            },
+            "total_to_postdraw_ms": {
+              "max": 345.934,
+              "n": 2,
+              "p50": 290.681,
+              "p95": 345.934
+            }
+          }
+        },
+        "rss_kib": {
+          "max": 273124.0,
+          "n": 3,
+          "p50": 271008.0,
+          "p95": 273124.0
+        },
+        "valid_processes": 3
+      },
+      "run-grouped": {
+        "identity": {
+          "native_sha256": "67418f8759f0c62edf0067ed2182f7a18c47f53b943dda9e6a6afe530fc33116",
+          "repository_sha": "cd29f99f58030192f9edf6c6fd7269964d348518"
+        },
+        "metrics": {
+          "cold": {
+            "authorize_ms": {
+              "max": 3.335,
+              "n": 2,
+              "p50": 3.223,
+              "p95": 3.335
+            },
+            "delta_scan_ms": {
+              "max": 25.135,
+              "n": 2,
+              "p50": 21.381,
+              "p95": 25.135
+            },
+            "discovery_ms": {
+              "max": 2.492,
+              "n": 2,
+              "p50": 2.317,
+              "p95": 2.492
+            },
+            "first_postdraw_ms": {
+              "max": 33.754,
+              "n": 2,
+              "p50": 31.263,
+              "p95": 33.754
+            },
+            "first_submit_ms": {
+              "max": 11.643,
+              "n": 2,
+              "p50": 9.341,
+              "p95": 11.643
+            },
+            "max_batch_ms": {
+              "max": 12.998,
+              "n": 2,
+              "p50": 8.913,
+              "p95": 12.998
+            },
+            "max_drain_ms": {
+              "max": 13.113,
+              "n": 2,
+              "p50": 11.278,
+              "p95": 13.113
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 37.866,
+              "n": 2,
+              "p50": 36.224,
+              "p95": 37.866
+            },
+            "raster_ms": {
+              "max": 60.346,
+              "n": 2,
+              "p50": 52.839,
+              "p95": 60.346
+            },
+            "release_to_commit_ms": {
+              "max": 221.732,
+              "n": 2,
+              "p50": 217.53,
+              "p95": 221.732
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 129.534,
+              "n": 2,
+              "p50": 116.623,
+              "p95": 129.534
+            },
+            "tile_bytes_exported": {
+              "max": 3997696.0,
+              "n": 2,
+              "p50": 3932160.0,
+              "p95": 3997696.0
+            },
+            "tile_stage_ms": {
+              "max": 37.383,
+              "n": 2,
+              "p50": 35.696,
+              "p95": 37.383
+            },
+            "total_to_postdraw_ms": {
+              "max": 352.027,
+              "n": 2,
+              "p50": 351.948,
+              "p95": 352.027
+            }
+          },
+          "warm": {
+            "authorize_ms": {
+              "max": 2.751,
+              "n": 2,
+              "p50": 2.532,
+              "p95": 2.751
+            },
+            "delta_scan_ms": {
+              "max": 18.474,
+              "n": 2,
+              "p50": 18.285,
+              "p95": 18.474
+            },
+            "discovery_ms": {
+              "max": 2.081,
+              "n": 2,
+              "p50": 2.001,
+              "p95": 2.081
+            },
+            "first_postdraw_ms": {
+              "max": 34.264,
+              "n": 2,
+              "p50": 26.838,
+              "p95": 34.264
+            },
+            "first_submit_ms": {
+              "max": 12.715,
+              "n": 2,
+              "p50": 10.256,
+              "p95": 12.715
+            },
+            "max_batch_ms": {
+              "max": 7.661,
+              "n": 2,
+              "p50": 6.313,
+              "p95": 7.661
+            },
+            "max_drain_ms": {
+              "max": 11.912,
+              "n": 2,
+              "p50": 11.895,
+              "p95": 11.912
+            },
+            "n": 2,
+            "native_apply_ms": {
+              "max": 29.34,
+              "n": 2,
+              "p50": 26.521,
+              "p95": 29.34
+            },
+            "raster_ms": {
+              "max": 50.146,
+              "n": 2,
+              "p50": 47.781,
+              "p95": 50.146
+            },
+            "release_to_commit_ms": {
+              "max": 167.908,
+              "n": 2,
+              "p50": 148.496,
+              "p95": 167.908
+            },
+            "source_sha256": [
+              "6df89cc963368830befd8dbf061db9bb0f40060556a8dfb127cf5e9681f68ec4"
+            ],
+            "stage_cpu_ms": {
+              "max": 102.98,
+              "n": 2,
+              "p50": 96.951,
+              "p95": 102.98
+            },
+            "tile_bytes_exported": {
+              "max": 3604480.0,
+              "n": 2,
+              "p50": 3604480.0,
+              "p95": 3604480.0
+            },
+            "tile_stage_ms": {
+              "max": 28.891,
+              "n": 2,
+              "p50": 26.086,
+              "p95": 28.891
+            },
+            "total_to_postdraw_ms": {
+              "max": 296.972,
+              "n": 2,
+              "p50": 276.331,
+              "p95": 296.972
+            }
+          }
+        },
+        "rss_kib": {
+          "max": 273520.0,
+          "n": 3,
+          "p50": 271940.0,
+          "p95": 273520.0
+        },
+        "valid_processes": 3
+      }
+    }
+  },
+  "rejected": {},
+  "workspace": {
+    "workspace": {
+      "grouped": {
+        "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+        "rss_kib": 323632,
+        "scenarios": {
+          "0.54/cold_brush": {
+            "authorize_ms": 3.411,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 31.485,
+            "native_apply_ms": 21.479,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 110.77,
+              "long_33ms": 2,
+              "long_83ms": 1,
+              "max": 135.32,
+              "n": 39,
+              "p50": 9.028,
+              "p95": 35.56
+            },
+            "release_to_commit_ms": 12.205,
+            "release_to_settled_ms": 135.379,
+            "stage_ms": 69.111
+          },
+          "0.54/eraser": {
+            "authorize_ms": 3.319,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 43.798,
+            "native_apply_ms": 22.062,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 84.38,
+              "long_33ms": 4,
+              "long_83ms": 1,
+              "max": 111.666,
+              "n": 33,
+              "p50": 11.851,
+              "p95": 38.647
+            },
+            "release_to_commit_ms": 10.497,
+            "release_to_settled_ms": 111.561,
+            "stage_ms": 75.197
+          },
+          "0.54/held_brush": {
+            "authorize_ms": 2.171,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 55.271,
+            "native_apply_ms": 30.059,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 99.15,
+              "long_33ms": 2,
+              "long_83ms": 0,
+              "max": 80.707,
+              "n": 34,
+              "p50": 10.086,
+              "p95": 40.081
+            },
+            "release_to_commit_ms": 10.229,
+            "release_to_settled_ms": 80.732,
+            "stage_ms": 79.872
+          },
+          "0.54/warm_overlap": {
+            "authorize_ms": 2.666,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 30.403,
+            "native_apply_ms": 30.665,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 78.18,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 107.63,
+              "n": 25,
+              "p50": 12.791,
+              "p95": 32.416
+            },
+            "release_to_commit_ms": 8.593,
+            "release_to_settled_ms": 107.648,
+            "stage_ms": 82.434
+          },
+          "1.00/cold_brush": {
+            "authorize_ms": 2.411,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 34.446,
+            "native_apply_ms": 26.483,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 79.01,
+              "long_33ms": 2,
+              "long_83ms": 1,
+              "max": 114.542,
+              "n": 26,
+              "p50": 12.657,
+              "p95": 38.371
+            },
+            "release_to_commit_ms": 10.269,
+            "release_to_settled_ms": 114.575,
+            "stage_ms": 79.709
+          },
+          "1.00/eraser": {
+            "authorize_ms": 2.449,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 40.55,
+            "native_apply_ms": 26.683,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 78.59,
+              "long_33ms": 4,
+              "long_83ms": 1,
+              "max": 105.752,
+              "n": 26,
+              "p50": 12.725,
+              "p95": 38.444
+            },
+            "release_to_commit_ms": 7.538,
+            "release_to_settled_ms": 105.768,
+            "stage_ms": 76.118
+          },
+          "1.00/held_brush": {
+            "authorize_ms": 2.249,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 35.133,
+            "native_apply_ms": 27.917,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 112.64,
+              "long_33ms": 1,
+              "long_83ms": 0,
+              "max": 78.741,
+              "n": 37,
+              "p50": 8.878,
+              "p95": 25.376
+            },
+            "release_to_commit_ms": 8.232,
+            "release_to_settled_ms": 78.696,
+            "stage_ms": 75.614
+          },
+          "1.00/warm_overlap": {
+            "authorize_ms": 2.323,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 34.723,
+            "native_apply_ms": 30.028,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 74.54,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 95.684,
+              "n": 25,
+              "p50": 13.416,
+              "p95": 25.52
+            },
+            "release_to_commit_ms": 9.889,
+            "release_to_settled_ms": 95.664,
+            "stage_ms": 79.939
+          }
+        },
+        "valid": true
+      },
+      "per-cell": {
+        "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+        "rss_kib": 323968,
+        "scenarios": {
+          "0.54/cold_brush": {
+            "authorize_ms": 7.852,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 35.456,
+            "native_apply_ms": 26.462,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 124.25,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 109.592,
+              "n": 44,
+              "p50": 8.048,
+              "p95": 19.916
+            },
+            "release_to_commit_ms": 7.847,
+            "release_to_settled_ms": 109.614,
+            "stage_ms": 77.754
+          },
+          "0.54/eraser": {
+            "authorize_ms": 8.263,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 36.686,
+            "native_apply_ms": 27.137,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 76.12,
+              "long_33ms": 4,
+              "long_83ms": 1,
+              "max": 111.894,
+              "n": 26,
+              "p50": 13.137,
+              "p95": 39.335
+            },
+            "release_to_commit_ms": 7.972,
+            "release_to_settled_ms": 111.928,
+            "stage_ms": 77.597
+          },
+          "0.54/held_brush": {
+            "authorize_ms": 14.611,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 33.293,
+            "native_apply_ms": 35.771,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 104.05,
+              "long_33ms": 1,
+              "long_83ms": 0,
+              "max": 77.27,
+              "n": 39,
+              "p50": 9.611,
+              "p95": 25.241
+            },
+            "release_to_commit_ms": 8.236,
+            "release_to_settled_ms": 77.284,
+            "stage_ms": 97.745
+          },
+          "0.54/warm_overlap": {
+            "authorize_ms": 7.546,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 36.191,
+            "native_apply_ms": 37.387,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 118.62,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 89.355,
+              "n": 41,
+              "p50": 8.43,
+              "p95": 23.546
+            },
+            "release_to_commit_ms": 8.334,
+            "release_to_settled_ms": 89.295,
+            "stage_ms": 92.886
+          },
+          "1.00/cold_brush": {
+            "authorize_ms": 7.761,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 34.63,
+            "native_apply_ms": 25.672,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 101.78,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 115.458,
+              "n": 32,
+              "p50": 9.825,
+              "p95": 28.889
+            },
+            "release_to_commit_ms": 7.489,
+            "release_to_settled_ms": 115.455,
+            "stage_ms": 75.883
+          },
+          "1.00/eraser": {
+            "authorize_ms": 7.47,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 37.386,
+            "native_apply_ms": 24.393,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 75.87,
+              "long_33ms": 4,
+              "long_83ms": 1,
+              "max": 112.555,
+              "n": 25,
+              "p50": 13.181,
+              "p95": 41.714
+            },
+            "release_to_commit_ms": 8.408,
+            "release_to_settled_ms": 112.589,
+            "stage_ms": 74.102
+          },
+          "1.00/held_brush": {
+            "authorize_ms": 8.179,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 30.566,
+            "native_apply_ms": 34.186,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 97.79,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 85.671,
+              "n": 34,
+              "p50": 10.226,
+              "p95": 24.596
+            },
+            "release_to_commit_ms": 18.4,
+            "release_to_settled_ms": 85.436,
+            "stage_ms": 86.524
+          },
+          "1.00/warm_overlap": {
+            "authorize_ms": 7.467,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 32.124,
+            "native_apply_ms": 32.817,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 100.17,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 93.889,
+              "n": 33,
+              "p50": 9.983,
+              "p95": 27.834
+            },
+            "release_to_commit_ms": 8.489,
+            "release_to_settled_ms": 93.882,
+            "stage_ms": 86.75
+          }
+        },
+        "valid": true
+      }
+    },
+    "workspace-repeat": {
+      "grouped": {
+        "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+        "rss_kib": 323724,
+        "scenarios": {
+          "0.54/cold_brush": {
+            "authorize_ms": 2.338,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 46.089,
+            "native_apply_ms": 21.398,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 92.47,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 107.432,
+              "n": 30,
+              "p50": 10.814,
+              "p95": 24.406
+            },
+            "release_to_commit_ms": 7.878,
+            "release_to_settled_ms": 107.508,
+            "stage_ms": 71.875
+          },
+          "0.54/eraser": {
+            "authorize_ms": 2.239,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 34.29,
+            "native_apply_ms": 24.049,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 103.9,
+              "long_33ms": 4,
+              "long_83ms": 1,
+              "max": 117.099,
+              "n": 31,
+              "p50": 9.625,
+              "p95": 40.199
+            },
+            "release_to_commit_ms": 13.243,
+            "release_to_settled_ms": 117.192,
+            "stage_ms": 73.089
+          },
+          "0.54/held_brush": {
+            "authorize_ms": 2.311,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 33.297,
+            "native_apply_ms": 27.367,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 106.01,
+              "long_33ms": 1,
+              "long_83ms": 0,
+              "max": 83.016,
+              "n": 38,
+              "p50": 9.433,
+              "p95": 22.315
+            },
+            "release_to_commit_ms": 10.24,
+            "release_to_settled_ms": 82.889,
+            "stage_ms": 77.552
+          },
+          "0.54/warm_overlap": {
+            "authorize_ms": 2.229,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 27.945,
+            "native_apply_ms": 32.938,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 102.38,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 129.308,
+              "n": 36,
+              "p50": 9.768,
+              "p95": 24.756
+            },
+            "release_to_commit_ms": 19.453,
+            "release_to_settled_ms": 122.954,
+            "stage_ms": 78.202
+          },
+          "1.00/cold_brush": {
+            "authorize_ms": 2.202,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 23.363,
+            "native_apply_ms": 27.351,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 90.23,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 128.933,
+              "n": 35,
+              "p50": 11.083,
+              "p95": 27.622
+            },
+            "release_to_commit_ms": 10.58,
+            "release_to_settled_ms": 128.857,
+            "stage_ms": 78.487
+          },
+          "1.00/eraser": {
+            "authorize_ms": 2.18,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 40.554,
+            "native_apply_ms": 26.628,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 78.88,
+              "long_33ms": 3,
+              "long_83ms": 1,
+              "max": 117.475,
+              "n": 25,
+              "p50": 12.678,
+              "p95": 36.862
+            },
+            "release_to_commit_ms": 8.375,
+            "release_to_settled_ms": 117.446,
+            "stage_ms": 72.573
+          },
+          "1.00/held_brush": {
+            "authorize_ms": 2.355,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 32.149,
+            "native_apply_ms": 34.22,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 86.83,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 87.361,
+              "n": 30,
+              "p50": 11.517,
+              "p95": 27.258
+            },
+            "release_to_commit_ms": 8.65,
+            "release_to_settled_ms": 90.714,
+            "stage_ms": 87.405
+          },
+          "1.00/warm_overlap": {
+            "authorize_ms": 2.187,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 30.594,
+            "native_apply_ms": 35.263,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 101.21,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 86.791,
+              "n": 32,
+              "p50": 9.88,
+              "p95": 23.815
+            },
+            "release_to_commit_ms": 8.276,
+            "release_to_settled_ms": 86.79,
+            "stage_ms": 82.566
+          }
+        },
+        "valid": true
+      },
+      "per-cell": {
+        "native_sha256": "7b3c291e4570500f2087c1a62e844cde5a7689ebdcf45fcbe12fa880260798e9",
+        "rss_kib": 325424,
+        "scenarios": {
+          "0.54/cold_brush": {
+            "authorize_ms": 8.195,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 33.48,
+            "native_apply_ms": 26.112,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 104.72,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 108.442,
+              "n": 35,
+              "p50": 9.549,
+              "p95": 23.43
+            },
+            "release_to_commit_ms": 7.93,
+            "release_to_settled_ms": 108.383,
+            "stage_ms": 80.782
+          },
+          "0.54/eraser": {
+            "authorize_ms": 7.476,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 36.998,
+            "native_apply_ms": 25.658,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 88.55,
+              "long_33ms": 2,
+              "long_83ms": 1,
+              "max": 108.087,
+              "n": 27,
+              "p50": 11.293,
+              "p95": 37.424
+            },
+            "release_to_commit_ms": 8.087,
+            "release_to_settled_ms": 108.131,
+            "stage_ms": 75.25
+          },
+          "0.54/held_brush": {
+            "authorize_ms": 8.141,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 37.605,
+            "native_apply_ms": 42.233,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 126.53,
+              "long_33ms": 2,
+              "long_83ms": 0,
+              "max": 78.366,
+              "n": 40,
+              "p50": 7.903,
+              "p95": 25.582
+            },
+            "release_to_commit_ms": 8.469,
+            "release_to_settled_ms": 78.336,
+            "stage_ms": 95.091
+          },
+          "0.54/warm_overlap": {
+            "authorize_ms": 8.493,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 29.189,
+            "native_apply_ms": 33.742,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 120.08,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 88.093,
+              "n": 43,
+              "p50": 8.328,
+              "p95": 23.56
+            },
+            "release_to_commit_ms": 9.011,
+            "release_to_settled_ms": 88.115,
+            "stage_ms": 87.29
+          },
+          "1.00/cold_brush": {
+            "authorize_ms": 8.023,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 37.1,
+            "native_apply_ms": 26.98,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 113.86,
+              "long_33ms": 1,
+              "long_83ms": 1,
+              "max": 112.508,
+              "n": 40,
+              "p50": 8.783,
+              "p95": 20.423
+            },
+            "release_to_commit_ms": 8.206,
+            "release_to_settled_ms": 112.471,
+            "stage_ms": 79.172
+          },
+          "1.00/eraser": {
+            "authorize_ms": 7.854,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 39.246,
+            "native_apply_ms": 25.289,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 106.42,
+              "long_33ms": 4,
+              "long_83ms": 1,
+              "max": 104.617,
+              "n": 28,
+              "p50": 9.397,
+              "p95": 37.683
+            },
+            "release_to_commit_ms": 8.108,
+            "release_to_settled_ms": 104.602,
+            "stage_ms": 78.676
+          },
+          "1.00/held_brush": {
+            "authorize_ms": 7.528,
+            "bytes_uploaded": 3145728.0,
+            "first_postdraw_ms": 30.285,
+            "native_apply_ms": 36.649,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 106.97,
+              "long_33ms": 1,
+              "long_83ms": 0,
+              "max": 74.249,
+              "n": 35,
+              "p50": 9.348,
+              "p95": 23.803
+            },
+            "release_to_commit_ms": 7.702,
+            "release_to_settled_ms": 74.196,
+            "stage_ms": 86.361
+          },
+          "1.00/warm_overlap": {
+            "authorize_ms": 8.048,
+            "bytes_uploaded": 3473408.0,
+            "first_postdraw_ms": 29.27,
+            "native_apply_ms": 39.588,
+            "pending_input_count_p95": 1.0,
+            "post_draw_intervals_ms": {
+              "fps_from_median_period": 78.45,
+              "long_33ms": 2,
+              "long_83ms": 0,
+              "max": 83.047,
+              "n": 29,
+              "p50": 12.747,
+              "p95": 57.846
+            },
+            "release_to_commit_ms": 9.714,
+            "release_to_settled_ms": 83.12,
+            "stage_ms": 92.808
+          }
+        },
+        "valid": true
+      }
+    }
+  }
+}
