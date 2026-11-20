@@ -4,7 +4,7 @@
 
 ## Observations
 
-- Basic painting now appears workable to the owner, but **deleting a selection takes a long time**. No duration, hardware benchmark or cause has been verified. [T-221](Tickets/T-221.md) separates Delete pixels from Deselect and measures the actual `clear_rect`/commit path.
+- Basic painting now appears workable to the owner, but **“deleting the selection” takes a long time**. This may refer to removing selected pixels **or** clearing the selection mask; the exact command, duration and cause have not been verified. [T-221](Tickets/T-221.md) compares both real user actions before assuming `clear_rect`/commit is slow.
 - The dock still has too much chrome and inconsistent iconography. The visual layout/interaction rules below **supersede incompatible chrome requirements** in the older dock plan, but retain the one-group-floating-host design and existing transaction safety.
 - The first visual Brushes dock (T-184) exists, but the selector needs to be denser and provide more settings supported by the actual native libmypaint/Hokusai engine.
 
@@ -37,12 +37,45 @@ The owner's screenshot indicates two major regions: a top FG/BG and recent-color
 - FG/BG each display their color. **Highlight the currently edited role**; the picker always reflects it and writes to **only that role**. Clicking BG is not Swap, and BG edits do not change the Brush paint color.
 - The other half contains **vertical recent-color bars**, omitting **both current FG and BG colors** and avoiding duplicates. Preserve canonical RGBA8/alpha and hidden RGB identities.
 - Keep Swap/Default/previous-color behavior discoverable without bulky explanatory text.
+- The recent bar is **filtered at display time**, not destructively pruned from the remembered history, and compares canonical packed RGBA8 identity rather than approximate floats.
 - The **full built-in Godot `ColorPicker` is an inline panel child**. Short docks and floating hosts scroll internally, **not** via an overflowing popup. Respect keyboard focus and wheel use.
 - [T-226](Tickets/T-226.md) owns this change and must preserve T-092's pixel/history/persistence safeguards; UX acceptance remains open.
 
 ## Brushes panel
 
 Keep visual preset samples, active-selection focus and four native Hokusai presets, but **replace long captions with tooltips/hints**. Add actual `.myb`/libmypaint controls **only after verifying native mapping**, ranges, defaults, dynamical curves and per-preset applicability. Freeze the complete effective settings for queued and live strokes. See [T-227](Tickets/T-227.md) and the originally completed [T-184](Tickets/T-184.md).
+
+## Conflict audit and ownership (current design takes precedence)
+
+| Existing ticket/contract | Potential collision | Resolution |
+| --- | --- | --- |
+| **T-079** (Done) | Old named chevron/group header, old minimize chrome | Historical delivery remains Done; **T-222/T-223 supersede visible chrome**, reusing T-079 group/flyout semantics |
+| **T-080/T-082** (Done) | Tab/group drag and insertion previews could be confused with proximity grouping | Keep transactional `DrawingDockLayout`/`DrawingDockDrag`; **T-223 marker = whole-group drag**, **T-224 panel icon = one-panel drag**. Never treat static proximity as a merge |
+| **T-081/T-091** | Old textual floating tabs and host/grip geometry | **T-225 owns tab icon visuals**; **T-091 keeps one-group host, edge resize, grip, width restore and physical validation**. Active tab clicks never collapse/close floating host |
+| **T-083** (manual gate) | Could be marked approved after only older dock tests | Closure now explicitly depends on T-091 and **T-222–T-225**, then requires fresh owner UX approval |
+| **T-092/T-063** | Prior native popover/collapsed advanced picker | **T-226 supersedes picker presentation only**, preserving FG/BG, exact color, preferences, History and Undo contracts; T-092 cannot close before T-226 |
+| **T-182/T-184** (Done) | Brush dropdown and visual preset panel could duplicate T-227 | Keep Done baseline; **T-227 owns only compact presentation and additional verified native settings**, not re-implementing presets/brush panel |
+| **T-088/T-095/T-197** | Selection Delete lag could be incorrectly folded into Brush latency or native selection migration | **T-221 owns initial Delete-vs-Deselect reproduction and its measured fix**; T-088 keeps mask/clipboard/Move acceptance; T-095/T-197 retain brush hardware/p95 targets |
+| **T-148/T-149** | Performance fix might bypass native tile/history authority | Preserve Rust source revisions, signed tile, mask and atomic history rules; T-221 is an independent diagnosis, not a GDScript-only fallback authority |
+
+### Icon click and collapse precedence
+
+- **Expanded dock:** an inactive panel icon selects that tab, expanding its group if necessary; clicking the *already active* icon in an expanded group collapses that group. The triangular group marker toggles the **same collapse bit**, not a second state.
+- **Minimized icon rail:** the icon opens/selects or hides the transient group **flyout**, without silently overwriting the persisted group collapse bit. The edge half-circle still toggles **whole-dock** minimized state.
+- **Floating host:** icon tabs switch active panels; clicking the current tab is a **no-op**, not a collapse, minimize or close action. Host grip moves/redocks the entire floating group.
+- **Pointer safety:** drag threshold wins over click; RMB on icon or marker opens the appropriate context menu without triggering LMB. Preserve keyboard-accessible equivalents.
+
+### Owner-directed execution order
+
+1. **T-221 — P0, Ready:** identify whether Delete or Deselect is slow and fix the measured stall first.
+2. **T-222 — P0, Ready:** edge half-circle plus exact icon input semantics.
+3. **T-226 — P0, Ready:** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
+4. **T-223 — P0, Blocked until T-222:** unnamed group marker and whole-group drag.
+5. **T-224 — P0, Blocked until T-223:** icon-to-icon grouping.
+6. **T-225 — P1, Ready:** floating icon tab consistency.
+7. **T-227 — P1, Ready:** compact brush selector and additional proven libmypaint controls.
+
+This is the **next owner-directed UI/performance sprint queue**, ahead of optional cosmetic/backlog work, while **T-148 native authority, T-149 migration and CI correctness retain their separate P0/engineering significance**. Priorities do not override hard dependencies or manual review.
 
 ## Manual review and gates
 
@@ -54,4 +87,4 @@ Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows po
 
 ## Dependency-respecting order
 
-Ready independent work: **T-221**, **T-222**, **T-225**, **T-226**, **T-227**. Next, **T-223** after T-222, then **T-224** after T-223. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+Use the owner-directed order above. Ready independent work: **T-221**, **T-222**, **T-226**, **T-225**, **T-227**; T-223 follows T-222, then T-224 follows T-223. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
