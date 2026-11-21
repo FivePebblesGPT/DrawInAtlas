@@ -69,7 +69,7 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 
 1. **T-221 — P0, Done:** Delete pixels (not Deselect) was slow in software; sparse-clear fix tested. Owner hardware recheck remains in T-088.
 2. **T-222 — P0, Done (2026-11-22):** edge half-circle plus exact icon input semantics; [native/Atlas evidence](evidence/T-222-2026-11-22-dock-interactions.md), T-083 owner review still pending.
-3. **T-226 — P0, Ready:** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
+3. **T-226 — P0, Done (2026-11-22):** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
 4. **T-223 — P0, Ready after T-222:** unnamed group marker and whole-group drag remain to implement.
 5. **T-224 — P0, Blocked until T-223:** icon-to-icon grouping.
 6. **T-225 — P1, Ready:** floating icon tab consistency.
@@ -83,8 +83,8 @@ This is the **next owner-directed UI/performance sprint queue**, ahead of option
 
 **Still In Progress or gated:** [T-083](Tickets/T-083.md) dock owner UX, [T-091](Tickets/T-091.md) physical floating-panel interaction, [T-092](Tickets/T-092.md) Colors/history UX, [T-088](Tickets/T-088.md) selection/native masks, [T-095](Tickets/T-095.md) physical Brush latency, and [T-059](Tickets/T-059.md) overall Drawing experience. The owner's request for changes explicitly **does not constitute approval** of the existing implementation.
 
-Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows portability [T-105](Tickets/T-105.md) and required hosted CI [T-106](Tickets/T-106.md) remain separate. This PR started as planning/documentation only; T-221 now provides a code fix and local benchmark evidence. The remaining UX tickets and owner gates are **not** approved by this implementation.
+Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows portability [T-105](Tickets/T-105.md) and required hosted CI [T-106](Tickets/T-106.md) remain separate. This PR started as planning/documentation only; T-221 now provides a code fix and local benchmark evidence. T-222 and T-226 also supply tested code updates, but the remaining UX tickets and owner gates are **not** approved by those implementations.
 
 ## Dependency-respecting order
 
-Use the owner-directed order above. Completed **T-221 and T-222**; next owner priority is **T-226**. T-223 is now Ready (T-222 prerequisite complete), T-224 still waits on T-223; T-225 and T-227 remain independent Ready work. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+Use the owner-directed order above. Completed **T-221, T-222 and T-226**; next owner priority is **T-223**. T-223 is now Ready (T-222 prerequisite complete), T-224 still waits on T-223; T-225 and T-227 remain independent Ready work. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.

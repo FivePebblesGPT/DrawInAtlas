@@ -101,13 +101,13 @@ func run() -> void:
 		not app.status.text.contains("revision"), "user-facing cursor replaces raw revision")
 	check(app.history_list.item_count == 1 and app.history_undo.disabled and app.history_redo.disabled,
 		"empty History is compact and actions disabled")
-	check(not app.color_advanced.visible and app.color_swatch_buttons.size() == 10,
-		"compact palette and six recent swatches initialize")
+	check(app.color_advanced.visible and app.color_swatch_buttons.size() == 10,
+		"inline native picker and six recent bars initialize")
 	app._set_foreground(Color8(10, 20, 30, 40))
 	check(app.active_color == Color8(10, 20, 30, 40) and app.color_hex.text == "#0A141E28",
 		"foreground is RGBA8 and hex mirrors alpha")
 	check(app.canvas.color_rgba == app._pack_color(app.active_color), "foreground feeds brush without artwork")
-	check(app.recent_colors.size() == 1 and app.recent_colors[0] == app.previous_foreground,
+	check(app.recent_colors.size() == 1 and app.recent_colors[0] == app._canonical_color(app.previous_foreground),
 		"previous foreground added to recent palette")
 	app.color_hex.text = "#AABBCCDD"
 	app._commit_hex()
@@ -180,10 +180,8 @@ func run() -> void:
 	app._set_selected_color(Color8(19, 77, 88, 99))
 	check(app.color_background == Color8(19, 77, 88, 99) and app.active_color == Color.BLACK,
 		"advanced picker target route respects selected background")
-	app._toggle_advanced_picker()
-	check(app.color_advanced.visible, "advanced picker accessible only when expanded")
-	app._toggle_advanced_picker()
-	check(not app.color_advanced.visible, "advanced picker closes to compact state")
+	check(app.color_advanced.visible and app.color_picker_scroll.get_parent() == app.dock_views["colors"],
+		"native ColorPicker remains embedded in scrollable panel")
 	check(app.current_document().revision == rev and app.current_document().is_dirty() == dirty,
 		"all color operations leave artwork and revision untouched")
 	app.queue_free()

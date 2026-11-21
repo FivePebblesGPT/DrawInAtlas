@@ -119,7 +119,9 @@ var color_role_label: Label
 var color_edit_background: bool = false
 var color_swatch_buttons: Array[Button] = []
 var color_advanced: ColorPicker
-var color_advanced_toggle: Button
+var color_recent_buttons: Array[Button] = []
+var color_top_strip: HBoxContainer
+var color_picker_scroll: ScrollContainer
 var foreground_button: Button
 var background_button: Button
 var previous_foreground_button: Button
@@ -1743,41 +1745,103 @@ func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
 ## Foreground and background are separately editable pigments, never a color-swap shortcut.
 ## PhotoCraft's distinct color targets inform the interaction; this remains a native Godot layout.
 func _build_color_controls(parent: VBoxContainer) -> void:
-	var swatches: HFlowContainer = HFlowContainer.new()
-	parent.add_child(swatches)
-	for role: String in ["Foreground", "Previous FG", "Background", "Previous BG"]:
+	# The real views are reparented between the scrollable dock, flyout and
+	# floating host. Keep the full native picker *inside* that single view.
+	color_top_strip = HBoxContainer.new()
+	color_top_strip.name = "PigmentsAndRecent"
+	color_top_strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(color_top_strip)
+	var roles: VBoxContainer = VBoxContainer.new()
+	roles.name = "PigmentRoles"
+	roles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	roles.size_flags_stretch_ratio = 1.0
+	color_top_strip.add_child(roles)
+	var current_row: HBoxContainer = HBoxContainer.new()
+	current_row.add_theme_constant_override("separation", 3)
+	roles.add_child(current_row)
+	var previous_row: HBoxContainer = HBoxContainer.new()
+	previous_row.add_theme_constant_override("separation", 3)
+	roles.add_child(previous_row)
+	for role: String in ["Foreground", "Background", "Previous FG", "Previous BG"]:
 		var button: Button = Button.new()
-		button.custom_minimum_size = Vector2(46, 30) if role in ["Foreground", "Background"] else Vector2(34, 30)
-		button.tooltip_text = role + (" — select for editing" if role in ["Foreground", "Background"] else " — restore previous color")
+		button.focus_mode = Control.FOCUS_ALL
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size = Vector2(38, 48) if role in ["Foreground", "Background"] else Vector2(30, 26)
+		button.tooltip_text = role + (" — select for editing" if role in ["Foreground", "Background"] else " — restore previous RGBA color")
 		button.pressed.connect(_color_swatch_pressed.bind(role))
-		swatches.add_child(button)
+		(current_row if role in ["Foreground", "Background"] else previous_row).add_child(button)
 		color_swatch_buttons.append(button)
 		match role:
 			"Foreground": foreground_button = button
 			"Previous FG": previous_foreground_button = button
 			"Background": background_button = button
 			"Previous BG": previous_background_button = button
-	var actions: HFlowContainer = HFlowContainer.new()
-	parent.add_child(actions)
-	var swap: Button = Button.new()
-	swap.text = "↔ Swap"
-	swap.tooltip_text = "Exchange the foreground brush and background pigments"
-	swap.pressed.connect(_swap_colors)
-	actions.add_child(swap)
-	var defaults: Button = Button.new()
-	defaults.text = "◩ Default"
-	defaults.tooltip_text = "Reset to black foreground and white background"
-	defaults.pressed.connect(_reset_colors)
-	actions.add_child(defaults)
+	var recent_column: VBoxContainer = VBoxContainer.new()
+	recent_column.name = "RecentBars"
+	recent_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	recent_column.size_flags_stretch_ratio = 1.0
+	color_top_strip.add_child(recent_column)
+	var recent_label: Label = Label.new()
+	recent_label.text = "Recent"
+	recent_label.tooltip_text = "Previous pigments except the current foreground and background"
+	recent_column.add_child(recent_label)
+	var recents: HBoxContainer = HBoxContainer.new()
+	recents.name = "RecentBarRow"
+	recents.add_theme_constant_override("separation", 2)
+	recent_column.add_child(recents)
+	for index: int in range(6):
+		var sample: Button = Button.new()
+		sample.name = "Recent_%d" % index
+		sample.custom_minimum_size = Vector2(10, 57)
+		sample.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		sample.focus_mode = Control.FOCUS_ALL
+		sample.tooltip_text = "Apply recent color to the edited role"
+		sample.pressed.connect(_use_recent_color.bind(index))
+		recents.add_child(sample)
+		color_recent_buttons.append(sample)
+		color_swatch_buttons.append(sample)
+	var utilities: HBoxContainer = HBoxContainer.new()
+	utilities.name = "PigmentUtilities"
+	parent.add_child(utilities)
+	for caption: String in ["↔", "◩"]:
+		var action: Button = Button.new()
+		action.text = caption
+		action.custom_minimum_size.x = 32
+		action.focus_mode = Control.FOCUS_ALL
+		action.tooltip_text = "Swap FG and BG colors" if caption == "↔" else "Default black FG / white BG"
+		action.pressed.connect(_swap_colors if caption == "↔" else _reset_colors)
+		utilities.add_child(action)
 	color_role_label = Label.new()
-	parent.add_child(color_role_label)
+	color_role_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	color_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	utilities.add_child(color_role_label)
 	color_hex = LineEdit.new()
 	color_hex.placeholder_text = "#RRGGBBAA"
 	color_hex.tooltip_text = "Edit the selected pigment as #RRGGBB or #RRGGBBAA"
 	color_hex.text_submitted.connect(func(_text: String) -> void: _commit_hex())
 	color_hex.focus_exited.connect(_commit_hex)
 	parent.add_child(color_hex)
+	# Native controls are deliberately not recreated or hidden behind a popup.
+	# The surrounding dock/flyout/host ScrollContainer owns vertical overflow.
+	# Godot's native picker has an intrinsic minimum width greater than 190px.
+	# Horizontal overflow stays inside this single picker viewport instead of
+	# widening the entire dock; vertical overflow stays with the host panel.
+	color_picker_scroll = ScrollContainer.new()
+	color_picker_scroll.name = "InlinePickerViewport"
+	color_picker_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	color_picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	color_picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	color_picker_scroll.follow_focus = true
+	color_picker_scroll.gui_input.connect(_scroll_inline_picker_wheel)
+	parent.add_child(color_picker_scroll)
+	color_advanced = ColorPicker.new()
+	color_advanced.name = "InlineColorPicker"
+	color_advanced.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	color_advanced.focus_mode = Control.FOCUS_ALL
+	color_advanced.color_changed.connect(_set_selected_color)
+	color_picker_scroll.add_child(color_advanced)
 	var rgba: GridContainer = GridContainer.new()
+	rgba.name = "ExactRGBA8"
 	rgba.columns = 2
 	parent.add_child(rgba)
 	for channel: String in ["R", "G", "B", "A"]:
@@ -1793,40 +1857,47 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 		spin.value_changed.connect(_commit_rgb)
 		rgba.add_child(spin)
 		color_rgb.append(spin)
-	var recent_label: Label = Label.new()
-	recent_label.text = "Recent colors"
-	parent.add_child(recent_label)
-	var recents: HFlowContainer = HFlowContainer.new()
-	parent.add_child(recents)
-	for index: int in range(6):
-		var sample: Button = Button.new()
-		sample.custom_minimum_size = Vector2(28, 26)
-		sample.tooltip_text = "Use recent color for selected pigment"
-		sample.pressed.connect(_use_recent_color.bind(index))
-		recents.add_child(sample)
-		color_swatch_buttons.append(sample)
-	color_advanced_toggle = Button.new()
-	color_advanced_toggle.text = "Advanced picker ▸"
-	color_advanced_toggle.pressed.connect(_toggle_advanced_picker)
-	parent.add_child(color_advanced_toggle)
-	color_advanced = ColorPicker.new()
-	color_advanced.visible = false
-	color_advanced.custom_minimum_size.y = 190
-	color_advanced.color_changed.connect(_set_selected_color)
-	parent.add_child(color_advanced)
 	_refresh_color_controls()
+
+## The inner ScrollContainer owns horizontal overflow, but Godot's native
+## ColorPicker stops plain wheel events before the host sees them. Relay only
+## vertical wheel events to the current dock/flyout/floating ScrollContainer;
+## leave pointer clicks, focus and modifier gestures to the native picker.
+func _scroll_inline_picker_wheel(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var wheel: InputEventMouseButton = event as InputEventMouseButton
+	if not wheel.pressed or wheel.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		return
+	if wheel.shift_pressed or wheel.ctrl_pressed or wheel.alt_pressed or wheel.meta_pressed:
+		return
+	var ancestor: Node = color_picker_scroll.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer:
+			var scroll: ScrollContainer = ancestor as ScrollContainer
+			if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+				var scrollbar: VScrollBar = scroll.get_v_scroll_bar()
+				var limit: float = maxf(0.0, scrollbar.max_value - scrollbar.page)
+				if limit > 0.0:
+					var step: int = maxi(24, roundi(scroll.size.y / 8.0 * maxf(wheel.factor, 1.0)))
+					scroll.scroll_vertical = clampi(scroll.scroll_vertical +
+						(-step if wheel.button_index == MOUSE_BUTTON_WHEEL_UP else step), 0, roundi(limit))
+					color_picker_scroll.accept_event()
+					return
+		ancestor = ancestor.get_parent()
 
 
 func _style_swatch(button: Button, value: Color, caption: String, selected: bool = false) -> void:
 	button.text = caption
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = value
+	# Show the actual RGB channels even for zero-alpha pigments. The native
+	# picker and RGBA tooltip expose opacity without losing hidden RGB identity.
+	style.bg_color = Color(value.r, value.g, value.b, 1.0)
 	style.set_border_width_all(2 if selected else 1)
 	style.border_color = Color(0.27, 0.65, 1.0) if selected else Color(0.35, 0.35, 0.35)
 	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
 		button.add_theme_stylebox_override(state, style)
-	var shown: Color = Color(0.23, 0.23, 0.23).lerp(Color(value.r, value.g, value.b, 1.0), value.a)
-	var ink: Color = Color.BLACK if shown.get_luminance() > 0.6 else Color.WHITE
+	var ink: Color = Color.BLACK if Color(value.r, value.g, value.b, 1.0).get_luminance() > 0.6 else Color.WHITE
 	button.add_theme_color_override("font_color", ink)
 	button.add_theme_color_override("font_hover_color", ink)
 	button.add_theme_color_override("font_pressed_color", ink)
@@ -1852,40 +1923,72 @@ func _refresh_color_controls() -> void:
 	_style_swatch(previous_foreground_button, previous_foreground, "↶")
 	_style_swatch(background_button, color_background, "BG", color_edit_background)
 	_style_swatch(previous_background_button, previous_background, "↶")
-	for index: int in range(6):
-		var button: Button = color_swatch_buttons[index + 4]
-		button.disabled = index >= recent_colors.size()
-		if not button.disabled:
-			_style_swatch(button, recent_colors[index], "")
+	foreground_button.tooltip_text = "Edit foreground #" + active_color.to_html(true).to_upper()
+	background_button.tooltip_text = "Edit background #" + color_background.to_html(true).to_upper()
+	previous_foreground_button.tooltip_text = "Restore previous foreground #" + previous_foreground.to_html(true).to_upper()
+	previous_background_button.tooltip_text = "Restore previous background #" + previous_background.to_html(true).to_upper()
+	var visible_colors: Array[Color] = _visible_recent_colors()
+	for index: int in range(color_recent_buttons.size()):
+		var button: Button = color_recent_buttons[index]
+		button.visible = index < visible_colors.size()
+		if button.visible:
+			_style_swatch(button, visible_colors[index], "")
+			button.tooltip_text = "Apply #" + visible_colors[index].to_html(true).to_upper() + " to " + ("BG" if color_edit_background else "FG")
 	if color_advanced != null:
 		color_advanced.color = selected
 	_updating_color_widgets = false
 
 
+## An exact identity for display filtering and deduplication. RGBA is straight,
+## so even zero-alpha RGB remains meaningful and does not get premultiplied away.
+func _canonical_color(value: Color) -> Color:
+	return Color8(clampi(roundi(value.r * 255.0), 0, 255),
+		clampi(roundi(value.g * 255.0), 0, 255),
+		clampi(roundi(value.b * 255.0), 0, 255),
+		clampi(roundi(value.a * 255.0), 0, 255))
+
+
+func _visible_recent_colors() -> Array[Color]:
+	var available: Array[Color] = []
+	var used: Dictionary = {_pack_color(active_color): true, _pack_color(color_background): true}
+	for item: Color in recent_colors:
+		var key: int = _pack_color(item)
+		if not used.has(key):
+			available.append(item)
+			used[key] = true
+	return available
+
+
 func _remember_recent(value: Color) -> void:
-	recent_colors.erase(value)
-	recent_colors.push_front(value)
+	var canonical: Color = _canonical_color(value)
+	var key: int = _pack_color(canonical)
+	for index: int in range(recent_colors.size() - 1, -1, -1):
+		if _pack_color(recent_colors[index]) == key:
+			recent_colors.remove_at(index)
+	recent_colors.push_front(canonical)
 	if recent_colors.size() > 6:
 		recent_colors.resize(6)
 
 
 func _set_foreground(value: Color) -> void:
-	if _updating_color_widgets or active_color == value:
+	var canonical: Color = _canonical_color(value)
+	if _updating_color_widgets or _pack_color(active_color) == _pack_color(canonical):
 		return
 	previous_foreground = active_color
 	_remember_recent(active_color)
-	active_color = value
+	active_color = canonical
 	if canvas != null:
-		canvas.color_rgba = _pack_color(value)
+		canvas.color_rgba = _pack_color(canonical)
 	_refresh_color_controls()
 
 
 func _set_background(value: Color) -> void:
-	if _updating_color_widgets or color_background == value:
+	var canonical: Color = _canonical_color(value)
+	if _updating_color_widgets or _pack_color(color_background) == _pack_color(canonical):
 		return
 	previous_background = color_background
 	_remember_recent(color_background)
-	color_background = value
+	color_background = canonical
 	# Background is a UI pigment, not a paint target or document operation.
 	_refresh_color_controls()
 
@@ -1895,7 +1998,6 @@ func _set_selected_color(value: Color) -> void:
 		_set_background(value)
 	else:
 		_set_foreground(value)
-
 
 func _swap_colors() -> void:
 	var former: Color = active_color
@@ -1924,8 +2026,9 @@ func _color_swatch_pressed(role: String) -> void:
 
 
 func _use_recent_color(index: int) -> void:
-	if index >= 0 and index < recent_colors.size():
-		_set_selected_color(recent_colors[index])
+	var visible_colors: Array[Color] = _visible_recent_colors()
+	if index >= 0 and index < visible_colors.size():
+		_set_selected_color(visible_colors[index])
 
 
 ## Color.html_is_valid also permits bare/abbreviated hex; the Colors editor
@@ -1953,11 +2056,6 @@ func _commit_rgb(_value: float) -> void:
 		return
 	_set_selected_color(Color8(int(color_rgb[0].value), int(color_rgb[1].value),
 		int(color_rgb[2].value), int(color_rgb[3].value)))
-
-
-func _toggle_advanced_picker() -> void:
-	color_advanced.visible = not color_advanced.visible
-	color_advanced_toggle.text = "Advanced picker ▾" if color_advanced.visible else "Advanced picker ▸"
 
 
 func _refresh_history() -> void:

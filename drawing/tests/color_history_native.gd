@@ -67,8 +67,8 @@ func run() -> void:
 	check(app.dock_layout.move_group("colors", "right", 0), "color test panel moved into view")
 	app._render_dock()
 	await frames(6)
-	check(app.color_advanced != null and not app.color_advanced.visible,
-		"advanced picker hidden at launch")
+	check(app.color_advanced != null and app.color_advanced.visible,
+		"native ColorPicker always inline at launch")
 	check(not app.record_selection_history and app.history_list.item_count == 1,
 		"history starts empty and preference off")
 	check(app.color_hex.get_parent().name == "Colors" and
@@ -85,7 +85,7 @@ func run() -> void:
 	check(rendered.b > rendered.r + 0.25 and rendered.b > rendered.g + 0.25,
 		"native framebuffer shows foreground blue swatch")
 	await click(app.color_swatch_buttons[4])
-	check(app.active_color == Color(0.12, 0.20, 0.35),
+	check(app.active_color == app._canonical_color(Color(0.12, 0.20, 0.35)),
 		"native recent swatch click restores previous brush pigment")
 	app._set_foreground(Color8(25, 66, 208, 255))
 	# Exercise the actual focused LineEdit/Enter path, not just a direct helper.
@@ -138,14 +138,12 @@ func run() -> void:
 	check(app.active_color != active_before_bg and not app.color_edit_background,
 		"native previous FG restores only foreground pigment")
 	await click(app.background_button)
-	await click(app.color_advanced_toggle)
 	check(app.color_advanced.visible and app.color_advanced.color == app.color_background,
-		"native click reveals picker seeded with selected background")
+		"inline native picker is seeded with selected background")
 	app._set_selected_color(Color8(14, 28, 42, 128))
 	check(app.color_background == Color8(14, 28, 42, 128) and app.canvas.color_rgba == app._pack_color(app.active_color),
 		"advanced picker background updates without altering brush")
-	await click(app.color_advanced_toggle)
-	check(not app.color_advanced.visible, "native click restores narrow compact palette")
+	check(app.color_advanced.visible, "inline picker stays present without popup toggle")
 	check(app.current_document().revision == initial_revision and
 		app.current_document().is_dirty() == initial_dirty,
 		"color controls do not dirty document")
@@ -246,12 +244,11 @@ func run() -> void:
 	check(host.visible and app.color_hex.is_visible_in_tree() and app.foreground_button.is_visible_in_tree(),
 		"compact Colors controls are visible in floating group")
 	await capture("t092-colors-floating")
-	app._toggle_advanced_picker()
+	host._scroll.ensure_control_visible(app.color_advanced)
 	await frames(7)
-	check(app.color_advanced.visible and app.color_advanced.get_parent().name == "Colors",
-		"advanced picker remains accessible after floating/resize")
-	await capture("t092-advanced-floating")
-	app._toggle_advanced_picker()
+	check(app.color_advanced.visible and app.color_picker_scroll.get_parent().name == "Colors",
+		"inline picker remains accessible after floating/resize")
+	await capture("t092-inline-floating")
 	app.queue_free()
 	await frames(8)
 	var reopened: Control = load("res://main.tscn").instantiate()
