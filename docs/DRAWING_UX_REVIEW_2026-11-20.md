@@ -73,7 +73,7 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 4. **T-223 — P0, Done (2026-11-22):** unnamed 24px group triangle and whole-group drag/menu; [native/Atlas evidence](evidence/T-223-2026-11-22-group-marker.md), T-083 owner review still pending.
 5. **T-224 — P0, Done (2026-11-22):** single-icon thresholded grouping and [explicit native drop previews](evidence/T-224-2026-11-22-icon-proximity.md) verified; no T-083 owner approval implied.
 6. **T-225 — P1, Done (2026-11-22):** [native/Atlas floating icon parity](evidence/T-225-2026-11-22-floating-icons.md), including keyboard focus retention; T-091/T-083 owner gates remain open.
-7. **T-227 — P1, Ready:** compact brush selector and additional proven libmypaint controls.
+7. **T-227 — P1, Done (2026-11-22):** [native/model/Atlas evidence](evidence/T-227-2026-11-22-compact-brushes.md) for a two-column Hokusai preview grid and one real native parameter, bounded dabs per actual radius (1–8); owner physical UX approval remains in T-095/T-059.
 
 This is the **next owner-directed UI/performance sprint queue**, ahead of optional cosmetic/backlog work, while **T-148 native authority, T-149 migration and CI correctness retain their separate P0/engineering significance**. Priorities do not override hard dependencies or manual review.
 

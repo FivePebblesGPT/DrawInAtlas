@@ -18,6 +18,10 @@ const FILES: Dictionary = {
 	"airbrush": "res://addons/drawing/brushes/airbrush.myb",
 }
 const PREVIEW_ROOT: String = "res://addons/drawing/brushes/previews/"
+## Hokusai evaluates dabs_per_actual_radius in its stroke spacing equation.
+## Keep this bounded: very high densities can multiply native dab work.
+const DENSITY_MIN: float = 1.0
+const DENSITY_MAX: float = 8.0
 
 
 static func preset_data(preset: String) -> Dictionary:
@@ -37,12 +41,26 @@ static func default_hardness(preset: String) -> float:
 	return float((data["settings"]["hardness"] as Dictionary)["base_value"])
 
 
+static func default_density(preset: String) -> float:
+	var data: Dictionary = preset_data(preset)
+	if data.is_empty():
+		return -1.0
+	var setting: Variant = (data["settings"] as Dictionary).get("dabs_per_actual_radius")
+	if not setting is Dictionary or not setting.get("base_value") is float:
+		return -1.0
+	return float(setting["base_value"])
+
+
 ## Opacity is a percentage of the preset's native base opaque value; pressure
 ## input maps and opaque_multiply curves remain intact. Hardness changes its
 ## MyPaint base value while retaining native speed/pressure shaping.
-static func configured_preset(preset: String, opacity: float, hardness: float) -> String:
+static func configured_preset(preset: String, opacity: float, hardness: float,
+		density: float = -1.0) -> String:
+	if density == -1.0:
+		density = default_density(preset)
 	if not is_finite(opacity) or not is_finite(hardness) or not (0.0 <= opacity and opacity <= 1.0) \
-			or not (0.0 <= hardness and hardness <= 1.0):
+			or not (0.0 <= hardness and hardness <= 1.0) or not is_finite(density) \
+			or not (DENSITY_MIN <= density and density <= DENSITY_MAX):
 		return ""
 	var path: String = str(FILES.get(preset, ""))
 	if path.is_empty() or not FileAccess.file_exists(path):
@@ -50,7 +68,8 @@ static func configured_preset(preset: String, opacity: float, hardness: float) -
 	var raw: String = FileAccess.get_file_as_string(path)
 	# Keep the exact bundled native bytes (including pressure curves and numeric
 	# precision) for the common 100% / default-hardness configuration.
-	if is_equal_approx(opacity, 1.0) and is_equal_approx(hardness, default_hardness(preset)):
+	if is_equal_approx(opacity, 1.0) and is_equal_approx(hardness, default_hardness(preset)) \
+			and is_equal_approx(density, default_density(preset)):
 		return raw
 	var data: Dictionary = preset_data(preset)
 	if data.is_empty():
@@ -61,4 +80,6 @@ static func configured_preset(preset: String, opacity: float, hardness: float) -
 	opaque_setting["base_value"] = float(opaque_setting["base_value"]) * opacity
 	var hardness_setting: Dictionary = settings["hardness"]
 	hardness_setting["base_value"] = hardness
+	var density_setting: Dictionary = settings["dabs_per_actual_radius"]
+	density_setting["base_value"] = density
 	return JSON.stringify(data)

@@ -219,7 +219,9 @@ func run() -> void:
 		"narrow keyboard focus reaches scrolled parameter control")
 	app.inspector.ensure_control_visible(panel.reset_button)
 	await frames(5)
-	check(app.inspector.scroll_vertical > 0, "Brushes focused control scrolls into viewport")
+	check(app.inspector.scroll_vertical > 0 or
+		panel.reset_button.get_global_rect().end.y <= app.inspector.get_global_rect().end.y,
+		"Brushes focused control is visible, with scrolling only when needed")
 	app.inspector.scroll_vertical = 0
 	await frames(4)
 	var wheel: InputEventMouseButton = InputEventMouseButton.new()

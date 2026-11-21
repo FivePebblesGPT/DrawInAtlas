@@ -65,6 +65,7 @@ var selected_brush_preset: String = "hard"
 var brush_width_value: float = 3.0
 var brush_opacity_value: float = 1.0
 var brush_hardness_overrides: Dictionary = {} # preset -> native hardness 0..1
+var brush_density_overrides: Dictionary = {} # preset -> native dabs / actual radius, 1..8
 var snap_toggle: CheckButton
 var grid_dialog: ConfirmationDialog
 var grid_fields: Array[SpinBox] = []
@@ -383,6 +384,7 @@ func _build_interface() -> void:
 	canvas.brush_preset = selected_brush_preset
 	canvas.brush_opacity = brush_opacity_value
 	canvas.brush_hardness = _selected_brush_hardness()
+	canvas.brush_density = _selected_brush_density()
 	brush_preset_control.select(BRUSH_SETTINGS.PRESETS.find(selected_brush_preset))
 	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
@@ -424,9 +426,10 @@ func _build_interface() -> void:
 	brush_panel.width_changed.connect(_set_brush_width)
 	brush_panel.opacity_changed.connect(_set_brush_opacity)
 	brush_panel.hardness_changed.connect(_set_brush_hardness)
+	brush_panel.density_changed.connect(_set_brush_density)
 	brush_panel.reset_requested.connect(_reset_selected_brush)
 	brush_panel.display(selected_brush_preset, brush_width_value,
-		brush_opacity_value, _selected_brush_hardness())
+		brush_opacity_value, _selected_brush_hardness(), _selected_brush_density())
 	var color_pane: VBoxContainer = _add_dock_section("Colors")
 	_build_color_controls(color_pane)
 	var layer_pane: VBoxContainer = _add_dock_section("Layers")
@@ -3195,17 +3198,23 @@ func _selected_brush_hardness() -> float:
 		BRUSH_SETTINGS.default_hardness(selected_brush_preset)))
 
 
+func _selected_brush_density() -> float:
+	return float(brush_density_overrides.get(selected_brush_preset,
+		BRUSH_SETTINGS.default_density(selected_brush_preset)))
+
+
 func _show_brush_settings() -> void:
 	if brush_panel != null:
 		brush_panel.display(selected_brush_preset, brush_width_value,
-			brush_opacity_value, _selected_brush_hardness())
+			brush_opacity_value, _selected_brush_hardness(), _selected_brush_density())
 
 
 func _save_workspace_preferences() -> void:
 	if preferences_persistence_enabled and _layout_booted:
 		WORKSPACE_PREFERENCES.save_file(preferences_settings_path, record_selection_history,
 			{"preset": selected_brush_preset, "width": brush_width_value,
-			"opacity": brush_opacity_value, "hardness": brush_hardness_overrides})
+			"opacity": brush_opacity_value, "hardness": brush_hardness_overrides,
+			"density": brush_density_overrides})
 
 
 func _select_brush_preset(preset: String) -> void:
@@ -3215,6 +3224,7 @@ func _select_brush_preset(preset: String) -> void:
 	if canvas != null:
 		canvas.brush_preset = preset
 		canvas.brush_hardness = _selected_brush_hardness()
+		canvas.brush_density = _selected_brush_density()
 	if brush_preset_control != null:
 		brush_preset_control.select(BRUSH_SETTINGS.PRESETS.find(preset))
 	_show_brush_settings()
@@ -3247,12 +3257,25 @@ func _set_brush_hardness(ratio: float) -> void:
 	_save_workspace_preferences()
 
 
+func _set_brush_density(dabs_per_radius: float) -> void:
+	if not is_finite(dabs_per_radius) or dabs_per_radius < BRUSH_SETTINGS.DENSITY_MIN \
+			or dabs_per_radius > BRUSH_SETTINGS.DENSITY_MAX:
+		return
+	brush_density_overrides[selected_brush_preset] = dabs_per_radius
+	if canvas != null:
+		canvas.brush_density = _selected_brush_density()
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
 func _reset_selected_brush() -> void:
 	brush_hardness_overrides.erase(selected_brush_preset)
+	brush_density_overrides.erase(selected_brush_preset)
 	_set_brush_width(3.0)
 	_set_brush_opacity(1.0)
 	if canvas != null:
 		canvas.brush_hardness = _selected_brush_hardness()
+		canvas.brush_density = _selected_brush_density()
 	_show_brush_settings()
 	_save_workspace_preferences()
 
@@ -3437,6 +3460,7 @@ func _load_preferences() -> void:
 			brush_width_value = float(brush["width"])
 			brush_opacity_value = float(brush["opacity"])
 			brush_hardness_overrides = brush["hardness"].duplicate(true)
+			brush_density_overrides = brush.get("density", {}).duplicate(true)
 
 
 func _toggle_selection_history() -> void:
