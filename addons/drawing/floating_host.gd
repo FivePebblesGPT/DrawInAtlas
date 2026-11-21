@@ -154,6 +154,12 @@ func _frontmost_at(point: Vector2) -> bool:
 func render() -> void:
 	if layout == null or _body == null:
 		return
+	var previous_focus: Control = get_viewport().gui_get_focus_owner()
+	var focused_tab_id: String = ""
+	for panel_id: String in tab_buttons:
+		if tab_buttons[panel_id] == previous_focus:
+			focused_tab_id = panel_id
+			break
 	# A dock refresh can be requested several times before the next frame.
 	# queue_free() alone leaves old tab strips and group chrome in layout until
 	# the frame ends. Detach immediately, then delete; never free panel views.
@@ -198,12 +204,20 @@ func render() -> void:
 	for panel_id: String in members:
 		var tab: Button = Button.new()
 		tab.name = "Tab_" + panel_id
-		tab.text = panel_id.capitalize()
-		tab.tooltip_text = "Floating tab " + panel_id + "; drag to redock or reorder"
-		tab.custom_minimum_size.y = 32
+		# The same registered panel icon is used in the dock, rail and flyout.
+		# Active floating tabs never collapse or dismiss their host on click.
+		tab.icon = DrawingDockIcons.for_panel(panel_id)
+		tab.expand_icon = true
+		tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tab.custom_minimum_size = Vector2(42, 42)
+		tab.tooltip_text = panel_id.capitalize() + " panel; drag to reorder or redock; Ctrl+Alt+Left/Right to reorder"
 		tab.focus_mode = Control.FOCUS_ALL
 		tab.toggle_mode = true
 		tab.button_pressed = group["active"] == panel_id
+		for property: Dictionary in tab.get_property_list():
+			if property["name"] == "accessibility_name":
+				tab.set("accessibility_name", panel_id.capitalize() + " panel")
+				break
 		tab.pressed.connect(_select_panel.bind(panel_id))
 		row.add_child(tab)
 		tab_buttons[panel_id] = tab
@@ -218,6 +232,15 @@ func render() -> void:
 	if views.has(group["active"]):
 		var panel_view: Control = views[group["active"]]
 		panel_view.reparent(frame)
+	if tab_buttons.has(focused_tab_id):
+		call_deferred("_restore_tab_focus", focused_tab_id)
+
+
+func _restore_tab_focus(panel_id: String) -> void:
+	var tab: Button = tab_buttons.get(panel_id) as Button
+	# Do not steal focus if another control took it after the re-render.
+	if tab != null and tab.is_visible_in_tree() and get_viewport().gui_get_focus_owner() == null:
+		tab.grab_focus()
 
 
 func _select_panel(panel_id: String) -> void:

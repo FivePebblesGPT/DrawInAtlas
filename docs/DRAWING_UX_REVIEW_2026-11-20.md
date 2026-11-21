@@ -72,7 +72,7 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 3. **T-226 — P0, Done (2026-11-22):** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
 4. **T-223 — P0, Done (2026-11-22):** unnamed 24px group triangle and whole-group drag/menu; [native/Atlas evidence](evidence/T-223-2026-11-22-group-marker.md), T-083 owner review still pending.
 5. **T-224 — P0, Done (2026-11-22):** single-icon thresholded grouping and [explicit native drop previews](evidence/T-224-2026-11-22-icon-proximity.md) verified; no T-083 owner approval implied.
-6. **T-225 — P1, Ready:** floating icon tab consistency.
+6. **T-225 — P1, Done (2026-11-22):** [native/Atlas floating icon parity](evidence/T-225-2026-11-22-floating-icons.md), including keyboard focus retention; T-091/T-083 owner gates remain open.
 7. **T-227 — P1, Ready:** compact brush selector and additional proven libmypaint controls.
 
 This is the **next owner-directed UI/performance sprint queue**, ahead of optional cosmetic/backlog work, while **T-148 native authority, T-149 migration and CI correctness retain their separate P0/engineering significance**. Priorities do not override hard dependencies or manual review.
@@ -87,4 +87,4 @@ Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows po
 
 ## Dependency-respecting order
 
-Use the owner-directed order above. Completed **T-221, T-222, T-226 and T-223**; next owner priority is **T-224**. T-224 is now Ready (T-223 prerequisite complete); T-225 and T-227 remain independent Ready work. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+Use the owner-directed order above. **T-221, T-222, T-226, T-223, T-224 and T-225** are engineering Done. Next owner-priority ticket is **T-227** (Ready); T-083/T-091 acceptance is still open. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.

@@ -723,12 +723,7 @@ func _layout_dock_flyout() -> void:
 
 
 func _dock_icon(panel_id: String) -> Texture2D:
-	# One icon per model member. Unknown future panels still use a graphic,
-	# never a one-letter placeholder or a hard-coded rail membership list.
-	var named_path: String = "res://addons/drawing/icons/dock_%s.svg" % panel_id
-	if ResourceLoader.exists(named_path):
-		return load(named_path) as Texture2D
-	return load("res://addons/drawing/icons/dock_panel.svg") as Texture2D
+	return DrawingDockIcons.for_panel(panel_id)
 
 
 ## One edge overlay survives dock re-renders and is never placed inside the
