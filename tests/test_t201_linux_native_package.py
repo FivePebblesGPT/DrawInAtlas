@@ -255,6 +255,23 @@ class LinuxNativeExportTests(unittest.TestCase):
             pack.write_bytes(make_pck())
             executable.write_bytes(elf(kind=2))
 
+    def test_staged_project_inside_export_root_is_rejected_without_publication(self) -> None:
+        """Regression for CI exporting ELF/PCK beside its staged project."""
+        nested_project = self.output / "project"
+        nested_project.mkdir()
+        try:
+            with self.assertRaisesRegex(
+                package.PackageError, "Unexpected export directory: project"
+            ):
+                package.package(self.stage, self.output)
+            self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+        finally:
+            nested_project.rmdir()
+        # Only ELF/PCK remain; the same strict validator must now accept the
+        # clean distribution, without making an exception for a project dir.
+        package.package(self.stage, self.output)
+        self.assertTrue(gate.inspect_distribution(self.output, "linux")["native_extension_shipped"])
+
     def test_rejected_special_entries_leave_export_unchanged(self) -> None:
         """A complete native projection must not authorize extra filesystem nodes."""
         native = self.output / gate.NATIVE_LIBRARY

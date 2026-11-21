@@ -38,7 +38,17 @@ class GroupedPanelDockRoadmapTests(unittest.TestCase):
                 fields = frontmatter(contents)
                 self.assertIn(f"id: T-{ticket_id:03}", fields)
                 preceding = ticket_id - 1 if ticket_id > 78 else 63
-                self.assertIn(f'depends_on: ["[[T-{preceding:03}]]"]', fields)
+                errors: list[str] = []
+                record = parse_ticket(DOCS / f"Tickets/T-{ticket_id:03}.md", errors)
+                self.assertFalse(errors, errors)
+                self.assertIsNotNone(record)
+                self.assertIn(f"T-{preceding:03}", record.dependencies)
+                self.assertEqual(len(record.dependencies), len(set(record.dependencies)))
+                if ticket_id == 83:
+                    # New required UI/physical gates extend the original chain.
+                    # Do not remove them just to satisfy an old exact-list test.
+                    for required in (91, 222, 223, 224, 225):
+                        self.assertIn(f"T-{required:03}", record.dependencies)
                 if ticket_id == 78:
                     self.assertIn("docking specification", contents.lower())
 

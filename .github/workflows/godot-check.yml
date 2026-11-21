@@ -375,29 +375,33 @@ jobs:
           # A fresh isolated stage is required even on repeated CI replays.
           release_root="$(mktemp -d "${TMPDIR:-/tmp}/drawing-dist.XXXXXXXX")"
           trap 'rm -rf "$release_root"' EXIT
+          # Export into a clean sibling of the staged project: the strict
+          # inventory forbids even an extra source-project directory.
+          mkdir -p "$release_root/dist"
           python3 tools/build_drawing_app.py --output "$release_root/project"
           godot --headless --editor --path "$release_root/project" --import --quit
-          godot --headless --path "$release_root/project" --export-release Linux "$release_root/Drawing.x86_64"
-          test -s "$release_root/Drawing.x86_64"
-          test -s "$release_root/Drawing.pck"
+          godot --headless --path "$release_root/project" --export-release Linux "$release_root/dist/Drawing.x86_64"
+          test -s "$release_root/dist/Drawing.x86_64"
+          test -s "$release_root/dist/Drawing.pck"
           # The .gdextension manifest is packed, but its ELF must be beside the PCK.
           # Fail closed on missing, unexpected or mismatched native export bytes.
           python3 tools/package_linux_export.py \
-            --stage "$release_root/project" --linux "$release_root"
+            --stage "$release_root/project" --linux "$release_root/dist"
           python3 -m unittest discover -s tests -p 'test_t201_linux_native_package.py' -v
+          python3 -m unittest discover -s tests -p 'test_t228_fast_ci_contract.py' -v
           python3 -m unittest discover -s tests -p 'test_t217_pck_index.py' -v
           python3 -m unittest discover -s tests -p 'test_t218_pck_payload_integrity.py' -v
           python3 -m unittest discover -s tests -p 'test_t219_pck_resource_names.py' -v
           python3 -m unittest discover -s tests -p 'test_t220_pck_project_identity.py' -v
           # Font bytes ship as imported .fontdata, not raw .ttf.
           # Probe the exported PCK rather than editor source files.
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root" --main-pack "$release_root/Drawing.pck" \
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root/dist" --main-pack "$release_root/dist/Drawing.pck" \
             --script "$release_root/project/tests/packaged_fonts_smoke.gd" \
             2>&1 | tee /tmp/godot-export-fonts.log
           python3 tools/check_godot_model_log.py /tmp/godot-export-fonts.log --marker DRAWING_PACK_FONT_PASSED
           # Inspect the exported ELF/PCK and launch with a disposable HOME/CWD.
           python3 tools/benchmarks/t068_release_gate.py \
-            --stage "$release_root/project" --linux "$release_root" \
+            --stage "$release_root/project" --linux "$release_root/dist" \
             --launch-linux --output /tmp/t068-standalone-linux-release.json
       # The standalone package import above only registers *its* classes.
       # The main checkout needs its own class cache before any --path . --script smoke.
