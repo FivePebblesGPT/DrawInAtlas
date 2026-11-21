@@ -70,8 +70,8 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 1. **T-221 — P0, Done:** Delete pixels (not Deselect) was slow in software; sparse-clear fix tested. Owner hardware recheck remains in T-088.
 2. **T-222 — P0, Done (2026-11-22):** edge half-circle plus exact icon input semantics; [native/Atlas evidence](evidence/T-222-2026-11-22-dock-interactions.md), T-083 owner review still pending.
 3. **T-226 — P0, Done (2026-11-22):** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
-4. **T-223 — P0, Ready after T-222:** unnamed group marker and whole-group drag remain to implement.
-5. **T-224 — P0, Blocked until T-223:** icon-to-icon grouping.
+4. **T-223 — P0, Done (2026-11-22):** unnamed 24px group triangle and whole-group drag/menu; [native/Atlas evidence](evidence/T-223-2026-11-22-group-marker.md), T-083 owner review still pending.
+5. **T-224 — P0, Ready after T-223:** icon-to-icon grouping remains to implement.
 6. **T-225 — P1, Ready:** floating icon tab consistency.
 7. **T-227 — P1, Ready:** compact brush selector and additional proven libmypaint controls.
 
@@ -87,4 +87,4 @@ Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows po
 
 ## Dependency-respecting order
 
-Use the owner-directed order above. Completed **T-221, T-222 and T-226**; next owner priority is **T-223**. T-223 is now Ready (T-222 prerequisite complete), T-224 still waits on T-223; T-225 and T-227 remain independent Ready work. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+Use the owner-directed order above. Completed **T-221, T-222, T-226 and T-223**; next owner priority is **T-224**. T-224 is now Ready (T-223 prerequisite complete); T-225 and T-227 remain independent Ready work. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.

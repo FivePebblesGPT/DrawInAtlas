@@ -10,6 +10,7 @@ const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
 const DOCK_TOGGLE_SCRIPT: Script = preload("res://addons/drawing/dock_toggle.gd")
+const DOCK_GROUP_MARKER_SCRIPT: Script = preload("res://addons/drawing/dock_group_marker.gd")
 const WORKSPACE_PREFERENCES: Script = preload("res://addons/drawing/workspace_preferences.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
@@ -76,6 +77,8 @@ var dock_rail: VBoxContainer
 var dock_toggle: Button
 var dock_panel_menu: PopupMenu
 var _dock_menu_panel_id: String = ""
+var dock_group_menu: PopupMenu
+var _dock_menu_group_id: String = ""
 var dock_stash: VBoxContainer
 var dock_flyout: PanelContainer
 var dock_flyout_tabs: HBoxContainer
@@ -409,6 +412,7 @@ func _build_interface() -> void:
 	_make_dock_flyout()
 	_make_dock_toggle()
 	_make_dock_panel_menu()
+	_make_dock_group_menu()
 	brush_panel = BRUSH_PANEL_SCRIPT.new() as DrawingBrushPanel
 	assert(dock_layout.register_panel("brushes"))
 	assert(dock_layout.attach_panel("brushes", "right", "brushes"))
@@ -670,13 +674,9 @@ func _make_dock_flyout() -> void:
 	var column: VBoxContainer = VBoxContainer.new()
 	column.name = "FlyoutColumn"
 	dock_flyout.add_child(column)
-	var heading: HBoxContainer = HBoxContainer.new()
-	column.add_child(heading)
-	var caption: Label = Label.new()
-	caption.name = "FlyoutTitle"
-	caption.text = "Dock panels"
-	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading.add_child(caption)
+	var strip_row: HBoxContainer = HBoxContainer.new()
+	strip_row.name = "FlyoutTabBar"
+	column.add_child(strip_row)
 	var close: Button = Button.new()
 	close.name = "CloseFlyout"
 	close.text = "×"
@@ -686,13 +686,15 @@ func _make_dock_flyout() -> void:
 	close.pressed.connect(func() -> void:
 		dock_layout.close_flyout("right")
 		_render_dock())
-	heading.add_child(close)
+	strip_row.add_child(close)
 	dock_flyout_tab_scroll = ScrollContainer.new()
 	dock_flyout_tab_scroll.name = "FlyoutTabScroll"
 	dock_flyout_tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	dock_flyout_tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	dock_flyout_tab_scroll.custom_minimum_size.y = 43
-	column.add_child(dock_flyout_tab_scroll)
+	dock_flyout_tab_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	strip_row.add_child(dock_flyout_tab_scroll)
+	strip_row.move_child(close, 1) # Compact close affordance at the far edge.
 	dock_flyout_tabs = HBoxContainer.new()
 	dock_flyout_tabs.name = "FlyoutTabs"
 	dock_flyout_tab_scroll.add_child(dock_flyout_tabs)
@@ -823,6 +825,47 @@ func _make_dock_panel_menu() -> void:
 	add_child(dock_panel_menu)
 
 
+## One popup serves every marker. Enablement is calculated from the model at
+## opening time; a previously rendered group ID cannot mutate a new owner.
+func _make_dock_group_menu() -> void:
+	dock_group_menu = PopupMenu.new()
+	dock_group_menu.name = "DockGroupContextMenu"
+	for entry: String in ["Move group up", "Move group down", "Merge group into previous", "Merge group into next",
+		"Split active panel into group", "Float whole group"]:
+		dock_group_menu.add_item(entry)
+	dock_group_menu.id_pressed.connect(_dock_group_menu_action)
+	add_child(dock_group_menu)
+
+
+func _show_dock_group_menu(group_id: String, point: Vector2) -> void:
+	if _dock_group_position(group_id) < 0:
+		return
+	var groups: Array = dock_layout.container_info("right")["groups"]
+	var index: int = _dock_group_position(group_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	_dock_menu_group_id = group_id
+	for action: int in range(4):
+		var unavailable: bool = (index == 0) if action % 2 == 0 else (index >= groups.size() - 1)
+		dock_group_menu.set_item_disabled(action, unavailable)
+	dock_group_menu.set_item_disabled(4, group["panels"].size() <= 1)
+	dock_group_menu.position = Vector2i(point.round())
+	dock_group_menu.popup()
+
+
+func _dock_group_menu_action(action_id: int) -> void:
+	var group_id: String = _dock_menu_group_id
+	if _dock_group_position(group_id) < 0:
+		return
+	match action_id:
+		0, 1, 2, 3:
+			_dock_arrange_action([5, 6, 7, 8][action_id], group_id)
+		4:
+			if dock_layout.group_info(group_id)["panels"].size() > 1:
+				_dock_arrange_action(4, group_id)
+		5:
+			_float_source(DrawingDockDrag.GROUP, group_id)
+
+
 func _show_dock_panel_menu(panel_id: String, point: Vector2) -> void:
 	var group_id: String = dock_layout.group_of(panel_id)
 	var group: Dictionary = dock_layout.group_info(group_id)
@@ -877,8 +920,10 @@ func _focused_dock_panel() -> String:
 
 
 func _group_collapse_pressed(group_id: String) -> void:
+	if _ignore_dock_icon_activation():
+		return
 	var group: Dictionary = dock_layout.group_info(group_id)
-	if dock_layout.set_group_collapsed(group_id, not bool(group["collapsed"])):
+	if not group.is_empty() and dock_layout.set_group_collapsed(group_id, not bool(group["collapsed"])):
 		_render_dock("group:" + group_id)
 
 
@@ -941,50 +986,33 @@ func _render_dock(focus_key: String = "") -> void:
 			frame.name = "Group_" + group_id
 			dock_panels.add_child(frame)
 			dock_group_frames[group_id] = frame
-			var heading: HBoxContainer = HBoxContainer.new()
-			heading.name = "GroupHeader"
-			frame.add_child(heading)
-			var collapse: Button = Button.new()
-			collapse.name = "Collapse_" + group_id
-			collapse.text = "▸" if bool(group["collapsed"]) else "▾"
-			collapse.tooltip_text = ("Expand " if bool(group["collapsed"]) else "Collapse ") + group_id.capitalize() + " group"
-			collapse.custom_minimum_size = Vector2(40, 40)
-			collapse.focus_mode = Control.FOCUS_ALL
-			collapse.pressed.connect(_group_collapse_pressed.bind(group_id))
-			heading.add_child(collapse)
-			dock_header_buttons[group_id] = collapse
-			var title: Label = Label.new()
-			title.text = group_id.capitalize()
-			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			title.clip_text = true
-			heading.add_child(title)
-			var drag_handle: Button = Button.new()
-			drag_handle.name = "GroupDrag_" + group_id
-			drag_handle.text = "↕"
-			drag_handle.tooltip_text = "Drag whole " + group_id.capitalize() + " group between dock and floating hosts; Ctrl+Alt+Shift+Up/Down to reorder"
-			drag_handle.custom_minimum_size = Vector2(32, 40)
-			drag_handle.focus_mode = Control.FOCUS_ALL
-			drag_handle.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.GROUP, group_id))
-			heading.add_child(drag_handle)
-			dock_group_handles[group_id] = drag_handle
-			var arrange: MenuButton = MenuButton.new()
-			arrange.name = "Arrange_" + group_id
-			arrange.text = "⋮"
-			arrange.tooltip_text = "Arrange tabs and groups by keyboard or pointer"
-			arrange.custom_minimum_size = Vector2(32, 40)
-			arrange.focus_mode = Control.FOCUS_ALL
-			heading.add_child(arrange)
-			var menu: PopupMenu = arrange.get_popup()
-			for label_text: String in ["Move active tab left", "Move active tab right", "Move active tab to previous group", "Move active tab to next group", "Split active tab into group", "Move group up", "Move group down", "Merge group into previous", "Merge group into next", "Send active tab to first floating host", "Send whole group to first floating host"]:
-				menu.add_item(label_text)
-			menu.id_pressed.connect(_dock_arrange_action.bind(group_id))
-			# A clipped horizontal strip supports arbitrary tab counts at small widths.
+			# One compact, common-height row; the marker is not a group title.
+			var bar: HBoxContainer = HBoxContainer.new()
+			bar.name = "GroupBar"
+			bar.add_theme_constant_override("separation", 2)
+			frame.add_child(bar)
+			var marker: DrawingDockGroupMarker = DOCK_GROUP_MARKER_SCRIPT.new() as DrawingDockGroupMarker
+			marker.name = "GroupMarker_" + group_id
+			marker.collapsed = bool(group["collapsed"])
+			marker.tooltip_text = ("Expand " if marker.collapsed else "Collapse ") + group_id.capitalize() + \
+				" group; drag whole group; right-click or Shift+F10 for group menu; Ctrl+Alt+Shift+Up/Down to reorder"
+			for property: Dictionary in marker.get_property_list():
+				if property["name"] == "accessibility_name":
+					marker.set("accessibility_name", group_id.capitalize() + " group marker")
+					break
+			marker.pressed.connect(_group_collapse_pressed.bind(group_id))
+			marker.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.GROUP, group_id))
+			bar.add_child(marker)
+			dock_header_buttons[group_id] = marker
+			dock_group_handles[group_id] = marker
+			# Horizontal overflow stays in the icon strip, never expands the dock.
 			var tab_scroll: ScrollContainer = ScrollContainer.new()
 			tab_scroll.name = "TabStripScroll_" + group_id
+			tab_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 			tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 			tab_scroll.custom_minimum_size.y = 45
-			frame.add_child(tab_scroll)
+			bar.add_child(tab_scroll)
 			dock_tab_strips[group_id] = tab_scroll
 			var tabs_row: HBoxContainer = HBoxContainer.new()
 			tabs_row.name = "TabStrip_" + group_id
@@ -1012,9 +1040,6 @@ func _render_dock(focus_key: String = "") -> void:
 			dock_rail.add_child(icon)
 		if not flyout_group_id.is_empty():
 			var group: Dictionary = dock_layout.group_info(flyout_group_id)
-			var flyout_column: VBoxContainer = dock_flyout.get_node("FlyoutColumn") as VBoxContainer
-			var caption: Label = flyout_column.find_child("FlyoutTitle", true, false) as Label
-			caption.text = flyout_group_id.capitalize()
 			for panel_id: String in group["panels"]:
 				if not dock_views.has(panel_id):
 					continue
@@ -1176,8 +1201,11 @@ func _make_dock_hint() -> void:
 func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> void:
 	if event is InputEventMouseButton:
 		var button: InputEventMouseButton = event as InputEventMouseButton
-		if button.button_index == MOUSE_BUTTON_RIGHT and button.pressed and kind == DrawingDockDrag.PANEL:
-			_show_dock_panel_menu(source_id, button.global_position)
+		if button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
+			if kind == DrawingDockDrag.PANEL:
+				_show_dock_panel_menu(source_id, button.global_position)
+			elif kind == DrawingDockDrag.GROUP:
+				_show_dock_group_menu(source_id, button.global_position)
 			get_viewport().set_input_as_handled()
 		elif button.button_index == MOUSE_BUTTON_LEFT and button.pressed:
 			_drag_candidate_kind = kind
@@ -1222,9 +1250,15 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
 			return
-		# Shift+F10 / Menu offers the same per-panel context menu for keyboard
-		# focus without changing the active tab or its collapse state.
+		# Shift+F10 / Menu opens the focused panel's or group's menu
+		# without changing the active tab or its collapsed state.
 		if event.keycode == KEY_MENU or (event.keycode == KEY_F10 and event.shift_pressed):
+			var focused: Control = get_viewport().gui_get_focus_owner()
+			for group_id: String in dock_group_handles:
+				if focused == dock_group_handles[group_id]:
+					_show_dock_group_menu(group_id, focused.get_global_rect().get_center())
+					get_viewport().set_input_as_handled()
+					return
 			var menu_panel: String = _focused_dock_panel()
 			if not menu_panel.is_empty():
 				var control: Control = get_viewport().gui_get_focus_owner()
@@ -1669,7 +1703,8 @@ func _dock_arrange_action(action_id: int, group_id: String) -> void:
 						"group": existing["id"], "index": existing["panels"].size()}
 					break
 	if not destination.is_empty():
-		_dock_apply(source_kind, source_id, destination, "edge:" + panel_id)
+		_dock_apply(source_kind, source_id, destination,
+			"drag-group:" + group_id if source_kind == DrawingDockDrag.GROUP else "edge:" + panel_id)
 
 
 func _dock_keyboard_command(event: InputEventKey) -> bool:

@@ -171,8 +171,10 @@ func run() -> void:
 	group_handle.grab_focus()
 	await frames(6)
 	var history_frame: Control = app.dock_group_frames["history"]
+	# The T-223 compact bar removes 40px of old heading height: aim inside
+	# the last group's body/strip, not within its group-slot edge threshold.
 	target = Vector2(history_frame.get_global_rect().end.x - 24.0,
-		minf(history_frame.get_global_rect().end.y - 2.0, app.inspector.get_global_rect().end.y - 6.0))
+		minf(history_frame.get_global_rect().end.y - 23.0, app.inspector.get_global_rect().end.y - 25.0))
 	await drag_begin(group_handle, target)
 	check(app.dock_drag.target().get("kind") == DrawingDockDrag.MERGE_GROUP,
 		"before scrolling to the bottom, the last-group interior is still a merge target")
@@ -201,7 +203,7 @@ func run() -> void:
 	group_handle = app.dock_group_handles["layers"]
 	group_handle.grab_focus()
 	await frames(8)
-	var color_header: Control = app.dock_group_frames["colors"].get_node("GroupHeader")
+	var color_header: Control = app.dock_group_frames["colors"].get_node("GroupBar")
 	target = color_header.get_global_rect().get_center()
 	await drag_begin(group_handle, target)
 	check(app.dock_drop_hint.visible, "merge target has visible hint")
