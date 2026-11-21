@@ -470,6 +470,10 @@ func _target_at(point: Vector2) -> Dictionary:
 	var strip: ScrollContainer = tab_strips.get(group_id) as ScrollContainer
 	if strip == null:
 		return {}
+	# A panel icon cannot merge by merely passing over the floating body.
+	# Whole-group drags still accept the host as their target.
+	if drag.source_kind() == DrawingDockDrag.PANEL and not strip.get_global_rect().has_point(point):
+		return {}
 	var index: int = groups[0]["panels"].size()
 	var x: float = strip.get_global_rect().end.x - 3.0
 	for j: int in range(groups[0]["panels"].size()):

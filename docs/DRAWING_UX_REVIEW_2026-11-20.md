@@ -71,7 +71,7 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 2. **T-222 — P0, Done (2026-11-22):** edge half-circle plus exact icon input semantics; [native/Atlas evidence](evidence/T-222-2026-11-22-dock-interactions.md), T-083 owner review still pending.
 3. **T-226 — P0, Done (2026-11-22):** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
 4. **T-223 — P0, Done (2026-11-22):** unnamed 24px group triangle and whole-group drag/menu; [native/Atlas evidence](evidence/T-223-2026-11-22-group-marker.md), T-083 owner review still pending.
-5. **T-224 — P0, Ready after T-223:** icon-to-icon grouping remains to implement.
+5. **T-224 — P0, Done (2026-11-22):** single-icon thresholded grouping and [explicit native drop previews](evidence/T-224-2026-11-22-icon-proximity.md) verified; no T-083 owner approval implied.
 6. **T-225 — P1, Ready:** floating icon tab consistency.
 7. **T-227 — P1, Ready:** compact brush selector and additional proven libmypaint controls.
 

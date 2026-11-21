@@ -94,6 +94,8 @@ var dock_drag: DrawingDockDrag
 var floating_hosts: Dictionary = {} # Container ID -> DrawingFloatingHost (real Control)
 var _floating_serial: int = 0
 var dock_drop_hint: ColorRect
+var dock_drop_caption: Label
+var dock_merge_outline: Panel
 var _drag_candidate_kind: String = ""
 var _drag_candidate_id: String = ""
 var _drag_candidate_position: Vector2 = Vector2.ZERO
@@ -1196,6 +1198,32 @@ func _make_dock_hint() -> void:
 	dock_drop_hint.z_index = 100
 	dock_drop_hint.visible = false
 	add_child(dock_drop_hint)
+	# The exact insertion line is retained for keyboard/pointer parity. A separate
+	# outlined strip and text tell users whether this will merge, reorder or split.
+	dock_merge_outline = Panel.new()
+	dock_merge_outline.name = "DockMergeTargetOutline"
+	dock_merge_outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dock_merge_outline.top_level = true
+	dock_merge_outline.z_index = 99
+	var outline_style: StyleBoxFlat = StyleBoxFlat.new()
+	outline_style.bg_color = Color(0.08, 0.72, 0.48, 0.12)
+	outline_style.border_color = Color(0.18, 0.88, 0.57, 0.96)
+	outline_style.set_border_width_all(2)
+	dock_merge_outline.add_theme_stylebox_override("panel", outline_style)
+	dock_merge_outline.visible = false
+	add_child(dock_merge_outline)
+	dock_drop_caption = Label.new()
+	dock_drop_caption.name = "DockDropCaption"
+	dock_drop_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dock_drop_caption.top_level = true
+	dock_drop_caption.z_index = 110
+	dock_drop_caption.add_theme_font_size_override("font_size", 13)
+	var caption_style: StyleBoxFlat = StyleBoxFlat.new()
+	caption_style.bg_color = Color(0.08, 0.13, 0.19, 0.95)
+	caption_style.set_content_margin_all(5.0)
+	dock_drop_caption.add_theme_stylebox_override("normal", caption_style)
+	dock_drop_caption.visible = false
+	add_child(dock_drop_caption)
 
 
 func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> void:
@@ -1314,6 +1342,28 @@ func _process(delta: float) -> void:
 		return
 	var grip_drag: bool = _grip_redock_active()
 	var over_host: DrawingFloatingHost = null if grip_drag else _topmost_host(_drag_pointer_position)
+	if not grip_drag:
+		var tab_strips_to_check: Array[ScrollContainer] = []
+		if over_host != null:
+			for tab_strip: ScrollContainer in over_host.tab_strips.values():
+				tab_strips_to_check.append(tab_strip)
+		elif dock_flyout.visible:
+			tab_strips_to_check.append(dock_flyout_tab_scroll)
+		else:
+			for tab_strip: ScrollContainer in dock_tab_strips.values():
+				tab_strips_to_check.append(tab_strip)
+		for tab_strip: ScrollContainer in tab_strips_to_check:
+			if not tab_strip.get_global_rect().has_point(_drag_pointer_position):
+				continue
+			var bounds_x: Rect2 = tab_strip.get_global_rect()
+			var direction_x: int = -1 if _drag_pointer_position.x < bounds_x.position.x + 22.0 else \
+				1 if _drag_pointer_position.x > bounds_x.end.x - 22.0 else 0
+			if direction_x != 0:
+				var before_x: int = tab_strip.scroll_horizontal
+				tab_strip.scroll_horizontal += roundi(float(direction_x) * 310.0 * delta)
+				if before_x != tab_strip.scroll_horizontal:
+					_preview_cross_drop(_drag_pointer_position)
+			break
 	var scroll_target: ScrollContainer = inspector if over_host == null else over_host._scroll
 	if not scroll_target.get_global_rect().has_point(_drag_pointer_position):
 		return
@@ -1386,9 +1436,7 @@ func _preview_grip_redock(source_host_id: String, group_id: String, point: Vecto
 	if hit.is_empty() or not dock_drag.preview(hit["target"]):
 		return false
 	_drag_pointer_position = point
-	dock_drop_hint.global_position = (hit["rect"] as Rect2).position
-	dock_drop_hint.size = (hit["rect"] as Rect2).size
-	dock_drop_hint.visible = true
+	_show_dock_drop_hint(hit, dock_drop_hint)
 	return true
 
 
@@ -1419,6 +1467,10 @@ func _topmost_host(point: Vector2) -> DrawingFloatingHost:
 func _clear_drop_hints() -> void:
 	if dock_drop_hint != null:
 		dock_drop_hint.visible = false
+	if dock_drop_caption != null:
+		dock_drop_caption.visible = false
+	if dock_merge_outline != null:
+		dock_merge_outline.visible = false
 	if _detach_hint != null:
 		_detach_hint.visible = false
 	for host: DrawingFloatingHost in floating_hosts.values():
@@ -1440,9 +1492,7 @@ func _preview_cross_drop(point: Vector2) -> void:
 		hit = _dock_target_at(point)
 	if not hit.is_empty() and dock_drag.preview(hit["target"]):
 		var marker: ColorRect = dock_drop_hint if host == null else host._hint
-		marker.global_position = (hit["rect"] as Rect2).position
-		marker.size = (hit["rect"] as Rect2).size
-		marker.visible = true
+		_show_dock_drop_hint(hit, marker, host)
 		return
 	# Canvas release is an explicit detach action; the model remains untouched
 	# until release, and invalid regions clear any previously valid target.
@@ -1580,6 +1630,10 @@ func _dock_target_at(position: Vector2) -> Dictionary:
 		if strip != null and strip.get_global_rect().has_point(position):
 			var tabs_row: HBoxContainer = strip.get_child(0) as HBoxContainer
 			return _dock_tab_target(group_id, position, tabs_row, strip)
+		# Passing over an expanded panel body is not an icon-proximity merge.
+		# A panel must explicitly enter the visible icon strip or a group gap.
+		if dock_drag.source_kind() == DrawingDockDrag.PANEL:
+			return {}
 		return {"target": _dock_target(group_id, dock_layout.group_info(group_id)["panels"].size(), false),
 			"rect": Rect2(frame_rect.position, Vector2(frame_rect.size.x, minf(frame_rect.size.y, 44.0)))}
 	if groups.is_empty():
@@ -1631,15 +1685,74 @@ func _dock_group_gap_y(index: int) -> float:
 	return last_button.get_global_rect().end.y if last_button != null else dock_rail.get_global_rect().end.y
 
 
+## UI-only visual semantics; DrawingDockDrag still validates/commits the
+## unchanged target dictionary on a snapshot. Only icon proximity can merge.
+func _drop_hint_mode(target: Dictionary) -> String:
+	var kind: String = String(target.get("kind", ""))
+	if kind == DrawingDockDrag.GROUP_SLOT:
+		return "split" if dock_drag.source_kind() == DrawingDockDrag.PANEL else "move_group"
+	if kind == DrawingDockDrag.TAB_SLOT or kind == DrawingDockDrag.MERGE_GROUP:
+		if dock_drag.source_kind() == DrawingDockDrag.GROUP:
+			return "merge_group"
+		var source_group: String = dock_layout.group_of(_dragged_panel_id())
+		return "reorder" if source_group == String(target.get("group", "")) else "merge_panel"
+	return ""
+
+
+func _dragged_panel_id() -> String:
+	if _cross_source == "right":
+		return _drag_candidate_id
+	if floating_hosts.has(_cross_source):
+		return String((floating_hosts[_cross_source] as DrawingFloatingHost)._candidate_id)
+	return ""
+
+
+func _show_dock_drop_hint(hit: Dictionary, marker: ColorRect, host: DrawingFloatingHost = null) -> void:
+	var target: Dictionary = hit["target"]
+	var mode: String = _drop_hint_mode(target)
+	var rect: Rect2 = hit["rect"]
+	marker.global_position = rect.position
+	marker.size = rect.size
+	marker.color = Color(0.95, 0.65, 0.19, 0.96) if mode == "split" or mode == "move_group" else \
+		Color(0.18, 0.88, 0.57, 0.96) if mode == "merge_panel" or mode == "merge_group" else \
+		Color(0.19, 0.78, 0.95, 0.96)
+	marker.visible = true
+	var label: String = ""
+	match mode:
+		"split": label = "Split panel into new group"
+		"move_group": label = "Move whole group"
+		"merge_panel": label = "Group panel with " + String(target["group"]).capitalize()
+		"merge_group": label = "Merge whole group into " + String(target["group"]).capitalize()
+		"reorder": label = "Reorder panel"
+	if not label.is_empty():
+		dock_drop_caption.text = label
+		dock_drop_caption.reset_size()
+		var viewport_rect: Rect2 = get_viewport_rect()
+		dock_drop_caption.global_position = Vector2(
+			clampf(rect.position.x - dock_drop_caption.size.x - 4.0, 2.0,
+				maxf(2.0, viewport_rect.size.x - dock_drop_caption.size.x - 2.0)),
+			clampf(rect.position.y - dock_drop_caption.size.y - 4.0, 2.0,
+				maxf(2.0, viewport_rect.size.y - dock_drop_caption.size.y - 2.0)))
+		dock_drop_caption.visible = true
+	if mode == "merge_panel" or mode == "merge_group":
+		var group_id: String = String(target["group"])
+		var strip: ScrollContainer = (dock_tab_strips.get(group_id) as ScrollContainer) if host == null else \
+			(host.tab_strips.get(group_id) as ScrollContainer)
+		if host == null and dock_flyout.visible and group_id == String(dock_layout.container_info("right")["flyout_group"]):
+			strip = dock_flyout_tab_scroll
+		if strip != null:
+			dock_merge_outline.global_position = strip.get_global_rect().position
+			dock_merge_outline.size = strip.get_global_rect().size
+			dock_merge_outline.visible = true
+
+
 func _preview_dock_target(position: Vector2) -> void:
 	var hit: Dictionary = _dock_target_at(position)
 	if hit.is_empty() or not dock_drag.preview(hit["target"]):
-		dock_drop_hint.visible = false
+		_clear_drop_hints()
 		return
-	var rectangle: Rect2 = hit["rect"]
-	dock_drop_hint.global_position = rectangle.position
-	dock_drop_hint.size = rectangle.size
-	dock_drop_hint.visible = true
+	_clear_drop_hints()
+	_show_dock_drop_hint(hit, dock_drop_hint)
 
 
 func _dock_apply(source_kind: String, source_id: String, destination: Dictionary, focus_key: String = "") -> bool:
