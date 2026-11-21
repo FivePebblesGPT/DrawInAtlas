@@ -1892,6 +1892,11 @@ impl DrawingNativeTiles {
         if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
             return err("Invalid external edit revision or tile count");
         }
+        // Godot PackedByteArray->Vec duplicates must not precede the
+        // stride-dependent source/before/after envelope preflight.
+        if !self.store.history_transfer_within_budget(tiles.len()) {
+            return err("Native external edit transfer exceeds tile memory budget");
+        }
         let mut changes = Vec::with_capacity(tiles.len());
         for entry in tiles.iter_shared() {
             let Some((x, y, before, after)) = (|| {

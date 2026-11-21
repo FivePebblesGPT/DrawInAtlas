@@ -7,6 +7,12 @@ const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 const ROOT_ID: String = "root"
 ## Native store cap; three full spans per touched tile cover source and replay buffers.
 const MAX_NATIVE_HISTORY_TRANSFER_BYTES: int = 256 * 1024 * 1024
+## Also bound direct external tile publication before lazy source resolution.
+## This is a conservative source/before/after envelope, not resident RSS.
+func _native_direct_transfer_within_budget(count: int) -> bool:
+	return count > 0 and count <= 128 and \
+		count * tile_stride * tile_stride * 4 * 3 <= MAX_NATIVE_HISTORY_TRANSFER_BYTES
+
 
 var id: String = ""
 var tile_stride: int = 256
@@ -776,6 +782,9 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if patches.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
+	# Fail before resolving a single pending/lazy source or copying full tiles.
+	if _native_raster_store != null and not _native_direct_transfer_within_budget(patches.size()):
+		return DrawingResult.failure("NATIVE_TILES", "Direct tile edit exceeds native transfer budget")
 
 	var detached: Dictionary[String, DrawingRasterTile] = {}
 	var bounds: Dictionary[String, Array] = {}
@@ -1152,6 +1161,23 @@ func _publish_edit(layer_id: String, expected: int,
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
+	# Count distinct touched tiles without loading source. This protects direct
+	# pixel producers from a stride-dependent burst of detached RGBA8 buffers.
+	if _native_raster_store != null:
+		var touched: Dictionary[String, bool] = {}
+		for coordinate: String in after:
+			var parts: PackedStringArray = coordinate.split(",")
+			if parts.size() != 2 or not parts[0].is_valid_int() \
+					or not parts[1].is_valid_int():
+				return DrawingResult.failure("COORD", "Invalid pixel coordinate")
+			var x: int = int(parts[0])
+			var y: int = int(parts[1])
+			if coordinate != TILES.pixel_key64(x, y) \
+					or not TILES.pixel_coordinates_in_projection_range(x, y):
+				return DrawingResult.failure("COORD", "Invalid signed native pixel coordinate")
+			touched[TILES.tile_key64(x, y, tile_stride)] = true
+			if not _native_direct_transfer_within_budget(touched.size()):
+				return DrawingResult.failure("NATIVE_TILES", "Direct pixel edit exceeds native transfer budget")
 
 	var detached: Dictionary[String, DrawingRasterTile] = {}
 	var bounds: Dictionary[String, Array] = {}
@@ -1237,8 +1263,8 @@ func _install_prepared_edit(layer_id: String, expected: int,
 	var replacements: Dictionary[String, PackedByteArray] = {}
 	var descriptors: Array[Dictionary] = []
 	if adopt:
-		if detached.size() > 128:
-			return DrawingResult.failure("NATIVE_TILES", "External raster transaction exceeds 128 tiles")
+		if not _native_direct_transfer_within_budget(detached.size()):
+			return DrawingResult.failure("NATIVE_TILES", "External raster transaction exceeds native transfer budget")
 		for key: String in detached:
 			var parts: PackedStringArray = key.split(",")
 			if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int() \

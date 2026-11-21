@@ -34,6 +34,19 @@ at most five tiles fit this envelope. This is a conservative transfer bound,
 not a claim about process RSS, fully resident mixed-document history, or
 completion of universal T-148 authority. [Execution evidence](evidence/T-229-2026-11-22-history-budget.md).
 
+**Stride-dependent direct-edit transfer bound (T-231, 2026-11-22):**
+With an attached store, `_publish_edit` (pixel maps) counts unique storage
+tile IDs and `_publish_tile_edit` checks patch tile count **before** lazy
+source reads. `_install_prepared_edit` rechecks the three-span envelope,
+`tile_count * stride² * 4 * 3 <= 256 MiB`, with at most 128 tiles before
+constructing full RGBA8 adoption descriptors. Both
+`DrawingNativeTiles.adopt_external_edit` and `adopt_untracked_edit` check
+the same bound **before** converting `PackedByteArray` into Rust `Vec`.
+Six 2048px tiles reject, 64px signed small edits still commit and retain
+byte-exact history/Save/Open. Non-native historical edit production is
+unchanged; aggregate resident memory and general native ownership are not
+claimed. [Execution evidence](evidence/T-231-2026-11-22-direct-budget.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.
