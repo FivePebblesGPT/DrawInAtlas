@@ -214,13 +214,18 @@ func run() -> void:
 		int(store.call("stats").get("revision", -1)) == ahead + 1 and
 		int(doc.read_pixel(layer, -2, 50).value) == COLOR_A,
 		"native-ahead rejection preserves both owners and original pixel")
-	# No native owner is attached to historical direct-edit fixture: preserve
-	# its original pixel-map Undo/Redo semantics until broader T-148 cutover.
+	# T-230 also routes the first historical Undo through Rust. A previously
+	# unattached document must not publish a Godot-only pixel history revision.
 	var old_only: Dictionary = make_document()
 	var old_doc: DrawingDocument = old_only["doc"]
 	check(old_doc._native_raster_store == null and old_doc.undo().ok and
-		old_doc.redo().ok and old_doc._native_raster_store == null,
-		"never-native historical history remains independently replayable")
+		old_doc._native_raster_store != null,
+		"never-native historical Undo bootstraps Rust authority")
+	var newly_attached: Object = old_doc._native_raster_store
+	check(old_doc.redo().ok and old_doc._native_raster_store == newly_attached and
+		int(newly_attached.call("stats").get("revision", -1)) == old_doc.revision and
+		int(old_doc.read_pixel("history", -2, 50).value) == COLOR_A,
+		"historical Redo keeps one canonical native revision and hidden RGB")
 	external_timeline()
 	print("T156_LEGACY_NATIVE_RESULT checks=%d failures=%d" % [checks, failures])
 	quit(0 if failures == 0 else 1)

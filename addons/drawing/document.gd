@@ -1640,7 +1640,10 @@ func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
 	var result: DrawingResult
 	if delta.tile_stride > 0:
 		result = _replay_native_tile_delta(delta, undo_action)
-	elif _native_raster_store != null:
+	elif _native_raster_store != null or ClassDB.class_exists("DrawingNativeTiles"):
+		# Even a detached legacy/Atlas pixel event must acquire Rust ownership.
+		# Otherwise it advances Godot alone and the next native gesture has to
+		# invalidate the host timeline at a checked rebase boundary.
 		result = _replay_pixel_delta_native(delta, undo_action)
 	else:
 		result = _publish_edit(delta.layer_id, revision,

@@ -153,6 +153,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t159_signed_replay_publication_bounds.gd 2>&1 | tee /tmp/godot-t159-signed-replay.log
           python3 tools/check_godot_model_log.py /tmp/godot-t159-signed-replay.log --marker T159_SIGNED_REPLAY_PASSED || ci_fail_marker 'T159 native signed replay rejected'
           grep -Fqx 'T159_SIGNED_REPLAY_PASSED checks=39 failures=0' /tmp/godot-t159-signed-replay.log || ci_fail_marker 'T159 signed replay assertion count changed'
+          # T-230: even the first legacy-pixel Undo/Redo in a detached document
+          # must bootstrap Rust ownership before advancing the host timeline.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t230-pixel-bootstrap.log --marker T230_PIXEL_BOOTSTRAP_PASSED || ci_fail_marker 'T230 detached legacy pixel native bootstrap rejected'
+          grep -Fqx 'T230_PIXEL_BOOTSTRAP_PASSED checks=33 failures=0' /tmp/godot-t230-pixel-bootstrap.log || ci_fail_marker 'T230 detached pixel bootstrap assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log

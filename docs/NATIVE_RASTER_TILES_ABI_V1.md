@@ -318,12 +318,13 @@ This does not replace T-154 byte-checked Undo/Redo park/unpark or make
 GDScript text glyph rasterization a Rust operation. See
 [T-155 evidence](evidence/T-155-2026-11-16-reraster.md).
 
-## Historical pixel-map history replay after native attachment (T-156, 2026-11-16)
+## Historical pixel-map history replay and detached bootstrap (T-156/T-230)
 
 `DrawingDelta` events from pre-native ordinary raster work may carry only
 `before/after` pixel dictionaries (`tile_stride == 0`). When the document
-already has `DrawingNativeTiles`, `replay_delta` now converts those cold
-history events into bounded detached whole-tile RGBA8 images, then calls the
+has `DrawingNativeTiles` **or the GDExtension class is available to create
+one**, `replay_delta` converts those cold history events into bounded
+detached whole-tile RGBA8 images, then calls the
 **same** `_replay_native_tile_delta` and Rust `replay_detached_history` used
 by native snapshots. It never publishes a Godot-only raster revision while an
 attached Rust owner remains in sync; malformed/noncanonical signed pixel
@@ -336,10 +337,15 @@ invents new Rust Undo tokens outside the document/Atlas chronological owner.
 Detached native replay deliberately clears obsolete Rust tokens; an older
 pixel-map event remains a host-owned history snapshot. Its later Undo/Redo
 repeats the checked native replay, including when the next Hokusai event's
-Rust token has been invalidated. Without an attached native store, the
-historical direct-session pixel publisher remains outside this narrow bridge.
-General source producers, host history lifetime and final T-148 universal
-authority still require further integration. See [T-156 evidence](evidence/T-156-2026-11-16-legacy-pixel-native.md).
+Rust token has been invalidated. T-230 closes the **previously unattached**
+replay case: the preflighted native tile path creates a provisional native
+store and attaches it only on a successful revision. It does **not** convert
+the original per-pixel edit producer or serialize host history commands.
+When the native extension is intentionally unavailable the prior direct
+pixel replay remains in place until T-150. General source producers, host
+history lifetime and final T-148 universal authority still require further
+integration. See [T-156 evidence](evidence/T-156-2026-11-16-legacy-pixel-native.md)
+and [T-230 evidence](evidence/T-230-2026-11-22-detached-pixel-bootstrap.md).
 
 ## Native-owned text/raster history parking (T-154, 2026-11-16)
 
