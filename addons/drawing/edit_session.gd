@@ -788,9 +788,116 @@ func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 	return DrawingResult.success(_after.size())
 
 
+## Content deletion visits only occupied source pixels. Selection bounds can
+## span millions of empty tiles; the candidate budget protects dense clears,
+## not the (potentially enormous) rectangle surrounding sparse content.
+## Pending tiles are checked against the mask *before* lazy resolution.
 func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 		max_pixels: int = 1048576) -> DrawingResult:
-	return fill_rect(area, 0, selection, max_pixels)
+	if _closed:
+		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if area.size.x <= 0 or area.size.y <= 0 or max_pixels <= 0:
+		return DrawingResult.failure("REGION_LIMIT", "Clear region or pixel budget is invalid")
+	# _stage() accepts only safe local coordinates, including when the source
+	# contains no tiles. Check the whole region before staging anything.
+	var last_x: int = int(area.position.x) + int(area.size.x) - 1
+	var last_y: int = int(area.position.y) + int(area.size.y) - 1
+	if area.position.x <= -1073741824 or last_x >= 1073741824 \
+			or area.position.y <= -1073741824 or last_y >= 1073741824 \
+			or not DrawingDocument.TILES.document_anchor_in_range(
+				anchor_x + int(area.position.x), anchor_y + int(area.position.y)) \
+			or not DrawingDocument.TILES.document_anchor_in_range(
+				anchor_x + last_x, anchor_y + last_y):
+		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds safe pixel coordinates")
+	_materialize_hokusai_preview()
+	_materialize_brush_preview()
+	var old_before: Dictionary[String, int] = _before.duplicate()
+	var old_after: Dictionary[String, int] = _after.duplicate()
+	var stride: int = document.tile_stride
+	var count: int = 0
+	# A mixed session can have newly staged pixels in absent source tiles.
+	# Freeze those keys before traversing source tiles; _stage will update them.
+	var staged_keys: Array[String] = _after.keys()
+	for key: String in document.tile_keys(layer_id):
+		var parts: PackedStringArray = key.split(",")
+		var tile_x: int = int(parts[0]) * stride - anchor_x
+		var tile_y: int = int(parts[1]) * stride - anchor_y
+		var left: int = maxi(int(area.position.x), tile_x)
+		var top: int = maxi(int(area.position.y), tile_y)
+		var right: int = mini(last_x + 1, tile_x + stride)
+		var bottom: int = mini(last_y + 1, tile_y + stride)
+		if left >= right or top >= bottom:
+			continue
+		if selection != null and selection.enabled and not selection.inverted \
+				and (selection.bounds.position.x >= right or selection.bounds.end.x <= left \
+				or selection.bounds.position.y >= bottom or selection.bounds.end.y <= top):
+			continue
+		# A pending tile with no selected pixels must neither fetch nor fail,
+		# even if its lazy provider is corrupt or unavailable.
+		if selection != null and selection.enabled \
+				and document._pending_tiles.has(layer_id + ":" + key):
+			var authorized: bool = false
+			for y: int in range(top, bottom):
+				for x: int in range(left, right):
+					if selection.allows(Vector2i(x, y)):
+						authorized = true
+						break
+				if authorized:
+					break
+			if not authorized:
+				continue
+		var resolved: DrawingResult = document._resolve_chunk(layer_id, key)
+		if not resolved.ok:
+			return _rollback_sparse_clear(old_before, old_after, resolved)
+		var tile: DrawingRasterTile = resolved.value as DrawingRasterTile
+		if tile == null:
+			continue
+		# Packed native-projected RGBA8 is decoded once per occupied tile.
+		# Zero-alpha pixels with hidden RGB are nonzero and must be cleared.
+		var pixels: Dictionary[int, int] = tile.sparse_pixels()
+		for index: int in pixels:
+			var x: int = tile_x + index % stride
+			var y: int = tile_y + index / stride
+			if x < left or x >= right or y < top or y >= bottom:
+				continue
+			if selection != null and not selection.allows(Vector2i(x, y)):
+				continue
+			count += 1
+			if count > max_pixels:
+				return _rollback_sparse_clear(old_before, old_after,
+					DrawingResult.failure("REGION_LIMIT", "Clear exceeds occupied pixel budget"))
+			var staged: DrawingResult = _stage(x, y, 0, selection, false, false,
+				int(pixels[index]))
+			if not staged.ok:
+				return _rollback_sparse_clear(old_before, old_after, staged)
+	# Source traversal cannot see pixels introduced by this detached session.
+	# It already rewrote source-backed patches to zero above, so only nonzero
+	# values left in _after still require a second pass.
+	for key: String in staged_keys:
+		if not _after.has(key) or int(_after[key]) == 0:
+			continue
+		var coords: PackedStringArray = key.split(",")
+		var x: int = int(coords[0]) - anchor_x
+		var y: int = int(coords[1]) - anchor_y
+		if x < area.position.x or x > last_x or y < area.position.y or y > last_y \
+				or (selection != null and not selection.allows(Vector2i(x, y))):
+			continue
+		count += 1
+		if count > max_pixels:
+			return _rollback_sparse_clear(old_before, old_after,
+				DrawingResult.failure("REGION_LIMIT", "Clear exceeds occupied pixel budget"))
+		var staged: DrawingResult = _stage(x, y, 0, selection)
+		if not staged.ok:
+			return _rollback_sparse_clear(old_before, old_after, staged)
+	return DrawingResult.success(_after.size())
+
+
+func _rollback_sparse_clear(before: Dictionary[String, int],
+		after: Dictionary[String, int], failure: DrawingResult) -> DrawingResult:
+	_before = before
+	_after = after
+	_rebuild_preview_tiles()
+	return failure
 
 
 ## v1 native ABI: one opaque stroke handle, one packed input batch and one

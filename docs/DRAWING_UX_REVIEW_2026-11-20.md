@@ -4,7 +4,7 @@
 
 ## Observations
 
-- Basic painting now appears workable to the owner, but **“deleting the selection” takes a long time**. This may refer to removing selected pixels **or** clearing the selection mask; the exact command, duration and cause have not been verified. [T-221](Tickets/T-221.md) compares both real user actions before assuming `clear_rect`/commit is slow.
+- Basic painting now appears workable to the owner, but **“deleting the selection” takes a long time**. That was **untimed owner feedback**; later [T-221](Tickets/T-221.md) reproduced slow **Delete pixels** separately from fast Deselect, and [measured a sparse-clear fix](evidence/T-221-2026-11-22-selection-delete.md). Owner physical-hardware recheck remains open.
 - The dock still has too much chrome and inconsistent iconography. The visual layout/interaction rules below **supersede incompatible chrome requirements** in the older dock plan, but retain the one-group-floating-host design and existing transaction safety.
 - The first visual Brushes dock (T-184) exists, but the selector needs to be denser and provide more settings supported by the actual native libmypaint/Hokusai engine.
 
@@ -67,7 +67,7 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 
 ### Owner-directed execution order
 
-1. **T-221 — P0, Ready:** identify whether Delete or Deselect is slow and fix the measured stall first.
+1. **T-221 — P0, Done:** Delete pixels (not Deselect) was slow in software; sparse-clear fix tested. Owner hardware recheck remains in T-088.
 2. **T-222 — P0, Ready:** edge half-circle plus exact icon input semantics.
 3. **T-226 — P0, Ready:** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
 4. **T-223 — P0, Blocked until T-222:** unnamed group marker and whole-group drag.
@@ -83,8 +83,8 @@ This is the **next owner-directed UI/performance sprint queue**, ahead of option
 
 **Still In Progress or gated:** [T-083](Tickets/T-083.md) dock owner UX, [T-091](Tickets/T-091.md) physical floating-panel interaction, [T-092](Tickets/T-092.md) Colors/history UX, [T-088](Tickets/T-088.md) selection/native masks, [T-095](Tickets/T-095.md) physical Brush latency, and [T-059](Tickets/T-059.md) overall Drawing experience. The owner's request for changes explicitly **does not constitute approval** of the existing implementation.
 
-Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows portability [T-105](Tickets/T-105.md) and required hosted CI [T-106](Tickets/T-106.md) remain separate. This PR is **planning/documentation only**, not a code or benchmark fix.
+Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows portability [T-105](Tickets/T-105.md) and required hosted CI [T-106](Tickets/T-106.md) remain separate. This PR started as planning/documentation only; T-221 now provides a code fix and local benchmark evidence. The remaining UX tickets and owner gates are **not** approved by this implementation.
 
 ## Dependency-respecting order
 
-Use the owner-directed order above. Ready independent work: **T-221**, **T-222**, **T-226**, **T-225**, **T-227**; T-223 follows T-222, then T-224 follows T-223. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+Use the owner-directed order above. Completed **T-221**; remaining ready independent work: **T-222**, **T-226**, **T-225**, **T-227**; T-223 follows T-222, then T-224 follows T-223. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
