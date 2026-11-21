@@ -9,6 +9,7 @@ const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd"
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
+const DOCK_TOGGLE_SCRIPT: Script = preload("res://addons/drawing/dock_toggle.gd")
 const WORKSPACE_PREFERENCES: Script = preload("res://addons/drawing/workspace_preferences.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
@@ -72,6 +73,9 @@ var top_bar: HBoxContainer
 var inspector: ScrollContainer
 var dock_panels: VBoxContainer
 var dock_rail: VBoxContainer
+var dock_toggle: Button
+var dock_panel_menu: PopupMenu
+var _dock_menu_panel_id: String = ""
 var dock_stash: VBoxContainer
 var dock_flyout: PanelContainer
 var dock_flyout_tabs: HBoxContainer
@@ -92,6 +96,7 @@ var _drag_candidate_id: String = ""
 var _drag_candidate_position: Vector2 = Vector2.ZERO
 var _drag_pointer_position: Vector2 = Vector2.ZERO
 var _suppress_drag_release: bool = false
+var _drag_candidate_moved: bool = false
 var _cross_source: String = "" # Pointer source: right dock or a floating host.
 var _detach_preview: bool = false
 var _detach_hint: PanelContainer
@@ -310,6 +315,7 @@ func _build_interface() -> void:
 	dock_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dock_split.dragged.connect(_on_dock_split_dragged)
 	dock_split.resized.connect(_apply_saved_dock_geometry)
+	dock_split.resized.connect(_layout_dock_toggle)
 	root.add_child(dock_split)
 	var edit_region: HBoxContainer = HBoxContainer.new()
 	edit_region.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -378,6 +384,8 @@ func _build_interface() -> void:
 	inspector.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	inspector.follow_focus = true
 	dock_split.add_child(inspector)
+	inspector.resized.connect(_layout_dock_toggle)
+	inspector.item_rect_changed.connect(_layout_dock_toggle)
 	dock_layout = DOCK_LAYOUT_SCRIPT.new() as DrawingDockLayout
 	dock_layout.create_container("right")
 	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
@@ -397,6 +405,8 @@ func _build_interface() -> void:
 	dock_rail.visible = false
 	inspector.add_child(dock_rail)
 	_make_dock_flyout()
+	_make_dock_toggle()
+	_make_dock_panel_menu()
 	brush_panel = BRUSH_PANEL_SCRIPT.new() as DrawingBrushPanel
 	assert(dock_layout.register_panel("brushes"))
 	assert(dock_layout.attach_panel("brushes", "right", "brushes"))
@@ -715,21 +725,47 @@ func _dock_icon(panel_id: String) -> Texture2D:
 	return load("res://addons/drawing/icons/dock_panel.svg") as Texture2D
 
 
+## One edge overlay survives dock re-renders and is never placed inside the
+## scrolled dock contents. The draw script clips to a translucent semicircle.
+func _make_dock_toggle() -> void:
+	dock_toggle = DOCK_TOGGLE_SCRIPT.new() as Button
+	dock_toggle.name = "DockEdgeToggle"
+	dock_toggle.tooltip_text = "Minimize right dock to icon rail"
+	dock_toggle.pressed.connect(_toggle_dock)
+	add_child(dock_toggle)
+	call_deferred("_layout_dock_toggle")
+
+
+func _layout_dock_toggle() -> void:
+	if dock_toggle == null or inspector == null or not inspector.is_inside_tree():
+		return
+	var bounds: Rect2 = inspector.get_global_rect()
+	var extent: Vector2 = dock_toggle.size
+	# A small overlap makes the half-circle visually connect to the seam,
+	# without consuming a panel row or shifting the split/canvas geometry.
+	dock_toggle.global_position = Vector2(bounds.position.x - extent.x + 2.0,
+		bounds.position.y + minf(16.0, maxf(0.0, bounds.size.y - extent.y)))
+
+
+## One stable panel icon across expanded dock and minimized rail. Pointer
+## gestures use the same 7px drag threshold as the transactional dock planner.
 func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	var button: Button = Button.new()
 	button.name = ("Rail_" if rail_button else "Edge_") + panel_id
 	button.icon = _dock_icon(panel_id)
 	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(42, 42)
 	button.focus_mode = Control.FOCUS_ALL
-	button.tooltip_text = ("Open group flyout: " if rail_button else "Select panel: ") + panel_id.capitalize()
+	button.tooltip_text = ("Toggle group flyout: " if rail_button else "Select/collapse group: ") + panel_id.capitalize()
+	button.tooltip_text += "; right-click or Shift+F10 for menu; drag to arrange"
 	button.toggle_mode = true
+	var group: Dictionary = dock_layout.group_info(dock_layout.group_of(panel_id))
 	button.button_pressed = (dock_layout.container_info("right")["flyout_group"] == dock_layout.group_of(panel_id)
-		and dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id) if rail_button else (dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id)
+		and group["active"] == panel_id) if rail_button else (group["active"] == panel_id)
 	button.pressed.connect(_rail_panel_pressed.bind(panel_id) if rail_button else _expanded_panel_pressed.bind(panel_id))
 	button.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
-	button.tooltip_text += "; drag to reorder, split, or merge"
-	# Godot 4.8 exposes accessible Control labels on supported backends.
+	# Keyboard users can find both the panel name and current state.
 	for property: Dictionary in button.get_property_list():
 		if property["name"] == "accessibility_name":
 			button.set("accessibility_name", panel_id.capitalize() + " panel")
@@ -737,14 +773,105 @@ func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	return button
 
 
+func _ignore_dock_icon_activation() -> bool:
+	# Godot's Button.pressed can arrive before or after the workspace's mouse
+	# release. The moved flag survives until the next deferred frame, so a
+	# release that ended a drag can never turn into a collapse or flyout click.
+	return _drag_candidate_moved or _suppress_drag_release or dock_drag.is_dragging()
+
+
 func _expanded_panel_pressed(panel_id: String) -> void:
-	if dock_layout.select_panel(panel_id):
-		_render_dock("edge:" + panel_id)
+	if _ignore_dock_icon_activation():
+		return
+	var group_id: String = dock_layout.group_of(panel_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if group.is_empty():
+		return
+	if group["active"] == panel_id and not bool(group["collapsed"]):
+		if dock_layout.set_group_collapsed(group_id, true):
+			_render_dock("edge:" + panel_id)
+		return
+	# A collapsed active tab expands; an inactive tab selects and expands.
+	if group["active"] != panel_id:
+		dock_layout.select_panel(panel_id)
+	if bool(group["collapsed"]):
+		dock_layout.set_group_collapsed(group_id, false)
+	_render_dock("edge:" + panel_id)
 
 
 func _rail_panel_pressed(panel_id: String) -> void:
+	if _ignore_dock_icon_activation():
+		return
 	if dock_layout.activate_from_rail("right", panel_id):
 		_render_dock("rail:" + panel_id)
+
+
+## The owner-specified three-dots action is on RMB, not a permanently
+## occupying toolbar button; menu actions target the clicked panel (including
+## inactive tabs), never the group's currently active panel by accident.
+func _make_dock_panel_menu() -> void:
+	dock_panel_menu = PopupMenu.new()
+	dock_panel_menu.name = "DockPanelContextMenu"
+	dock_panel_menu.add_item("Move panel left", 0)
+	dock_panel_menu.add_item("Move panel right", 1)
+	dock_panel_menu.add_separator()
+	dock_panel_menu.add_item("Split panel into group", 2)
+	dock_panel_menu.add_item("Float this panel", 3)
+	dock_panel_menu.id_pressed.connect(_dock_panel_menu_action)
+	add_child(dock_panel_menu)
+
+
+func _show_dock_panel_menu(panel_id: String, point: Vector2) -> void:
+	var group_id: String = dock_layout.group_of(panel_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if group.is_empty() or dock_layout.owner_of(panel_id) != "right":
+		return
+	_dock_menu_panel_id = panel_id
+	var index: int = group["panels"].find(panel_id)
+	dock_panel_menu.set_item_disabled(dock_panel_menu.get_item_index(0), index <= 0)
+	dock_panel_menu.set_item_disabled(dock_panel_menu.get_item_index(1), index >= group["panels"].size() - 1)
+	dock_panel_menu.set_item_disabled(dock_panel_menu.get_item_index(2), group["panels"].size() <= 1)
+	# PopupMenu is a Window: position is a screen coordinate, not a child of
+	# the scrolled tab strip. The menu clamps to the visible desktop itself.
+	dock_panel_menu.position = Vector2i(point.round())
+	dock_panel_menu.popup()
+
+
+func _dock_panel_menu_action(action_id: int) -> void:
+	var panel_id: String = _dock_menu_panel_id
+	var group_id: String = dock_layout.group_of(panel_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if group.is_empty() or dock_layout.owner_of(panel_id) != "right":
+		return
+	var index: int = group["panels"].find(panel_id)
+	var target: Dictionary = {}
+	match action_id:
+		0:
+			if index > 0:
+				target = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index - 1}
+		1:
+			if index + 1 < group["panels"].size():
+				target = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index + 2}
+		2:
+			if group["panels"].size() > 1:
+				target = {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": _dock_group_position(group_id) + 1}
+		3:
+			_float_source(DrawingDockDrag.PANEL, panel_id)
+			return
+	if not target.is_empty():
+		_dock_apply(DrawingDockDrag.PANEL, panel_id, target,
+			"rail:" + panel_id if bool(dock_layout.container_info("right")["minimized"]) else "edge:" + panel_id)
+
+
+func _focused_dock_panel() -> String:
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	for panel_id: String in dock_tab_buttons:
+		if dock_tab_buttons[panel_id] == focused:
+			return panel_id
+	for panel_id: String in dock_rail_buttons:
+		if dock_rail_buttons[panel_id] == focused:
+			return panel_id
+	return ""
 
 
 func _group_collapse_pressed(group_id: String) -> void:
@@ -800,14 +927,6 @@ func _render_dock(focus_key: String = "") -> void:
 	dock_group_frames.clear()
 	dock_group_handles.clear()
 	if not minimized:
-		var minimize: Button = Button.new()
-		minimize.name = "MinimizeDock"
-		minimize.text = "‹  Minimize panels"
-		minimize.tooltip_text = "Minimize right dock to icon rail"
-		minimize.custom_minimum_size.y = 40
-		minimize.focus_mode = Control.FOCUS_ALL
-		minimize.pressed.connect(_toggle_dock)
-		dock_panels.add_child(minimize)
 		for group: Dictionary in info["groups"]:
 			var visible_members: Array[String] = []
 			for panel_id: String in group["panels"]:
@@ -879,14 +998,6 @@ func _render_dock(focus_key: String = "") -> void:
 					panel_view.reparent(frame)
 			frame.add_child(HSeparator.new())
 	else:
-		var expand: Button = Button.new()
-		expand.name = "ExpandDock"
-		expand.text = "»"
-		expand.custom_minimum_size = Vector2(44, 44)
-		expand.tooltip_text = "Expand right dock"
-		expand.focus_mode = Control.FOCUS_ALL
-		expand.pressed.connect(_toggle_dock)
-		dock_rail.add_child(expand)
 		for entry: Dictionary in dock_layout.rail_icons("right"):
 			if bool(entry["separator_before"]):
 				var separator: HSeparator = HSeparator.new()
@@ -923,6 +1034,11 @@ func _render_dock(focus_key: String = "") -> void:
 	dock_panels.visible = not minimized
 	dock_rail.visible = minimized
 	dock_flyout.visible = minimized and not flyout_group_id.is_empty()
+	if dock_toggle != null:
+		dock_toggle.set("minimized", minimized)
+		dock_toggle.tooltip_text = "Expand right dock (also in Window menu)" if minimized else "Minimize right dock to icon rail (also in Window menu)"
+		dock_toggle.queue_redraw()
+	_layout_dock_toggle()
 	_layout_dock_flyout()
 	_render_floating_hosts()
 	if not focus_key.is_empty():
@@ -1056,10 +1172,16 @@ func _make_dock_hint() -> void:
 
 
 func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_drag_candidate_kind = kind
-		_drag_candidate_id = source_id
-		_drag_candidate_position = event.global_position
+	if event is InputEventMouseButton:
+		var button: InputEventMouseButton = event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_RIGHT and button.pressed and kind == DrawingDockDrag.PANEL:
+			_show_dock_panel_menu(source_id, button.global_position)
+			get_viewport().set_input_as_handled()
+		elif button.button_index == MOUSE_BUTTON_LEFT and button.pressed:
+			_drag_candidate_kind = kind
+			_drag_candidate_id = source_id
+			_drag_candidate_moved = false
+			_drag_candidate_position = button.global_position
 
 
 ## Godot 4.8 beta's TabBar close icon is drawn by the theme, but forwarded
@@ -1098,17 +1220,31 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
 			return
+		# Shift+F10 / Menu offers the same per-panel context menu for keyboard
+		# focus without changing the active tab or its collapse state.
+		if event.keycode == KEY_MENU or (event.keycode == KEY_F10 and event.shift_pressed):
+			var menu_panel: String = _focused_dock_panel()
+			if not menu_panel.is_empty():
+				var control: Control = get_viewport().gui_get_focus_owner()
+				_show_dock_panel_menu(menu_panel, control.get_global_rect().get_center())
+				get_viewport().set_input_as_handled()
+				return
 		if _dock_keyboard_command(event):
 			get_viewport().set_input_as_handled()
 		return
-	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty():
+	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty() and bool(event.button_mask & MOUSE_BUTTON_MASK_LEFT):
 		_drag_pointer_position = event.global_position
-		if not dock_drag.is_dragging() and event.global_position.distance_to(_drag_candidate_position) >= 7.0:
-			begin_cross_drag("right", _drag_candidate_kind, _drag_candidate_id)
+		if event.global_position.distance_to(_drag_candidate_position) >= 7.0:
+			_drag_candidate_moved = true
+			if not dock_drag.is_dragging():
+				begin_cross_drag("right", _drag_candidate_kind, _drag_candidate_id)
 		if dock_drag.is_dragging() and _cross_source == "right":
 			_preview_cross_drop(event.global_position)
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		# Deferred reset accommodates either GUI-signal/input ordering on the
+		# release frame; a dragged icon must not toggle its collapsed state.
+		call_deferred("_reset_dock_pointer_gesture")
 		if _suppress_drag_release:
 			_suppress_drag_release = false
 			get_viewport().set_input_as_handled()
@@ -1119,6 +1255,10 @@ func _input(event: InputEvent) -> void:
 		else:
 			_drag_candidate_id = ""
 			_drag_candidate_kind = ""
+
+
+func _reset_dock_pointer_gesture() -> void:
+	_drag_candidate_moved = false
 
 
 func _notification(what: int) -> void:
@@ -3089,6 +3229,7 @@ func _toggle_dock() -> void:
 		dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if not minimized else _expanded_dock_width))
 		if minimized:
 			call_deferred("_restore_expanded_scroll")
+		_layout_dock_toggle()
 		_schedule_layout_save()
 
 
@@ -3761,6 +3902,7 @@ func _apply_saved_dock_geometry() -> void:
 	var usable: int = maxi(160, roundi(dock_split.size.x) - 180)
 	var width: int = 48 if minimized else mini(_expanded_dock_width, usable)
 	dock_split.split_offset = maxi(0, int(dock_split.size.x) - width)
+	_layout_dock_toggle()
 	if not minimized:
 		inspector.scroll_vertical = _expanded_scroll
 

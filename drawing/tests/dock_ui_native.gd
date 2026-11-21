@@ -76,7 +76,7 @@ func run() -> void:
 	var initial_revision: int = app.current_document().revision
 	var initial_dirty: bool = app.current_document().is_dirty()
 	check(layout.rail_icons("right").size() == 3, "default singleton groups register three attached panels")
-	check(app.dock_panels.get_child_count() == 4 and app.dock_panels.get_child(3).name == "Group_history",
+	check(app.dock_panels.get_child_count() == 3 and app.dock_panels.get_child(2).name == "Group_history",
 		"expanded dock displays independently collapsible ordered groups")
 	var colors: Button = app.dock_header_buttons["colors"]
 	var layers: Button = app.dock_header_buttons["layers"]
@@ -123,15 +123,15 @@ func run() -> void:
 	check((app.dock_header_buttons["history"] as Button).has_focus() and dock_scroll.scroll_vertical > 0,
 		"focus scrolls the History chevron into view")
 	var old_scroll: int = dock_scroll.scroll_vertical
-	var minimize: Button = app.dock_panels.get_node("MinimizeDock") as Button
+	var minimize: Button = app.dock_toggle
 	minimize.grab_focus()
 	await frames(8)
 	await click(minimize)
 	check(bool(layout.container_info("right")["minimized"]) and app.dock_rail.visible and
 		app.inspector.visible and app.inspector.size.x <= 62,
 		"real pointer minimizes the dock into a narrow, persistent rail")
-	check(app.dock_rail_buttons.size() == 4 and app.dock_rail.get_child_count() == 7,
-		"rail contains four panel icons, two group separators and an expand control")
+	check(app.dock_rail_buttons.size() == 4 and app.dock_rail.get_child_count() == 6 and
+		app.dock_toggle.visible, "rail contains four panel icons, two separators and persistent edge toggle")
 	for panel_id: String in ["colors", "swatches", "layers", "history"]:
 		var icon_button: Button = app.dock_rail_buttons[panel_id]
 		check(icon_button.icon != null and icon_button.text.is_empty() and icon_button.focus_mode == Control.FOCUS_ALL and
@@ -195,7 +195,7 @@ func run() -> void:
 	await press_enter()
 	check(layout.container_info("right")["flyout_group"] == "history" and flyout.visible,
 		"Enter on focused rail icon switches group flyout")
-	await click(app.dock_rail.get_node("ExpandDock") as Button)
+	await click(app.dock_toggle)
 	await frames(5)
 	check(not bool(layout.container_info("right")["minimized"]) and
 		bool(layout.group_info("colors")["collapsed"]) and layout.group_info("colors")["active"] == "swatches",

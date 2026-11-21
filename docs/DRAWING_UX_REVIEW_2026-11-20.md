@@ -68,9 +68,9 @@ Keep visual preset samples, active-selection focus and four native Hokusai prese
 ### Owner-directed execution order
 
 1. **T-221 — P0, Done:** Delete pixels (not Deselect) was slow in software; sparse-clear fix tested. Owner hardware recheck remains in T-088.
-2. **T-222 — P0, Ready:** edge half-circle plus exact icon input semantics.
+2. **T-222 — P0, Done (2026-11-22):** edge half-circle plus exact icon input semantics; [native/Atlas evidence](evidence/T-222-2026-11-22-dock-interactions.md), T-083 owner review still pending.
 3. **T-226 — P0, Ready:** FG/BG + recents + embedded scrolling native picker; independent of marker implementation.
-4. **T-223 — P0, Blocked until T-222:** unnamed group marker and whole-group drag.
+4. **T-223 — P0, Ready after T-222:** unnamed group marker and whole-group drag remain to implement.
 5. **T-224 — P0, Blocked until T-223:** icon-to-icon grouping.
 6. **T-225 — P1, Ready:** floating icon tab consistency.
 7. **T-227 — P1, Ready:** compact brush selector and additional proven libmypaint controls.
@@ -87,4 +87,4 @@ Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows po
 
 ## Dependency-respecting order
 
-Use the owner-directed order above. Completed **T-221**; remaining ready independent work: **T-222**, **T-226**, **T-225**, **T-227**; T-223 follows T-222, then T-224 follows T-223. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+Use the owner-directed order above. Completed **T-221 and T-222**; next owner priority is **T-226**. T-223 is now Ready (T-222 prerequisite complete), T-224 still waits on T-223; T-225 and T-227 remain independent Ready work. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
