@@ -153,6 +153,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t159_signed_replay_publication_bounds.gd 2>&1 | tee /tmp/godot-t159-signed-replay.log
           python3 tools/check_godot_model_log.py /tmp/godot-t159-signed-replay.log --marker T159_SIGNED_REPLAY_PASSED || ci_fail_marker 'T159 native signed replay rejected'
           grep -Fqx 'T159_SIGNED_REPLAY_PASSED checks=39 failures=0' /tmp/godot-t159-signed-replay.log || ci_fail_marker 'T159 signed replay assertion count changed'
+          # T-229 keeps history-replay transfer cost stride-sensitive before
+          # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t229-history-budget.log --marker T229_HISTORY_BUDGET_PASSED || ci_fail_marker 'T229 native history transfer budget rejected'
+          grep -Fqx 'T229_HISTORY_BUDGET_PASSED checks=18 failures=0' /tmp/godot-t229-history-budget.log || ci_fail_marker 'T229 history budget assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t211_native_ci_contract.py' -v || ci_fail_marker 'T211 required-native CI source contract rejected'
           ci_finish
       - name: Verify T-086 source-space dirty-display tile invalidation

@@ -181,6 +181,16 @@ impl TileStore {
             .filter(|len| *len > 0 && *len <= MAX_TILE_BYTES)
             .ok_or("Invalid or unconfigured tile stride")
     }
+    // Bound the entire history transfer before Godot buffers are copied into
+    // Rust vectors. Resident canonical source plus both snapshots can be live
+    // simultaneously; this is deliberately conservative for detached replay.
+    fn history_transfer_within_budget(&self, count: usize) -> bool {
+        self.stride_bytes()
+            .ok()
+            .and_then(|tile_bytes| tile_bytes.checked_mul(count)?.checked_mul(3))
+            .is_some_and(|bytes| bytes <= MAX_STORED_BYTES)
+    }
+
     fn allowed(&self, layer: &str) -> bool {
         self.editable_layers.get(layer).copied().unwrap_or(false)
     }
@@ -1383,6 +1393,9 @@ impl DrawingNativeTiles {
         if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
             return err("Invalid detached history revision or tile count");
         }
+        if !self.store.history_transfer_within_budget(tiles.len()) {
+            return err("Native history transfer exceeds tile memory budget");
+        }
         let layer = layer.to_string();
         let mut changes = Vec::with_capacity(tiles.len());
         for entry in tiles.iter_shared() {
@@ -1445,6 +1458,9 @@ impl DrawingNativeTiles {
             || tiles.len() > MAX_ACTIVE_TILES
         {
             return err("Stale revision or invalid native history tile count");
+        }
+        if !self.store.history_transfer_within_budget(tiles.len()) {
+            return err("Native history transfer exceeds tile memory budget");
         }
         let layer = layer.to_string();
         let mut entries = Vec::with_capacity(tiles.len());
@@ -1944,6 +1960,25 @@ impl DrawingNativeTiles {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn history_transfer_checks_stride_sensitive_budget_before_buffer_copies() {
+        let wide = TileStore {
+            stride: 2048,
+            ..TileStore::default()
+        };
+        assert!(wide.history_transfer_within_budget(5));
+        assert!(!wide.history_transfer_within_budget(6));
+        assert!(!wide.history_transfer_within_budget(128));
+        let normal = TileStore {
+            stride: 256,
+            ..TileStore::default()
+        };
+        assert!(normal.history_transfer_within_budget(128));
+        assert!(!normal.history_transfer_within_budget(usize::MAX));
+        let missing = TileStore::default();
+        assert!(!missing.history_transfer_within_budget(1));
+    }
+
     fn initialized(stride: usize) -> TileStore {
         let mut store = TileStore {
             stride,

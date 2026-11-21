@@ -5,6 +5,8 @@ extends RefCounted
 
 const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 const ROOT_ID: String = "root"
+## Native store cap; three full spans per touched tile cover source and replay buffers.
+const MAX_NATIVE_HISTORY_TRANSFER_BYTES: int = 256 * 1024 * 1024
 
 var id: String = ""
 var tile_stride: int = 256
@@ -996,6 +998,10 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if undo_action else delta.after_tiles
 	if expected.is_empty() or expected.size() != replacement.size() or expected.size() > 128:
 		return DrawingResult.failure("HISTORY_TARGET", "Invalid native history tile count")
+	# Reject an oversized history envelope *before* lazy source resolution and
+	# whole-tile snapshots. The same conservative bound applies in the Rust ABI.
+	if expected.size() * tile_stride * tile_stride * 4 * 3 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+		return DrawingResult.failure("HISTORY_TARGET", "Native history exceeds tile memory budget")
 	var base_revision: int = revision
 	var source_node: DrawingLayerNode = _nodes[delta.layer_id]
 	var detached: Dictionary[String, DrawingRasterTile] = {}
@@ -1570,7 +1576,7 @@ func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> Drawi
 	# Bound the detached bytes prepared in Godot *before* entering Rust. Three
 	# full spans per tile cover source, replacement and temporary native replay.
 	var bytes_per_tile: int = tile_stride * tile_stride * 4
-	var max_tiles: int = mini(128, (256 * 1024 * 1024) / (3 * bytes_per_tile))
+	var max_tiles: int = mini(128, MAX_NATIVE_HISTORY_TRANSFER_BYTES / (3 * bytes_per_tile))
 	for coordinate: String in replacement:
 		if not expected.has(coordinate):
 			return DrawingResult.failure("HISTORY_TARGET", "Legacy pixel history is incomplete")
