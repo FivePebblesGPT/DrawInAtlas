@@ -182,12 +182,14 @@ func run() -> void:
 	var dock_wheel: InputEventMouseButton = InputEventMouseButton.new()
 	dock_wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
 	dock_wheel.pressed = true
-	dock_wheel.position = app.inspector.global_position + Vector2(24, 18)
+	# T-251 made the top-left 34px gutter a real dock toggle hit area.
+	# Scroll from the same empty gutter *below* the toggle instead.
+	dock_wheel.position = app.inspector.global_position + Vector2(16, 90)
 	dock_wheel.global_position = dock_wheel.position
 	root.push_input(dock_wheel, true)
 	await frames(5)
 	check(app.inspector.scroll_vertical > 0,
-		"native wheel over dock header scrolls the stacked panels vertically")
+		"native wheel over dock gutter below toggle scrolls stacked panels")
 	app.tool_buttons["Brush"].grab_focus()
 	app.inspector.scroll_vertical = 0
 	await frames(4)

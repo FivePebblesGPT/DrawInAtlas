@@ -131,17 +131,27 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
         self.assertIn("res://tests/topbar_overflow_smoke.gd", workflow)
         self.assertIn("--marker T090_OVERFLOW_PASSED", workflow)
 
+    def test_cold_native_workflow_builds_required_extension_before_import(self) -> None:
+        workflow = (ROOT / ".github/workflows/godot-native-t090-workspace.yml").read_text()
+        self.assertIn("make build TOOLCHAIN=system", workflow)
+        self.assertIn("toolchain: 1.99.1", workflow)
+        self.assertNotIn("python3 tools/build_drawing_app.py --in-place", workflow)
+        self.assertLess(workflow.index("make build TOOLCHAIN=system"),
+                        workflow.index("res://tests/responsive_workspace_native.gd"))
+        self.assertIn("--audio-driver Dummy", workflow)
+        self.assertIn("tools/check_native_t090_log.py", workflow)
+
     def test_native_log_verifier_fails_closed(self) -> None:
-        good = "T090_NATIVE: 77 checks; 0 failed\nT090_NATIVE_PASSED: 77 checks\n"
+        good = "T090_NATIVE: 83 checks; 0 failed\nT090_NATIVE_PASSED: 83 checks\n"
         self.assertTrue(verify(good)[0])
         self.assertTrue(verify(good + "ERROR: Texture with GL ID of 24: leaked 1364 bytes.\n")[0])
         for bad in (
-            good.replace("77 checks", "76 checks"),
+            good.replace("83 checks", "82 checks"),
             good.replace("0 failed", "1 failed"),
             good + "SCRIPT ERROR: broken\n",
             "ERROR: runtime fail\n" + good,
             good + "ERROR: unknown fatal\n",
-            "T090_NATIVE_PASSED: 77 checks\n",
+            "T090_NATIVE_PASSED: 83 checks\n",
         ):
             with self.subTest(bad=bad[:40]):
                 self.assertFalse(verify(bad)[0])

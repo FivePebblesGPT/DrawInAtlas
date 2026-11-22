@@ -180,6 +180,8 @@ func run() -> void:
 		"File and Object stay distinct and outside Window")
 	await shortcut(KEY_N)
 	check(app.tabs.size() == 2 and app.active_tab == 1, "native Ctrl+N opens a second document")
+	# Width is a workspace preference; the harness must not depend on a prior run.
+	app.width_spin.value = 3.0
 	await key(KEY_BRACKETRIGHT)
 	check(app.width_spin.value == 4.0, "] increases brush size without document edits")
 	await key(KEY_BRACKETLEFT)
@@ -256,6 +258,27 @@ func run() -> void:
 		check(more_popup.is_item_checked(grid_more_id) == app.canvas.show_grid,
 			"native View grid checkmark updates without rebuilding popup")
 		app._toggle_grid()
+	root.size = Vector2i(1280, 760)
+	app.size = Vector2(1280, 760)
+	await frames(10)
+	# The current dock toggle uses a real rail slot when minimized and a
+	# dock-owned overlay when expanded. Resizing or collapsing it must not
+	# reintroduce T-090's black gutters or steal the top toolbar viewport.
+	for minimized: bool in [true, false]:
+		app._toggle_dock()
+		await frames(10)
+		check(bool(app.dock_layout.container_info("right")["minimized"]) == minimized,
+			"T-090 resize verifies intended dock state: %s" % minimized)
+		check(app.top_bar.get_global_rect().end.x <= app.size.x + 2.0 and
+			app.canvas.get_global_rect().end.x <= app.size.x + 2.0 and
+			app.canvas.size.x >= 125.0 and app.dock_toggle.is_visible_in_tree(),
+			"dock toggle preserves full-width chrome and usable canvas: %s" % minimized)
+		var boundary_image: Image = root.get_texture().get_image()
+		check(boundary_image != null and not boundary_image.is_empty() and
+			boundary_image.get_pixel(2, int(boundary_image.get_height() / 2)).r > 0.1 and
+			boundary_image.get_pixel(boundary_image.get_width() - 3,
+				int(boundary_image.get_height() / 2)).r > 0.1,
+			"dock transition keeps both native viewport edges filled: %s" % minimized)
 	root.size = Vector2i(1280, 760)
 	app.size = Vector2(1280, 760)
 	await frames(10)

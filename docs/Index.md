@@ -1,5 +1,8 @@
 # Ticket Kanban Index
 
+**T-090 engineering Done (2026-11-22):** current Godot 4.8 beta3 software-X11 responsive workspace 83/83, headless More 32/32, repaired T-063 dock-gutter scroll 75/75 and T-120 native menu regression; local cold `make build` imports both native consumers. The T-090 on-demand workflow now builds required Rust before import. [Evidence](evidence/T-090-2026-11-22-current-native.md). T-059/T-250 hardware UX approval stays open.
+
+
 **T-087 engineering Done (2026-11-22):** Current Hokusai-only standalone
 model 82/82, real-X11 framebuffer 104/104 and new Atlas-hosted frame/grid
 15/15 verify independently visual image bounds, transparent checkerboard,
@@ -224,7 +227,7 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-086 · Incremental viewport cache and zoom](Tickets/T-086.md) | In Progress | Native dirty-tile display + physical dense zoom acceptance | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-102](Tickets/T-102.md), [T-103](Tickets/T-103.md), [T-149](Tickets/T-149.md) |
 | [T-087 · Visible image edge, transparency and grid](Tickets/T-087.md) | Done | [Current standalone + Atlas native evidence](evidence/T-087-2026-11-22-current-native.md); physical/owner visual approval stays T-059/T-250/T-056 | [T-053](Tickets/T-053.md) |
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | T-221 sparse Delete fix Done; physical recheck, T-149 native mask and Move/clipboard acceptance remain | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-149](Tickets/T-149.md), [T-221](Tickets/T-221.md) |
-| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | In Progress | Completed scope; see ticket evidence | [T-063](Tickets/T-063.md) |
+| [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | [Current beta3 native/More/resize and cold-build evidence](evidence/T-090-2026-11-22-current-native.md); owner T-059/T-250 UX gate remains separate | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | T-225 icon tabs Done; one-group host/edge resize physical validation remain | [T-082](Tickets/T-082.md), [T-225](Tickets/T-225.md) |
 | [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | T-226 new scrollable inline picker supersedes old popup layout; History and color semantics retained | [T-063](Tickets/T-063.md), [T-226](Tickets/T-226.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | Required-native hosted CI and independent owner evidence | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md), [T-106](Tickets/T-106.md), [T-107](Tickets/T-107.md), [T-150](Tickets/T-150.md) |
