@@ -990,6 +990,14 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 				or _pending_tiles.has(layer_id + ":" + key) \
 				or _nodes[layer_id].tiles.get(key) != validated_sources[key]:
 			return DrawingResult.failure("STALE_PIXEL", "Native publication source or descriptor changed")
+		# A later source callback may mutate an earlier tile in place while
+		# preserving object identity and document revision. The previously
+		# snapshotted original must still match before the Rust commit.
+		var resident: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
+		var resident_bytes: PackedByteArray = resident.to_rgba8() if resident != null \
+			else PackedByteArray()
+		if resident_bytes != before_bytes[key]:
+			return DrawingResult.failure("STALE_PIXEL", "Native publication source bytes changed")
 	var result: DrawingResult = DrawingResult.success(null, native_revision)
 	result.regions = regions
 	result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,

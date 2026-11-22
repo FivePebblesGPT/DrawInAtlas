@@ -571,3 +571,17 @@ unmodified tiles remain allowed. The rejection is before Rust's atomic
 external-edit adoption and does not claim to roll back side effects of a
 malicious/misbehaving provider itself. See T-235's fail-first evidence. This
 is not universal native raster production or detached host history ownership.
+
+### Brush publication source-byte reentrancy (T-238, 2026-11-22)
+
+`DrawingDocument._publish_native_tile_edit` already validates/fixes the
+complete output descriptor set (T-234), but later lazy provider callbacks
+may still mutate an *earlier* resident `DrawingRasterTile` in place without
+changing its reference or the document revision. After all providers return,
+the document now compares each live resident tile's full canonical RGBA8
+with the `before_bytes` already retained for its reversible delta, prior to
+returning a prepared publication. This catches transparent hidden-RGB changes
+and needs no second retained full-tile snapshot. An absent source remains an
+empty byte snapshot. A rejected `STALE_PIXEL` result never publishes the
+requested Brush pixels or consumes Rust history; a provider's own side effects
+are not rolled back. See [T-238 evidence](evidence/T-238-2026-11-22-brush-source-reentrancy.md).

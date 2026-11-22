@@ -107,6 +107,17 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn(f"--marker {marker}", workflow)
         self.assertIn(f"{marker} checks=40 failures=0", workflow)
 
+    def test_required_fast_step_rechecks_brush_source_bytes_after_lazy_callbacks(self) -> None:
+        workflow = FAST.read_text()
+        name = "t238_brush_source_reentrancy"
+        marker = "T238_BRUSH_SOURCE_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=18 failures=0", workflow)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)
