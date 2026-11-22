@@ -59,7 +59,7 @@ class ViewportNativeCiContracts(unittest.TestCase):
         make = MAKEFILE.read_text(encoding="utf-8")
         self.assertIn("SHELL := /bin/bash", make)
         section = make.split("test-viewport-cache: import-drawing import-atlas", 1)[1]
-        section = section.split("\n# T-251:", 1)[0]
+        section = section.split("\n\n", 1)[0]
         self.assertEqual(section.count("set -euo pipefail"), 3)
         self.assertIn("check_t086_logs.py viewport", section)
         self.assertIn("check_t086_logs.py cold", section)

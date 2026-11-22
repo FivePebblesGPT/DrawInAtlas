@@ -13,7 +13,7 @@ from check_native_t088_log import verify_log
 class NativeFloatingSelectionLogTests(unittest.TestCase):
     """Reject an early/incomplete success marker or hidden script error."""
 
-    SUMMARY = ("T088_NATIVE: 51 checks; 0 failed "
+    SUMMARY = ("T088_NATIVE: 52 checks; 0 failed "
                "(Godot 4.8-beta2 (official), display X11, 1010x740, zoom 50/100/200/400%)")
 
     def test_valid_complete_witness(self) -> None:
@@ -27,7 +27,7 @@ class NativeFloatingSelectionLogTests(unittest.TestCase):
         self.assertEqual(verify_log(text), ([], 1))
 
     def test_under_count_and_failures(self) -> None:
-        self.assertTrue(verify_log(self.SUMMARY.replace("51 checks", "50 checks")
+        self.assertTrue(verify_log(self.SUMMARY.replace("52 checks", "51 checks")
                                    + "\nT088_NATIVE_PASSED")[0])
         self.assertTrue(verify_log(self.SUMMARY.replace("0 failed", "1 failed")
                                    + "\nT088_NATIVE_PASSED")[0])

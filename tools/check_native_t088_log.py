@@ -36,7 +36,7 @@ def verify_log(content: str) -> tuple[list[str], int]:
     if len(summaries) != 1 or len(markers) != 1:
         failures.append("expected exactly one native summary and one success marker")
     elif (summaries[0][0] >= markers[0]
-          or int(summaries[0][1].group(1)) < 51
+          or int(summaries[0][1].group(1)) < 52
           or int(summaries[0][1].group(2)) != 0):
         failures.append("too few assertions, nonzero failures, or invalid marker order")
     marker_position = markers[0] if markers else len(lines)

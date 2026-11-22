@@ -15,13 +15,18 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1 and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
       - name: Install software-display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import canonical standalone Drawing package
+      - name: Build required native extension and import Drawing/Atlas consumers
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+          # No generated native .so is tracked; consumers must import after registration.
+          make build TOOLCHAIN=system
       - name: Verify native selection mask, live move, keyboard clipboard and exact pixels
         run: |
           set -euo pipefail
@@ -97,6 +102,14 @@ jobs:
             --script res://tests/t253_selection_delete_native.gd \
             2>&1 | tee /tmp/t253-native.log
           python3 tools/check_godot_model_log.py /tmp/t253-native.log --marker T253_NATIVE_PASSED
+      - name: Verify Atlas-owned dense Delete and global native Undo/Redo
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s godot --headless \
+            --audio-driver Dummy --path . --script res://tests/t253_atlas_dense_delete.gd \
+            2>&1 | tee /tmp/t253-atlas.log
+          grep -Fxq 'T253_ATLAS_PASSED' /tmp/t253-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t253-atlas.log --marker T253_ATLAS_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -112,5 +125,6 @@ jobs:
             /tmp/t144-outline-native.log
             /tmp/t145-outline-native.log
             /tmp/t253-native.log
+            /tmp/t253-atlas.log
             /tmp/t253-screenshots/
           if-no-files-found: warn
