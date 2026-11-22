@@ -23,7 +23,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-color-interruption test-live-stroke check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-color-interruption test-live-stroke check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -127,6 +127,11 @@ test-floating-focus: import-drawing import-atlas
 test-floating-release: import-drawing import-atlas
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t259_floating_lost_release_native.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path . --script res://tests/t259_atlas_floating_lost_release_native.gd
+
+# T-264: lost mouse-up recovery across expanded, minimized and flyout dock drags.
+test-dock-release: import-drawing import-atlas
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t264_dock_lost_release_native.gd
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path . --script res://tests/t264_atlas_dock_lost_release_native.gd
 
 # T-261: interrupted ColorPicker pointer gestures never commit phantom recents.
 test-color-interruption: import-drawing import-atlas

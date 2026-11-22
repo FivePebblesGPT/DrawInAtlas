@@ -1,5 +1,7 @@
 # Ticket Kanban Index
 
+**T-264 engineering Done (2026-11-22):** [Right-dock mouse-up loss recovery](evidence/T-264-2026-11-22-dock-release.md) cancels stale icon/group/rail/flyout transfers when unpressed motion reports that the left button is gone; native standalone X11 and embedded Atlas tests preserve panel ownership and document history. **T-091 physical Windows/Linux, T-083 dock approval and T-250 owner review remain open.**
+
 **T-263 engineering Done (2026-11-22):** [Explicit Bash for the T-262 live-stroke Make target](evidence/T-263-2026-11-22-make-bash-shell.md) removes dependence on `/bin/sh` supporting `pipefail`; a fail-first restricted-shell control, process-exit negative cases and the real native 81/81 + X11 144/144 Make run pass. **T-085/T-094/T-180 and T-250 remain open.**
 
 **T-262 engineering Done (2026-11-22):** [T-085 required-native on-demand CI repair](evidence/T-262-2026-11-22-live-stroke-ci.md) pins Rust 1.99.1, builds/imports both Drawing and Atlas, runs 81/81 headless and 144/144 X11 held-preview checks with strict nine-burst coverage. `make test-live-stroke` and fail-first Python contracts pass locally. **T-085 physical p95, T-094 hosted CI and owner gates remain open.**
@@ -322,6 +324,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | --- | --- | --- | --- |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
+| [T-264 · Recover lost mouse-up from right-dock icon/group gestures](Tickets/T-264.md) | Done | **P1 engineering:** [standalone X11 and Atlas pointer fail-first/rollback evidence](evidence/T-264-2026-11-22-dock-release.md); T-091/T-083/T-250 gates open | [T-251](Tickets/T-251.md), [T-254](Tickets/T-254.md), [T-259](Tickets/T-259.md) |
 | [T-263 · Make held-stroke test fail-closed on older POSIX shells](Tickets/T-263.md) | Done | **P1 engineering:** [restricted-shell fail-first, real Make process controls and 81/144 native evidence](evidence/T-263-2026-11-22-make-bash-shell.md); T-085/T-094/T-250 gates unchanged | [T-262](Tickets/T-262.md) |
 | [T-262 · Build native Brush for T-085 held-preview CI and enforce full log coverage](Tickets/T-262.md) | Done | **P1 engineering:** [native build, strict 81/144 checks, nine 840-sample replays and CI contracts](evidence/T-262-2026-11-22-live-stroke-ci.md); T-085/T-094 hosted/physical gates open | [T-204](Tickets/T-204.md), [T-153](Tickets/T-153.md) |
 | [T-261 · Cancel interrupted ColorPicker previews and recover fresh presses](Tickets/T-261.md) | Done | **P1 engineering:** [fail-first standalone/Atlas X11 evidence](evidence/T-261-2026-11-22-color-interruption.md); T-250/T-059 owner review unchanged | [T-252](Tickets/T-252.md) |

@@ -1312,6 +1312,9 @@ func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> voi
 				_show_dock_group_menu(source_id, button.global_position)
 			get_viewport().set_input_as_handled()
 		elif button.button_index == MOUSE_BUTTON_LEFT and button.pressed:
+			# The OS may have dropped the last release. A fresh press begins
+			# a new independent icon/group gesture, not the old canceled one.
+			_suppress_drag_release = false
 			_drag_candidate_kind = kind
 			_drag_candidate_id = source_id
 			_drag_candidate_moved = false
@@ -1373,6 +1376,17 @@ func _input(event: InputEvent) -> void:
 		if _dock_keyboard_command(event):
 			get_viewport().set_input_as_handled()
 		return
+	if event is InputEventMouseMotion and not bool(event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Docked icons, group markers, rail and flyout tabs share this source.
+		# A motion without the held button proves mouse-up was missed, even
+		# when neither window nor application lost focus. Abandon the preview
+		# and fence a possible late release before it can detach the source.
+		if not _drag_candidate_id.is_empty() or (_cross_source == "right" and dock_drag.is_dragging()):
+			_drag_candidate_moved = true
+			_suppress_drag_release = true
+			_cancel_cross_drop(true)
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty() and bool(event.button_mask & MOUSE_BUTTON_MASK_LEFT):
 		_drag_pointer_position = event.global_position
 		if event.global_position.distance_to(_drag_candidate_position) >= 7.0:
