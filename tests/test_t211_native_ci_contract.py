@@ -206,6 +206,20 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn("_committing_drawing", history)
         self.assertIn("_remember_revisions(command)", history)
 
+    def test_required_fast_step_reserves_non_drawing_atlas_commands(self) -> None:
+        workflow = FAST.read_text()
+        name = "t246_atlas_command_reservation"
+        marker = "T246_ATLAS_COMMAND_PASSED"
+        source = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(source.is_file())
+        self.assertIn(marker, source.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=206 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("_executing_command", history)
+        self.assertIn("_timeline_reserved()", history)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

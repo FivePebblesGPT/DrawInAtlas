@@ -239,6 +239,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t245_atlas_commit_reentrancy.gd 2>&1 | tee /tmp/godot-t245-atlas-commit.log
           python3 tools/check_godot_model_log.py /tmp/godot-t245-atlas-commit.log --marker T245_ATLAS_COMMIT_PASSED || ci_fail_marker 'T245 Atlas command reentrancy rejected'
           grep -Fqx 'T245_ATLAS_COMMIT_PASSED checks=126 failures=0' /tmp/godot-t245-atlas-commit.log || ci_fail_marker 'T245 Atlas reentrancy assertion count changed'
+          # T-246 reserves ordinary Atlas command application across host
+          # callbacks, context capture, transfer/rebind and changed observers.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t246_atlas_command_reservation.gd 2>&1 | tee /tmp/godot-t246-atlas-command.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t246-atlas-command.log --marker T246_ATLAS_COMMAND_PASSED || ci_fail_marker 'T246 Atlas command reservation rejected'
+          grep -Fqx 'T246_ATLAS_COMMAND_PASSED checks=206 failures=0' /tmp/godot-t246-atlas-command.log || ci_fail_marker 'T246 Atlas command assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
