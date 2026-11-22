@@ -147,6 +147,9 @@ var _color_edit_original: Color = Color.TRANSPARENT
 var _color_edit_pointer_down: bool = false
 var _color_edit_text: Control
 var _color_edit_ignore_until_release: bool = false
+## After a lost release or OS focus loss, discard stale picker signals until
+## the next deliberate press, which must be able to start a fresh gesture.
+var _color_edit_recover_on_press: bool = false
 var _color_write_suspended: bool = false
 var preferences_dialog: AcceptDialog
 var open_dialog: FileDialog
@@ -1404,6 +1407,12 @@ func _notification(what: int) -> void:
 		_request_window_quit()
 		return
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if _color_edit_pending:
+			if _color_edit_pointer_down:
+				_cancel_interrupted_color_pointer()
+			else:
+				# Typed/keyboard edits have no held pointer to abandon.
+				_finish_color_edit()
 		if dock_drag != null and (dock_drag.is_dragging() or not _drag_candidate_id.is_empty()):
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
 			_cancel_cross_drop(true)
@@ -2305,6 +2314,14 @@ func _is_color_input_focus(control: Control) -> bool:
 
 func _end_cancelled_color_pointer() -> void:
 	_color_edit_ignore_until_release = false
+	_color_edit_recover_on_press = false
+
+
+func _cancel_interrupted_color_pointer() -> void:
+	# The mouse release might never arrive. Roll back the live preview, keep
+	# rejecting stale native ColorPicker events, but let a fresh press recover.
+	_cancel_color_edit()
+	_color_edit_recover_on_press = true
 
 
 func _track_color_input(event: InputEvent) -> void:
@@ -2313,6 +2330,8 @@ func _track_color_input(event: InputEvent) -> void:
 		if button.button_index != MOUSE_BUTTON_LEFT:
 			return
 		if button.pressed:
+			if _color_edit_recover_on_press:
+				_end_cancelled_color_pointer()
 			if _color_edit_pending and not _color_edit_pointer_down:
 				_finish_color_edit()
 			if _color_input_target(button.position):
@@ -2324,6 +2343,10 @@ func _track_color_input(event: InputEvent) -> void:
 			# Native ColorPicker changes its value during GUI dispatch, after
 			# _input(). Finish after that last release-frame color_changed.
 			call_deferred("_finish_color_edit")
+	elif event is InputEventMouseMotion:
+		var motion: InputEventMouseMotion = event as InputEventMouseMotion
+		if _color_edit_pointer_down and not bool(motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+			_cancel_interrupted_color_pointer()
 	elif event is InputEventKey:
 		var key: InputEventKey = event as InputEventKey
 		var focused: Control = get_viewport().gui_get_focus_owner()
