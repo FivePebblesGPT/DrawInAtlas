@@ -1,5 +1,7 @@
 # Ticket Kanban Index
 
+**T-260 engineering Done (2026-11-22):** [Floating-dock current-width regression](evidence/T-260-2026-11-22-dock-width-regression.md) updates T-081 native and Python assertions for the T-251 226px expanded width, 34px toggle gutter and 48px minimized rail; the strict X11 witness now passes 71/71. The clean-build on-demand workflow pins Rust and builds both native consumers. **T-250, T-083 and T-091 owner/physical gates remain open.**
+
 **T-259 engineering Done (2026-11-22):** [Missed mouse-up without focus loss](evidence/T-259-2026-11-22-lost-release.md) no longer leaves floating move/resize or tab drag alive after a motion reports the left button released. Fail-first 13/28 standalone and 4/10 Atlas regressions; post-fix 28/28 and 10/10, with neighboring floating suites passing. **T-091 physical review and T-250/T-083 owner gates remain open.**
 
 **T-258 Done (2026-11-22):** [Floating gesture focus-loss rollback](evidence/T-258-2026-11-22-focus-loss.md) cancels temporary move/resize and tab transfers if the OS eats a mouse-up. Fail-first standalone 13/25 and Atlas 4/9 failures, then native 30/30 and Atlas 9/9 pass; ten neighboring suites are green. **T-091 physical focus/window-manager review and T-250/T-083 gates stay open.**
@@ -420,6 +422,7 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | [T-078 · Panel architecture and state](Tickets/T-078.md) | Done | Completed scope; see ticket evidence | [T-063](Tickets/T-063.md) |
 | [T-079 · Collapsible dock and grouped icon rail](Tickets/T-079.md) | Done | Completed scope; see ticket evidence | [T-078](Tickets/T-078.md) |
 | [T-080 · Tab and group reordering](Tickets/T-080.md) | Done | Completed scope; see ticket evidence | [T-079](Tickets/T-079.md) |
+| [T-260 · Restore floating-dock width regression after toggle redesign](Tickets/T-260.md) | Done | **P1 engineering:** [71 native checks and clean-native workflow](evidence/T-260-2026-11-22-dock-width-regression.md); T-250/T-083/T-091 review unchanged | [T-081](Tickets/T-081.md), [T-251](Tickets/T-251.md) |
 | [T-081 · Floating tabbed panel containers](Tickets/T-081.md) | Done | Completed scope; see ticket evidence | [T-080](Tickets/T-080.md) |
 | [T-082 · Cross-container panel and group docking](Tickets/T-082.md) | Done | Completed scope; see ticket evidence | [T-081](Tickets/T-081.md) |
 | [T-084 · Scout PhotoCraft live-paint pipeline](Tickets/T-084.md) | Done | Historical completed evidence; legacy implementation no longer policy | [T-052](Tickets/T-052.md) |

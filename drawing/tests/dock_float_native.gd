@@ -120,7 +120,36 @@ func run() -> void:
 	check(layout.rail_icons("right").size() == 5, "initial dock has five panel icons")
 	var original_canvas_width: float = app.canvas.size.x
 	var original_dock_floor: float = app.inspector.get_combined_minimum_size().x
-	check(original_dock_floor >= 190.0, "expanded dock reserves compact panel width")
+	check(original_dock_floor >= 226.0, "expanded dock reserves compact panel width")
+	check(is_equal_approx(app.inspector.custom_minimum_size.x, 226.0),
+		"T260 expanded inspector minimum includes 34px toggle gutter")
+	check(app.dock_panel_gutter.get_theme_constant("margin_left") == 34,
+		"T260 gutter reserves the expanded toggle hit width")
+	var expanded_toggle_rect: Rect2 = app.dock_toggle.get_global_rect()
+	check(app.inspector.get_global_rect().has_point(expanded_toggle_rect.get_center()),
+		"T260 expanded toggle belongs inside the dock")
+	await click(app.dock_toggle)
+	await frames(6)
+	check(bool(layout.container_info("right")["minimized"]), "T260 mouse click minimizes dock")
+	check(is_equal_approx(app.inspector.custom_minimum_size.x, 48.0),
+		"T260 minimized rail retains 48px minimum")
+	check(app.dock_toggle.get_parent() == app.dock_toggle_slot and
+		app.dock_rail.get_child(0) == app.dock_toggle_slot,
+		"T260 minimized toggle occupies first VBox rail slot")
+	var first_rail_button: Button = app.dock_rail_buttons.values()[0] as Button
+	check(first_rail_button.get_global_rect().position.y >= app.dock_toggle_slot.get_global_rect().end.y - 1.0,
+		"T260 first minimized panel icon follows reserved toggle slot")
+	check(app.inspector.get_global_rect().has_point(app.dock_toggle.get_global_rect().get_center()),
+		"T260 minimized toggle remains on dock")
+	await click(app.dock_toggle)
+	await frames(6)
+	check(not bool(layout.container_info("right")["minimized"]), "T260 mouse click expands dock")
+	check(app.dock_toggle.get_global_rect().position.distance_to(expanded_toggle_rect.position) <= 1.0,
+		"T260 toggle retains exact dock-relative anchor across collapse")
+	check(is_equal_approx(app.inspector.custom_minimum_size.x, 226.0),
+		"T260 expansion restores exact inspector minimum")
+	check(is_equal_approx(app.canvas.size.x, original_canvas_width),
+		"T260 full dock cycle preserves original canvas width")
 	var first_id: String = app.float_group("colors")
 	await frames(9)
 	check(not first_id.is_empty(), "float group programmatically")
@@ -138,6 +167,8 @@ func run() -> void:
 	check(is_equal_approx(original_canvas_width, app.canvas.size.x), "floating overlay leaves split canvas width unchanged")
 	check(is_equal_approx(original_dock_floor, app.inspector.get_combined_minimum_size().x),
 		"removing Colors cannot shrink expanded dock minimum width")
+	check(is_equal_approx(app.inspector.custom_minimum_size.x, 226.0),
+		"T260 floating a group keeps the expanded 226px width floor")
 	await click(host.tab_buttons["swatches"] as Button)
 	check(layout.group_info("colors")["active"] == "swatches", "native tab click selects alternative panel")
 	check(app.dock_views["swatches"].get_parent() == host.group_frames["colors"] and app.dock_views["colors"].get_parent() == app.dock_stash,

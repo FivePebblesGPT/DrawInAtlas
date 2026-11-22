@@ -15,15 +15,17 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
       - name: Install X11 software renderer
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
       - name: Verify T-081 evidence contracts
         run: python3 -m unittest discover -s tests -p 'test_t081_float_native.py' -v
-      - name: Stage canonical standalone Drawing app and import resources
-        run: |
-          set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+      - name: Build native extension and import both Drawing and Atlas
+        run: make build TOOLCHAIN=system
       - name: Exercise real pointer, group ownership and stable canvas width
         run: |
           set -euo pipefail

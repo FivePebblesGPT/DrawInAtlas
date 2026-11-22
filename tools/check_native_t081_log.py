@@ -12,7 +12,7 @@ from pathlib import Path
 
 SUMMARY = re.compile(r"T081_FLOAT_NATIVE: (\d+) checks; (\d+) failed")
 MARKER = "T081_FLOAT_NATIVE_PASSED"
-MINIMUM_CHECKS = 58
+MINIMUM_CHECKS = 71
 KNOWN_POST_EXIT = (
     re.compile(r"ERROR: Texture with GL ID of \d+: leaked \d+ bytes\."),
     re.compile(r"ERROR: \d+ RID allocations of type '[^']+' were leaked at exit\."),
