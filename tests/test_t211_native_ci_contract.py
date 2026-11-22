@@ -176,6 +176,22 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn(f"{marker} checks=40 failures=0", workflow)
         self.assertIn("has_active_edit", (ROOT / "addons/drawing/document.gd").read_text())
 
+    def test_required_fast_step_reserves_pending_script_history_owner(self) -> None:
+        workflow = FAST.read_text()
+        for project, name, marker, count in (
+            ("drawing", "t244_pending_session_history_handoff", "T244_PENDING_SESSION_PASSED", 50),
+            (".", "t244_atlas_pending_session_history", "T244_ATLAS_PENDING_PASSED", 18),
+        ):
+            source_dir = "drawing/tests" if project == "drawing" else "tests"
+            source_path = ROOT / source_dir / f"{name}.gd"
+            self.assertTrue(source_path.is_file())
+            self.assertIn(marker, source_path.read_text())
+            self.assertIn(f"--path {project} --script res://tests/{name}.gd", workflow)
+            self.assertIn(f"--marker {marker}", workflow)
+            self.assertIn(f"{marker} checks={count} failures=0", workflow)
+        self.assertIn("_register_edit_session", (ROOT / "addons/drawing/edit_session.gd").read_text())
+        self.assertIn("WeakRef", (ROOT / "addons/drawing/document.gd").read_text())
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

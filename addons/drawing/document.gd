@@ -58,6 +58,10 @@ var _saved_untracked_revision: int = 0
 ## history in one checked rebase before the next native brush transaction.
 var _native_raster_store: Object
 var _native_source_identities: Dictionary[String, Variant] = {}
+## A GDScript-only EditSession can stage a command before Rust has begun an
+## edit. Keep only weak handles: abandoned sessions must not pin the document
+## or permanently prevent an otherwise pristine host/local history handoff.
+var _open_edit_sessions: Array[WeakRef] = []
 ## Reentrant lazy providers must never resolve the same key recursively.
 var _resolving_chunks: Dictionary[String, bool] = {}
 
@@ -1495,11 +1499,32 @@ func display_changes_since(old_revision: int) -> Dictionary:
 	return {"full": false, "regions": regions}
 
 
+## Both document.begin_edit() and direct DrawingEditSession constructors
+## register their pending commands here, before any pixels or Rust edits exist.
+func _register_edit_session(session: DrawingEditSession) -> void:
+	_has_pending_edit_sessions()
+	_open_edit_sessions.append(weakref(session))
+
+
+## An open script session holds a command-owner reservation even if it has
+## not yet staged a pixel or attached Rust. Closed and freed sessions do not.
+func _has_pending_edit_sessions() -> bool:
+	var live: Array[WeakRef] = []
+	for holder: WeakRef in _open_edit_sessions:
+		var session: DrawingEditSession = holder.get_ref() as DrawingEditSession
+		if session != null and not session._closed:
+			live.append(holder)
+	_open_edit_sessions = live
+	return not live.is_empty()
+
+
 ## A host must select external ownership *before* it begins committing edits.
 ## Switching a document with existing local entries would silently split history.
 func set_external_history(enabled: bool) -> DrawingResult:
 	if enabled == external_history:
 		return DrawingResult.success()
+	if _has_pending_edit_sessions():
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot switch history owner during an edit session")
 	# A native gesture may already have staged tiles without committing a
 	# document revision. Its eventual command owner must not change mid-edit.
 	if _native_raster_store != null and (not _native_raster_store.has_method("has_active_edit")

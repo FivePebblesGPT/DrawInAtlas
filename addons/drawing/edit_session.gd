@@ -201,6 +201,10 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 	view_transform = transform
 	anchor_x = origin_x
 	anchor_y = origin_y
+	# A script-only gesture must reserve its history owner even when created
+	# directly rather than through DrawingDocument.begin_edit(). The document
+	# holds only a weak handle and releases closed/abandoned sessions.
+	document._register_edit_session(self)
 	var size: int = document.tile_stride
 	if (size & (size - 1)) == 0:
 		_stage_tile_shift = 0
