@@ -149,9 +149,9 @@ func run() -> void:
 	else:
 		check(false, "rejected inputs cannot corrupt the document before valid controls")
 
-	# This sub-ticket guards already-native-owned documents, not the future
-	# T-150 Legacy retirement. Keep the previous >2^53 integer-only direct
-	# API fixture working until that backend is deliberately removed.
+	# Historical direct pixel publication is still supported before native
+	# attachment. T-230 now requires *all* pixel-history replay to cross the
+	# signed Rust projection boundary, so an out-of-range Undo must fail closed.
 	var legacy: DrawingDocument = DrawingDocument.new("t160-legacy-64bit", STRIDE)
 	var legacy_layer: String = str(legacy.create_layer(DrawingLayerNode.RASTER, "Old").value)
 	var old_far: String = "9007199254740993,-9007199254740993"
@@ -161,10 +161,11 @@ func run() -> void:
 	check(old_commit.ok and int(legacy.read_pixel(legacy_layer,
 		9007199254740993, -9007199254740993).value) == HIDDEN,
 		"pre-native signed 64-bit direct pixel fixture remains unchanged")
-	check(legacy.undo().ok and legacy.redo().ok and
+	check(not legacy.undo().ok and legacy.history_position() == 1 and
+		legacy._native_raster_store == null and
 		int(legacy.read_pixel(legacy_layer,
 		9007199254740993, -9007199254740993).value) == HIDDEN,
-		"pre-native 64-bit direct history still replays")
+		"out-of-projection historical Undo fails closed without native attachment")
 
 	if failures == 0:
 		print("T160_DIRECT_BOUNDS_PASSED checks=%d failures=0" % checks)

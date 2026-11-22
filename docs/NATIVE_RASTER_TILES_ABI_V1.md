@@ -47,6 +47,22 @@ byte-exact history/Save/Open. Non-native historical edit production is
 unchanged; aggregate resident memory and general native ownership are not
 claimed. [Execution evidence](evidence/T-231-2026-11-22-direct-budget.md).
 
+**First direct tile-local edit bootstrap (T-232, 2026-11-22):** When the
+Rust class is available but the document has no attached native store,
+`_publish_tile_edit` preflights the same bound and safe signed projection
+*before* resolving pending sources. After the source-identity validation,
+`_install_prepared_edit` configures a **provisional** `DrawingNativeTiles`
+store at the live document revision and imports only touched original tile
+bytes. Its `adopt_external_edit` (or `adopt_untracked_edit`) must succeed before
+the store is attached to the `DrawingDocument`. A failed preflight, source
+import or Rust adoption cannot install a partial native owner or any Godot
+projection. Successful recorded edits produce the same full-tile
+`DrawingDelta` with native token as existing attached edits; untracked
+edits never invent an Undo token. Public `request_chunk` produces a *copy*,
+not a valid session-owned source identity. The older global-pixel
+`_publish_edit` path still deliberately retains native-absent production;
+T-148 and T-149 remain open. [T-232 evidence](evidence/T-232-2026-11-22-tile-bootstrap.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.

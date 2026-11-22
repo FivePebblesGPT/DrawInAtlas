@@ -783,7 +783,9 @@ func _publish_tile_edit(layer_id: String, expected: int,
 	if patches.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
 	# Fail before resolving a single pending/lazy source or copying full tiles.
-	if _native_raster_store != null and not _native_direct_transfer_within_budget(patches.size()):
+	var native_tile_publisher: bool = _native_raster_store != null \
+		or ClassDB.class_exists("DrawingNativeTiles")
+	if native_tile_publisher and not _native_direct_transfer_within_budget(patches.size()):
 		return DrawingResult.failure("NATIVE_TILES", "Direct tile edit exceeds native transfer budget")
 
 	var detached: Dictionary[String, DrawingRasterTile] = {}
@@ -799,11 +801,10 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		var tile_y: int = int(components[1])
 		if tile_key != "%d,%d" % [tile_x, tile_y]:
 			return DrawingResult.failure("COORD", "Noncanonical storage tile coordinate")
-		# When Rust owns this document, direct/older tile sessions must obey
-		# the same projection as native publication. Keep pre-native historical
-		# signed-64-bit fixtures intact until the Legacy backend is retired.
-		# Validate before tile_x * stride or any lazy source callback.
-		if _native_raster_store != null \
+		# Even the first tile-local edit must obey the Rust projection when
+		# native support is installed. Validate before signed multiplication
+		# or any lazy source callback; the pixel-map cutover is separate.
+		if native_tile_publisher \
 				and not TILES.tile_coordinates_in_projection_range(tile_x, tile_y, tile_stride):
 			return DrawingResult.failure("COORD", "Storage tile outside safe signed projection bounds")
 		if not session_sources.has(tile_key):
@@ -867,7 +868,7 @@ func _publish_tile_edit(layer_id: String, expected: int,
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, true, session_sources)
+		detached, bounds, record_history, true, session_sources, true, true)
 
 
 ## Publish detached whole-tile snapshots from a native brush transaction.
@@ -1237,7 +1238,8 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		bounds: Dictionary[String, Array], record_history: bool,
 		owned_history_maps: bool = false,
 		sources: Dictionary[String, Variant] = {},
-		track_unrecorded: bool = true) -> DrawingResult:
+		track_unrecorded: bool = true,
+		bootstrap_native: bool = false) -> DrawingResult:
 	# All source resolution must have finished before the native commit. Do not
 	# call a lazy provider after Rust accepts an external tile transaction.
 	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id) \
@@ -1255,10 +1257,19 @@ func _install_prepared_edit(layer_id: String, expected: int,
 	# Once Rust owns this document, even a non-historical direct raster edit
 	# must advance its canonical tiles in the same revision. Untracked edits
 	# invalidate native Undo tokens; they never invent a history event.
-	# The last preflight above proved an attached store is at exactly the
-	# document revision. Only a genuinely native-absent document uses the
-	# historical GDScript-only projection until T-150 retires that backend.
-	var adopt: bool = _native_raster_store != null
+	# First tile-local edits may attach a provisional native owner. It is never
+	# published to the document unless the Rust adoption succeeds; failed
+	# imports or edits leave canonical authority and history unchanged. Older
+	# direct pixel-map producers retain their separate cutover under T-148.
+	var native_store: Object = _native_raster_store
+	var provisional_store: bool = false
+	if native_store == null and bootstrap_native and ClassDB.class_exists("DrawingNativeTiles"):
+		native_store = ClassDB.instantiate("DrawingNativeTiles")
+		if native_store == null or int(native_store.call("tile_abi_version")) != 1 \
+				or not native_store.call("configure", tile_stride, expected):
+			return DrawingResult.failure("NATIVE_TILES", "Native tile bootstrap rejected")
+		provisional_store = true
+	var adopt: bool = native_store != null
 	var originals: Dictionary[String, PackedByteArray] = {}
 	var replacements: Dictionary[String, PackedByteArray] = {}
 	var descriptors: Array[Dictionary] = []
@@ -1271,9 +1282,10 @@ func _install_prepared_edit(layer_id: String, expected: int,
 					or key != "%d,%d" % [int(parts[0]), int(parts[1])]:
 				return DrawingResult.failure("COORD", "Invalid native external tile key")
 			var source: DrawingRasterTile = sources[key] as DrawingRasterTile
-			var has_native: bool = bool(_native_raster_store.call("has_source", layer_id,
+			var has_native: bool = bool(native_store.call("has_source", layer_id,
 				int(parts[0]), int(parts[1]), expected))
-			if has_native and not _native_source_matches(layer_id, key, source):
+			if has_native and not provisional_store \
+					and not _native_source_matches(layer_id, key, source):
 				return DrawingResult.failure("STALE_PIXEL", "External tile lost native source identity")
 			var from_bytes: PackedByteArray = source.to_rgba8() if source != null else PackedByteArray()
 			var to_bytes: PackedByteArray = detached[key].to_rgba8()
@@ -1286,17 +1298,29 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		# validation that could reject the paired Godot projection.
 		result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
 			originals, replacements)
-		if not _native_raster_store.call("set_layer_editable", layer_id, true):
+		if not native_store.call("set_layer_editable", layer_id, true):
 			return DrawingResult.failure("NATIVE_TILES", "Native raster layer rejected")
+		if provisional_store:
+			# A previously loaded or unmodified tile already has source bytes in
+			# Godot. The fresh Rust store must authorize those *exact* originals
+			# before adopting their replacements; no live store is mutated here.
+			for descriptor: Dictionary in descriptors:
+				if not native_store.call("import_source", layer_id,
+						int(descriptor["tile_x"]), int(descriptor["tile_y"]),
+						expected, descriptor["before"]):
+					return DrawingResult.failure("NATIVE_TILES", "Native bootstrap source rejected")
 		# The call is failure-atomic on the Rust side. The document projection
 		# then installs only detached tiles, with no fallible source lookups.
 		var native_method: String = "adopt_external_edit" if record_history else "adopt_untracked_edit"
-		var accepted: Dictionary = _native_raster_store.call(native_method,
+		var accepted: Dictionary = native_store.call(native_method,
 			layer_id, expected, descriptors)
 		if not bool(accepted.get("ok", false)) or int(accepted.get("revision", -1)) != expected + 1:
 			return DrawingResult.failure("NATIVE_TILES", str(accepted.get("error", "Native adoption failed")))
 		if record_history:
 			result.delta.native_history_token = int(accepted.get("history_token", 0))
+		if provisional_store:
+			_native_raster_store = native_store
+			_native_source_identities.clear()
 	else:
 		result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
 			else DrawingDelta.new(layer_id, before, after)

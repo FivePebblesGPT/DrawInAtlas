@@ -163,6 +163,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t231_direct_native_transfer_budget.gd 2>&1 | tee /tmp/godot-t231-direct-budget.log
           python3 tools/check_godot_model_log.py /tmp/godot-t231-direct-budget.log --marker T231_DIRECT_BUDGET_PASSED || ci_fail_marker 'T231 native direct transfer budget rejected'
           grep -Fqx 'T231_DIRECT_BUDGET_PASSED checks=24 failures=0' /tmp/godot-t231-direct-budget.log || ci_fail_marker 'T231 direct transfer assertion count changed'
+          # T-232 gives the first tile-local non-Brush edit an atomic Rust
+          # owner, preserving hidden RGB, host history, and failed-bootstrap rollback.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t232_tile_native_bootstrap.gd 2>&1 | tee /tmp/godot-t232-tile-bootstrap.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t232-tile-bootstrap.log --marker T232_TILE_BOOTSTRAP_PASSED || ci_fail_marker 'T232 first tile-local native ownership rejected'
+          grep -Fqx 'T232_TILE_BOOTSTRAP_PASSED checks=34 failures=0' /tmp/godot-t232-tile-bootstrap.log || ci_fail_marker 'T232 tile-local native bootstrap assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
