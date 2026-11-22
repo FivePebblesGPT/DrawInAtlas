@@ -17,11 +17,20 @@ jobs:
           use-dotnet: false
       - name: Install software-display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import standalone Drawing package
+      - name: Build mandatory native extension and import both consumers
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+          # Standalone and Atlas must use the same compiled canonical package.
+          make build TOOLCHAIN=system
+      - name: Verify standalone image-frame model
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/image_frame_smoke.gd \
+            2>&1 | tee /tmp/t087-model.log
+          grep -Fq 'T087_MODEL: 82 checks; 0 failed' /tmp/t087-model.log
+          grep -q 'T087_MODEL_PASSED' /tmp/t087-model.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T087_MODEL_FAILED:' /tmp/t087-model.log; then exit 1; fi
       - name: Verify image bounds, 16px checker, grid alignment and native snapped pointer
         run: |
           set -euo pipefail
@@ -31,10 +40,22 @@ jobs:
           grep -Fq 'T087_NATIVE: 104 checks; 0 failed' /tmp/t087-native.log
           grep -q 'T087_NATIVE_PASSED' /tmp/t087-native.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T087_NATIVE_FAILED:' /tmp/t087-native.log; then exit 1; fi
+      - name: Verify Atlas-hosted image guide and unbounded source
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+            --audio-driver Dummy --path . --script res://tests/t087_atlas_image_frame_native.gd \
+            2>&1 | tee /tmp/t087-atlas.log
+          grep -Fq 'T087_ATLAS: 15 checks; 0 failures' /tmp/t087-atlas.log
+          grep -q 'T087_ATLAS_PASSED' /tmp/t087-atlas.log
+          if grep -E 'SCRIPT ERROR:|^ERROR:|T087_ATLAS_FAILED:' /tmp/t087-atlas.log; then exit 1; fi
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t087-xvfb-image-frame-grid
-          path: /tmp/t087-native.log
+          path: |
+            /tmp/t087-model.log
+            /tmp/t087-native.log
+            /tmp/t087-atlas.log
           if-no-files-found: warn
