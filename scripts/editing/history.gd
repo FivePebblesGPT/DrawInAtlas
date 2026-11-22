@@ -23,6 +23,8 @@ var _replaying: bool = false
 var _committing_drawing: bool = false
 ## Reserve other synchronous host commands across context callbacks, apply and signals.
 var _executing_command: bool = false
+## Synchronous history notifications are observable, not a second command window.
+var _notifying_changed: bool = false
 var _contexts_before: Array[DrawingHistoryContext] = []
 var _contexts_after: Array[DrawingHistoryContext] = []
 ## Expected live revisions for every Drawing document touched by this timeline.
@@ -52,7 +54,14 @@ func _init(campaign: AtlasCampaign = null) -> void:
 
 
 func _timeline_reserved() -> bool:
-	return _committing_drawing or _executing_command
+	return _committing_drawing or _executing_command or _notifying_changed
+
+
+func _emit_changed() -> void:
+	var previous: bool = _notifying_changed
+	_notifying_changed = true
+	changed.emit()
+	_notifying_changed = previous
 
 
 func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
@@ -73,7 +82,7 @@ func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
 	_saved_state = 0 if saved else -1
 	_external_revision = 0
 	_saved_external_revision = 0
-	changed.emit()
+	_emit_changed()
 
 
 ## Applying a command is transactional: invalid commands do not mutate history.
@@ -93,7 +102,7 @@ func execute(command: AtlasEditCommand) -> bool:
 	if command is AtlasAssetRebind:
 		# Save As creates a durable B that survives undoing only its binding.
 		_external_revision += 1
-		changed.emit()
+		_emit_changed()
 	_executing_command = false
 	return true
 
@@ -149,7 +158,7 @@ func execute_asset_rebind(command: AtlasAssetRebind) -> bool:
 	_append_applied(command, command.before_context, command.after_context, true)
 	# Saved B is independently durable. Undo binding never clears this dirty bit.
 	_external_revision += 1
-	changed.emit()
+	_emit_changed()
 	_executing_command = false
 	return true
 
@@ -236,7 +245,7 @@ func _append_applied(command: AtlasEditCommand, before: DrawingHistoryContext,
 		_states.append(_next_state)
 	else:
 		_states.append(_states[_cursor - 1])
-	changed.emit()
+	_emit_changed()
 
 
 func undo() -> bool:
@@ -251,7 +260,7 @@ func undo() -> bool:
 	_cursor -= 1
 	_restore(_contexts_before[_cursor], command)
 	_replaying = false
-	changed.emit()
+	_emit_changed()
 	return true
 
 
@@ -267,7 +276,7 @@ func redo() -> bool:
 	_restore(_contexts_after[_cursor], command)
 	_cursor += 1
 	_replaying = false
-	changed.emit()
+	_emit_changed()
 	return true
 
 
@@ -307,7 +316,7 @@ func mark_saved() -> void:
 		return
 	_saved_state = _states[_cursor]
 	_saved_external_revision = _external_revision
-	changed.emit()
+	_emit_changed()
 
 
 func mark_external_change() -> void:
@@ -316,7 +325,7 @@ func mark_external_change() -> void:
 	# External metadata edits are dirty even when not represented by commands.
 	_discard_redo()
 	_external_revision += 1
-	changed.emit()
+	_emit_changed()
 
 
 func _discard_redo() -> void:
