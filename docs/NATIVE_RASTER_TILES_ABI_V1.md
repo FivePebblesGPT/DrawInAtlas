@@ -77,6 +77,21 @@ revision. This applies to the native Brush projection only; the separate
 Rust transaction's own authorization and memory limits still apply.
 [T-234 evidence](evidence/T-234-2026-11-22-publication-preflight.md).
 
+## Direct pixel-map input preflight (T-236)
+
+`DrawingDocument._publish_edit` validates *all* changed signed, canonical
+coordinates and their original/replacement RGBA8 values, and applies the
+128-tile/256 MiB native transfer envelope, **before** invoking any pending
+source callbacks. It stages immutable copies of caller-owned pixel maps and
+retains a SHA-256 fingerprint of each resolved source tile. Before Rust
+adoption it rechecks both input maps and original tile bytes; an in-place
+reentrant mutation cannot pass using only an unchanged `DrawingRasterTile`
+identity or document revision. Invalid edits publish no new document pixels,
+history, revision or native owner. A callback's unauthorized changes to its
+own source object are not rolled back. Historical synthetic strides outside
+Rust's 16–2048 ABI retain their existing non-native signed-coordinate oracle.
+[T-236 evidence](evidence/T-236-2026-11-22-pixel-map-preflight.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.

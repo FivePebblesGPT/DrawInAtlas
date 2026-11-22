@@ -49,7 +49,8 @@ func _run() -> void:
 	document.resolve_calls = 0
 	result = edit.commit()
 	_check(result.ok and document.revision == before_revision + 1 and
-		result.delta.after.size() == 144, "atomic single-tile publication")
+		result.delta.tile_stride == 16 and result.delta.native_history_token > 0,
+		"atomic single-tile native publication")
 	_check(document.resolve_calls == 1, "exactly one source resolve for 144 pixels")
 	_check(result.regions.size() == 1 and result.regions[0].width == 12 and
 		result.regions[0].height == 12, "dirty bounds unchanged")
@@ -60,7 +61,10 @@ func _run() -> void:
 	_check(document.redo().ok and int(document.read_pixel(layer, 1, 1).value) == 0x00112233,
 		"redo restores published hidden RGB")
 
-	var far: CountingDocument = CountingDocument.new("far-publication", 16)
+	# The huge signed legacy-oracle coordinates exceed the native 2^52 tile
+	# projection. Use an intentionally out-of-native-ABI stride to retain the
+	# historical full-64-bit signed-coordinate test without bypassing Rust bounds.
+	var far: CountingDocument = CountingDocument.new("far-publication", 8)
 	var far_layer: String = String(far.create_layer(DrawingLayerNode.RASTER, "Far").value)
 	var anchor: int = 9007199254740993
 	var far_edit: DrawingEditSession = far.begin_edit(far_layer, far.revision,

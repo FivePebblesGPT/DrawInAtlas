@@ -1216,66 +1216,66 @@ func _publish_edit(layer_id: String, expected: int,
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
-	# The first pixel-map producer must obey the same native bounds as an
-	# attached edit: a successful publication will bootstrap Rust authority.
-	# Preflight all touched tiles before resolving any lazy source.
-	# The Rust tile ABI configures storage strides in [16, 2048]. Synthetic
-	# out-of-ABI documents retain the existing Godot-only oracle path.
+	# Validate and freeze the complete pixel-map request before any lazy source
+	# callback. In particular, a malformed *later* original/replacement cannot
+	# run an earlier provider, and reentrant providers cannot change the staged
+	# values or the eventual history delta without changing document revision.
 	var native_pixel_publisher: bool = _native_raster_store != null \
 		or (tile_stride >= 16 and tile_stride <= 2048 \
 		and ClassDB.class_exists("DrawingNativeTiles"))
-	if native_pixel_publisher:
-		var touched: Dictionary[String, bool] = {}
-		for coordinate: String in after:
-			var parts: PackedStringArray = coordinate.split(",")
-			if parts.size() != 2 or not parts[0].is_valid_int() \
-					or not parts[1].is_valid_int():
-				return DrawingResult.failure("COORD", "Invalid pixel coordinate")
-			var x: int = int(parts[0])
-			var y: int = int(parts[1])
-			if coordinate != TILES.pixel_key64(x, y) \
-					or not TILES.pixel_coordinates_in_projection_range(x, y):
-				return DrawingResult.failure("COORD", "Invalid signed native pixel coordinate")
+	var frozen_before: Dictionary[String, int] = before.duplicate()
+	var frozen_after: Dictionary[String, int] = after.duplicate()
+	var touched: Dictionary[String, bool] = {}
+	for coordinate: String in frozen_after:
+		var parts: PackedStringArray = coordinate.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() \
+				or not parts[1].is_valid_int():
+			return DrawingResult.failure("COORD", "Invalid pixel coordinate")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		if coordinate != TILES.pixel_key64(x, y) \
+				or (native_pixel_publisher \
+				and not TILES.pixel_coordinates_in_projection_range(x, y)):
+			return DrawingResult.failure("COORD", "Invalid signed native pixel coordinate")
+		if not frozen_before.has(coordinate):
+			return DrawingResult.failure("STALE_PIXEL", "Gesture lacks original pixel")
+		if frozen_before[coordinate] < 0 or frozen_before[coordinate] > 0xffffffff \
+				or frozen_after[coordinate] < 0 or frozen_after[coordinate] > 0xffffffff:
+			return DrawingResult.failure("RGBA", "Invalid pixel-map RGBA8 value")
+		if native_pixel_publisher:
 			touched[TILES.tile_key64(x, y, tile_stride)] = true
 			if not _native_direct_transfer_within_budget(touched.size()):
 				return DrawingResult.failure("NATIVE_TILES", "Direct pixel edit exceeds native transfer budget")
 
 	var detached: Dictionary[String, DrawingRasterTile] = {}
 	var bounds: Dictionary[String, Array] = {}
-	# Publication validates every original before installing any detached tile.
-	# A source tile is immutable during the validation pass, barring a
-	# reentrant provider; revision/editability are checked again before install:
-	# resolve it once per touched tile, not once per changed pixel. Null is a
-	# valid resolved (unallocated) tile; failures are returned immediately.
 	var sources: Dictionary[String, Variant] = {}
-	for coordinate: String in after:
+	var source_digests: Dictionary[String, String] = {}
+	# Resolve each tile only once. Fingerprint canonical source bytes as soon
+	# as they are verified: object identity alone cannot detect in-place changes
+	# made to an earlier tile by a later provider.
+	for coordinate: String in frozen_after:
 		var components: PackedStringArray = coordinate.split(",")
-		if components.size() != 2 or not components[0].is_valid_int() \
-				or not components[1].is_valid_int():
-			return DrawingResult.failure("COORD", "Invalid pixel coordinate")
 		var x: int = int(components[0])
 		var y: int = int(components[1])
-		if coordinate != TILES.pixel_key64(x, y):
-			return DrawingResult.failure("COORD", "Noncanonical signed pixel coordinate")
-		# Reject an unprojectable pixel before any allocation, even when the
-		# native store has not yet been created for this document.
-		if native_pixel_publisher \
-				and not TILES.pixel_coordinates_in_projection_range(x, y):
-			return DrawingResult.failure("COORD", "Pixel outside safe signed projection bounds")
 		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
 		if not sources.has(tile_key):
 			var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
 			if not resolved.ok:
 				return resolved
 			sources[tile_key] = resolved.value
+			var source: DrawingRasterTile = resolved.value as DrawingRasterTile
+			if source != null:
+				source_digests[tile_key] = DrawingRasterTile.digest_rgba8(
+					source.to_rgba8(), tile_stride)
 		var existing: DrawingRasterTile = sources[tile_key] as DrawingRasterTile
 		var point: Vector2i = TILES.local_offset64(x, y, tile_stride)
 		var original: int = existing.get_rgba(point.x, point.y) if existing != null else 0
-		if original != before.get(coordinate, -1):
+		if original != frozen_before[coordinate]:
 			return DrawingResult.failure("STALE_PIXEL", "Source pixel changed during gesture")
 		if not detached.has(tile_key):
 			detached[tile_key] = existing.detached_copy() if existing != null else DrawingRasterTile.new(tile_stride)
-		detached[tile_key].set_rgba(point.x, point.y, after[coordinate])
+		detached[tile_key].set_rgba(point.x, point.y, frozen_after[coordinate])
 		if not bounds.has(tile_key):
 			bounds[tile_key] = [x, y, x, y]
 		else:
@@ -1285,7 +1285,13 @@ func _publish_edit(layer_id: String, expected: int,
 			rect[2] = maxi(int(rect[2]), x)
 			rect[3] = maxi(int(rect[3]), y)
 
-	return _install_prepared_edit(layer_id, expected, before, after,
+	if before != frozen_before or after != frozen_after:
+		return DrawingResult.failure("STALE_PIXEL", "Pixel-map inputs changed during preflight")
+	for tile_key: String in source_digests:
+		var source: DrawingRasterTile = sources[tile_key] as DrawingRasterTile
+		if DrawingRasterTile.digest_rgba8(source.to_rgba8(), tile_stride) != source_digests[tile_key]:
+			return DrawingResult.failure("STALE_PIXEL", "Tile source bytes changed during preflight")
+	return _install_prepared_edit(layer_id, expected, frozen_before, frozen_after,
 		detached, bounds, record_history, false, sources, track_unrecorded,
 		native_pixel_publisher)
 
