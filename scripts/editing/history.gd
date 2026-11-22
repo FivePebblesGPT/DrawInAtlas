@@ -10,10 +10,26 @@ signal restoration_warning(message: String)
 
 ## Application-level setting, not serialized artwork state.
 var record_selection_history: bool = false
-## Host can supply typed before/after context for legacy Atlas commands too.
-var context_provider: Callable
+## Host handlers are configurable only between history operations. A context
+## callback or synchronous observer must not replace its own partner midway
+## through capture/restoration, including reflective Object.set() writes.
+var _context_provider: Callable
+var context_provider: Callable:
+	get:
+		return _context_provider
+	set(value):
+		if _timeline_reserved() or _replaying:
+			return
+		_context_provider = value
 ## Optional synchronous host UI restoration; false triggers a visible warning.
-var context_restorer: Callable
+var _context_restorer: Callable
+var context_restorer: Callable:
+	get:
+		return _context_restorer
+	set(value):
+		if _timeline_reserved() or _replaying:
+			return
+		_context_restorer = value
 var last_playback_warning: String = ""
 var last_playback_context: DrawingHistoryContext
 var _replaying: bool = false
