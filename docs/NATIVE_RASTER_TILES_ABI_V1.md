@@ -92,6 +92,18 @@ own source object are not rolled back. Historical synthetic strides outside
 Rust's 16–2048 ABI retain their existing non-native signed-coordinate oracle.
 [T-236 evidence](evidence/T-236-2026-11-22-pixel-map-preflight.md).
 
+## Pending native edit and history ownership (T-243, 2026-11-22)
+
+`DrawingNativeTiles.has_active_edit()` reports whether Rust currently retains
+an unfinished tile transaction. It is read-only and does not alter native FFI
+counters, revision, source, or Undo/Redo tokens. `DrawingDocument` uses it in
+`set_external_history()` to reject a non-idempotent local/host owner handoff
+before a pending edit commits. Idempotent calls stay allowed, and a cancelled
+edit frees the pristine history owner to transition. The document fails
+closed if an attached store lacks the expected probe. This fence covers
+attached native tile transactions, not arbitrary unrelated Atlas commands or
+GDScript-only sessions. [T-243 evidence](evidence/T-243-2026-11-22-active-history-handoff.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.

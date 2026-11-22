@@ -1500,6 +1500,11 @@ func display_changes_since(old_revision: int) -> Dictionary:
 func set_external_history(enabled: bool) -> DrawingResult:
 	if enabled == external_history:
 		return DrawingResult.success()
+	# A native gesture may already have staged tiles without committing a
+	# document revision. Its eventual command owner must not change mid-edit.
+	if _native_raster_store != null and (not _native_raster_store.has_method("has_active_edit")
+			or bool(_native_raster_store.call("has_active_edit"))):
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot switch history owner during a native edit")
 	if not _events.is_empty():
 		return DrawingResult.failure("HISTORY_OWNED", "Cannot migrate an existing local history implicitly")
 	# Atlas commands are not stored in _events. Once a host-owned revision is

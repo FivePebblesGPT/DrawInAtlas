@@ -164,6 +164,18 @@ class RequiredNativeCIContracts(unittest.TestCase):
             self.assertIn(f"--marker {marker}", workflow)
             self.assertIn(f"{marker} checks={count} failures=0", workflow)
 
+    def test_required_fast_step_fences_active_native_history_handoff(self) -> None:
+        workflow = FAST.read_text()
+        name = "t243_active_history_handoff"
+        marker = "T243_ACTIVE_OWNER_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=40 failures=0", workflow)
+        self.assertIn("has_active_edit", (ROOT / "addons/drawing/document.gd").read_text())
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

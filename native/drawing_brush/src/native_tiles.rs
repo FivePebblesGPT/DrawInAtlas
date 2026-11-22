@@ -1379,6 +1379,14 @@ impl DrawingNativeTiles {
             })
     }
 
+    /// A pending transaction reserves the current document history owner.
+    /// This query is read-only: it does not count as an FFI edit or mutate
+    /// the active transaction, native revision or token stacks.
+    #[func]
+    fn has_active_edit(&self) -> bool {
+        self.store.active.is_some()
+    }
+
     /// Cheap, side-effect-free history identity probe. The document may have
     /// older detached history events after a non-raster revision rebase;
     /// those can safely replay through their saved tile snapshots instead.

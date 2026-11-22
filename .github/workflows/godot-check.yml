@@ -221,6 +221,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t242_atlas_history_mode_readonly.gd 2>&1 | tee /tmp/godot-t242-atlas-mode.log
           python3 tools/check_godot_model_log.py /tmp/godot-t242-atlas-mode.log --marker T242_ATLAS_MODE_PASSED || ci_fail_marker 'T242 Atlas history ownership property guard rejected'
           grep -Fqx 'T242_ATLAS_MODE_PASSED checks=18 failures=0' /tmp/godot-t242-atlas-mode.log || ci_fail_marker 'T242 Atlas assertion count changed'
+          # T-243 prevents native edits from changing their command owner
+          # between a Rust begin_edit and its eventual commit/cancellation.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t243_active_history_handoff.gd 2>&1 | tee /tmp/godot-t243-active-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t243-active-owner.log --marker T243_ACTIVE_OWNER_PASSED || ci_fail_marker 'T243 active native history handoff rejected'
+          grep -Fqx 'T243_ACTIVE_OWNER_PASSED checks=40 failures=0' /tmp/godot-t243-active-owner.log || ci_fail_marker 'T243 active history assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
