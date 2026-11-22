@@ -824,6 +824,28 @@ func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	return button
 
 
+## Match expanded/floating panel icon identity in minimized flyouts. The
+## flyout's transient selection is independent of persisted group collapse.
+func _flyout_panel_button(panel_id: String, active: bool) -> Button:
+	var tab: Button = Button.new()
+	tab.name = "Tab_" + panel_id
+	tab.icon = _dock_icon(panel_id)
+	tab.expand_icon = true
+	tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tab.custom_minimum_size = Vector2(42, 42)
+	tab.focus_mode = Control.FOCUS_ALL
+	tab.tooltip_text = panel_id.capitalize() + " panel; right-click or Shift+F10 for menu; drag to reorder or split"
+	tab.toggle_mode = true
+	tab.button_pressed = active
+	for property: Dictionary in tab.get_property_list():
+		if property["name"] == "accessibility_name":
+			tab.set("accessibility_name", panel_id.capitalize() + " panel")
+			break
+	tab.pressed.connect(_flyout_tab_pressed.bind(panel_id))
+	tab.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
+	return tab
+
+
 func _ignore_dock_icon_activation() -> bool:
 	# Godot's Button.pressed can arrive before or after the workspace's mouse
 	# release. The moved flag survives until the next deferred frame, so a
@@ -963,6 +985,8 @@ func _focused_dock_panel() -> String:
 	for panel_id: String in dock_rail_buttons:
 		if dock_rail_buttons[panel_id] == focused:
 			return panel_id
+	if focused != null and focused.get_parent() == dock_flyout_tabs and focused.name.begins_with("Tab_"):
+		return String(focused.name).trim_prefix("Tab_")
 	return ""
 
 
@@ -975,6 +999,17 @@ func _group_collapse_pressed(group_id: String) -> void:
 
 
 func _flyout_tab_pressed(panel_id: String) -> void:
+	var info: Dictionary = dock_layout.container_info("right")
+	var group_id: String = dock_layout.group_of(panel_id)
+	var open: bool = bool(info["minimized"]) and group_id == String(info["flyout_group"])
+	var active: bool = open and String(dock_layout.group_info(group_id)["active"]) == panel_id
+	var current_tab: Button = dock_flyout_tabs.get_node_or_null("Tab_" + panel_id) as Button
+	if _ignore_dock_icon_activation() or not open or active:
+		# Button toggles *before* the pressed callback. Restore the model's
+		# pressed state on active/no-op clicks and suppressed drag releases.
+		if current_tab != null:
+			current_tab.set_pressed_no_signal(active)
+		return
 	if dock_layout.select_panel(panel_id):
 		_render_dock("tab:" + panel_id)
 
@@ -1092,18 +1127,7 @@ func _render_dock(focus_key: String = "") -> void:
 			for panel_id: String in group["panels"]:
 				if not dock_views.has(panel_id):
 					continue
-				var tab: Button = Button.new()
-				tab.name = "Tab_" + panel_id
-				tab.text = panel_id.capitalize()
-				tab.tooltip_text = panel_id.capitalize() + " panel tab"
-				tab.custom_minimum_size.y = 40
-				tab.focus_mode = Control.FOCUS_ALL
-				tab.toggle_mode = true
-				tab.button_pressed = panel_id == String(group["active"])
-				tab.pressed.connect(_flyout_tab_pressed.bind(panel_id))
-				tab.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
-				tab.tooltip_text += "; drag to reorder or split"
-				dock_flyout_tabs.add_child(tab)
+				dock_flyout_tabs.add_child(_flyout_panel_button(panel_id, panel_id == String(group["active"])))
 			if dock_views.has(String(group["active"])):
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
 	inspector.custom_minimum_size.x = 48 if minimized else EXPANDED_DOCK_MIN_WIDTH

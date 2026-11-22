@@ -1,10 +1,12 @@
 # Ticket Kanban Index
 
+**T-254 Done (2026-11-22):** [icon-only minimized flyouts](evidence/T-254-2026-11-22-flyout-icons.md) share the dock/floating icons, including fallback and focusable 42px tabs; clicked-tab RMB/Shift+F10, active no-op, Escape rollback, restart, 100/150/200% X11 and Atlas checks pass. Prior code fails 81 checks; corrected 183/183 X11 and 12/12 Atlas. **All P0 owner UX corrections T-251–T-254 are Done. T-250 is now Manual Review, not approved.**
+
 **T-253 Done (2026-11-22):** [Dense Selection Delete input→frame repair](evidence/T-253-2026-11-22-dense-selection-delete.md): 71,901 occupied pixels / 512² image, clean fail-first X11 p95 **1,127ms→179ms** (7 trials); the same 500ms witness fails before, passes after, exact native tile history, signed RGBA8/hidden RGB and Atlas generation Save/Open verified. T-250 owner review remains Blocked, next P0 **T-254**.
 
 **T-252 Done (2026-11-22):** [Settled native ColorPicker gestures](evidence/T-252-2026-11-22-recent-colors.md) now preview live without flooding recents; Restore previous chrome and Recent heading removed, compact FG/Swap/BG/recents preserved. Persist exact RGBA8 colors in an independent app-only setting; standalone X11/model, Atlas, prefs and neighboring regressions pass locally. T-250 remains Blocked pending T-253/T-254 and owner approval.
 
-**OWNER UX OVERRIDE — 2026-11-22:** Actual Drawing build was **not approved**. **T-251 and T-252 Done** (dock-local toggle and settled recent-color gestures); **T-253 Done** for measured dense Delete (owner hardware pending); finish **T-254** (P0, Ready), then require **T-250 manual hands-on Drawing approval** before any unfinished/future Atlas feature ticket can be Done. The owner PNGs are now in `docs/assets/drawing-ux-2026-11-22/` (remote `7b1fd306`). [Rejection/acceptance contract](DRAWING_UX_REVIEW_2026-11-22.md). Prior seven UX engineering tickets remain historical Done, not usability approval. Stop prioritizing optional history hardening/CI over this UX queue.
+**OWNER UX OVERRIDE — 2026-11-22:** Actual Drawing build was **not approved**. **T-251, T-252, T-253, T-254 all Done for engineering fixes**; now **T-250 Manual Review** requires hands-on Drawing acceptance before any unfinished/future Atlas feature ticket can be Done. The owner PNGs are now in `docs/assets/drawing-ux-2026-11-22/` (remote `7b1fd306`). [Rejection/acceptance contract](DRAWING_UX_REVIEW_2026-11-22.md). Prior seven UX engineering tickets remain historical Done, not usability approval. Stop prioritizing optional history hardening/CI over this UX queue.
 
 **T-249 Done (2026-11-22):** [Atlas context handler reservation](evidence/T-249-2026-11-22-context-handler-reservation.md) prevents synchronous command callbacks or listeners from replacing the context capture/restoration handlers mid-operation. The 84-check regression fails 42 cases on the prior code and passes after the fix; T-148, hosted CI and owner gates remain open.
 
@@ -274,6 +276,8 @@ Do **not** infer signoff from software tests or prior product scope. T-096 was m
 | [T-038 · Broader code-only review](Tickets/T-038.md) | Manual Review | Completed scope; see ticket evidence | [T-033](Tickets/T-033.md), [T-034](Tickets/T-034.md), [T-035](Tickets/T-035.md), [T-036](Tickets/T-036.md) |
 | [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Blocked | Completed scope; see ticket evidence | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md), [T-250](Tickets/T-250.md) |
 
+| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Manual Review | **P0 owner action now needed:** all four corrections Done, require hands-on approval with hardware and concept comparison. Atlas delivery remains blocked | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md) |
+
 ## 4. Other ready backlog
 
 Other feature/product tickets remain valid; no unrelated approval is assumed.
@@ -283,7 +287,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
 | [T-253 · Fix remaining end-to-end Selection Delete frame stall](Tickets/T-253.md) | Done | **P0 engineering Done:** [X11 input-to-frame fail-first and exact RGBA8/Atlas evidence](evidence/T-253-2026-11-22-dense-selection-delete.md); owner hardware under T-250 still open | [T-221](Tickets/T-221.md) |
-| [T-254 · Use icon-only tabs in minimized panel flyouts](Tickets/T-254.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-225](Tickets/T-225.md) |
+| [T-254 · Use icon-only tabs in minimized panel flyouts](Tickets/T-254.md) | Done | **P0 engineering complete:** [X11/Atlas/icon/keyboard evidence](evidence/T-254-2026-11-22-flyout-icons.md); owner acceptance remains T-250 | [T-225](Tickets/T-225.md) |
 | [T-221 · Profile and fix slow selection Delete](Tickets/T-221.md) | Done | **P0 / #1 owner queue completed.** [Measured evidence](evidence/T-221-2026-11-22-selection-delete.md): sparse Delete p50 1,212.5 → 21.3 ms native X11; owner hardware review remains in T-088 | [T-053](Tickets/T-053.md) |
 | [T-222 · Replace giant dock minimize chrome with compact icon interactions](Tickets/T-222.md) | Done | **P0 / #2 completed.** [Native/Atlas evidence](evidence/T-222-2026-11-22-dock-interactions.md): vector edge overlay, icon actions and scaling; T-083 owner review open | [T-079](Tickets/T-079.md) |
 | [T-226 · Redesign Colors with focused FG/BG, recent-color bars and inline scrollable native picker](Tickets/T-226.md) | Done | **P0 / #3 completed.** [Model/native/Atlas evidence](evidence/T-226-2026-11-22-inline-colors.md): canonical RGBA8 history; inline native picker, narrow/floating scroll; parent T-092 review still open | [T-063](Tickets/T-063.md) |
@@ -309,7 +313,7 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
 
-| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Blocked | **P0 / manual approval required:** T-251–T-254 corrective UX acceptance and owner hands-on signoff; blocks unfinished/future Atlas features | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md) |
+
 | [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md), [T-250](Tickets/T-250.md) |
 | [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | Completed scope; see ticket evidence | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md), [T-250](Tickets/T-250.md) |
 | [T-040 · GM/player views and calibration](Tickets/T-040.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-013](Tickets/T-013.md), [T-250](Tickets/T-250.md) |

@@ -19,7 +19,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-dock-toggle check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-dock-toggle test-dock-flyout check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -80,6 +80,12 @@ test-graphical: import-drawing
 test-dock-toggle: import-drawing import-atlas
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t251_dock_toggle_native.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path . --script res://tests/t251_atlas_dock_native.gd
+
+# T-254: real minimized-flyout icon, context, persistence and Atlas checks.
+# Stage + import before the tests so named SVG/fallback assets are available.
+test-dock-flyout: import-drawing import-atlas
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t254_flyout_icons_native.gd
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path . --script res://tests/t254_atlas_flyout_native.gd
 
 python-test:
 	@"$(PYTHON)" -m unittest discover -s tests -p 'test_toolchain_build.py'

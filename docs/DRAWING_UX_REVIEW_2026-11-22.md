@@ -65,3 +65,18 @@ plus exact RGBA8/Undo/Redo/Atlas Save/Open checks. The sparse 8-pixel
 T-221 result did not predict the dense frame stall. **Engineering Done does
 not equal owner acceptance:** physical retest remains on T-250/T-088;
 T-254 icon-only flyouts remain the next P0 task.
+
+## T-254 minimized-flyout icon completion — 2026-11-22
+
+[T-254](Tickets/T-254.md) replaces the last visible text flyout-tab row with
+canonical icon-only tabs (including fallback for future panels) matching the
+expanded rail and floating host. Focused inactive flyout tabs now open their
+own context menu on RMB/Shift+F10 without changing selection or collapsed
+state; active-tab click and canceled drag cannot unpress or close the flyout.
+[Evidence](evidence/T-254-2026-11-22-flyout-icons.md): prior code fails 81
+assertions, fixed standalone GUI 183/183 and Atlas GUI 12/12, with neighboring
+docking regressions. **All four P0 corrections are engineering Done. T-250 is
+now in Manual Review, not Done**: the owner still needs to test the build,
+including actual-device Selection Delete responsiveness, and explicitly approve
+or request further changes. Older mentions of T-254 being next/blocked above
+are historical checkpoints, not the current Kanban status.
