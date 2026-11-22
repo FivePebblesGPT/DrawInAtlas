@@ -1,5 +1,7 @@
 # Ticket Kanban Index
 
+**OWNER UX OVERRIDE — 2026-11-22:** Actual Drawing build was **not approved**. Finish **T-251 → T-252 → T-253 → T-254** (all P0, Ready), then require **T-250 manual hands-on Drawing approval** before any unfinished/future Atlas feature ticket can be Done. The 2026-11-22 source images are in the owner's conversation; binary attachment to the repository remains pending. [Rejection/acceptance contract](DRAWING_UX_REVIEW_2026-11-22.md). Prior seven UX engineering tickets remain historical Done, not usability approval. Stop prioritizing optional history hardening/CI over this UX queue.
+
 **T-249 Done (2026-11-22):** [Atlas context handler reservation](evidence/T-249-2026-11-22-context-handler-reservation.md) prevents synchronous command callbacks or listeners from replacing the context capture/restoration handlers mid-operation. The 84-check regression fails 42 cases on the prior code and passes after the fix; T-148, hosted CI and owner gates remain open.
 
 **T-248 Done (2026-11-22):** [active-map reservation](evidence/T-248-2026-11-22-active-map-reservation.md) prevents synchronous Atlas history callbacks from rebinding the current edit target through direct or reflective property writes. The 70-check fixture fails 14 cases on the prior code and passes after the fix; T-148, hosted CI, and owner gates remain open.
@@ -274,6 +276,10 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-222](Tickets/T-222.md) |
+| [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-226](Tickets/T-226.md) |
+| [T-253 · Fix remaining end-to-end Selection Delete frame stall](Tickets/T-253.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-221](Tickets/T-221.md) |
+| [T-254 · Use icon-only tabs in minimized panel flyouts](Tickets/T-254.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-225](Tickets/T-225.md) |
 | [T-221 · Profile and fix slow selection Delete](Tickets/T-221.md) | Done | **P0 / #1 owner queue completed.** [Measured evidence](evidence/T-221-2026-11-22-selection-delete.md): sparse Delete p50 1,212.5 → 21.3 ms native X11; owner hardware review remains in T-088 | [T-053](Tickets/T-053.md) |
 | [T-222 · Replace giant dock minimize chrome with compact icon interactions](Tickets/T-222.md) | Done | **P0 / #2 completed.** [Native/Atlas evidence](evidence/T-222-2026-11-22-dock-interactions.md): vector edge overlay, icon actions and scaling; T-083 owner review open | [T-079](Tickets/T-079.md) |
 | [T-226 · Redesign Colors with focused FG/BG, recent-color bars and inline scrollable native picker](Tickets/T-226.md) | Done | **P0 / #3 completed.** [Model/native/Atlas evidence](evidence/T-226-2026-11-22-inline-colors.md): canonical RGBA8 history; inline native picker, narrow/floating scroll; parent T-092 review still open | [T-063](Tickets/T-063.md) |
@@ -299,6 +305,7 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
 
+| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Blocked | **P0 / manual approval required:** T-251–T-254 corrective UX acceptance and owner hands-on signoff; blocks unfinished/future Atlas features | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md) |
 | [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md) |
 | [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | Completed scope; see ticket evidence | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md) |
 | [T-040 · GM/player views and calibration](Tickets/T-040.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-013](Tickets/T-013.md) |

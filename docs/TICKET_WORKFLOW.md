@@ -51,3 +51,7 @@ The explicit [Drawing feature inventory](DRAWING_FEATURE_INVENTORY.md) is **appr
 - Update the Kanban table and run `tools/validate_ticket_store.py` on every
   split. Recheck CI and manual gates on the actual remote SHA; do not manufacture
   approvals or count a documentation split as a performance improvement.
+
+## Owner-directed Drawing-first Atlas dependency (2026-11-22)
+
+T-250 is a **manual-review** ticket with explicit hard dependencies T-251–T-254. Every unfinished or future Atlas *feature/user-facing integration* ticket must carry direct `[[T-250]]` in `depends_on`; validation and CI must not be mistaken for owner signoff. Keep old Done records as historical proof rather than making a Done ticket depend on a new unfinished gate. The Atlas gate's scope includes Atlas-specific product tickets under E-005/E-007/E-008/E-009, but not prerequisite standalone Drawing fixes (to avoid a cycle). This gate prevents **Done** status, even where independent preparations are possible. See [2026-11-22 UX review](DRAWING_UX_REVIEW_2026-11-22.md).

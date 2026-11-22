@@ -88,3 +88,8 @@ Native ownership [T-148](Tickets/T-148.md)/[T-149](Tickets/T-149.md), Windows po
 ## Dependency-respecting order
 
 Use the owner-directed order above. **T-221, T-222, T-226, T-223, T-224 and T-225** are engineering Done. Next owner-priority ticket is **T-227** (Ready); T-083/T-091 acceptance is still open. Implement one bounded engineering ticket at a time with native screenshots, pointer tests and logs. Do not mark parent owner gates Done without explicit dated owner signoff.
+
+
+## Superseding owner rejection — 2026-11-22
+
+See [the actual editor/concept comparison and corrective ticket queue](DRAWING_UX_REVIEW_2026-11-22.md). Previous T-221/T-222/T-225/T-226 narrow engineering completion does **not** imply accepted UX. New T-250 manual gate blocks future Atlas feature completion.
