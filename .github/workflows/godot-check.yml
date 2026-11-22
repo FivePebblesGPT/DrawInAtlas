@@ -173,6 +173,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t233_pixel_native_bootstrap.gd 2>&1 | tee /tmp/godot-t233-pixel-bootstrap.log
           python3 tools/check_godot_model_log.py /tmp/godot-t233-pixel-bootstrap.log --marker T233_PIXEL_BOOTSTRAP_PASSED || ci_fail_marker 'T233 first direct pixel-map native ownership rejected'
           grep -Fqx 'T233_PIXEL_BOOTSTRAP_PASSED checks=37 failures=0' /tmp/godot-t233-pixel-bootstrap.log || ci_fail_marker 'T233 direct pixel bootstrap assertion count changed'
+          # T-234 validates the whole native Brush publication envelope and
+          # freezes descriptors before any lazy source callbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t234_native_publication_preflight.gd 2>&1 | tee /tmp/godot-t234-publication.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t234-publication.log --marker T234_NATIVE_PUBLICATION_PASSED || ci_fail_marker 'T234 native publication preflight rejected'
+          grep -Fqx 'T234_NATIVE_PUBLICATION_PASSED checks=32 failures=0' /tmp/godot-t234-publication.log || ci_fail_marker 'T234 native publication assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log

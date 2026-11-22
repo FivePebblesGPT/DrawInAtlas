@@ -63,6 +63,20 @@ not a valid session-owned source identity. The older global-pixel
 `_publish_edit` path still deliberately retains native-absent production;
 T-148 and T-149 remain open. [T-232 evidence](evidence/T-232-2026-11-22-tile-bootstrap.md).
 
+## Native Brush publication input preflight (T-234)
+
+Before `_publish_native_tile_edit` calls any lazy source provider, the
+Godot document validates a complete native output descriptor set: one to 128
+signed, canonical in-projection tiles, a conservative three-span transfer
+envelope no larger than 256 MiB, matching expected source identities and
+in-tile dirty rectangles, and exactly `stride * stride * 4` RGBA8 bytes for
+each tile. It freezes the incoming RGBA8 buffers and metadata, then checks
+that no lazy callback modified the caller-owned inputs before yielding a
+prepared document edit. Rejection publishes neither pixels nor document
+revision. This applies to the native Brush projection only; the separate
+Rust transaction's own authorization and memory limits still apply.
+[T-234 evidence](evidence/T-234-2026-11-22-publication-preflight.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.

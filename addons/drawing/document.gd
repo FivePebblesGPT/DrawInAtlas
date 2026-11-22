@@ -885,21 +885,24 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER \
 			or not _editable(layer_id):
 		return DrawingResult.failure("LOCKED", "Edited raster layer became unavailable")
-	if images.is_empty() or images.size() > 128 or bounds.size() != images.size():
-		return DrawingResult.failure("NATIVE_TILES", "Invalid native tile publication count")
-	var prepared: Dictionary[String, DrawingRasterTile] = {}
-	var before_bytes: Dictionary[String, PackedByteArray] = {}
-	var after_bytes: Dictionary[String, PackedByteArray] = {}
-	var regions: Array[DrawingDirtyRegion] = []
+	if images.is_empty() or bounds.size() != images.size() \
+			or not _native_direct_transfer_within_budget(images.size()):
+		return DrawingResult.failure("NATIVE_TILES", "Native tile publication exceeds transfer bounds")
+	# Validate and freeze *every* caller-owned descriptor before resolving a
+	# lazy source. A later malformed tile must not execute an earlier source's
+	# callback; a reentrant callback must not replace a validated RGBA8 buffer.
+	var validated_images: Dictionary[String, PackedByteArray] = {}
+	var validated_bounds: Dictionary[String, Rect2i] = {}
+	var validated_sources: Dictionary[String, Variant] = {}
 	for key: String in images:
-		var components: PackedStringArray = key.split(",")
-		if components.size() != 2 or not components[0].is_valid_int() \
-				or not components[1].is_valid_int():
+		var parts: PackedStringArray = key.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() \
+				or not parts[1].is_valid_int():
 			return DrawingResult.failure("COORD", "Invalid native tile key")
-		var cx: int = int(components[0])
-		var cy: int = int(components[1])
-		if key != "%d,%d" % [cx, cy] \
-				or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+		var tx: int = int(parts[0])
+		var ty: int = int(parts[1])
+		if key != "%d,%d" % [tx, ty] \
+				or not TILES.tile_coordinates_in_projection_range(tx, ty, tile_stride):
 			return DrawingResult.failure("COORD", "Native tile coordinate outside safe bounds")
 		if not sources.has(key) or not bounds.has(key):
 			return DrawingResult.failure("STALE_PIXEL", "Native tile lacks verified source or dirty bounds")
@@ -907,15 +910,28 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 		if not dirty.has_area() or dirty.position.x < 0 or dirty.position.y < 0 \
 				or dirty.end.x > tile_stride or dirty.end.y > tile_stride:
 			return DrawingResult.failure("COORD", "Native tile dirty bounds invalid")
+		var bytes: PackedByteArray = images[key]
+		if bytes.size() != tile_stride * tile_stride * 4:
+			return DrawingResult.failure("RGBA", "Native RGBA8 tile length mismatch")
+		validated_images[key] = bytes.duplicate()
+		validated_bounds[key] = dirty
+		validated_sources[key] = sources[key]
+	var prepared: Dictionary[String, DrawingRasterTile] = {}
+	var before_bytes: Dictionary[String, PackedByteArray] = {}
+	var after_bytes: Dictionary[String, PackedByteArray] = {}
+	var regions: Array[DrawingDirtyRegion] = []
+	for key: String in validated_images:
+		var components: PackedStringArray = key.split(",")
+		var cx: int = int(components[0])
+		var cy: int = int(components[1])
+		var dirty: Rect2i = validated_bounds[key]
 		var resolved: DrawingResult = _resolve_chunk(layer_id, key)
 		if not resolved.ok:
 			return resolved
 		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
-		if original != sources[key]:
+		if original != validated_sources[key]:
 			return DrawingResult.failure("STALE_PIXEL", "Native source identity changed")
-		var bytes: PackedByteArray = images[key]
-		if bytes.size() != tile_stride * tile_stride * 4:
-			return DrawingResult.failure("RGBA", "Native RGBA8 tile length mismatch")
+		var bytes: PackedByteArray = validated_images[key]
 		var candidate: DrawingRasterTile = DrawingRasterTile.from_rgba8(tile_stride, bytes)
 		var previous: PackedByteArray = original.to_rgba8() if original != null \
 			else PackedByteArray()
@@ -932,10 +948,16 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 	# is the last point at which a full rejection can leave Rust untouched.
 	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id):
 		return DrawingResult.failure("STALE_REVISION", "Preflight source changed document authority")
+	if images.size() != validated_images.size() or bounds.size() != validated_bounds.size() \
+			or sources.size() != validated_sources.size():
+		return DrawingResult.failure("STALE_PIXEL", "Native publication inputs changed during preflight")
 	for key: String in prepared:
-		if _pending_tiles.has(layer_id + ":" + key) \
-				or _nodes[layer_id].tiles.get(key) != sources[key]:
-			return DrawingResult.failure("STALE_PIXEL", "Preflight source identity changed")
+		if not images.has(key) or images[key] != validated_images[key] \
+				or not bounds.has(key) or bounds[key] != validated_bounds[key] \
+				or not sources.has(key) or sources[key] != validated_sources[key] \
+				or _pending_tiles.has(layer_id + ":" + key) \
+				or _nodes[layer_id].tiles.get(key) != validated_sources[key]:
+			return DrawingResult.failure("STALE_PIXEL", "Native publication source or descriptor changed")
 	var result: DrawingResult = DrawingResult.success(null, native_revision)
 	result.regions = regions
 	result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
