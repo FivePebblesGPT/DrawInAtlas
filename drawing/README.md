@@ -17,6 +17,9 @@ make drawing
 make drawing TOOLCHAIN=bundle BUNDLE=/path/to/drawing-toolchain-linux-x86_64.tar.zst
 ```
 
+GNU Make and Bash are required on the Linux build/test host, including
+`make test-live-stroke` with fail-closed native log pipelines.
+
 Brush/Eraser require the Rust Hokusai GDExtension. Make builds, stages and
 registers it before Godot import. Configure installed executable paths in
 `local.mk` or command-line overrides; see [toolchain setup](../docs/TOOLCHAIN.md).

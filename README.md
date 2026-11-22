@@ -20,6 +20,10 @@ make drawing                      # installed Godot/Cargo/uv; see local.mk.examp
 make drawing TOOLCHAIN=bundle BUNDLE=/path/to/drawing-toolchain-linux-x86_64.tar.zst
 ```
 
+GNU Make and Bash are required for the Linux development targets; the held-stroke
+`make test-live-stroke` target uses Bash `pipefail` to reject failing Godot
+processes even when their output is piped through `tee`.
+
 The Rust Hokusai extension is mandatory. `make drawing` builds it, stages the addon,
 registers the GDExtension before Godot import, and launches the editor. To generate
 a new source-pinned offline archive on an online Linux host, run `make bundle`;

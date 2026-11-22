@@ -1,3 +1,7 @@
+# GNU Make otherwise uses /bin/sh, which may not support pipefail. Our
+# logged native test recipes need Bash to preserve Godot failure through tee.
+SHELL := /bin/bash
+
 # Toolchain setup: CLI assignments override local.mk, which overrides these defaults.
 PYTHON ?= python3
 TOOLCHAIN ?= auto
