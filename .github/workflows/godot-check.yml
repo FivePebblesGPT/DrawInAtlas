@@ -188,6 +188,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t236_pixel_map_preflight.gd 2>&1 | tee /tmp/godot-t236-pixel-preflight.log
           python3 tools/check_godot_model_log.py /tmp/godot-t236-pixel-preflight.log --marker T236_PIXEL_PREFLIGHT_PASSED || ci_fail_marker 'T236 direct pixel-map descriptor/reentrancy preflight rejected'
           grep -Fqx 'T236_PIXEL_PREFLIGHT_PASSED checks=35 failures=0' /tmp/godot-t236-pixel-preflight.log || ci_fail_marker 'T236 pixel-map assertion count changed'
+          # T-237 freezes complete detached native tile history before any
+          # lazy source and rejects reentrant payload/token changes before Rust.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t237_detached_tile_replay_preflight.gd 2>&1 | tee /tmp/godot-t237-history-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t237-history-preflight.log --marker T237_HISTORY_PREFLIGHT_PASSED || ci_fail_marker 'T237 detached native tile-history descriptor/reentrancy preflight rejected'
+          grep -Fqx 'T237_HISTORY_PREFLIGHT_PASSED checks=40 failures=0' /tmp/godot-t237-history-preflight.log || ci_fail_marker 'T237 detached tile-history assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log

@@ -57,3 +57,17 @@ The preceding planned buffer contract is retained as T-147-era design history;
 the actually implemented and tested production ABI is the Rust `TileStore`
 documented in [NATIVE_RASTER_TILES_ABI_V1.md](NATIVE_RASTER_TILES_ABI_V1.md).
 The old two-renderer/opaque-pixel assumptions are not active requirements.
+
+### Detached tile history whole-payload preflight (T-237, 2026-11-22)
+
+`DrawingDocument._replay_native_tile_delta` validates **all** tile keys,
+matching before/after members, RGBA8 buffer lengths and the existing
+128-tile/256 MiB envelope *before* invoking a lazy source provider. It
+freezes full-tile expected and replacement bytes, then rechecks live delta
+layer/stride/history-token metadata, exact keys and contents, and resident
+source identity and RGBA8 after all callbacks, before issuing a Rust replay.
+Reentrant changes reject with `STALE_PIXEL`; malformed initial payloads
+reject with `COORD`, `RGBA` or `HISTORY_TARGET` without a source read.
+The guard does not roll back side effects independently made by an untrusted
+source callback. This is a detached-history publication invariant, not a
+claim that the entire host-owned undo timeline is Rust-native.

@@ -1066,14 +1066,18 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 	# whole-tile snapshots. The same conservative bound applies in the Rust ABI.
 	if expected.size() * tile_stride * tile_stride * 4 * 3 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
 		return DrawingResult.failure("HISTORY_TARGET", "Native history exceeds tile memory budget")
-	var base_revision: int = revision
-	var source_node: DrawingLayerNode = _nodes[delta.layer_id]
-	var detached: Dictionary[String, DrawingRasterTile] = {}
-	var sources: Dictionary[String, Variant] = {}
+	# Validate and detach the whole history payload before resolving any lazy
+	# source. Otherwise a bad later tile can invoke an earlier provider, or a
+	# provider can rewrite a later buffer before it is snapshotted.
+	var source_layer: String = delta.layer_id
+	var source_stride: int = delta.tile_stride
+	var source_token: int = delta.native_history_token
+	var frozen_keys: Array[String] = replacement.keys()
 	var original_bytes: Dictionary[String, PackedByteArray] = {}
 	var replacement_bytes: Dictionary[String, PackedByteArray] = {}
-	var regions: Array[DrawingDirtyRegion] = []
-	for key: String in replacement:
+	var coordinates_by_key: Dictionary[String, Vector2i] = {}
+	var full_length: int = tile_stride * tile_stride * 4
+	for key: String in frozen_keys:
 		if not expected.has(key):
 			return DrawingResult.failure("HISTORY_TARGET", "Native history snapshot missing")
 		var coordinates: PackedStringArray = key.split(",")
@@ -1085,20 +1089,28 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if key != "%d,%d" % [cx, cy] \
 				or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
 			return DrawingResult.failure("COORD", "Native history tile outside safe bounds")
-		# Take immutable preflight snapshots: a lazy provider can reenter and
-		# mutate either the document or its caller-owned delta dictionaries.
 		var before: PackedByteArray = expected[key].duplicate()
 		var after: PackedByteArray = replacement[key].duplicate()
-		var full_length: int = tile_stride * tile_stride * 4
 		if (not before.is_empty() and before.size() != full_length) \
 				or (not after.is_empty() and after.size() != full_length):
 			return DrawingResult.failure("RGBA", "Native history buffer malformed")
-		var resolved: DrawingResult = _resolve_chunk(delta.layer_id, key)
+		original_bytes[key] = before
+		replacement_bytes[key] = after
+		coordinates_by_key[key] = Vector2i(cx, cy)
+	var base_revision: int = revision
+	var source_node: DrawingLayerNode = _nodes[source_layer]
+	var detached: Dictionary[String, DrawingRasterTile] = {}
+	var sources: Dictionary[String, Variant] = {}
+	var regions: Array[DrawingDirtyRegion] = []
+	for key: String in frozen_keys:
+		var before: PackedByteArray = original_bytes[key]
+		var after: PackedByteArray = replacement_bytes[key]
+		var resolved: DrawingResult = _resolve_chunk(source_layer, key)
 		if not resolved.ok:
 			return resolved
-		if revision != base_revision or not _nodes.has(delta.layer_id) \
-				or not is_same(_nodes[delta.layer_id], source_node) \
-				or not _editable(delta.layer_id):
+		if revision != base_revision or not _nodes.has(source_layer) \
+				or not is_same(_nodes[source_layer], source_node) \
+				or not _editable(source_layer):
 			return DrawingResult.failure("STALE_REVISION", "History source changed during lazy load")
 		var source: DrawingRasterTile = resolved.value as DrawingRasterTile
 		var source_bytes: PackedByteArray = source.to_rgba8() if source != null \
@@ -1106,26 +1118,38 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if source_bytes != before and not (source_bytes.is_empty() and \
 				before.count(0) == before.size()):
 			return DrawingResult.failure("STALE_PIXEL", "Native history source differs")
-		original_bytes[key] = before
-		replacement_bytes[key] = after
 		sources[key] = source
 		if not after.is_empty():
 			detached[key] = DrawingRasterTile.from_rgba8(tile_stride, after)
-		regions.append(DrawingDirtyRegion.new(delta.layer_id,
-			cx * tile_stride, cy * tile_stride, tile_stride, tile_stride))
+		var tile: Vector2i = coordinates_by_key[key]
+		regions.append(DrawingDirtyRegion.new(source_layer,
+			tile.x * tile_stride, tile.y * tile_stride, tile_stride, tile_stride))
 	# All lazy callbacks have returned. Recheck the full source set before
 	# consuming an irreversible Rust history token or installing any tiles.
-	if revision != base_revision or not _nodes.has(delta.layer_id) \
-			or not is_same(_nodes[delta.layer_id], source_node) \
-			or not _editable(delta.layer_id):
+	if revision != base_revision or not _nodes.has(source_layer) \
+			or not is_same(_nodes[source_layer], source_node) \
+			or not _editable(source_layer):
 		return DrawingResult.failure("STALE_REVISION", "History replay lost document authority")
+	# Compare the *live* delta fields, not only the aliases retained above.
+	# The owner may replace a dictionary or change its layer/stride/token from
+	# inside a lazy callback, even when the frozen tile buffers remain valid.
+	var live_expected: Dictionary[String, PackedByteArray] = delta.after_tiles \
+		if undo_action else delta.before_tiles
+	var live_replacement: Dictionary[String, PackedByteArray] = delta.before_tiles \
+		if undo_action else delta.after_tiles
+	if delta.layer_id != source_layer or delta.tile_stride != source_stride \
+			or delta.native_history_token != source_token \
+			or live_expected.size() != original_bytes.size() \
+			or live_replacement.size() != replacement_bytes.size():
+		return DrawingResult.failure("STALE_PIXEL", "History descriptor changed during source loading")
 	for key: String in sources:
-		if _pending_tiles.has(delta.layer_id + ":" + key) \
-				or not is_same(_nodes[delta.layer_id].tiles.get(key), sources[key]) \
-				or expected.get(key) != original_bytes[key] \
-				or replacement.get(key) != replacement_bytes[key]:
+		if _pending_tiles.has(source_layer + ":" + key) \
+				or not is_same(_nodes[source_layer].tiles.get(key), sources[key]) \
+				or not live_expected.has(key) or not live_replacement.has(key) \
+				or live_expected[key] != original_bytes[key] \
+				or live_replacement[key] != replacement_bytes[key]:
 			return DrawingResult.failure("STALE_PIXEL", "History source identity or snapshot changed")
-		var resident: DrawingRasterTile = _nodes[delta.layer_id].tiles.get(key)
+		var resident: DrawingRasterTile = _nodes[source_layer].tiles.get(key)
 		var current: PackedByteArray = resident.to_rgba8() if resident != null \
 			else PackedByteArray()
 		var before: PackedByteArray = original_bytes[key]
