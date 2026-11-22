@@ -234,6 +234,20 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn("_notifying_changed", history)
         self.assertIn("_emit_changed()", history)
 
+    def test_required_fast_step_reserves_atlas_active_map(self) -> None:
+        workflow = FAST.read_text()
+        name = "t248_atlas_active_map_reservation"
+        marker = "T248_ATLAS_ACTIVE_MAP_PASSED"
+        source = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(source.is_file())
+        self.assertIn(marker, source.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=70 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("var active_map_id: String:", history)
+        self.assertIn("if _timeline_reserved() or _replaying:", history)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

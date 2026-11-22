@@ -249,6 +249,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t247_atlas_history_notifications.gd 2>&1 | tee /tmp/godot-t247-atlas-notifications.log
           python3 tools/check_godot_model_log.py /tmp/godot-t247-atlas-notifications.log --marker T247_ATLAS_NOTIFICATION_PASSED || ci_fail_marker 'T247 Atlas changed notification reservation rejected'
           grep -Fqx 'T247_ATLAS_NOTIFICATION_PASSED checks=259 failures=0' /tmp/godot-t247-atlas-notifications.log || ci_fail_marker 'T247 Atlas notification assertion count changed'
+          # T-248 blocks active-map rebind through synchronous history callbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t248_atlas_active_map_reservation.gd 2>&1 | tee /tmp/godot-t248-atlas-active-map.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t248-atlas-active-map.log --marker T248_ATLAS_ACTIVE_MAP_PASSED || ci_fail_marker 'T248 Atlas active-map reservation rejected'
+          grep -Fqx 'T248_ATLAS_ACTIVE_MAP_PASSED checks=70 failures=0' /tmp/godot-t248-atlas-active-map.log || ci_fail_marker 'T248 active-map assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log

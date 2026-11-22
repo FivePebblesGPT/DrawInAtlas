@@ -32,7 +32,16 @@ var _contexts_after: Array[DrawingHistoryContext] = []
 ## still holds after later undo/redo replay has incremented that revision.
 var _drawing_revisions: Dictionary[int, int] = {}
 
-var active_map_id: String = ""
+## The host may navigate while idle, including between a gesture and commit,
+## but synchronous command callbacks must not rebind the active edit target.
+var _active_map_id: String = ""
+var active_map_id: String:
+	get:
+		return _active_map_id
+	set(value):
+		if _timeline_reserved() or _replaying:
+			return
+		_active_map_id = value
 var _campaign: AtlasCampaign
 var _commands: Array[AtlasEditCommand] = []
 ## One unique state token per command boundary (length = commands + 1).
