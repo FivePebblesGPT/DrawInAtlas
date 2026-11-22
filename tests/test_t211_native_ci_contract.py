@@ -74,6 +74,17 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn(f"--marker {marker}", workflow)
         self.assertIn(f"{marker} checks=32 failures=0", workflow)
 
+    def test_required_fast_step_preflights_tile_local_patch_inputs(self) -> None:
+        workflow = FAST.read_text()
+        name = "t235_tile_patch_preflight"
+        marker = "T235_TILE_PREFLIGHT_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=34 failures=0", workflow)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

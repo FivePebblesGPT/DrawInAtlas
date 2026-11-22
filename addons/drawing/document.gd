@@ -788,10 +788,15 @@ func _publish_tile_edit(layer_id: String, expected: int,
 	if native_tile_publisher and not _native_direct_transfer_within_budget(patches.size()):
 		return DrawingResult.failure("NATIVE_TILES", "Direct tile edit exceeds native transfer budget")
 
-	var detached: Dictionary[String, DrawingRasterTile] = {}
-	var bounds: Dictionary[String, Array] = {}
-	var before: Dictionary[String, int] = {}
-	var after: Dictionary[String, int] = {}
+	# Validate and freeze the *entire* tile-local descriptor set before any
+	# lazy source callback. Otherwise an invalid later patch can run an earlier
+	# provider, and a reentrant provider can change the patch we eventually
+	# publish without changing the document revision.
+	var validated_patches: Dictionary[String, Dictionary] = {}
+	var validated_sources: Dictionary[String, Variant] = {}
+	# Sessions may hold verified but unchanged sources besides patched tiles.
+	# Preserve those entries while still detecting reentrant map mutations.
+	var frozen_session_sources: Dictionary[String, Variant] = session_sources.duplicate()
 	for tile_key: String in patches:
 		var components: PackedStringArray = tile_key.split(",")
 		if components.size() != 2 or not components[0].is_valid_int() \
@@ -801,33 +806,48 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		var tile_y: int = int(components[1])
 		if tile_key != "%d,%d" % [tile_x, tile_y]:
 			return DrawingResult.failure("COORD", "Noncanonical storage tile coordinate")
-		# Even the first tile-local edit must obey the Rust projection when
-		# native support is installed. Validate before signed multiplication
-		# or any lazy source callback; the pixel-map cutover is separate.
 		if native_tile_publisher \
 				and not TILES.tile_coordinates_in_projection_range(tile_x, tile_y, tile_stride):
 			return DrawingResult.failure("COORD", "Storage tile outside safe signed projection bounds")
 		if not session_sources.has(tile_key):
 			return DrawingResult.failure("STALE_PIXEL", "Gesture lacks its verified source tile")
-		var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
-		if not resolved.ok:
-			return resolved
-		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
-		# A source replacement without the expected document revision is also
-		# unsafe. The session's preflight captured the authoritative tile.
-		if original != session_sources[tile_key]:
-			return DrawingResult.failure("STALE_PIXEL", "Source tile changed during gesture")
-		var source_pixels: Dictionary[int, int] = {}
-		if original != null:
-			source_pixels = original.sparse_pixels()
 		var patch: Dictionary = patches[tile_key]
-		var has_zero_replacements: bool = false
 		for local_index: int in patch:
 			if local_index < 0 or local_index >= tile_stride * tile_stride:
 				return DrawingResult.failure("COORD", "Invalid storage tile offset")
 			var replacement: int = int(patch[local_index])
 			if replacement < 0 or replacement > 0xffffffff:
 				return DrawingResult.failure("RGBA", "Invalid storage tile RGBA8")
+		validated_patches[tile_key] = patch.duplicate(true)
+		validated_sources[tile_key] = session_sources[tile_key]
+
+	var detached: Dictionary[String, DrawingRasterTile] = {}
+	var bounds: Dictionary[String, Array] = {}
+	var before: Dictionary[String, int] = {}
+	var after: Dictionary[String, int] = {}
+	var source_digests: Dictionary[String, String] = {}
+	for tile_key: String in validated_patches:
+		var components: PackedStringArray = tile_key.split(",")
+		var tile_x: int = int(components[0])
+		var tile_y: int = int(components[1])
+		var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
+		if not resolved.ok:
+			return resolved
+		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
+		if original != validated_sources[tile_key]:
+			return DrawingResult.failure("STALE_PIXEL", "Source tile changed during gesture")
+		var source_pixels: Dictionary[int, int] = {}
+		if original != null:
+			source_pixels = original.sparse_pixels()
+			# Only retain a canonical SHA-256 fingerprint. Holding a second
+			# sparse Dictionary per tile could exceed the transfer budget for
+			# many dense tiles, even though the RGBA8 envelope is bounded.
+			source_digests[tile_key] = DrawingRasterTile.digest_rgba8(
+				original.to_rgba8(), tile_stride)
+		var patch: Dictionary = validated_patches[tile_key]
+		var has_zero_replacements: bool = false
+		for local_index: int in patch:
+			var replacement: int = int(patch[local_index])
 			var local_x: int = local_index % tile_stride
 			var local_y: int = local_index / tile_stride
 			var x: int = tile_x * tile_stride + local_x
@@ -849,10 +869,6 @@ func _publish_tile_edit(layer_id: String, expected: int,
 				rect[2] = maxi(int(rect[2]), x)
 				rect[3] = maxi(int(rect[3]), y)
 		if not patch.is_empty():
-			# A complete tile-local patch is already validated. Merge nonzero
-			# replacements in native Dictionary code, rather than making one
-			# GDScript set_rgba call per pixel. Transparent-black erasures must
-			# remove sparse keys; hidden-RGB alpha-zero values stay as stored.
 			var candidate: DrawingRasterTile = original.detached_copy() if original != null \
 				else DrawingRasterTile.new(tile_stride)
 			if not has_zero_replacements:
@@ -867,8 +883,24 @@ func _publish_tile_edit(layer_id: String, expected: int,
 			detached[tile_key] = candidate
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
+	# The only reentrant boundary above is source resolution. A provider may
+	# change input maps or modify an already-authorized tile *in place*, which
+	# preserves its identity. Revalidate both before Rust commits any bytes.
+	if patches.size() != validated_patches.size() \
+			or session_sources != frozen_session_sources:
+		return DrawingResult.failure("STALE_PIXEL", "Tile patch descriptors changed during preflight")
+	for tile_key: String in validated_patches:
+		if not patches.has(tile_key) or patches[tile_key] != validated_patches[tile_key] \
+				or not session_sources.has(tile_key) \
+				or session_sources[tile_key] != validated_sources[tile_key]:
+			return DrawingResult.failure("STALE_PIXEL", "Tile patch descriptors changed during preflight")
+		var source: DrawingRasterTile = validated_sources[tile_key] as DrawingRasterTile
+		if source != null and (not source_digests.has(tile_key) \
+				or DrawingRasterTile.digest_rgba8(
+					source.to_rgba8(), tile_stride) != source_digests[tile_key]):
+			return DrawingResult.failure("STALE_PIXEL", "Tile source bytes changed during preflight")
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, true, session_sources, true, true)
+		detached, bounds, record_history, true, validated_sources, true, true)
 
 
 ## Publish detached whole-tile snapshots from a native brush transaction.

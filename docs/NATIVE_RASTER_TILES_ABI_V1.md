@@ -541,3 +541,18 @@ semantic text history remains usable. TEXT↔RASTER transitions still use the
 separate T-154 parking bridge, and host-owned detached history is not newly
 made native-authoritative by this change; see
 [T-178 evidence](evidence/T-178-2026-11-16-text-history.md).
+
+### Direct tile-patch whole-request preflight (T-235)
+
+`DrawingDocument._publish_tile_edit` validates the **entire** tile-local
+patch descriptor set before resolving any lazy source (canonical signed tile
+IDs, native projection range, local offsets, exact unsigned RGBA8 values,
+and verified session source entries). It freezes the requested changes and
+full source map; a provider cannot rewrite later patches or add source entries
+without triggering a pre-commit refusal. Canonical RGBA8 source fingerprints are
+compared again after all callbacks, since object identity alone cannot detect
+in-place edits to previously checked tiles. Valid extra source entries for
+unmodified tiles remain allowed. The rejection is before Rust's atomic
+external-edit adoption and does not claim to roll back side effects of a
+malicious/misbehaving provider itself. See T-235's fail-first evidence. This
+is not universal native raster production or detached host history ownership.

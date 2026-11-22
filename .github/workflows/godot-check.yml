@@ -178,6 +178,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t234_native_publication_preflight.gd 2>&1 | tee /tmp/godot-t234-publication.log
           python3 tools/check_godot_model_log.py /tmp/godot-t234-publication.log --marker T234_NATIVE_PUBLICATION_PASSED || ci_fail_marker 'T234 native publication preflight rejected'
           grep -Fqx 'T234_NATIVE_PUBLICATION_PASSED checks=32 failures=0' /tmp/godot-t234-publication.log || ci_fail_marker 'T234 native publication assertion count changed'
+          # T-235 validates all direct tile-local patches before lazy sources
+          # and rejects reentrant descriptor/content mutation before adoption.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t235_tile_patch_preflight.gd 2>&1 | tee /tmp/godot-t235-tile-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t235-tile-preflight.log --marker T235_TILE_PREFLIGHT_PASSED || ci_fail_marker 'T235 tile-local patch descriptor/reentrancy preflight rejected'
+          grep -Fqx 'T235_TILE_PREFLIGHT_PASSED checks=34 failures=0' /tmp/godot-t235-tile-preflight.log || ci_fail_marker 'T235 tile-local assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
