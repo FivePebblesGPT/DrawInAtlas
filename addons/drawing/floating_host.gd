@@ -442,6 +442,10 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if not _gesture.is_empty() or not _candidate_id.is_empty() or (drag.is_dragging() and _owns_drag()):
+			# Move/resize previews mutate the host frame directly. A canceled
+			# gesture must restore both edges, not merely stop receiving motion.
+			if _gesture == "move" or _gesture == "resize":
+				set_host_rect(_frame_start)
 			_suppress_release = true
 			_clear_gesture()
 			get_viewport().set_input_as_handled()
