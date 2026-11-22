@@ -403,6 +403,10 @@ func _notification(what: int) -> void:
 		return
 	if _gesture.is_empty() and _candidate_id.is_empty() and (drag == null or not drag.is_dragging() or not _owns_drag()):
 		return
+	_cancel_pointer_preview()
+
+
+func _cancel_pointer_preview() -> void:
 	if _gesture == "move" or _gesture == "resize":
 		set_host_rect(_frame_start)
 	_suppress_release = true
@@ -441,6 +445,16 @@ func _input(event: InputEvent) -> void:
 			_show_focused_context():
 			get_viewport().set_input_as_handled()
 		return
+	# The OS can lose a mouse-up without deactivating the window. A subsequent
+	# motion with the left bit cleared is authoritative evidence the gesture
+	# ended; roll back its preview rather than committing stale geometry on a
+	# later release. An idle sibling must not cancel another host's drag.
+	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) == 0:
+		if not _gesture.is_empty() or not _candidate_id.is_empty() or \
+			(drag.is_dragging() and _owns_drag()):
+			_cancel_pointer_preview()
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		if _gesture.is_empty() and _candidate_id.is_empty() and not drag.is_dragging() and \
 			_frontmost_at(event.global_position) and _hit_resize_edges(event.global_position) == Vector4i.ZERO:
@@ -457,12 +471,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if not _gesture.is_empty() or not _candidate_id.is_empty() or (drag.is_dragging() and _owns_drag()):
-			# Move/resize previews mutate the host frame directly. A canceled
-			# gesture must restore both edges, not merely stop receiving motion.
-			if _gesture == "move" or _gesture == "resize":
-				set_host_rect(_frame_start)
-			_suppress_release = true
-			_clear_gesture()
+			_cancel_pointer_preview()
 			get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and event.ctrl_pressed and event.alt_pressed and not event.echo:
