@@ -40,13 +40,14 @@ class T092ColorsHistoryTests(unittest.TestCase):
 
     def test_color_targets_are_explicit_and_independent(self) -> None:
         workspace = (ROOT / "addons/drawing/workspace.gd").read_text()
-        for signature in ("func _set_background(value: Color)",
+        for signature in ("func _set_background(value: Color, record_recent: bool = true)",
                           "func _set_selected_color(value: Color)",
                           "func _reset_colors()", "color_edit_background = true",
-                          '"Previous BG":', '"R", "G", "B", "A"'):
+                          '"Background": color_edit_background = true', '"R", "G", "B", "A"'):
             with self.subTest(signature=signature):
                 self.assertIn(signature, workspace)
-        self.assertIn("color_advanced.color_changed.connect(_set_selected_color)", workspace)
+        self.assertIn("color_advanced.color_changed.connect(_on_picker_color_changed)", workspace)
+        self.assertNotIn('"Previous BG":', workspace)
 
     def test_app_preference_is_separate_from_document_file(self) -> None:
         prefs = (ROOT / "addons/drawing/workspace_preferences.gd").read_text()

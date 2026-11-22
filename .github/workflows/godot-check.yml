@@ -448,6 +448,10 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/color_history_smoke.gd 2>&1 | tee /tmp/godot-t092-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t092-model.log --marker T092_MODEL_PASSED || ci_fail_marker 'T092 Colors/History model log rejected'
+          # T-252 keeps native ColorPicker drag/keyboard updates out of recent
+          # history until the input gesture settles. Same required step ID.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t252_colors_model.gd 2>&1 | tee /tmp/godot-t252-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t252-model.log --marker T252_MODEL_PASSED || ci_fail_marker 'T252 settled-color model log rejected'
           python3 -m unittest discover -s tests -p 'test_t092_color_history.py' -v
           ci_finish
       - name: Verify T-093 Object source discovery, recent-root consent, image import and safe Open

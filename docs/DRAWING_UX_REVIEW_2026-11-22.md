@@ -42,3 +42,17 @@ checks pass. See [T-251 evidence](evidence/T-251-2026-11-22-dock-toggle.md).
 Do not treat this as color-panel, Selection Delete or overall dock acceptance.
 The owner's original current/concept PNGs were committed at `7b1fd306`
 under `docs/assets/drawing-ux-2026-11-22/` before this fix.
+
+## T-252 engineering result — 2026-11-22
+
+The ColorPicker may now change FG/BG continuously during a drag while the
+recent-color list records one **previous settled** pigment on release, not each
+frame of the gradient. Keyboard changes, native text/spin controls, cancellation,
+and role switching have explicit completion boundaries. The earlier redundant
+restore-previous row and Recent label are removed, and the native picker follows
+the one-row FG/Swap/BG plus vertical recent bars directly. Exact hex/default
+controls remain available by scrolling. Pigment preferences survive restart
+independently of `.drawing` content/history. [Evidence](evidence/T-252-2026-11-22-recent-colors.md)
+includes model/native X11 pointer and Atlas integration tests. Owner hardware UX
+confirmation is still outstanding. The manual Drawing gate T-250 stays Blocked
+until T-253, T-254 and actual owner review are complete.

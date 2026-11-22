@@ -31,8 +31,9 @@ func run() -> void:
 	check(app.color_advanced.get_parent() == app.color_picker_scroll and
 		app.color_picker_scroll.get_parent() == app.dock_views["colors"],
 		"native picker lives in same panel view and has no popover")
-	check(app.color_recent_buttons.size() == 6 and app.color_swatch_buttons.size() == 10,
-		"six compact bars coexist with FG/BG and their previous-color controls")
+	check(app.color_recent_buttons.size() == 6 and app.color_swatch_buttons.size() == 8 and
+		app.foreground_button.get_parent().get_child_count() == 3,
+		"single-row FG/Swap/BG and six bars have no redundant restore buttons")
 	var hidden_a: Color = Color8(12, 47, 82, 0)
 	var hidden_b: Color = Color8(13, 47, 82, 0)
 	app._set_foreground(hidden_a)
@@ -72,12 +73,24 @@ func run() -> void:
 		app.color_hex.text == "#5A3C1E00" and app.color_advanced.color == new_bg and
 		app.canvas.color_rgba == app._pack_color(new_fg),
 		"native picker signal updates only background, including transparent hidden RGB")
-	app._color_swatch_pressed("Previous BG")
-	check(app.color_background == third and app.color_advanced.color == third,
-		"previous background restore synchronizes inline picker")
-	app._color_swatch_pressed("Previous FG")
+	var bg_recent: int = -1
+	for i: int in range(app._visible_recent_colors().size()):
+		if app._pack_color(app._visible_recent_colors()[i]) == app._pack_color(third):
+			bg_recent = i
+	check(bg_recent >= 0, "previous BG remains retrievable after picker change")
+	if bg_recent >= 0:
+		app._use_recent_color(bg_recent)
+	check(app.color_background == third, "recent bar restores BG independently")
+	app._color_swatch_pressed("Foreground")
+	var fg_recent: int = -1
+	for i: int in range(app._visible_recent_colors().size()):
+		if app._pack_color(app._visible_recent_colors()[i]) == app._pack_color(hidden_a):
+			fg_recent = i
+	check(fg_recent >= 0, "previous FG remains retrievable from recents")
+	if fg_recent >= 0:
+		app._use_recent_color(fg_recent)
 	check(app.active_color == hidden_a and app.color_advanced.color == hidden_a,
-		"previous foreground restore updates active target and picker")
+		"recent foreground restores the exact pigment without extra restore buttons")
 	for i: int in range(12):
 		app._remember_recent(Color8(i + 100, i, 200, i + 5))
 	check(app.recent_colors.size() == 6 and app._visible_recent_colors().size() <= 6,

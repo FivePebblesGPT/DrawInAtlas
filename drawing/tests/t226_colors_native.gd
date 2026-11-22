@@ -138,7 +138,7 @@ func run() -> void:
 		"scroll can bring the native picker into the visible dock viewport")
 	# The picker itself must respond to actual mouse input, not only a helper
 	# invoked from our model test. Scroll its color square into view first.
-	scroll.scroll_vertical = 220
+	scroll.scroll_vertical = 45
 	await frames(8)
 	var picker_point: Vector2 = app.color_advanced.get_global_rect().position + Vector2(42, 45)
 	check(scroll.get_global_rect().has_point(picker_point) and
