@@ -1105,6 +1105,14 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		original_bytes[key] = before
 		replacement_bytes[key] = after
 		coordinates_by_key[key] = Vector2i(cx, cy)
+	# Fail before any lazy provider is invoked. Even a byte-identical out-of-
+	# order replay must not invalidate newer retained native history entries.
+	if source_token > 0 and _native_raster_store != null \
+			and _attached_native_revision_matches(revision) \
+			and not _native_raster_store.call("has_history_token", source_token,
+				revision, undo_action) \
+			and _native_raster_store.call("has_retained_history_token", source_token):
+		return DrawingResult.failure("HISTORY_ORDER", "Native history token is retained out of order")
 	var base_revision: int = revision
 	var source_node: DrawingLayerNode = _nodes[source_layer]
 	var detached: Dictionary[String, DrawingRasterTile] = {}
@@ -1196,9 +1204,15 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 				return DrawingResult.failure("NATIVE_HISTORY", "Native history source import rejected")
 	if not replay_store.call("set_layer_editable", delta.layer_id, true):
 		return DrawingResult.failure("NATIVE_HISTORY", "Detached replay layer rejected")
-	var live_token: bool = current_store and delta.native_history_token > 0 and \
-		replay_store.call("has_history_token", delta.native_history_token,
+	var live_token: bool = current_store and source_token > 0 and \
+		replay_store.call("has_history_token", source_token,
 			base_revision, undo_action)
+	# Detached replay invalidates Rust Undo/Redo. A retained token that is not
+	# the next event belongs to the live timeline and must fail without a
+	# fallback, even when the requested tiles are disjoint from newer edits.
+	if current_store and source_token > 0 and not live_token \
+			and replay_store.call("has_retained_history_token", source_token):
+		return DrawingResult.failure("HISTORY_ORDER", "Native history token is retained out of order")
 	var native_replay: Dictionary
 	if live_token:
 		native_replay = replay_store.call("replay_history_token",

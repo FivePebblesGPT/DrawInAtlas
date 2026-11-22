@@ -991,6 +991,17 @@ impl TileStore {
         Ok(())
     }
 
+    // Do not treat a retained but out-of-order token as detached. Detached
+    // replay discards the native history timeline, even for disjoint tiles.
+    fn retains_history_token(&self, token: i64) -> bool {
+        token > 0
+            && self
+                .undo
+                .iter()
+                .chain(self.redo.iter())
+                .any(|event| event.token == token)
+    }
+
     fn history_matches(&self, token: i64, undo: bool) -> bool {
         if token <= 0 || self.active.is_some() {
             return false;
@@ -1376,6 +1387,13 @@ impl DrawingNativeTiles {
         expected_revision >= 0
             && self.store.revision == expected_revision as u64
             && self.store.history_matches(transaction, undo)
+    }
+
+    /// Side-effect-free lookup across both history stacks, including tokens
+    /// that cannot be replayed next. Evicted/rebased tokens return false.
+    #[func]
+    fn has_retained_history_token(&self, transaction: i64) -> bool {
+        self.store.retains_history_token(transaction)
     }
 
     /// Checked detached-history replay when the original Rust token has been
@@ -3182,9 +3200,16 @@ mod tests {
             assert!(store.authorized.contains(&original));
         }
         let last = store.undo.last().unwrap().token;
+        let older = store.undo.first().unwrap().token;
+        assert!(store.retains_history_token(older));
+        assert!(store.retains_history_token(last));
+        assert!(!store.retains_history_token(-1));
+        assert!(!store.retains_history_token(last + 42));
+        assert!(!store.history_matches(older, true));
         assert!(!store.history_matches(last + 42, true));
         assert_eq!(store.undo_or_redo(true).unwrap(), 1);
         assert!(store.history_matches(last, false));
+        assert!(store.retains_history_token(last)); // token moved to redo
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.revision, 4);
         let _active = store.begin("ink", 4, false).unwrap();
@@ -3198,6 +3223,7 @@ mod tests {
             [0x33, 0x22, 0, 255]
         );
         store.rebase_external(4, 5).unwrap();
+        assert!(!store.retains_history_token(last));
         assert!(store.tiles.is_empty() && store.authorized.is_empty());
         assert!(store.undo.is_empty() && store.redo.is_empty());
         assert_eq!(store.revision, 5);

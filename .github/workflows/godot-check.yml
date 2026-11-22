@@ -198,6 +198,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t238_brush_source_reentrancy.gd 2>&1 | tee /tmp/godot-t238-brush-source.log
           python3 tools/check_godot_model_log.py /tmp/godot-t238-brush-source.log --marker T238_BRUSH_SOURCE_PASSED || ci_fail_marker 'T238 Brush source-byte reentrancy rejected'
           grep -Fqx 'T238_BRUSH_SOURCE_PASSED checks=18 failures=0' /tmp/godot-t238-brush-source.log || ci_fail_marker 'T238 Brush source assertion count changed'
+          # T-239 keeps live host-owned native tokens in strict Undo/Redo
+          # order while retaining detached replay for evicted history.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t239_native_history_order.gd 2>&1 | tee /tmp/godot-t239-history-order.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t239-history-order.log --marker T239_HISTORY_ORDER_PASSED || ci_fail_marker 'T239 retained native history ordering rejected'
+          grep -Fqx 'T239_HISTORY_ORDER_PASSED checks=36 failures=0' /tmp/godot-t239-history-order.log || ci_fail_marker 'T239 history-order assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
