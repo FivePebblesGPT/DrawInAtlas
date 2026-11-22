@@ -192,6 +192,20 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn("_register_edit_session", (ROOT / "addons/drawing/edit_session.gd").read_text())
         self.assertIn("WeakRef", (ROOT / "addons/drawing/document.gd").read_text())
 
+    def test_required_fast_step_reserves_atlas_history_during_publication(self) -> None:
+        workflow = FAST.read_text()
+        name = "t245_atlas_commit_reentrancy"
+        marker = "T245_ATLAS_COMMIT_PASSED"
+        path = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(path.is_file())
+        self.assertIn(marker, path.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=126 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("_committing_drawing", history)
+        self.assertIn("_remember_revisions(command)", history)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

@@ -17,6 +17,10 @@ var context_restorer: Callable
 var last_playback_warning: String = ""
 var last_playback_context: DrawingHistoryContext
 var _replaying: bool = false
+## A Drawing commit can resolve caller-owned lazy sources synchronously. Their
+## callbacks must not insert, undo, reset or mark saved another host command
+## before this transaction has been appended to the Atlas timeline.
+var _committing_drawing: bool = false
 var _contexts_before: Array[DrawingHistoryContext] = []
 var _contexts_after: Array[DrawingHistoryContext] = []
 ## Expected live revisions for every Drawing document touched by this timeline.
@@ -46,6 +50,8 @@ func _init(campaign: AtlasCampaign = null) -> void:
 
 
 func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
+	if _committing_drawing:
+		return
 	_campaign = campaign
 	active_map_id = ""
 	_commands.clear()
@@ -67,7 +73,7 @@ func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
 ## Applying a command is transactional: invalid commands do not mutate history.
 ## Only after successful apply do we discard the redo branch and issue a state ID.
 func execute(command: AtlasEditCommand) -> bool:
-	if _replaying or _campaign == null or command == null or command.map_id != active_map_id \
+	if _replaying or _committing_drawing or _campaign == null or command == null or command.map_id != active_map_id \
 			or not _revisions_valid(command):
 		return false
 	var before: DrawingHistoryContext = _capture_context(command.map_id, command.floor_id)
@@ -87,27 +93,30 @@ func execute(command: AtlasEditCommand) -> bool:
 ## after the gesture: its canonical pixels have *already* been committed.
 func commit_drawing(session: DrawingEditSession, before: DrawingHistoryContext,
 		after: DrawingHistoryContext) -> DrawingResult:
-	if _replaying or _campaign == null or session == null or session.document == null \
+	if _replaying or _committing_drawing or _campaign == null or session == null or session.document == null \
 			or before == null or after == null or before.map_id.is_empty() \
 			or before.document_id != session.document.id or after.document_id != before.document_id \
 			or not session.document.external_history or _campaign.get_map(before.map_id) == null \
 			or not _revision_valid(session.document):
 		return DrawingResult.failure("HISTORY_CONTEXT", "Invalid drawing origin or external history owner")
+	_committing_drawing = true
 	var result: DrawingResult = session.commit()
 	if not result.ok:
+		_committing_drawing = false
 		return result
 	var command: AtlasDrawingEdit = AtlasDrawingEdit.new(session.document, result.delta,
 		before, after, result.regions)
-	# After a successful commit, all command eligibility is captured by this
-	# synchronous and non-failing append; no second local history is created.
+	# The complete host append and revision-ledger update form one reserved
+	# boundary, including callbacks from the changed signal.
 	_append_applied(command, before, after, true)
 	_remember_revisions(command)
+	_committing_drawing = false
 	return result
 
 
 ## Atomic across the two documents from Atlas's chronological point of view.
 func execute_drawing_transfer(command: AtlasDrawingTransfer) -> bool:
-	if _replaying or _campaign == null or command == null or command.map_id.is_empty() \
+	if _replaying or _committing_drawing or _campaign == null or command == null or command.map_id.is_empty() \
 			or _campaign.get_map(command.map_id) == null or not _revisions_valid(command) \
 			or not command.apply(_campaign):
 		return false
@@ -117,7 +126,7 @@ func execute_drawing_transfer(command: AtlasDrawingTransfer) -> bool:
 
 
 func execute_asset_rebind(command: AtlasAssetRebind) -> bool:
-	if _replaying or _campaign == null or command == null or command.map_id.is_empty() \
+	if _replaying or _committing_drawing or _campaign == null or command == null or command.map_id.is_empty() \
 			or _campaign.get_map(command.map_id) == null or not command.apply(_campaign):
 		return false
 	_append_applied(command, command.before_context, command.after_context, true)
@@ -129,7 +138,7 @@ func execute_asset_rebind(command: AtlasAssetRebind) -> bool:
 
 func record_selection_change(before: DrawingHistoryContext,
 		after: DrawingHistoryContext) -> bool:
-	if _replaying or _campaign == null or not record_selection_history or before == null \
+	if _replaying or _committing_drawing or _campaign == null or not record_selection_history or before == null \
 			or after == null or before.same_selection(after) \
 			or _campaign.get_map(before.map_id) == null:
 		return false
@@ -213,7 +222,7 @@ func _append_applied(command: AtlasEditCommand, before: DrawingHistoryContext,
 
 
 func undo() -> bool:
-	if _replaying or not can_undo():
+	if _replaying or _committing_drawing or not can_undo():
 		return false
 	_replaying = true
 	var command: AtlasEditCommand = _commands[_cursor - 1]
@@ -229,7 +238,7 @@ func undo() -> bool:
 
 
 func redo() -> bool:
-	if _replaying or not can_redo():
+	if _replaying or _committing_drawing or not can_redo():
 		return false
 	_replaying = true
 	var command: AtlasEditCommand = _commands[_cursor]
@@ -276,12 +285,16 @@ func is_dirty() -> bool:
 
 
 func mark_saved() -> void:
+	if _committing_drawing:
+		return
 	_saved_state = _states[_cursor]
 	_saved_external_revision = _external_revision
 	changed.emit()
 
 
 func mark_external_change() -> void:
+	if _committing_drawing:
+		return
 	# External metadata edits are dirty even when not represented by commands.
 	_discard_redo()
 	_external_revision += 1
