@@ -19,7 +19,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-color-interruption check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-color-interruption test-live-stroke check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -74,6 +74,18 @@ test-graphical: import-drawing
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t195_release_catchup.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t196_release_deferred.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t197_first_preview_callback.gd
+
+# T-262: reproducible T-085 held-preview native CI witness after both imports.
+# Retain complete process logs during validation, then remove temporary files.
+test-live-stroke: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing --script res://tests/live_stroke_smoke.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T085_MODEL_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/live_stroke_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_native_t085_log.py "$$log"
 
 # T-251: real pointer/framebuffer regression against both standalone Drawing and
 # the Atlas-hosted canonical workspace. Both need an imported native extension.
