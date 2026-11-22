@@ -151,6 +151,19 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn(f"--marker {marker}", workflow)
         self.assertIn(f"{marker} checks=29 failures=0", workflow)
 
+    def test_required_fast_step_protects_external_history_property(self) -> None:
+        workflow = FAST.read_text()
+        for project, name, marker, count in (
+            ("drawing", "t242_history_mode_readonly", "T242_HISTORY_MODE_PASSED", 25),
+            (".", "t242_atlas_history_mode_readonly", "T242_ATLAS_MODE_PASSED", 18),
+        ):
+            path = ROOT / ("drawing/tests" if project == "drawing" else "tests") / f"{name}.gd"
+            self.assertTrue(path.is_file())
+            self.assertIn(marker, path.read_text())
+            self.assertIn(f"--path {project} --script res://tests/{name}.gd", workflow)
+            self.assertIn(f"--marker {marker}", workflow)
+            self.assertIn(f"{marker} checks={count} failures=0", workflow)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

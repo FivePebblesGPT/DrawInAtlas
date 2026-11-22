@@ -213,6 +213,14 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t241_host_history_owner_fence.gd 2>&1 | tee /tmp/godot-t241-host-owner.log
           python3 tools/check_godot_model_log.py /tmp/godot-t241-host-owner.log --marker T241_HOST_OWNER_PASSED || ci_fail_marker 'T241 host-owned history handoff rejected'
           grep -Fqx 'T241_HOST_OWNER_PASSED checks=29 failures=0' /tmp/godot-t241-host-owner.log || ci_fail_marker 'T241 host owner assertion count changed'
+          # T-242 makes the host-ownership flag getter-only: direct and
+          # reflective writes must not bypass T-241's checked handoff.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t242_history_mode_readonly.gd 2>&1 | tee /tmp/godot-t242-history-mode.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t242-history-mode.log --marker T242_HISTORY_MODE_PASSED || ci_fail_marker 'T242 history ownership property guard rejected'
+          grep -Fqx 'T242_HISTORY_MODE_PASSED checks=25 failures=0' /tmp/godot-t242-history-mode.log || ci_fail_marker 'T242 history mode assertion count changed'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t242_atlas_history_mode_readonly.gd 2>&1 | tee /tmp/godot-t242-atlas-mode.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t242-atlas-mode.log --marker T242_ATLAS_MODE_PASSED || ci_fail_marker 'T242 Atlas history ownership property guard rejected'
+          grep -Fqx 'T242_ATLAS_MODE_PASSED checks=18 failures=0' /tmp/godot-t242-atlas-mode.log || ci_fail_marker 'T242 Atlas assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log

@@ -34,7 +34,12 @@ var _display_changes: Array[Dictionary] = []
 var display_source_epoch: int = 0
 ## One local ordered timeline. A selection step carries the current content token.
 ## External Atlas-owned documents use the host timeline instead of this one.
-var external_history: bool = false
+## Read-only projection: all ownership changes must use set_external_history().
+## Plain and reflective writes to a getter-only property cannot skip its
+## checked revision/local-history fence (T-241).
+var _external_history: bool = false
+var external_history: bool:
+	get: return _external_history
 ## Revision at which the host claimed an otherwise unowned timeline. The
 ## document cannot prove that external commands were discarded, so switching
 ## back is safe only if no canonical document revision occurred in that mode.
@@ -1503,7 +1508,7 @@ func set_external_history(enabled: bool) -> DrawingResult:
 	# the revision, and a repeated enable must not reset this ownership fence.
 	if external_history and revision != _external_history_anchor_revision:
 		return DrawingResult.failure("HISTORY_OWNED", "Cannot discard an active external history implicitly")
-	external_history = enabled
+	_external_history = enabled
 	_external_history_anchor_revision = revision if enabled else -1
 	return DrawingResult.success()
 
