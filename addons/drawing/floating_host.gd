@@ -32,6 +32,10 @@ var _candidate_kind: String = ""
 var _candidate_id: String = ""
 var _candidate_start: Vector2
 var _suppress_release: bool = false
+var _panel_menu: PopupMenu
+var _group_menu: PopupMenu
+var _menu_panel_id: String = ""
+var _menu_group_id: String = ""
 
 
 func setup(id: String, state: DrawingDockLayout, planner: DrawingDockDrag,
@@ -72,6 +76,23 @@ func _ready() -> void:
 	hide_button.focus_mode = Control.FOCUS_ALL
 	hide_button.pressed.connect(func() -> void: hide_requested.emit(host_id))
 	_header.add_child(hide_button)
+	# Context commands are available from icon RMB/Shift+F10, not permanent
+	# text buttons. Keep the popups outside the disposable tab-strip subtree.
+	_panel_menu = PopupMenu.new()
+	_panel_menu.name = "FloatingPanelContextMenu"
+	_panel_menu.add_item("Move panel left", 0)
+	_panel_menu.add_item("Move panel right", 1)
+	_panel_menu.add_separator()
+	_panel_menu.add_item("Split into new floating group", 2)
+	_panel_menu.add_item("Dock this panel", 3)
+	_panel_menu.add_item("Dock whole group", 4)
+	_panel_menu.id_pressed.connect(_floating_panel_menu_action)
+	add_child(_panel_menu)
+	_group_menu = PopupMenu.new()
+	_group_menu.name = "FloatingGroupContextMenu"
+	_group_menu.add_item("Dock whole group", 0)
+	_group_menu.id_pressed.connect(_floating_group_menu_action)
+	add_child(_group_menu)
 	_scroll = ScrollContainer.new()
 	_scroll.name = "FloatingScroll"
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -256,12 +277,14 @@ func _toggle_collapse(group_id: String) -> void:
 
 ## Accessible commands are scoped to one host/group. Splitting a floating tab
 ## creates a *new host*, never a nested second group in this container.
-func _arrange(action: int, group_id: String) -> void:
+func _arrange(action: int, group_id: String, requested_panel: String = "") -> void:
 	var group: Dictionary = layout.group_info(group_id)
-	if group.is_empty():
+	if group.is_empty() or layout.owner_of(String(group["active"])) != host_id:
 		return
-	var panel_id: String = group["active"]
+	var panel_id: String = String(group["active"]) if requested_panel.is_empty() else requested_panel
 	var panel_index: int = group["panels"].find(panel_id)
+	if panel_index < 0:
+		return
 	match action:
 		0:
 			if panel_index > 0:
@@ -290,6 +313,74 @@ func _arrange(action: int, group_id: String) -> void:
 					_apply(kind, source, {"kind": DrawingDockDrag.TAB_SLOT if action == 5 else DrawingDockDrag.MERGE_GROUP,
 						"group": other_group["id"], "index": other_group["panels"].size()})
 					return
+
+
+func _show_floating_panel_menu(panel_id: String, point: Vector2) -> void:
+	if layout.owner_of(panel_id) != host_id:
+		return
+	var group_id: String = layout.group_of(panel_id)
+	var group: Dictionary = layout.group_info(group_id)
+	if group.is_empty():
+		return
+	_menu_panel_id = panel_id
+	var index: int = group["panels"].find(panel_id)
+	_panel_menu.set_item_disabled(_panel_menu.get_item_index(0), index <= 0)
+	_panel_menu.set_item_disabled(_panel_menu.get_item_index(1), index >= group["panels"].size() - 1)
+	_panel_menu.set_item_disabled(_panel_menu.get_item_index(2), group["panels"].size() <= 1)
+	_panel_menu.position = Vector2i(point.round())
+	_panel_menu.popup()
+
+
+func _show_floating_group_menu(group_id: String, point: Vector2) -> void:
+	var info: Dictionary = layout.container_info(host_id)
+	if info.is_empty() or (info["groups"] as Array).size() != 1 or \
+		String(info["groups"][0]["id"]) != group_id:
+		return
+	_menu_group_id = group_id
+	_group_menu.position = Vector2i(point.round())
+	_group_menu.popup()
+
+
+func _floating_panel_menu_action(action_id: int) -> void:
+	var panel_id: String = _menu_panel_id
+	if layout.owner_of(panel_id) != host_id:
+		return # A delayed popup callback must not act on a redocked tab.
+	var group_id: String = layout.group_of(panel_id)
+	if action_id >= 0 and action_id <= 4:
+		_arrange(action_id, group_id, panel_id)
+
+
+func _floating_group_menu_action(action_id: int) -> void:
+	if action_id == 0:
+		var group: Dictionary = layout.group_info(_menu_group_id)
+		if not group.is_empty() and layout.owner_of(String(group["active"])) == host_id:
+			_arrange(4, _menu_group_id)
+
+
+func _visible_floating_tab_at(point: Vector2) -> String:
+	# Godot's global Button rect is not clipped by the horizontal ScrollContainer.
+	# A tab hidden under the grip/close must never get a context command.
+	for strip: ScrollContainer in tab_strips.values():
+		if not strip.is_visible_in_tree() or not strip.get_global_rect().has_point(point):
+			continue
+		for panel_id: String in tab_buttons:
+			var tab: Button = tab_buttons[panel_id] as Button
+			if tab.is_visible_in_tree() and tab.get_global_rect().has_point(point):
+				return panel_id
+	return ""
+
+
+func _show_focused_context() -> bool:
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	for panel_id: String in tab_buttons:
+		if tab_buttons[panel_id] == focused:
+			_show_floating_panel_menu(panel_id, focused.get_global_rect().get_center())
+			return true
+	for group_id: String in group_handles:
+		if group_handles[group_id] == focused:
+			_show_floating_group_menu(group_id, focused.get_global_rect().get_center())
+			return true
+	return false
 
 
 func _apply(kind: String, source: String, target: Dictionary) -> bool:
@@ -328,6 +419,26 @@ func _tab_press(event: InputEvent, kind: String, source: String) -> void:
 
 func _input(event: InputEvent) -> void:
 	if not visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo and \
+		(event.keycode == KEY_MENU or (event.keycode == KEY_F10 and event.shift_pressed)):
+		if _gesture.is_empty() and _candidate_id.is_empty() and not drag.is_dragging() and \
+			_show_focused_context():
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if _gesture.is_empty() and _candidate_id.is_empty() and not drag.is_dragging() and \
+			_frontmost_at(event.global_position) and _hit_resize_edges(event.global_position) == Vector4i.ZERO:
+			var panel_id: String = _visible_floating_tab_at(event.global_position)
+			if not panel_id.is_empty():
+				_show_floating_panel_menu(panel_id, event.global_position)
+				get_viewport().set_input_as_handled()
+			else:
+				var grip: Button = _header.get_node_or_null("MoveHandle") as Button
+				if grip != null and grip.get_global_rect().has_point(event.global_position) and \
+					not group_handles.is_empty():
+					_show_floating_group_menu(String(group_handles.keys()[0]), event.global_position)
+					get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if not _gesture.is_empty() or not _candidate_id.is_empty() or (drag.is_dragging() and _owns_drag()):
