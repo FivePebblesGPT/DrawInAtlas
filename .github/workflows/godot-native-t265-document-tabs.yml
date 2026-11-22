@@ -1,0 +1,50 @@
+name: Godot T-265 visible document-tab close targeting (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  document-tab-close-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 3
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+      - name: Install pinned Rust 1.99.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+      - name: Install X11/Mesa
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Build required native extension and import both consumers
+        run: make build TOOLCHAIN=system
+      - name: Verify standalone visible document close glyph
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 1700x1200x24' godot \
+            --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/t265_document_tab_close_native.gd 2>&1 | tee /tmp/t265-native.log
+          python3 tools/check_godot_model_log.py /tmp/t265-native.log --marker T265_NATIVE_PASSED
+      - name: Verify Atlas embedded document close glyph
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 1700x1200x24' godot \
+            --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path . --script res://tests/t265_atlas_document_tab_close_native.gd 2>&1 | tee /tmp/t265-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t265-atlas.log --marker T265_ATLAS_PASSED
+      - name: Preserve complete logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t265-visible-document-tab-close
+          path: |
+            /tmp/t265-native.log
+            /tmp/t265-atlas.log
+          if-no-files-found: warn

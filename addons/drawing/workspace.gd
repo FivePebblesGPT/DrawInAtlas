@@ -1329,14 +1329,19 @@ func _tab_close_hit(position: Vector2) -> int:
 	if not show_document_tabs or tab_bar == null or not tab_bar.is_visible_in_tree():
 		return -1
 	var local: Vector2 = tab_bar.get_global_transform_with_canvas().affine_inverse() * position
-	for index: int in range(tab_bar.tab_count):
-		var tab: Rect2 = tab_bar.get_tab_rect(index)
-		if tab.size.x < 32.0:
-			continue
-		var close: Rect2 = Rect2(tab.end.x - 30.0, tab.position.y, 28.0, tab.size.y)
-		if close.has_point(local):
-			return index
-	return -1
+	if not Rect2(Vector2.ZERO, tab_bar.size).has_point(local):
+		return -1
+	# With clip_tabs, Godot returns the same offscreen origin for multiple
+	# hidden tabs. Their stale rectangles can overlap a visible close glyph;
+	# ask the TabBar which tab is *actually* rendered at this pointer first.
+	var index: int = tab_bar.get_tab_idx_at_point(local)
+	if index < 0 or index >= tab_bar.tab_count:
+		return -1
+	var tab: Rect2 = tab_bar.get_tab_rect(index)
+	if tab.size.x < 32.0:
+		return -1
+	var close: Rect2 = Rect2(tab.end.x - 30.0, tab.position.y, 28.0, tab.size.y)
+	return index if close.has_point(local) else -1
 
 
 func _input(event: InputEvent) -> void:
