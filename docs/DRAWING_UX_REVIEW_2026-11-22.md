@@ -56,3 +56,12 @@ independently of `.drawing` content/history. [Evidence](evidence/T-252-2026-11-2
 includes model/native X11 pointer and Atlas integration tests. Owner hardware UX
 confirmation is still outstanding. The manual Drawing gate T-250 stays Blocked
 until T-253, T-254 and actual owner review are complete.
+
+## T-253 dense-selection correction — 2026-11-22
+
+[T-253](Tickets/T-253.md) has new fail-first **real X11 input→frame**
+evidence: p95 1,127ms before, 179ms after for 71,901 pixels at 119% zoom,
+plus exact RGBA8/Undo/Redo/Atlas Save/Open checks. The sparse 8-pixel
+T-221 result did not predict the dense frame stall. **Engineering Done does
+not equal owner acceptance:** physical retest remains on T-250/T-088;
+T-254 icon-only flyouts remain the next P0 task.

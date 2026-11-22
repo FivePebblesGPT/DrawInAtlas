@@ -163,6 +163,14 @@ var _brush_tile_publish: bool = true
 ## until an external edit API needs canonical global keys.
 var _brush_deferred: bool = false
 var _brush_change_count: int = 0
+## T-253: a dense Delete keeps full RGBA8 tiles and tile-local preview offsets,
+## not 70k+ global string-keyed pixel deltas. Mixed edit APIs materialize
+## the same canonical pixel maps before continuing.
+var _clear_deferred: bool = false
+var _clear_change_count: int = 0
+var _clear_images: Dictionary[String, PackedByteArray] = {}
+var _clear_sources: Dictionary[String, Variant] = {}
+var _clear_bounds: Dictionary[String, Rect2i] = {}
 ## Rollback records each first-attempted local offset in the paint batch,
 ## including source-identical pixels whose once-only coverage was recorded.
 ## Each entry is [prior_patch_exists, prior_pixel, newly_covered, global_y, global_x].
@@ -214,7 +222,7 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 
 
 func change_count() -> int:
-	return _after.size() + _hokusai_change_count + _brush_change_count + _native_change_count
+	return _after.size() + _hokusai_change_count + _brush_change_count + _native_change_count + _clear_change_count
 
 
 ## Publish uses canonical global string-keyed _before/_after; retain that
@@ -245,6 +253,31 @@ func _materialize_hokusai_preview() -> void:
 
 ## Materialize Brush-only tile-local edits on the first mixed edit API. This
 ## keeps the canonical before/after contract for shape/fill/clipboard callers.
+## Maintain the old mixed-session contract if a caller uses a second editing
+## API after a deferred Delete. The standalone Delete commit skips this work.
+func _materialize_clear_preview() -> void:
+	if not _clear_deferred:
+		return
+	var stride: int = document.tile_stride
+	for tile_key: String in _preview_tiles:
+		var parts: PackedStringArray = tile_key.split(",")
+		var tile_x: int = int(parts[0])
+		var tile_y: int = int(parts[1])
+		var original: DrawingRasterTile = _clear_sources[tile_key] as DrawingRasterTile
+		var pixels: Dictionary[int, int] = original.sparse_pixels()
+		for local_index: int in _preview_tiles[tile_key]:
+			var x: int = tile_x * stride + local_index % stride
+			var y: int = tile_y * stride + local_index / stride
+			var key: String = "%d,%d" % [x, y]
+			_before[key] = int(pixels[local_index])
+			_after[key] = 0
+	_clear_deferred = false
+	_clear_change_count = 0
+	_clear_images.clear()
+	_clear_sources.clear()
+	_clear_bounds.clear()
+
+
 func _materialize_brush_preview() -> void:
 	if not _brush_deferred:
 		return
@@ -514,6 +547,11 @@ func cancel() -> void:
 	_brush_deferred = false
 	_brush_change_count = 0
 	_brush_tile_journal.clear()
+	_clear_deferred = false
+	_clear_change_count = 0
+	_clear_images.clear()
+	_clear_sources.clear()
+	_clear_bounds.clear()
 	_before.clear()
 	_after.clear()
 	_hokusai_deferred = false
@@ -548,7 +586,10 @@ func commit() -> DrawingResult:
 	var tile_only: bool = (_hokusai_deferred and _after.is_empty()) \
 		or (_brush_deferred and _after.is_empty()) \
 		or (_brush_tile_publish and not _after.is_empty())
-	if tile_only:
+	if _clear_deferred:
+		result = document._publish_dense_clear_tiles(layer_id, expected_revision,
+			_clear_images, _clear_sources, _clear_bounds)
+	elif tile_only:
 		result = document._publish_tile_edit(layer_id, expected_revision,
 			_preview_tiles, _source_tiles)
 	else:
@@ -559,6 +600,11 @@ func commit() -> DrawingResult:
 	_brush_deferred = false
 	_brush_change_count = 0
 	_brush_tile_journal.clear()
+	_clear_deferred = false
+	_clear_change_count = 0
+	_clear_images.clear()
+	_clear_sources.clear()
+	_clear_bounds.clear()
 	_hokusai_deferred = false
 	_hokusai_change_count = 0
 	_before.clear()
@@ -578,6 +624,8 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		internal_brush: bool = false) -> DrawingResult:
 	if not internal_brush:
 		_stationary_dab_valid = false
+	if _clear_deferred:
+		_materialize_clear_preview()
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if internal_brush and _brush_tile_publish and not _hokusai_deferred:
@@ -815,6 +863,11 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds safe pixel coordinates")
 	_materialize_hokusai_preview()
 	_materialize_brush_preview()
+	_materialize_clear_preview()
+	if _before.is_empty() and _after.is_empty() and _preview_tiles.is_empty() \
+			and _native_tiles == null and ClassDB.class_exists("DrawingNativeTiles") \
+			and document.tile_stride >= 16 and document.tile_stride <= 2048:
+		return _clear_rect_dense_tiles(area, selection, max_pixels, last_x, last_y)
 	var old_before: Dictionary[String, int] = _before.duplicate()
 	var old_after: Dictionary[String, int] = _after.duplicate()
 	var stride: int = document.tile_stride
@@ -894,6 +947,104 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 		if not staged.ok:
 			return _rollback_sparse_clear(old_before, old_after, staged)
 	return DrawingResult.success(_after.size())
+
+
+## Fast Delete path: one source scan and one changed RGBA8 snapshot per
+## occupied tile. Empty selection space is never traversed; sparse masks and
+## transparent pixels with hidden RGB are treated exactly like _stage().
+## Nothing reaches Rust or the document until commit() performs a checked
+## whole-tile preflight. A failed stage leaves no partially published preview.
+func _clear_rect_dense_tiles(area: Rect2i, selection: DrawingSelection,
+		max_pixels: int, last_x: int, last_y: int) -> DrawingResult:
+	var stride: int = document.tile_stride
+	var count: int = 0
+	for tile_key: String in document.tile_keys(layer_id):
+		var parts: PackedStringArray = tile_key.split(",")
+		var tile_x: int = int(parts[0]) * stride - anchor_x
+		var tile_y: int = int(parts[1]) * stride - anchor_y
+		var left: int = maxi(int(area.position.x), tile_x)
+		var top: int = maxi(int(area.position.y), tile_y)
+		var right: int = mini(last_x + 1, tile_x + stride)
+		var bottom: int = mini(last_y + 1, tile_y + stride)
+		if left >= right or top >= bottom:
+			continue
+		if selection != null and selection.enabled and not selection.inverted \
+				and (selection.bounds.position.x >= right or selection.bounds.end.x <= left \
+				or selection.bounds.position.y >= bottom or selection.bounds.end.y <= top):
+			continue
+		# Preserve the lazy-source rule: never fetch a pending tile that has
+		# no selected pixels, even when its backing provider is corrupt.
+		if selection != null and selection.enabled \
+				and document._pending_tiles.has(layer_id + ":" + tile_key):
+			var authorized: bool = false
+			for y: int in range(top, bottom):
+				for x: int in range(left, right):
+					if selection.allows(Vector2i(x, y)):
+						authorized = true
+						break
+				if authorized:
+					break
+			if not authorized:
+				continue
+		var resolved: DrawingResult = document._resolve_chunk(layer_id, tile_key)
+		if not resolved.ok:
+			_discard_dense_clear()
+			return resolved
+		var source: DrawingRasterTile = resolved.value as DrawingRasterTile
+		if source == null:
+			continue
+		var pixels: Dictionary[int, int] = source.sparse_pixels()
+		var patch: Dictionary[int, int] = {}
+		var replacement: PackedByteArray = PackedByteArray()
+		var min_x: int = stride
+		var min_y: int = stride
+		var max_x: int = -1
+		var max_y: int = -1
+		for local_index: int in pixels:
+			var local_x: int = local_index % stride
+			var local_y: int = local_index / stride
+			var x: int = tile_x + local_x
+			var y: int = tile_y + local_y
+			if x < left or x >= right or y < top or y >= bottom \
+					or (selection != null and not selection.allows(Vector2i(x, y))):
+				continue
+			count += 1
+			if count > max_pixels:
+				_discard_dense_clear()
+				return DrawingResult.failure("REGION_LIMIT", "Clear exceeds occupied pixel budget")
+			if replacement.is_empty():
+				replacement = source.to_rgba8()
+			replacement.encode_u32(local_index * 4, 0)
+			patch[local_index] = 0
+			min_x = mini(min_x, local_x)
+			min_y = mini(min_y, local_y)
+			max_x = maxi(max_x, local_x)
+			max_y = maxi(max_y, local_y)
+		if patch.is_empty():
+			continue
+		_clear_images[tile_key] = replacement
+		_clear_sources[tile_key] = source
+		_clear_bounds[tile_key] = Rect2i(min_x, min_y, max_x - min_x + 1, max_y - min_y + 1)
+		_source_tiles[tile_key] = source
+		_preview_tiles[tile_key] = patch
+		_preview_epoch += 1
+		_preview_tile_versions[tile_key] = _preview_epoch
+		_invalidate_exact_preview_display_index()
+	_clear_change_count = count
+	_clear_deferred = count > 0
+	return DrawingResult.success(count)
+
+
+func _discard_dense_clear() -> void:
+	_clear_deferred = false
+	_clear_change_count = 0
+	_clear_images.clear()
+	_clear_sources.clear()
+	_clear_bounds.clear()
+	_source_tiles.clear()
+	_preview_tiles.clear()
+	_preview_tile_versions.clear()
+	_invalidate_exact_preview_display_index()
 
 
 func _rollback_sparse_clear(before: Dictionary[String, int],

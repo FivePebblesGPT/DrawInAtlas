@@ -3549,6 +3549,10 @@ func _commit_clipboard_edit(edit: DrawingEditSession,
 
 
 func _delete_selection() -> void:
+	# T-253 opt-in whole-command trace; the graphical witness separately
+	# measures input dispatch through the first updated OS framebuffer.
+	var trace_start_us: int = Time.get_ticks_usec() if OS.has_environment(
+		"DRAWING_T253_PROFILE") else 0
 	if not _can_persist_or_close("Delete Pixels"):
 		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
@@ -3560,6 +3564,7 @@ func _delete_selection() -> void:
 		_show_error(started.message)
 		return
 	_before_gesture = _capture_context()
+	var trace_begin_us: int = Time.get_ticks_usec() if trace_start_us > 0 else 0
 	var edit: DrawingEditSession = started.value as DrawingEditSession
 	var staged: DrawingResult = edit.clear_rect(canvas.selected, canvas.selection_mask)
 	if not staged.ok:
@@ -3567,7 +3572,14 @@ func _delete_selection() -> void:
 		_before_gesture = null
 		_show_error(staged.message)
 		return
+	var trace_stage_us: int = Time.get_ticks_usec() if trace_start_us > 0 else 0
 	_commit_clipboard_edit(edit)
+	if trace_start_us > 0:
+		var finished_us: int = Time.get_ticks_usec()
+		print("T253_DELETE_PHASE: preflight_us=%d stage_us=%d commit_ui_us=%d total_us=%d tiles=%d" % [
+			trace_begin_us - trace_start_us, trace_stage_us - trace_begin_us,
+			finished_us - trace_stage_us, finished_us - trace_start_us,
+			current_document().tile_keys(current_layer()).size()])
 
 
 func _cut_selection() -> void:

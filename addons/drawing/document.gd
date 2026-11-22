@@ -916,6 +916,61 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		detached, bounds, record_history, true, validated_sources, true, true)
 
 
+## Dense Delete uses the same fail-closed whole-tile validator and native
+## history envelope as a brush transaction, but with an external atomic Rust
+## adoption instead of per-pixel GDScript staging/history reconstruction.
+## Every lazy source and snapshot is validated before native mutation; only
+## the already-prepared document projection is installed afterward.
+func _publish_dense_clear_tiles(layer_id: String, expected: int,
+		images: Dictionary[String, PackedByteArray],
+		sources: Dictionary[String, Variant],
+		bounds: Dictionary[String, Rect2i]) -> DrawingResult:
+	if not _attached_native_revision_matches(expected):
+		return DrawingResult.failure("STALE_REVISION", "Attached native raster revision diverged")
+	var checked: DrawingResult = _publish_native_tile_edit(layer_id, expected,
+		expected + 1, images, sources, bounds, true, true)
+	if not checked.ok:
+		return checked
+	var native_store: Object = _native_raster_store
+	var provisional: bool = native_store == null
+	if provisional:
+		if not ClassDB.class_exists("DrawingNativeTiles"):
+			return DrawingResult.failure("NATIVE_TILES", "Required tile ABI unavailable")
+		native_store = ClassDB.instantiate("DrawingNativeTiles")
+		if native_store == null or int(native_store.call("tile_abi_version")) != 1 \
+				or not native_store.call("configure", tile_stride, expected):
+			return DrawingResult.failure("NATIVE_TILES", "Native clear bootstrap rejected")
+	if not native_store.call("set_layer_editable", layer_id, true):
+		return DrawingResult.failure("NATIVE_TILES", "Native clear layer rejected")
+	var descriptors: Array[Dictionary] = []
+	for key: String in checked.delta.before_tiles:
+		var coordinates: PackedStringArray = key.split(",")
+		var tile_x: int = int(coordinates[0])
+		var tile_y: int = int(coordinates[1])
+		var has_native: bool = bool(native_store.call("has_source", layer_id,
+			tile_x, tile_y, expected))
+		if has_native and not provisional \
+				and not _native_source_matches(layer_id, key, sources[key] as DrawingRasterTile):
+			return DrawingResult.failure("STALE_PIXEL", "Clear source lost native identity")
+		var old: PackedByteArray = checked.delta.before_tiles[key]
+		var next: PackedByteArray = checked.delta.after_tiles[key]
+		if provisional and not native_store.call("import_source", layer_id,
+				tile_x, tile_y, expected, old):
+			return DrawingResult.failure("NATIVE_TILES", "Native clear source import rejected")
+		descriptors.append({"tile_x": tile_x, "tile_y": tile_y,
+			"before": old, "after": next})
+	var adopted: Dictionary = native_store.call("adopt_external_edit",
+		layer_id, expected, descriptors)
+	if not bool(adopted.get("ok", false)) \
+			or int(adopted.get("revision", -1)) != expected + 1:
+		return DrawingResult.failure("NATIVE_TILES", str(adopted.get("error", "Native clear rejected")))
+	if provisional:
+		_native_raster_store = native_store
+		_native_source_identities.clear()
+	return _install_prepared_native_tile_edit(layer_id, expected, expected + 1,
+		checked, true, int(adopted.get("history_token", 0)))
+
+
 ## Publish detached whole-tile snapshots from a native brush transaction.
 ## This preparatory document seam never constructs per-pixel String history
 ## maps. Callers must preflight the Rust transaction before committing it;

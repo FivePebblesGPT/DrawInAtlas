@@ -346,6 +346,10 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd 2>&1 | tee /tmp/godot-t088-selection-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-selection-model.log --marker T088_MODEL_PASSED || ci_fail_marker 'T088_MODEL_PASSED log rejected'
+          # T-253: 4k-pixel native whole-tile Delete, protected hidden RGB,
+          # mixed edit fallback and exact Undo/Redo/Save/Open. Same step ID.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t253_selection_delete_model.gd 2>&1 | tee /tmp/godot-t253-delete-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t253-delete-model.log --marker T253_MODEL_PASSED || ci_fail_marker 'T253 dense Delete model log rejected'
           # T-088 sparse transparent Paste must match a separate dense source oracle.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_paste_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-paste.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-paste.log --marker T088_SPARSE_PASTE_PASSED || ci_fail_marker 'T088 sparse paste source oracle rejected'
@@ -727,6 +731,10 @@ jobs:
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
           python3 tools/check_godot_model_log.py /tmp/godot-t055-composition.log --marker T055_COMPOSITION_PASSED
+          # T-253: Atlas's external timeline stores the canonical 2-tile
+          # native Delete delta with atomic Undo/Redo and bundle Save/Open.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t253_atlas_dense_delete.gd 2>&1 | tee /tmp/godot-t253-atlas-dense-delete.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t253-atlas-dense-delete.log --marker T253_ATLAS_PASSED
           # T-111: a pending Line may not publish onto a replaced, hidden,
           # locked, or unpresented raster target even when IDs are unchanged.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t111_line_release_authorization_smoke.gd 2>&1 | tee /tmp/godot-t111-line-gate.log
