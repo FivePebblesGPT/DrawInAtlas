@@ -23,7 +23,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -90,6 +90,27 @@ test-live-stroke: import-drawing import-atlas
 	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
 	    --path drawing --script res://tests/live_stroke_native.gd 2>&1 | tee "$$log"; \
 	  "$(PYTHON)" tools/check_native_t085_log.py "$$log"
+
+# T-266: current T-086 cached viewport + canonical cold renderer witnesses.
+# Historical pre-optimization fixture digests are checked separately; their
+# old renderer API cannot be substituted for the required current native API.
+test-viewport-cache: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/viewport_cache_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_t086_logs.py viewport "$$log"
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t137_preview_cold_population_native.gd 2>&1 | tee "$$log"; \
+	  grep -Fxq 'T137_NATIVE_PASSED checks=19 failures=0' "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T137_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing \
+	    --script res://tests/renderer_cold_benchmark.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_t086_logs.py cold "$$log"
+	@"$(PYTHON)" -m unittest tests.test_t086_benchmark_fixtures
 
 # T-251: real pointer/framebuffer regression against both standalone Drawing and
 # the Atlas-hosted canonical workspace. Both need an imported native extension.
