@@ -27,9 +27,18 @@ func fixture(name: String, external: bool = false) -> Dictionary:
 		check(document.set_external_history(true).ok, "host history mode enabled")
 	var result: DrawingResult = document._publish_edit(layer, document.revision,
 		{"-1,2": 0, "65,0": 0}, {"-1,2": HIDDEN, "65,0": OPAQUE})
-	check(result.ok and result.delta.tile_stride == 0,
-		"historical pixel map captured without native Brush")
-	return {"document": document, "layer": layer, "delta": result.delta.detached_copy()}
+	# Construct an actual pre-cutover in-memory archive: the current publisher
+	# always attaches Rust, but historical stored events were per-pixel maps.
+	var historical: DrawingDelta = DrawingDelta.new(layer,
+		{"-1,2": 0, "65,0": 0}, {"-1,2": HIDDEN, "65,0": OPAQUE})
+	if result.ok:
+		document._native_raster_store = null
+		document._native_source_identities.clear()
+		if not external:
+			document._events[0]["delta"] = historical
+	check(result.ok and historical.tile_stride == 0,
+		"pre-cutover pixel-map fixture restored from historical payload")
+	return {"document": document, "layer": layer, "delta": historical.detached_copy()}
 
 
 func canonical_matches(document: DrawingDocument, layer: String, key: String) -> bool:

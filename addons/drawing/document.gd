@@ -1162,9 +1162,15 @@ func _publish_edit(layer_id: String, expected: int,
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
-	# Count distinct touched tiles without loading source. This protects direct
-	# pixel producers from a stride-dependent burst of detached RGBA8 buffers.
-	if _native_raster_store != null:
+	# The first pixel-map producer must obey the same native bounds as an
+	# attached edit: a successful publication will bootstrap Rust authority.
+	# Preflight all touched tiles before resolving any lazy source.
+	# The Rust tile ABI configures storage strides in [16, 2048]. Synthetic
+	# out-of-ABI documents retain the existing Godot-only oracle path.
+	var native_pixel_publisher: bool = _native_raster_store != null \
+		or (tile_stride >= 16 and tile_stride <= 2048 \
+		and ClassDB.class_exists("DrawingNativeTiles"))
+	if native_pixel_publisher:
 		var touched: Dictionary[String, bool] = {}
 		for coordinate: String in after:
 			var parts: PackedStringArray = coordinate.split(",")
@@ -1197,10 +1203,9 @@ func _publish_edit(layer_id: String, expected: int,
 		var y: int = int(components[1])
 		if coordinate != TILES.pixel_key64(x, y):
 			return DrawingResult.failure("COORD", "Noncanonical signed pixel coordinate")
-		# A native-attached document cannot accept an unprojectable direct
-		# pixel outside Rust's shared signed tile/history boundary. Old
-		# non-native direct sessions retain their historical 64-bit tests.
-		if _native_raster_store != null \
+		# Reject an unprojectable pixel before any allocation, even when the
+		# native store has not yet been created for this document.
+		if native_pixel_publisher \
 				and not TILES.pixel_coordinates_in_projection_range(x, y):
 			return DrawingResult.failure("COORD", "Pixel outside safe signed projection bounds")
 		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
@@ -1227,7 +1232,8 @@ func _publish_edit(layer_id: String, expected: int,
 			rect[3] = maxi(int(rect[3]), y)
 
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, false, sources, track_unrecorded)
+		detached, bounds, record_history, false, sources, track_unrecorded,
+		native_pixel_publisher)
 
 
 ## Shared atomic installation, history and dirty-region publication for both
@@ -1259,8 +1265,8 @@ func _install_prepared_edit(layer_id: String, expected: int,
 	# invalidate native Undo tokens; they never invent a history event.
 	# First tile-local edits may attach a provisional native owner. It is never
 	# published to the document unless the Rust adoption succeeds; failed
-	# imports or edits leave canonical authority and history unchanged. Older
-	# direct pixel-map producers retain their separate cutover under T-148.
+	# imports or edits leave canonical authority and history unchanged. Both
+	# direct pixel-map and tile-local publishers acquire Rust on first use.
 	var native_store: Object = _native_raster_store
 	var provisional_store: bool = false
 	if native_store == null and bootstrap_native and ClassDB.class_exists("DrawingNativeTiles"):
@@ -1690,8 +1696,10 @@ func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
 	var result: DrawingResult
 	if delta.tile_stride > 0:
 		result = _replay_native_tile_delta(delta, undo_action)
-	elif _native_raster_store != null or ClassDB.class_exists("DrawingNativeTiles"):
-		# Even a detached legacy/Atlas pixel event must acquire Rust ownership.
+	elif _native_raster_store != null or (tile_stride >= 16 and tile_stride <= 2048
+			and ClassDB.class_exists("DrawingNativeTiles")):
+		# Even a detached legacy/Atlas pixel event must acquire Rust ownership
+		# when its storage stride is supported by the native tile ABI.
 		# Otherwise it advances Godot alone and the next native gesture has to
 		# invalidate the host timeline at a checked rebase boundary.
 		result = _replay_pixel_delta_native(delta, undo_action)

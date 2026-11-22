@@ -123,7 +123,8 @@ func signed_parity(stride: int) -> void:
 	check(result.ok and expected.ok, "signed and hidden-RGB tile + pixel publishers accept")
 	if not result.ok or not expected.ok:
 		return
-	check(native_delta_matches_pixel_oracle(result.delta, expected.delta, stride),
+	check(native_delta_matches_pixel_oracle(result.delta,
+		DrawingDelta.new(reference["layer"], before, after), stride),
 		"native tile history represents the same exact pixel-space changes")
 	check(result.regions.size() == expected.regions.size(), "same source dirty-region count")
 	for point: Vector2i in points:
@@ -254,10 +255,14 @@ func signed_mask_brush_and_cancellation() -> void:
 		check(fast_preview.ok and slow_preview.ok and
 			fast_preview.value.get_data() == slow_preview.value.get_data(),
 			"signed masked preview matches independent pixel publisher")
+		# The independent pixel publisher now acquires native authority too;
+		# snapshot its global pixel maps before commit as the oracle.
+		var pixel_oracle: DrawingDelta = DrawingDelta.new(reference["layer"],
+			slow_edit._before, slow_edit._after)
 		var fast_result: DrawingResult = fast_edit.commit()
 		var slow_result: DrawingResult = slow_edit.commit()
 		check(fast_result.ok and slow_result.ok and
-			native_delta_matches_pixel_oracle(fast_result.delta, slow_result.delta, 30),
+			native_delta_matches_pixel_oracle(fast_result.delta, pixel_oracle, 30),
 			"signed masked Brush/Eraser native history matches pixel oracle")
 		var fast_source: DrawingResult = DrawingRenderer.render(doc, area,
 			origin.x, origin.y, 128 * 128)

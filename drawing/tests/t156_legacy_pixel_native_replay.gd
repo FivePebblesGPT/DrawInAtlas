@@ -53,7 +53,13 @@ func make_document() -> Dictionary:
 		"History", "root", "history").value)
 	var initial: DrawingResult = doc._publish_edit(layer, doc.revision,
 		{"-2,50": 0, "2,50": 0}, {"-2,50": COLOR_A, "2,50": COLOR_B})
-	check(initial.ok and initial.delta.tile_stride == 0,
+	# Simulate an archived pre-cutover local event, not a new editor edit.
+	if initial.ok:
+		doc._native_raster_store = null
+		doc._native_source_identities.clear()
+		doc._events[0]["delta"] = DrawingDelta.new(layer,
+			{"-2,50": 0, "2,50": 0}, {"-2,50": COLOR_A, "2,50": COLOR_B})
+	check(initial.ok and (doc._events[0]["delta"] as DrawingDelta).tile_stride == 0,
 		"older host event stores historical pixel dictionaries")
 	return {"doc": doc, "layer": layer}
 
@@ -67,6 +73,12 @@ func external_timeline() -> void:
 	check(doc.set_external_history(true).ok, "external host timeline enabled")
 	var legacy: DrawingResult = doc._publish_edit(layer, doc.revision,
 		{"-2,50": 0, "2,50": 0}, {"-2,50": COLOR_A, "2,50": COLOR_B})
+	# Recreate the detached per-pixel command in an older Atlas timeline.
+	if legacy.ok:
+		doc._native_raster_store = null
+		doc._native_source_identities.clear()
+		legacy.delta = DrawingDelta.new(layer,
+			{"-2,50": 0, "2,50": 0}, {"-2,50": COLOR_A, "2,50": COLOR_B})
 	check(legacy.ok and legacy.delta.tile_stride == 0,
 		"external host captures detached historical pixel event")
 	var before_brush: PackedByteArray = read_tile(doc, layer, "-1,0")

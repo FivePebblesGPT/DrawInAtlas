@@ -52,6 +52,17 @@ class RequiredNativeCIContracts(unittest.TestCase):
         self.assertIn(f"--marker {marker}", workflow)
         self.assertIn(f"{marker} checks=34 failures=0", workflow)
 
+    def test_required_fast_step_bootstraps_first_pixel_map_edit(self) -> None:
+        workflow = FAST.read_text()
+        name = "t233_pixel_native_bootstrap"
+        marker = "T233_PIXEL_BOOTSTRAP_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=37 failures=0", workflow)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

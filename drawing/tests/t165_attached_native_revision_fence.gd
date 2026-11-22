@@ -163,14 +163,16 @@ func run() -> void:
 	run_divergence(false, false, false)
 	run_divergence(false, true, true)
 	run_reentrant_source()
-	# Non-native direct edits remain historical/available until T-150.
+	# First direct pixel publication now acquires Rust rather than waiting
+	# for a Brush gesture; it must still preserve exact hidden RGBA8.
 	var legacy: DrawingDocument = DrawingDocument.new("t165-legacy", STRIDE)
 	var layer: String = str(legacy.create_layer(DrawingLayerNode.RASTER, "Legacy").value)
 	var nonnative: DrawingResult = legacy._publish_edit(layer, legacy.revision,
 		{"-2,4": 0}, {"-2,4": HIDDEN}, false)
-	check(nonnative.ok and legacy._native_raster_store == null and
+	check(nonnative.ok and legacy._native_raster_store != null and
+		nonnative.delta.tile_stride == STRIDE and
 		int(legacy.read_pixel(layer, -2, 4).value) == HIDDEN,
-		"native-absent publisher remains functional pending T-150")
+		"first direct pixel publication adopts exact native RGBA8")
 	# At the correctly synchronized boundary, both direct formats retain the
 	# existing checked adoption contract and full native RGBA8.
 	var normal: Dictionary = new_painted_doc()
