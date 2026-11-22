@@ -1,5 +1,12 @@
 # Ticket Kanban Index
 
+**T-092 engineering Done (2026-11-22):** After T-226/T-252, the single
+Colors/History/preferences implementation passes current native Godot 4.8
+beta3 standalone model **66/66**, X11 **57/57** and Atlas-hosted
+history/prefs **21/21**. A clean on-demand workflow now builds the required
+Rust library before either consumer import; [current evidence](evidence/T-092-2026-11-22-current-native.md).
+**No owner signoff:** T-250/T-059/T-056 remain open.
+
 **T-090 engineering Done (2026-11-22):** current Godot 4.8 beta3 software-X11 responsive workspace 83/83, headless More 32/32, repaired T-063 dock-gutter scroll 75/75 and T-120 native menu regression; local cold `make build` imports both native consumers. The T-090 on-demand workflow now builds required Rust before import. [Evidence](evidence/T-090-2026-11-22-current-native.md). T-059/T-250 hardware UX approval stays open.
 
 
@@ -229,7 +236,7 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-088 · Selection masks, clipboard and Move](Tickets/T-088.md) | In Progress | T-221 sparse Delete fix Done; physical recheck, T-149 native mask and Move/clipboard acceptance remain | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-149](Tickets/T-149.md), [T-221](Tickets/T-221.md) |
 | [T-090 · Responsive UI, menu, tabs and brush wheel](Tickets/T-090.md) | Done | [Current beta3 native/More/resize and cold-build evidence](evidence/T-090-2026-11-22-current-native.md); owner T-059/T-250 UX gate remains separate | [T-063](Tickets/T-063.md) |
 | [T-091 · Single-group floating dock and width recovery](Tickets/T-091.md) | In Progress | T-225 icon tabs Done; one-group host/edge resize physical validation remain | [T-082](Tickets/T-082.md), [T-225](Tickets/T-225.md) |
-| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | In Progress | T-226 new scrollable inline picker supersedes old popup layout; History and color semantics retained | [T-063](Tickets/T-063.md), [T-226](Tickets/T-226.md) |
+| [T-092 · Compact Colors and History preferences](Tickets/T-092.md) | Done | [Current required-native standalone/Atlas evidence](evidence/T-092-2026-11-22-current-native.md); physical owner UX remains T-059/T-250/T-056 | [T-063](Tickets/T-063.md), [T-226](Tickets/T-226.md) |
 | [T-094 · Restore CI and owner acceptance evidence](Tickets/T-094.md) | In Progress | Required-native hosted CI and independent owner evidence | [T-053](Tickets/T-053.md), [T-055](Tickets/T-055.md), [T-063](Tickets/T-063.md), [T-106](Tickets/T-106.md), [T-107](Tickets/T-107.md), [T-150](Tickets/T-150.md) |
 | [T-095 · Eliminate 60px Brush latency](Tickets/T-095.md) | In Progress | After T-152: reference-device 60/96px responsiveness and owner signoff | [T-053](Tickets/T-053.md), [T-098](Tickets/T-098.md), [T-099](Tickets/T-099.md), [T-100](Tickets/T-100.md), [T-152](Tickets/T-152.md) |
 | [T-180 · Rebuildable offline toolchain and Make-first Drawing launch](Tickets/T-180.md) | In Progress | [Identical 251 MiB Arch/Ubuntu builds and hosted cold-native workflow](evidence/T-180-2026-11-17-local-validation.md) pass; four desktop/native-transition/export failures remain | [T-153](Tickets/T-153.md) |
