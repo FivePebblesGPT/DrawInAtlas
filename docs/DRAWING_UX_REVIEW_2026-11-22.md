@@ -32,3 +32,13 @@ Original attachments are now checked into this repository byte-for-byte under [`
 **Atlas gate:** All *unfinished* Atlas feature/user-facing integration tickets must depend directly on T-250, including E-005/E-007/E-008/E-009 Atlas product-facing descendants. Do not change historical Done ticket states or put the gate on Drawing-only fixes; do not claim owner approval merely from images, CI or software-X11 tests. New Atlas tickets must name T-250 as a direct dependency. Owners may approve T-250 only after T-251–T-254 are Done and a concrete hands-on review of the updated build.
 
 The original T-221/T-222/T-225/T-226 engineering evidence remains historical proof for narrower scopes; no new owner-reported failure is overridden by old synthetic benchmark results.
+
+## T-251 engineering result — 2026-11-22
+
+The toggle now has a 48×56 reserved minimized rail slot and a 34px
+expanded-only horizontal gutter (with a fixed 226px expanded minimum) for the same 30×56 dock-local overlay. Actual
+X11 pointer, focus, narrow-window, simulated HiDPI and Atlas-host regression
+checks pass. See [T-251 evidence](evidence/T-251-2026-11-22-dock-toggle.md).
+Do not treat this as color-panel, Selection Delete or overall dock acceptance.
+The owner's original current/concept PNGs were committed at `7b1fd306`
+under `docs/assets/drawing-ux-2026-11-22/` before this fix.

@@ -21,7 +21,9 @@ const ROW_LOCK: int = 2
 # Largest compact built-in panel (Colors/History plus scrollbar) needs
 # a stable floor. Otherwise floating a group shrinks the dock's intrinsic
 # minimum and silently changes the canvas width without a splitter drag.
-const EXPANDED_DOCK_MIN_WIDTH: int = 192
+# The T-251 fixed left overlay gutter adds 34px to the original 192px
+# minimum. Keep a constant floor independent of which panel is docked or floated.
+const EXPANDED_DOCK_MIN_WIDTH: int = 226
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -73,8 +75,10 @@ var image_frame_dialog: ConfirmationDialog
 var image_frame_fields: Array[SpinBox] = []
 var top_bar: HBoxContainer
 var inspector: ScrollContainer
+var dock_panel_gutter: MarginContainer
 var dock_panels: VBoxContainer
 var dock_rail: VBoxContainer
+var dock_toggle_slot: HBoxContainer
 var dock_toggle: Button
 var dock_panel_menu: PopupMenu
 var _dock_menu_panel_id: String = ""
@@ -404,10 +408,17 @@ func _build_interface() -> void:
 	dock_stash.name = "DockViewStorage"
 	dock_stash.visible = false
 	add_child(dock_stash)
+	# Keep the fixed dock toggle inside the dock without covering scrolling
+	# panel controls. This is a horizontal gutter, never a full-width row.
+	dock_panel_gutter = MarginContainer.new()
+	dock_panel_gutter.name = "DockPanelGutter"
+	dock_panel_gutter.add_theme_constant_override("margin_left", 34)
+	dock_panel_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inspector.add_child(dock_panel_gutter)
 	dock_panels = VBoxContainer.new()
 	dock_panels.name = "DockPanels"
 	dock_panels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inspector.add_child(dock_panels)
+	dock_panel_gutter.add_child(dock_panels)
 	dock_rail = VBoxContainer.new()
 	dock_rail.name = "DockIconRail"
 	dock_rail.custom_minimum_size.x = 48
@@ -729,26 +740,54 @@ func _dock_icon(panel_id: String) -> Texture2D:
 	return DrawingDockIcons.for_panel(panel_id)
 
 
-## One edge overlay survives dock re-renders and is never placed inside the
-## scrolled dock contents. The draw script clips to a translucent semicircle.
+## The same half-circle belongs to the dock in both states. The minimized
+## rail owns a real VBox slot; the expanded dock overlays its left gutter.
 func _make_dock_toggle() -> void:
+	dock_toggle_slot = HBoxContainer.new()
+	dock_toggle_slot.name = "DockToggleSlot"
+	dock_toggle_slot.custom_minimum_size = Vector2(48, 56)
+	dock_rail.add_child(dock_toggle_slot)
 	dock_toggle = DOCK_TOGGLE_SCRIPT.new() as Button
 	dock_toggle.name = "DockEdgeToggle"
 	dock_toggle.tooltip_text = "Minimize right dock to icon rail"
 	dock_toggle.pressed.connect(_toggle_dock)
-	add_child(dock_toggle)
+	dock_toggle_slot.add_child(dock_toggle)
+	# DockEdgeToggle's own _ready establishes focus/vector styling; the
+	# rail state is in flow, and must not retain its previous top-level mode.
+	dock_toggle.top_level = false
 	call_deferred("_layout_dock_toggle")
+
+
+func _place_dock_toggle(minimized: bool) -> void:
+	var was_focused: bool = dock_toggle.has_focus()
+	if minimized:
+		if dock_toggle.get_parent() != dock_toggle_slot:
+			dock_toggle.top_level = false
+			dock_toggle.reparent(dock_toggle_slot, false)
+		dock_toggle.top_level = false
+		dock_toggle_slot.show()
+	else:
+		dock_toggle_slot.hide()
+		if dock_toggle.get_parent() != inspector:
+			dock_toggle.reparent(inspector, false)
+		dock_toggle.top_level = true
+	_layout_dock_toggle()
+	if was_focused:
+		# Moving a focused Button between parents drops Godot's GUI focus.
+		# Restore it after the new parent becomes visible this frame.
+		dock_toggle.call_deferred("grab_focus")
 
 
 func _layout_dock_toggle() -> void:
 	if dock_toggle == null or inspector == null or not inspector.is_inside_tree():
 		return
-	var bounds: Rect2 = inspector.get_global_rect()
-	var extent: Vector2 = dock_toggle.size
-	# A small overlap makes the half-circle visually connect to the seam,
-	# without consuming a panel row or shifting the split/canvas geometry.
-	dock_toggle.global_position = Vector2(bounds.position.x - extent.x + 2.0,
-		bounds.position.y + minf(16.0, maxf(0.0, bounds.size.y - extent.y)))
+	if dock_toggle.get_parent() == dock_toggle_slot:
+		# HBoxContainer determines the button's actual placement; the VBox
+		# slot displaces the first panel icon rather than covering it.
+		return
+	# This top-level Control is INSIDE PanelDock, not hanging over canvas.
+	# A 34px gutter leaves every scrolling group/icon outside its hit area.
+	dock_toggle.global_position = inspector.get_global_rect().position
 
 
 ## One stable panel icon across expanded dock and minimized rail. Pointer
@@ -956,6 +995,8 @@ func _render_dock(focus_key: String = "") -> void:
 			view.reparent(dock_stash)
 	for parent: Node in [dock_panels, dock_rail, dock_flyout_tabs]:
 		for child: Node in parent.get_children():
+			if child == dock_toggle_slot:
+				continue
 			parent.remove_child(child)
 			child.queue_free()
 	var info: Dictionary = dock_layout.container_info("right")
@@ -1059,9 +1100,11 @@ func _render_dock(focus_key: String = "") -> void:
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
 	inspector.custom_minimum_size.x = 48 if minimized else EXPANDED_DOCK_MIN_WIDTH
 	dock_panels.visible = not minimized
+	dock_panel_gutter.visible = not minimized
 	dock_rail.visible = minimized
 	dock_flyout.visible = minimized and not flyout_group_id.is_empty()
 	if dock_toggle != null:
+		_place_dock_toggle(minimized)
 		dock_toggle.set("minimized", minimized)
 		dock_toggle.tooltip_text = "Expand right dock (also in Window menu)" if minimized else "Minimize right dock to icon rail (also in Window menu)"
 		dock_toggle.queue_redraw()

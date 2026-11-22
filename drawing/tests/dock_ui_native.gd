@@ -130,8 +130,10 @@ func run() -> void:
 	check(bool(layout.container_info("right")["minimized"]) and app.dock_rail.visible and
 		app.inspector.visible and app.inspector.size.x <= 62,
 		"real pointer minimizes the dock into a narrow, persistent rail")
-	check(app.dock_rail_buttons.size() == 4 and app.dock_rail.get_child_count() == 6 and
-		app.dock_toggle.visible, "rail contains four panel icons, two separators and persistent edge toggle")
+	check(app.dock_rail_buttons.size() == 4 and app.dock_rail.get_child_count() == 7 and
+		app.dock_rail.get_child(0) == app.dock_toggle_slot and
+		app.dock_toggle.get_parent() == app.dock_toggle_slot and
+		app.dock_toggle.visible, "rail contains a reserved toggle slot, four icons and two separators")
 	for panel_id: String in ["colors", "swatches", "layers", "history"]:
 		var icon_button: Button = app.dock_rail_buttons[panel_id]
 		check(icon_button.icon != null and icon_button.text.is_empty() and icon_button.focus_mode == Control.FOCUS_ALL and

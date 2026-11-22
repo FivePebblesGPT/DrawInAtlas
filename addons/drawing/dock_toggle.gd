@@ -1,5 +1,6 @@
 extends Button
-## T-222: a non-scrolling, keyboard-focusable half-circle at the dock/canvas seam.
+## T-251: a keyboard-focusable half-circle inside the dock, in a fixed
+## minimized rail slot or as a non-scrolling overlay in the expanded gutter.
 ## All geometry is vector drawn, so it survives Godot/OS UI scaling without
 ## pre-rasterized, blurry assets. The actual hit area is only 30×56 logical px.
 
@@ -14,7 +15,6 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	z_index = 60
-	top_level = true
 	for property: Dictionary in get_property_list():
 		if property["name"] == "accessibility_name":
 			set("accessibility_name", "Expand or minimize panel dock")

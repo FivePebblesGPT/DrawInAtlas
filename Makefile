@@ -19,7 +19,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-dock-toggle check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -74,6 +74,12 @@ test-graphical: import-drawing
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t195_release_catchup.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t196_release_deferred.gd
 	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t197_first_preview_callback.gd
+
+# T-251: real pointer/framebuffer regression against both standalone Drawing and
+# the Atlas-hosted canonical workspace. Both need an imported native extension.
+test-dock-toggle: import-drawing import-atlas
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path drawing --script res://tests/t251_dock_toggle_native.gd
+	@xvfb-run -a $(WITH_TOOL) godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy --path . --script res://tests/t251_atlas_dock_native.gd
 
 python-test:
 	@"$(PYTHON)" -m unittest discover -s tests -p 'test_toolchain_build.py'

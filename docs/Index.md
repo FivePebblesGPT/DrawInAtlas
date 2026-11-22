@@ -1,6 +1,6 @@
 # Ticket Kanban Index
 
-**OWNER UX OVERRIDE — 2026-11-22:** Actual Drawing build was **not approved**. Finish **T-251 → T-252 → T-253 → T-254** (all P0, Ready), then require **T-250 manual hands-on Drawing approval** before any unfinished/future Atlas feature ticket can be Done. The 2026-11-22 source images are in the owner's conversation; binary attachment to the repository remains pending. [Rejection/acceptance contract](DRAWING_UX_REVIEW_2026-11-22.md). Prior seven UX engineering tickets remain historical Done, not usability approval. Stop prioritizing optional history hardening/CI over this UX queue.
+**OWNER UX OVERRIDE — 2026-11-22:** Actual Drawing build was **not approved**. **T-251 Done** (dock-local toggle/rail slot); finish **T-252 → T-253 → T-254** (P0, Ready), then require **T-250 manual hands-on Drawing approval** before any unfinished/future Atlas feature ticket can be Done. The owner PNGs are now in `docs/assets/drawing-ux-2026-11-22/` (remote `7b1fd306`). [Rejection/acceptance contract](DRAWING_UX_REVIEW_2026-11-22.md). Prior seven UX engineering tickets remain historical Done, not usability approval. Stop prioritizing optional history hardening/CI over this UX queue.
 
 **T-249 Done (2026-11-22):** [Atlas context handler reservation](evidence/T-249-2026-11-22-context-handler-reservation.md) prevents synchronous command callbacks or listeners from replacing the context capture/restoration handlers mid-operation. The 84-check regression fails 42 cases on the prior code and passes after the fix; T-148, hosted CI and owner gates remain open.
 
@@ -276,7 +276,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-222](Tickets/T-222.md) |
+| [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-226](Tickets/T-226.md) |
 | [T-253 · Fix remaining end-to-end Selection Delete frame stall](Tickets/T-253.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-221](Tickets/T-221.md) |
 | [T-254 · Use icon-only tabs in minimized panel flyouts](Tickets/T-254.md) | Ready | **P0 owner rejection, 2026-11-22:** [acceptance](DRAWING_UX_REVIEW_2026-11-22.md); T-250 manual review required after fix | [T-225](Tickets/T-225.md) |

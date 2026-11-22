@@ -95,14 +95,16 @@ func run() -> void:
 	check(layout.set_panel_visible("brushes", false), "hide large brush fixture to reveal panel icons")
 	app._render_dock()
 	await frames(5)
-	check(app.dock_toggle != null and app.dock_toggle.visible and app.dock_toggle.top_level,
-		"edge toggle persists as an overlay outside the scroll dock")
+	check(app.dock_toggle != null and app.dock_toggle.visible and app.dock_toggle.top_level and
+		app.dock_toggle.get_parent() == app.inspector,
+		"expanded toggle is a non-scrolling overlay owned by PanelDock")
 	check(app.dock_panels.get_node_or_null("MinimizeDock") == null and
 		app.dock_rail.get_node_or_null("ExpandDock") == null,
 		"no giant minimize or expand rows")
-	check(app.dock_toggle.get_global_rect().end.x <= app.inspector.get_global_rect().position.x + 3 and
-		app.dock_toggle.get_global_rect().position.x >= app.canvas.get_global_rect().position.x,
-		"toggle protrudes into canvas by only its half-circle hit area")
+	check(app.dock_toggle.get_global_rect().position.x >= app.inspector.get_global_rect().position.x and
+		app.dock_toggle.get_global_rect().end.x <= app.inspector.get_global_rect().position.x + 34 and
+		app.dock_panels.get_parent() == app.dock_panel_gutter,
+		"dock-local overlay fits inside the panel gutter, not the canvas")
 	check(app.dock_toggle.size.x <= 32 and app.dock_toggle.size.y <= 60,
 		"compact logical toggle footprint")
 	await screenshot("expanded")
@@ -188,7 +190,9 @@ func run() -> void:
 	var selected_before: String = layout.group_info("colors")["active"]
 	await click(app.dock_toggle.get_global_rect().get_center())
 	check(layout.container_info("right")["minimized"] and app.dock_toggle.visible and
-		app.dock_toggle.minimized, "half-circle click minimizes and remains visible")
+		app.dock_toggle.minimized and not app.dock_toggle.top_level and
+		app.dock_toggle.get_parent() == app.dock_toggle_slot,
+		"half-circle moves into a genuine rail slot on minimize")
 	check(app.inspector.size.x <= 55 and app.dock_rail.visible and not app.dock_panels.visible,
 		"minimized rail is narrow without an expand button row")
 	check(layout.group_info("colors")["collapsed"], "minimizing does not reset collapse bit")
@@ -218,8 +222,9 @@ func run() -> void:
 	await frames(12)
 	check(app.canvas.size.x >= 125 and app.inspector.get_global_rect().end.x <= 421,
 		"narrow dock does not consume the canvas")
-	check(app.dock_toggle.visible and app.dock_toggle.get_global_rect().end.x <=
-		app.inspector.get_global_rect().position.x + 3, "edge overlay tracks narrow split")
+	check(app.dock_toggle.visible and app.dock_toggle.get_global_rect().position.x >=
+		app.inspector.get_global_rect().position.x and app.dock_toggle.get_global_rect().end.x <=
+		app.inspector.get_global_rect().position.x + 34, "dock-local overlay tracks narrow split")
 	await screenshot("narrow")
 	# Simulate scaled desktop content. The vector semicircle must remain a
 	# small seam overlay without clipping the editor in either DPI setting.
@@ -230,8 +235,8 @@ func run() -> void:
 		var seam: Rect2 = app.dock_toggle.get_global_rect()
 		var dock: Rect2 = app.inspector.get_global_rect()
 		check(app.dock_toggle.is_visible_in_tree() and seam.size.x <= 32 and
-			absf(seam.end.x - dock.position.x) <= 3.0,
-			"vector toggle remains attached to dock seam at %.0f%%" % (ui_scale * 100.0))
+			absf(seam.position.x - dock.position.x) <= 3.0 and seam.end.x <= dock.position.x + 34.0,
+			"vector toggle remains inside panel dock at %.0f%%" % (ui_scale * 100.0))
 		check(app.canvas.size.x >= 125 and app.dock_toggle.get_global_rect().position.x >= 0,
 			"scaled dock leaves visible canvas and reachable toggle at %.0f%%" % (ui_scale * 100.0))
 		await screenshot("scale-%d" % roundi(ui_scale * 100.0))
