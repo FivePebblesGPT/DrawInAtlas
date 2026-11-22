@@ -266,9 +266,9 @@ Do **not** infer signoff from software tests or prior product scope. T-096 was m
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-009 · Search and world discovery purpose](Tickets/T-009.md) | Manual Review | Completed scope; see ticket evidence | — |
+| [T-009 · Search and world discovery purpose](Tickets/T-009.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
 | [T-038 · Broader code-only review](Tickets/T-038.md) | Manual Review | Completed scope; see ticket evidence | [T-033](Tickets/T-033.md), [T-034](Tickets/T-034.md), [T-035](Tickets/T-035.md), [T-036](Tickets/T-036.md) |
-| [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Manual Review | Completed scope; see ticket evidence | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md) |
+| [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Blocked | Completed scope; see ticket evidence | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md), [T-250](Tickets/T-250.md) |
 
 ## 4. Other ready backlog
 
@@ -288,12 +288,12 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-225 · Use dock-style panel icons instead of text in floating tabs](Tickets/T-225.md) | Done | **P1 / #6 completed.** [Native/Atlas evidence](evidence/T-225-2026-11-22-floating-icons.md): same SVG/fallback icons, pressed/focus, pointer/keyboard, drag/grip, restart and scaling; T-091/T-083 physical/owner review open | [T-081](Tickets/T-081.md) |
 | [T-227 · Compact the Brushes selector and expose verified libmypaint parameters](Tickets/T-227.md) | Done | **P1 / #7 completed.** [Native/model/Atlas evidence](evidence/T-227-2026-11-22-compact-brushes.md): compact native preview grid, 1–8 mapped dabs/actual radius, frozen queued/native strokes and strict preset preferences; T-095/T-059 owner hardware remains open | [T-184](Tickets/T-184.md) |
 
-| [T-018 · Compact layer/object/link hierarchy](Tickets/T-018.md) | Ready | Completed scope; see ticket evidence | [T-006](Tickets/T-006.md), [T-012](Tickets/T-012.md) |
-| [T-023 · Bucket](Tickets/T-023.md) | Ready | Completed scope; see ticket evidence | — |
-| [T-024 · Line](Tickets/T-024.md) | Ready | Completed scope; see ticket evidence | — |
-| [T-025 · Polygon](Tickets/T-025.md) | Ready | Completed scope; see ticket evidence | — |
-| [T-026 · Editable open/closed wall paths](Tickets/T-026.md) | Ready | Completed scope; see ticket evidence | — |
-| [T-027 · Editable text and small-text culling](Tickets/T-027.md) | Ready | Completed scope; see ticket evidence | — |
+| [T-018 · Compact layer/object/link hierarchy](Tickets/T-018.md) | Blocked | Completed scope; see ticket evidence | [T-006](Tickets/T-006.md), [T-012](Tickets/T-012.md), [T-250](Tickets/T-250.md) |
+| [T-023 · Bucket](Tickets/T-023.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
+| [T-024 · Line](Tickets/T-024.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
+| [T-025 · Polygon](Tickets/T-025.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
+| [T-026 · Editable open/closed wall paths](Tickets/T-026.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
+| [T-027 · Editable text and small-text culling](Tickets/T-027.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
 | [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | Completed scope; see ticket evidence | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
 | [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Ready | Completed scope; see ticket evidence | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | Completed scope; see ticket evidence | [T-051](Tickets/T-051.md) |
@@ -306,10 +306,10 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | --- | --- | --- | --- |
 
 | [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Blocked | **P0 / manual approval required:** T-251–T-254 corrective UX acceptance and owner hands-on signoff; blocks unfinished/future Atlas features | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md) |
-| [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md) |
-| [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | Completed scope; see ticket evidence | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md) |
-| [T-040 · GM/player views and calibration](Tickets/T-040.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-013](Tickets/T-013.md) |
-| [T-041 · Tokens](Tickets/T-041.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md) |
+| [T-013 · Projector framing object](Tickets/T-013.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-022](Tickets/T-022.md), [T-250](Tickets/T-250.md) |
+| [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | Completed scope; see ticket evidence | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md), [T-250](Tickets/T-250.md) |
+| [T-040 · GM/player views and calibration](Tickets/T-040.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-013](Tickets/T-013.md), [T-250](Tickets/T-250.md) |
+| [T-041 · Tokens](Tickets/T-041.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-250](Tickets/T-250.md) |
 | [T-042 · Fog and reveal](Tickets/T-042.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-019](Tickets/T-019.md) |
 | [T-043 · Player-output privacy acceptance](Tickets/T-043.md) | Blocked | Completed scope; see ticket evidence | [T-040](Tickets/T-040.md), [T-041](Tickets/T-041.md), [T-042](Tickets/T-042.md) |
 | [T-045 · Authoritative sessions and commands](Tickets/T-045.md) | Blocked | Completed scope; see ticket evidence | [E-007](Epics/E-007.md), [T-039](Tickets/T-039.md) |
