@@ -35,6 +35,10 @@ var display_source_epoch: int = 0
 ## One local ordered timeline. A selection step carries the current content token.
 ## External Atlas-owned documents use the host timeline instead of this one.
 var external_history: bool = false
+## Revision at which the host claimed an otherwise unowned timeline. The
+## document cannot prove that external commands were discarded, so switching
+## back is safe only if no canonical document revision occurred in that mode.
+var _external_history_anchor_revision: int = -1
 var record_selection_history: bool = false
 var _events: Array[Dictionary] = []
 var _cursor: int = 0
@@ -1489,9 +1493,18 @@ func display_changes_since(old_revision: int) -> Dictionary:
 ## A host must select external ownership *before* it begins committing edits.
 ## Switching a document with existing local entries would silently split history.
 func set_external_history(enabled: bool) -> DrawingResult:
-	if enabled != external_history and not _events.is_empty():
+	if enabled == external_history:
+		return DrawingResult.success()
+	if not _events.is_empty():
 		return DrawingResult.failure("HISTORY_OWNED", "Cannot migrate an existing local history implicitly")
+	# Atlas commands are not stored in _events. Once a host-owned revision is
+	# committed, allowing a local takeover would orphan external Undo/Redo
+	# events and native tokens. Even undoing back to identical pixels advances
+	# the revision, and a repeated enable must not reset this ownership fence.
+	if external_history and revision != _external_history_anchor_revision:
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot discard an active external history implicitly")
 	external_history = enabled
+	_external_history_anchor_revision = revision if enabled else -1
 	return DrawingResult.success()
 
 
