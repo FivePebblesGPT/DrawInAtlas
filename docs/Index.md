@@ -202,8 +202,8 @@ These tracks may progress independently where possible, but their final acceptan
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | In Progress | Completed scope; see ticket evidence | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md), [T-108](Tickets/T-108.md) |
-| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | In Progress | Completed scope; see ticket evidence | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md), [T-109](Tickets/T-109.md) |
+| [T-064 · Nested Object Assets with cycle-safe references](Tickets/T-064.md) | In Progress | Completed scope; see ticket evidence | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md), [T-108](Tickets/T-108.md), [T-250](Tickets/T-250.md) |
+| [T-065 · Asset Browser and NULL-placeholder workflow](Tickets/T-065.md) | In Progress | Completed scope; see ticket evidence | [T-053](Tickets/T-053.md), [T-060](Tickets/T-060.md), [T-063](Tickets/T-063.md), [T-109](Tickets/T-109.md), [T-250](Tickets/T-250.md) |
 | [T-068 · Evaluate native drawing rasterization and compositing](Tickets/T-068.md) | In Progress | Rust-first direction; T-105 portability and post-consolidation profiling | [T-052](Tickets/T-052.md), [T-104](Tickets/T-104.md), [T-105](Tickets/T-105.md), [T-151](Tickets/T-151.md) |
 | [T-083 · Docking layout persistence and owner UX validation](Tickets/T-083.md) | In Progress | T-222–225 engineering Done; T-091 physical validation and explicit owner review remain | [T-082](Tickets/T-082.md), [T-091](Tickets/T-091.md), [T-222](Tickets/T-222.md), [T-223](Tickets/T-223.md), [T-224](Tickets/T-224.md), [T-225](Tickets/T-225.md) |
 | [T-085 · Real-time strokes and smooth input](Tickets/T-085.md) | In Progress | Retest batched native input, held preview and cancellation | [T-052](Tickets/T-052.md), [T-053](Tickets/T-053.md), [T-149](Tickets/T-149.md) |
@@ -258,7 +258,7 @@ These tracks may progress independently where possible, but their final acceptan
 | [T-105 · Portable native candidate builds and process-memory evidence](Tickets/T-105.md) | In Progress | Required-native Linux/Windows builds, exports and process/VRAM evidence | [T-052](Tickets/T-052.md), [T-150](Tickets/T-150.md) |
 | [T-106 · Restore green required fast-desktop GitHub CI](Tickets/T-106.md) | In Progress | Fresh post-Legacy required-native CI inventory + hosted green | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
 | [T-107 · Hosted CI replay and 23-finding owner-evidence matrix](Tickets/T-107.md) | In Progress | New hosted replay and 23-finding owner matrix; preserve historic 46 | [T-053](Tickets/T-053.md), [T-150](Tickets/T-150.md) |
-| [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | In Progress | Completed scope; see ticket evidence | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md) |
+| [T-108 · Nested Object Save As link-vs-copy policy and safe export](Tickets/T-108.md) | In Progress | Completed scope; see ticket evidence | [T-060](Tickets/T-060.md), [T-062](Tickets/T-062.md), [T-250](Tickets/T-250.md) |
 
 ## 3. Owner decisions and independent manual review
 
@@ -294,8 +294,8 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-025 · Polygon](Tickets/T-025.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
 | [T-026 · Editable open/closed wall paths](Tickets/T-026.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
 | [T-027 · Editable text and small-text culling](Tickets/T-027.md) | Blocked | Completed scope; see ticket evidence | [T-250](Tickets/T-250.md) |
-| [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Ready | Completed scope; see ticket evidence | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md) |
-| [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Ready | Completed scope; see ticket evidence | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md) |
+| [T-049 · Raster-first authoring defaults and semantic-vector tools](Tickets/T-049.md) | Blocked | Completed scope; see ticket evidence | [T-028](Tickets/T-028.md), [T-050](Tickets/T-050.md), [T-250](Tickets/T-250.md) |
+| [T-056 · Validate isolation, shared assets, LOD and saves](Tickets/T-056.md) | Blocked | Completed scope; see ticket evidence | [T-055](Tickets/T-055.md), [T-058](Tickets/T-058.md), [T-250](Tickets/T-250.md) |
 | [T-059 · Approved Drawing feature scope; implement and validate UX](Tickets/T-059.md) | Ready | Completed scope; see ticket evidence | [T-051](Tickets/T-051.md) |
 
 ## 5. Blocked by dependencies or future owner review
@@ -310,12 +310,12 @@ T-096 is blocked on T-149 because the pending native source/preview path would i
 | [T-017 · Revisit floor-link authoring/testing](Tickets/T-017.md) | Blocked | Completed scope; see ticket evidence | [T-003](Tickets/T-003.md), [T-004](Tickets/T-004.md), [T-012](Tickets/T-012.md), [T-018](Tickets/T-018.md), [E-TOOLS](Epics/E-TOOLS.md), [T-250](Tickets/T-250.md) |
 | [T-040 · GM/player views and calibration](Tickets/T-040.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-013](Tickets/T-013.md), [T-250](Tickets/T-250.md) |
 | [T-041 · Tokens](Tickets/T-041.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-250](Tickets/T-250.md) |
-| [T-042 · Fog and reveal](Tickets/T-042.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-019](Tickets/T-019.md) |
-| [T-043 · Player-output privacy acceptance](Tickets/T-043.md) | Blocked | Completed scope; see ticket evidence | [T-040](Tickets/T-040.md), [T-041](Tickets/T-041.md), [T-042](Tickets/T-042.md) |
-| [T-045 · Authoritative sessions and commands](Tickets/T-045.md) | Blocked | Completed scope; see ticket evidence | [E-007](Epics/E-007.md), [T-039](Tickets/T-039.md) |
-| [T-046 · Roles and filtered replication](Tickets/T-046.md) | Blocked | Completed scope; see ticket evidence | [T-045](Tickets/T-045.md), [T-039](Tickets/T-039.md) |
-| [T-047 · Reconnect and resynchronization](Tickets/T-047.md) | Blocked | Completed scope; see ticket evidence | [T-045](Tickets/T-045.md), [T-046](Tickets/T-046.md) |
-| [T-048 · Collaboration acceptance](Tickets/T-048.md) | Blocked | Completed scope; see ticket evidence | [T-046](Tickets/T-046.md), [T-047](Tickets/T-047.md), [T-043](Tickets/T-043.md) |
+| [T-042 · Fog and reveal](Tickets/T-042.md) | Blocked | Completed scope; see ticket evidence | [T-039](Tickets/T-039.md), [T-019](Tickets/T-019.md), [T-250](Tickets/T-250.md) |
+| [T-043 · Player-output privacy acceptance](Tickets/T-043.md) | Blocked | Completed scope; see ticket evidence | [T-040](Tickets/T-040.md), [T-041](Tickets/T-041.md), [T-042](Tickets/T-042.md), [T-250](Tickets/T-250.md) |
+| [T-045 · Authoritative sessions and commands](Tickets/T-045.md) | Blocked | Completed scope; see ticket evidence | [E-007](Epics/E-007.md), [T-039](Tickets/T-039.md), [T-250](Tickets/T-250.md) |
+| [T-046 · Roles and filtered replication](Tickets/T-046.md) | Blocked | Completed scope; see ticket evidence | [T-045](Tickets/T-045.md), [T-039](Tickets/T-039.md), [T-250](Tickets/T-250.md) |
+| [T-047 · Reconnect and resynchronization](Tickets/T-047.md) | Blocked | Completed scope; see ticket evidence | [T-045](Tickets/T-045.md), [T-046](Tickets/T-046.md), [T-250](Tickets/T-250.md) |
+| [T-048 · Collaboration acceptance](Tickets/T-048.md) | Blocked | Completed scope; see ticket evidence | [T-046](Tickets/T-046.md), [T-047](Tickets/T-047.md), [T-043](Tickets/T-043.md), [T-250](Tickets/T-250.md) |
 | [T-096 · Accurate selection contours and responsive Move](Tickets/T-096.md) | Blocked | Native source/Move revalidation before physical owner review | [T-053](Tickets/T-053.md), [T-149](Tickets/T-149.md) |
 
 
