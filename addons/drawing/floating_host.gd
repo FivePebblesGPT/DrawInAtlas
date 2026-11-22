@@ -396,8 +396,22 @@ func _apply(kind: String, source: String, target: Dictionary) -> bool:
 	return true
 
 
+# A focus loss can eat the matching OS mouse-up. Roll back the floating
+# preview and pending tab transfer before the next input from this window.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_WINDOW_FOCUS_OUT and what != NOTIFICATION_APPLICATION_FOCUS_OUT:
+		return
+	if _gesture.is_empty() and _candidate_id.is_empty() and (drag == null or not drag.is_dragging() or not _owns_drag()):
+		return
+	if _gesture == "move" or _gesture == "resize":
+		set_host_rect(_frame_start)
+	_suppress_release = true
+	_clear_gesture()
+
+
 func _handle_press(event: InputEvent, kind: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_suppress_release = false # A new press supersedes an OS-lost release.
 		if kind == "move" and (event as InputEventMouseButton).shift_pressed and not group_handles.is_empty():
 			var group_id: String = group_handles.keys()[0]
 			_tab_press(event, DrawingDockDrag.GROUP, group_id)
@@ -411,6 +425,7 @@ func _handle_press(event: InputEvent, kind: String) -> void:
 
 func _tab_press(event: InputEvent, kind: String, source: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_suppress_release = false
 		_candidate_kind = kind
 		_candidate_id = source
 		_candidate_start = event.global_position
@@ -456,6 +471,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if _frontmost_at(event.global_position):
+			_suppress_release = false
 			raise_host()
 			# A prior target host may have seen a press without the matching
 			# release during a cross-host transfer. Never replay that stale tab.
