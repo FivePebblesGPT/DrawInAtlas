@@ -1,5 +1,12 @@
 # Ticket Kanban Index
 
+**[T-270](Tickets/T-270.md) engineering Done (2026-11-23):**
+[T-091 required-native floating-dock CI](evidence/T-270-2026-11-23-floating-native-ci.md)
+now builds/imports Rust-backed Drawing and Atlas before 44-check one-group,
+53-check grip and 8-check Atlas Escape X11 witnesses. The clean
+`make test-floating-dock` passes; **T-091 physical Windows/Linux, T-083/T-250
+owner and T-094/T-180 hosted review remain open.**
+
 **[T-269](Tickets/T-269.md) engineering Done (2026-11-22):** [Required-native T-089 layer on-demand CI](evidence/T-269-2026-11-22-native-layers-ci.md) now compiles/registers Rust and imports Drawing/Atlas before the 63-check hierarchy model, 36-check X11 row/framebuffer and new 27-check Atlas nested group/host history/Save/Open witnesses. Local `make test-layer-hierarchy` passes; **T-059/T-250 owner UX, T-094/T-180 hosted CI and physical review remain open.**
 
 **T-268 engineering Done (2026-11-22):** [Required-native T-096 large-selection/Move CI](evidence/T-268-2026-11-22-large-move-ci.md) now builds/imports the Rust-backed Drawing/Atlas consumers, enforces 13,847-check model and 34-check X11 Move evidence, and adds 22-check Atlas signed masked Move/native history/Save/Open. The full `make test-large-move` passes locally; **T-096 stays Blocked on T-149, T-250 owner and T-094/T-180 hosted gates remain open.**
@@ -334,6 +341,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | --- | --- | --- | --- |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
+| [T-270 · Restore required-native T-091 floating-dock CI and Atlas rollback](Tickets/T-270.md) | Done | **P1 engineering:** [Rust build, 44/53 X11 floating/grip and 8 Atlas cancellation](evidence/T-270-2026-11-23-floating-native-ci.md); T-091/T-083/T-250 review and hosted CI remain open | [T-091](Tickets/T-091.md), [T-153](Tickets/T-153.md), [T-257](Tickets/T-257.md) |
 | [T-269 · Restore native T-089 layer UI CI and Atlas group/history verification](Tickets/T-269.md) | Done | **P1 engineering:** [63 model, 36 X11, 27 Atlas framebuffer/global-history/Save/Open](evidence/T-269-2026-11-22-native-layers-ci.md); T-059/T-250 owner UX and T-094/T-180 hosted gates open | [T-089](Tickets/T-089.md) |
 | [T-268 · Restore required-native T-096 large Move and Atlas history CI](Tickets/T-268.md) | Done | **P1 engineering:** [13,847 model, 34 native X11, 22 Atlas signed large Move/Undo/Redo/Save/Open](evidence/T-268-2026-11-22-large-move-ci.md); T-096/T-149 and T-250 gates open | [T-267](Tickets/T-267.md), [T-253](Tickets/T-253.md) |
 | [T-267 · Restore required-native selection/contour on-demand CI](Tickets/T-267.md) | Done | **P1 engineering:** [native clean build, 52/52 Selection, seven signed contours, X11 dense Delete, Atlas history](evidence/T-267-2026-11-22-native-selection-ci.md); T-088/T-149 and owner gates remain open | [T-153](Tickets/T-153.md), [T-210](Tickets/T-210.md), [T-253](Tickets/T-253.md) |

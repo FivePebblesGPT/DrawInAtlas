@@ -15,13 +15,17 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1 for required Hokusai GDExtension
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
       - name: Install X11 software-rendered display
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import canonical independent Drawing package
+      - name: Build native extension and import both Drawing and Atlas
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+          make build TOOLCHAIN=system
       - name: Verify one-group float, all eight resize directions, width persistence and screenshots
         run: |
           set -euo pipefail
@@ -39,6 +43,15 @@ jobs:
             --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
             --script res://tests/dock_grip_redock_native.gd 2>&1 | tee /tmp/t091-grip-native.log
           python3 tools/check_native_t091_log.py /tmp/t091-grip-native.log --kind grip
+      - name: Verify embedded Atlas floating-host cancellation and history isolation
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path . \
+            --script res://tests/t257_atlas_floating_cancel_native.gd 2>&1 | tee /tmp/t091-atlas.log
+          grep -Fxq 'T257_ATLAS: 8 checks; 0 failed' /tmp/t091-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t091-atlas.log --marker T257_ATLAS_PASSED
       - name: Upload software framebuffer evidence and original diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -47,5 +60,6 @@ jobs:
           path: |
             /tmp/t091-native.log
             /tmp/t091-grip-native.log
+            /tmp/t091-atlas.log
             /tmp/t091-screenshots/
           if-no-files-found: warn

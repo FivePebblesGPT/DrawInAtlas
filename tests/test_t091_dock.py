@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 
+from tools.check_native_t091_log import verify
+
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-from check_native_t091_log import verify  # noqa: E402
 
 
 class T091DockTests(unittest.TestCase):
@@ -20,9 +19,9 @@ class T091DockTests(unittest.TestCase):
 
     def test_native_workflow_imports_before_x11_and_uploads_evidence(self) -> None:
         workflow = (ROOT / ".github/workflows/godot-native-t091-docking.yml").read_text()
-        for required in ("workflow_dispatch", "--import --quit", "xvfb-run",
+        for required in ("workflow_dispatch", "make build TOOLCHAIN=system", "xvfb-run",
                          "dock_single_group_native.gd", "dock_grip_redock_native.gd", "T091_SCREENSHOTS",
-                         "check_native_t091_log.py", "--kind grip", "upload-artifact@v4"):
+                         "check_native_t091_log.py", "--kind grip", "t257_atlas_floating_cancel_native.gd", "upload-artifact@v4"):
             with self.subTest(required=required):
                 self.assertIn(required, workflow)
 
