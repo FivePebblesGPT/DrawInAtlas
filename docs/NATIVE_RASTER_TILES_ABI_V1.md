@@ -588,3 +588,14 @@ and needs no second retained full-tile snapshot. An absent source remains an
 empty byte snapshot. A rejected `STALE_PIXEL` result never publishes the
 requested Brush pixels or consumes Rust history; a provider's own side effects
 are not rolled back. See [T-238 evidence](evidence/T-238-2026-11-22-brush-source-reentrancy.md).
+
+**T-240 FFI whole-batch payload preflight (2026-11-22):**
+The `DrawingNativeTiles` recorded/untracked `adopt_*`,
+`replay_detached_history`, and `replay_history_token` GDExtension methods
+first check the existing 128-tile and three-span 256 MiB transfer budget,
+then decode **all** descriptors into borrowed/refcounted `PackedByteArray`
+handles, rejecting malformed fields, duplicate signed IDs, and buffers other
+than empty or precisely `stride² × 4` bytes. Only after the entire array
+passes do these entry points copy buffers into Rust `Vec<u8>`; rejected
+malformed batches do not account earlier full-tile byte copies. Native
+revisions/history are unchanged on rejection. [T-240 evidence](evidence/T-240-2026-11-22-ffi-payload-preflight.md).

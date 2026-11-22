@@ -1396,6 +1396,45 @@ impl DrawingNativeTiles {
         self.store.retains_history_token(transaction)
     }
 
+    /// Validate every packed descriptor before cloning *any* RGBA8 buffer.
+    /// A malformed later entry must not allocate earlier full-tile spans.
+    /// Empty byte arrays denote absent/transparent tiles in the v1 ABI.
+    fn checked_transfer_descriptors(
+        &self,
+        layer: &str,
+        tiles: &Array<Dictionary<Variant, Variant>>,
+        first_field: &str,
+        second_field: &str,
+    ) -> Option<Vec<(TileId, PackedByteArray, PackedByteArray)>> {
+        let tile_bytes = self.store.stride_bytes().ok()?;
+        let mut validated = Vec::with_capacity(tiles.len());
+        let mut seen = HashSet::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let x = entry.get("tile_x")?.try_to::<i64>().ok()?;
+            let y = entry.get("tile_y")?.try_to::<i64>().ok()?;
+            let first = entry.get(first_field)?.try_to::<PackedByteArray>().ok()?;
+            let second = entry.get(second_field)?.try_to::<PackedByteArray>().ok()?;
+            if x.unsigned_abs() > SAFE_COORD as u64
+                || y.unsigned_abs() > SAFE_COORD as u64
+                || !seen.insert((x, y))
+                || !(first.is_empty() || first.len() == tile_bytes)
+                || !(second.is_empty() || second.len() == tile_bytes)
+            {
+                return None;
+            }
+            validated.push((
+                TileId {
+                    layer: layer.to_owned(),
+                    x,
+                    y,
+                },
+                first,
+                second,
+            ));
+        }
+        Some(validated)
+    }
+
     /// Checked detached-history replay when the original Rust token has been
     /// evicted or detached. Unlike adopt_external_edit this does not invent a
     /// token absent from the document's chronological timeline. Any older
@@ -1415,31 +1454,18 @@ impl DrawingNativeTiles {
             return err("Native history transfer exceeds tile memory budget");
         }
         let layer = layer.to_string();
-        let mut changes = Vec::with_capacity(tiles.len());
-        for entry in tiles.iter_shared() {
-            let Some((x, y, before, after)) = (|| {
-                Some((
-                    entry.get("tile_x")?.try_to::<i64>().ok()?,
-                    entry.get("tile_y")?.try_to::<i64>().ok()?,
-                    entry.get("expected")?.try_to::<PackedByteArray>().ok()?,
-                    entry.get("replacement")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed detached history tile descriptor");
-            };
+        let Some(validated) =
+            self.checked_transfer_descriptors(&layer, &tiles, "expected", "replacement")
+        else {
+            return err("Malformed detached history tile descriptor");
+        };
+        let mut changes = Vec::with_capacity(validated.len());
+        for (id, before, after) in validated {
             self.store.external_bytes_received = self
                 .store
                 .external_bytes_received
                 .saturating_add(before.len().saturating_add(after.len()) as u64);
-            changes.push((
-                TileId {
-                    layer: layer.clone(),
-                    x,
-                    y,
-                },
-                before.as_slice().to_vec(),
-                after.as_slice().to_vec(),
-            ));
+            changes.push((id, before.as_slice().to_vec(), after.as_slice().to_vec()));
         }
         match self
             .store
@@ -1481,28 +1507,21 @@ impl DrawingNativeTiles {
             return err("Native history transfer exceeds tile memory budget");
         }
         let layer = layer.to_string();
-        let mut entries = Vec::with_capacity(tiles.len());
-        for item in tiles.iter_shared() {
-            let Some((x, y, expected, replacement)) = (|| {
-                Some((
-                    item.get("tile_x")?.try_to::<i64>().ok()?,
-                    item.get("tile_y")?.try_to::<i64>().ok()?,
-                    item.get("expected")?.try_to::<PackedByteArray>().ok()?,
-                    item.get("replacement")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed native history tile descriptor");
-            };
-            entries.push((
-                TileId {
-                    layer: layer.clone(),
-                    x,
-                    y,
-                },
-                expected.as_slice().to_vec(),
-                replacement.as_slice().to_vec(),
-            ));
-        }
+        let Some(validated) =
+            self.checked_transfer_descriptors(&layer, &tiles, "expected", "replacement")
+        else {
+            return err("Malformed native history tile descriptor");
+        };
+        let entries: Vec<_> = validated
+            .into_iter()
+            .map(|(id, expected, replacement)| {
+                (
+                    id,
+                    expected.as_slice().to_vec(),
+                    replacement.as_slice().to_vec(),
+                )
+            })
+            .collect();
         if !self
             .store
             .history_tiles_match(transaction, undo, &layer, &entries)
@@ -1915,42 +1934,25 @@ impl DrawingNativeTiles {
         if !self.store.history_transfer_within_budget(tiles.len()) {
             return err("Native external edit transfer exceeds tile memory budget");
         }
-        let mut changes = Vec::with_capacity(tiles.len());
-        for entry in tiles.iter_shared() {
-            let Some((x, y, before, after)) = (|| {
-                Some((
-                    entry.get("tile_x")?.try_to::<i64>().ok()?,
-                    entry.get("tile_y")?.try_to::<i64>().ok()?,
-                    entry.get("before")?.try_to::<PackedByteArray>().ok()?,
-                    entry.get("after")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed external tile descriptor");
-            };
+        let layer = layer.to_string();
+        let Some(validated) = self.checked_transfer_descriptors(&layer, &tiles, "before", "after")
+        else {
+            return err("Malformed external tile descriptor");
+        };
+        let mut changes = Vec::with_capacity(validated.len());
+        for (id, before, after) in validated {
             self.store.external_bytes_received = self
                 .store
                 .external_bytes_received
                 .saturating_add(before.len().saturating_add(after.len()) as u64);
-            changes.push((
-                TileId {
-                    layer: layer.to_string(),
-                    x,
-                    y,
-                },
-                before.as_slice().to_vec(),
-                after.as_slice().to_vec(),
-            ));
+            changes.push((id, before.as_slice().to_vec(), after.as_slice().to_vec()));
         }
         let result = if record_history {
             self.store
-                .adopt_external(&layer.to_string(), expected_revision as u64, changes)
+                .adopt_external(&layer, expected_revision as u64, changes)
         } else {
-            self.store.apply_external_tiles(
-                &layer.to_string(),
-                expected_revision as u64,
-                changes,
-                false,
-            )
+            self.store
+                .apply_external_tiles(&layer, expected_revision as u64, changes, false)
         };
         match result {
             Ok((token, count)) => {

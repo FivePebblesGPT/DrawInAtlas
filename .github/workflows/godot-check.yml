@@ -203,6 +203,11 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t239_native_history_order.gd 2>&1 | tee /tmp/godot-t239-history-order.log
           python3 tools/check_godot_model_log.py /tmp/godot-t239-history-order.log --marker T239_HISTORY_ORDER_PASSED || ci_fail_marker 'T239 retained native history ordering rejected'
           grep -Fqx 'T239_HISTORY_ORDER_PASSED checks=36 failures=0' /tmp/godot-t239-history-order.log || ci_fail_marker 'T239 history-order assertion count changed'
+          # T-240 preflights entire Rust FFI tile descriptor arrays before
+          # copying full RGBA8 buffers or accounting rejected tile spans.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t240_native_ffi_payload_preflight.gd 2>&1 | tee /tmp/godot-t240-ffi-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t240-ffi-preflight.log --marker T240_FFI_PREFLIGHT_PASSED || ci_fail_marker 'T240 native FFI payload preflight rejected'
+          grep -Fqx 'T240_FFI_PREFLIGHT_PASSED checks=32 failures=0' /tmp/godot-t240-ffi-preflight.log || ci_fail_marker 'T240 FFI payload assertion count changed'
           # T-229 keeps history-replay transfer cost stride-sensitive before
           # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
