@@ -1,0 +1,55 @@
+name: Godot T-255 clipped floating-tab hit areas (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  floating-tabs-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 3
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+      - name: Install pinned Rust 1.99.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
+      - name: Install software-X11 display
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Build mandatory native extension and import Drawing and Atlas
+        run: |
+          set -euo pipefail
+          make build TOOLCHAIN=system
+      - name: Test clipped tab, grip, close, partial visibility and screenshot
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/t255-screenshots
+          T255_SCREENSHOTS=/tmp/t255-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/t255_floating_tab_hit_native.gd 2>&1 | tee /tmp/t255-native.log
+          python3 tools/check_godot_model_log.py /tmp/t255-native.log --marker T255_NATIVE_PASSED
+      - name: Test canonical Atlas-embedded floating host
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path . \
+            --script res://tests/t255_atlas_floating_tab_hit_native.gd 2>&1 | tee /tmp/t255-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t255-atlas.log --marker T255_ATLAS_PASSED
+      - name: Upload framebuffer evidence and original diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t255-xvfb-clipped-floating-tabs
+          path: |
+            /tmp/t255-native.log
+            /tmp/t255-atlas.log
+            /tmp/t255-screenshots/
+          if-no-files-found: warn

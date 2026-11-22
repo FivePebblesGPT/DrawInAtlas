@@ -346,17 +346,21 @@ func _input(event: InputEvent) -> void:
 			# release during a cross-host transfer. Never replay that stale tab.
 			_candidate_id = ""
 			_candidate_kind = ""
-			for panel_id: String in tab_buttons:
-				var tab: Control = tab_buttons[panel_id] as Control
-				if tab.get_global_rect().has_point(event.global_position):
-					_candidate_kind = DrawingDockDrag.PANEL
-					_candidate_id = panel_id
-					_candidate_start = event.global_position
-					# Godot 4.8 beta's forwarded GUI events may hit the
-					# wrong button in a scrolled strip. Route viewport hits
-					# by the actual visible tab rectangles instead.
-					get_viewport().set_input_as_handled()
-					break
+			# Godot reports a scrolled child's full rectangle even where the
+			# ScrollContainer clips it. Never let an invisible tab capture a
+			# click from the move grip or close button on either side.
+			var strip: ScrollContainer = tab_strips.values()[0] as ScrollContainer if not tab_strips.is_empty() else null
+			if strip != null and strip.is_visible_in_tree() and strip.get_global_rect().has_point(event.global_position):
+				for panel_id: String in tab_buttons:
+					var tab: Control = tab_buttons[panel_id] as Control
+					if tab.is_visible_in_tree() and tab.get_global_rect().has_point(event.global_position):
+						_candidate_kind = DrawingDockDrag.PANEL
+						_candidate_id = panel_id
+						_candidate_start = event.global_position
+						# Keep viewport-level tab dispatch for Godot 4.8 beta's
+						# scrolled GUI events, but only inside the visible strip.
+						get_viewport().set_input_as_handled()
+						break
 			var sides: Vector4i = _hit_resize_edges(event.global_position)
 			if sides != Vector4i.ZERO:
 				_gesture = "resize"
