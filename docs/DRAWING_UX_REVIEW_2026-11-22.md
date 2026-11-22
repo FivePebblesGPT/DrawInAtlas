@@ -4,9 +4,15 @@
 
 ## Source images (owner-provided in conversation)
 
-- **Actual running editor:** `image(1).png` (1280×795). Demonstrates the dock toggle colliding with panel buttons and recents collecting a full red drag gradient.
-- **Approved visual *reference*, not approval of implementation:** `DrawInAtlasColorPanelConcept.png` (1280×795). Compare the top FG/BG and recent-color strip, picker spacing and icon-only tab layout against this image.
-- The **original image attachments are in the owner's 2026-11-22 conversation**, not checked into this GitHub branch. Do not silently substitute a recreated concept image or claim it is attached to the repository. The task to commit original image bytes is pending an available binary upload channel.
+Original attachments are now checked into this repository byte-for-byte under [`assets/drawing-ux-2026-11-22/`](assets/drawing-ux-2026-11-22/). Do not silently substitute a recreated concept image for these originals.
+
+- **Actual running editor:** committed as `DrawingCurrent.png` (1280×795; the owner's conversation attachment `image(1).png`). Demonstrates the dock toggle colliding with panel buttons and recents collecting a full red drag gradient.
+
+![Owner's actual Drawing build screenshot](assets/drawing-ux-2026-11-22/DrawingCurrent.png)
+
+- **Approved visual *reference*, not approval of implementation:** committed as `DrawInAtlasColorPanelConcept.png` (1280×795). Compare the top FG/BG and recent-color strip, picker spacing and icon-only tab layout against this image.
+
+![Owner's original Color panel concept](assets/drawing-ux-2026-11-22/DrawInAtlasColorPanelConcept.png)
 
 ## Rejected behavior and corrective ownership
 
