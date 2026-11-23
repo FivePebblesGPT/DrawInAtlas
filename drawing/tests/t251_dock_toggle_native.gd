@@ -39,6 +39,13 @@ func key(keycode: Key) -> void:
 		await frames(4)
 
 
+## T-273: exercise the actual edge target, not a point taken from the button's
+## current (possibly wrong) geometry. The target is inside the right-dock edge.
+func edge_target(app: Control) -> Vector2:
+	var dock: Rect2 = app.inspector.get_global_rect()
+	return Vector2(dock.end.x - 10.0, dock.position.y + 28.0)
+
+
 func overlaps(a: Rect2, b: Rect2) -> bool:
 	var intersection: Rect2 = a.intersection(b)
 	return intersection.size.x > 0.5 and intersection.size.y > 0.5
@@ -69,11 +76,9 @@ func check_geometry(app: Control, minimized: bool, label: String) -> void:
 		check(toggle.top_level and toggle.get_parent() == app.inspector and
 			not app.dock_toggle_slot.visible and app.dock_panel_gutter.visible,
 			label + ": overlay is dock-owned, scroll-independent and slot is hidden")
-		for node: Node in app.dock_panel_gutter.find_children("*", "Button", true, false):
-			var button: Button = node as Button
-			if button.is_visible_in_tree():
-				check(not overlaps(area, button.get_global_rect()),
-					label + ": no scrolled button under toggle: " + button.name)
+		# Descendants of the native ColorPicker can extend outside their clipped
+		# scroll viewport. Unclipped child rects are not pointer targets: the
+		# scrolled-edge input witness below verifies which control receives LMB.
 
 
 func shot(name: String) -> void:
@@ -110,6 +115,13 @@ func run() -> void:
 	app._render_dock()
 	await frames()
 	check_geometry(app, false, "initial expanded")
+	await click(edge_target(app))
+	check(bool(app.dock_layout.container_info("right")["minimized"]),
+		"T-273: clicking visible window-edge control minimizes expanded right dock")
+	if bool(app.dock_layout.container_info("right")["minimized"]):
+		await click(edge_target(app))
+		check(not bool(app.dock_layout.container_info("right")["minimized"]),
+			"T-273: same edge target expands the minimized dock")
 	await shot("expanded")
 	var previous_slot: HBoxContainer = app.dock_toggle_slot
 	var previous_toggle: Button = app.dock_toggle
@@ -144,6 +156,15 @@ func run() -> void:
 	app.inspector.scroll_vertical = 350
 	await frames(10)
 	check_geometry(app, false, "scrolled expanded")
+	var color_before_edge_click: Color = app.active_color
+	await click(edge_target(app))
+	check(bool(app.dock_layout.container_info("right")["minimized"]),
+		"T-273: edge click after picker scroll reaches dock, not clipped picker button")
+	check(app.active_color == color_before_edge_click,
+		"T-273: dock-edge click does not edit the underlying ColorPicker")
+	await click(edge_target(app))
+	check(not bool(app.dock_layout.container_info("right")["minimized"]),
+		"T-273: scrolled edge target expands back to dock contents")
 	app.inspector.scroll_vertical = 0
 	await frames()
 	# Floating a group neither steals the toggle nor overlaps its geometry.
@@ -171,12 +192,12 @@ func run() -> void:
 		root.content_scale_factor = scale
 		await frames(16)
 		check_geometry(app, false, "expanded %d%%" % roundi(100.0 * scale))
-		await click(app.dock_toggle.get_global_rect().get_center())
+		await click(edge_target(app))
 		check(bool(app.dock_layout.container_info("right")["minimized"]),
 			"DPI-scaled native pointer minimizes at %d%%" % roundi(scale * 100.0))
 		check_geometry(app, true, "minimized %d%%" % roundi(100.0 * scale))
 		await shot("minimized-%d" % roundi(100.0 * scale))
-		await click(app.dock_toggle.get_global_rect().get_center())
+		await click(edge_target(app))
 		check(not bool(app.dock_layout.container_info("right")["minimized"]),
 			"DPI-scaled native pointer expands at %d%%" % roundi(scale * 100.0))
 	root.content_scale_factor = 1.0

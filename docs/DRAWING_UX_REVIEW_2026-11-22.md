@@ -80,3 +80,15 @@ now in Manual Review, not Done**: the owner still needs to test the build,
 including actual-device Selection Delete responsiveness, and explicitly approve
 or request further changes. Older mentions of T-254 being next/blocked above
 are historical checkpoints, not the current Kanban status.
+
+## Second owner review — 2026-11-23 (PR #23)
+
+Further actual expanded/minimized screenshots were **rejected**: the half-circle
+was anchored at the canvas seam rather than the outer dock edge, its arrow
+directions were reversed, and its minimized position was inset. The ColorPicker
+still wastes horizontal space and duplicates editing chrome. Focused follow-up
+[P0 T-273](Tickets/T-273.md) corrects the dock toggle with actual X11 render
+inspection and pointer tests (engineering Done); [P0 T-274](Tickets/T-274.md)
+owns the native picker composition and is Ready. [T-250](Tickets/T-250.md)
+is **Blocked** again until T-274 engineering and an explicit owner walkthrough;
+prior review-ready wording above is a historical snapshot, not approval.

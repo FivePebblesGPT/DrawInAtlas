@@ -422,11 +422,11 @@ func _build_interface() -> void:
 	dock_stash.name = "DockViewStorage"
 	dock_stash.visible = false
 	add_child(dock_stash)
-	# Keep the fixed dock toggle inside the dock without covering scrolling
-	# panel controls. This is a horizontal gutter, never a full-width row.
+	# Keep the edge toggle inside the dock without covering scrolling controls.
+	# The right-side gutter matches the outer window edge, not the canvas seam.
 	dock_panel_gutter = MarginContainer.new()
 	dock_panel_gutter.name = "DockPanelGutter"
-	dock_panel_gutter.add_theme_constant_override("margin_left", 34)
+	dock_panel_gutter.add_theme_constant_override("margin_right", 34)
 	dock_panel_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inspector.add_child(dock_panel_gutter)
 	dock_panels = VBoxContainer.new()
@@ -760,6 +760,8 @@ func _make_dock_toggle() -> void:
 	dock_toggle_slot = HBoxContainer.new()
 	dock_toggle_slot.name = "DockToggleSlot"
 	dock_toggle_slot.custom_minimum_size = Vector2(48, 56)
+	# In flow, but flush against the dock's outer edge rather than inset left.
+	dock_toggle_slot.alignment = BoxContainer.ALIGNMENT_END
 	dock_rail.add_child(dock_toggle_slot)
 	dock_toggle = DOCK_TOGGLE_SCRIPT.new() as Button
 	dock_toggle.name = "DockEdgeToggle"
@@ -799,9 +801,12 @@ func _layout_dock_toggle() -> void:
 		# HBoxContainer determines the button's actual placement; the VBox
 		# slot displaces the first panel icon rather than covering it.
 		return
-	# This top-level Control is INSIDE PanelDock, not hanging over canvas.
-	# A 34px gutter leaves every scrolling group/icon outside its hit area.
-	dock_toggle.global_position = inspector.get_global_rect().position
+	# This top-level Control stays INSIDE PanelDock at its outer (right)
+	# boundary in both states. The right gutter keeps scrolling controls
+	# outside its fixed pointer target.
+	var dock_bounds: Rect2 = inspector.get_global_rect()
+	dock_toggle.global_position = Vector2(dock_bounds.end.x - dock_toggle.size.x,
+		dock_bounds.position.y)
 
 
 ## One stable panel icon across expanded dock and minimized rail. Pointer

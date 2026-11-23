@@ -1,5 +1,12 @@
 # Ticket Kanban Index
 
+**[T-273](Tickets/T-273.md) P0 engineering Done (2026-11-23):**
+[outer-right-edge dock toggle and chevron correction](evidence/T-273-2026-11-23-dock-edge.md)
+passed standalone X11 92-check, Atlas 19-check, flyout 138/10-check witnesses;
+real expanded/minimized/floating/HiDPI screenshots were **opened and reviewed**.
+**[T-274](Tickets/T-274.md) P0 Ready:** native ColorPicker width and duplicate
+controls still require correction; **T-250 moved back to Blocked**, no owner signoff.
+
 **[T-272](Tickets/T-272.md) engineering Done (2026-11-23):**
 [UI-only assertion cleanup and actual visual-inspection evidence](evidence/T-272-2026-11-23-visual-test-audit.md)
 now has 50 passing X11 Drawing/Atlas witness logs (one historical Godot
@@ -345,7 +352,7 @@ Do **not** infer signoff from software tests or prior product scope. T-096 was m
 | [T-038 · Broader code-only review](Tickets/T-038.md) | Manual Review | Completed scope; see ticket evidence | [T-033](Tickets/T-033.md), [T-034](Tickets/T-034.md), [T-035](Tickets/T-035.md), [T-036](Tickets/T-036.md) |
 | [T-039 · Player projection and privacy contract](Tickets/T-039.md) | Blocked | Completed scope; see ticket evidence | [E-003](Epics/E-003.md), [E-004](Epics/E-004.md), [E-006](Epics/E-006.md), [E-SAVE](Epics/E-SAVE.md), [T-250](Tickets/T-250.md) |
 
-| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Manual Review | **P0 owner action now needed:** all four corrections Done, require hands-on approval with hardware and concept comparison. Atlas delivery remains blocked | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md) |
+| [T-250 · Owner manual review of Drawing before Atlas](Tickets/T-250.md) | Blocked | **Second owner rejection:** T-273 outer-edge toggle Done; T-274 ColorPicker composition Ready. Manual review resumes only after corrections; Atlas delivery remains blocked | [T-251](Tickets/T-251.md), [T-252](Tickets/T-252.md), [T-253](Tickets/T-253.md), [T-254](Tickets/T-254.md), [T-273](Tickets/T-273.md), [T-274](Tickets/T-274.md) |
 
 ## 4. Other ready backlog
 
@@ -353,6 +360,8 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-273 · Align whole right-dock toggle with outer edge](Tickets/T-273.md) | Done | **P0 engineering:** [real X11 screenshots and behavioral input proof](evidence/T-273-2026-11-23-dock-edge.md); T-250 owner review unapproved | [T-251](Tickets/T-251.md) |
+| [T-274 · Compact native ColorPicker width and duplicate chrome](Tickets/T-274.md) | Ready | **Next P0:** actual screenshot-driven composition repair, not cosmetic-geometry tests | [T-226](Tickets/T-226.md), [T-252](Tickets/T-252.md) |
 | [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Done | Appearance-only oracles retired; real screenshots inspected, 50 native logs and 33 Python checks pass; [full audit](evidence/T-272-2026-11-23-visual-test-audit.md). Original dock/ColorPicker UX remains for owner T-250 | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
