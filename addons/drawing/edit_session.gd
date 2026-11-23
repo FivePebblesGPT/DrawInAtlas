@@ -1936,6 +1936,13 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset
+			# _stage() cannot publish beyond the signed view-relative range.
+			# Do not inspect an unpublishable neighbor's arbitrary lazy source:
+			# it can contain the same color and make an otherwise legal edge
+			# fill fail after already staging the valid seed.
+			if next.x <= -1073741824 or next.x >= 1073741824 \
+					or next.y <= -1073741824 or next.y >= 1073741824:
+				continue
 			if not queued.has(next):
 				queued[next] = true
 				frontier.append(next)

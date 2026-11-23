@@ -1,0 +1,8 @@
+test_required_native_step_runs_bulk_preflight_fail_closed (test_t290_bulk_edit_preflight_ci.BulkEditPreflightCIContracts.test_required_native_step_runs_bulk_preflight_fail_closed) ... ok
+test_required_fast_step_runs_native_masked_seed_oracle (test_t291_masked_fill_seed_ci.MaskedFillSeedCIContracts.test_required_fast_step_runs_native_masked_seed_oracle) ... ok
+test_required_native_step_checks_exact_boundary_witness (test_t292_fill_frontier_ci.FillFrontierCIContracts.test_required_native_step_checks_exact_boundary_witness) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.010s
+
+OK
