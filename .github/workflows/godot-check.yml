@@ -865,6 +865,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t295_brush_native_projection.gd 2>&1 | tee /tmp/godot-t295-brush-projection.log
           grep -Fxq 'T295_BRUSH_PROJECTION_PASSED checks=50 failures=0' /tmp/godot-t295-brush-projection.log
           python3 tools/check_godot_model_log.py /tmp/godot-t295-brush-projection.log --marker T295_BRUSH_PROJECTION_PASSED
+          # T-296: invalid native signed Delete may not load lazy tiles or flatten Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t296_clear_native_projection.gd 2>&1 | tee /tmp/godot-t296-clear-projection.log
+          grep -Fxq 'T296_CLEAR_PROJECTION_PASSED checks=50 failures=0' /tmp/godot-t296-clear-projection.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t296-clear-projection.log --marker T296_CLEAR_PROJECTION_PASSED
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_verified_stage_smoke.gd 2>&1 | tee /tmp/godot-t068-verified-stage.log
           grep -q 'T068_VERIFIED_STAGE_PASSED' /tmp/godot-t068-verified-stage.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_VERIFIED_STAGE_FAILED:' /tmp/godot-t068-verified-stage.log; then exit 1; fi

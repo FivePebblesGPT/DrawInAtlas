@@ -919,6 +919,10 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 			or not DrawingDocument.TILES.document_anchor_in_range(
 				anchor_x + last_x, anchor_y + last_y):
 		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds safe pixel coordinates")
+	# Dense and sparse Delete both resolve lazy sources. Reject the *whole*
+	# unpublishable native region before touching pending tiles or a Brush preview.
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds native document projection")
 	_materialize_hokusai_preview()
 	_materialize_brush_preview()
 	_materialize_clear_preview()
