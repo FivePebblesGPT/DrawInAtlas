@@ -99,7 +99,7 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
         native = (ROOT / "drawing/tests/responsive_workspace_native.gd").read_text()
         self.assertIn("await click_at(button.get_global_rect().get_center())", native)
         self.assertIn("app.active_tool == name and button.button_pressed", native)
-        self.assertIn("button.focus_mode == Control.FOCUS_ALL", native)
+        self.assertIn('app.tool_buttons["Brush"].focus_mode == Control.FOCUS_ALL', native)
         self.assertNotIn("check_tool_glyph_centers", native)
 
     def test_native_witness_covers_pointer_resize_and_scaling(self) -> None:
