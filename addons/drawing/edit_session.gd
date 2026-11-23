@@ -1886,6 +1886,15 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
 	if rgba < 0 or rgba > 0xffffffff:
 		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	# Begin-edit anchors permit a wider historical signed range than Rust's
+	# canonical pixel projection. Validate the *global* seed before resolving
+	# a lazy tile, not after staging at an unpublishable coordinate.
+	var native_projection: bool = document._native_raster_store != null or (
+		document.tile_stride >= 16 and document.tile_stride <= 2048
+		and ClassDB.class_exists("DrawingNativeTiles"))
+	if native_projection and not DrawingDocument.TILES.pixel_coordinates_in_projection_range(
+			anchor_x + int(seed.x), anchor_y + int(seed.y)):
+		return DrawingResult.failure("COORD_RANGE", "Fill seed exceeds native projection")
 	# A masked-out seed cannot expand the fill frontier. Reject it before
 	# resolving an arbitrary lazy source or flattening an accepted Brush.
 	if selection != null and not selection.allows(seed):
@@ -1942,6 +1951,11 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			# fill fail after already staging the valid seed.
 			if next.x <= -1073741824 or next.x >= 1073741824 \
 					or next.y <= -1073741824 or next.y >= 1073741824:
+				continue
+			# This can overflow native projection even though the local offset is
+			# valid. Do not enqueue/fetch a neighbor that Rust cannot publish.
+			if native_projection and not DrawingDocument.TILES.pixel_coordinates_in_projection_range(
+					anchor_x + int(next.x), anchor_y + int(next.y)):
 				continue
 			if not queued.has(next):
 				queued[next] = true
