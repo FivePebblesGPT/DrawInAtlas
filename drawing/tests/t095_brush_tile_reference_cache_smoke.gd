@@ -45,7 +45,10 @@ func begin(target: Dictionary, tile_fast: bool) -> DrawingEditSession:
 	var doc: DrawingDocument = target["doc"]
 	var edit: DrawingEditSession = doc.begin_edit(target["layer"], doc.revision,
 		Transform2D.IDENTITY, ORIGIN.x, ORIGIN.y).value
-	edit._brush_tile_publish = tile_fast
+	# The fast variant exercises the session's *default* publisher decision;
+	# only the reference intentionally forces canonical pixel-key publication.
+	if not tile_fast:
+		edit._brush_tile_publish = false
 	return edit
 
 func pixels(target: Dictionary, edit: DrawingEditSession = null) -> PackedByteArray:
@@ -60,7 +63,11 @@ func equivalent(fast: Dictionary, reference: Dictionary,
 	check(pixels(fast, cached) == pixels(reference, canonical),
 		label + " preview RGBA8")
 	# Even a transparent source tile must be recorded as successfully resolved.
-	check(cached._brush_cached_source_ready, label + " authoritative source cached")
+	if cached._brush_tile_publish:
+		check(cached._brush_cached_source_ready, label + " authoritative source cached")
+	else:
+		check(not cached._after.is_empty() and cached._brush_change_count == 0,
+			label + " canonical pixel edits for unsupported tile stride")
 	if cached._preview_tiles.has(cached._brush_cached_tile_key):
 		check(cached._brush_cached_patch == cached._preview_tiles[cached._brush_cached_tile_key],
 			label + " current patch reference matches published preview")
@@ -92,6 +99,8 @@ func case_signed_tiles(stride: int, erase: bool) -> void:
 	var original: PackedByteArray = pixels(fast)
 	var cached: DrawingEditSession = begin(fast, true)
 	var canonical: DrawingEditSession = begin(reference, false)
+	check(cached._brush_tile_publish == (stride >= 16),
+		"stride=%d native Brush publisher only for supported ABI" % stride)
 	var mask: DrawingSelection = DrawingSelection.new(Rect2i(-45, -40, 91, 81), true)
 	check(mask.combine_rectangle(Rect2i(-6, -8, 14, 16), "Subtract"),
 		"selection hole")

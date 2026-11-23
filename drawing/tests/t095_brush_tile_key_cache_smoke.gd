@@ -79,8 +79,12 @@ func case_stride(stride: int, erase: bool) -> void:
 			if allowed and result.ok:
 				var canonical_tile: String = DrawingDocument.TILES.tile_key64(world_x,
 					world_y, stride)
-				check(edit._brush_cached_tile_key == canonical_tile,
-					"cached tile matches independent signed tile key")
+				if edit._brush_tile_publish:
+					check(edit._brush_cached_tile_key == canonical_tile,
+						"cached tile matches independent signed tile key")
+				else:
+					check(edit._after.has(key) == expected_after.has(key),
+						"canonical pixel publisher retains exact changed pixels")
 				if canonical_tile == previous_tile:
 					tile_reuse += 1
 				else:
@@ -89,15 +93,26 @@ func case_stride(stride: int, erase: bool) -> void:
 	check(tile_switches > 0 and (stride == 1 or tile_reuse > 0),
 		"test exercises tile transitions and spatially adjacent cache hits")
 	# Reverse-direction revisit must not change first hit's paint value.
-	check(edit._after.is_empty() and edit.change_count() == expected_after.size(),
-		"tile-only Brush retains exact changed-pixel count")
+	check((edit._after.is_empty() if edit._brush_tile_publish
+		else edit._after == expected_after)
+		and edit.change_count() == expected_after.size(),
+		"Brush retains exact changed-pixel count for its publisher")
 	var preview: PackedByteArray = snapshot(doc, edit)
 	check(snapshot(doc) == original, "source remains unchanged during preview")
 	var committed: DrawingResult = edit.commit()
 	check(committed.ok, "tile-local commit succeeds stride=%d erase=%s code=%s msg=%s" % [stride, erase, committed.code, committed.message])
 	if committed.ok:
-		check(committed.delta.before == expected_before and
-			committed.delta.after == expected_after, "history matches canonical pixel reads")
+		if edit._brush_tile_publish:
+			check(committed.delta.tile_stride == stride
+				and committed.delta.before.is_empty()
+				and committed.delta.after.is_empty()
+				and not committed.delta.after_tiles.is_empty()
+				and committed.delta.native_history_token > 0,
+				"native whole-tile history has retained Rust token")
+		else:
+			check(committed.delta.before == expected_before and
+				committed.delta.after == expected_after,
+				"canonical pixel history matches independent pixel reads")
 	check(snapshot(doc) == preview, "preview and commit are byte-identical")
 	check(doc.undo().ok and snapshot(doc) == original, "Undo restores source RGBA8")
 	check(doc.redo().ok and snapshot(doc) == preview, "Redo restores exact brush pixels")

@@ -1,3 +1,12 @@
+**[T-298](Tickets/T-298.md) P1 implementation Done (2026-11-24):**
+[T-095 native tile-publisher stride selection](evidence/T-298-2026-11-24-brush-stride.md)
+uses canonical pixel-key Brush/Erase publication for valid synthetic strides
+below Rust's 16px minimum, instead of failing after correct previews.
+The existing T-095 on-demand native test now passes 632/632, the adjacent
+tile-key oracle passes 33,037/33,037, and supported native strides retain
+tile-local history. T-095 physical owner review, T-068/T-148 and hosted CI
+remain open.
+
 **[T-297](Tickets/T-297.md) P1 implementation Done (2026-11-23):**
 [Brush candidate-window numeric overflow guard](evidence/T-297-2026-11-23-brush-candidate-bounds.md)
 clips floating bounds before integer conversion and preserves small clipped
@@ -525,6 +534,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-298 · Select canonical Brush publisher for unsupported native tile strides](Tickets/T-298.md) | Done | **P1 implementation:** [10-failure native regression, 632/632 source-reference and 33,037/33,037 tile-key cache checks](evidence/T-298-2026-11-24-brush-stride.md); T-095 owner hardware/hosted and T-068/T-148 gates remain open | [T-153](Tickets/T-153.md) |
 | [T-297 · Reject Brush candidate-window integer overflow before raster staging](Tickets/T-297.md) | Done | **P1 implementation:** [48/113 original failures, 113/113 corrected clipped/unclipped Brush and Undo/Redo checks](evidence/T-297-2026-11-23-brush-candidate-bounds.md); T-095 stride-3 and T-068/T-148 hosted/owner gates remain open | [T-153](Tickets/T-153.md) |
 | [T-296 · Preflight native Delete projection before lazy I/O](Tickets/T-296.md) | Done | **P1 implementation:** [15-failure real-native baseline, 50/50 signed Delete/Brush/Undo/Redo and eight neighboring suites](evidence/T-296-2026-11-23-clear-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
 | [T-295 · Preflight native Brush per-pixel projection before lazy I/O](Tickets/T-295.md) | Done | **P1 implementation:** [30-failure native baseline, 50/50 signed Brush/mixed-gesture/Undo/Redo and neighboring regression evidence](evidence/T-295-2026-11-23-brush-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |

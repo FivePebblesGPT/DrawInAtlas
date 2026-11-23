@@ -213,6 +213,9 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 	view_transform = transform
 	anchor_x = origin_x
 	anchor_y = origin_y
+	# The direct tile publisher requires the native tile ABI. Small synthetic
+	# strides remain valid documents, but must use canonical pixel-key edits.
+	_brush_tile_publish = document.tile_stride >= 16 and document.tile_stride <= 2048
 	var native_publisher: bool = document._native_raster_store != null or (
 		document.tile_stride >= 16 and document.tile_stride <= 2048
 		and ClassDB.class_exists("DrawingNativeTiles"))
