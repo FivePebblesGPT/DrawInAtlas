@@ -847,6 +847,32 @@ func _bulk_selection_excludes_area(area: Rect2i, selection: DrawingSelection) ->
 		and not selection.allows_any_in_area(area)
 
 
+## Polygon bounding boxes can overlap selected pixels that lie entirely
+## outside the filled shape. Prove the true intersection empty only for a
+## bounded candidate window; large/uncertain cases retain normal staging.
+func _polygon_selection_excludes_pixels(area: Rect2i, points: PackedVector2Array,
+		selection: DrawingSelection) -> bool:
+	if selection == null or not selection.enabled or selection.inverted:
+		return false
+	var overlap: Rect2i = area.intersection(selection.bounds)
+	if not overlap.has_area():
+		return true
+	if overlap.size.x > DrawingSelection.MAX_BULK_OVERLAP_PROBES \
+			or overlap.size.y > DrawingSelection.MAX_BULK_OVERLAP_PROBES / overlap.size.x:
+		return false
+	# Point-in-polygon itself scales with vertex count: cap the full work,
+	# not just the selected raster candidate count.
+	var candidate_count: int = overlap.size.x * overlap.size.y
+	if points.size() > 65536 / candidate_count:
+		return false
+	for y: int in range(overlap.position.y, overlap.end.y):
+		for x: int in range(overlap.position.x, overlap.end.x):
+			if selection.allows(Vector2i(x, y)) and Geometry2D.is_point_in_polygon(
+					Vector2(x + 0.5, y + 0.5), points):
+				return false
+	return true
+
+
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
 ## A region is always view-relative, and bounded before allocating/staging changes.
 func apply_region(area: Rect2i, rgba8: PackedByteArray,
@@ -1909,6 +1935,8 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 	if not _bulk_area_in_native_projection(area):
 		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds native document projection")
 	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
+	if _polygon_selection_excludes_pixels(area, points, selection):
 		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not

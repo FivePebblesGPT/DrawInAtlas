@@ -1,3 +1,10 @@
+**[T-301](Tickets/T-301.md) P1 implementation Done (2026-11-24):**
+[True polygon interior vs selected-pixel bounded preflight](evidence/T-301-2026-11-24-polygon-selection.md)
+keeps accepted deferred Brush and lazy source untouched when a selected pixel
+lies inside polygon bounds but outside its painted geometry. Native beta4
+fail-first 3/39, passing 39/39 and eight adjacent 573/573 checks; T-068/T-148,
+hosted CI and owner approval remain open.
+
 **[T-300](Tickets/T-300.md) P1 implementation Done (2026-11-24):**
 [Bounded exact selection-mask overlap preflight](evidence/T-300-2026-11-24-masked-overlap.md)
 prevents masked interior holes and boolean subtraction from flattening a
@@ -547,6 +554,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-301 · Preserve pending Brush across polygon/selection geometric no-ops](Tickets/T-301.md) | Done | **P1 implementation:** [3-failure native baseline, 39/39 corrected and 573/573 neighboring checks](evidence/T-301-2026-11-24-polygon-selection.md); T-068/T-148 and hosted/owner gates remain open | [T-300](Tickets/T-300.md) |
 | [T-300 · Preserve deferred Brush across masked interior bulk no-ops](Tickets/T-300.md) | Done | **P1 implementation:** [13-failure baseline, 62/62 native and 652/652 neighboring checks](evidence/T-300-2026-11-24-masked-overlap.md); T-068/T-148, hosted/owner gates remain open | [T-299](Tickets/T-299.md) |
 | [T-299 · Preserve deferred Brush on selection-excluded bulk no-ops](Tickets/T-299.md) | Done | **P1 implementation:** [8-failure baseline, 40/40 real native and 480/480 neighboring checks](evidence/T-299-2026-11-24-masked-bulk.md); T-068/T-148/hosted and T-250 owner gates remain open | [T-153](Tickets/T-153.md), [T-290](Tickets/T-290.md) |
 | [T-298 · Select canonical Brush publisher for unsupported native tile strides](Tickets/T-298.md) | Done | **P1 implementation:** [10-failure native regression, 632/632 source-reference and 33,037/33,037 tile-key cache checks](evidence/T-298-2026-11-24-brush-stride.md); T-095 owner hardware/hosted and T-068/T-148 gates remain open | [T-153](Tickets/T-153.md) |
