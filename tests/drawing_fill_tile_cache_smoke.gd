@@ -166,8 +166,8 @@ func _run() -> void:
 	_check(budget.undo().ok and int(budget.read_pixel(budget_layer, 2, 2).value) == OLD,
 		"retry still uses ordinary Undo history")
 
-	# The public session can stage wider signed anchors than the native tile
-	# projection can publish. Rejection must not mutate source or history.
+	# Session anchors remain wide, but invalid bulk edits must be rejected
+	# before staging anything for native tile publication.
 	var far: DrawingDocument = DrawingDocument.new("far-fill", 16)
 	var far_layer: String = String(far.create_layer(DrawingLayerNode.RASTER, "Pixels").value)
 	var unsafe_anchor: int = 9007199254740993
@@ -178,15 +178,16 @@ func _run() -> void:
 	if unsafe.ok:
 		var unsafe_edit: DrawingEditSession = unsafe.value as DrawingEditSession
 		var unsafe_stage: DrawingResult = unsafe_edit.fill_rect(Rect2i(-2, 0, 3, 1), OLD)
-		_check(unsafe_stage.ok and unsafe_edit.change_count() == 3,
-			"unsafe signed gesture stages three candidate pixels")
+		_check(not unsafe_stage.ok and unsafe_stage.code == "COORD_RANGE" and
+			unsafe_edit.change_count() == 0 and unsafe_edit._source_tiles.is_empty(),
+			"unsafe signed bulk region rejects before staging or lazy reads")
 		var unsafe_commit: DrawingResult = unsafe_edit.commit() if unsafe_stage.ok else unsafe_stage
 		var unchanged_unsafe: bool = true
 		for offset: int in range(-2, 1):
 			unchanged_unsafe = unchanged_unsafe and int(far.read_pixel(far_layer,
 				unsafe_anchor + offset, -unsafe_anchor).value) == 0
 		_check(not unsafe_commit.ok and far.revision == far_revision and unchanged_unsafe,
-			"unsafe native publication rejects without source or revision mutation")
+			"unsafe native bulk preflight rejects without source or revision mutation")
 		unsafe_edit.cancel()
 
 	# The exact large signed anchor has nonzero low bits and crosses the

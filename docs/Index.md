@@ -1,3 +1,10 @@
+**[T-294](Tickets/T-294.md) P1 implementation Done (2026-11-23):**
+[bulk edit global native projection guard](evidence/T-294-2026-11-23-bulk-native-projection.md)
+rejects unpublishable signed rectangle, byte-region and polygon edits before
+lazy-source access or deferred Brush materialization. Real beta4 Rust witness
+71/71 and eight adjacent native suites 301/301 pass. T-148/T-068 and
+hosted/owner review gates remain open.
+
 **[T-293](Tickets/T-293.md) P1 implementation Done (2026-11-23):**
 [native global signed flood-fill projection guard](evidence/T-293-2026-11-23-native-fill-projection.md)
 rejects unpublishable ±2⁵² seeds/frontier neighbors before lazy reads,
@@ -497,6 +504,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-294 · Preflight native bulk edit global projection before lazy I/O](Tickets/T-294.md) | Done | **P1 implementation:** [44-failure native baseline, 71/71 signed bulk/Brush/Undo/Redo and 301/301 neighbors](evidence/T-294-2026-11-23-bulk-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
 | [T-293 · Preflight native global flood-fill projection before lazy I/O](Tickets/T-293.md) | Done | **P1 implementation:** [18-failure native baseline, 41/41 exact signed endpoint/Undo/Redo and 283/283 neighbors](evidence/T-293-2026-11-23-native-fill-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
 | [T-292 · Bound flood-fill frontiers before lazy source reads](Tickets/T-292.md) | Done | **P1 implementation:** [10-failure native baseline, 38/38 signed edge fill, 283/283 neighboring native and required-CI witness](evidence/T-292-2026-11-23-fill-frontier.md); T-148/T-068/owner/hosted gates open | [T-153](Tickets/T-153.md) |
 | [T-291 · Skip selection-excluded fill seeds before lazy reads](Tickets/T-291.md) | Done | **P1 implementation:** [10-failure native pre-fix, 33/33 fixed, 250/250 neighboring native and required-CI witness](evidence/T-291-2026-11-23-masked-seed-preflight.md); T-148/T-068/owner/hosted gates open | [T-153](Tickets/T-153.md) |

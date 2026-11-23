@@ -800,6 +800,22 @@ func _bulk_area_in_view_range(area: Rect2i) -> bool:
 		and area.position.y > -1073741824 and last_y < 1073741824
 
 
+## Before any lazy tile fetch or deferred Brush materialization, reject an
+## entire bulk edit that cannot be published by the attached/native tile path.
+## Non-native documents retain their wider historical signed anchor range.
+func _bulk_area_in_native_projection(area: Rect2i) -> bool:
+	if document._native_raster_store == null and not (
+			document.tile_stride >= 16 and document.tile_stride <= 2048
+			and ClassDB.class_exists("DrawingNativeTiles")):
+		return true
+	var first_x: int = anchor_x + int(area.position.x)
+	var first_y: int = anchor_y + int(area.position.y)
+	var last_x: int = first_x + int(area.size.x) - 1
+	var last_y: int = first_y + int(area.size.y) - 1
+	return DrawingDocument.TILES.pixel_coordinates_in_projection_range(first_x, first_y) \
+		and DrawingDocument.TILES.pixel_coordinates_in_projection_range(last_x, last_y)
+
+
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
 ## A region is always view-relative, and bounded before allocating/staging changes.
 func apply_region(area: Rect2i, rgba8: PackedByteArray,
@@ -812,6 +828,8 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 		return DrawingResult.failure("RGBA", "Region bytes must be tightly packed RGBA8")
 	if not _bulk_area_in_view_range(area):
 		return DrawingResult.failure("COORD_RANGE", "Region exceeds safe view-relative pixel coordinates")
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Region exceeds native document projection")
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -841,6 +859,8 @@ func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
 	if not _bulk_area_in_view_range(area):
 		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds safe view-relative pixel coordinates")
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds native document projection")
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -1832,6 +1852,8 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		return DrawingResult.failure("SHAPE_LIMIT", "Polygon exceeds candidate budget")
 	if not _bulk_area_in_view_range(area):
 		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds safe view-relative pixel coordinates")
+	if not _bulk_area_in_native_projection(area):
+		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds native document projection")
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.

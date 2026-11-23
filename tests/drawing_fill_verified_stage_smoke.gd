@@ -151,14 +151,16 @@ func _run() -> void:
 	_check(far.redo().ok and _read_far_row(far, far_layer, anchor) == far_published,
 		"far-world Redo restores the exact final fill pixels and guards")
 
-	# Stage stays public at >2^53 but native tile publication must fail closed.
+	# Public anchors stay wider than native projection, but bulk staging now
+	# rejects an entirely unpublishable range before source access.
 	var unsafe_anchor: int = 9007199254740993
 	var unsafe_revision: int = far.revision
 	var unsafe: DrawingEditSession = far.begin_edit(far_layer, unsafe_revision,
 		Transform2D.IDENTITY, unsafe_anchor, -unsafe_anchor).value
-	_check(unsafe.fill_rect(Rect2i(-1, 0, 3, 1), ORIGINAL).ok and
-		unsafe.change_count() == 3,
-		"wide signed public edit can stage three candidate source pixels")
+	var rejected_bulk: DrawingResult = unsafe.fill_rect(Rect2i(-1, 0, 3, 1), ORIGINAL)
+	_check(not rejected_bulk.ok and rejected_bulk.code == "COORD_RANGE" and
+		unsafe.change_count() == 0 and unsafe._source_tiles.is_empty(),
+		"wide signed public bulk edit rejects before staging source pixels")
 	var unsafe_result: DrawingResult = unsafe.commit()
 	var unsafe_cleared: bool = true
 	for dx: int in range(-2, 3):
@@ -167,7 +169,7 @@ func _run() -> void:
 		unsafe_cleared = unsafe_cleared and unsafe_pixel.ok and int(unsafe_pixel.value) == 0
 	_check(not unsafe_result.ok and far.revision == unsafe_revision and
 		unsafe_cleared and _read_far_row(far, far_layer, anchor) == far_published,
-		"unsafe native publication cannot mutate revision, source or valid pixels")
+		"rejected native bulk edit cannot mutate revision, source or valid pixels")
 	unsafe.cancel()
 
 	# A provider can change a document revision during a detached session.
