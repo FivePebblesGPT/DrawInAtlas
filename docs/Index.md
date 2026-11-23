@@ -1,5 +1,12 @@
 # Ticket Kanban Index
 
+**[T-272](Tickets/T-272.md) engineering Done (2026-11-23):**
+[UI-only assertion cleanup and actual visual-inspection evidence](evidence/T-272-2026-11-23-visual-test-audit.md)
+now has 50 passing X11 Drawing/Atlas witness logs (one historical Godot
+ScrollContainer diagnostic), 33 passing Python contract tests, and strict
+observed T-081/T-090/T-091 check floors. This removes cosmetic test oracles,
+**not** the visible dock-toggle/ColorPicker defects or T-250 owner gate.
+
 **[T-271](Tickets/T-271.md) engineering Done (2026-11-23):**
 [required-native T-093 Object-source CI](evidence/T-271-2026-11-23-object-sources-ci.md)
 now builds/imports Rust-backed Drawing and Atlas before the 56-check root
@@ -346,7 +353,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
-| [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | In Progress | Appearance-only assertions removed/refactored across native/Atlas UI suites; [audit and evidence](evidence/T-272-2026-11-23-visual-test-audit.md); hosted/native validation pending, T-250 unchanged | — |
+| [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Done | Appearance-only oracles retired; real screenshots inspected, 50 native logs and 33 Python checks pass; [full audit](evidence/T-272-2026-11-23-visual-test-audit.md). Original dock/ColorPicker UX remains for owner T-250 | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
 | [T-271 · Restore native Object-source discovery CI and Atlas browser identity](Tickets/T-271.md) | Done | **P1 engineering:** [Rust build, 56 model, 27/20 X11 UI and 24 Atlas identity/host history](evidence/T-271-2026-11-23-object-sources-ci.md); T-065/T-059/T-250 owner and T-094/T-180 hosted gates remain open | [T-093](Tickets/T-093.md), [T-120](Tickets/T-120.md), [T-153](Tickets/T-153.md) |

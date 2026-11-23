@@ -65,7 +65,7 @@ class T270FloatingDockCIContracts(unittest.TestCase):
         from tools.check_native_t091_log import verify
 
         for kind, count, prefix in (
-            ("single", 44, "T091_NATIVE"),
+            ("single", 43, "T091_NATIVE"),
             ("grip", 53, "T091_GRIP_NATIVE"),
         ):
             good = f"{prefix}: {count} checks; 0 failed\n{prefix}_PASSED"

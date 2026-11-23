@@ -150,8 +150,12 @@ func run() -> void:
 	if not screenshot_path.is_empty():
 		await RenderingServer.frame_post_draw
 		var screenshot: Image = root.get_texture().get_image()
-		check(screenshot != null and screenshot.save_png(screenshot_path) == OK,
-			"Atlas source browser framebuffer screenshot saved")
+		if screenshot == null:
+			print("OPTIONAL_VISUAL_CAPTURE_FAILED: T271: missing framebuffer")
+		else:
+			var capture_status: int = screenshot.save_png(screenshot_path)
+			if capture_status != OK:
+				print("OPTIONAL_VISUAL_CAPTURE_FAILED: T271: " + str(capture_status))
 	# Refreshing from the exact verified listing cannot authorize a changed file.
 	var source_file: FileAccess = FileAccess.open(source_path, FileAccess.WRITE)
 	check(source_file != null, "source fixture can be deliberately corrupted")

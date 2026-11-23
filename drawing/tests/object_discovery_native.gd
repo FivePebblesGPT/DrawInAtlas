@@ -37,8 +37,12 @@ func capture(label: String) -> void:
 	DirAccess.make_dir_recursive_absolute(folder)
 	await RenderingServer.frame_post_draw
 	var pixels: Image = root.get_texture().get_image()
-	check(pixels != null and pixels.save_png(folder.path_join(label + ".png")) == OK,
-		"saved a real framebuffer screenshot: " + label)
+	if pixels == null:
+		print("OPTIONAL_VISUAL_CAPTURE_FAILED: T093: missing framebuffer")
+		return
+	var capture_status: int = pixels.save_png(folder.path_join(label + ".png"))
+	if capture_status != OK:
+		print("OPTIONAL_VISUAL_CAPTURE_FAILED: T093: " + str(capture_status))
 
 
 func _initialize() -> void:

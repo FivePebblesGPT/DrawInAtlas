@@ -36,19 +36,19 @@ class FloatingDockNativeContracts(unittest.TestCase):
                 self.assertIn(value, workflow)
 
     def test_accepts_complete_native_evidence_and_only_known_teardown(self) -> None:
-        valid = "T081_FLOAT_NATIVE: 65 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED"
+        valid = "T081_FLOAT_NATIVE: 66 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED"
         self.assertEqual(verify(valid), (True, [], 0))
         self.assertEqual(verify(valid + "\nERROR: Texture with GL ID of 7: leaked 1024 bytes."),
                          (True, [], 1))
 
     def test_rejects_stale_runtime_failure_or_spoofed_log(self) -> None:
-        valid = "T081_FLOAT_NATIVE: 65 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED"
+        valid = "T081_FLOAT_NATIVE: 66 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED"
         for content in (
             "", "T081_FLOAT_NATIVE: 58 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED",
-            "T081_FLOAT_NATIVE: 64 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED",
-            "T081_FLOAT_NATIVE: 65 checks; 1 failed\nT081_FLOAT_NATIVE_PASSED",
+            "T081_FLOAT_NATIVE: 65 checks; 0 failed\nT081_FLOAT_NATIVE_PASSED",
+            "T081_FLOAT_NATIVE: 66 checks; 1 failed\nT081_FLOAT_NATIVE_PASSED",
             valid + "\nT081_FLOAT_NATIVE_PASSED",
-            "T081_FLOAT_NATIVE_PASSED\nT081_FLOAT_NATIVE: 65 checks; 0 failed",
+            "T081_FLOAT_NATIVE_PASSED\nT081_FLOAT_NATIVE: 66 checks; 0 failed",
             valid + "\nT081_NATIVE_FAILED: host resized canvas",
             valid + "\nSCRIPT ERROR: stale host pointer",
             valid + "\nParse Error: failed source import",

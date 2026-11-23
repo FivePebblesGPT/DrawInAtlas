@@ -159,8 +159,11 @@ func run() -> void:
 	root.size = Vector2i(1050, 490)
 	app.dock_split.split_offset = roundi(app.dock_split.size.x) - 190
 	await frames(14)
-	check(app.inspector.size.x <= 235 and app.color_hex.size.x >= 105,
-		"narrow and short dock retains a usable exact-hex editor")
+	app.inspector.ensure_control_visible(app.color_hex)
+	await frames(6)
+	check(app.color_hex.editable and app.color_hex.is_visible_in_tree() and
+		app.inspector.get_global_rect().intersects(app.color_hex.get_global_rect()),
+		"narrow and short dock scrolls an editable hex field into reach")
 	app.inspector.ensure_control_visible(app.color_advanced)
 	await frames(8)
 	check(app.inspector.get_global_rect().intersects(app.color_advanced.get_global_rect()) and

@@ -64,14 +64,14 @@ comparison. A screenshot being saved is no longer a UI-acceptance assertion.
 
 ## CI/test contracts and commands
 
-T-081's minimum complete native log changes **71 → 65 checks** after removal of
-four explicit size/gutter oracles, one optional screenshot count and one
-aesthetic small-host dimension check. T-090's complete native GUI log changes
-**83 → 29 checks** (three 14-check glyph-centering sweeps, seven optional
-screenshot counts, three framebuffer edge-color checks and two dock-edge-color
-checks removed). Neither verifier allows missing markers, real script errors,
-failed assertions or an incomplete surviving check floor. Historical evidence
-continues to quote the original count as historical evidence.
+Earlier source-only estimates were **71 → 65** (T-081) and **83 → 29**
+(T-090). Real execution with the supplied toolchain corrected these to
+**66** and **36** respectively, independently of whether optional screenshot
+capture is enabled. The strict check floors now require those actual counts.
+T-091 likewise requires **43** standalone host checks and **53** grip/redock
+checks. Verifiers reject incomplete logs, script errors, failed assertions,
+missing or duplicate markers and disallowed runtime diagnostics. Older ticket
+evidence retains its historical pre-cleanup counts.
 
 The required hosted fast-desktop workflow now runs both targeted Python
 source/log contract suites (`test_t090_responsive_workspace.py` and
@@ -86,6 +86,100 @@ make test-dock-toggle test-dock-flyout test-floating-tabs test-floating-dock \
   test-color-interruption TOOLCHAIN=system
 ```
 
-**Validation boundary:** A static source/contract review alone is not a
-fresh Godot render. Native runs must be observed before claiming new GUI
-performance, interaction or visual results. Owner T-250 remains Manual Review.
+**Initial validation boundary:** This was written before the later local
+native execution. The following completion evidence supersedes the earlier
+"no new render" observation; it does not self-approve T-250.
+
+## Local completion verification — 2026-11-23
+
+**Inputs:** user-supplied branch snapshot at Git `5eaa24ddff4dce17`,
+`drawing-toolchain-linux-x86_64.tar(2).zst` with Godot 4.8 beta 3, Rust 1.99.1,
+and an offline Cargo vendor tree. Rebuilt `libdrawing_brush.so` from native
+sources; imported standalone Drawing and Atlas. The initial release-profile
+compiler and Atlas editor imports exceeded separate outer execution limits;
+resuming with their cached outputs completed successfully. No downloaded
+replacement source or substitute engine version was used.
+
+**Test matrix:** the completed run produced **50 native X11 logs** with
+zero assertion failures (including 33 standalone Drawing and 17 Atlas
+witnesses), exercising T-063, T-065, T-079–083, T-090–093, T-184, T-221–227,
+T-251–259, T-261, T-264–265 and T-271 paths. Representative complete
+post-cleanup native check counts:
+
+| Witness | Result | Why retained |
+| --- | ---: | --- |
+| T-081 floating host | 66/66 | Dock/canvas stability, pointer move/resize and unique panel ownership |
+| T-090 responsive workspace | 36/36 | Real tool pointer dispatch, keyboard, resize, menu state and document tab closure |
+| T-091 one-group floating host / grip-redock | 43/43; 53/53 | Edge drags, clamping, cancellation, group state and persistence |
+| T-251 dock toggle / Atlas | 285/285; 17/17 | Click, focus, reparent, DPI and dock non-interception |
+| T-092 Colors/history | 53/53 | Real scroll-to-visible input reachability and history safety |
+| T-093 Object discovery / T-271 Atlas | 27/27; 24/24 | Browser selection, Object-source identity and global history isolation |
+| T-065 Asset Browser | 19/19 | Panel registered by identity, not an arbitrary dock icon count |
+| T-253 selection Delete / Atlas | 41/41; 15/15 | Native selected-pixel/history behavior |
+
+All 50 witness logs were checked for their failure marker and zero assertion
+failures. The original T-080 drag suite still emitted Godot's existing
+`ERROR: Unable to make the control visible because it is obscured by the inner ScrollContainer.`
+focus diagnostic after its success marker. Thus the collection is **assertion-
+clean**, not literally free of Godot diagnostic output; T-080's existing
+follow-up is not silently suppressed.
+
+**Python/test-store:** 33 targeted Python tests passed across T-081/T-090/T-091/
+T-092/T-093/T-270/T-271; `tests/check_explicit_types.py` passed **595
+project scripts and 33 skill documents**; `tools/validate_ticket_store.py`
+validated **272 tickets** with dependency/manual-review gates. Targeted
+native strict log verifiers passed against real run logs. A separately run
+T-063 documentation contract still fails because it expects T-056 to be
+`Ready` although the authoritative ticket is correctly `Blocked` behind
+T-250. This was identified before T-272 and is not an appearance-only assertion;
+T-272 did not alter this unrelated product/review gate.
+
+**Fail-first, then correction:** the first native T-092 run exposed three
+wrongly written checks that assumed offscreen ColorPicker controls should
+already intersect the visible dock after a History scroll. Tests now
+use `ensure_control_visible` on FG, Hex and alpha separately and assert the
+actual reachable state. The initial T-065 native run expected exactly four
+icons, even though Brushes now registers separately; it was changed to
+check browser identity/group membership. Both witnesses were rerun with
+zero failures, not waived.
+
+### Images actually opened and examined
+
+The following were captured from the rebuilt running editor under **actual
+X11/Xvfb + Mesa llvmpipe** and opened for visual inspection. Paths are
+session-local capture locations, **not** durable repository references; the
+user's original concept/current images under `docs/assets/drawing-ux-2026-11-22/`
+remain the durable design references. Captures may also be shared as
+conversation screenshot artifacts.
+
+| Captured image (relative to local `screenshots/`) | Frame | Inspection outcome |
+| --- | --- | --- |
+| `t251_dock_toggle_native_drawing/expanded.png` | 1180×750 | Expanded toggle remains on an oversized left gutter; ColorPicker contents remain clipped/waste horizontal space. Not approved |
+| `t251_dock_toggle_native_drawing/minimized.png` | 1180×750 | Minimized toggle remains inset/away from the intended edge; action arrow direction remains suspect. Not approved |
+| `t251_dock_toggle_native_drawing/minimized-200.png` | 1180×750, simulated 200% content scale | Toggle, rail and an intentionally overlapping floating fixture visibly occupy cramped areas; not proof of hardware HiDPI ergonomics |
+| `color_history_native_drawing/t092-compact-narrow.png` | 1280×800 | FG/BG strip, picker and extra controls still consume awkward space; scroll access works, design not approved |
+| `color_history_native_drawing/t092-colors-floating.png` | 1280×800 | Real floating ColorPicker shown with clipping/scroll in small host; panel sizing still requires product correction |
+| `dock_persistence_native_drawing/t083-after-relaunch.png` | 1240×800 | Persisted floating groups and minimized rail reappear; their current layout is functional, not aesthetically accepted |
+
+These images were **visually compared** against the user's two real screenshot
+reports, `image(2).png` and `image(3).png`, and the committed original
+`DrawInAtlasColorPanelConcept.png`. The wrongly aligned toggle and redundant
+ColorPicker space have **not** been fixed by removing cosmetic assertions.
+Visual acceptance remains a separate owner decision under T-250; T-083 and
+T-059 remain distinct manual/physical gates.
+
+### Additional cleanup and boundaries
+
+- Removed fixed two-column Brushes grid, numeric ColorPicker hex/dock width,
+  icon-strip minimum, and T-091 decorative header/title checks where they
+  claimed aesthetic correctness only. Actual scroll, keyboard focus, resize,
+  group ownership and preference round-trips remain tested.
+- Optional screenshot saves no longer affect behavioral assertion totals in
+  additional T-082/T-083/T-091 dock witnesses, T-065 Asset Browser, T-093
+  Object-source discovery, T-184 brush panels or T-271 Atlas source witness.
+  Image capture failures are printed as diagnostics but do not imply the
+  functional witness failed.
+- `T-081`, `T-090`, and `T-091` Python log-contract fixtures and minimum
+  accepted counts were reconciled against the **observed** X11 results.
+- No native drawing/brush implementation, panel production geometry, Atlas
+  document model, or release/owner approval state changed.

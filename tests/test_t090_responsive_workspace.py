@@ -138,16 +138,16 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
         self.assertIn("tools/check_native_t090_log.py", workflow)
 
     def test_native_log_verifier_fails_closed(self) -> None:
-        good = "T090_NATIVE: 29 checks; 0 failed\nT090_NATIVE_PASSED: 29 checks\n"
+        good = "T090_NATIVE: 36 checks; 0 failed\nT090_NATIVE_PASSED: 36 checks\n"
         self.assertTrue(verify(good)[0])
         self.assertTrue(verify(good + "ERROR: Texture with GL ID of 24: leaked 1364 bytes.\n")[0])
         for bad in (
-            good.replace("29 checks", "28 checks"),
+            good.replace("36 checks", "35 checks"),
             good.replace("0 failed", "1 failed"),
             good + "SCRIPT ERROR: broken\n",
             "ERROR: runtime fail\n" + good,
             good + "ERROR: unknown fatal\n",
-            "T090_NATIVE_PASSED: 29 checks\n",
+            "T090_NATIVE_PASSED: 36 checks\n",
         ):
             with self.subTest(bad=bad[:40]):
                 self.assertFalse(verify(bad)[0])

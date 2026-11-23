@@ -216,12 +216,23 @@ func run() -> void:
 	# Narrow standard dock and floating Color panel: controls must remain reachable.
 	app.dock_split.split_offset = roundi(app.dock_split.size.x) - 190
 	await frames(8)
-	check(app.color_hex.is_visible_in_tree() and app.color_hex.editable and app.inspector.get_global_rect().intersects(app.color_hex.get_global_rect()),
-		"narrow dock keeps the editable hex field reachable")
-	check(app.foreground_button.is_visible_in_tree() and app.inspector.get_global_rect().intersects(app.foreground_button.get_global_rect()),
-		"narrow dock retains a reachable foreground role control")
-	check(app.color_rgb.size() == 4 and app.color_rgb[3].focus_mode == Control.FOCUS_ALL and app.inspector.get_global_rect().intersects(app.color_rgb[3].get_global_rect()),
-		"narrow dock keeps the alpha input keyboard and pointer accessible")
+	# T-272: reaching controls through the real scroll viewport is functional;
+	# treating an initially offscreen control as a layout defect is not.
+	app.inspector.ensure_control_visible(app.foreground_button)
+	await frames(6)
+	check(app.foreground_button.is_visible_in_tree() and
+		app.inspector.get_global_rect().intersects(app.foreground_button.get_global_rect()),
+		"narrow dock scroll exposes foreground role for pointer input")
+	app.inspector.ensure_control_visible(app.color_hex)
+	await frames(6)
+	check(app.color_hex.is_visible_in_tree() and app.color_hex.editable and
+		app.inspector.get_global_rect().intersects(app.color_hex.get_global_rect()),
+		"narrow dock scroll exposes editable hex field")
+	app.inspector.ensure_control_visible(app.color_rgb[3])
+	await frames(6)
+	check(app.color_rgb.size() == 4 and app.color_rgb[3].get_line_edit().focus_mode != Control.FOCUS_NONE and
+		app.inspector.get_global_rect().intersects(app.color_rgb[3].get_global_rect()),
+		"narrow dock scroll exposes keyboard-accessible alpha input")
 	app.inspector.scroll_vertical = 0
 	await frames(8)
 	check(app.foreground_button.is_visible_in_tree() and

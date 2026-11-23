@@ -86,8 +86,9 @@ func capture(name: String) -> void:
 		return
 	DirAccess.make_dir_recursive_absolute(out)
 	await RenderingServer.frame_post_draw
-	check(root.get_texture().get_image().save_png(out.path_join(name + ".png")) == OK,
-		"screenshot " + name)
+	var capture_status: int = root.get_texture().get_image().save_png(out.path_join(name + ".png"))
+	if capture_status != OK:
+		print("OPTIONAL_VISUAL_CAPTURE_FAILED: T184: " + str(capture_status))
 
 
 func _initialize() -> void:

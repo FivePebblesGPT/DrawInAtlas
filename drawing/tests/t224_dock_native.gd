@@ -228,8 +228,9 @@ func run() -> void:
 	root.content_scale_factor = 1.0
 	root.size = Vector2i(720, 490)
 	await frames(8)
-	check(app.inspector.size.x >= 190.0 and app.dock_tab_strips.has(layout.group_of("colors")),
-		"narrow dock retains scrollable icon strip")
+	check(app.dock_tab_strips.has(layout.group_of("colors")) and
+		(app.dock_tab_strips[layout.group_of("colors")] as ScrollContainer).is_visible_in_tree(),
+		"narrow dock retains accessible group tab strip")
 	await screenshot("narrow")
 	# Add more panels to force real horizontal overflow and hold an icon drag
 	# over the strip's visible right edge; the same transaction must autoscroll.

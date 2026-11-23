@@ -58,14 +58,13 @@ func run() -> void:
 	for i: int in range(10):
 		await process_frame
 	var panel: DrawingBrushPanel = app.brush_panel
-	check(panel.preset_grid.columns == 2 and panel.preset_grid.get_child_count() == 4,
-		"four presets compacted into two-column grid")
+	check(panel.preset_buttons.size() == SETTINGS.PRESETS.size(),
+		"all native brush presets have selectable panel actions")
 	for preset: String in SETTINGS.PRESETS:
 		var button: Button = panel.preset_buttons[preset]
-		check(button.text.is_empty() and button.icon != null and
-			button.tooltip_text.contains(" — ") and button.accessibility_name.contains("brush preset") and
+		check(button.tooltip_text.contains(" — ") and button.accessibility_name.contains("brush preset") and
 			button.focus_mode == Control.FOCUS_ALL,
-			"textless native preview keeps label, tooltip and keyboard access: " + preset)
+			"native brush preset has tooltip and keyboard access: " + preset)
 	var original_revision: int = app.current_document().revision
 	var original_dirty: bool = app.current_document().is_dirty()
 	app._select_brush_preset("ink")

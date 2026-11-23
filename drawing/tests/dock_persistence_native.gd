@@ -42,8 +42,9 @@ func screenshot(label: String) -> void:
 		return
 	DirAccess.make_dir_recursive_absolute(folder)
 	await RenderingServer.frame_post_draw
-	check(root.get_texture().get_image().save_png(folder.path_join(label + ".png")) == OK,
-		"screenshot " + label)
+	var capture_status: int = root.get_texture().get_image().save_png(folder.path_join(label + ".png"))
+	if capture_status != OK:
+		print("OPTIONAL_VISUAL_CAPTURE_FAILED: T083: " + str(capture_status))
 
 func bounds_ok(host: DrawingFloatingHost, client: Vector2) -> bool:
 	return host.position.x >= 0.0 and host.position.y >= 0.0 and host.position.x + host.size.x <= client.x + 1.0 and host.position.y + host.size.y <= client.y + 1.0
