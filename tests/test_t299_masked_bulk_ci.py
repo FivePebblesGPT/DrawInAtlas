@@ -26,8 +26,10 @@ class MaskedBulkContracts(unittest.TestCase):
 
     def test_early_guard_precedes_deferred_materialization(self) -> None:
         source = (ROOT / "addons/drawing/edit_session.gd").read_text(encoding="utf-8")
-        self.assertIn("not selection.inverted", source)
-        self.assertIn("not selection.bounds.intersects(area)", source)
+        self.assertIn("not selection.allows_any_in_area(area)", source)
+        selection = (ROOT / "addons/drawing/selection.gd").read_text(encoding="utf-8")
+        self.assertIn("if not enabled or inverted:", selection)
+        self.assertIn("if not overlap.has_area():", selection)
         for name, next_name in (
             ("apply_region", "fill_rect"),
             ("fill_rect", "clear_rect"),

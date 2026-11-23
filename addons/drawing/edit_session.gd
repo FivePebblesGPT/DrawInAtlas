@@ -839,12 +839,12 @@ func _bulk_area_in_native_projection(area: Rect2i) -> bool:
 		and DrawingDocument.TILES.pixel_coordinates_in_projection_range(last_x, last_y)
 
 
-## A non-inverted selection entirely outside a bulk area makes the edit a
-## no-op. Check its conservative bounds before materializing deferred strokes
-## or resolving any lazy source; inverted masks can include the outside area.
+## Prove a selected bulk region is empty before touching deferred brushes or
+## lazy sources. Complex mask/boolean overlaps use a bounded exact probe;
+## uncertain large areas fall through to the existing per-pixel selection.
 func _bulk_selection_excludes_area(area: Rect2i, selection: DrawingSelection) -> bool:
-	return selection != null and selection.enabled and not selection.inverted \
-		and not selection.bounds.intersects(area)
+	return selection != null and selection.enabled \
+		and not selection.allows_any_in_area(area)
 
 
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
