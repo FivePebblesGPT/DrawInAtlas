@@ -39,12 +39,48 @@ class Check:
     script: str
 
 
+def _validate_workflow_envelope(workflow: str) -> None:
+    """Reject workflow/job settings the local Bash replay does not model.
+
+    The complete checked-in workflow has one Ubuntu job, triggered by push
+    and pull request. Step-only snippets are allowed for unit tests; a full
+    workflow must keep this known execution context. This is a conservative
+    indentation contract, not a general-purpose YAML parser.
+    """
+    if not re.search(r"^jobs:[ \t]*$", workflow, re.MULTILINE):
+        if re.search(r"^[^ \t#\r\n]", workflow, re.MULTILINE):
+            raise ValueError("Unrecognized workflow envelope")
+        return
+
+    envelope: list[tuple[int, str]] = []
+    for line in workflow.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent < 6:
+            envelope.append((indent, line[indent:]))
+
+    required = [
+        (0, "on:"), (2, "push:"), (2, "pull_request:"),
+        (0, "jobs:"), (2, "smoke-and-desktop:"),
+        (4, "runs-on: ubuntu-latest"), (4, "steps:"),
+    ]
+    # The job's friendly display name has no bearing on replay semantics.
+    if (len(envelope) != len(required) + 1
+            or envelope[0][0] != 0
+            or not re.fullmatch(r"name: [^\r\n$]+", envelope[0][1])
+            or envelope[1:] != required):
+        raise ValueError("Unreplayable workflow/job configuration: unexpected "
+                         "trigger, runner, job, defaults, environment or metadata")
+
+
 def extract_checks(workflow: str) -> list[Check]:
     """Parse the narrow checked-in steps convention without a YAML dependency.
 
     Reject a CI-step change that cannot be replayed verbatim instead of
     silently claiming its test succeeded.
     """
+    _validate_workflow_envelope(workflow)
     matches = list(STEP_START.finditer(workflow))
     if not matches:
         raise ValueError("No workflow steps found")

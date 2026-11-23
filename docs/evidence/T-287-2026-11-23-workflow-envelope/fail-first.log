@@ -1,0 +1,148 @@
+test_current_workflow_remains_replayable (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_current_workflow_remains_replayable) ... ok
+test_noop_comments_and_step_only_unit_fixtures_work (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_noop_comments_and_step_only_unit_fixtures_work) ... ok
+test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) ... 
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='root environment') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='root defaults') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='root concurrency') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='other event') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='event filters') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job environment') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job defaults') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job container') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job matrix') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job timeout') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job condition') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='different runner') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='duplicated runner') ... FAIL
+  test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='second job') ... FAIL
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='root environment')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='root defaults')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='root concurrency')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='other event')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='event filters')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job environment')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job defaults')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job container')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job matrix')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job timeout')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='job condition')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='different runner')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='duplicated runner')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+======================================================================
+FAIL: test_unmodeled_root_and_job_execution_configuration_is_rejected (tests.test_t287_ci_workflow_envelope.ReplayWorkflowEnvelopeContracts.test_unmodeled_root_and_job_execution_configuration_is_rejected) (label='second job')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t287_ci_workflow_envelope.py", line 45, in test_unmodeled_root_and_job_execution_configuration_is_rejected
+    with self.assertRaises(ValueError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: ValueError not raised
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.048s
+
+FAILED (failures=14)

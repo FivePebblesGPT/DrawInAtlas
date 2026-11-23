@@ -1,3 +1,10 @@
+**[T-287](Tickets/T-287.md) P1 validation Done (2026-11-23):**
+[local fast-CI replay now rejects unmodeled workflow and job configuration](evidence/T-287-2026-11-23-workflow-envelope.md),
+including alternate runners, root/job env/defaults, triggers, matrix/containers
+and extra jobs. Fourteen fail-first negative cases were detected, and 50
+focused/neighboring Python tests pass; the 46 live check scripts remain intact.
+This is not a hosted beta4 CI pass or T-250 owner review.
+
 **[T-286](Tickets/T-286.md) P1 validation Done (2026-11-23):**
 [local fast-CI replay now rejects non-replayable step metadata](evidence/T-286-2026-11-23-ci-replay-metadata.md),
 including unsupported working directory/environment, duplicate condition
@@ -450,6 +457,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-287 · Reject non-replayable workflow and job metadata in local fast CI](Tickets/T-287.md) | Done | **P1 validation:** [14 fail-first envelope violations, 50/50 replay/CI/owner-evidence Python contracts](evidence/T-287-2026-11-23-workflow-envelope.md); hosted CI and owner review remain open | [T-122](Tickets/T-122.md), [T-286](Tickets/T-286.md) |
 | [T-286 · Reject non-replayable step metadata in local fast CI](Tickets/T-286.md) | Done | **P1 validation:** [8 fail-first metadata violations, 47/47 strict replay/CI/owner-evidence Python contracts](evidence/T-286-2026-11-23-ci-replay-metadata.md); hosted CI and owner review remain open | [T-122](Tickets/T-122.md) |
 | [T-285 · Normalize repeat beta4 Linux native release exports](Tickets/T-285.md) | Done | **P1 implementation:** [29 native-package plus 45 adjacent PCK/CI/portability tests](evidence/T-285-2026-11-23-reexport-normalization.md); exact two-native inventory, stage digest, late rollback, hosted/owner gates remain open | [T-201](Tickets/T-201.md), [T-212](Tickets/T-212.md) |
 | [T-284 · Make T-124 queued Brush CI backlog deterministic](Tickets/T-284.md) | Done | **P1 validation:** [840 input samples force deferred second gesture, 4 × 78/78 headless, 20/20 native X11, fail-closed short-path mutation](evidence/T-284-2026-11-23-queued-brush-backlog.md); hosted/owner T-085/T-250 gates remain open | [T-124](Tickets/T-124.md), [T-262](Tickets/T-262.md) |
