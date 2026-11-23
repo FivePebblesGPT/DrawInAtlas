@@ -1,0 +1,30 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_FILL_CACHE_FAILED: exact three-pixel delta committed atomically
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:100)
+ERROR: T068_FILL_CACHE_FAILED: seed far positive/negative signed world coordinates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:151)
+ERROR: T068_FILL_CACHE_FAILED: fill crosses a far signed-64-bit tile seam
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:155)
+ERROR: T068_FILL_CACHE_FAILED: exact far signed coordinates remain distinct
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:158)
+ERROR: T068_FILL_CACHE_FAILED: far-world Undo restores original hidden RGB
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:161)
+T068_FILL_CACHE_FAILED checks=30 failures=5

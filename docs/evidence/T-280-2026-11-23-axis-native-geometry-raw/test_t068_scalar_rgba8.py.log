@@ -1,0 +1,10 @@
+test_all_pinned_small_and_large_cases_match_pixels_and_coverage (test_t068_scalar_rgba8.ScalarRgba8Tests.test_all_pinned_small_and_large_cases_match_pixels_and_coverage) ... ok
+test_atomic_rejection_of_malformed_input_and_all_output_aliases (test_t068_scalar_rgba8.ScalarRgba8Tests.test_atomic_rejection_of_malformed_input_and_all_output_aliases) ... ok
+test_evidence_tampering_is_rejected (test_t068_scalar_rgba8.ScalarRgba8Tests.test_evidence_tampering_is_rejected) ... ok
+test_native_source_over_erase_noop_and_hidden_rgb (test_t068_scalar_rgba8.ScalarRgba8Tests.test_native_source_over_erase_noop_and_hidden_rgb) ... ok
+test_two_run_evidence_reproduces_exactly (test_t068_scalar_rgba8.ScalarRgba8Tests.test_two_run_evidence_reproduces_exactly) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 10.639s
+
+OK

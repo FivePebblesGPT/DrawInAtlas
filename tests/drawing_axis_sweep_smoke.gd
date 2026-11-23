@@ -1,6 +1,8 @@
 extends SceneTree
 ## T-068: exact Geometry2D oracle for horizontal/vertical hard-brush sweeps.
 ## The oracle stays independent of the optimized segment's implementation.
+## Native tile history no longer exposes per-pixel DrawingDelta.after.
+## Check full committed/Undo/Redo document pixels instead.
 
 var checks: int = 0
 var failures: int = 0
@@ -37,13 +39,35 @@ func _oracle(start: Vector2, finish: Vector2, width: float,
 	return expected
 
 
+func _region_matches(doc: DrawingDocument, layer: String, start: Vector2,
+		finish: Vector2, width: float, anchor_x: int, anchor_y: int,
+		expected: Dictionary[String, int], undone: bool) -> bool:
+	var radius: float = width * 0.5
+	var left: int = floori(minf(start.x, finish.x) - radius - 0.5)
+	var top: int = floori(minf(start.y, finish.y) - radius - 0.5)
+	var right: int = ceili(maxf(start.x, finish.x) + radius + 0.5)
+	var bottom: int = ceili(maxf(start.y, finish.y) + radius + 0.5)
+	# Include a one-pixel border to prove neither the optimized sweep nor its
+	# native commit painted beyond the exact Geometry2D/mask coverage.
+	for y: int in range(top - 1, bottom + 1):
+		for x: int in range(left - 1, right + 1):
+			var key: String = DrawingDocument.TILES.pixel_key64(anchor_x + x, anchor_y + y)
+			var expected_pixel: int = 0 if undone else int(expected.get(key, 0))
+			var pixel: DrawingResult = doc.read_pixel(layer, anchor_x + x, anchor_y + y)
+			if not pixel.ok or int(pixel.value) != expected_pixel:
+				return false
+	return true
+
+
 func _case(start: Vector2, finish: Vector2, width: float,
 		mask: DrawingSelection = null) -> void:
 	var label: String = "%s -> %s width=%s mask=%s" % [start, finish, width, mask != null]
 	var doc: DrawingDocument = DrawingDocument.new("axis-sweep", 16)
 	var layer: String = String(doc.create_layer(DrawingLayerNode.RASTER, "Pixels").value)
-	var anchor_x: int = 9007199254740993
-	var anchor_y: int = -9007199254740993
+	# Keep source tile low bits nonzero, but stay within the native ±2^52
+	# tile projection. The original >2^53 anchor must fail publication.
+	var anchor_x: int = 1125899906842625
+	var anchor_y: int = -1125899906842625
 	var edit: DrawingEditSession = doc.begin_edit(layer, doc.revision,
 		Transform2D.IDENTITY, anchor_x, anchor_y).value as DrawingEditSession
 	var path: PackedVector2Array = PackedVector2Array([start, finish])
@@ -57,21 +81,20 @@ func _case(start: Vector2, finish: Vector2, width: float,
 	var count: int = edit.change_count()
 	_check(edit.paint_path(path, 0x80442211, width, false, mask).ok and edit.change_count() == count,
 		"once-covered repeated path " + label)
+	var prior_revision: int = doc.revision
 	var committed: DrawingResult = edit.commit()
-	_check(committed.ok and committed.delta != null, "commit " + label)
+	_check(committed.ok and doc.revision == prior_revision + 1,
+		"native commit advances one revision " + label)
 	if not committed.ok:
 		return
-	var actual: Dictionary[String, int] = committed.delta.after
-	_check(actual == expected, "exact original Geometry2D pixel set and RGBA8 " + label)
-	_check(doc.undo().ok and doc.redo().ok, "undo/redo " + label)
-	var all_pixels_match: bool = true
-	for key: String in expected:
-		var split: PackedStringArray = key.split(",")
-		var pixel: DrawingResult = doc.read_pixel(layer, int(split[0]), int(split[1]))
-		if not pixel.ok or int(pixel.value) != expected[key]:
-			all_pixels_match = false
-			break
-	_check(all_pixels_match, "persisted exact RGBA8 after redo " + label)
+	_check(_region_matches(doc, layer, start, finish, width, anchor_x, anchor_y,
+		expected, false), "exact original Geometry2D pixels and RGBA8 " + label)
+	var undone: DrawingResult = doc.undo()
+	_check(undone.ok and _region_matches(doc, layer, start, finish, width,
+		anchor_x, anchor_y, expected, true), "full blank region after undo " + label)
+	var redone: DrawingResult = doc.redo()
+	_check(redone.ok and _region_matches(doc, layer, start, finish, width,
+		anchor_x, anchor_y, expected, false), "full exact RGBA8 after redo " + label)
 
 
 func _randomized_geometry_parity() -> void:
@@ -127,6 +150,26 @@ func _run() -> void:
 	var mask: DrawingSelection = DrawingSelection.new(Rect2i(-3, -2, 8, 6), true)
 	_case(Vector2(-15.25, 0.5), Vector2(24.75, 0.5), 8.0, mask)
 	_case(Vector2(0.5, -16.25), Vector2(0.5, 21.5), 8.0, mask)
+	# The public gesture may be created at >2^53, but the native tile
+	# publisher must fail closed with no revision or pixel mutation.
+	var unsafe_anchor: int = 9007199254740993
+	var unsafe: DrawingDocument = DrawingDocument.new("axis-out-of-projection", 16)
+	var unsafe_layer: String = String(unsafe.create_layer(DrawingLayerNode.RASTER, "Unsafe").value)
+	var unsafe_revision: int = unsafe.revision
+	var unsafe_begin: DrawingResult = unsafe.begin_edit(unsafe_layer, unsafe_revision,
+		Transform2D.IDENTITY, unsafe_anchor, -unsafe_anchor)
+	_check(unsafe_begin.ok, "out-of-projection gesture remains constructible")
+	if unsafe_begin.ok:
+		var unsafe_edit: DrawingEditSession = unsafe_begin.value as DrawingEditSession
+		var unsafe_stage: DrawingResult = unsafe_edit.paint_path(
+			PackedVector2Array([Vector2(0.5, 0.5), Vector2(3.5, 0.5)]),
+			0x80442211, 2.5)
+		var unsafe_commit: DrawingResult = unsafe_edit.commit() if unsafe_stage.ok else unsafe_stage
+		var unsafe_pixel: DrawingResult = unsafe.read_pixel(unsafe_layer, unsafe_anchor, -unsafe_anchor)
+		_check(not unsafe_commit.ok and unsafe.revision == unsafe_revision and
+			unsafe_pixel.ok and int(unsafe_pixel.value) == 0,
+			"out-of-projection sweep cannot publish pixels or history")
+		unsafe_edit.cancel()
 	print("T068_AXIS_SWEEP_%s checks=%d failures=%d" % [
 		"PASSED" if failures == 0 else "FAILED", checks, failures])
 	quit(0 if failures == 0 else 1)

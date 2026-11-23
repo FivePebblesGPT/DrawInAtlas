@@ -1691,10 +1691,11 @@ approval, and no input-to-photon latency measurement is claimed.
   target or physical end-to-end benchmark.
 - T-068 safe stationary round-dab CPU shortcut: `tests/drawing_dab_geometry_smoke.gd` compares its pixels against the **original** Godot `Geometry2D` segment oracle at fractional/negative positions, tile seams and 64-bit signed anchors, including undo/redo, no-op alpha and hidden RGB (125 assertions). The large raster benchmark and 25-gesture native stress run are **targeted**, not push-gating.
 - T-068 bounded axis-aligned swept hard-brush shortcut:
-  `tests/drawing_axis_sweep_smoke.gd` (**239** assertions) compares precise
-  touched-pixel dictionaries, RGBA8 values, masks, once-per-gesture coverage,
-  undo/redo and 320 seeded axis geometry cases against independent Godot
-  `Geometry2D` closest-segment results. It runs in the existing T-068 fast-CI
+  `tests/drawing_axis_sweep_smoke.gd` (**241** current beta4 assertions;
+  239 historical beta2 assertions) compares exact staged touched-pixel
+  counts with independent Geometry2D coverage and complete committed RGBA8,
+  Undo/Redo, masks, once-per-gesture coverage and 320 seeded axis geometry
+  cases against Godot `Geometry2D` closest-segment results. It runs in the existing T-068 fast-CI
   step, not a new native test or CI job. The seven-sample headless
   `drawing_axis_sweep_benchmark.gd` is **diagnostic only**, not a push gate or
   physical input-to-visible timing claim.
