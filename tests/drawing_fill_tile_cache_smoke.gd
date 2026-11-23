@@ -45,6 +45,18 @@ func _fetch(name: String) -> Variant:
 	return blobs.get(name, null)
 
 
+func _read_pixels(document: DrawingDocument, layer: String,
+		bounds: Rect2i) -> Dictionary[Vector2i, int]:
+	var pixels: Dictionary[Vector2i, int] = {}
+	for y: int in range(bounds.position.y, bounds.end.y):
+		for x: int in range(bounds.position.x, bounds.end.x):
+			var pixel: DrawingResult = document.read_pixel(layer, x, y)
+			if not pixel.ok:
+				return {}
+			pixels[Vector2i(x, y)] = int(pixel.value)
+	return pixels
+
+
 func _run() -> void:
 	var blank: DrawingDocument = DrawingDocument.new("blank", 16)
 	var empty_layer: String = String(blank.create_layer(DrawingLayerNode.RASTER, "Empty").value)
@@ -96,21 +108,26 @@ func _run() -> void:
 		"valid tile remains cached, failed resolves are retried")
 	_check(doc.revision == saved_revision and int(doc.read_pixel(layer, 15, 0).value) == OLD,
 		"staging never changes published transparent RGB")
+	var bounds: Rect2i = Rect2i(14, -1, 6, 3)
+	var source_pixels: Dictionary[Vector2i, int] = _read_pixels(doc, layer, bounds)
+	_check(source_pixels.size() == bounds.get_area() and
+		source_pixels.get(Vector2i(15, 0), -1) == OLD and
+		source_pixels.get(Vector2i(16, 0), -1) == OLD and
+		source_pixels.get(Vector2i(17, 0), -1) == OLD and
+		source_pixels.get(Vector2i(18, 0), -1) == 0,
+		"snapshot exact hidden-RGB seed and adjacent clear border")
+	var expected_pixels: Dictionary[Vector2i, int] = source_pixels.duplicate()
+	for x: int in range(15, 18):
+		expected_pixels[Vector2i(x, 0)] = NEW
 	var published: DrawingResult = edit.commit()
-	_check(published.ok and published.delta != null and published.delta.after.size() == 3,
-		"exact three-pixel delta committed atomically")
-	var exact: bool = true
-	for x: int in range(15, 18):
-		exact = exact and int(doc.read_pixel(layer, x, 0).value) == NEW
-	_check(exact and int(doc.read_pixel(layer, 18, 0).value) == 0,
-		"fill does not extend into unallocated clear space")
-	_check(doc.undo().ok, "undo exact lazy fill")
-	var restored: bool = true
-	for x: int in range(15, 18):
-		restored = restored and int(doc.read_pixel(layer, x, 0).value) == OLD
-	_check(restored, "undo restores hidden RGB and alpha zero across seam")
-	_check(doc.redo().ok and int(doc.read_pixel(layer, 17, 0).value) == NEW,
-		"redo restores exact published bytes")
+	_check(published.ok and doc.revision == saved_revision + 1,
+		"three-pixel fill commits one native revision atomically")
+	_check(_read_pixels(doc, layer, bounds) == expected_pixels,
+		"committed region exactly changes only three pixels across lazy seam")
+	_check(doc.undo().ok and _read_pixels(doc, layer, bounds) == source_pixels,
+		"undo restores every source pixel and hidden RGB across seam")
+	_check(doc.redo().ok and _read_pixels(doc, layer, bounds) == expected_pixels,
+		"redo restores exact full-region published bytes")
 
 	# A selection must constrain the fill without destroying the neighboring
 	# linked source pixel; there is no implicit conversion of hidden RGB.
@@ -119,10 +136,17 @@ func _run() -> void:
 	var masked: DrawingEditSession = doc.begin_edit(layer, doc.revision).value
 	_check(masked.flood_fill(Vector2i(15, 0), NEW, mask, 96).ok and
 		masked.change_count() == 2, "mask excludes a connected pixel")
+	var mask_source: Dictionary[Vector2i, int] = _read_pixels(doc, layer, bounds)
+	var mask_expected: Dictionary[Vector2i, int] = mask_source.duplicate()
+	mask_expected[Vector2i(15, 0)] = NEW
+	mask_expected[Vector2i(16, 0)] = NEW
 	_check(masked.commit().ok, "masked fill commit")
-	_check(int(doc.read_pixel(layer, 16, 0).value) == NEW and
-		int(doc.read_pixel(layer, 17, 0).value) == OLD,
-		"masked fill leaves excluded hidden-RGB source unchanged")
+	_check(_read_pixels(doc, layer, bounds) == mask_expected,
+		"mask changes only two connected pixels, retaining excluded hidden RGB")
+	_check(doc.undo().ok and _read_pixels(doc, layer, bounds) == mask_source,
+		"masked fill Undo restores the entire region")
+	_check(doc.redo().ok and _read_pixels(doc, layer, bounds) == mask_expected,
+		"masked fill Redo preserves exact mask boundary")
 
 	# Candidate budget rolls back the entire gesture, not just the last batch.
 	var budget: DrawingDocument = DrawingDocument.new("fill-budget", 16)
@@ -142,24 +166,64 @@ func _run() -> void:
 	_check(budget.undo().ok and int(budget.read_pixel(budget_layer, 2, 2).value) == OLD,
 		"retry still uses ordinary Undo history")
 
-	# Tile addressing never converts a signed 64-bit origin through float32.
+	# The public session can stage wider signed anchors than the native tile
+	# projection can publish. Rejection must not mutate source or history.
 	var far: DrawingDocument = DrawingDocument.new("far-fill", 16)
 	var far_layer: String = String(far.create_layer(DrawingLayerNode.RASTER, "Pixels").value)
-	var anchor: int = 9007199254740993
-	var far_seed: DrawingEditSession = far.begin_edit(far_layer, far.revision,
+	var unsafe_anchor: int = 9007199254740993
+	var far_revision: int = far.revision
+	var unsafe: DrawingResult = far.begin_edit(far_layer, far_revision,
+		Transform2D.IDENTITY, unsafe_anchor, -unsafe_anchor)
+	_check(unsafe.ok, "wide signed anchor remains valid for a public edit")
+	if unsafe.ok:
+		var unsafe_edit: DrawingEditSession = unsafe.value as DrawingEditSession
+		var unsafe_stage: DrawingResult = unsafe_edit.fill_rect(Rect2i(-2, 0, 3, 1), OLD)
+		_check(unsafe_stage.ok and unsafe_edit.change_count() == 3,
+			"unsafe signed gesture stages three candidate pixels")
+		var unsafe_commit: DrawingResult = unsafe_edit.commit() if unsafe_stage.ok else unsafe_stage
+		var unchanged_unsafe: bool = true
+		for offset: int in range(-2, 1):
+			unchanged_unsafe = unchanged_unsafe and int(far.read_pixel(far_layer,
+				unsafe_anchor + offset, -unsafe_anchor).value) == 0
+		_check(not unsafe_commit.ok and far.revision == far_revision and unchanged_unsafe,
+			"unsafe native publication rejects without source or revision mutation")
+		unsafe_edit.cancel()
+
+	# The exact large signed anchor has nonzero low bits and crosses the
+	# x=tile_size-1 / x=0 source tile seam at the local -2/-1 boundary.
+	var anchor: int = 1125899906842625
+	var far_seed: DrawingEditSession = far.begin_edit(far_layer, far_revision,
 		Transform2D.IDENTITY, anchor, -anchor).value
-	_check(far_seed.fill_rect(Rect2i(0, 0, 2, 1), OLD).ok and far_seed.commit().ok,
-		"seed far positive/negative signed world coordinates")
-	var far_edit: DrawingEditSession = far.begin_edit(far_layer, far.revision,
+	_check(far_seed.fill_rect(Rect2i(-2, 0, 3, 1), OLD).ok and far_seed.commit().ok,
+		"seed exact hidden RGB across a legal large signed tile seam")
+	var signed_seed_revision: int = far.revision
+	var far_edit: DrawingEditSession = far.begin_edit(far_layer, signed_seed_revision,
 		Transform2D.IDENTITY, anchor, -anchor).value
-	_check(far_edit.flood_fill(Vector2i.ZERO, NEW, null, 32).ok and
-		far_edit.change_count() == 2 and far_edit.commit().ok,
-		"fill crosses a far signed-64-bit tile seam")
-	_check(int(far.read_pixel(far_layer, anchor, -anchor).value) == NEW and
-		int(far.read_pixel(far_layer, anchor + 1, -anchor).value) == NEW,
-		"exact far signed coordinates remain distinct")
-	_check(far.undo().ok and int(far.read_pixel(far_layer, anchor, -anchor).value) == OLD,
-		"far-world Undo restores original hidden RGB")
+	_check(far_edit.flood_fill(Vector2i(-2, 0), NEW, null, 32).ok and
+		far_edit.change_count() == 3 and far.revision == signed_seed_revision,
+		"fill stages exactly three far-signed seam pixels without publication")
+	_check(far_edit.commit().ok and far.revision == signed_seed_revision + 1,
+		"far signed fill publishes a single native revision")
+	var exact_far: bool = true
+	for offset: int in range(-3, 2):
+		var expected: int = NEW if offset >= -2 and offset <= 0 else 0
+		exact_far = exact_far and int(far.read_pixel(far_layer,
+			anchor + offset, -anchor).value) == expected
+	_check(exact_far, "far signed fill changes only the intended three pixels")
+	_check(far.undo().ok, "far-world undo succeeds")
+	var restored_far: bool = true
+	for offset: int in range(-3, 2):
+		var expected: int = OLD if offset >= -2 and offset <= 0 else 0
+		restored_far = restored_far and int(far.read_pixel(far_layer,
+			anchor + offset, -anchor).value) == expected
+	_check(restored_far, "far-world undo restores every hidden-RGB source pixel")
+	_check(far.redo().ok, "far-world redo succeeds")
+	var redone_far: bool = true
+	for offset: int in range(-3, 2):
+		var expected: int = NEW if offset >= -2 and offset <= 0 else 0
+		redone_far = redone_far and int(far.read_pixel(far_layer,
+			anchor + offset, -anchor).value) == expected
+	_check(redone_far, "far-world redo restores all three pixels and seam guards")
 
 	print("T068_FILL_CACHE_%s checks=%d failures=%d" % [
 		"PASSED" if failures == 0 else "FAILED", checks, failures])

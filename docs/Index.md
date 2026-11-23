@@ -1,3 +1,10 @@
+**[T-281](Tickets/T-281.md) P1 validation Done (2026-11-23):**
+[native lazy flood-fill tile-cache committed-pixel/Undo/Redo witness](evidence/T-281-2026-11-23-native-fill-cache.md)
+now passes 39/39 Rust-backed beta4 checks, including masked and unmasked
+seams, exact hidden RGB, large signed native bounds and two mutation controls.
+The independent verified-staging fill test remains red (8/29); T-068 and
+hosted CI remain open. No T-250 owner acceptance is inferred.
+
 **[T-280](Tickets/T-280.md) P1 validation Done (2026-11-23):**
 [native axis-sweep Geometry2D full-region publication/Undo/Redo oracle](evidence/T-280-2026-11-23-axis-native-geometry.md)
 now passes 241/241 Rust-backed beta4 checks across 34 directional/masked
@@ -408,6 +415,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-281 · Restore native lazy flood-fill tile-cache and full-region history witness](Tickets/T-281.md) | Done | **P1 validation:** [39/39 native lazy fill, signed seam, masked/unmasked Undo/Redo and mutation controls](evidence/T-281-2026-11-23-native-fill-cache.md); verified-stage and hosted CI remain open | [T-278](Tickets/T-278.md), [T-280](Tickets/T-280.md) |
 | [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Done | Appearance-only oracles retired; real screenshots inspected, 50 native logs and 33 Python checks pass; [full audit](evidence/T-272-2026-11-23-visual-test-audit.md). Original dock/ColorPicker UX remains for owner T-250 | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |

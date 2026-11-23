@@ -1,0 +1,15 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_FILL_CACHE_FAILED checks=39 failures=2
+ERROR: T068_FILL_CACHE_FAILED: committed region exactly changes only three pixels across lazy seam
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:125)
+ERROR: T068_FILL_CACHE_FAILED: redo restores exact full-region published bytes
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_fill_tile_cache_smoke.gd:24)
+       [1] _run (res://tests/drawing_fill_tile_cache_smoke.gd:129)
