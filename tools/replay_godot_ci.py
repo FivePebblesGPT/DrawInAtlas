@@ -28,6 +28,8 @@ ENGINE_VERSION = "4.8.beta4.official.b070e63b1"
 STEP_START = re.compile(r"^      - name: (.+)$", re.MULTILINE)
 STEP_ID = re.compile(r"^        id: (ci_[a-z0-9_]+)$", re.MULTILINE)
 RUN_LINE = re.compile(r"^        run: (.+)$", re.MULTILINE)
+STEP_FIELD = re.compile(r"([a-z][a-z0-9-]*):[ \t]*(.*)\Z")
+ALLOWED_STEP_FIELDS = frozenset({"id", "if", "continue-on-error", "shell", "run"})
 
 
 @dataclass(frozen=True)
@@ -54,13 +56,31 @@ def extract_checks(workflow: str) -> list[Check]:
             continue  # checkout, engine setup, version preflight, final summary
         if len(ids) != 1:
             raise ValueError(f"Ambiguous check ID in {match.group(1)}")
-        if re.search(r"^        uses:", block, re.MULTILINE):
-            raise ValueError(f"External action cannot be replayed: {ids[0]}")
-        if "        if: ${{ !cancelled() }}" not in block or "        continue-on-error: true" not in block:
-            raise ValueError(f"Nonstandard step conditions cannot be replayed: {ids[0]}")
-        if re.search(r"^        (?:env:|shell: (?!bash$))", block, re.MULTILINE):
-            raise ValueError(f"Nonstandard step environment or shell: {ids[0]}")
-        if len(RUN_LINE.findall(block)) != 1:
+        # Only these simple step keys are reproduced by the local Bash runner.
+        # Unknown settings (working-directory, timeout-minutes, env, etc.) or
+        # duplicate YAML keys would silently change the GitHub execution
+        # semantics while the replay still reported a trusted outcome.
+        metadata: dict[str, str] = {}
+        for line in block.splitlines():
+            if not line.startswith("        ") or line.startswith("          "):
+                continue
+            field = line[8:]
+            if not field.strip() or field.lstrip().startswith("#"):
+                continue
+            parsed = STEP_FIELD.fullmatch(field)
+            if parsed is None:
+                raise ValueError(f"Unsupported step metadata in {ids[0]}: {field}")
+            key, value = parsed.groups()
+            if key not in ALLOWED_STEP_FIELDS or key in metadata:
+                raise ValueError(f"Unsupported or duplicate step key in {ids[0]}: {key}")
+            metadata[key] = value
+        if metadata.get("id") != ids[0]:
+            raise ValueError(f"Ambiguous step ID in {match.group(1)}")
+        if (metadata.get("if") != "${{ !cancelled() }}"
+                or metadata.get("continue-on-error") != "true"
+                or metadata.get("shell", "bash") != "bash"):
+            raise ValueError(f"Nonstandard step conditions or shell: {ids[0]}")
+        if len(RUN_LINE.findall(block)) != 1 or "run" not in metadata:
             raise ValueError(f"Missing or multiple run commands: {ids[0]}")
         run = RUN_LINE.search(block)
         if run is None:
