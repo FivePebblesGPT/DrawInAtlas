@@ -1,0 +1,4 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+T158_TILE_BOUNDS_PASSED checks=24 failures=0
