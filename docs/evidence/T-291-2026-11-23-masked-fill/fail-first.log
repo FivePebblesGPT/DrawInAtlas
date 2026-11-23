@@ -1,0 +1,55 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 0 remains a successful no-op
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:83)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 0 does not call lazy source provider
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:84)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 1 remains a successful no-op
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:83)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 1 does not call lazy source provider
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:84)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 2 remains a successful no-op
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:83)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 2 does not call lazy source provider
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:84)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 3 remains a successful no-op
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:83)
+ERROR: T291_MASKED_FILL_FAILED: masked-out fill 3 does not call lazy source provider
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:84)
+ERROR: T291_MASKED_FILL_FAILED: invalid inputs leave lazy source and detached Brush untouched
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:101)
+ERROR: T291_MASKED_FILL_FAILED: valid retry resolves the source exactly once
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t291_masked_fill_seed_preflight.gd:24)
+       [1] _run (res://tests/t291_masked_fill_seed_preflight.gd:107)
+T291_MASKED_FILL_FAILED checks=33 failures=10

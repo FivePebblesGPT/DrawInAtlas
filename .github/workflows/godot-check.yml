@@ -845,6 +845,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t290_bulk_edit_preflight.gd 2>&1 | tee /tmp/godot-t290-bulk-preflight.log
           grep -Fxq 'T290_BULK_PREFLIGHT_PASSED checks=28 failures=0' /tmp/godot-t290-bulk-preflight.log
           python3 tools/check_godot_model_log.py /tmp/godot-t290-bulk-preflight.log --marker T290_BULK_PREFLIGHT_PASSED
+          # T-291: masked-out fill seeds cannot resolve lazy chunks or flatten Brush.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t291_masked_fill_seed_preflight.gd 2>&1 | tee /tmp/godot-t291-masked-fill.log
+          grep -Fxq 'T291_MASKED_FILL_PASSED checks=33 failures=0' /tmp/godot-t291-masked-fill.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t291-masked-fill.log --marker T291_MASKED_FILL_PASSED
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_verified_stage_smoke.gd 2>&1 | tee /tmp/godot-t068-verified-stage.log
           grep -q 'T068_VERIFIED_STAGE_PASSED' /tmp/godot-t068-verified-stage.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_VERIFIED_STAGE_FAILED:' /tmp/godot-t068-verified-stage.log; then exit 1; fi

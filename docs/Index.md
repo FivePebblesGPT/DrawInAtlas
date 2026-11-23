@@ -1,3 +1,9 @@
+**[T-291](Tickets/T-291.md) P1 implementation Done (2026-11-23):**
+[selection-excluded flood-fill seeds now bypass lazy source reads without
+flattening a valid deferred Brush](evidence/T-291-2026-11-23-masked-seed-preflight.md).
+Fail-first catches 10/33 failures, corrected 33/33 and seven neighboring
+native suites 250/250 pass. T-148/T-068, hosted CI and T-250 remain open.
+
 **[T-290](Tickets/T-290.md) P1 implementation Done (2026-11-23):**
 [bulk rectangle/byte-region/polygon preflight now preserves deferred Brush and
 avoids lazy-source side effects on invalid input](evidence/T-290-2026-11-23-bulk-preflight.md).
@@ -478,6 +484,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-291 · Skip selection-excluded fill seeds before lazy reads](Tickets/T-291.md) | Done | **P1 implementation:** [10-failure native pre-fix, 33/33 fixed, 250/250 neighboring native and required-CI witness](evidence/T-291-2026-11-23-masked-seed-preflight.md); T-148/T-068/owner/hosted gates open | [T-153](Tickets/T-153.md) |
 | [T-290 · Preflight bulk raster regions before deferred Brush and lazy I/O](Tickets/T-290.md) | Done | **P1 implementation:** [8-failure native pre-fix, 28/28 fixed, 323 neighboring native checks and strict required-CI marker](evidence/T-290-2026-11-23-bulk-preflight.md); T-148/T-068/owner/hosted gates remain open | [T-153](Tickets/T-153.md) |
 | [T-289 · Reject invalid flood-fill seeds/colors before lazy reads](Tickets/T-289.md) | Done | **P1 implementation:** [13-failure native pre-fix, 23/23 fixed, 161 neighboring native checks and required-CI strict marker](evidence/T-289-2026-11-23-fill-preflight.md); T-068/hardware/hosted gates remain open | [T-153](Tickets/T-153.md) |
 | [T-288 · Restore native Rust fill-to-frame CI and beta4 profiler provenance](Tickets/T-288.md) | Done | **P1 validation:** [native build and registration, exact 96/96 fill, two 21-trial X11 processes 770/770, mutation and engine-hash contracts](evidence/T-288-2026-11-23-native-fill-frame.md); T-068/T-094/owner gates open | [T-153](Tickets/T-153.md) |

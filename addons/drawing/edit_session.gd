@@ -1886,6 +1886,10 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
 	if rgba < 0 or rgba > 0xffffffff:
 		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	# A masked-out seed cannot expand the fill frontier. Reject it before
+	# resolving an arbitrary lazy source or flattening an accepted Brush.
+	if selection != null and not selection.allows(seed):
+		return DrawingResult.success(change_count())
 	var original: DrawingResult = _fill_source_pixel(seed)
 	if not original.ok:
 		return original
