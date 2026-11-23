@@ -165,7 +165,7 @@ def _inspect_binary(path: Path, platform: str, *, shared: bool = False) -> None:
 
 def inspect_distribution_entries(
     directory: Path, platform: str, *, allow_missing_native: bool = False,
-    engine_copied_native: bool = False,
+    engine_copied_native: bool = False, preexisting_native: bool = False,
 ) -> dict[str, Path]:
     """Require an exact regular-file export tree, including directory entries.
 
@@ -185,6 +185,12 @@ def inspect_distribution_entries(
             raise ReleaseError("An engine-copied library is only valid before packaging")
         expected.add(NATIVE_LIBRARY.name)
         required.add(NATIVE_LIBRARY.name)
+    if preexisting_native:
+        if not (platform == "linux" and allow_missing_native and engine_copied_native):
+            raise ReleaseError(
+                "A preexisting native library is only allowed during Linux re-export normalization"
+            )
+        required.add(NATIVE_LIBRARY.as_posix())
     expected_directories = {
         parent.as_posix()
         for name in expected

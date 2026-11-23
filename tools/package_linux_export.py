@@ -66,6 +66,47 @@ def _preflight_unpacked_export(distribution: Path, source: Path, engine_copy: Pa
         inspect_distribution(temporary_distribution, "linux")
 
 
+def _normalize_reexport(distribution: Path, destination: Path, engine_copy: Path,
+                        expected_digest: str) -> Path:
+    """Normalize a repeat Godot export without dropping the known-good native ELF.
+
+    The engine can emit the same root-level library again when exporting into
+    an already packaged directory. Validate the *exact* two-library layout,
+    preflight its final one-library projection and roll back the root copy on
+    any late inspection error. Never remove unrelated or mismatched bytes.
+    """
+    try:
+        inspect_distribution_entries(
+            distribution, "linux", allow_missing_native=True,
+            engine_copied_native=True, preexisting_native=True,
+        )
+    except ReleaseError as exc:
+        raise PackageError(f"Invalid re-export layout: {exc}") from exc
+    if digest(engine_copy) != expected_digest:
+        raise PackageError("Engine-copied native library differs from staged build")
+
+    try:
+        with tempfile.TemporaryDirectory(prefix=".native-reexport-", dir=distribution.parent) as work:
+            workspace = Path(work)
+            projection = workspace / "projection"
+            projection.mkdir()
+            for filename in (BINARY["linux"], "Drawing.pck", NATIVE_LIBRARY.as_posix()):
+                target = projection / filename
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.link(distribution / filename, target)
+            inspect_distribution(projection, "linux")
+            backup = workspace / engine_copy.name
+            os.replace(engine_copy, backup)
+            try:
+                inspect_distribution(distribution, "linux")
+            except (ReleaseError, OSError):
+                os.replace(backup, engine_copy)
+                raise
+    except (ReleaseError, OSError) as exc:
+        raise PackageError(f"Invalid Linux distribution after re-export: {exc}") from exc
+    return destination
+
+
 def package(stage: Path, distribution: Path) -> Path:
     """Install an exact native ELF, leaving rejected distributions unchanged."""
     try:
@@ -82,9 +123,14 @@ def package(stage: Path, distribution: Path) -> Path:
         if path == distribution or distribution in path.parents
     ):
         raise PackageError("Native destination cannot follow a symlink")
+    root_copy = distribution / NATIVE_LIBRARY.name
     if destination.exists():
         if not destination.is_file() or digest(destination) != stage_info["native_library_sha256"]:
             raise PackageError("Existing exported native library differs from staged build")
+        if root_copy.exists() or root_copy.is_symlink():
+            return _normalize_reexport(
+                distribution, destination, root_copy, stage_info["native_library_sha256"]
+            )
         try:
             inspect_distribution(distribution, "linux")
         except ReleaseError as exc:
@@ -101,7 +147,6 @@ def package(stage: Path, distribution: Path) -> Path:
         parent = parent.parent
     installed = False
     temporary: Path | None = None
-    root_copy = distribution / NATIVE_LIBRARY.name
     engine_copy = root_copy if root_copy.exists() or root_copy.is_symlink() else None
     try:
         _preflight_unpacked_export(distribution, source, engine_copy)
