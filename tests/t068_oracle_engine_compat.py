@@ -40,3 +40,31 @@ def require_current_engine_matches_pinned_beta2(
     normalized = {**regenerated, "godot_version": LEGACY_ENGINE}
     if normalized != pinned:
         raise AssertionError("Regenerated fixture differs beyond engine metadata")
+
+# T-277: native-attached documents cannot publish the historical >2^53
+# coordinates.  The relocated live probe still covers a far signed location;
+# the beta2 fixture's historical anchors and every raster result stay pinned.
+BRUSH_NATIVE_ANCHORS = ("1125899906842625", "-1125899906842625")
+
+
+def require_native_brush_matches_pinned_beta2(
+    pinned: dict[str, Any], regenerated: dict[str, Any],
+) -> None:
+    """Verify legal live anchors and exact historical brush raster parity.
+
+    Unlike unrelated quad fixtures, this one intentionally relocates the two
+    absolute anchors to the native-publishable range.  No coverage, channel,
+    digest, case ordering, or other field is exempt from strict comparison.
+    """
+    if (regenerated.get("anchor_x"), regenerated.get("anchor_y")) != BRUSH_NATIVE_ANCHORS:
+        raise AssertionError("Native brush anchor pair differs from the pinned legal probe")
+    if (pinned.get("anchor_x"), pinned.get("anchor_y")) != (
+        "9007199254740993", "-9007199254740993",
+    ):
+        raise AssertionError("Historical brush anchor pair was modified")
+    relocated = {
+        **regenerated,
+        "anchor_x": pinned["anchor_x"],
+        "anchor_y": pinned["anchor_y"],
+    }
+    require_current_engine_matches_pinned_beta2(pinned, relocated)

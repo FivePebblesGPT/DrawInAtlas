@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from t068_oracle_engine_compat import require_current_engine_matches_pinned_beta2
+from t068_oracle_engine_compat import require_native_brush_matches_pinned_beta2
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools/benchmarks"))
@@ -130,7 +130,7 @@ class BrushFixtureContracts(unittest.TestCase):
             )
             self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
             self.assertIn("T068_SKIA_BRUSH_ORACLE_PASSED: 16", process.stdout)
-            require_current_engine_matches_pinned_beta2(
+            require_native_brush_matches_pinned_beta2(
                 json.loads(BRUSH.ORACLE_FILE.read_text()), json.loads(destination.read_text()))
 
     def test_mask_predicates_cover_rect_sparse_and_inverted(self) -> None:

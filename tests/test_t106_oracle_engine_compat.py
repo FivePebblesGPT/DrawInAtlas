@@ -7,7 +7,11 @@ import json
 import unittest
 from pathlib import Path
 
-from t068_oracle_engine_compat import require_current_engine_matches_pinned_beta2
+from t068_oracle_engine_compat import (
+    BRUSH_NATIVE_ANCHORS,
+    require_current_engine_matches_pinned_beta2,
+    require_native_brush_matches_pinned_beta2,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = (
@@ -42,6 +46,33 @@ class EngineCompatibilityTests(unittest.TestCase):
                 altered_pinned["godot_version"] = "4.8-beta4 (official)"
                 with self.assertRaises(AssertionError):
                     require_current_engine_matches_pinned_beta2(altered_pinned, regenerated)
+
+    def test_native_brush_relocation_preserves_every_historical_pixel(self) -> None:
+        pinned = json.loads((ROOT / "tools/benchmarks/t068_skia_brush_oracle.json").read_text())
+        live = copy.deepcopy(pinned)
+        live["godot_version"] = "4.8-beta4 (official)"
+        live["anchor_x"], live["anchor_y"] = BRUSH_NATIVE_ANCHORS
+        require_native_brush_matches_pinned_beta2(pinned, live)
+
+        for mutation in (
+            lambda value: value.update(anchor_x="9007199254740993"),
+            lambda value: value.update(anchor_y="-1125899906842624"),
+            lambda value: value.update(anchor_x="1125899906842626"),
+            lambda value: value["cases"][0]["changed_indices"].pop(),
+            lambda value: value["cases"][0].update(after_sha256="0" * 64),
+            lambda value: value["cases"][0]["coverage_indices"].pop(),
+            lambda value: value["cases"].reverse(),
+        ):
+            with self.subTest(mutation=mutation):
+                changed = copy.deepcopy(live)
+                mutation(changed)
+                with self.assertRaises(AssertionError):
+                    require_native_brush_matches_pinned_beta2(pinned, changed)
+
+        altered_pinned = copy.deepcopy(pinned)
+        altered_pinned["anchor_y"] = "-9007199254740992"
+        with self.assertRaises(AssertionError):
+            require_native_brush_matches_pinned_beta2(altered_pinned, live)
 
 
 if __name__ == "__main__":
