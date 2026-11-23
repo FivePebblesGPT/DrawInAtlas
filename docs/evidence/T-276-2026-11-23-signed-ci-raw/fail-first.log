@@ -1,0 +1,24 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T066_BENCHMARK initial_ms=18.764 incremental_ms=14.736 initial_writes=8 incremental_writes=6 initial_renames=8 incremental_renames=6 chunk_count=3
+ERROR: T066_FAILED: historical >2^53 coordinates remain representable in unbound pixel edits
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/campaign_bundle_smoke.gd:43)
+       [1] _corruption_and_precision (res://tests/campaign_bundle_smoke.gd:306)
+       [2] _run (res://tests/campaign_bundle_smoke.gd:101)
+ERROR: T066_FAILED: save rejects native-unsafe signed source:
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/campaign_bundle_smoke.gd:43)
+       [1] _corruption_and_precision (res://tests/campaign_bundle_smoke.gd:309)
+       [2] _run (res://tests/campaign_bundle_smoke.gd:101)
+ERROR: T066_FAILED: rejected save cannot publish or acknowledge the unsafe revision
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/campaign_bundle_smoke.gd:43)
+       [1] _corruption_and_precision (res://tests/campaign_bundle_smoke.gd:311)
+       [2] _run (res://tests/campaign_bundle_smoke.gd:101)
+ATLAS_BUNDLE_FAILED (91 checks, 3 failures)

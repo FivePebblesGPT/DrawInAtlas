@@ -296,20 +296,54 @@ func _corruption_and_precision() -> void:
 		var reopened: DrawingResult = loaded.registry.document_at("world", "ground", 0)
 		_check(reopened.ok and reopened.value.read_pixel(layer, x, y).value == 0x00b16317,
 			"exact positive/negative signed projection-edge pixel survives JSON")
-	# Public in-memory pixel edits may still be represented as signed int64,
-	# but a save must fail closed before exposing tiles outside the native-safe
-	# projection. Prove the previously published generation remains readable.
+	# Current required-native direct publication rejects unsafe pixels *before*
+	# creating an invalid document revision. The prior T-202 witness expected a
+	# non-native edit to succeed here and then demanded a failed Save, which is
+	# no longer the behavior of this production build.
 	var root_path: String = AtlasCampaignBundle.root_path(campaign_file)
 	var published_root: String = FileAccess.get_file_as_string(root_path)
 	var unsafe_x: int = 9007199254740993
 	var unsafe_y: int = -9007199254740993
-	_check(_paint(doc, layer, unsafe_x, unsafe_y, PackedByteArray([99, 88, 77, 0])),
-		"historical >2^53 coordinates remain representable in unbound pixel edits")
+	var revision_before: int = doc.revision
+	var dirty_before: bool = doc.is_dirty()
+	var keys_before: Array[String] = doc.tile_keys(layer)
+	var started: DrawingResult = doc.begin_edit(layer, revision_before,
+		Transform2D.IDENTITY, unsafe_x, unsafe_y)
+	_check(started.ok, "legacy signed anchor can still start a gesture")
+	if started.ok:
+		var staged: DrawingResult = started.value.apply_region(Rect2i(0, 0, 1, 1),
+			PackedByteArray([99, 88, 77, 0]))
+		var refusal: DrawingResult = staged if not staged.ok else started.value.commit()
+		_check(not refusal.ok and refusal.code in ["COORD", "COORD_RANGE"],
+			"native direct edit refuses out-of-projection pixels: %s %s" %
+			[refusal.code, refusal.message])
+		started.value.cancel()
+	_check(doc.revision == revision_before and doc.is_dirty() == dirty_before
+		and doc.tile_keys(layer) == keys_before,
+		"rejected pixel edit leaves source revision, dirtiness and tiles intact")
+	_check(FileAccess.get_file_as_string(root_path) == published_root,
+		"rejected pixel edit never updates the campaign root")
+	# Separately exercise the *cold* save boundary with a deliberately invalid
+	# in-memory tile. Public edits can no longer create this state; importing
+	# damaged/unauthorized internal projections must still fail closed. Mark a
+	# legitimate metadata edit dirty first: clean documents are intentionally
+	# reused from their immutable existing manifest without exporting pixels.
+	_check(doc.rename_layer(layer, "Signed projection edge (pending)").ok
+		and doc.is_dirty(), "pending valid metadata causes an export on Save")
+	var dirty_revision: int = doc.revision
+	var invalid_key: String = TILES.tile_key64(unsafe_x, unsafe_y, doc.tile_stride)
+	doc._nodes[layer].tiles[invalid_key] = DrawingRasterTile.new(doc.tile_stride)
 	var rejected: DrawingResult = AtlasCampaignBundle.save(campaign, registry, null, campaign_file)
-	_check(not rejected.ok and rejected.code == "COORD_RANGE",
-		"save rejects native-unsafe signed source: %s %s" % [rejected.code, rejected.message])
+	_check(not rejected.ok and rejected.code in ["COORD_RANGE", "STALE_SOURCE"],
+		"save rejects corrupted native-unsafe source: %s %s" %
+		[rejected.code, rejected.message])
 	_check(doc.is_dirty() and FileAccess.get_file_as_string(root_path) == published_root,
-		"rejected save cannot publish or acknowledge the unsafe revision")
+		"rejected save cannot publish or acknowledge a corrupted raster projection")
+	doc._nodes[layer].tiles.erase(invalid_key)
+	_check(doc.revision == dirty_revision and doc.tile_keys(layer) == keys_before,
+		"corruption fixture cleanup restores original authorized pixels")
+	_check(doc.export_manifest().ok,
+		"rejected cold Save does not poison subsequently authorized manifest export")
 	var unchanged: AtlasStoreResult = AtlasCampaignBundle.load(campaign_file)
 	_check(unchanged.error == OK and unchanged.registry != null,
 		"old signed-edge generation still opens after rejected save")

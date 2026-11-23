@@ -1,0 +1,9 @@
+scenario	exit_code	result
+T-066 fail-first	1	ATLAS_BUNDLE_FAILED (91 checks, 3 failures)
+T-066 final	0	ATLAS_BUNDLE_PASSED (97 checks, 0 failures)
+T-066 editor	0	ATLAS_BUNDLE_EDITOR_PASSED (23 checks, 0 failures)
+Atlas storage first attempt	134	aborted without assertion
+Atlas storage isolated rerun	0	ATLAS_STORAGE_PASSED (77 checks, 0 failures)
+T-158 native bounds	0	T158_TILE_BOUNDS_PASSED checks=24 failures=0
+T-159 signed replay	0	T159_SIGNED_REPLAY_PASSED checks=39 failures=0
+T-071 storage Python	0	Ran 8 tests, OK
