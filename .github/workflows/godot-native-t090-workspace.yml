@@ -27,7 +27,7 @@ jobs:
           set -euo pipefail
           # A checkout contains no built .so: register Rust before either import.
           make build TOOLCHAIN=system
-      - name: Verify native resize, framebuffer edges, per-tab pointer close and brush wheel
+      - name: Verify native resize, menu state, per-tab pointer close and brush wheel
         run: |
           set -euo pipefail
           mkdir -p /tmp/t090-screenshots

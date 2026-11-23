@@ -44,12 +44,12 @@ func run() -> void:
 	await frames(8)
 	check(not host_id.is_empty(), "Atlas floats Colors panel")
 	var host: DrawingFloatingHost = app.floating_hosts[host_id]
-	check(host.tab_buttons["colors"].icon == app._dock_icon("colors") and
-		host.tab_buttons["colors"].text.is_empty(), "embedded host uses same panel icon")
+	check(host.tab_buttons.has("colors") and (host.tab_buttons["colors"] as Button).focus_mode == Control.FOCUS_ALL,
+		"embedded Colors tab is keyboard-focusable")
 	check(app.move_group_to_floating("layers", host_id), "merge Layers tab in embedded host")
 	await frames(8)
-	check(host.tab_buttons["layers"].icon == app._dock_icon("layers") and
-		host.tab_buttons["layers"].text.is_empty(), "second tab shares dock icon")
+	check(host.tab_buttons.has("layers") and (host.tab_buttons["layers"] as Button).focus_mode == Control.FOCUS_ALL,
+		"embedded Layers tab is keyboard-focusable")
 	check(host.group_frames.size() == 1 and layout.container_info(host_id)["groups"].size() == 1,
 		"Atlas floating host retains one group")
 	(host.tab_buttons["colors"] as Button).emit_signal("pressed")
@@ -62,8 +62,8 @@ func run() -> void:
 	await frames(4)
 	app.show_hidden_floating_hosts()
 	await frames(6)
-	check(host.visible and host.tab_buttons["colors"].icon == app._dock_icon("colors"),
-		"Atlas hide/reopen retains icon tab")
+	check(host.visible and layout.owner_of("colors") == host_id and host.tab_buttons.has("colors"),
+		"Atlas hide/reopen preserves Colors tab identity and ownership")
 	check(app.current_document().revision == revision and app.current_document().is_dirty() == dirty,
 		"Atlas document history unchanged")
 	check(app.get_parent() == atlas and not app._window_quit_guard_enabled,

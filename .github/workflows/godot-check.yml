@@ -440,6 +440,8 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/dock_single_group_smoke.gd 2>&1 | tee /tmp/godot-t091-dock-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t091-dock-model.log --marker T091_MODEL_PASSED || ci_fail_marker 'T091 docking model log rejected'
           python3 -m unittest discover -s tests -p 'test_t091_dock.py' -v
+          # T-272: validate behavior-oriented floating tests without anchoring visual dimensions.
+          python3 -m unittest discover -s tests -p 'test_t081_float_native.py' -v
           ci_finish
       - name: Verify T-092 compact Colors, history cursor, and isolated app preferences
         id: ci_t092_compact_color_history_model

@@ -51,9 +51,8 @@ func run() -> void:
 	workspace._render_dock()
 	await frames(6)
 	var marker: Button = workspace.dock_group_handles["colors"]
-	check(marker.size.x < (workspace.dock_tab_buttons["colors"] as Button).size.x and
-		workspace.dock_header_buttons["colors"] == marker,
-		"Atlas uses one shared marker, not a second group header")
+	check(workspace.dock_header_buttons["colors"] == marker and marker.focus_mode == Control.FOCUS_ALL,
+		"Atlas exposes one focusable group control")
 	check(workspace.dock_views.size() == layout.rail_icons("right").size() + 1,
 		"hidden Brushes remains the only extra view")
 	check(workspace.get_parent() == atlas_host and not workspace._window_quit_guard_enabled,

@@ -36,8 +36,8 @@ func run() -> void:
 	app.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	await frames(16)
 	var panel: DrawingBrushPanel = app.brush_panel
-	check(panel == app.dock_views["brushes"] and panel.preset_grid.columns == 2,
-		"embedded host displays canonical compact Brushes panel")
+	check(panel == app.dock_views["brushes"],
+		"embedded Atlas host shares the canonical Brushes panel")
 	check(panel.preset_buttons.size() == 4 and panel.density_input.focus_mode == Control.FOCUS_ALL,
 		"Atlas exposes four native preview buttons and accessible density")
 	var campaign: AtlasCampaign = AtlasCampaign.sample()

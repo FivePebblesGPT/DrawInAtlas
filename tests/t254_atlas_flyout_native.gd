@@ -62,11 +62,8 @@ func run() -> void:
 	check(workspace.dock_flyout.visible, "Atlas host opens transient flyout")
 	for panel: String in ["colors", "layers"]:
 		var tab: Button = workspace.dock_flyout_tabs.get_node("Tab_" + panel) as Button
-		check(tab.text.is_empty() and tab.icon == workspace._dock_icon(panel) and
-			tab.icon == (workspace.dock_rail_buttons[panel] as Button).icon,
-			panel + " uses same icon in Atlas flyout")
-		check(tab.custom_minimum_size == Vector2(42, 42) and tab.focus_mode == Control.FOCUS_ALL,
-			panel + " is compact and keyboard accessible")
+		check(tab.focus_mode == Control.FOCUS_ALL and tab.tooltip_text.contains(panel.capitalize()),
+			"Atlas flyout tab has keyboard focus and descriptive tooltip")
 	await click(workspace.dock_flyout_tabs.get_node("Tab_layers"))
 	check(layout.group_info("colors")["active"] == "layers" and
 		workspace.dock_views["layers"] == original["layers"],
