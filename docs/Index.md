@@ -1,3 +1,10 @@
+**[T-297](Tickets/T-297.md) P1 implementation Done (2026-11-23):**
+[Brush candidate-window numeric overflow guard](evidence/T-297-2026-11-23-brush-candidate-bounds.md)
+clips floating bounds before integer conversion and preserves small clipped
+strokes with huge finite widths. Original 48/113 fail-first, corrected 113/113,
+neighboring native geometry and history regressions green. T-095's pre-existing
+stride-3 test and T-068/T-148, hosted CI and owner gates remain open.
+
 **[T-296](Tickets/T-296.md) P1 implementation Done (2026-11-23):**
 [Native Delete signed projection preflight](evidence/T-296-2026-11-23-clear-native-projection.md)
 rejects globally unpublishable clear regions before lazy chunk access or
@@ -518,6 +525,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-297 · Reject Brush candidate-window integer overflow before raster staging](Tickets/T-297.md) | Done | **P1 implementation:** [48/113 original failures, 113/113 corrected clipped/unclipped Brush and Undo/Redo checks](evidence/T-297-2026-11-23-brush-candidate-bounds.md); T-095 stride-3 and T-068/T-148 hosted/owner gates remain open | [T-153](Tickets/T-153.md) |
 | [T-296 · Preflight native Delete projection before lazy I/O](Tickets/T-296.md) | Done | **P1 implementation:** [15-failure real-native baseline, 50/50 signed Delete/Brush/Undo/Redo and eight neighboring suites](evidence/T-296-2026-11-23-clear-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
 | [T-295 · Preflight native Brush per-pixel projection before lazy I/O](Tickets/T-295.md) | Done | **P1 implementation:** [30-failure native baseline, 50/50 signed Brush/mixed-gesture/Undo/Redo and neighboring regression evidence](evidence/T-295-2026-11-23-brush-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |
 | [T-294 · Preflight native bulk edit global projection before lazy I/O](Tickets/T-294.md) | Done | **P1 implementation:** [44-failure native baseline, 71/71 signed bulk/Brush/Undo/Redo and 301/301 neighbors](evidence/T-294-2026-11-23-bulk-native-projection.md); T-148/T-068/hosted/owner gates open | [T-153](Tickets/T-153.md) |

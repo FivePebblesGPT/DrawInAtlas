@@ -1,0 +1,293 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T297_BRUSH_BOUNDS_FAILED: unclipped finite huge width 999999999999999879147136483328.0 rejects rather than reporting success
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _unclipped (res://tests/t297_brush_candidate_bounds.gd:39)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:100)
+ERROR: T297_BRUSH_BOUNDS_FAILED: rejected width leaves preview, prior pointer and revision untouched
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _unclipped (res://tests/t297_brush_candidate_bounds.gd:41)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:100)
+ERROR: T297_BRUSH_BOUNDS_FAILED: unclipped finite huge width 10000000000000000159028911097599180468360808563945281389781327557747838772170381060813469985856815104.0 rejects rather than reporting success
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _unclipped (res://tests/t297_brush_candidate_bounds.gd:39)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:101)
+ERROR: T297_BRUSH_BOUNDS_FAILED: rejected width leaves preview, prior pointer and revision untouched
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _unclipped (res://tests/t297_brush_candidate_bounds.gd:41)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:101)
+ERROR: T297_BRUSH_BOUNDS_FAILED: dab very wide Brush clipped to 2x2 stages precisely four candidates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:76)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped Brush publishes
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:78)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Undo restores exact source/hidden RGB (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:89)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:102)
+ERROR: T297_BRUSH_BOUNDS_FAILED: horizontal very wide Brush clipped to 2x2 stages precisely four candidates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:76)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped Brush publishes
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:78)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Undo restores exact source/hidden RGB (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:89)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:103)
+ERROR: T297_BRUSH_BOUNDS_FAILED: vertical very wide Brush clipped to 2x2 stages precisely four candidates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:76)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped Brush publishes
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:78)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Undo restores exact source/hidden RGB (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:89)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:104)
+ERROR: T297_BRUSH_BOUNDS_FAILED: oblique very wide Brush clipped to 2x2 stages precisely four candidates
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:76)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped Brush publishes
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:78)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,0) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (0,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: clipped pixel (1,1) is exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:83)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Undo restores exact source/hidden RGB (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:89)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (0,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+ERROR: T297_BRUSH_BOUNDS_FAILED: Redo restores exact RGBA8 (1,1)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t297_brush_candidate_bounds.gd:19)
+       [1] _clipped (res://tests/t297_brush_candidate_bounds.gd:94)
+       [2] _run (res://tests/t297_brush_candidate_bounds.gd:105)
+T297_BRUSH_BOUNDS_FAILED checks=113 failures=48

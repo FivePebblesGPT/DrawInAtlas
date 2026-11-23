@@ -1665,17 +1665,30 @@ func paint_path(path: PackedVector2Array, rgba: int, width: float = 1.0,
 func _paint_segment(start: Vector2, finish: Vector2, radius: float, rgba: int,
 		erase: bool, selection: DrawingSelection, max_candidates: int,
 		clip_bounds: Rect2i = Rect2i(), depth: int = 0) -> DrawingResult:
-	var left: int = floori(minf(start.x, finish.x) - radius - 0.5)
-	var top: int = floori(minf(start.y, finish.y) - radius - 0.5)
-	var right: int = ceili(maxf(start.x, finish.x) + radius + 0.5)
-	var bottom: int = ceili(maxf(start.y, finish.y) + radius + 0.5)
-	# Restrict only this stroke's candidate window, never sparse document data.
-	# Clipping before the candidate limit also avoids processing off-frame runs.
+	# Preserve floating bounds until *after* clipping: floori/ceili on an
+	# enormous but finite radius can saturate int64, then right-left wraps
+	# negative and accidentally reports success with no painted pixels.
+	var left_bound: float = minf(start.x, finish.x) - radius - 0.5
+	var top_bound: float = minf(start.y, finish.y) - radius - 0.5
+	var right_bound: float = maxf(start.x, finish.x) + radius + 0.5
+	var bottom_bound: float = maxf(start.y, finish.y) + radius + 0.5
+	# A huge brush clipped to a tiny canvas is still a valid bounded edit.
 	if clip_bounds.has_area():
-		left = maxi(left, clip_bounds.position.x)
-		top = maxi(top, clip_bounds.position.y)
-		right = mini(right, clip_bounds.end.x)
-		bottom = mini(bottom, clip_bounds.end.y)
+		left_bound = maxf(left_bound, float(clip_bounds.position.x))
+		top_bound = maxf(top_bound, float(clip_bounds.position.y))
+		right_bound = minf(right_bound, float(clip_bounds.end.x))
+		bottom_bound = minf(bottom_bound, float(clip_bounds.end.y))
+	# Candidate pixels must fit _stage's view-relative domain. Compare while
+	# floating so no integer conversion can overflow or wrap a span to zero.
+	if not is_finite(left_bound) or not is_finite(top_bound) \
+			or not is_finite(right_bound) or not is_finite(bottom_bound) \
+			or left_bound <= -1073741824.0 or top_bound <= -1073741824.0 \
+			or right_bound > 1073741824.0 or bottom_bound > 1073741824.0:
+		return DrawingResult.failure("BRUSH_LIMIT", "Brush candidate window exceeds safe pixel coordinates")
+	var left: int = floori(left_bound)
+	var top: int = floori(top_bound)
+	var right: int = ceili(right_bound)
+	var bottom: int = ceili(bottom_bound)
 	var columns: int = right - left
 	var rows: int = bottom - top
 	if columns <= 0 or rows <= 0:
@@ -1748,8 +1761,8 @@ func _paint_oblique_scanlines(start: Vector2, finish: Vector2, radius: float,
 			continue
 		var x_a: float = lerpf(start.x, finish.x, t_low)
 		var x_b: float = lerpf(start.x, finish.x, t_high)
-		var first_x: int = maxi(left, floori(minf(x_a, x_b) - broad_radius))
-		var last_x: int = mini(right, ceili(maxf(x_a, x_b) + broad_radius + 1.0))
+		var first_x: int = floori(maxf(float(left), minf(x_a, x_b) - broad_radius))
+		var last_x: int = ceili(minf(float(right), maxf(x_a, x_b) + broad_radius + 1.0))
 		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 		for x: int in range(first_x, last_x):
 			if covered_row.has(anchor_x + x):
@@ -1778,8 +1791,8 @@ func _paint_dab_scanlines(center: Vector2, radius: float, left: int, top: int,
 		if dy * dy > broad_squared:
 			continue
 		var reach: float = sqrt(maxf(0.0, broad_squared - dy * dy))
-		var first_x: int = maxi(left, floori(center.x - reach - 2.5))
-		var last_x: int = mini(right, ceili(center.x + reach + 1.5))
+		var first_x: int = floori(maxf(float(left), center.x - reach - 2.5))
+		var last_x: int = ceili(minf(float(right), center.x + reach + 1.5))
 		var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 		for x: int in range(first_x, last_x):
 			if covered_row.has(anchor_x + x):
@@ -1806,8 +1819,8 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			if dy_squared > radius_squared:
 				continue
 			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
-			var first_x: int = maxi(left, floori(min_x - reach - 2.5))
-			var last_x: int = mini(right, ceili(max_x + reach + 1.5))
+			var first_x: int = floori(maxf(float(left), min_x - reach - 2.5))
+			var last_x: int = ceili(minf(float(right), max_x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
@@ -1830,8 +1843,8 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 			if dy_squared > radius_squared:
 				continue
 			var reach: float = sqrt(maxf(0.0, radius_squared - dy_squared))
-			var first_x: int = maxi(left, floori(start.x - reach - 2.5))
-			var last_x: int = mini(right, ceili(start.x + reach + 1.5))
+			var first_x: int = floori(maxf(float(left), start.x - reach - 2.5))
+			var last_x: int = ceili(minf(float(right), start.x + reach + 1.5))
 			var covered_row: Dictionary = _covered_rows.get(anchor_y + y, {})
 			for x: int in range(first_x, last_x):
 				if covered_row.has(anchor_x + x):
