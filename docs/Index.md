@@ -346,6 +346,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 
 | Ticket | Status | Scope / next gate | Hard dependencies |
 | --- | --- | --- | --- |
+| [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Ready | Audit UI suites/CI, remove purely cosmetic assertions, preserve state/transition/performance tests; visual acceptance by actual rendered-image inspection, T-250 unchanged | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
 | [T-271 · Restore native Object-source discovery CI and Atlas browser identity](Tickets/T-271.md) | Done | **P1 engineering:** [Rust build, 56 model, 27/20 X11 UI and 24 Atlas identity/host history](evidence/T-271-2026-11-23-object-sources-ci.md); T-065/T-059/T-250 owner and T-094/T-180 hosted gates remain open | [T-093](Tickets/T-093.md), [T-120](Tickets/T-120.md), [T-153](Tickets/T-153.md) |

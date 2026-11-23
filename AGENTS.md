@@ -1,0 +1,13 @@
+# Agent instructions for DrawInAtlas
+
+Read `docs/Index.md` and `docs/TICKET_WORKFLOW.md` before taking engineering tickets. Ticket frontmatter is authoritative; respect dependency chains, Kanban state, and explicit owner manual-review gates. Do not treat passing automation as owner signoff.
+
+## Visual UI work: render, look, correct, then test
+
+1. **Inspect the real UI.** Launch/render the affected Godot Drawing and/or Atlas editor, capture screenshots of the actual application, and **open and visually inspect the rendered images**. Merely writing a screenshot to disk, counting assertions, or reading node geometry is not visual verification. Do not substitute invented/generated mockups for screenshots of the running build.
+2. **Compare against the intended design.** Use the owner's original screenshots/concepts and written requirements as references. Inspect relevant states (expanded, minimized, flyout, floating), widths, UI scale/HiDPI and scrolling when affected. Look for alignment, spacing, proportions, clipped controls, arrow/icon orientation, confusing whitespace and overall composition. State what differs, fix it, re-render and inspect again.
+3. **Keep visual and functional evidence separate.** Screenshots plus an actual visual review support claims about appearance. Automated tests should check state, transitions, input routing/hit targets, accessibility behavior, persistence/data integrity and performance. A numeric rectangle/spacing/width assertion that only declares appearance “correct” cannot replace seeing the UI. Retain geometry checks only when they directly protect functional behavior (e.g. click target interception or reachability), and prove the behavior with interactions where practical.
+4. **Do not bless a bad layout with tests.** Establish intended visual placement first, then test observable interactions and other functional invariants. Do not change expected coordinates just to make the current implementation pass. If the actual render cannot be inspected, say visual validation is incomplete and do not claim visual acceptance.
+5. **Record inspected evidence.** For visual tickets, include the build SHA, screenshot locations, exact states/scales inspected, discrepancies found, and corrections/reinspection. Screenshot *generation* without documented inspection is not sufficient evidence of visual completion. A visually reviewed engineering result still does **not** self-approve owner UX gates such as T-250.
+
+For UI-only appearance assertions already in the test suite, follow [T-272](docs/Tickets/T-272.md): audit and remove or refactor them without losing functional, transition, performance, or safety coverage.
