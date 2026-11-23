@@ -208,10 +208,10 @@ static func recover(raw: Variant, live: DrawingDockLayout, aliases: Dictionary =
 			hosts.append({"id": entry["id"], "visible": true,
 				"rect": [60.0, 65.0, 310.0, 350.0], "client": [1280.0, 760.0]})
 			changed = true
-	var width: int = 270
+	var width: int = 390
 	var scroll: int = 0
 	if raw.get("dock_width") is int or raw.get("dock_width") is float:
-		width = clampi(int(raw["dock_width"]), 160, 800) if _finite_number(raw["dock_width"]) else 270
+		width = clampi(int(raw["dock_width"]), 160, 800) if _finite_number(raw["dock_width"]) else 390
 	else:
 		changed = true
 	if raw.get("dock_scroll") is int or raw.get("dock_scroll") is float:

@@ -70,6 +70,23 @@ func run() -> void:
 	check(app.dock_layout.move_group("colors", "right", 0), "Colors visible in Atlas dock")
 	app._render_dock()
 	await frames(8)
+	check(app.color_advanced.hex_visible and app.color_advanced.sliders_visible and
+		not app.color_exact_details.visible, "Atlas native picker has hex and channels without duplicate chrome")
+	app.inspector.ensure_control_visible(app.color_exact_toggle)
+	await frames(7)
+	await click(app.color_exact_toggle)
+	check(app.color_exact_details.visible, "Atlas pointer opens exact RGBA8 disclosure")
+	app.inspector.ensure_control_visible(app.color_hex)
+	await frames(6)
+	await click(app.color_hex)
+	check(root.gui_get_focus_owner() == app.color_hex,
+		"Atlas expanded canonical entry accepts real keyboard focus")
+	app.inspector.ensure_control_visible(app.color_exact_toggle)
+	await frames(5)
+	await click(app.color_exact_toggle)
+	check(not app.color_exact_details.visible, "Atlas pointer closes exact RGBA8 disclosure")
+	app.inspector.scroll_vertical = 0
+	await frames(7)
 	var campaign: AtlasCampaign = AtlasCampaign.sample()
 	var registry: AtlasDrawingRegistry = AtlasDrawingRegistry.new()
 	check(registry.attach_campaign(campaign).ok and

@@ -19,12 +19,11 @@ const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 const BRUSH_PANEL_SCRIPT: Script = preload("res://addons/drawing/brush_panel.gd")
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
-# Largest compact built-in panel (Colors/History plus scrollbar) needs
-# a stable floor. Otherwise floating a group shrinks the dock's intrinsic
-# minimum and silently changes the canvas width without a splitter drag.
-# The T-251 fixed left overlay gutter adds 34px to the original 192px
-# minimum. Keep a constant floor independent of which panel is docked or floated.
+# Keep a compact minimum independent of the active group. At normal desktop
+# sizes prefer a wide native ColorPicker, while narrow/floating hosts scroll
+# internally rather than forcing the canvas to shrink to the picker's minimum.
 const EXPANDED_DOCK_MIN_WIDTH: int = 226
+const DEFAULT_DOCK_WIDTH: int = 390
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -49,7 +48,7 @@ var recent_colors_settings_path: String = "user://drawing-recent-colors-v1.json"
 var layout_recovery_status: String = "defaults" # defaults / loaded / repaired / invalid
 var _layout_booted: bool = false
 var _layout_save_pending: bool = false
-var _saved_layout_width: int = 270
+var _saved_layout_width: int = DEFAULT_DOCK_WIDTH
 var _saved_layout_scroll: int = 0
 var tabs: Array[Dictionary] = []
 var active_tab: int = -1
@@ -112,7 +111,7 @@ var _drag_candidate_moved: bool = false
 var _cross_source: String = "" # Pointer source: right dock or a floating host.
 var _detach_preview: bool = false
 var _detach_hint: PanelContainer
-var _expanded_dock_width: int = 270
+var _expanded_dock_width: int = DEFAULT_DOCK_WIDTH
 var _expanded_scroll: int = 0
 var dock_layout: DrawingDockLayout
 var dock_views: Dictionary = {} # Stable panel IDs -> existing Controls, never duplicated.
@@ -133,6 +132,8 @@ var color_advanced: ColorPicker
 var color_recent_buttons: Array[Button] = []
 var color_top_strip: HBoxContainer
 var color_picker_scroll: ScrollContainer
+var color_exact_toggle: CheckButton
+var color_exact_details: VBoxContainer
 var foreground_button: Button
 var background_button: Button
 var color_background: Color = Color.WHITE
@@ -422,11 +423,10 @@ func _build_interface() -> void:
 	dock_stash.name = "DockViewStorage"
 	dock_stash.visible = false
 	add_child(dock_stash)
-	# Keep the edge toggle inside the dock without covering scrolling controls.
-	# The right-side gutter matches the outer window edge, not the canvas seam.
+	# Full-width scrolling content: only the first dock header reserves the
+	# edge toggle. A full-height 34px gutter needlessly constrains the picker.
 	dock_panel_gutter = MarginContainer.new()
 	dock_panel_gutter.name = "DockPanelGutter"
-	dock_panel_gutter.add_theme_constant_override("margin_right", 34)
 	dock_panel_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inspector.add_child(dock_panel_gutter)
 	dock_panels = VBoxContainer.new()
@@ -802,8 +802,7 @@ func _layout_dock_toggle() -> void:
 		# slot displaces the first panel icon rather than covering it.
 		return
 	# This top-level Control stays INSIDE PanelDock at its outer (right)
-	# boundary in both states. The right gutter keeps scrolling controls
-	# outside its fixed pointer target.
+	# boundary. Only the first header needs to avoid its pointer target.
 	var dock_bounds: Rect2 = inspector.get_global_rect()
 	dock_toggle.global_position = Vector2(dock_bounds.end.x - dock_toggle.size.x,
 		dock_bounds.position.y)
@@ -1108,6 +1107,13 @@ func _render_dock(focus_key: String = "") -> void:
 			tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 			tab_scroll.custom_minimum_size.y = 45
 			bar.add_child(tab_scroll)
+			if dock_panels.get_child_count() == 1:
+				# The only overlay collision is at the top of the first header.
+				# The ColorPicker and later groups can reclaim the full dock width.
+				var exclusion: Control = Control.new()
+				exclusion.name = "DockToggleHeaderExclusion"
+				exclusion.custom_minimum_size.x = 34
+				bar.add_child(exclusion)
 			dock_tab_strips[group_id] = tab_scroll
 			var tabs_row: HBoxContainer = HBoxContainer.new()
 			tabs_row.name = "TabStrip_" + group_id
@@ -1116,6 +1122,13 @@ func _render_dock(focus_key: String = "") -> void:
 				var edge: Button = _panel_button(panel_id, false)
 				tabs_row.add_child(edge)
 				dock_tab_buttons[panel_id] = edge
+			if dock_panels.get_child_count() == 1:
+				# The toggle reaches 56px below the header's top. The body starts
+				# after its pointer area, including at noninteger UI scales.
+				var gap: Control = Control.new()
+				gap.name = "DockToggleHeaderClearance"
+				gap.custom_minimum_size.y = 10
+				frame.add_child(gap)
 			if not bool(group["collapsed"]):
 				var active_id: String = String(group["active"])
 				if visible_members.has(active_id):
@@ -2045,14 +2058,21 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 	recents.add_theme_constant_override("separation", 2)
 	color_top_strip.add_child(recents)
 	for index: int in range(6):
+		# Reserve six equal vertical positions even when history is empty.
+		# Hidden recents must not turn two colors into huge horizontal blocks.
+		var slot: Control = Control.new()
+		slot.name = "RecentSlot_%d" % index
+		slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.custom_minimum_size = Vector2(12, 52)
+		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		recents.add_child(slot)
 		var sample: Button = Button.new()
 		sample.name = "Recent_%d" % index
-		sample.custom_minimum_size = Vector2(10, 52)
-		sample.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		sample.focus_mode = Control.FOCUS_ALL
 		sample.tooltip_text = "Apply recent color to the edited role"
 		sample.pressed.connect(_use_recent_color.bind(index))
-		recents.add_child(sample)
+		slot.add_child(sample)
+		sample.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		color_recent_buttons.append(sample)
 		color_swatch_buttons.append(sample)
 	# The native picker remains inline and scrollable inside the same view.
@@ -2066,23 +2086,36 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 	parent.add_child(color_picker_scroll)
 	color_advanced = ColorPicker.new()
 	color_advanced.name = "InlineColorPicker"
-	color_advanced.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	color_advanced.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	color_advanced.focus_mode = Control.FOCUS_ALL
 	color_advanced.color_changed.connect(_on_picker_color_changed)
 	color_picker_scroll.add_child(color_advanced)
-	# Keep the exact canonical input below the native picker. It remains
-	# reachable by scrolling but no longer splits the owner's FG/BG/recents
-	# strip from the picker square.
-	var exact_row: HBoxContainer = HBoxContainer.new()
-	exact_row.name = "ExactColorEntry"
-	parent.add_child(exact_row)
+	# Godot's native picker already includes hex, RGB/HSV and alpha editors.
+	# Preserve our strict canonical RGBA8 inputs (including hidden RGB at zero
+	# alpha) as an explicit optional tool, not a second always-visible editor.
+	color_exact_toggle = CheckButton.new()
+	color_exact_toggle.name = "ExactRGBA8Toggle"
+	color_exact_toggle.text = "Exact RGBA8"
+	color_exact_toggle.tooltip_text = "Show strict 8-bit channels and #RRGGBBAA entry"
+	color_exact_toggle.toggled.connect(_set_color_exact_expanded)
+	var utilities: HBoxContainer = HBoxContainer.new()
+	utilities.name = "ExactColorActions"
+	parent.add_child(utilities)
 	var defaults: Button = Button.new()
 	defaults.name = "DefaultPigments"
 	defaults.text = "◩"
 	defaults.custom_minimum_size.x = 28
 	defaults.tooltip_text = "Default black foreground / white background"
 	defaults.pressed.connect(_reset_colors)
-	exact_row.add_child(defaults)
+	utilities.add_child(defaults)
+	utilities.add_child(color_exact_toggle)
+	color_exact_details = VBoxContainer.new()
+	color_exact_details.name = "ExactRGBA8Details"
+	color_exact_details.visible = false
+	parent.add_child(color_exact_details)
+	var exact_row: HBoxContainer = HBoxContainer.new()
+	exact_row.name = "ExactColorEntry"
+	color_exact_details.add_child(exact_row)
 	color_hex = LineEdit.new()
 	color_hex.placeholder_text = "#RRGGBBAA"
 	color_hex.tooltip_text = "Edit selected pigment as #RRGGBB or #RRGGBBAA"
@@ -2093,7 +2126,7 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 	var rgba: GridContainer = GridContainer.new()
 	rgba.name = "ExactRGBA8"
 	rgba.columns = 2
-	parent.add_child(rgba)
+	color_exact_details.add_child(rgba)
 	for channel: String in ["R", "G", "B", "A"]:
 		var spin: SpinBox = SpinBox.new()
 		spin.min_value = 0
@@ -2108,6 +2141,12 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 		rgba.add_child(spin)
 		color_rgb.append(spin)
 	_refresh_color_controls()
+
+
+func _set_color_exact_expanded(expanded: bool) -> void:
+	color_exact_details.visible = expanded
+	color_exact_toggle.set_pressed_no_signal(expanded)
+
 
 ## The inner ScrollContainer owns horizontal overflow, but Godot's native
 ## ColorPicker stops plain wheel events before the host sees them. Relay only
@@ -3758,7 +3797,7 @@ func _toggle_dock() -> void:
 		_render_dock()
 		# Only the rail width changes on minimize. The flyout is an overlay
 		# under canvas and must not participate in HSplitContainer sizing.
-		dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if not minimized else _expanded_dock_width))
+		dock_split.split_offset = -(48 if not minimized else _expanded_dock_width)
 		if minimized:
 			call_deferred("_restore_expanded_scroll")
 		_layout_dock_toggle()
@@ -3783,8 +3822,8 @@ func _capture_dragged_dock_width() -> void:
 func _reset_dock_width() -> void:
 	if bool(dock_layout.container_info("right")["minimized"]):
 		_toggle_dock()
-	_expanded_dock_width = 270
-	dock_split.split_offset = maxi(0, int(dock_split.size.x) - 270)
+	_expanded_dock_width = DEFAULT_DOCK_WIDTH
+	dock_split.split_offset = -DEFAULT_DOCK_WIDTH
 	_schedule_layout_save()
 
 
@@ -4433,7 +4472,10 @@ func _apply_saved_dock_geometry() -> void:
 	var minimized: bool = dock_layout.container_info("right")["minimized"]
 	var usable: int = maxi(160, roundi(dock_split.size.x) - 180)
 	var width: int = 48 if minimized else mini(_expanded_dock_width, usable)
-	dock_split.split_offset = maxi(0, int(dock_split.size.x) - width)
+	# HSplitContainer offsets are relative to the right-anchored stretch split,
+	# not absolute x positions. A positive (split width - target) offset was
+	# clamped at the right pane's minimum, truncating the native picker.
+	dock_split.split_offset = -width
 	_layout_dock_toggle()
 	if not minimized:
 		inspector.scroll_vertical = _expanded_scroll
@@ -4481,7 +4523,7 @@ func reset_workspace_layout() -> void:
 		dock_layout.register_panel(panel_id)
 		dock_layout.attach_panel(panel_id, "right", panel_id)
 	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
-	_expanded_dock_width = 270
+	_expanded_dock_width = DEFAULT_DOCK_WIDTH
 	_expanded_scroll = 0
 	_render_dock()
 	call_deferred("_apply_saved_dock_geometry")

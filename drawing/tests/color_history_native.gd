@@ -74,7 +74,9 @@ func run() -> void:
 		"native ColorPicker always inline at launch")
 	check(not app.record_selection_history and app.history_list.item_count == 1,
 		"history starts empty and preference off")
-	check(app.color_hex.get_parent().get_parent().name == "Colors" and
+	app._set_color_exact_expanded(true)
+	await frames(3)
+	check(app.color_exact_details.get_parent().name == "Colors" and
 		app.history_list.get_parent().name == "History",
 		"compact controls belong to their independent dock panels")
 	var initial_revision: int = app.current_document().revision
