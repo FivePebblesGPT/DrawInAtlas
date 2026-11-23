@@ -1,0 +1,70 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid seed cannot enter the lazy provider or stage pixels: (1073741824, 0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:68)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid view-relative seed is consistently rejected: (-1073741824, 0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:66)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid seed cannot enter the lazy provider or stage pixels: (-1073741824, 0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:68)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid view-relative seed is consistently rejected: (0, 1073741824)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:66)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid seed cannot enter the lazy provider or stage pixels: (0, 1073741824)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:68)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid view-relative seed is consistently rejected: (0, -1073741824)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:66)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid seed cannot enter the lazy provider or stage pixels: (0, -1073741824)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:68)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid view-relative seed is consistently rejected: (2147483647, 0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:66)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid seed cannot enter the lazy provider or stage pixels: (2147483647, 0)
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:68)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid color cannot fetch a source or affect the session
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:76)
+ERROR: T289_FILL_PREFLIGHT_FAILED: invalid color cannot fetch a source or affect the session
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:76)
+ERROR: T289_FILL_PREFLIGHT_FAILED: rejecting requests does not materialize either lazy source
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:80)
+ERROR: T289_FILL_PREFLIGHT_FAILED: valid fill retries in same session, fetching its source once
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/t289_fill_preflight.gd:23)
+       [1] _run (res://tests/t289_fill_preflight.gd:84)
+T289_FILL_PREFLIGHT_FAILED checks=23 failures=13

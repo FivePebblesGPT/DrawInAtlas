@@ -1,3 +1,10 @@
+**[T-289](Tickets/T-289.md) P1 implementation Done (2026-11-23):**
+[early flood-fill seed/RGBA8 validation prevents invalid requests from
+invoking arbitrary lazy-source loaders](evidence/T-289-2026-11-23-fill-preflight.md).
+The real native fail-first fixture reported 13/23 failures; corrected 23/23,
+161 neighboring native checks and strict required-CI coverage pass. T-068
+performance/portability, hosted CI and T-250 owner gates remain open.
+
 **[T-288](Tickets/T-288.md) P1 validation Done (2026-11-23):**
 [T-068 native fill-to-frame runner builds/registers Rust before profiling](evidence/T-288-2026-11-23-native-fill-frame.md),
 with exact post-frame canonical RGBA8 coverage instead of retired pixel
@@ -464,6 +471,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-289 · Reject invalid flood-fill seeds/colors before lazy reads](Tickets/T-289.md) | Done | **P1 implementation:** [13-failure native pre-fix, 23/23 fixed, 161 neighboring native checks and required-CI strict marker](evidence/T-289-2026-11-23-fill-preflight.md); T-068/hardware/hosted gates remain open | [T-153](Tickets/T-153.md) |
 | [T-288 · Restore native Rust fill-to-frame CI and beta4 profiler provenance](Tickets/T-288.md) | Done | **P1 validation:** [native build and registration, exact 96/96 fill, two 21-trial X11 processes 770/770, mutation and engine-hash contracts](evidence/T-288-2026-11-23-native-fill-frame.md); T-068/T-094/owner gates open | [T-153](Tickets/T-153.md) |
 | [T-287 · Reject non-replayable workflow and job metadata in local fast CI](Tickets/T-287.md) | Done | **P1 validation:** [14 fail-first envelope violations, 50/50 replay/CI/owner-evidence Python contracts](evidence/T-287-2026-11-23-workflow-envelope.md); hosted CI and owner review remain open | [T-122](Tickets/T-122.md), [T-286](Tickets/T-286.md) |
 | [T-286 · Reject non-replayable step metadata in local fast CI](Tickets/T-286.md) | Done | **P1 validation:** [8 fail-first metadata violations, 47/47 strict replay/CI/owner-evidence Python contracts](evidence/T-286-2026-11-23-ci-replay-metadata.md); hosted CI and owner review remain open | [T-122](Tickets/T-122.md) |

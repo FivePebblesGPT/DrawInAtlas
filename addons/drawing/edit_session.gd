@@ -1854,6 +1854,14 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		limit: int = 262144) -> DrawingResult:
 	if limit <= 0 or _closed:
 		return DrawingResult.failure("FILL_LIMIT", "Invalid flood fill budget/session")
+	# Match _stage's accepted view-relative pixel and color ranges *before*
+	# asking a lazy source provider for data. A provider is arbitrary external
+	# code and must not be invoked for an edit that can never be published.
+	if seed.x <= -1073741824 or seed.x >= 1073741824 \
+			or seed.y <= -1073741824 or seed.y >= 1073741824:
+		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
 	var original: DrawingResult = _fill_source_pixel(seed)
 	if not original.ok:
 		return original
