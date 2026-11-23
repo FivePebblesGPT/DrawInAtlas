@@ -873,6 +873,10 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t297_brush_candidate_bounds.gd 2>&1 | tee /tmp/godot-t297-brush-bounds.log
           grep -Fxq 'T297_BRUSH_BOUNDS_PASSED checks=113 failures=0' /tmp/godot-t297-brush-bounds.log
           python3 tools/check_godot_model_log.py /tmp/godot-t297-brush-bounds.log --marker T297_BRUSH_BOUNDS_PASSED
+          # T-299: disjoint/empty selections cannot flatten an accepted Brush on no-op bulk edits.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t299_masked_bulk_noop.gd 2>&1 | tee /tmp/godot-t299-masked-bulk.log
+          grep -Fxq 'T299_MASKED_BULK_PASSED checks=40 failures=0' /tmp/godot-t299-masked-bulk.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t299-masked-bulk.log --marker T299_MASKED_BULK_PASSED
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_fill_verified_stage_smoke.gd 2>&1 | tee /tmp/godot-t068-verified-stage.log
           grep -q 'T068_VERIFIED_STAGE_PASSED' /tmp/godot-t068-verified-stage.log
           if grep -E 'SCRIPT ERROR:|^ERROR:|T068_VERIFIED_STAGE_FAILED:' /tmp/godot-t068-verified-stage.log; then exit 1; fi

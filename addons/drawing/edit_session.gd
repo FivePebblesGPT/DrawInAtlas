@@ -839,6 +839,14 @@ func _bulk_area_in_native_projection(area: Rect2i) -> bool:
 		and DrawingDocument.TILES.pixel_coordinates_in_projection_range(last_x, last_y)
 
 
+## A non-inverted selection entirely outside a bulk area makes the edit a
+## no-op. Check its conservative bounds before materializing deferred strokes
+## or resolving any lazy source; inverted masks can include the outside area.
+func _bulk_selection_excludes_area(area: Rect2i, selection: DrawingSelection) -> bool:
+	return selection != null and selection.enabled and not selection.inverted \
+		and not selection.bounds.intersects(area)
+
+
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
 ## A region is always view-relative, and bounded before allocating/staging changes.
 func apply_region(area: Rect2i, rgba8: PackedByteArray,
@@ -853,6 +861,8 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 		return DrawingResult.failure("COORD_RANGE", "Region exceeds safe view-relative pixel coordinates")
 	if not _bulk_area_in_native_projection(area):
 		return DrawingResult.failure("COORD_RANGE", "Region exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -884,6 +894,8 @@ func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds safe view-relative pixel coordinates")
 	if not _bulk_area_in_native_projection(area):
 		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -926,6 +938,8 @@ func clear_rect(area: Rect2i, selection: DrawingSelection = null,
 	# unpublishable native region before touching pending tiles or a Brush preview.
 	if not _bulk_area_in_native_projection(area):
 		return DrawingResult.failure("COORD_RANGE", "Clear area exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	_materialize_brush_preview()
 	_materialize_clear_preview()
@@ -1894,6 +1908,8 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds safe view-relative pixel coordinates")
 	if not _bulk_area_in_native_projection(area):
 		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds native document projection")
+	if _bulk_selection_excludes_area(area, selection):
+		return DrawingResult.success(change_count())
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
