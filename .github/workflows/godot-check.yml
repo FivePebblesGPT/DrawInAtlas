@@ -12,17 +12,17 @@ jobs:
         with:
           # Godot cannot import LFS pointer text as textures.
           lfs: true
-      - name: Install Godot 4.8-beta3 (standard, non-.NET)
+      - name: Install Godot 4.8-beta4 (standard, non-.NET)
         uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta3
+          version: 4.8.0-beta4
           use-dotnet: false
           include-templates: true
       - name: Verify the exact beta engine
         shell: bash
         timeout-minutes: 10
         run: |
-          godot --version | grep -E '^4\.8\.beta3\.official\.'
+          godot --version | grep -Fx '4.8.beta4.official.b070e63b1'
           # All runnable consumers require native classes before their first import.
           make test TOOLCHAIN=system
       - name: Enforce explicit types in owned GDScript and skill examples

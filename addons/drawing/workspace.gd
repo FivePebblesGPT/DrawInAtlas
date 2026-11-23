@@ -206,6 +206,9 @@ const ROW_PAGE: int = 200
 
 
 func _ready() -> void:
+	if get_parent() == get_tree().root and "--verify-native-extension" in OS.get_cmdline_user_args():
+		get_tree().quit(preload("res://addons/drawing/native_extension_probe.gd").run())
+		return
 	_recent_objects_root = ROOT_HISTORY.read_file(recent_objects_root_settings_path)
 	_load_preferences()
 	_load_color_history()

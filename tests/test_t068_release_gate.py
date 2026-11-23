@@ -177,12 +177,9 @@ class PortableReleaseGateTests(unittest.TestCase):
 
         def checked(command: list[str], **kwargs: object) -> Completed:
             exported = Path(command[0])
-            self.assertEqual(command[1:3], ["--path", str(exported.parent)])
-            if "--script" in command:
-                self.assertEqual(command[3:], ["--headless", "--script",
-                                               "res://tests/native_extension_ready.gd"])
-            else:
-                self.assertEqual(command[3:], ["--headless", "--quit-after", "5"])
+            self.assertEqual(command[1:4], ["--headless", "--quit-after", "5"])
+            probe = "--verify-native-extension" in command
+            self.assertEqual(command[4:], ["--", "--verify-native-extension"] if probe else [])
             self.assertNotEqual(kwargs["cwd"], self.stage)
             self.assertNotEqual(exported.parent, self.linux)
             self.assertTrue((exported.parent / "Drawing.pck").is_file())
@@ -193,8 +190,7 @@ class PortableReleaseGateTests(unittest.TestCase):
             assert isinstance(env, dict)
             self.assertNotIn("GODOT_PROJECT_PATH", env)
             self.assertNotEqual(env["HOME"], str(Path.home()))
-            return Completed(0, "Godot Engine v4.8.beta3\n" +
-                             ("NATIVE_EXTENSION_READY\n" if "--script" in command else ""))
+            return Completed(0, "Godot Engine v4.8.beta4\n" + ("NATIVE_EXTENSION_READY\n" if probe else ""))
 
         with patch.object(release.subprocess, "run", side_effect=checked):
             success = release.inspect_release(self.stage, self.linux, None, launch=True)

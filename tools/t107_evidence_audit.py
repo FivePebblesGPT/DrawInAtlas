@@ -33,6 +33,7 @@ MANUAL_GATES = ("T-056", "T-059", "T-065", "T-083", "T-095", "T-096")
 # Its exact original workflow is retained alongside the scripts and logs;
 # later CI changes must not retroactively rewrite historical evidence.
 REPLAY_WORKFLOW_SHA256 = "835f044bf57224999dea386959bbc14b4f60e3d5b4a4bf798db8ff2da79a411f"
+HISTORICAL_ENGINE = "4.8.beta3.official.c51ff06e8"
 RUNTIME = DOCS / "evidence/T-107-2026-11-12-runtime"
 RUNTIME_MARKERS = {
     "standalone-roundtrip.log": "DRAWING_STANDALONE_PASSED",
@@ -154,7 +155,7 @@ def replay_inventory(directory: Path) -> dict[str, Any]:
     if ([check.identifier for check in checks] !=
             [check.identifier for check in current_checks]):
         raise AuditError("Required CI check IDs differ from captured 46-step inventory")
-    problems = verify_replay(directory, checks, workflow)
+    problems = verify_replay(directory, checks, workflow, expected_engine=HISTORICAL_ENGINE)
     if problems and problems != [REPLAY_UNATTESTED]:
         raise AuditError("Invalid CI replay: " + "; ".join(problems))
     report = json.loads(_read_regular(directory / "report.json"))
@@ -205,7 +206,7 @@ def runtime_inventory(directory: Path = RUNTIME) -> dict[str, Any]:
             known_leaks = 0
         results.append({"name": name, "sha256": _hash(data), "bytes": len(data),
                         "known_post_exit_leak_diagnostics": known_leaks})
-    if b"4.8.beta3.official.c51ff06e8" not in _read_regular(directory / "godot-version.log"):
+    if HISTORICAL_ENGINE.encode() not in _read_regular(directory / "godot-version.log"):
         raise AuditError("Runtime engine version is not the pinned beta3 build")
     return {"kind": "local-isolated-regression-not-physical-acceptance",
             "checks": results, "source_scope": "canonical standalone Drawing and Atlas integration"}

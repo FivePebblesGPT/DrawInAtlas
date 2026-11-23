@@ -24,7 +24,7 @@ from typing import Any
 from report_godot_ci import WORKFLOW, expected_check_ids, summarize
 
 ROOT = Path(__file__).resolve().parents[1]
-ENGINE_VERSION = re.compile(r"^4\.8\.beta3\.official\.")
+ENGINE_VERSION = "4.8.beta4.official.b070e63b1"
 STEP_START = re.compile(r"^      - name: (.+)$", re.MULTILINE)
 STEP_ID = re.compile(r"^        id: (ci_[a-z0-9_]+)$", re.MULTILINE)
 RUN_LINE = re.compile(r"^        run: (.+)$", re.MULTILINE)
@@ -200,8 +200,8 @@ def main(argv: list[str] | None = None) -> int:
         identity = revision_identity(git_sha, dirty=dirty,
                                      expected=args.expected_commit, allow_dirty=args.allow_dirty)
         godot_version = subprocess.check_output(["godot", "--version"], cwd=ROOT, text=True).strip()
-        if not ENGINE_VERSION.match(godot_version):
-            raise ValueError(f"Godot version is not pinned 4.8 beta3: {godot_version}")
+        if godot_version != ENGINE_VERSION:
+            raise ValueError(f"Expected pinned Godot {ENGINE_VERSION}; got {godot_version}")
         output = args.output.resolve()
         if ROOT == output or ROOT in output.parents:
             raise ValueError("Place replay logs outside the tracked repository")

@@ -76,17 +76,32 @@ class LinuxNativeExportTests(unittest.TestCase):
             env = kwargs["env"]
             assert isinstance(env, dict)
             self.assertNotEqual(env["HOME"], str(Path.home()))
-            self.assertEqual(command[1:3], ["--path", str(executable.parent)])
-            if "--script" in command:
-                self.assertEqual(command[-1], "res://tests/native_extension_ready.gd")
-                return Completed("Godot Engine v4.8.beta3\nNATIVE_EXTENSION_READY\n")
-            self.assertEqual(command[3:], ["--headless", "--quit-after", "5"])
-            return Completed("Godot Engine v4.8.beta3\n")
+            self.assertEqual(command[1:4], ["--headless", "--quit-after", "5"])
+            if "--verify-native-extension" in command:
+                self.assertEqual(command[4:], ["--", "--verify-native-extension"])
+                return Completed("Godot Engine v4.8.beta4\nNATIVE_EXTENSION_READY\n")
+            self.assertEqual(command[4:], [])
+            return Completed("Godot Engine v4.8.beta4\n")
 
         with patch.object(gate.subprocess, "run", side_effect=run) as mocked:
             result = gate.launch_linux(self.output)
         self.assertEqual(mocked.call_count, 2)
         self.assertTrue(result["native_abi_verified"])
+
+    def test_engine_copy_is_normalized_only_if_it_matches_the_stage(self) -> None:
+        root_copy = self.output / gate.NATIVE_LIBRARY.name
+        wrong = self.native.read_bytes() + b"extra"
+        root_copy.write_bytes(wrong)
+        with self.assertRaisesRegex(package.PackageError, "Engine-copied native library differs"):
+            package.package(self.stage, self.output)
+        self.assertEqual(root_copy.read_bytes(), wrong)
+        self.assertFalse((self.output / gate.NATIVE_LIBRARY).exists())
+
+        root_copy.write_bytes(self.native.read_bytes())
+        destination = package.package(self.stage, self.output)
+        self.assertEqual(destination, self.output / gate.NATIVE_LIBRARY)
+        self.assertFalse(root_copy.exists())
+        self.assertEqual(destination.read_bytes(), self.native.read_bytes())
 
     def test_unrelated_pack_is_rejected_before_native_publication(self) -> None:
         pack = self.output / "Drawing.pck"

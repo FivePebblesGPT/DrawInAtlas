@@ -13,7 +13,7 @@ jobs:
           lfs: true
       - uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta3
+          version: 4.8.0-beta4
           use-dotnet: false
           include-templates: true
       - name: Portable source and fail-closed report tests
@@ -79,7 +79,7 @@ jobs:
           arch: x64
       - uses: chickensoft-games/setup-godot@v2
         with:
-          version: 4.8.0-beta3
+          version: 4.8.0-beta4
           use-dotnet: false
           include-templates: true
       - name: Windows MSVC strict-FP and Godot canonical native-ABI parity

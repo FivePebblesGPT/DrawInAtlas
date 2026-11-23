@@ -41,7 +41,8 @@ def _read_artifact(directory: Path, relative: str) -> bytes:
 
 
 def verify_replay(directory: Path, checks: list[Check], workflow: str, *,
-                  expected_commit: str | None = None) -> list[str]:
+                  expected_commit: str | None = None,
+                  expected_engine: str = ENGINE_VERSION) -> list[str]:
     """Check full inventory, status consistency, original scripts and raw log digests.
 
     Parameters
@@ -54,6 +55,8 @@ def verify_replay(directory: Path, checks: list[Check], workflow: str, *,
         The exact workflow source used as the expected script inventory.
     expected_commit : str | None
         Full Git commit SHA used for candidate attribution, if provided.
+    expected_engine : str
+        Exact engine build; historical audits supply their original pin.
 
     Returns
     -------
@@ -76,8 +79,8 @@ def verify_replay(directory: Path, checks: list[Check], workflow: str, *,
         problems.append("Unknown report schema or runner")
     if report.get("workflow_sha256") != _sha256(workflow.encode("utf-8")):
         problems.append("Workflow digest differs from recorded source")
-    if not isinstance(report.get("godot_version"), str) or not ENGINE_VERSION.match(report["godot_version"]):
-        problems.append("Report does not identify pinned Godot 4.8 beta3")
+    if report.get("godot_version") != expected_engine:
+        problems.append(f"Report does not identify pinned Godot {expected_engine}")
     revision = report.get("candidate_commit")
     if (not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision)
             or report.get("base_head_sha") != revision or report.get("working_tree_clean") is not True):

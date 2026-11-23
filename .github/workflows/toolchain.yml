@@ -52,6 +52,14 @@ jobs:
         run: make bundle
       - name: Validate archive manifest
         run: make bundle-verify
+      - name: Upload verified offline toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: drawing-toolchain-linux-x86_64
+          path: .build/bundles/drawing-toolchain-linux-x86_64.tar.zst
+          if-no-files-found: error
+          include-hidden-files: true
+          compression-level: 0
       - name: Test native-present Drawing/Atlas with offline toolchain
         run: |
           python3 tools/check_offline_toolchain.py \

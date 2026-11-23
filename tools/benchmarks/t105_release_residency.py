@@ -26,6 +26,7 @@ from t068_release_gate import NATIVE_LIBRARY, check_launch_log, inspect_distribu
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "tools/benchmarks/t105_release_residency.py"
 RELEASE_GATE = ROOT / "tools/benchmarks/t068_release_gate.py"
+ENGINE_VERSION = "4.8.beta4.official.b070e63b1"
 LIMITATIONS = (
     "Linux /proc VmRSS/VmHWM of isolated exported Godot process, not detached native worker",
     "OS CPU includes startup and idle --quit-after frames, NOT a 96px Brush gesture",
@@ -97,7 +98,6 @@ def launch_once(distribution: Path, *, frames: int = 120, timeout: int = 45) -> 
         before = resource.getrusage(resource.RUSAGE_CHILDREN)
         start = time.perf_counter()
         proc = subprocess.Popen([str(base / "distribution" / "Drawing.x86_64"),
-                                 "--path", str(base / "distribution"),
                                  "--headless", "--quit-after", str(frames)],
                                 cwd=base / "work", env=env,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -131,7 +131,10 @@ def launch_once(distribution: Path, *, frames: int = 120, timeout: int = 45) -> 
             watcher.join(timeout=3)
         elapsed = (time.perf_counter() - start) * 1000
         after = resource.getrusage(resource.RUSAGE_CHILDREN)
-        leaks = check_launch_log(out + "\n" + err, proc.returncode)
+        log = out + "\n" + err
+        leaks = check_launch_log(log, proc.returncode)
+        if not any(line.startswith(f"Godot Engine v{ENGINE_VERSION} - ") for line in log.splitlines()):
+            raise RuntimeError(f"Expected Godot export template {ENGINE_VERSION}")
         if sampling_errors:
             raise RuntimeError("Invalid Godot memory sampler: " + sampling_errors[0])
         if not peaks:
@@ -157,7 +160,7 @@ def measure(stage: Path, distribution: Path, runs: int = 3, frames: int = 120) -
               "source_sha256": {str(path.relative_to(ROOT)): digest(path)
                                 for path in (SOURCE, RELEASE_GATE)},
               "stage": stage_info, "release": release_info,
-              "engine": "4.8.beta3.official.c51ff06e8", "frames": frames,
+              "engine": ENGINE_VERSION, "frames": frames,
               "runs": observations,
               "summary": {key: {"p50": nearest([float(r[key]) for r in observations], 0.5),
                                 "p95": nearest([float(r[key]) for r in observations], 0.95),
@@ -176,7 +179,7 @@ def validate(result: Any) -> None:
         "schema", "ticket", "platform", "source_sha256", "stage", "release",
         "engine", "frames", "runs", "summary", "windows", "vram", "complete", "limitations"}
         or result["schema"] != 1 or result["ticket"] != "T-105" or
-        result["platform"] != "linux-x86_64" or result["engine"] != "4.8.beta3.official.c51ff06e8" or
+        result["platform"] != "linux-x86_64" or result["engine"] != ENGINE_VERSION or
         result["source_sha256"] != {str(p.relative_to(ROOT)): digest(p)
                                     for p in (SOURCE, RELEASE_GATE)} or
         result["windows"] != {"status": "not_tested"} or

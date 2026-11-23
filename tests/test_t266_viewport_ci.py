@@ -80,7 +80,7 @@ class ViewportNativeCiContracts(unittest.TestCase):
     def test_current_cold_exact_pixel_hashes_and_workload(self) -> None:
         cases = {name: {"sha256": digest, "median_ms": 1.5, "p95_ms": 1.8}
                  for name, digest in verifier.COLD_SHA256.items()}
-        report = {"engine": "4.8-beta3 (official)", "samples_per_case": 9,
+        report = {"engine": "4.8-beta4 (official)", "samples_per_case": 9,
                   "viewport_source": [256, 256], "storage_stride": 128,
                   "layer_count": 2, "cases": cases}
         valid = f"T086_COLD_BENCH_JSON {json.dumps(report)}\nT086_COLD_BENCH_PASSED\n"

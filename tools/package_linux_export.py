@@ -36,7 +36,7 @@ class PackageError(ValueError):
     """Refuse incomplete or inconsistent native distributions."""
 
 
-def _preflight_unpacked_export(distribution: Path, source: Path) -> None:
+def _preflight_unpacked_export(distribution: Path, source: Path, engine_copy: Path | None) -> None:
     """Validate a would-be native package without publishing to the export.
 
     Hardlink the existing ELF/PCK into a disposable sibling on the *same*
@@ -46,7 +46,8 @@ def _preflight_unpacked_export(distribution: Path, source: Path) -> None:
     # Inspect every entry (including empty directories and special nodes),
     # not only regular files. This is the same exact-tree rule as the final gate.
     try:
-        inspect_distribution_entries(distribution, "linux", allow_missing_native=True)
+        inspect_distribution_entries(distribution, "linux", allow_missing_native=True,
+                                     engine_copied_native=engine_copy is not None)
     except ReleaseError as exc:
         raise PackageError(f"Invalid pre-package export layout: {exc}") from exc
     expected = {BINARY["linux"], "Drawing.pck"}
@@ -100,10 +101,19 @@ def package(stage: Path, distribution: Path) -> Path:
         parent = parent.parent
     installed = False
     temporary: Path | None = None
+    root_copy = distribution / NATIVE_LIBRARY.name
+    engine_copy = root_copy if root_copy.exists() or root_copy.is_symlink() else None
     try:
-        _preflight_unpacked_export(distribution, source)
+        _preflight_unpacked_export(distribution, source, engine_copy)
+        if engine_copy is not None and digest(engine_copy) != stage_info["native_library_sha256"]:
+            raise PackageError("Engine-copied native library differs from staged build")
         for directory in reversed(created_dirs):
             directory.mkdir()
+        if engine_copy is not None:
+            os.replace(engine_copy, destination)
+            installed = True
+            inspect_distribution(distribution, "linux")
+            return destination
         # Reserve a fresh, exclusive temporary file. A fixed .so.tmp name
         # could belong to another process or be an invalid pre-existing export
         # entry; failed packaging must never remove someone else's bytes.
@@ -125,7 +135,10 @@ def package(stage: Path, distribution: Path) -> Path:
         # A post-install inspector failure must not leak even a valid native
         # binary into a rejected distribution. Preserve any prior export.
         if installed:
-            destination.unlink(missing_ok=True)
+            if engine_copy is not None:
+                os.replace(destination, engine_copy)
+            else:
+                destination.unlink(missing_ok=True)
         if isinstance(exc, PackageError):
             raise
         raise PackageError(f"Invalid Linux distribution after packaging: {exc}") from exc

@@ -41,7 +41,7 @@ def fixture() -> dict:
                                    "sha256": "a" * 64},
                         "pack": {"name": "Drawing.pck", "size": 96,
                                  "sha256": "b" * 64}},
-            "engine": "4.8.beta3.official.c51ff06e8", "frames": 120,
+            "engine": "4.8.beta4.official.b070e63b1", "frames": 120,
             "runs": rows,
             "summary": {key: {"p50": release.nearest([float(row[key]) for row in rows], 0.5),
                               "p95": release.nearest([float(row[key]) for row in rows], 0.95),
@@ -63,7 +63,7 @@ class T105EvidenceTests(unittest.TestCase):
     def test_reject_forged_windows_gpu_or_completion(self) -> None:
         for key, value in (("complete", True), ("windows", {"status": "passed"}),
                            ("vram", {"status": "measured"}),
-                           ("platform", "windows-x86_64")):
+                           ("platform", "windows-x86_64"), ("engine", "4.8.beta3.official.c51ff06e8")):
             with self.subTest(key=key):
                 record = fixture()
                 record[key] = value

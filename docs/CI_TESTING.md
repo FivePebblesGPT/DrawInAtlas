@@ -29,7 +29,7 @@ The local tested command for the software X11 benchmark is:
 
 ```
 python3 tools/run_t146_hokusai_bench.py \
-  --godot /path/to/Godot_v4.8-beta3_linux.x86_64 \
+  --godot /path/to/Godot_v4.8-beta4_linux.x86_64 \
   --output /tmp/t153-bench --cold 1 --warm 0
 ```
 
