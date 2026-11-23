@@ -1,0 +1,20 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+ERROR: T068_TILE_CACHE_FAILED: commit publishes exact touched-pixel count
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_edit_tile_cache_smoke.gd:21)
+       [1] _run (res://tests/drawing_edit_tile_cache_smoke.gd:62)
+ERROR: T068_TILE_CACHE_FAILED: signed 64-bit anchors allow pixel-accurate cached reads
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_edit_tile_cache_smoke.gd:21)
+       [1] _run (res://tests/drawing_edit_tile_cache_smoke.gd:161)
+ERROR: T068_TILE_CACHE_FAILED: far signed pixel remains exact
+   at: push_error (core/variant/variant_utility.cpp:1024)
+   GDScript backtrace (most recent call first):
+       [0] _check (res://tests/drawing_edit_tile_cache_smoke.gd:21)
+       [1] _run (res://tests/drawing_edit_tile_cache_smoke.gd:164)
+T068_TILE_CACHE_FAILED checks=31 failures=3

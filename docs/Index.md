@@ -1,3 +1,9 @@
+**[T-278](Tickets/T-278.md) P1 validation Done (2026-11-23):**
+[native T-068 tile-cache publication and signed anchor witness](evidence/T-278-2026-11-23-native-tile-cache.md)
+now passes 38/38 real Rust-backed Godot beta4 checks with exact committed
+RGBA8/Undo/Redo snapshots and rejected unsafe signed publication. The
+separate T-068 geometry/sweep CI failures remain unresolved.
+
 **[T-277](Tickets/T-277.md) P1 validation Done (2026-11-23):**
 [required-native T-068 Skia live-oracle parity repair](evidence/T-277-2026-11-23-skia-native-oracle.md)
 regenerates all 16 cases at legal signed anchors and matches the immutable
@@ -386,6 +392,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-275 · Repair stale workspace CI/owner-gate test contracts](Tickets/T-275.md) | Done | **P1 CI engineering:** [T-063/T-072 canonical status dependencies and 73-check native workspace regression](evidence/T-275-2026-11-23-workspace-ci-gates.md); T-250 approval and other hosted CI gates remain open | [T-063](Tickets/T-063.md), [T-072](Tickets/T-072.md) |
 | [T-276 · Repair T-066 native-signed campaign-save CI fixture](Tickets/T-276.md) | Done | **P1 validation:** [97-check native-signed edit and corrupted save projection proof](evidence/T-276-2026-11-23-signed-ci-contract.md); broader CI/native architecture and T-250 owner gates remain open | [T-066](Tickets/T-066.md), [T-158](Tickets/T-158.md), [T-159](Tickets/T-159.md), [T-202](Tickets/T-202.md) |
 | [T-277 · Repair T-068 Skia live oracle under native ownership](Tickets/T-277.md) | Done | **P1 validation:** [16-case live native exact parity against immutable beta2 fixture](evidence/T-277-2026-11-23-skia-native-oracle.md); other T-068 smokes and hosted CI remain red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-276](Tickets/T-276.md) |
+| [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); separate dab/sweep CI groups still red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Done | Appearance-only oracles retired; real screenshots inspected, 50 native logs and 33 Python checks pass; [full audit](evidence/T-272-2026-11-23-visual-test-audit.md). Original dock/ColorPicker UX remains for owner T-250 | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
