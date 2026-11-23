@@ -13,17 +13,18 @@ sampled estimates, not an exact allocation trace.
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
+import re
 import signal
 import statistics
 import subprocess
 import sys
 import time
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
-
 
 SCRIPT = "res://tests/drawing_fill_frame_native.gd"
 REQUIRED_SIZES = (32, 64, 96)
@@ -113,6 +114,25 @@ def find_witness_pid(parent_pid: int, godot: Path) -> int | None:
     return None
 
 
+def validated_engine(raw: Any) -> dict[str, str]:
+    """Attest actual Godot version/hash, not a historical provenance label."""
+    lock = tomllib.loads((Path(__file__).resolve().parents[2] / "toolchain.lock.toml")
+                         .read_text(encoding="utf-8"))
+    pin = re.fullmatch(r"(\d+)\.(\d+)\.(beta\d+)", lock["godot"]["version"])
+    if pin is None or not isinstance(raw, dict):
+        raise ValueError("missing or unsupported Godot engine provenance")
+    major, minor, status = pin.groups()
+    engine_hash = raw.get("hash")
+    if (type(raw.get("major")) is not int or raw["major"] != int(major)
+            or type(raw.get("minor")) is not int or raw["minor"] != int(minor)
+            or raw.get("status") != status or raw.get("build") != "official"
+            or not isinstance(engine_hash, str)
+            or re.fullmatch(r"[0-9a-f]{40}", engine_hash) is None):
+        raise ValueError("fill profile engine differs from pinned official Godot")
+    return {"version": f"{major}.{minor}.{status}", "build": "official",
+            "hash": engine_hash}
+
+
 def validate_witness(raw: Any, trials: int) -> None:
     """Fail closed on nonpassing, incomplete or mismatched measurements."""
     if not isinstance(raw, dict) or raw.get("schema") != "t068-bucket-frame-v1":
@@ -137,6 +157,7 @@ def validate_witness(raw: Any, trials: int) -> None:
                 raise ValueError(f"invalid {name} latency samples")
     if not isinstance(raw.get("checks"), int) or raw["checks"] < trials * 3 * 5:
         raise ValueError("too few native checks")
+    validated_engine(raw.get("engine"))
 
 
 def profile_once(
@@ -215,6 +236,7 @@ def profile_once(
             "max_sampled_swap_kib": swap_peak,
         },
         "witness_checks": witness["checks"],
+        "engine": validated_engine(witness["engine"]),
         "cases": witness["cases"],
         "files": {"log": log_path.name, "json": json_path.name, "frame": screenshot_path.name},
     }
@@ -258,9 +280,12 @@ def main(argv: list[str] | None = None) -> int:
     results = [profile_once(args.godot.resolve(), root, args.output_dir, index,
                             args.trials, args.sample_ms, args.timeout_seconds)
                for index in range(1, args.runs + 1)]
+    engines = [row["engine"] for row in results]
+    if not engines or any(engine != engines[0] for engine in engines):
+        raise ValueError("multiple fill runs used different Godot builds")
     evidence = {
         "schema": "t068-linux-fill-process-profile-v1",
-        "engine": "pinned Godot 4.8 beta 2 required by caller",
+        "engine": engines[0],
         "platform": sys.platform,
         "runs": results,
         "summary": summarize(results),

@@ -1,0 +1,14 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":20.47,"median_ms":19.91,"min_ms":18.004,"p95_ms":20.47,"samples_ms":[18.004,19.564,19.91,20.097,20.47]},"event_to_frame_post_draw":{"max_ms":40.489,"median_ms":38.334,"min_ms":37.376,"p95_ms":40.489,"samples_ms":[37.376,38.127,38.334,39.923,40.489]},"pixels":1024,"size":32,"trials":5}
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":88.353,"median_ms":71.898,"min_ms":69.034,"p95_ms":88.353,"samples_ms":[69.034,71.19,71.898,74.748,88.353]},"event_to_frame_post_draw":{"max_ms":110.492,"median_ms":91.592,"min_ms":88.01,"p95_ms":110.492,"samples_ms":[88.01,91.209,91.592,94.906,110.492]},"pixels":4096,"size":64,"trials":5}
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":189.199,"median_ms":176.566,"min_ms":175.69,"p95_ms":189.199,"samples_ms":[175.69,176.106,176.566,180.502,189.199]},"event_to_frame_post_draw":{"max_ms":208.969,"median_ms":195.466,"min_ms":195.296,"p95_ms":208.969,"samples_ms":[195.296,195.409,195.466,200.541,208.969]},"pixels":9216,"size":96,"trials":5}
+T068_FILL_FRAME_PASSED checks=96 failures=0

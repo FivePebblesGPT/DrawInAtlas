@@ -1,0 +1,11 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+[godot_ai game_helper] registered mcp capture (debugger active=false, logger=true)
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":22.826,"median_ms":19.699,"min_ms":17.979,"p95_ms":21.989,"samples_ms":[17.979,18.162,18.31,18.411,18.455,18.682,18.721,19.15,19.495,19.661,19.699,19.812,19.889,19.986,20.056,20.167,20.458,21.225,21.916,21.989,22.826]},"event_to_frame_post_draw":{"max_ms":47.849,"median_ms":38.31,"min_ms":36.047,"p95_ms":40.85,"samples_ms":[36.047,36.137,36.508,36.521,36.563,36.851,36.97,37.223,37.93,38.287,38.31,38.467,38.514,38.603,38.674,39.271,39.8,39.917,40.015,40.85,47.849]},"pixels":1024,"size":32,"trials":21}
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":92.111,"median_ms":73.789,"min_ms":68.027,"p95_ms":87.575,"samples_ms":[68.027,68.953,69.077,71.489,71.842,72.141,72.776,72.997,73.197,73.349,73.789,74.832,75.248,75.388,75.648,79.061,82.459,84.313,86.609,87.575,92.111]},"event_to_frame_post_draw":{"max_ms":118.421,"median_ms":93.763,"min_ms":86.748,"p95_ms":114.053,"samples_ms":[86.748,88.067,88.251,89.756,91.58,91.871,92.246,92.385,92.561,92.696,93.763,94.156,94.898,95.777,96.543,97.859,101.463,105.466,105.657,114.053,118.421]},"pixels":4096,"size":64,"trials":21}
+T068_FILL_FRAME_CASE {"cpu_dispatch":{"max_ms":208.875,"median_ms":185.853,"min_ms":164.983,"p95_ms":208.236,"samples_ms":[164.983,172.651,174.906,176.425,177.483,177.935,178.828,179.133,180.108,182.715,185.853,186.155,186.446,189.874,193.826,197.442,198.497,198.607,202.737,208.236,208.875]},"event_to_frame_post_draw":{"max_ms":229.063,"median_ms":204.682,"min_ms":183.869,"p95_ms":228.023,"samples_ms":[183.869,192.281,193.995,197.087,198.019,198.175,198.716,199.94,201.384,202.231,204.682,206.787,207.97,209.928,215.704,217.187,217.198,218.699,223.124,228.023,229.063]},"pixels":9216,"size":96,"trials":21}
+T068_FILL_FRAME_PASSED checks=385 failures=0

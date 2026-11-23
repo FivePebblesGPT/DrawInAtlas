@@ -1,0 +1,27 @@
+test_missing_or_reordered_native_preflight_is_rejected (tests.test_t288_fill_native_ci.FillNativeCiTests.test_missing_or_reordered_native_preflight_is_rejected) ... FAIL
+test_real_on_demand_workflow_builds_registered_native_engine (tests.test_t288_fill_native_ci.FillNativeCiTests.test_real_on_demand_workflow_builds_registered_native_engine) ... ERROR
+
+======================================================================
+ERROR: test_real_on_demand_workflow_builds_registered_native_engine (tests.test_t288_fill_native_ci.FillNativeCiTests.test_real_on_demand_workflow_builds_registered_native_engine)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t288_fill_native_ci.py", line 46, in test_real_on_demand_workflow_builds_registered_native_engine
+    validate_fill_workflow(WORKFLOW.read_text(encoding="utf-8"))
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t288_fill_native_ci.py", line 24, in validate_fill_workflow
+    raise ValueError("fill runner must install the pinned Rust compiler")
+ValueError: fill runner must install the pinned Rust compiler
+
+======================================================================
+FAIL: test_missing_or_reordered_native_preflight_is_rejected (tests.test_t288_fill_native_ci.FillNativeCiTests.test_missing_or_reordered_native_preflight_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/mnt/data/unpacked/sprint-2026-11-23-godot-beta4/DrawInAtlas_sprint_2026-11-23-godot-beta4/tests/test_t288_fill_native_ci.py", line 51, in test_missing_or_reordered_native_preflight_is_rejected
+    self.assertIsNotNone(build_step)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+AssertionError: unexpectedly None
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.001s
+
+FAILED (failures=1, errors=1)

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools" / "benchmarks"))
@@ -16,6 +16,7 @@ from t068_fill_process_profile import (  # noqa: E402
     sample_pid,
     summarize,
     validate_witness,
+    validated_engine,
 )
 
 
@@ -42,6 +43,8 @@ class FillProfileTests(unittest.TestCase):
     def witness(trials: int = 21) -> dict:
         return {
             "schema": "t068-bucket-frame-v1", "failures": 0,
+            "engine": {"major": 4, "minor": 8, "status": "beta4", "build": "official",
+                       "hash": "b070e63b161aa816afac71dcfc9d60859d38f220"},
             "configured_trials_per_size": trials, "checks": trials * 15 + 20,
             "cases": [{"size": size, "trials": trials,
                        "cpu_dispatch": {"samples_ms": [1.0] * trials},
@@ -66,6 +69,17 @@ class FillProfileTests(unittest.TestCase):
                 broken["cases"][2]["event_to_frame_post_draw"]["samples_ms"].pop()
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
                 validate_witness(broken, 21)
+
+    def test_engine_provenance_rejects_wrong_version_build_or_hash(self) -> None:
+        engine = self.witness()["engine"]
+        self.assertEqual(validated_engine(engine)["version"], "4.8.beta4")
+        for field, value in (("major", 5), ("minor", 7), ("status", "beta3"),
+                             ("build", "custom"), ("hash", "bad"), ("hash", None)):
+            broken = {**engine, field: value}
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                validate_witness({**self.witness(), "engine": broken}, 21)
+        with self.assertRaises(ValueError):
+            validate_witness({**self.witness(), "engine": None}, 21)
 
     def test_reject_xvfb_wrapper_even_when_command_contains_script(self) -> None:
         godot = Path("/opt/godot")
