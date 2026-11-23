@@ -10,6 +10,8 @@ import re
 import unittest
 from pathlib import Path
 
+from tools.validate_ticket_store import parse_ticket
+
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 PAGES = {
@@ -64,10 +66,23 @@ class ToolWorkflowDocsTests(unittest.TestCase):
         self.assertNotIn('"Bucket"', workspace.split('for name: String in [', 1)[1].split(']:', 1)[0])
 
     def test_pending_tool_tickets_are_not_marked_completed(self) -> None:
-        for name in PENDING:
-            ticket = PAGES[name][2]
-            self.assertIn('status: "Ready"', source(f"docs/Tickets/{ticket}.md"))
-        self.assertIn('status: "Ready"', source("docs/Tickets/T-027.md"))
+        gate_errors: list[str] = []
+        gate = parse_ticket(DOCS / "Tickets/T-250.md", gate_errors)
+        self.assertEqual(gate_errors, [])
+        self.assertIsNotNone(gate)
+        self.assertTrue(gate.manual_review)
+        for ticket_id in (*[PAGES[name][2] for name in PENDING], "T-027"):
+            with self.subTest(ticket=ticket_id):
+                errors: list[str] = []
+                item = parse_ticket(DOCS / f"Tickets/{ticket_id}.md", errors)
+                self.assertEqual(errors, [])
+                self.assertIsNotNone(item)
+                # The tools remain unshipped, but a legitimate new manual
+                # prerequisite can move them from Ready to Blocked.
+                self.assertNotIn(item.status, {"Done", "Archived"})
+                self.assertIn("T-250", item.dependencies)
+                if not gate.approved:
+                    self.assertNotEqual(item.status, "Done")
         self.assertIn('status: "In Progress"', source("docs/Tickets/T-068.md"))
         self.assertIn('status: "Done"', source("docs/Tickets/T-058.md"))
         for name in PENDING:

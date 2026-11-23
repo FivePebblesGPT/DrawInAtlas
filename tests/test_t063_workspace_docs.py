@@ -5,6 +5,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+from tools.validate_ticket_store import parse_ticket
+
 ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE = (ROOT / "addons/drawing/workspace.gd").read_text(encoding="utf-8")
 TOP_BAR = (ROOT / "addons/drawing/editor_top_bar.gd").read_text(encoding="utf-8")
@@ -87,12 +89,30 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
         self.assertIn('status: "Done"', TICKET)
         self.assertIn('manual_review: false', TICKET)
         self.assertIn('depends_on: ["[[T-053]]"]', TICKET)
-        browser_ticket = (ROOT / "docs/Tickets/T-065.md").read_text(encoding="utf-8")
-        self.assertIn('status: "In Progress"', browser_ticket)
-        self.assertIn('manual_review: true', browser_ticket)
-        self.assertNotIn('status: "Done"', browser_ticket)
-        self.assertIn('status: "Ready"', (ROOT / "docs/Tickets/T-059.md").read_text(encoding="utf-8"))
-        self.assertIn('status: "Ready"', (ROOT / "docs/Tickets/T-056.md").read_text(encoding="utf-8"))
+        def ticket(number: str):
+            errors: list[str] = []
+            item = parse_ticket(ROOT / f"docs/Tickets/{number}.md", errors)
+            self.assertEqual(errors, [])
+            self.assertIsNotNone(item)
+            return item
+
+        # These are owner-review gates, not immutable Kanban snapshots. The
+        # November 22 dependency update correctly moved T-056 to Blocked.
+        browser = ticket("T-065")
+        scope = ticket("T-059")
+        integration = ticket("T-056")
+        gate = ticket("T-250")
+        self.assertTrue(browser.manual_review)
+        self.assertTrue(scope.manual_review)
+        self.assertTrue(integration.manual_review)
+        self.assertTrue(gate.manual_review)
+        self.assertIn("T-250", browser.dependencies)
+        self.assertIn("T-250", integration.dependencies)
+        if not gate.approved:
+            self.assertNotEqual(browser.status, "Done")
+            self.assertNotEqual(integration.status, "Done")
+        if not scope.approved:
+            self.assertNotEqual(scope.status, "Done")
 
     def test_approved_feature_scope_is_not_ux_approval(self) -> None:
         self.assertIn('**Status:** Proposed design', UI)

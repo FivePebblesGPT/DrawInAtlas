@@ -1,5 +1,11 @@
 # Ticket Kanban Index
 
+**[T-275](Tickets/T-275.md) P1 engineering Done (2026-11-23):**
+[stale T-063/T-072 CI ticket-state assertions and narrow Canvas test repair](evidence/T-275-2026-11-23-workspace-ci-gates.md)
+validated canonical manual-review dependencies without pretending T-056/T-065
+are Ready or approved; real Godot beta4 T-063 X11 73-check witness passed.
+**T-250 still requires explicit owner signoff**, and unrelated fast CI failures remain.
+
 **[T-273](Tickets/T-273.md) P0 engineering Done (2026-11-23):**
 [outer-right-edge dock toggle and chevron correction](evidence/T-273-2026-11-23-dock-edge.md)
 passed standalone X11 92-check, Atlas 19-check, flyout 138/10-check witnesses;
@@ -365,6 +371,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | --- | --- | --- | --- |
 | [T-273 · Align whole right-dock toggle with outer edge](Tickets/T-273.md) | Done | **P0 engineering:** [real X11 screenshots and behavioral input proof](evidence/T-273-2026-11-23-dock-edge.md); T-250 owner review unapproved | [T-251](Tickets/T-251.md) |
 | [T-274 · Compact native ColorPicker width and duplicate chrome](Tickets/T-274.md) | Done | **P0 engineering:** [native full-width picker, optional exact RGBA8, real X11 screenshots and Drawing/Atlas regression](evidence/T-274-2026-11-23-native-picker-composition.md); owner approval remains T-250 | [T-226](Tickets/T-226.md), [T-252](Tickets/T-252.md) |
+| [T-275 · Repair stale workspace CI/owner-gate test contracts](Tickets/T-275.md) | Done | **P1 CI engineering:** [T-063/T-072 canonical status dependencies and 73-check native workspace regression](evidence/T-275-2026-11-23-workspace-ci-gates.md); T-250 approval and other hosted CI gates remain open | [T-063](Tickets/T-063.md), [T-072](Tickets/T-072.md) |
 | [T-272 · Remove appearance-only UI test assertions; require visual inspection](Tickets/T-272.md) | Done | Appearance-only oracles retired; real screenshots inspected, 50 native logs and 33 Python checks pass; [full audit](evidence/T-272-2026-11-23-visual-test-audit.md). Original dock/ColorPicker UX remains for owner T-250 | — |
 | [T-251 · Fix dock toggle placement/overlap](Tickets/T-251.md) | Done | **P0 owner correction complete:** [native/Atlas focus, geometry and scale evidence](evidence/T-251-2026-11-22-dock-toggle.md); T-250 owner review still pending | [T-222](Tickets/T-222.md) |
 | [T-252 · Commit deliberate recent colors and remove Restore previous](Tickets/T-252.md) | Done | **P0 correction complete:** [color gesture and native/Atlas evidence](evidence/T-252-2026-11-22-recent-colors.md); T-250 owner review outstanding | [T-226](Tickets/T-226.md) |
