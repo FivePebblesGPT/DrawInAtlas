@@ -15,14 +15,19 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1 and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
       - name: Install software-display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import canonical standalone Drawing package
+      - name: Build mandatory native extension and import Drawing/Atlas consumers
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
-      - name: Verify native resize, framebuffer edges, per-tab pointer close and brush wheel
+          # A checkout contains no built .so: register Rust before either import.
+          make build TOOLCHAIN=system
+      - name: Verify native resize, menu state, per-tab pointer close and brush wheel
         run: |
           set -euo pipefail
           mkdir -p /tmp/t090-screenshots

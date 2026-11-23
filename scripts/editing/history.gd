@@ -10,13 +10,37 @@ signal restoration_warning(message: String)
 
 ## Application-level setting, not serialized artwork state.
 var record_selection_history: bool = false
-## Host can supply typed before/after context for legacy Atlas commands too.
-var context_provider: Callable
+## Host handlers are configurable only between history operations. A context
+## callback or synchronous observer must not replace its own partner midway
+## through capture/restoration, including reflective Object.set() writes.
+var _context_provider: Callable
+var context_provider: Callable:
+	get:
+		return _context_provider
+	set(value):
+		if _timeline_reserved() or _replaying:
+			return
+		_context_provider = value
 ## Optional synchronous host UI restoration; false triggers a visible warning.
-var context_restorer: Callable
+var _context_restorer: Callable
+var context_restorer: Callable:
+	get:
+		return _context_restorer
+	set(value):
+		if _timeline_reserved() or _replaying:
+			return
+		_context_restorer = value
 var last_playback_warning: String = ""
 var last_playback_context: DrawingHistoryContext
 var _replaying: bool = false
+## A Drawing commit can resolve caller-owned lazy sources synchronously. Their
+## callbacks must not insert, undo, reset or mark saved another host command
+## before this transaction has been appended to the Atlas timeline.
+var _committing_drawing: bool = false
+## Reserve other synchronous host commands across context callbacks, apply and signals.
+var _executing_command: bool = false
+## Synchronous history notifications are observable, not a second command window.
+var _notifying_changed: bool = false
 var _contexts_before: Array[DrawingHistoryContext] = []
 var _contexts_after: Array[DrawingHistoryContext] = []
 ## Expected live revisions for every Drawing document touched by this timeline.
@@ -24,7 +48,16 @@ var _contexts_after: Array[DrawingHistoryContext] = []
 ## still holds after later undo/redo replay has incremented that revision.
 var _drawing_revisions: Dictionary[int, int] = {}
 
-var active_map_id: String = ""
+## The host may navigate while idle, including between a gesture and commit,
+## but synchronous command callbacks must not rebind the active edit target.
+var _active_map_id: String = ""
+var active_map_id: String:
+	get:
+		return _active_map_id
+	set(value):
+		if _timeline_reserved() or _replaying:
+			return
+		_active_map_id = value
 var _campaign: AtlasCampaign
 var _commands: Array[AtlasEditCommand] = []
 ## One unique state token per command boundary (length = commands + 1).
@@ -45,7 +78,20 @@ func _init(campaign: AtlasCampaign = null) -> void:
 	_campaign = campaign
 
 
+func _timeline_reserved() -> bool:
+	return _committing_drawing or _executing_command or _notifying_changed
+
+
+func _emit_changed() -> void:
+	var previous: bool = _notifying_changed
+	_notifying_changed = true
+	changed.emit()
+	_notifying_changed = previous
+
+
 func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
+	if _timeline_reserved() or _replaying:
+		return
 	_campaign = campaign
 	active_map_id = ""
 	_commands.clear()
@@ -61,17 +107,19 @@ func reset(campaign: AtlasCampaign, saved: bool = true) -> void:
 	_saved_state = 0 if saved else -1
 	_external_revision = 0
 	_saved_external_revision = 0
-	changed.emit()
+	_emit_changed()
 
 
 ## Applying a command is transactional: invalid commands do not mutate history.
 ## Only after successful apply do we discard the redo branch and issue a state ID.
 func execute(command: AtlasEditCommand) -> bool:
-	if _replaying or _campaign == null or command == null or command.map_id != active_map_id \
+	if _replaying or _timeline_reserved() or _campaign == null or command == null or command.map_id != active_map_id \
 			or not _revisions_valid(command):
 		return false
+	_executing_command = true
 	var before: DrawingHistoryContext = _capture_context(command.map_id, command.floor_id)
 	if not command.apply(_campaign):
+		_executing_command = false
 		return false
 	var after: DrawingHistoryContext = _capture_context(command.map_id, command.floor_id)
 	_append_applied(command, before, after, true)
@@ -79,7 +127,8 @@ func execute(command: AtlasEditCommand) -> bool:
 	if command is AtlasAssetRebind:
 		# Save As creates a durable B that survives undoing only its binding.
 		_external_revision += 1
-		changed.emit()
+		_emit_changed()
+	_executing_command = false
 	return true
 
 
@@ -87,49 +136,61 @@ func execute(command: AtlasEditCommand) -> bool:
 ## after the gesture: its canonical pixels have *already* been committed.
 func commit_drawing(session: DrawingEditSession, before: DrawingHistoryContext,
 		after: DrawingHistoryContext) -> DrawingResult:
-	if _replaying or _campaign == null or session == null or session.document == null \
+	if _replaying or _timeline_reserved() or _campaign == null or session == null or session.document == null \
 			or before == null or after == null or before.map_id.is_empty() \
 			or before.document_id != session.document.id or after.document_id != before.document_id \
 			or not session.document.external_history or _campaign.get_map(before.map_id) == null \
 			or not _revision_valid(session.document):
 		return DrawingResult.failure("HISTORY_CONTEXT", "Invalid drawing origin or external history owner")
+	_committing_drawing = true
 	var result: DrawingResult = session.commit()
 	if not result.ok:
+		_committing_drawing = false
 		return result
 	var command: AtlasDrawingEdit = AtlasDrawingEdit.new(session.document, result.delta,
 		before, after, result.regions)
-	# After a successful commit, all command eligibility is captured by this
-	# synchronous and non-failing append; no second local history is created.
+	# The complete host append and revision-ledger update form one reserved
+	# boundary, including callbacks from the changed signal.
 	_append_applied(command, before, after, true)
 	_remember_revisions(command)
+	_committing_drawing = false
 	return result
 
 
 ## Atomic across the two documents from Atlas's chronological point of view.
 func execute_drawing_transfer(command: AtlasDrawingTransfer) -> bool:
-	if _replaying or _campaign == null or command == null or command.map_id.is_empty() \
-			or _campaign.get_map(command.map_id) == null or not _revisions_valid(command) \
-			or not command.apply(_campaign):
+	if _replaying or _timeline_reserved() or _campaign == null or command == null or command.map_id.is_empty() \
+			or _campaign.get_map(command.map_id) == null or not _revisions_valid(command):
+		return false
+	_executing_command = true
+	if not command.apply(_campaign):
+		_executing_command = false
 		return false
 	_append_applied(command, command.before_context, command.after_context, true)
 	_remember_revisions(command)
+	_executing_command = false
 	return true
 
 
 func execute_asset_rebind(command: AtlasAssetRebind) -> bool:
-	if _replaying or _campaign == null or command == null or command.map_id.is_empty() \
-			or _campaign.get_map(command.map_id) == null or not command.apply(_campaign):
+	if _replaying or _timeline_reserved() or _campaign == null or command == null or command.map_id.is_empty() \
+			or _campaign.get_map(command.map_id) == null:
+		return false
+	_executing_command = true
+	if not command.apply(_campaign):
+		_executing_command = false
 		return false
 	_append_applied(command, command.before_context, command.after_context, true)
 	# Saved B is independently durable. Undo binding never clears this dirty bit.
 	_external_revision += 1
-	changed.emit()
+	_emit_changed()
+	_executing_command = false
 	return true
 
 
 func record_selection_change(before: DrawingHistoryContext,
 		after: DrawingHistoryContext) -> bool:
-	if _replaying or _campaign == null or not record_selection_history or before == null \
+	if _replaying or _timeline_reserved() or _campaign == null or not record_selection_history or before == null \
 			or after == null or before.same_selection(after) \
 			or _campaign.get_map(before.map_id) == null:
 		return false
@@ -209,11 +270,11 @@ func _append_applied(command: AtlasEditCommand, before: DrawingHistoryContext,
 		_states.append(_next_state)
 	else:
 		_states.append(_states[_cursor - 1])
-	changed.emit()
+	_emit_changed()
 
 
 func undo() -> bool:
-	if _replaying or not can_undo():
+	if _replaying or _timeline_reserved() or not can_undo():
 		return false
 	_replaying = true
 	var command: AtlasEditCommand = _commands[_cursor - 1]
@@ -224,12 +285,12 @@ func undo() -> bool:
 	_cursor -= 1
 	_restore(_contexts_before[_cursor], command)
 	_replaying = false
-	changed.emit()
+	_emit_changed()
 	return true
 
 
 func redo() -> bool:
-	if _replaying or not can_redo():
+	if _replaying or _timeline_reserved() or not can_redo():
 		return false
 	_replaying = true
 	var command: AtlasEditCommand = _commands[_cursor]
@@ -240,7 +301,7 @@ func redo() -> bool:
 	_restore(_contexts_after[_cursor], command)
 	_cursor += 1
 	_replaying = false
-	changed.emit()
+	_emit_changed()
 	return true
 
 
@@ -276,16 +337,20 @@ func is_dirty() -> bool:
 
 
 func mark_saved() -> void:
+	if _timeline_reserved() or _replaying:
+		return
 	_saved_state = _states[_cursor]
 	_saved_external_revision = _external_revision
-	changed.emit()
+	_emit_changed()
 
 
 func mark_external_change() -> void:
+	if _timeline_reserved() or _replaying:
+		return
 	# External metadata edits are dirty even when not represented by commands.
 	_discard_redo()
 	_external_revision += 1
-	changed.emit()
+	_emit_changed()
 
 
 func _discard_redo() -> void:

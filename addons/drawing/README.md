@@ -102,8 +102,11 @@ For embedded Drawing, call `set_external_history(true)` **before** edits, then
 use `AtlasEditHistory.commit_drawing(session, before_context, after_context)`.
 It records one externally committed delta in the existing Atlas timeline;
 `DrawingDocument.undo()` is intentionally disabled in that mode to prevent
-double histories. The Atlas-owned `AtlasDrawingEdit` supports revision-checked
-undo/redo. The host must supply validated stable map/floor/detail/document/asset
+double histories. Once a host-owned document revision is committed, switching
+back to local history is rejected with `HISTORY_OWNED`; no local command list
+can prove that Atlas has discarded its external timeline. Before any edits,
+mode selection remains reversible. The Atlas-owned `AtlasDrawingEdit` supports
+revision-checked undo/redo. The host must supply validated stable map/floor/detail/document/asset
 IDs and any affected world bounds; a UI-only restoration cannot recreate
 missing geometry. Atlas's multi-document move and Save As history callbacks
 are tested in `tests/drawing_history_smoke.gd`; concrete asset registry/editor

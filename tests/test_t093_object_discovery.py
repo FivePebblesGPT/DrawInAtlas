@@ -1,13 +1,12 @@
 """T-093: source-root consent, packaging, native evidence and fail-closed log contracts."""
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 
+from tools.check_native_t093_log import verify
+
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-from check_native_t093_log import verify  # noqa: E402
 
 
 class T093DiscoveryContracts(unittest.TestCase):
@@ -16,7 +15,7 @@ class T093DiscoveryContracts(unittest.TestCase):
         native = (ROOT / ".github/workflows/godot-native-t093-object-sources.yml").read_text()
         for expected in ("object_discovery_smoke.gd", "T093_MODEL_PASSED", "ci_finish"):
             self.assertIn(expected, fast)
-        for expected in ("workflow_dispatch", "--import --quit", "xvfb-run",
+        for expected in ("workflow_dispatch", "make build TOOLCHAIN=system", "xvfb-run",
                          "object_discovery_native.gd", "T093_SCREENSHOTS",
                          "check_native_t093_log.py", "upload-artifact@v4"):
             self.assertIn(expected, native)

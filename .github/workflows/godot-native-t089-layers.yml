@@ -15,24 +15,48 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
       - name: Install software-display dependencies
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import canonical standalone Drawing package
+      - name: Build mandatory native extension and import Drawing and Atlas
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+          make build TOOLCHAIN=system
+      - name: Verify native layer hierarchy and guarded model transactions
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/layer_structure_smoke.gd \
+            2>&1 | tee /tmp/t089-model.log
+          grep -Fxq 'T089_MODEL_PASSED: 63 checks' /tmp/t089-model.log
+          python3 tools/check_godot_model_log.py /tmp/t089-model.log --marker T089_MODEL_PASSED
       - name: Verify X11 dock wheel, row eye/lock pointer, keyboard and framebuffer
         run: |
           set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a godot --display-driver x11 --rendering-method gl_compatibility \
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a -s '-screen 0 1600x1200x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility \
             --audio-driver Dummy --path drawing --script res://tests/layer_structure_native.gd \
             2>&1 | tee /tmp/t089-native.log
           python3 tools/check_native_t089_log.py /tmp/t089-native.log
+      - name: Verify real Atlas-hosted nested layers and global native history
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s xvfb-run -a -s '-screen 0 1600x1200x24' \
+            godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path . --script res://tests/t269_atlas_layers_native.gd \
+            2>&1 | tee /tmp/t269-atlas.log
+          grep -Fxq 'T269_ATLAS: 27 checks; 0 failures' /tmp/t269-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t269-atlas.log --marker T269_ATLAS_PASSED
       - name: Upload software-only diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t089-xvfb-layer-structure
-          path: /tmp/t089-native.log
+          path: |
+            /tmp/t089-model.log
+            /tmp/t089-native.log
+            /tmp/t269-atlas.log
           if-no-files-found: warn

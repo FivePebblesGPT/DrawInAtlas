@@ -20,6 +20,7 @@ func _initialize() -> void:
 func run() -> void:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREF_FILE))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREF_FILE + ".bak"))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREF_FILE + "-colors"))
 	check(DrawingWorkspacePreferences.decode({}).is_empty(), "missing schema rejected")
 	check(DrawingWorkspacePreferences.decode({"schema": 5, "record_selection_history": true}).is_empty(), "future schema rejected")
 	check(DrawingWorkspacePreferences.decode({"schema": 1, "record_selection_history": 1}).is_empty(), "nonboolean toggle rejected")
@@ -76,6 +77,7 @@ func run() -> void:
 	var app: Control = load("res://main.tscn").instantiate()
 	app.layout_persistence_enabled = false
 	app.preferences_settings_path = PREF_FILE
+	app.recent_colors_settings_path = PREF_FILE + "-colors"
 	root.add_child(app)
 	await frames(5)
 	check(not app.record_selection_history and not app.selection_history_toggle.button_pressed,
@@ -101,13 +103,13 @@ func run() -> void:
 		not app.status.text.contains("revision"), "user-facing cursor replaces raw revision")
 	check(app.history_list.item_count == 1 and app.history_undo.disabled and app.history_redo.disabled,
 		"empty History is compact and actions disabled")
-	check(not app.color_advanced.visible and app.color_swatch_buttons.size() == 10,
-		"compact palette and six recent swatches initialize")
+	check(app.color_advanced.visible and app.color_swatch_buttons.size() == 8,
+		"inline native picker and six recent bars initialize")
 	app._set_foreground(Color8(10, 20, 30, 40))
 	check(app.active_color == Color8(10, 20, 30, 40) and app.color_hex.text == "#0A141E28",
 		"foreground is RGBA8 and hex mirrors alpha")
 	check(app.canvas.color_rgba == app._pack_color(app.active_color), "foreground feeds brush without artwork")
-	check(app.recent_colors.size() == 1 and app.recent_colors[0] == app.previous_foreground,
+	check(app.recent_colors.size() == 1 and app.recent_colors[0] == app._canonical_color(Color(0.12, 0.20, 0.35)),
 		"previous foreground added to recent palette")
 	app.color_hex.text = "#AABBCCDD"
 	app._commit_hex()
@@ -153,17 +155,18 @@ func run() -> void:
 	app.color_hex.text = "#33445566"
 	app._commit_hex()
 	check(app.color_background == Color8(51, 68, 85, 102) and
-		app.previous_background == Color.WHITE and app.active_color == brush_before and
+		app._visible_recent_colors().any(func(c: Color) -> bool: return c == Color.WHITE) and
+		app.active_color == brush_before and
 		app.canvas.color_rgba == brush_rgba,
 		"background hex changes only the secondary pigment and preserves its undo swatch")
 	app.color_rgb[3].value = 0
 	check(app.color_background == Color8(51, 68, 85, 0) and
 		app.active_color == brush_before and app.color_hex.text == "#33445500",
 		"background RGBA editing retains hidden RGB at alpha zero")
-	app._color_swatch_pressed("Previous BG")
+	app._use_recent_color(0)
 	check(app.color_background == Color8(51, 68, 85, 102) and
 		app.active_color == brush_before and app.color_edit_background,
-		"previous background restores background, not foreground")
+		"recent background color restores only BG, not foreground")
 	app._color_swatch_pressed("Foreground")
 	check(not app.color_edit_background and app.color_hex.text == "#11BBCC22" and
 		app.active_color == brush_before,
@@ -180,15 +183,14 @@ func run() -> void:
 	app._set_selected_color(Color8(19, 77, 88, 99))
 	check(app.color_background == Color8(19, 77, 88, 99) and app.active_color == Color.BLACK,
 		"advanced picker target route respects selected background")
-	app._toggle_advanced_picker()
-	check(app.color_advanced.visible, "advanced picker accessible only when expanded")
-	app._toggle_advanced_picker()
-	check(not app.color_advanced.visible, "advanced picker closes to compact state")
+	check(app.color_advanced.visible and app.color_picker_scroll.get_parent() == app.dock_views["colors"],
+		"native ColorPicker remains embedded in scrollable panel")
 	check(app.current_document().revision == rev and app.current_document().is_dirty() == dirty,
 		"all color operations leave artwork and revision untouched")
 	app.queue_free()
 	await frames(3)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREF_FILE))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREF_FILE + "-colors"))
 	print("T092_MODEL: %d checks; %d failed" % [checks, failures])
 	if failures == 0:
 		print("T092_MODEL_PASSED")

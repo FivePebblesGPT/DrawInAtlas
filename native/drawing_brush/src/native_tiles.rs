@@ -181,6 +181,16 @@ impl TileStore {
             .filter(|len| *len > 0 && *len <= MAX_TILE_BYTES)
             .ok_or("Invalid or unconfigured tile stride")
     }
+    // Bound the entire history transfer before Godot buffers are copied into
+    // Rust vectors. Resident canonical source plus both snapshots can be live
+    // simultaneously; this is deliberately conservative for detached replay.
+    fn history_transfer_within_budget(&self, count: usize) -> bool {
+        self.stride_bytes()
+            .ok()
+            .and_then(|tile_bytes| tile_bytes.checked_mul(count)?.checked_mul(3))
+            .is_some_and(|bytes| bytes <= MAX_STORED_BYTES)
+    }
+
     fn allowed(&self, layer: &str) -> bool {
         self.editable_layers.get(layer).copied().unwrap_or(false)
     }
@@ -981,6 +991,17 @@ impl TileStore {
         Ok(())
     }
 
+    // Do not treat a retained but out-of-order token as detached. Detached
+    // replay discards the native history timeline, even for disjoint tiles.
+    fn retains_history_token(&self, token: i64) -> bool {
+        token > 0
+            && self
+                .undo
+                .iter()
+                .chain(self.redo.iter())
+                .any(|event| event.token == token)
+    }
+
     fn history_matches(&self, token: i64, undo: bool) -> bool {
         if token <= 0 || self.active.is_some() {
             return false;
@@ -1358,6 +1379,14 @@ impl DrawingNativeTiles {
             })
     }
 
+    /// A pending transaction reserves the current document history owner.
+    /// This query is read-only: it does not count as an FFI edit or mutate
+    /// the active transaction, native revision or token stacks.
+    #[func]
+    fn has_active_edit(&self) -> bool {
+        self.store.active.is_some()
+    }
+
     /// Cheap, side-effect-free history identity probe. The document may have
     /// older detached history events after a non-raster revision rebase;
     /// those can safely replay through their saved tile snapshots instead.
@@ -1366,6 +1395,52 @@ impl DrawingNativeTiles {
         expected_revision >= 0
             && self.store.revision == expected_revision as u64
             && self.store.history_matches(transaction, undo)
+    }
+
+    /// Side-effect-free lookup across both history stacks, including tokens
+    /// that cannot be replayed next. Evicted/rebased tokens return false.
+    #[func]
+    fn has_retained_history_token(&self, transaction: i64) -> bool {
+        self.store.retains_history_token(transaction)
+    }
+
+    /// Validate every packed descriptor before cloning *any* RGBA8 buffer.
+    /// A malformed later entry must not allocate earlier full-tile spans.
+    /// Empty byte arrays denote absent/transparent tiles in the v1 ABI.
+    fn checked_transfer_descriptors(
+        &self,
+        layer: &str,
+        tiles: &Array<Dictionary<Variant, Variant>>,
+        first_field: &str,
+        second_field: &str,
+    ) -> Option<Vec<(TileId, PackedByteArray, PackedByteArray)>> {
+        let tile_bytes = self.store.stride_bytes().ok()?;
+        let mut validated = Vec::with_capacity(tiles.len());
+        let mut seen = HashSet::with_capacity(tiles.len());
+        for entry in tiles.iter_shared() {
+            let x = entry.get("tile_x")?.try_to::<i64>().ok()?;
+            let y = entry.get("tile_y")?.try_to::<i64>().ok()?;
+            let first = entry.get(first_field)?.try_to::<PackedByteArray>().ok()?;
+            let second = entry.get(second_field)?.try_to::<PackedByteArray>().ok()?;
+            if x.unsigned_abs() > SAFE_COORD as u64
+                || y.unsigned_abs() > SAFE_COORD as u64
+                || !seen.insert((x, y))
+                || !(first.is_empty() || first.len() == tile_bytes)
+                || !(second.is_empty() || second.len() == tile_bytes)
+            {
+                return None;
+            }
+            validated.push((
+                TileId {
+                    layer: layer.to_owned(),
+                    x,
+                    y,
+                },
+                first,
+                second,
+            ));
+        }
+        Some(validated)
     }
 
     /// Checked detached-history replay when the original Rust token has been
@@ -1383,32 +1458,22 @@ impl DrawingNativeTiles {
         if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
             return err("Invalid detached history revision or tile count");
         }
+        if !self.store.history_transfer_within_budget(tiles.len()) {
+            return err("Native history transfer exceeds tile memory budget");
+        }
         let layer = layer.to_string();
-        let mut changes = Vec::with_capacity(tiles.len());
-        for entry in tiles.iter_shared() {
-            let Some((x, y, before, after)) = (|| {
-                Some((
-                    entry.get("tile_x")?.try_to::<i64>().ok()?,
-                    entry.get("tile_y")?.try_to::<i64>().ok()?,
-                    entry.get("expected")?.try_to::<PackedByteArray>().ok()?,
-                    entry.get("replacement")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed detached history tile descriptor");
-            };
+        let Some(validated) =
+            self.checked_transfer_descriptors(&layer, &tiles, "expected", "replacement")
+        else {
+            return err("Malformed detached history tile descriptor");
+        };
+        let mut changes = Vec::with_capacity(validated.len());
+        for (id, before, after) in validated {
             self.store.external_bytes_received = self
                 .store
                 .external_bytes_received
                 .saturating_add(before.len().saturating_add(after.len()) as u64);
-            changes.push((
-                TileId {
-                    layer: layer.clone(),
-                    x,
-                    y,
-                },
-                before.as_slice().to_vec(),
-                after.as_slice().to_vec(),
-            ));
+            changes.push((id, before.as_slice().to_vec(), after.as_slice().to_vec()));
         }
         match self
             .store
@@ -1446,29 +1511,25 @@ impl DrawingNativeTiles {
         {
             return err("Stale revision or invalid native history tile count");
         }
-        let layer = layer.to_string();
-        let mut entries = Vec::with_capacity(tiles.len());
-        for item in tiles.iter_shared() {
-            let Some((x, y, expected, replacement)) = (|| {
-                Some((
-                    item.get("tile_x")?.try_to::<i64>().ok()?,
-                    item.get("tile_y")?.try_to::<i64>().ok()?,
-                    item.get("expected")?.try_to::<PackedByteArray>().ok()?,
-                    item.get("replacement")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed native history tile descriptor");
-            };
-            entries.push((
-                TileId {
-                    layer: layer.clone(),
-                    x,
-                    y,
-                },
-                expected.as_slice().to_vec(),
-                replacement.as_slice().to_vec(),
-            ));
+        if !self.store.history_transfer_within_budget(tiles.len()) {
+            return err("Native history transfer exceeds tile memory budget");
         }
+        let layer = layer.to_string();
+        let Some(validated) =
+            self.checked_transfer_descriptors(&layer, &tiles, "expected", "replacement")
+        else {
+            return err("Malformed native history tile descriptor");
+        };
+        let entries: Vec<_> = validated
+            .into_iter()
+            .map(|(id, expected, replacement)| {
+                (
+                    id,
+                    expected.as_slice().to_vec(),
+                    replacement.as_slice().to_vec(),
+                )
+            })
+            .collect();
         if !self
             .store
             .history_tiles_match(transaction, undo, &layer, &entries)
@@ -1876,42 +1937,30 @@ impl DrawingNativeTiles {
         if expected_revision < 0 || tiles.is_empty() || tiles.len() > MAX_ACTIVE_TILES {
             return err("Invalid external edit revision or tile count");
         }
-        let mut changes = Vec::with_capacity(tiles.len());
-        for entry in tiles.iter_shared() {
-            let Some((x, y, before, after)) = (|| {
-                Some((
-                    entry.get("tile_x")?.try_to::<i64>().ok()?,
-                    entry.get("tile_y")?.try_to::<i64>().ok()?,
-                    entry.get("before")?.try_to::<PackedByteArray>().ok()?,
-                    entry.get("after")?.try_to::<PackedByteArray>().ok()?,
-                ))
-            })() else {
-                return err("Malformed external tile descriptor");
-            };
+        // Godot PackedByteArray->Vec duplicates must not precede the
+        // stride-dependent source/before/after envelope preflight.
+        if !self.store.history_transfer_within_budget(tiles.len()) {
+            return err("Native external edit transfer exceeds tile memory budget");
+        }
+        let layer = layer.to_string();
+        let Some(validated) = self.checked_transfer_descriptors(&layer, &tiles, "before", "after")
+        else {
+            return err("Malformed external tile descriptor");
+        };
+        let mut changes = Vec::with_capacity(validated.len());
+        for (id, before, after) in validated {
             self.store.external_bytes_received = self
                 .store
                 .external_bytes_received
                 .saturating_add(before.len().saturating_add(after.len()) as u64);
-            changes.push((
-                TileId {
-                    layer: layer.to_string(),
-                    x,
-                    y,
-                },
-                before.as_slice().to_vec(),
-                after.as_slice().to_vec(),
-            ));
+            changes.push((id, before.as_slice().to_vec(), after.as_slice().to_vec()));
         }
         let result = if record_history {
             self.store
-                .adopt_external(&layer.to_string(), expected_revision as u64, changes)
+                .adopt_external(&layer, expected_revision as u64, changes)
         } else {
-            self.store.apply_external_tiles(
-                &layer.to_string(),
-                expected_revision as u64,
-                changes,
-                false,
-            )
+            self.store
+                .apply_external_tiles(&layer, expected_revision as u64, changes, false)
         };
         match result {
             Ok((token, count)) => {
@@ -1944,6 +1993,25 @@ impl DrawingNativeTiles {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn history_transfer_checks_stride_sensitive_budget_before_buffer_copies() {
+        let wide = TileStore {
+            stride: 2048,
+            ..TileStore::default()
+        };
+        assert!(wide.history_transfer_within_budget(5));
+        assert!(!wide.history_transfer_within_budget(6));
+        assert!(!wide.history_transfer_within_budget(128));
+        let normal = TileStore {
+            stride: 256,
+            ..TileStore::default()
+        };
+        assert!(normal.history_transfer_within_budget(128));
+        assert!(!normal.history_transfer_within_budget(usize::MAX));
+        let missing = TileStore::default();
+        assert!(!missing.history_transfer_within_budget(1));
+    }
+
     fn initialized(stride: usize) -> TileStore {
         let mut store = TileStore {
             stride,
@@ -3142,9 +3210,16 @@ mod tests {
             assert!(store.authorized.contains(&original));
         }
         let last = store.undo.last().unwrap().token;
+        let older = store.undo.first().unwrap().token;
+        assert!(store.retains_history_token(older));
+        assert!(store.retains_history_token(last));
+        assert!(!store.retains_history_token(-1));
+        assert!(!store.retains_history_token(last + 42));
+        assert!(!store.history_matches(older, true));
         assert!(!store.history_matches(last + 42, true));
         assert_eq!(store.undo_or_redo(true).unwrap(), 1);
         assert!(store.history_matches(last, false));
+        assert!(store.retains_history_token(last)); // token moved to redo
         assert_eq!(store.undo_or_redo(false).unwrap(), 1);
         assert_eq!(store.revision, 4);
         let _active = store.begin("ink", 4, false).unwrap();
@@ -3158,6 +3233,7 @@ mod tests {
             [0x33, 0x22, 0, 255]
         );
         store.rebase_external(4, 5).unwrap();
+        assert!(!store.retains_history_token(last));
         assert!(store.tiles.is_empty() && store.authorized.is_empty());
         assert!(store.undo.is_empty() && store.redo.is_empty());
         assert_eq!(store.revision, 5);

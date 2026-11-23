@@ -47,6 +47,7 @@ var brush_width: float = 3.0
 var brush_preset: String = "hard"
 var brush_opacity: float = 1.0 # 0..1 multiplier of the preset native opaque base
 var brush_hardness: float = -1.0 # -1 means the bundled preset native default
+var brush_density: float = -1.0 # -1 means the preset's native dabs-per-radius default
 const BUNDLED_PRESETS: Dictionary = {
     "hard": "res://addons/drawing/brushes/hard_round.myb",
     "soft": "res://addons/drawing/brushes/soft.myb",
@@ -1665,6 +1666,7 @@ func _capture_deferred_stroke(position: Vector2) -> void:
 	_deferred_stroke = {"capturing": true, "document": document, "layer": layer_id,
 		"tool": tool, "color": color_rgba, "width": brush_width,
 		"preset": brush_preset, "opacity": brush_opacity, "hardness": brush_hardness,
+		"density": brush_density,
 		"selection": selection_mask.detached_copy(),
 		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i(),
 		"clip_enabled": clip_strokes_to_image_frame}
@@ -1802,10 +1804,11 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 	var hardness: float = float(configuration.get("hardness", brush_hardness))
 	if hardness < 0.0:
 		hardness = BRUSH_SETTINGS.default_hardness(str(configuration.get("preset", brush_preset)))
+	var density: float = float(configuration.get("density", brush_density))
 	var preset_text: String = BRUSH_SETTINGS.configured_preset(
-		str(configuration.get("preset", brush_preset)), opacity, hardness)
+		str(configuration.get("preset", brush_preset)), opacity, hardness, density)
 	if preset_text.is_empty():
-		canvas_error.emit("Invalid native brush opacity/hardness or preset")
+		canvas_error.emit("Invalid native brush opacity/hardness/density or preset")
 		cancel_gesture()
 		return
 	var started: DrawingResult = session.begin_native_stroke(_native_brush,

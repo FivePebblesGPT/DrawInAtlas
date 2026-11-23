@@ -15,13 +15,24 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1 for mandatory native Drawing
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
       - name: Install X11 software-rendered display
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import canonical standalone Drawing package
+      - name: Build mandatory Rust extension and import Drawing and Atlas
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+          make build TOOLCHAIN=system
+      - name: Verify first-use source root, portable identity and negative cases
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s godot --headless --audio-driver Dummy \
+            --path drawing --script res://tests/object_discovery_smoke.gd \
+            2>&1 | tee /tmp/t093-model.log
+          grep -Fxq 'T093_MODEL: 56 checks; 0 failed' /tmp/t093-model.log
+          python3 tools/check_godot_model_log.py /tmp/t093-model.log --marker T093_MODEL_PASSED
       - name: Verify root chooser, source thumbnails, exact Open, and real native pointer/framebuffer
         run: |
           set -euo pipefail
@@ -40,14 +51,26 @@ jobs:
             --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
             --script res://tests/t120_file_object_native.gd 2>&1 | tee /tmp/t120-native.log
           python3 tools/check_native_t120_log.py /tmp/t120-native.log
+      - name: Verify Atlas shared Object browser identity and history isolation
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot \
+            --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path . --script res://tests/t271_atlas_object_sources_native.gd \
+            2>&1 | tee /tmp/t271-atlas.log
+          grep -Fxq 'T271_ATLAS: 24 checks; 0 failed' /tmp/t271-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t271-atlas.log --marker T271_ATLAS_PASSED
       - name: Upload Xvfb-only framebuffer screenshots and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t093-xvfb-object-sources
           path: |
+            /tmp/t093-model.log
             /tmp/t093-native.log
             /tmp/t093-screenshots/
             /tmp/t120-native.log
             /tmp/t120-screenshots/
+            /tmp/t271-atlas.log
           if-no-files-found: warn

@@ -176,8 +176,12 @@ func run() -> void:
 	canvas.tool = "Brush"
 	canvas.color_rgba = 0xff40e0ff
 	canvas.brush_width = 8.0
+	canvas.brush_preset = "hard"
 	var before_preview: int = doc.revision
 	mouse_button(canvas, Vector2(30.5, 30.5), true)
+	# Native Hokusai may defer a stationary down sample until motion or
+	# release; request an actual staged preview before inspecting tile stats.
+	mouse_motion(canvas, Vector2(31.5, 30.5))
 	await frames(4)
 	var held: Dictionary = canvas.last_frame_metrics.duplicate()
 	check(canvas.session != null and doc.revision == before_preview,
@@ -214,6 +218,7 @@ func run() -> void:
 	await frames(3)
 	var prior_quarter: int = doc.revision
 	mouse_button(canvas, Vector2(-120.5, -120.5), true)
+	mouse_motion(canvas, Vector2(-119.5, -120.5))
 	await frames(4)
 	var quarter_held: Dictionary = canvas.last_frame_metrics.duplicate()
 	check(canvas.session != null and doc.revision == prior_quarter,
@@ -574,8 +579,9 @@ func run() -> void:
 	await frames(4)
 	check(not canvas._occupied_display_tiles.has("1,0")
 		and not canvas._display_tiles.has("1,0")
-		and int(canvas.last_frame_metrics["bytes_uploaded"]) == 0,
-		"undo returns to zero-alpha tile without uploading transparent texture")
+		and int(canvas.last_frame_metrics["textures_created"]) == 0
+		and int(canvas.last_frame_metrics["bytes_uploaded"]) <= 65536,
+		"undo prunes the transparent tile without uploading it; surviving tiles may refresh")
 	check(int(sparse_doc.read_pixel(sparse_layer, 165, 20).value) == 0x0028d246,
 		"undo retains exact hidden RGBA8 channels")
 	check(sparse_doc.redo().ok, "redo previously culled source tile")

@@ -1,0 +1,53 @@
+name: Godot T-257 floating drag and resize Escape rollback (on demand)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  floating-cancel-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install pinned Godot 4.8 beta 3
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.8.0-beta3
+          use-dotnet: false
+      - name: Install pinned Rust 1.99.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
+      - name: Install X11/Mesa
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      - name: Build native extension and import both consumers
+        run: make build TOOLCHAIN=system
+      - name: Test standalone floating cancellation at 100/150/200 percent
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/t257-screens
+          T257_SCREENSHOTS=/tmp/t257-screens timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot \
+            --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path drawing --script res://tests/t257_floating_cancel_native.gd 2>&1 | tee /tmp/t257-native.log
+          python3 tools/check_godot_model_log.py /tmp/t257-native.log --marker T257_NATIVE_PASSED
+      - name: Test Atlas-embedded floating cancellation
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot \
+            --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+            --path . --script res://tests/t257_atlas_floating_cancel_native.gd 2>&1 | tee /tmp/t257-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t257-atlas.log --marker T257_ATLAS_PASSED
+      - name: Upload captured logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t257-native-floating-cancel
+          path: |
+            /tmp/t257-native.log
+            /tmp/t257-atlas.log
+            /tmp/t257-screens/
+          if-no-files-found: warn

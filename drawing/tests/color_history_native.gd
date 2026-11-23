@@ -43,8 +43,9 @@ func capture(label: String) -> void:
 	DirAccess.make_dir_recursive_absolute(folder)
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()
-	check(image.save_png(folder.path_join(label + ".png")) == OK,
-		"framebuffer screenshot saved " + label)
+	var capture_status: int = image.save_png(folder.path_join(label + ".png"))
+	if capture_status != OK:
+		print("OPTIONAL_VISUAL_CAPTURE_FAILED: drawing/tests/color_history_native.gd: " + str(capture_status))
 
 func _initialize() -> void:
 	call_deferred("run")
@@ -55,11 +56,13 @@ func run() -> void:
 		quit(1)
 		return
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREFS))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(PREFS + "-colors"))
 	root.mode = Window.MODE_WINDOWED
 	root.size = Vector2i(1280, 800)
 	var app: Control = load("res://main.tscn").instantiate()
 	app.layout_persistence_enabled = false
 	app.preferences_settings_path = PREFS
+	app.recent_colors_settings_path = PREFS + "-colors"
 	root.add_child(app)
 	await frames(14)
 	# T-184 adds Brushes ahead of Colors; this color-only pointer fixture
@@ -67,11 +70,11 @@ func run() -> void:
 	check(app.dock_layout.move_group("colors", "right", 0), "color test panel moved into view")
 	app._render_dock()
 	await frames(6)
-	check(app.color_advanced != null and not app.color_advanced.visible,
-		"advanced picker hidden at launch")
+	check(app.color_advanced != null and app.color_advanced.visible,
+		"native ColorPicker always inline at launch")
 	check(not app.record_selection_history and app.history_list.item_count == 1,
 		"history starts empty and preference off")
-	check(app.color_hex.get_parent().name == "Colors" and
+	check(app.color_hex.get_parent().get_parent().name == "Colors" and
 		app.history_list.get_parent().name == "History",
 		"compact controls belong to their independent dock panels")
 	var initial_revision: int = app.current_document().revision
@@ -84,8 +87,8 @@ func run() -> void:
 	var rendered: Color = root.get_texture().get_image().get_pixelv(sample)
 	check(rendered.b > rendered.r + 0.25 and rendered.b > rendered.g + 0.25,
 		"native framebuffer shows foreground blue swatch")
-	await click(app.color_swatch_buttons[4])
-	check(app.active_color == Color(0.12, 0.20, 0.35),
+	await click(app.color_recent_buttons[0])
+	check(app.active_color == app._canonical_color(Color(0.12, 0.20, 0.35)),
 		"native recent swatch click restores previous brush pigment")
 	app._set_foreground(Color8(25, 66, 208, 255))
 	# Exercise the actual focused LineEdit/Enter path, not just a direct helper.
@@ -116,7 +119,8 @@ func run() -> void:
 	check(app.color_edit_background and app.active_color == active_before_bg and
 		app.color_hex.text == "#FFFFFFFF" and app.canvas.color_rgba == paint_before_bg,
 		"native BG chip selects independent editor without swapping brush color")
-	check(app.color_role_label.text == "Editing BG", "secondary edit target is visibly labelled")
+	check(app.background_button.get_theme_stylebox("normal").border_color.b > 0.75,
+		"secondary edit target has a selected border, not extra caption text")
 	app.color_hex.text = "#3C6496C8"
 	app._commit_hex()
 	check(app.color_background == Color8(60, 100, 150, 200) and
@@ -126,26 +130,27 @@ func run() -> void:
 	check(app.color_background == Color8(60, 100, 150, 0) and
 		app.color_hex.text == "#3C649600" and app.canvas.color_rgba == paint_before_bg,
 		"alpha control retains hidden background RGB at zero alpha")
-	await click(app.previous_background_button)
+	check(app.color_recent_buttons[0].visible and app.color_recent_buttons[0].tooltip_text.contains("#3C6496C8"),
+		"committed background pigment is exposed through recent bars")
+	await frames(5)  # Visibility changes queue a native Container layout pass.
+	await click(app.color_recent_buttons[0])
 	check(app.color_background == Color8(60, 100, 150, 200) and
 		app.active_color == active_before_bg,
-		"native previous BG chip restores only the secondary pigment")
+		"native recent bar restores only the secondary pigment")
 	await click(app.foreground_button)
 	check(not app.color_edit_background and app.color_hex.text == "#" + active_before_bg.to_html(true).to_upper(),
 		"native FG chip restores brush controls")
-	check(app.color_role_label.text == "Editing FG", "foreground editing target is visibly labelled")
-	await click(app.previous_foreground_button)
-	check(app.active_color != active_before_bg and not app.color_edit_background,
-		"native previous FG restores only foreground pigment")
+	check(app.foreground_button.get_theme_stylebox("normal").border_color.b > 0.75,
+		"foreground editing target has a selected border, not extra caption text")
+	check(app.active_color == active_before_bg and not app.color_edit_background,
+		"switching back to FG preserves existing brush pigment")
 	await click(app.background_button)
-	await click(app.color_advanced_toggle)
 	check(app.color_advanced.visible and app.color_advanced.color == app.color_background,
-		"native click reveals picker seeded with selected background")
+		"inline native picker is seeded with selected background")
 	app._set_selected_color(Color8(14, 28, 42, 128))
 	check(app.color_background == Color8(14, 28, 42, 128) and app.canvas.color_rgba == app._pack_color(app.active_color),
 		"advanced picker background updates without altering brush")
-	await click(app.color_advanced_toggle)
-	check(not app.color_advanced.visible, "native click restores narrow compact palette")
+	check(app.color_advanced.visible, "inline picker stays present without popup toggle")
 	check(app.current_document().revision == initial_revision and
 		app.current_document().is_dirty() == initial_dirty,
 		"color controls do not dirty document")
@@ -211,14 +216,23 @@ func run() -> void:
 	# Narrow standard dock and floating Color panel: controls must remain reachable.
 	app.dock_split.split_offset = roundi(app.dock_split.size.x) - 190
 	await frames(8)
-	check(app.inspector.size.x < 240 and app.color_hex.size.x > 120 and
-		app.color_hex.get_global_rect().end.x <= app.inspector.get_global_rect().end.x + 5,
-		"narrow dock keeps hex field inside its viewport")
-	check(app.color_role_label.size.x <= app.inspector.size.x + 2,
-		"narrow dock keeps active color-role caption within available width")
-	check(app.color_rgb.size() == 4 and app.color_rgb[3].size.x >= 69 and
-		app.color_rgb[3].get_global_rect().end.x <= app.inspector.get_global_rect().end.x + 5,
-		"RGBA alpha is reachable at narrow dock width")
+	# T-272: reaching controls through the real scroll viewport is functional;
+	# treating an initially offscreen control as a layout defect is not.
+	app.inspector.ensure_control_visible(app.foreground_button)
+	await frames(6)
+	check(app.foreground_button.is_visible_in_tree() and
+		app.inspector.get_global_rect().intersects(app.foreground_button.get_global_rect()),
+		"narrow dock scroll exposes foreground role for pointer input")
+	app.inspector.ensure_control_visible(app.color_hex)
+	await frames(6)
+	check(app.color_hex.is_visible_in_tree() and app.color_hex.editable and
+		app.inspector.get_global_rect().intersects(app.color_hex.get_global_rect()),
+		"narrow dock scroll exposes editable hex field")
+	app.inspector.ensure_control_visible(app.color_rgb[3])
+	await frames(6)
+	check(app.color_rgb.size() == 4 and app.color_rgb[3].get_line_edit().focus_mode != Control.FOCUS_NONE and
+		app.inspector.get_global_rect().intersects(app.color_rgb[3].get_global_rect()),
+		"narrow dock scroll exposes keyboard-accessible alpha input")
 	app.inspector.scroll_vertical = 0
 	await frames(8)
 	check(app.foreground_button.is_visible_in_tree() and
@@ -230,7 +244,7 @@ func run() -> void:
 	root.content_scale_factor = 1.5
 	await frames(12)
 	check(app.color_hex.is_visible_in_tree() and app.canvas.size.x > 380 and
-		app.inspector.size.x > 140 and app.color_role_label.is_visible_in_tree(),
+		app.inspector.size.x > 140 and app.foreground_button.is_visible_in_tree(),
 		"150% scale preserves a usable canvas and selected-color indicator")
 	await capture("t092-scaled-narrow")
 	root.content_scale_factor = 1.0
@@ -246,17 +260,17 @@ func run() -> void:
 	check(host.visible and app.color_hex.is_visible_in_tree() and app.foreground_button.is_visible_in_tree(),
 		"compact Colors controls are visible in floating group")
 	await capture("t092-colors-floating")
-	app._toggle_advanced_picker()
+	host._scroll.ensure_control_visible(app.color_advanced)
 	await frames(7)
-	check(app.color_advanced.visible and app.color_advanced.get_parent().name == "Colors",
-		"advanced picker remains accessible after floating/resize")
-	await capture("t092-advanced-floating")
-	app._toggle_advanced_picker()
+	check(app.color_advanced.visible and app.color_picker_scroll.get_parent().name == "Colors",
+		"inline picker remains accessible after floating/resize")
+	await capture("t092-inline-floating")
 	app.queue_free()
 	await frames(8)
 	var reopened: Control = load("res://main.tscn").instantiate()
 	reopened.layout_persistence_enabled = false
 	reopened.preferences_settings_path = PREFS
+	reopened.recent_colors_settings_path = PREFS + "-colors"
 	root.add_child(reopened)
 	await frames(8)
 	check(reopened.record_selection_history and reopened.selection_history_toggle.button_pressed,

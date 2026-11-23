@@ -2,7 +2,7 @@ class_name DrawingWorkspacePreferences
 extends RefCounted
 ## App settings only: never stored in `.drawing` or used in content revision checks.
 
-const VERSION: int = 2
+const VERSION: int = 3
 const MAX_BYTES: int = 2048
 const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 
@@ -10,9 +10,15 @@ const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 static func decode(value: Variant) -> Dictionary:
 	if not value is Dictionary or not value.get("record_selection_history") is bool:
 		return {}
-	if value.get("schema") == 1:
+	var schema: Variant = value.get("schema")
+	# JSON.parse_string produces floats for integer schema versions. Accept
+	# only integral finite versions, not fractional/corrupt replacements.
+	if not (schema is int or schema is float) or not is_finite(float(schema)) \
+			or float(schema) != floorf(float(schema)):
+		return {}
+	if int(schema) == 1:
 		return {"record_selection_history": value["record_selection_history"]}
-	if value.get("schema") != VERSION or not value.get("brush") is Dictionary:
+	if not int(schema) in [2, VERSION] or not value.get("brush") is Dictionary:
 		return {}
 	var brush: Dictionary = value["brush"]
 	if not BRUSH_SETTINGS.PRESETS.has(brush.get("preset")) \
@@ -32,9 +38,20 @@ static func decode(value: Variant) -> Dictionary:
 				or not is_finite(float(hardness[key])) \
 				or not (0.0 <= float(hardness[key]) and float(hardness[key]) <= 1.0):
 			return {}
+	var density: Variant = brush.get("density", {}) if int(schema) == 2 else brush.get("density")
+	if not density is Dictionary:
+		return {}
+	for key: Variant in density:
+		if not BRUSH_SETTINGS.PRESETS.has(key) \
+				or not (density[key] is float or density[key] is int) \
+				or not is_finite(float(density[key])) \
+				or not (BRUSH_SETTINGS.DENSITY_MIN <= float(density[key]) \
+					and float(density[key]) <= BRUSH_SETTINGS.DENSITY_MAX):
+			return {}
 	return {"record_selection_history": value["record_selection_history"],
 		"brush": {"preset": brush["preset"], "width": width,
-		"opacity": opacity, "hardness": hardness.duplicate(true)}}
+		"opacity": opacity, "hardness": hardness.duplicate(true),
+		"density": (density as Dictionary).duplicate(true)}}
 
 
 static func read_file(path: String) -> Dictionary:
@@ -54,7 +71,8 @@ static func read_file(path: String) -> Dictionary:
 
 static func save_file(path: String, enabled: bool, brush: Dictionary = {}) -> bool:
 	if brush.is_empty():
-		brush = {"preset": "hard", "width": 3.0, "opacity": 1.0, "hardness": {}}
+		brush = {"preset": "hard", "width": 3.0, "opacity": 1.0,
+			"hardness": {}, "density": {}}
 	var document: Dictionary = {"schema": VERSION, "record_selection_history": enabled,
 		"brush": brush}
 	if decode(document).is_empty():

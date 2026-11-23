@@ -149,22 +149,31 @@ func run() -> void:
 	else:
 		check(false, "rejected inputs cannot corrupt the document before valid controls")
 
-	# This sub-ticket guards already-native-owned documents, not the future
-	# T-150 Legacy retirement. Keep the previous >2^53 integer-only direct
-	# API fixture working until that backend is deliberately removed.
+	# Reconstruct a pre-cutover stored raster/history event with an out-of-range
+	# signed 64-bit coordinate. New direct pixel publishing now rejects it, but
+	# historical replay must still fail closed without attaching Rust.
 	var legacy: DrawingDocument = DrawingDocument.new("t160-legacy-64bit", STRIDE)
 	var legacy_layer: String = str(legacy.create_layer(DrawingLayerNode.RASTER, "Old").value)
 	var old_far: String = "9007199254740993,-9007199254740993"
 	check(legacy._native_raster_store == null, "historical non-native session stays detached")
-	var old_commit: DrawingResult = legacy._publish_edit(legacy_layer, legacy.revision,
-		{old_far: 0}, {old_far: HIDDEN})
-	check(old_commit.ok and int(legacy.read_pixel(legacy_layer,
-		9007199254740993, -9007199254740993).value) == HIDDEN,
-		"pre-native signed 64-bit direct pixel fixture remains unchanged")
-	check(legacy.undo().ok and legacy.redo().ok and
+	var far_x: int = 9007199254740993
+	var far_y: int = -9007199254740993
+	var far_key: String = DrawingDocument.TILES.tile_key64(far_x, far_y, STRIDE)
+	var far_local: Vector2i = DrawingDocument.TILES.local_offset64(far_x, far_y, STRIDE)
+	var old_tile: DrawingRasterTile = DrawingRasterTile.new(STRIDE)
+	old_tile.set_rgba(far_local.x, far_local.y, HIDDEN)
+	legacy._nodes[legacy_layer].tiles[far_key] = old_tile
+	legacy.revision += 1
+	legacy._append_event({"kind": "content", "delta": DrawingDelta.new(legacy_layer,
+		{old_far: 0}, {old_far: HIDDEN})}, true)
+	check(int(legacy.read_pixel(legacy_layer,
+		far_x, far_y).value) == HIDDEN,
+		"archived pre-native signed 64-bit source fixture remains readable")
+	check(not legacy.undo().ok and legacy.history_position() == 1 and
+		legacy._native_raster_store == null and
 		int(legacy.read_pixel(legacy_layer,
 		9007199254740993, -9007199254740993).value) == HIDDEN,
-		"pre-native 64-bit direct history still replays")
+		"out-of-projection historical Undo fails closed without native attachment")
 
 	if failures == 0:
 		print("T160_DIRECT_BOUNDS_PASSED checks=%d failures=0" % checks)

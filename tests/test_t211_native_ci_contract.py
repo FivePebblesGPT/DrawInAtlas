@@ -41,6 +41,228 @@ class RequiredNativeCIContracts(unittest.TestCase):
             self.assertIn(f"--marker {marker}", workflow)
             self.assertIn(f"{marker} checks={count} failures=0", workflow)
 
+    def test_required_fast_step_bootstraps_first_tile_local_edit(self) -> None:
+        workflow = FAST.read_text()
+        name = "t232_tile_native_bootstrap"
+        marker = "T232_TILE_BOOTSTRAP_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=34 failures=0", workflow)
+
+    def test_required_fast_step_bootstraps_first_pixel_map_edit(self) -> None:
+        workflow = FAST.read_text()
+        name = "t233_pixel_native_bootstrap"
+        marker = "T233_PIXEL_BOOTSTRAP_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=37 failures=0", workflow)
+
+    def test_required_fast_step_preflights_native_brush_publication(self) -> None:
+        workflow = FAST.read_text()
+        name = "t234_native_publication_preflight"
+        marker = "T234_NATIVE_PUBLICATION_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=32 failures=0", workflow)
+
+    def test_required_fast_step_preflights_tile_local_patch_inputs(self) -> None:
+        workflow = FAST.read_text()
+        name = "t235_tile_patch_preflight"
+        marker = "T235_TILE_PREFLIGHT_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=34 failures=0", workflow)
+
+    def test_required_fast_step_preflights_pixel_map_inputs(self) -> None:
+        workflow = FAST.read_text()
+        name = "t236_pixel_map_preflight"
+        marker = "T236_PIXEL_PREFLIGHT_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=35 failures=0", workflow)
+
+    def test_required_fast_step_preflights_detached_tile_history(self) -> None:
+        workflow = FAST.read_text()
+        name = "t237_detached_tile_replay_preflight"
+        marker = "T237_HISTORY_PREFLIGHT_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=40 failures=0", workflow)
+
+    def test_required_fast_step_rechecks_brush_source_bytes_after_lazy_callbacks(self) -> None:
+        workflow = FAST.read_text()
+        name = "t238_brush_source_reentrancy"
+        marker = "T238_BRUSH_SOURCE_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=18 failures=0", workflow)
+
+    def test_required_fast_step_rejects_retained_out_of_order_history(self) -> None:
+        workflow = FAST.read_text()
+        name = "t239_native_history_order"
+        marker = "T239_HISTORY_ORDER_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=36 failures=0", workflow)
+
+    def test_required_fast_step_preflights_native_ffi_payloads(self) -> None:
+        workflow = FAST.read_text()
+        name = "t240_native_ffi_payload_preflight"
+        marker = "T240_FFI_PREFLIGHT_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=32 failures=0", workflow)
+
+    def test_required_fast_step_fences_host_owned_history_handoff(self) -> None:
+        workflow = FAST.read_text()
+        name = "t241_host_history_owner_fence"
+        marker = "T241_HOST_OWNER_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=29 failures=0", workflow)
+
+    def test_required_fast_step_protects_external_history_property(self) -> None:
+        workflow = FAST.read_text()
+        for project, name, marker, count in (
+            ("drawing", "t242_history_mode_readonly", "T242_HISTORY_MODE_PASSED", 25),
+            (".", "t242_atlas_history_mode_readonly", "T242_ATLAS_MODE_PASSED", 18),
+        ):
+            path = ROOT / ("drawing/tests" if project == "drawing" else "tests") / f"{name}.gd"
+            self.assertTrue(path.is_file())
+            self.assertIn(marker, path.read_text())
+            self.assertIn(f"--path {project} --script res://tests/{name}.gd", workflow)
+            self.assertIn(f"--marker {marker}", workflow)
+            self.assertIn(f"{marker} checks={count} failures=0", workflow)
+
+    def test_required_fast_step_fences_active_native_history_handoff(self) -> None:
+        workflow = FAST.read_text()
+        name = "t243_active_history_handoff"
+        marker = "T243_ACTIVE_OWNER_PASSED"
+        source_path = ROOT / f"drawing/tests/{name}.gd"
+        self.assertTrue(source_path.is_file())
+        self.assertIn(marker, source_path.read_text())
+        self.assertIn(f"res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=40 failures=0", workflow)
+        self.assertIn("has_active_edit", (ROOT / "addons/drawing/document.gd").read_text())
+
+    def test_required_fast_step_reserves_pending_script_history_owner(self) -> None:
+        workflow = FAST.read_text()
+        for project, name, marker, count in (
+            ("drawing", "t244_pending_session_history_handoff", "T244_PENDING_SESSION_PASSED", 50),
+            (".", "t244_atlas_pending_session_history", "T244_ATLAS_PENDING_PASSED", 18),
+        ):
+            source_dir = "drawing/tests" if project == "drawing" else "tests"
+            source_path = ROOT / source_dir / f"{name}.gd"
+            self.assertTrue(source_path.is_file())
+            self.assertIn(marker, source_path.read_text())
+            self.assertIn(f"--path {project} --script res://tests/{name}.gd", workflow)
+            self.assertIn(f"--marker {marker}", workflow)
+            self.assertIn(f"{marker} checks={count} failures=0", workflow)
+        self.assertIn("_register_edit_session", (ROOT / "addons/drawing/edit_session.gd").read_text())
+        self.assertIn("WeakRef", (ROOT / "addons/drawing/document.gd").read_text())
+
+    def test_required_fast_step_reserves_atlas_history_during_publication(self) -> None:
+        workflow = FAST.read_text()
+        name = "t245_atlas_commit_reentrancy"
+        marker = "T245_ATLAS_COMMIT_PASSED"
+        path = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(path.is_file())
+        self.assertIn(marker, path.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=126 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("_committing_drawing", history)
+        self.assertIn("_remember_revisions(command)", history)
+
+    def test_required_fast_step_reserves_non_drawing_atlas_commands(self) -> None:
+        workflow = FAST.read_text()
+        name = "t246_atlas_command_reservation"
+        marker = "T246_ATLAS_COMMAND_PASSED"
+        source = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(source.is_file())
+        self.assertIn(marker, source.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=206 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("_executing_command", history)
+        self.assertIn("_timeline_reserved()", history)
+
+    def test_required_fast_step_reserves_atlas_history_notifications(self) -> None:
+        workflow = FAST.read_text()
+        name = "t247_atlas_history_notifications"
+        marker = "T247_ATLAS_NOTIFICATION_PASSED"
+        source = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(source.is_file())
+        self.assertIn(marker, source.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=259 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("_notifying_changed", history)
+        self.assertIn("_emit_changed()", history)
+
+    def test_required_fast_step_reserves_atlas_active_map(self) -> None:
+        workflow = FAST.read_text()
+        name = "t248_atlas_active_map_reservation"
+        marker = "T248_ATLAS_ACTIVE_MAP_PASSED"
+        source = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(source.is_file())
+        self.assertIn(marker, source.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=70 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("var active_map_id: String:", history)
+        self.assertIn("if _timeline_reserved() or _replaying:", history)
+
+    def test_required_fast_step_freezes_atlas_context_handlers(self) -> None:
+        workflow = FAST.read_text()
+        name = "t249_atlas_context_handler_reservation"
+        marker = "T249_CONTEXT_OWNER_PASSED"
+        source = ROOT / "tests" / f"{name}.gd"
+        self.assertTrue(source.is_file())
+        self.assertIn(marker, source.read_text())
+        self.assertIn(f"--path . --script res://tests/{name}.gd", workflow)
+        self.assertIn(f"--marker {marker}", workflow)
+        self.assertIn(f"{marker} checks=84 failures=0", workflow)
+        history = (ROOT / "scripts/editing/history.gd").read_text()
+        self.assertIn("var context_provider: Callable:", history)
+        self.assertIn("var context_restorer: Callable:", history)
+        self.assertIn("if _timeline_reserved() or _replaying:", history)
+
     def test_optional_native_ci_retains_tile_publication_and_rollback(self) -> None:
         workflow = NATIVE.read_text()
         self.assertIn("res://tests/t095_native_pigment_atomic.gd", workflow)

@@ -19,11 +19,22 @@ class T092ColorsHistoryTests(unittest.TestCase):
 
     def test_native_workflow_stages_imports_and_collects_software_evidence(self) -> None:
         workflow = (ROOT / ".github/workflows/godot-native-t092-color-history.yml").read_text()
-        for field in ("workflow_dispatch", "--import --quit", "xvfb-run",
-                      "color_history_native.gd", "T092_SCREENSHOTS",
-                      "check_native_t092_log.py", "upload-artifact@v4"):
+        for field in ("workflow_dispatch", "dtolnay/rust-toolchain@stable",
+                      "toolchain: 1.99.1", "make build TOOLCHAIN=system",
+                      "xvfb-run", "color_history_native.gd", "T092_SCREENSHOTS",
+                      "check_native_t092_log.py", "t092_atlas_history_native.gd",
+                      "T092_ATLAS_PASSED", "check_godot_model_log.py",
+                      "upload-artifact@v4"):
             with self.subTest(field=field):
                 self.assertIn(field, workflow)
+
+    def test_atlas_history_view_contract_is_checked(self) -> None:
+        test = (ROOT / "tests/t092_atlas_history_native.gd").read_text()
+        for expectation in ("History owned by host", "global_history.undo()",
+                            "global_history.redo()", "record_selection_history",
+                            "document.external_history", "PIGMENT"):
+            with self.subTest(expectation=expectation):
+                self.assertIn(expectation, test)
 
     def test_log_retains_known_shutdown_warnings_only_after_success(self) -> None:
         base = "T092_NATIVE: 51 checks; 0 failed\nT092_NATIVE_PASSED"
@@ -40,13 +51,14 @@ class T092ColorsHistoryTests(unittest.TestCase):
 
     def test_color_targets_are_explicit_and_independent(self) -> None:
         workspace = (ROOT / "addons/drawing/workspace.gd").read_text()
-        for signature in ("func _set_background(value: Color)",
+        for signature in ("func _set_background(value: Color, record_recent: bool = true)",
                           "func _set_selected_color(value: Color)",
                           "func _reset_colors()", "color_edit_background = true",
-                          '"Previous BG":', '"R", "G", "B", "A"'):
+                          '"Background": color_edit_background = true', '"R", "G", "B", "A"'):
             with self.subTest(signature=signature):
                 self.assertIn(signature, workspace)
-        self.assertIn("color_advanced.color_changed.connect(_set_selected_color)", workspace)
+        self.assertIn("color_advanced.color_changed.connect(_on_picker_color_changed)", workspace)
+        self.assertNotIn('"Previous BG":', workspace)
 
     def test_app_preference_is_separate_from_document_file(self) -> None:
         prefs = (ROOT / "addons/drawing/workspace_preferences.gd").read_text()

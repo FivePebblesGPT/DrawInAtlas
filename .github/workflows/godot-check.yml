@@ -153,6 +153,116 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t159_signed_replay_publication_bounds.gd 2>&1 | tee /tmp/godot-t159-signed-replay.log
           python3 tools/check_godot_model_log.py /tmp/godot-t159-signed-replay.log --marker T159_SIGNED_REPLAY_PASSED || ci_fail_marker 'T159 native signed replay rejected'
           grep -Fqx 'T159_SIGNED_REPLAY_PASSED checks=39 failures=0' /tmp/godot-t159-signed-replay.log || ci_fail_marker 'T159 signed replay assertion count changed'
+          # T-230: even the first legacy-pixel Undo/Redo in a detached document
+          # must bootstrap Rust ownership before advancing the host timeline.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t230-pixel-bootstrap.log --marker T230_PIXEL_BOOTSTRAP_PASSED || ci_fail_marker 'T230 detached legacy pixel native bootstrap rejected'
+          grep -Fqx 'T230_PIXEL_BOOTSTRAP_PASSED checks=33 failures=0' /tmp/godot-t230-pixel-bootstrap.log || ci_fail_marker 'T230 detached pixel bootstrap assertion count changed'
+          # T-231 bounds direct pixel/tile adoption before source resolution
+          # and Rust PackedByteArray-to-Vec copies, even with 2048px tiles.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t231_direct_native_transfer_budget.gd 2>&1 | tee /tmp/godot-t231-direct-budget.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t231-direct-budget.log --marker T231_DIRECT_BUDGET_PASSED || ci_fail_marker 'T231 native direct transfer budget rejected'
+          grep -Fqx 'T231_DIRECT_BUDGET_PASSED checks=24 failures=0' /tmp/godot-t231-direct-budget.log || ci_fail_marker 'T231 direct transfer assertion count changed'
+          # T-232 gives the first tile-local non-Brush edit an atomic Rust
+          # owner, preserving hidden RGB, host history, and failed-bootstrap rollback.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t232_tile_native_bootstrap.gd 2>&1 | tee /tmp/godot-t232-tile-bootstrap.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t232-tile-bootstrap.log --marker T232_TILE_BOOTSTRAP_PASSED || ci_fail_marker 'T232 first tile-local native ownership rejected'
+          grep -Fqx 'T232_TILE_BOOTSTRAP_PASSED checks=34 failures=0' /tmp/godot-t232-tile-bootstrap.log || ci_fail_marker 'T232 tile-local native bootstrap assertion count changed'
+          # T-233 gives the first direct/mixed pixel-map publication a bounded
+          # Rust owner; old pixel deltas remain supported as historical input.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t233_pixel_native_bootstrap.gd 2>&1 | tee /tmp/godot-t233-pixel-bootstrap.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t233-pixel-bootstrap.log --marker T233_PIXEL_BOOTSTRAP_PASSED || ci_fail_marker 'T233 first direct pixel-map native ownership rejected'
+          grep -Fqx 'T233_PIXEL_BOOTSTRAP_PASSED checks=37 failures=0' /tmp/godot-t233-pixel-bootstrap.log || ci_fail_marker 'T233 direct pixel bootstrap assertion count changed'
+          # T-234 validates the whole native Brush publication envelope and
+          # freezes descriptors before any lazy source callbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t234_native_publication_preflight.gd 2>&1 | tee /tmp/godot-t234-publication.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t234-publication.log --marker T234_NATIVE_PUBLICATION_PASSED || ci_fail_marker 'T234 native publication preflight rejected'
+          grep -Fqx 'T234_NATIVE_PUBLICATION_PASSED checks=32 failures=0' /tmp/godot-t234-publication.log || ci_fail_marker 'T234 native publication assertion count changed'
+          # T-235 validates all direct tile-local patches before lazy sources
+          # and rejects reentrant descriptor/content mutation before adoption.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t235_tile_patch_preflight.gd 2>&1 | tee /tmp/godot-t235-tile-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t235-tile-preflight.log --marker T235_TILE_PREFLIGHT_PASSED || ci_fail_marker 'T235 tile-local patch descriptor/reentrancy preflight rejected'
+          grep -Fqx 'T235_TILE_PREFLIGHT_PASSED checks=34 failures=0' /tmp/godot-t235-tile-preflight.log || ci_fail_marker 'T235 tile-local assertion count changed'
+          # T-236 validates the complete direct pixel-map descriptor set
+          # before lazy sources, then rejects reentrant map/source mutations.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t236_pixel_map_preflight.gd 2>&1 | tee /tmp/godot-t236-pixel-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t236-pixel-preflight.log --marker T236_PIXEL_PREFLIGHT_PASSED || ci_fail_marker 'T236 direct pixel-map descriptor/reentrancy preflight rejected'
+          grep -Fqx 'T236_PIXEL_PREFLIGHT_PASSED checks=35 failures=0' /tmp/godot-t236-pixel-preflight.log || ci_fail_marker 'T236 pixel-map assertion count changed'
+          # T-237 freezes complete detached native tile history before any
+          # lazy source and rejects reentrant payload/token changes before Rust.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t237_detached_tile_replay_preflight.gd 2>&1 | tee /tmp/godot-t237-history-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t237-history-preflight.log --marker T237_HISTORY_PREFLIGHT_PASSED || ci_fail_marker 'T237 detached native tile-history descriptor/reentrancy preflight rejected'
+          grep -Fqx 'T237_HISTORY_PREFLIGHT_PASSED checks=40 failures=0' /tmp/godot-t237-history-preflight.log || ci_fail_marker 'T237 detached tile-history assertion count changed'
+          # T-238 revalidates previously resolved Brush source bytes after
+          # later lazy callbacks, even when the source object is unchanged.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t238_brush_source_reentrancy.gd 2>&1 | tee /tmp/godot-t238-brush-source.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t238-brush-source.log --marker T238_BRUSH_SOURCE_PASSED || ci_fail_marker 'T238 Brush source-byte reentrancy rejected'
+          grep -Fqx 'T238_BRUSH_SOURCE_PASSED checks=18 failures=0' /tmp/godot-t238-brush-source.log || ci_fail_marker 'T238 Brush source assertion count changed'
+          # T-239 keeps live host-owned native tokens in strict Undo/Redo
+          # order while retaining detached replay for evicted history.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t239_native_history_order.gd 2>&1 | tee /tmp/godot-t239-history-order.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t239-history-order.log --marker T239_HISTORY_ORDER_PASSED || ci_fail_marker 'T239 retained native history ordering rejected'
+          grep -Fqx 'T239_HISTORY_ORDER_PASSED checks=36 failures=0' /tmp/godot-t239-history-order.log || ci_fail_marker 'T239 history-order assertion count changed'
+          # T-240 preflights entire Rust FFI tile descriptor arrays before
+          # copying full RGBA8 buffers or accounting rejected tile spans.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t240_native_ffi_payload_preflight.gd 2>&1 | tee /tmp/godot-t240-ffi-preflight.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t240-ffi-preflight.log --marker T240_FFI_PREFLIGHT_PASSED || ci_fail_marker 'T240 native FFI payload preflight rejected'
+          grep -Fqx 'T240_FFI_PREFLIGHT_PASSED checks=32 failures=0' /tmp/godot-t240-ffi-preflight.log || ci_fail_marker 'T240 FFI payload assertion count changed'
+          # T-241 prevents a host-owned native history timeline from being
+          # silently replaced by an empty local timeline after a revision.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t241_host_history_owner_fence.gd 2>&1 | tee /tmp/godot-t241-host-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t241-host-owner.log --marker T241_HOST_OWNER_PASSED || ci_fail_marker 'T241 host-owned history handoff rejected'
+          grep -Fqx 'T241_HOST_OWNER_PASSED checks=29 failures=0' /tmp/godot-t241-host-owner.log || ci_fail_marker 'T241 host owner assertion count changed'
+          # T-242 makes the host-ownership flag getter-only: direct and
+          # reflective writes must not bypass T-241's checked handoff.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t242_history_mode_readonly.gd 2>&1 | tee /tmp/godot-t242-history-mode.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t242-history-mode.log --marker T242_HISTORY_MODE_PASSED || ci_fail_marker 'T242 history ownership property guard rejected'
+          grep -Fqx 'T242_HISTORY_MODE_PASSED checks=25 failures=0' /tmp/godot-t242-history-mode.log || ci_fail_marker 'T242 history mode assertion count changed'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t242_atlas_history_mode_readonly.gd 2>&1 | tee /tmp/godot-t242-atlas-mode.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t242-atlas-mode.log --marker T242_ATLAS_MODE_PASSED || ci_fail_marker 'T242 Atlas history ownership property guard rejected'
+          grep -Fqx 'T242_ATLAS_MODE_PASSED checks=18 failures=0' /tmp/godot-t242-atlas-mode.log || ci_fail_marker 'T242 Atlas assertion count changed'
+          # T-243 prevents native edits from changing their command owner
+          # between a Rust begin_edit and its eventual commit/cancellation.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t243_active_history_handoff.gd 2>&1 | tee /tmp/godot-t243-active-owner.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t243-active-owner.log --marker T243_ACTIVE_OWNER_PASSED || ci_fail_marker 'T243 active native history handoff rejected'
+          grep -Fqx 'T243_ACTIVE_OWNER_PASSED checks=40 failures=0' /tmp/godot-t243-active-owner.log || ci_fail_marker 'T243 active history assertion count changed'
+          # T-244 reserves local/Atlas command ownership during pending
+          # GDScript EditSessions, even before Rust attaches or stages pixels.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t244_pending_session_history_handoff.gd 2>&1 | tee /tmp/godot-t244-pending-session.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t244-pending-session.log --marker T244_PENDING_SESSION_PASSED || ci_fail_marker 'T244 pending script session ownership rejected'
+          grep -Fqx 'T244_PENDING_SESSION_PASSED checks=50 failures=0' /tmp/godot-t244-pending-session.log || ci_fail_marker 'T244 pending session assertion count changed'
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t244_atlas_pending_session_history.gd 2>&1 | tee /tmp/godot-t244-atlas-session.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t244-atlas-session.log --marker T244_ATLAS_PENDING_PASSED || ci_fail_marker 'T244 Atlas pending session ownership rejected'
+          grep -Fqx 'T244_ATLAS_PENDING_PASSED checks=18 failures=0' /tmp/godot-t244-atlas-session.log || ci_fail_marker 'T244 Atlas pending session assertion count changed'
+          # T-245 reserves the Atlas timeline across lazy Drawing publication,
+          # host command insertion and native history ledger bookkeeping.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t245_atlas_commit_reentrancy.gd 2>&1 | tee /tmp/godot-t245-atlas-commit.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t245-atlas-commit.log --marker T245_ATLAS_COMMIT_PASSED || ci_fail_marker 'T245 Atlas command reentrancy rejected'
+          grep -Fqx 'T245_ATLAS_COMMIT_PASSED checks=126 failures=0' /tmp/godot-t245-atlas-commit.log || ci_fail_marker 'T245 Atlas reentrancy assertion count changed'
+          # T-246 reserves ordinary Atlas command application across host
+          # callbacks, context capture, transfer/rebind and changed observers.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t246_atlas_command_reservation.gd 2>&1 | tee /tmp/godot-t246-atlas-command.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t246-atlas-command.log --marker T246_ATLAS_COMMAND_PASSED || ci_fail_marker 'T246 Atlas command reservation rejected'
+          grep -Fqx 'T246_ATLAS_COMMAND_PASSED checks=206 failures=0' /tmp/godot-t246-atlas-command.log || ci_fail_marker 'T246 Atlas command assertion count changed'
+          # T-247 reserves every synchronous Atlas changed notification, so
+          # observers cannot nest commands or rewrite save/dirty checkpoints.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t247_atlas_history_notifications.gd 2>&1 | tee /tmp/godot-t247-atlas-notifications.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t247-atlas-notifications.log --marker T247_ATLAS_NOTIFICATION_PASSED || ci_fail_marker 'T247 Atlas changed notification reservation rejected'
+          grep -Fqx 'T247_ATLAS_NOTIFICATION_PASSED checks=259 failures=0' /tmp/godot-t247-atlas-notifications.log || ci_fail_marker 'T247 Atlas notification assertion count changed'
+          # T-248 blocks active-map rebind through synchronous history callbacks.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t248_atlas_active_map_reservation.gd 2>&1 | tee /tmp/godot-t248-atlas-active-map.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t248-atlas-active-map.log --marker T248_ATLAS_ACTIVE_MAP_PASSED || ci_fail_marker 'T248 Atlas active-map reservation rejected'
+          grep -Fqx 'T248_ATLAS_ACTIVE_MAP_PASSED checks=70 failures=0' /tmp/godot-t248-atlas-active-map.log || ci_fail_marker 'T248 active-map assertion count changed'
+          # T-249 freezes Atlas capture/restoration handlers during reserved history
+          # callbacks, including native Drawing publication and Undo/Redo.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t249_atlas_context_handler_reservation.gd 2>&1 | tee /tmp/godot-t249-atlas-context.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t249-atlas-context.log --marker T249_CONTEXT_OWNER_PASSED || ci_fail_marker 'T249 Atlas context handler reservation rejected'
+          grep -Fqx 'T249_CONTEXT_OWNER_PASSED checks=84 failures=0' /tmp/godot-t249-atlas-context.log || ci_fail_marker 'T249 context handler assertion count changed'
+          # T-229 keeps history-replay transfer cost stride-sensitive before
+          # lazy source callbacks or Rust PackedByteArray-to-Vec copies.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t229_native_history_budget.gd 2>&1 | tee /tmp/godot-t229-history-budget.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t229-history-budget.log --marker T229_HISTORY_BUDGET_PASSED || ci_fail_marker 'T229 native history transfer budget rejected'
+          grep -Fqx 'T229_HISTORY_BUDGET_PASSED checks=18 failures=0' /tmp/godot-t229-history-budget.log || ci_fail_marker 'T229 history budget assertion count changed'
           python3 -m unittest discover -s tests -p 'test_t211_native_ci_contract.py' -v || ci_fail_marker 'T211 required-native CI source contract rejected'
           ci_finish
       - name: Verify T-086 source-space dirty-display tile invalidation
@@ -236,6 +346,10 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_clipboard_smoke.gd 2>&1 | tee /tmp/godot-t088-selection-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-selection-model.log --marker T088_MODEL_PASSED || ci_fail_marker 'T088_MODEL_PASSED log rejected'
+          # T-253: 4k-pixel native whole-tile Delete, protected hidden RGB,
+          # mixed edit fallback and exact Undo/Redo/Save/Open. Same step ID.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t253_selection_delete_model.gd 2>&1 | tee /tmp/godot-t253-delete-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t253-delete-model.log --marker T253_MODEL_PASSED || ci_fail_marker 'T253 dense Delete model log rejected'
           # T-088 sparse transparent Paste must match a separate dense source oracle.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/selection_sparse_paste_smoke.gd 2>&1 | tee /tmp/godot-t088-sparse-paste.log
           python3 tools/check_godot_model_log.py /tmp/godot-t088-sparse-paste.log --marker T088_SPARSE_PASTE_PASSED || ci_fail_marker 'T088 sparse paste source oracle rejected'
@@ -326,6 +440,8 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/dock_single_group_smoke.gd 2>&1 | tee /tmp/godot-t091-dock-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t091-dock-model.log --marker T091_MODEL_PASSED || ci_fail_marker 'T091 docking model log rejected'
           python3 -m unittest discover -s tests -p 'test_t091_dock.py' -v
+          # T-272: validate behavior-oriented floating tests without anchoring visual dimensions.
+          python3 -m unittest discover -s tests -p 'test_t081_float_native.py' -v
           ci_finish
       - name: Verify T-092 compact Colors, history cursor, and isolated app preferences
         id: ci_t092_compact_color_history_model
@@ -338,6 +454,10 @@ jobs:
           godot --headless --editor --path drawing --import --quit
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/color_history_smoke.gd 2>&1 | tee /tmp/godot-t092-model.log
           python3 tools/check_godot_model_log.py /tmp/godot-t092-model.log --marker T092_MODEL_PASSED || ci_fail_marker 'T092 Colors/History model log rejected'
+          # T-252 keeps native ColorPicker drag/keyboard updates out of recent
+          # history until the input gesture settles. Same required step ID.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing --script res://tests/t252_colors_model.gd 2>&1 | tee /tmp/godot-t252-model.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t252-model.log --marker T252_MODEL_PASSED || ci_fail_marker 'T252 settled-color model log rejected'
           python3 -m unittest discover -s tests -p 'test_t092_color_history.py' -v
           ci_finish
       - name: Verify T-093 Object source discovery, recent-root consent, image import and safe Open
@@ -375,29 +495,33 @@ jobs:
           # A fresh isolated stage is required even on repeated CI replays.
           release_root="$(mktemp -d "${TMPDIR:-/tmp}/drawing-dist.XXXXXXXX")"
           trap 'rm -rf "$release_root"' EXIT
+          # Export into a clean sibling of the staged project: the strict
+          # inventory forbids even an extra source-project directory.
+          mkdir -p "$release_root/dist"
           python3 tools/build_drawing_app.py --output "$release_root/project"
           godot --headless --editor --path "$release_root/project" --import --quit
-          godot --headless --path "$release_root/project" --export-release Linux "$release_root/Drawing.x86_64"
-          test -s "$release_root/Drawing.x86_64"
-          test -s "$release_root/Drawing.pck"
+          godot --headless --path "$release_root/project" --export-release Linux "$release_root/dist/Drawing.x86_64"
+          test -s "$release_root/dist/Drawing.x86_64"
+          test -s "$release_root/dist/Drawing.pck"
           # The .gdextension manifest is packed, but its ELF must be beside the PCK.
           # Fail closed on missing, unexpected or mismatched native export bytes.
           python3 tools/package_linux_export.py \
-            --stage "$release_root/project" --linux "$release_root"
+            --stage "$release_root/project" --linux "$release_root/dist"
           python3 -m unittest discover -s tests -p 'test_t201_linux_native_package.py' -v
+          python3 -m unittest discover -s tests -p 'test_t228_fast_ci_contract.py' -v
           python3 -m unittest discover -s tests -p 'test_t217_pck_index.py' -v
           python3 -m unittest discover -s tests -p 'test_t218_pck_payload_integrity.py' -v
           python3 -m unittest discover -s tests -p 'test_t219_pck_resource_names.py' -v
           python3 -m unittest discover -s tests -p 'test_t220_pck_project_identity.py' -v
           # Font bytes ship as imported .fontdata, not raw .ttf.
           # Probe the exported PCK rather than editor source files.
-          timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root" --main-pack "$release_root/Drawing.pck" \
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path "$release_root/dist" --main-pack "$release_root/dist/Drawing.pck" \
             --script "$release_root/project/tests/packaged_fonts_smoke.gd" \
             2>&1 | tee /tmp/godot-export-fonts.log
           python3 tools/check_godot_model_log.py /tmp/godot-export-fonts.log --marker DRAWING_PACK_FONT_PASSED
           # Inspect the exported ELF/PCK and launch with a disposable HOME/CWD.
           python3 tools/benchmarks/t068_release_gate.py \
-            --stage "$release_root/project" --linux "$release_root" \
+            --stage "$release_root/project" --linux "$release_root/dist" \
             --launch-linux --output /tmp/t068-standalone-linux-release.json
       # The standalone package import above only registers *its* classes.
       # The main checkout needs its own class cache before any --path . --script smoke.
@@ -609,6 +733,10 @@ jobs:
           set -euo pipefail
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/drawing_composition_smoke.gd 2>&1 | tee /tmp/godot-t055-composition.log
           python3 tools/check_godot_model_log.py /tmp/godot-t055-composition.log --marker T055_COMPOSITION_PASSED
+          # T-253: Atlas's external timeline stores the canonical 2-tile
+          # native Delete delta with atomic Undo/Redo and bundle Save/Open.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t253_atlas_dense_delete.gd 2>&1 | tee /tmp/godot-t253-atlas-dense-delete.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t253-atlas-dense-delete.log --marker T253_ATLAS_PASSED
           # T-111: a pending Line may not publish onto a replaced, hidden,
           # locked, or unpresented raster target even when IDs are unchanged.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --path . --script res://tests/t111_line_release_authorization_smoke.gd 2>&1 | tee /tmp/godot-t111-line-gate.log

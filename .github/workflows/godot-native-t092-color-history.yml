@@ -15,13 +15,25 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1 and rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt
       - name: Install X11 software-rendered display
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage and import canonical standalone Drawing package
+      - name: Build mandatory native extension and import Drawing/Atlas consumers
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
+          # A clean checkout has no native .so; both Godot consumers must import
+          # against the same freshly built extension before running UI tests.
+          make build TOOLCHAIN=system
+      - name: Verify preference, History, and canonical colors model
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --path drawing \
+            --script res://tests/color_history_smoke.gd 2>&1 | tee /tmp/t092-model.log
+          python3 tools/check_godot_model_log.py /tmp/t092-model.log --marker T092_MODEL_PASSED
       - name: Verify swatch framebuffer, event cursor, native dock clicks and floating layout
         run: |
           set -euo pipefail
@@ -31,12 +43,30 @@ jobs:
             --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
             --script res://tests/color_history_native.gd 2>&1 | tee /tmp/t092-native.log
           python3 tools/check_native_t092_log.py /tmp/t092-native.log
+          mkdir -p /tmp/t252-screenshots
+          T252_SCREENSHOTS=/tmp/t252-screenshots timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path drawing \
+            --script res://tests/t252_colors_native.gd 2>&1 | tee /tmp/t252-native.log
+          python3 tools/check_godot_model_log.py /tmp/t252-native.log --marker T252_NATIVE_PASSED
+      - name: Verify Atlas-owned History and Drawing UI-only preferences
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s \
+            xvfb-run -a --server-args='-screen 0 2200x1500x24' godot --display-driver x11 \
+            --rendering-method gl_compatibility --audio-driver Dummy --path . \
+            --script res://tests/t092_atlas_history_native.gd 2>&1 | tee /tmp/t092-atlas.log
+          python3 tools/check_godot_model_log.py /tmp/t092-atlas.log --marker T092_ATLAS_PASSED
       - name: Upload Xvfb-only framebuffer screenshots and diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: t092-xvfb-color-history
           path: |
+            /tmp/t092-model.log
             /tmp/t092-native.log
+            /tmp/t092-atlas.log
             /tmp/t092-screenshots/
+            /tmp/t252-native.log
+            /tmp/t252-screenshots/
           if-no-files-found: warn

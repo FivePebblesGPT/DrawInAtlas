@@ -9,7 +9,10 @@ const DOCK_LAYOUT_SCRIPT: Script = preload("res://addons/drawing/dock_layout.gd"
 const DOCK_DRAG_SCRIPT: Script = preload("res://addons/drawing/dock_drag.gd")
 const FLOATING_HOST_SCRIPT: Script = preload("res://addons/drawing/floating_host.gd")
 const DOCK_PERSISTENCE_SCRIPT: Script = preload("res://addons/drawing/dock_persistence.gd")
+const DOCK_TOGGLE_SCRIPT: Script = preload("res://addons/drawing/dock_toggle.gd")
+const DOCK_GROUP_MARKER_SCRIPT: Script = preload("res://addons/drawing/dock_group_marker.gd")
 const WORKSPACE_PREFERENCES: Script = preload("res://addons/drawing/workspace_preferences.gd")
+const COLOR_HISTORY_SETTINGS: Script = preload("res://addons/drawing/color_history_settings.gd")
 const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser_panel.gd")
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
 const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
@@ -19,7 +22,9 @@ const ROW_LOCK: int = 2
 # Largest compact built-in panel (Colors/History plus scrollbar) needs
 # a stable floor. Otherwise floating a group shrinks the dock's intrinsic
 # minimum and silently changes the canvas width without a splitter drag.
-const EXPANDED_DOCK_MIN_WIDTH: int = 192
+# The T-251 fixed left overlay gutter adds 34px to the original 192px
+# minimum. Keep a constant floor independent of which panel is docked or floated.
+const EXPANDED_DOCK_MIN_WIDTH: int = 226
 
 signal object_tab_closed(session: DrawingObjectEditorSession)
 
@@ -40,6 +45,7 @@ var layout_panel_aliases: Dictionary = {} # Explicit old stable ID -> registered
 var layout_settings_path: String = "user://drawing-workspace-dock-v1.json"
 var preferences_persistence_enabled: bool = true
 var preferences_settings_path: String = "user://drawing-workspace-preferences-v1.json"
+var recent_colors_settings_path: String = "user://drawing-recent-colors-v1.json"
 var layout_recovery_status: String = "defaults" # defaults / loaded / repaired / invalid
 var _layout_booted: bool = false
 var _layout_save_pending: bool = false
@@ -63,6 +69,7 @@ var selected_brush_preset: String = "hard"
 var brush_width_value: float = 3.0
 var brush_opacity_value: float = 1.0
 var brush_hardness_overrides: Dictionary = {} # preset -> native hardness 0..1
+var brush_density_overrides: Dictionary = {} # preset -> native dabs / actual radius, 1..8
 var snap_toggle: CheckButton
 var grid_dialog: ConfirmationDialog
 var grid_fields: Array[SpinBox] = []
@@ -70,8 +77,15 @@ var image_frame_dialog: ConfirmationDialog
 var image_frame_fields: Array[SpinBox] = []
 var top_bar: HBoxContainer
 var inspector: ScrollContainer
+var dock_panel_gutter: MarginContainer
 var dock_panels: VBoxContainer
 var dock_rail: VBoxContainer
+var dock_toggle_slot: HBoxContainer
+var dock_toggle: Button
+var dock_panel_menu: PopupMenu
+var _dock_menu_panel_id: String = ""
+var dock_group_menu: PopupMenu
+var _dock_menu_group_id: String = ""
 var dock_stash: VBoxContainer
 var dock_flyout: PanelContainer
 var dock_flyout_tabs: HBoxContainer
@@ -87,11 +101,14 @@ var dock_drag: DrawingDockDrag
 var floating_hosts: Dictionary = {} # Container ID -> DrawingFloatingHost (real Control)
 var _floating_serial: int = 0
 var dock_drop_hint: ColorRect
+var dock_drop_caption: Label
+var dock_merge_outline: Panel
 var _drag_candidate_kind: String = ""
 var _drag_candidate_id: String = ""
 var _drag_candidate_position: Vector2 = Vector2.ZERO
 var _drag_pointer_position: Vector2 = Vector2.ZERO
 var _suppress_drag_release: bool = false
+var _drag_candidate_moved: bool = false
 var _cross_source: String = "" # Pointer source: right dock or a floating host.
 var _detach_preview: bool = false
 var _detach_hint: PanelContainer
@@ -110,20 +127,30 @@ var history_redo: Button
 var _history_stamp: String = ""
 var color_hex: LineEdit
 var color_rgb: Array[SpinBox] = []
-var color_role_label: Label
 var color_edit_background: bool = false
 var color_swatch_buttons: Array[Button] = []
 var color_advanced: ColorPicker
-var color_advanced_toggle: Button
+var color_recent_buttons: Array[Button] = []
+var color_top_strip: HBoxContainer
+var color_picker_scroll: ScrollContainer
 var foreground_button: Button
 var background_button: Button
-var previous_foreground_button: Button
-var previous_background_button: Button
 var color_background: Color = Color.WHITE
-var previous_foreground: Color = Color(0.12, 0.20, 0.35)
-var previous_background: Color = Color.WHITE
 var recent_colors: Array[Color] = []
 var _updating_color_widgets: bool = false
+## A native picker/SpinBox can emit many color_changed events during one
+## pointer/keyboard gesture. Show each RGBA8 preview, but commit exactly the
+## previous settled pigment to recents when the gesture ends.
+var _color_edit_pending: bool = false
+var _color_edit_background: bool = false
+var _color_edit_original: Color = Color.TRANSPARENT
+var _color_edit_pointer_down: bool = false
+var _color_edit_text: Control
+var _color_edit_ignore_until_release: bool = false
+## After a lost release or OS focus loss, discard stale picker signals until
+## the next deliberate press, which must be able to start a fresh gesture.
+var _color_edit_recover_on_press: bool = false
+var _color_write_suspended: bool = false
 var preferences_dialog: AcceptDialog
 var open_dialog: FileDialog
 var save_dialog: FileDialog
@@ -181,6 +208,7 @@ const ROW_PAGE: int = 200
 func _ready() -> void:
 	_recent_objects_root = ROOT_HISTORY.read_file(recent_objects_root_settings_path)
 	_load_preferences()
+	_load_color_history()
 	_build_interface()
 	if not initial_asset_browser_root.is_empty():
 		show_asset_browser(initial_asset_browser_root)
@@ -310,6 +338,7 @@ func _build_interface() -> void:
 	dock_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dock_split.dragged.connect(_on_dock_split_dragged)
 	dock_split.resized.connect(_apply_saved_dock_geometry)
+	dock_split.resized.connect(_layout_dock_toggle)
 	root.add_child(dock_split)
 	var edit_region: HBoxContainer = HBoxContainer.new()
 	edit_region.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -370,6 +399,7 @@ func _build_interface() -> void:
 	canvas.brush_preset = selected_brush_preset
 	canvas.brush_opacity = brush_opacity_value
 	canvas.brush_hardness = _selected_brush_hardness()
+	canvas.brush_density = _selected_brush_density()
 	brush_preset_control.select(BRUSH_SETTINGS.PRESETS.find(selected_brush_preset))
 	inspector = ScrollContainer.new()
 	inspector.name = "PanelDock"
@@ -378,6 +408,8 @@ func _build_interface() -> void:
 	inspector.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	inspector.follow_focus = true
 	dock_split.add_child(inspector)
+	inspector.resized.connect(_layout_dock_toggle)
+	inspector.item_rect_changed.connect(_layout_dock_toggle)
 	dock_layout = DOCK_LAYOUT_SCRIPT.new() as DrawingDockLayout
 	dock_layout.create_container("right")
 	dock_drag = DOCK_DRAG_SCRIPT.new(dock_layout) as DrawingDockDrag
@@ -387,16 +419,26 @@ func _build_interface() -> void:
 	dock_stash.name = "DockViewStorage"
 	dock_stash.visible = false
 	add_child(dock_stash)
+	# Keep the fixed dock toggle inside the dock without covering scrolling
+	# panel controls. This is a horizontal gutter, never a full-width row.
+	dock_panel_gutter = MarginContainer.new()
+	dock_panel_gutter.name = "DockPanelGutter"
+	dock_panel_gutter.add_theme_constant_override("margin_left", 34)
+	dock_panel_gutter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inspector.add_child(dock_panel_gutter)
 	dock_panels = VBoxContainer.new()
 	dock_panels.name = "DockPanels"
 	dock_panels.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inspector.add_child(dock_panels)
+	dock_panel_gutter.add_child(dock_panels)
 	dock_rail = VBoxContainer.new()
 	dock_rail.name = "DockIconRail"
 	dock_rail.custom_minimum_size.x = 48
 	dock_rail.visible = false
 	inspector.add_child(dock_rail)
 	_make_dock_flyout()
+	_make_dock_toggle()
+	_make_dock_panel_menu()
+	_make_dock_group_menu()
 	brush_panel = BRUSH_PANEL_SCRIPT.new() as DrawingBrushPanel
 	assert(dock_layout.register_panel("brushes"))
 	assert(dock_layout.attach_panel("brushes", "right", "brushes"))
@@ -406,9 +448,10 @@ func _build_interface() -> void:
 	brush_panel.width_changed.connect(_set_brush_width)
 	brush_panel.opacity_changed.connect(_set_brush_opacity)
 	brush_panel.hardness_changed.connect(_set_brush_hardness)
+	brush_panel.density_changed.connect(_set_brush_density)
 	brush_panel.reset_requested.connect(_reset_selected_brush)
 	brush_panel.display(selected_brush_preset, brush_width_value,
-		brush_opacity_value, _selected_brush_hardness())
+		brush_opacity_value, _selected_brush_hardness(), _selected_brush_density())
 	var color_pane: VBoxContainer = _add_dock_section("Colors")
 	_build_color_controls(color_pane)
 	var layer_pane: VBoxContainer = _add_dock_section("Layers")
@@ -658,13 +701,9 @@ func _make_dock_flyout() -> void:
 	var column: VBoxContainer = VBoxContainer.new()
 	column.name = "FlyoutColumn"
 	dock_flyout.add_child(column)
-	var heading: HBoxContainer = HBoxContainer.new()
-	column.add_child(heading)
-	var caption: Label = Label.new()
-	caption.name = "FlyoutTitle"
-	caption.text = "Dock panels"
-	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	heading.add_child(caption)
+	var strip_row: HBoxContainer = HBoxContainer.new()
+	strip_row.name = "FlyoutTabBar"
+	column.add_child(strip_row)
 	var close: Button = Button.new()
 	close.name = "CloseFlyout"
 	close.text = "×"
@@ -674,13 +713,15 @@ func _make_dock_flyout() -> void:
 	close.pressed.connect(func() -> void:
 		dock_layout.close_flyout("right")
 		_render_dock())
-	heading.add_child(close)
+	strip_row.add_child(close)
 	dock_flyout_tab_scroll = ScrollContainer.new()
 	dock_flyout_tab_scroll.name = "FlyoutTabScroll"
 	dock_flyout_tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	dock_flyout_tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	dock_flyout_tab_scroll.custom_minimum_size.y = 43
-	column.add_child(dock_flyout_tab_scroll)
+	dock_flyout_tab_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	strip_row.add_child(dock_flyout_tab_scroll)
+	strip_row.move_child(close, 1) # Compact close affordance at the far edge.
 	dock_flyout_tabs = HBoxContainer.new()
 	dock_flyout_tabs.name = "FlyoutTabs"
 	dock_flyout_tab_scroll.add_child(dock_flyout_tabs)
@@ -707,29 +748,78 @@ func _layout_dock_flyout() -> void:
 
 
 func _dock_icon(panel_id: String) -> Texture2D:
-	# One icon per model member. Unknown future panels still use a graphic,
-	# never a one-letter placeholder or a hard-coded rail membership list.
-	var named_path: String = "res://addons/drawing/icons/dock_%s.svg" % panel_id
-	if ResourceLoader.exists(named_path):
-		return load(named_path) as Texture2D
-	return load("res://addons/drawing/icons/dock_panel.svg") as Texture2D
+	return DrawingDockIcons.for_panel(panel_id)
 
 
+## The same half-circle belongs to the dock in both states. The minimized
+## rail owns a real VBox slot; the expanded dock overlays its left gutter.
+func _make_dock_toggle() -> void:
+	dock_toggle_slot = HBoxContainer.new()
+	dock_toggle_slot.name = "DockToggleSlot"
+	dock_toggle_slot.custom_minimum_size = Vector2(48, 56)
+	dock_rail.add_child(dock_toggle_slot)
+	dock_toggle = DOCK_TOGGLE_SCRIPT.new() as Button
+	dock_toggle.name = "DockEdgeToggle"
+	dock_toggle.tooltip_text = "Minimize right dock to icon rail"
+	dock_toggle.pressed.connect(_toggle_dock)
+	dock_toggle_slot.add_child(dock_toggle)
+	# DockEdgeToggle's own _ready establishes focus/vector styling; the
+	# rail state is in flow, and must not retain its previous top-level mode.
+	dock_toggle.top_level = false
+	call_deferred("_layout_dock_toggle")
+
+
+func _place_dock_toggle(minimized: bool) -> void:
+	var was_focused: bool = dock_toggle.has_focus()
+	if minimized:
+		if dock_toggle.get_parent() != dock_toggle_slot:
+			dock_toggle.top_level = false
+			dock_toggle.reparent(dock_toggle_slot, false)
+		dock_toggle.top_level = false
+		dock_toggle_slot.show()
+	else:
+		dock_toggle_slot.hide()
+		if dock_toggle.get_parent() != inspector:
+			dock_toggle.reparent(inspector, false)
+		dock_toggle.top_level = true
+	_layout_dock_toggle()
+	if was_focused:
+		# Moving a focused Button between parents drops Godot's GUI focus.
+		# Restore it after the new parent becomes visible this frame.
+		dock_toggle.call_deferred("grab_focus")
+
+
+func _layout_dock_toggle() -> void:
+	if dock_toggle == null or inspector == null or not inspector.is_inside_tree():
+		return
+	if dock_toggle.get_parent() == dock_toggle_slot:
+		# HBoxContainer determines the button's actual placement; the VBox
+		# slot displaces the first panel icon rather than covering it.
+		return
+	# This top-level Control is INSIDE PanelDock, not hanging over canvas.
+	# A 34px gutter leaves every scrolling group/icon outside its hit area.
+	dock_toggle.global_position = inspector.get_global_rect().position
+
+
+## One stable panel icon across expanded dock and minimized rail. Pointer
+## gestures use the same 7px drag threshold as the transactional dock planner.
 func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	var button: Button = Button.new()
 	button.name = ("Rail_" if rail_button else "Edge_") + panel_id
 	button.icon = _dock_icon(panel_id)
 	button.expand_icon = true
+	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(42, 42)
 	button.focus_mode = Control.FOCUS_ALL
-	button.tooltip_text = ("Open group flyout: " if rail_button else "Select panel: ") + panel_id.capitalize()
+	button.tooltip_text = ("Toggle group flyout: " if rail_button else "Select/collapse group: ") + panel_id.capitalize()
+	button.tooltip_text += "; right-click or Shift+F10 for menu; drag to arrange"
 	button.toggle_mode = true
+	var group: Dictionary = dock_layout.group_info(dock_layout.group_of(panel_id))
 	button.button_pressed = (dock_layout.container_info("right")["flyout_group"] == dock_layout.group_of(panel_id)
-		and dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id) if rail_button else (dock_layout.group_info(dock_layout.group_of(panel_id))["active"] == panel_id)
+		and group["active"] == panel_id) if rail_button else (group["active"] == panel_id)
 	button.pressed.connect(_rail_panel_pressed.bind(panel_id) if rail_button else _expanded_panel_pressed.bind(panel_id))
 	button.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
-	button.tooltip_text += "; drag to reorder, split, or merge"
-	# Godot 4.8 exposes accessible Control labels on supported backends.
+	# Keyboard users can find both the panel name and current state.
 	for property: Dictionary in button.get_property_list():
 		if property["name"] == "accessibility_name":
 			button.set("accessibility_name", panel_id.capitalize() + " panel")
@@ -737,23 +827,192 @@ func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	return button
 
 
+## Match expanded/floating panel icon identity in minimized flyouts. The
+## flyout's transient selection is independent of persisted group collapse.
+func _flyout_panel_button(panel_id: String, active: bool) -> Button:
+	var tab: Button = Button.new()
+	tab.name = "Tab_" + panel_id
+	tab.icon = _dock_icon(panel_id)
+	tab.expand_icon = true
+	tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tab.custom_minimum_size = Vector2(42, 42)
+	tab.focus_mode = Control.FOCUS_ALL
+	tab.tooltip_text = panel_id.capitalize() + " panel; right-click or Shift+F10 for menu; drag to reorder or split"
+	tab.toggle_mode = true
+	tab.button_pressed = active
+	for property: Dictionary in tab.get_property_list():
+		if property["name"] == "accessibility_name":
+			tab.set("accessibility_name", panel_id.capitalize() + " panel")
+			break
+	tab.pressed.connect(_flyout_tab_pressed.bind(panel_id))
+	tab.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
+	return tab
+
+
+func _ignore_dock_icon_activation() -> bool:
+	# Godot's Button.pressed can arrive before or after the workspace's mouse
+	# release. The moved flag survives until the next deferred frame, so a
+	# release that ended a drag can never turn into a collapse or flyout click.
+	return _drag_candidate_moved or _suppress_drag_release or dock_drag.is_dragging()
+
+
 func _expanded_panel_pressed(panel_id: String) -> void:
-	if dock_layout.select_panel(panel_id):
-		_render_dock("edge:" + panel_id)
+	if _ignore_dock_icon_activation():
+		return
+	var group_id: String = dock_layout.group_of(panel_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if group.is_empty():
+		return
+	if group["active"] == panel_id and not bool(group["collapsed"]):
+		if dock_layout.set_group_collapsed(group_id, true):
+			_render_dock("edge:" + panel_id)
+		return
+	# A collapsed active tab expands; an inactive tab selects and expands.
+	if group["active"] != panel_id:
+		dock_layout.select_panel(panel_id)
+	if bool(group["collapsed"]):
+		dock_layout.set_group_collapsed(group_id, false)
+	_render_dock("edge:" + panel_id)
 
 
 func _rail_panel_pressed(panel_id: String) -> void:
+	if _ignore_dock_icon_activation():
+		return
 	if dock_layout.activate_from_rail("right", panel_id):
 		_render_dock("rail:" + panel_id)
 
 
-func _group_collapse_pressed(group_id: String) -> void:
+## The owner-specified three-dots action is on RMB, not a permanently
+## occupying toolbar button; menu actions target the clicked panel (including
+## inactive tabs), never the group's currently active panel by accident.
+func _make_dock_panel_menu() -> void:
+	dock_panel_menu = PopupMenu.new()
+	dock_panel_menu.name = "DockPanelContextMenu"
+	dock_panel_menu.add_item("Move panel left", 0)
+	dock_panel_menu.add_item("Move panel right", 1)
+	dock_panel_menu.add_separator()
+	dock_panel_menu.add_item("Split panel into group", 2)
+	dock_panel_menu.add_item("Float this panel", 3)
+	dock_panel_menu.id_pressed.connect(_dock_panel_menu_action)
+	add_child(dock_panel_menu)
+
+
+## One popup serves every marker. Enablement is calculated from the model at
+## opening time; a previously rendered group ID cannot mutate a new owner.
+func _make_dock_group_menu() -> void:
+	dock_group_menu = PopupMenu.new()
+	dock_group_menu.name = "DockGroupContextMenu"
+	for entry: String in ["Move group up", "Move group down", "Merge group into previous", "Merge group into next",
+		"Split active panel into group", "Float whole group"]:
+		dock_group_menu.add_item(entry)
+	dock_group_menu.id_pressed.connect(_dock_group_menu_action)
+	add_child(dock_group_menu)
+
+
+func _show_dock_group_menu(group_id: String, point: Vector2) -> void:
+	if _dock_group_position(group_id) < 0:
+		return
+	var groups: Array = dock_layout.container_info("right")["groups"]
+	var index: int = _dock_group_position(group_id)
 	var group: Dictionary = dock_layout.group_info(group_id)
-	if dock_layout.set_group_collapsed(group_id, not bool(group["collapsed"])):
+	_dock_menu_group_id = group_id
+	for action: int in range(4):
+		var unavailable: bool = (index == 0) if action % 2 == 0 else (index >= groups.size() - 1)
+		dock_group_menu.set_item_disabled(action, unavailable)
+	dock_group_menu.set_item_disabled(4, group["panels"].size() <= 1)
+	dock_group_menu.position = Vector2i(point.round())
+	dock_group_menu.popup()
+
+
+func _dock_group_menu_action(action_id: int) -> void:
+	var group_id: String = _dock_menu_group_id
+	if _dock_group_position(group_id) < 0:
+		return
+	match action_id:
+		0, 1, 2, 3:
+			_dock_arrange_action([5, 6, 7, 8][action_id], group_id)
+		4:
+			if dock_layout.group_info(group_id)["panels"].size() > 1:
+				_dock_arrange_action(4, group_id)
+		5:
+			_float_source(DrawingDockDrag.GROUP, group_id)
+
+
+func _show_dock_panel_menu(panel_id: String, point: Vector2) -> void:
+	var group_id: String = dock_layout.group_of(panel_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if group.is_empty() or dock_layout.owner_of(panel_id) != "right":
+		return
+	_dock_menu_panel_id = panel_id
+	var index: int = group["panels"].find(panel_id)
+	dock_panel_menu.set_item_disabled(dock_panel_menu.get_item_index(0), index <= 0)
+	dock_panel_menu.set_item_disabled(dock_panel_menu.get_item_index(1), index >= group["panels"].size() - 1)
+	dock_panel_menu.set_item_disabled(dock_panel_menu.get_item_index(2), group["panels"].size() <= 1)
+	# PopupMenu is a Window: position is a screen coordinate, not a child of
+	# the scrolled tab strip. The menu clamps to the visible desktop itself.
+	dock_panel_menu.position = Vector2i(point.round())
+	dock_panel_menu.popup()
+
+
+func _dock_panel_menu_action(action_id: int) -> void:
+	var panel_id: String = _dock_menu_panel_id
+	var group_id: String = dock_layout.group_of(panel_id)
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if group.is_empty() or dock_layout.owner_of(panel_id) != "right":
+		return
+	var index: int = group["panels"].find(panel_id)
+	var target: Dictionary = {}
+	match action_id:
+		0:
+			if index > 0:
+				target = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index - 1}
+		1:
+			if index + 1 < group["panels"].size():
+				target = {"kind": DrawingDockDrag.TAB_SLOT, "group": group_id, "index": index + 2}
+		2:
+			if group["panels"].size() > 1:
+				target = {"kind": DrawingDockDrag.GROUP_SLOT, "container": "right", "index": _dock_group_position(group_id) + 1}
+		3:
+			_float_source(DrawingDockDrag.PANEL, panel_id)
+			return
+	if not target.is_empty():
+		_dock_apply(DrawingDockDrag.PANEL, panel_id, target,
+			"rail:" + panel_id if bool(dock_layout.container_info("right")["minimized"]) else "edge:" + panel_id)
+
+
+func _focused_dock_panel() -> String:
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	for panel_id: String in dock_tab_buttons:
+		if dock_tab_buttons[panel_id] == focused:
+			return panel_id
+	for panel_id: String in dock_rail_buttons:
+		if dock_rail_buttons[panel_id] == focused:
+			return panel_id
+	if focused != null and focused.get_parent() == dock_flyout_tabs and focused.name.begins_with("Tab_"):
+		return String(focused.name).trim_prefix("Tab_")
+	return ""
+
+
+func _group_collapse_pressed(group_id: String) -> void:
+	if _ignore_dock_icon_activation():
+		return
+	var group: Dictionary = dock_layout.group_info(group_id)
+	if not group.is_empty() and dock_layout.set_group_collapsed(group_id, not bool(group["collapsed"])):
 		_render_dock("group:" + group_id)
 
 
 func _flyout_tab_pressed(panel_id: String) -> void:
+	var info: Dictionary = dock_layout.container_info("right")
+	var group_id: String = dock_layout.group_of(panel_id)
+	var open: bool = bool(info["minimized"]) and group_id == String(info["flyout_group"])
+	var active: bool = open and String(dock_layout.group_info(group_id)["active"]) == panel_id
+	var current_tab: Button = dock_flyout_tabs.get_node_or_null("Tab_" + panel_id) as Button
+	if _ignore_dock_icon_activation() or not open or active:
+		# Button toggles *before* the pressed callback. Restore the model's
+		# pressed state on active/no-op clicks and suppressed drag releases.
+		if current_tab != null:
+			current_tab.set_pressed_no_signal(active)
+		return
 	if dock_layout.select_panel(panel_id):
 		_render_dock("tab:" + panel_id)
 
@@ -782,6 +1041,8 @@ func _render_dock(focus_key: String = "") -> void:
 			view.reparent(dock_stash)
 	for parent: Node in [dock_panels, dock_rail, dock_flyout_tabs]:
 		for child: Node in parent.get_children():
+			if child == dock_toggle_slot:
+				continue
 			parent.remove_child(child)
 			child.queue_free()
 	var info: Dictionary = dock_layout.container_info("right")
@@ -800,14 +1061,6 @@ func _render_dock(focus_key: String = "") -> void:
 	dock_group_frames.clear()
 	dock_group_handles.clear()
 	if not minimized:
-		var minimize: Button = Button.new()
-		minimize.name = "MinimizeDock"
-		minimize.text = "‹  Minimize panels"
-		minimize.tooltip_text = "Minimize right dock to icon rail"
-		minimize.custom_minimum_size.y = 40
-		minimize.focus_mode = Control.FOCUS_ALL
-		minimize.pressed.connect(_toggle_dock)
-		dock_panels.add_child(minimize)
 		for group: Dictionary in info["groups"]:
 			var visible_members: Array[String] = []
 			for panel_id: String in group["panels"]:
@@ -820,50 +1073,33 @@ func _render_dock(focus_key: String = "") -> void:
 			frame.name = "Group_" + group_id
 			dock_panels.add_child(frame)
 			dock_group_frames[group_id] = frame
-			var heading: HBoxContainer = HBoxContainer.new()
-			heading.name = "GroupHeader"
-			frame.add_child(heading)
-			var collapse: Button = Button.new()
-			collapse.name = "Collapse_" + group_id
-			collapse.text = "▸" if bool(group["collapsed"]) else "▾"
-			collapse.tooltip_text = ("Expand " if bool(group["collapsed"]) else "Collapse ") + group_id.capitalize() + " group"
-			collapse.custom_minimum_size = Vector2(40, 40)
-			collapse.focus_mode = Control.FOCUS_ALL
-			collapse.pressed.connect(_group_collapse_pressed.bind(group_id))
-			heading.add_child(collapse)
-			dock_header_buttons[group_id] = collapse
-			var title: Label = Label.new()
-			title.text = group_id.capitalize()
-			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			title.clip_text = true
-			heading.add_child(title)
-			var drag_handle: Button = Button.new()
-			drag_handle.name = "GroupDrag_" + group_id
-			drag_handle.text = "↕"
-			drag_handle.tooltip_text = "Drag whole " + group_id.capitalize() + " group between dock and floating hosts; Ctrl+Alt+Shift+Up/Down to reorder"
-			drag_handle.custom_minimum_size = Vector2(32, 40)
-			drag_handle.focus_mode = Control.FOCUS_ALL
-			drag_handle.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.GROUP, group_id))
-			heading.add_child(drag_handle)
-			dock_group_handles[group_id] = drag_handle
-			var arrange: MenuButton = MenuButton.new()
-			arrange.name = "Arrange_" + group_id
-			arrange.text = "⋮"
-			arrange.tooltip_text = "Arrange tabs and groups by keyboard or pointer"
-			arrange.custom_minimum_size = Vector2(32, 40)
-			arrange.focus_mode = Control.FOCUS_ALL
-			heading.add_child(arrange)
-			var menu: PopupMenu = arrange.get_popup()
-			for label_text: String in ["Move active tab left", "Move active tab right", "Move active tab to previous group", "Move active tab to next group", "Split active tab into group", "Move group up", "Move group down", "Merge group into previous", "Merge group into next", "Send active tab to first floating host", "Send whole group to first floating host"]:
-				menu.add_item(label_text)
-			menu.id_pressed.connect(_dock_arrange_action.bind(group_id))
-			# A clipped horizontal strip supports arbitrary tab counts at small widths.
+			# One compact, common-height row; the marker is not a group title.
+			var bar: HBoxContainer = HBoxContainer.new()
+			bar.name = "GroupBar"
+			bar.add_theme_constant_override("separation", 2)
+			frame.add_child(bar)
+			var marker: DrawingDockGroupMarker = DOCK_GROUP_MARKER_SCRIPT.new() as DrawingDockGroupMarker
+			marker.name = "GroupMarker_" + group_id
+			marker.collapsed = bool(group["collapsed"])
+			marker.tooltip_text = ("Expand " if marker.collapsed else "Collapse ") + group_id.capitalize() + \
+				" group; drag whole group; right-click or Shift+F10 for group menu; Ctrl+Alt+Shift+Up/Down to reorder"
+			for property: Dictionary in marker.get_property_list():
+				if property["name"] == "accessibility_name":
+					marker.set("accessibility_name", group_id.capitalize() + " group marker")
+					break
+			marker.pressed.connect(_group_collapse_pressed.bind(group_id))
+			marker.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.GROUP, group_id))
+			bar.add_child(marker)
+			dock_header_buttons[group_id] = marker
+			dock_group_handles[group_id] = marker
+			# Horizontal overflow stays in the icon strip, never expands the dock.
 			var tab_scroll: ScrollContainer = ScrollContainer.new()
 			tab_scroll.name = "TabStripScroll_" + group_id
+			tab_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			tab_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 			tab_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 			tab_scroll.custom_minimum_size.y = 45
-			frame.add_child(tab_scroll)
+			bar.add_child(tab_scroll)
 			dock_tab_strips[group_id] = tab_scroll
 			var tabs_row: HBoxContainer = HBoxContainer.new()
 			tabs_row.name = "TabStrip_" + group_id
@@ -879,14 +1115,6 @@ func _render_dock(focus_key: String = "") -> void:
 					panel_view.reparent(frame)
 			frame.add_child(HSeparator.new())
 	else:
-		var expand: Button = Button.new()
-		expand.name = "ExpandDock"
-		expand.text = "»"
-		expand.custom_minimum_size = Vector2(44, 44)
-		expand.tooltip_text = "Expand right dock"
-		expand.focus_mode = Control.FOCUS_ALL
-		expand.pressed.connect(_toggle_dock)
-		dock_rail.add_child(expand)
 		for entry: Dictionary in dock_layout.rail_icons("right"):
 			if bool(entry["separator_before"]):
 				var separator: HSeparator = HSeparator.new()
@@ -899,30 +1127,23 @@ func _render_dock(focus_key: String = "") -> void:
 			dock_rail.add_child(icon)
 		if not flyout_group_id.is_empty():
 			var group: Dictionary = dock_layout.group_info(flyout_group_id)
-			var flyout_column: VBoxContainer = dock_flyout.get_node("FlyoutColumn") as VBoxContainer
-			var caption: Label = flyout_column.find_child("FlyoutTitle", true, false) as Label
-			caption.text = flyout_group_id.capitalize()
 			for panel_id: String in group["panels"]:
 				if not dock_views.has(panel_id):
 					continue
-				var tab: Button = Button.new()
-				tab.name = "Tab_" + panel_id
-				tab.text = panel_id.capitalize()
-				tab.tooltip_text = panel_id.capitalize() + " panel tab"
-				tab.custom_minimum_size.y = 40
-				tab.focus_mode = Control.FOCUS_ALL
-				tab.toggle_mode = true
-				tab.button_pressed = panel_id == String(group["active"])
-				tab.pressed.connect(_flyout_tab_pressed.bind(panel_id))
-				tab.gui_input.connect(_dock_drag_press.bind(DrawingDockDrag.PANEL, panel_id))
-				tab.tooltip_text += "; drag to reorder or split"
-				dock_flyout_tabs.add_child(tab)
+				dock_flyout_tabs.add_child(_flyout_panel_button(panel_id, panel_id == String(group["active"])))
 			if dock_views.has(String(group["active"])):
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
 	inspector.custom_minimum_size.x = 48 if minimized else EXPANDED_DOCK_MIN_WIDTH
 	dock_panels.visible = not minimized
+	dock_panel_gutter.visible = not minimized
 	dock_rail.visible = minimized
 	dock_flyout.visible = minimized and not flyout_group_id.is_empty()
+	if dock_toggle != null:
+		_place_dock_toggle(minimized)
+		dock_toggle.set("minimized", minimized)
+		dock_toggle.tooltip_text = "Expand right dock (also in Window menu)" if minimized else "Minimize right dock to icon rail (also in Window menu)"
+		dock_toggle.queue_redraw()
+	_layout_dock_toggle()
 	_layout_dock_flyout()
 	_render_floating_hosts()
 	if not focus_key.is_empty():
@@ -1053,13 +1274,51 @@ func _make_dock_hint() -> void:
 	dock_drop_hint.z_index = 100
 	dock_drop_hint.visible = false
 	add_child(dock_drop_hint)
+	# The exact insertion line is retained for keyboard/pointer parity. A separate
+	# outlined strip and text tell users whether this will merge, reorder or split.
+	dock_merge_outline = Panel.new()
+	dock_merge_outline.name = "DockMergeTargetOutline"
+	dock_merge_outline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dock_merge_outline.top_level = true
+	dock_merge_outline.z_index = 99
+	var outline_style: StyleBoxFlat = StyleBoxFlat.new()
+	outline_style.bg_color = Color(0.08, 0.72, 0.48, 0.12)
+	outline_style.border_color = Color(0.18, 0.88, 0.57, 0.96)
+	outline_style.set_border_width_all(2)
+	dock_merge_outline.add_theme_stylebox_override("panel", outline_style)
+	dock_merge_outline.visible = false
+	add_child(dock_merge_outline)
+	dock_drop_caption = Label.new()
+	dock_drop_caption.name = "DockDropCaption"
+	dock_drop_caption.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dock_drop_caption.top_level = true
+	dock_drop_caption.z_index = 110
+	dock_drop_caption.add_theme_font_size_override("font_size", 13)
+	var caption_style: StyleBoxFlat = StyleBoxFlat.new()
+	caption_style.bg_color = Color(0.08, 0.13, 0.19, 0.95)
+	caption_style.set_content_margin_all(5.0)
+	dock_drop_caption.add_theme_stylebox_override("normal", caption_style)
+	dock_drop_caption.visible = false
+	add_child(dock_drop_caption)
 
 
 func _dock_drag_press(event: InputEvent, kind: String, source_id: String) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_drag_candidate_kind = kind
-		_drag_candidate_id = source_id
-		_drag_candidate_position = event.global_position
+	if event is InputEventMouseButton:
+		var button: InputEventMouseButton = event as InputEventMouseButton
+		if button.button_index == MOUSE_BUTTON_RIGHT and button.pressed:
+			if kind == DrawingDockDrag.PANEL:
+				_show_dock_panel_menu(source_id, button.global_position)
+			elif kind == DrawingDockDrag.GROUP:
+				_show_dock_group_menu(source_id, button.global_position)
+			get_viewport().set_input_as_handled()
+		elif button.button_index == MOUSE_BUTTON_LEFT and button.pressed:
+			# The OS may have dropped the last release. A fresh press begins
+			# a new independent icon/group gesture, not the old canceled one.
+			_suppress_drag_release = false
+			_drag_candidate_kind = kind
+			_drag_candidate_id = source_id
+			_drag_candidate_moved = false
+			_drag_candidate_position = button.global_position
 
 
 ## Godot 4.8 beta's TabBar close icon is drawn by the theme, but forwarded
@@ -1070,17 +1329,23 @@ func _tab_close_hit(position: Vector2) -> int:
 	if not show_document_tabs or tab_bar == null or not tab_bar.is_visible_in_tree():
 		return -1
 	var local: Vector2 = tab_bar.get_global_transform_with_canvas().affine_inverse() * position
-	for index: int in range(tab_bar.tab_count):
-		var tab: Rect2 = tab_bar.get_tab_rect(index)
-		if tab.size.x < 32.0:
-			continue
-		var close: Rect2 = Rect2(tab.end.x - 30.0, tab.position.y, 28.0, tab.size.y)
-		if close.has_point(local):
-			return index
-	return -1
+	if not Rect2(Vector2.ZERO, tab_bar.size).has_point(local):
+		return -1
+	# With clip_tabs, Godot returns the same offscreen origin for multiple
+	# hidden tabs. Their stale rectangles can overlap a visible close glyph;
+	# ask the TabBar which tab is *actually* rendered at this pointer first.
+	var index: int = tab_bar.get_tab_idx_at_point(local)
+	if index < 0 or index >= tab_bar.tab_count:
+		return -1
+	var tab: Rect2 = tab_bar.get_tab_rect(index)
+	if tab.size.x < 32.0:
+		return -1
+	var close: Rect2 = Rect2(tab.end.x - 30.0, tab.position.y, 28.0, tab.size.y)
+	return index if close.has_point(local) else -1
 
 
 func _input(event: InputEvent) -> void:
+	_track_color_input(event)
 	if event is InputEventMouseButton:
 		var click: InputEventMouseButton = event as InputEventMouseButton
 		if click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
@@ -1098,17 +1363,48 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if dock_drag.is_dragging() or not _drag_candidate_id.is_empty():
 			return
+		# Shift+F10 / Menu opens the focused panel's or group's menu
+		# without changing the active tab or its collapsed state.
+		if event.keycode == KEY_MENU or (event.keycode == KEY_F10 and event.shift_pressed):
+			var focused: Control = get_viewport().gui_get_focus_owner()
+			for group_id: String in dock_group_handles:
+				if focused == dock_group_handles[group_id]:
+					_show_dock_group_menu(group_id, focused.get_global_rect().get_center())
+					get_viewport().set_input_as_handled()
+					return
+			var menu_panel: String = _focused_dock_panel()
+			if not menu_panel.is_empty():
+				var control: Control = get_viewport().gui_get_focus_owner()
+				_show_dock_panel_menu(menu_panel, control.get_global_rect().get_center())
+				get_viewport().set_input_as_handled()
+				return
 		if _dock_keyboard_command(event):
 			get_viewport().set_input_as_handled()
 		return
-	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty():
+	if event is InputEventMouseMotion and not bool(event.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		# Docked icons, group markers, rail and flyout tabs share this source.
+		# A motion without the held button proves mouse-up was missed, even
+		# when neither window nor application lost focus. Abandon the preview
+		# and fence a possible late release before it can detach the source.
+		if not _drag_candidate_id.is_empty() or (_cross_source == "right" and dock_drag.is_dragging()):
+			_drag_candidate_moved = true
+			_suppress_drag_release = true
+			_cancel_cross_drop(true)
+			get_viewport().set_input_as_handled()
+			return
+	if event is InputEventMouseMotion and not _drag_candidate_id.is_empty() and bool(event.button_mask & MOUSE_BUTTON_MASK_LEFT):
 		_drag_pointer_position = event.global_position
-		if not dock_drag.is_dragging() and event.global_position.distance_to(_drag_candidate_position) >= 7.0:
-			begin_cross_drag("right", _drag_candidate_kind, _drag_candidate_id)
+		if event.global_position.distance_to(_drag_candidate_position) >= 7.0:
+			_drag_candidate_moved = true
+			if not dock_drag.is_dragging():
+				begin_cross_drag("right", _drag_candidate_kind, _drag_candidate_id)
 		if dock_drag.is_dragging() and _cross_source == "right":
 			_preview_cross_drop(event.global_position)
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		# Deferred reset accommodates either GUI-signal/input ordering on the
+		# release frame; a dragged icon must not toggle its collapsed state.
+		call_deferred("_reset_dock_pointer_gesture")
 		if _suppress_drag_release:
 			_suppress_drag_release = false
 			get_viewport().set_input_as_handled()
@@ -1121,11 +1417,21 @@ func _input(event: InputEvent) -> void:
 			_drag_candidate_kind = ""
 
 
+func _reset_dock_pointer_gesture() -> void:
+	_drag_candidate_moved = false
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and _window_quit_guard_enabled:
 		_request_window_quit()
 		return
 	if what == NOTIFICATION_WM_WINDOW_FOCUS_OUT or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		if _color_edit_pending:
+			if _color_edit_pointer_down:
+				_cancel_interrupted_color_pointer()
+			else:
+				# Typed/keyboard edits have no held pointer to abandon.
+				_finish_color_edit()
 		if dock_drag != null and (dock_drag.is_dragging() or not _drag_candidate_id.is_empty()):
 			_suppress_drag_release = not _drag_candidate_id.is_empty()
 			_cancel_cross_drop(true)
@@ -1138,6 +1444,28 @@ func _process(delta: float) -> void:
 		return
 	var grip_drag: bool = _grip_redock_active()
 	var over_host: DrawingFloatingHost = null if grip_drag else _topmost_host(_drag_pointer_position)
+	if not grip_drag:
+		var tab_strips_to_check: Array[ScrollContainer] = []
+		if over_host != null:
+			for tab_strip: ScrollContainer in over_host.tab_strips.values():
+				tab_strips_to_check.append(tab_strip)
+		elif dock_flyout.visible:
+			tab_strips_to_check.append(dock_flyout_tab_scroll)
+		else:
+			for tab_strip: ScrollContainer in dock_tab_strips.values():
+				tab_strips_to_check.append(tab_strip)
+		for tab_strip: ScrollContainer in tab_strips_to_check:
+			if not tab_strip.get_global_rect().has_point(_drag_pointer_position):
+				continue
+			var bounds_x: Rect2 = tab_strip.get_global_rect()
+			var direction_x: int = -1 if _drag_pointer_position.x < bounds_x.position.x + 22.0 else \
+				1 if _drag_pointer_position.x > bounds_x.end.x - 22.0 else 0
+			if direction_x != 0:
+				var before_x: int = tab_strip.scroll_horizontal
+				tab_strip.scroll_horizontal += roundi(float(direction_x) * 310.0 * delta)
+				if before_x != tab_strip.scroll_horizontal:
+					_preview_cross_drop(_drag_pointer_position)
+			break
 	var scroll_target: ScrollContainer = inspector if over_host == null else over_host._scroll
 	if not scroll_target.get_global_rect().has_point(_drag_pointer_position):
 		return
@@ -1210,9 +1538,7 @@ func _preview_grip_redock(source_host_id: String, group_id: String, point: Vecto
 	if hit.is_empty() or not dock_drag.preview(hit["target"]):
 		return false
 	_drag_pointer_position = point
-	dock_drop_hint.global_position = (hit["rect"] as Rect2).position
-	dock_drop_hint.size = (hit["rect"] as Rect2).size
-	dock_drop_hint.visible = true
+	_show_dock_drop_hint(hit, dock_drop_hint)
 	return true
 
 
@@ -1243,6 +1569,10 @@ func _topmost_host(point: Vector2) -> DrawingFloatingHost:
 func _clear_drop_hints() -> void:
 	if dock_drop_hint != null:
 		dock_drop_hint.visible = false
+	if dock_drop_caption != null:
+		dock_drop_caption.visible = false
+	if dock_merge_outline != null:
+		dock_merge_outline.visible = false
 	if _detach_hint != null:
 		_detach_hint.visible = false
 	for host: DrawingFloatingHost in floating_hosts.values():
@@ -1264,9 +1594,7 @@ func _preview_cross_drop(point: Vector2) -> void:
 		hit = _dock_target_at(point)
 	if not hit.is_empty() and dock_drag.preview(hit["target"]):
 		var marker: ColorRect = dock_drop_hint if host == null else host._hint
-		marker.global_position = (hit["rect"] as Rect2).position
-		marker.size = (hit["rect"] as Rect2).size
-		marker.visible = true
+		_show_dock_drop_hint(hit, marker, host)
 		return
 	# Canvas release is an explicit detach action; the model remains untouched
 	# until release, and invalid regions clear any previously valid target.
@@ -1404,6 +1732,10 @@ func _dock_target_at(position: Vector2) -> Dictionary:
 		if strip != null and strip.get_global_rect().has_point(position):
 			var tabs_row: HBoxContainer = strip.get_child(0) as HBoxContainer
 			return _dock_tab_target(group_id, position, tabs_row, strip)
+		# Passing over an expanded panel body is not an icon-proximity merge.
+		# A panel must explicitly enter the visible icon strip or a group gap.
+		if dock_drag.source_kind() == DrawingDockDrag.PANEL:
+			return {}
 		return {"target": _dock_target(group_id, dock_layout.group_info(group_id)["panels"].size(), false),
 			"rect": Rect2(frame_rect.position, Vector2(frame_rect.size.x, minf(frame_rect.size.y, 44.0)))}
 	if groups.is_empty():
@@ -1455,15 +1787,74 @@ func _dock_group_gap_y(index: int) -> float:
 	return last_button.get_global_rect().end.y if last_button != null else dock_rail.get_global_rect().end.y
 
 
+## UI-only visual semantics; DrawingDockDrag still validates/commits the
+## unchanged target dictionary on a snapshot. Only icon proximity can merge.
+func _drop_hint_mode(target: Dictionary) -> String:
+	var kind: String = String(target.get("kind", ""))
+	if kind == DrawingDockDrag.GROUP_SLOT:
+		return "split" if dock_drag.source_kind() == DrawingDockDrag.PANEL else "move_group"
+	if kind == DrawingDockDrag.TAB_SLOT or kind == DrawingDockDrag.MERGE_GROUP:
+		if dock_drag.source_kind() == DrawingDockDrag.GROUP:
+			return "merge_group"
+		var source_group: String = dock_layout.group_of(_dragged_panel_id())
+		return "reorder" if source_group == String(target.get("group", "")) else "merge_panel"
+	return ""
+
+
+func _dragged_panel_id() -> String:
+	if _cross_source == "right":
+		return _drag_candidate_id
+	if floating_hosts.has(_cross_source):
+		return String((floating_hosts[_cross_source] as DrawingFloatingHost)._candidate_id)
+	return ""
+
+
+func _show_dock_drop_hint(hit: Dictionary, marker: ColorRect, host: DrawingFloatingHost = null) -> void:
+	var target: Dictionary = hit["target"]
+	var mode: String = _drop_hint_mode(target)
+	var rect: Rect2 = hit["rect"]
+	marker.global_position = rect.position
+	marker.size = rect.size
+	marker.color = Color(0.95, 0.65, 0.19, 0.96) if mode == "split" or mode == "move_group" else \
+		Color(0.18, 0.88, 0.57, 0.96) if mode == "merge_panel" or mode == "merge_group" else \
+		Color(0.19, 0.78, 0.95, 0.96)
+	marker.visible = true
+	var label: String = ""
+	match mode:
+		"split": label = "Split panel into new group"
+		"move_group": label = "Move whole group"
+		"merge_panel": label = "Group panel with " + String(target["group"]).capitalize()
+		"merge_group": label = "Merge whole group into " + String(target["group"]).capitalize()
+		"reorder": label = "Reorder panel"
+	if not label.is_empty():
+		dock_drop_caption.text = label
+		dock_drop_caption.reset_size()
+		var viewport_rect: Rect2 = get_viewport_rect()
+		dock_drop_caption.global_position = Vector2(
+			clampf(rect.position.x - dock_drop_caption.size.x - 4.0, 2.0,
+				maxf(2.0, viewport_rect.size.x - dock_drop_caption.size.x - 2.0)),
+			clampf(rect.position.y - dock_drop_caption.size.y - 4.0, 2.0,
+				maxf(2.0, viewport_rect.size.y - dock_drop_caption.size.y - 2.0)))
+		dock_drop_caption.visible = true
+	if mode == "merge_panel" or mode == "merge_group":
+		var group_id: String = String(target["group"])
+		var strip: ScrollContainer = (dock_tab_strips.get(group_id) as ScrollContainer) if host == null else \
+			(host.tab_strips.get(group_id) as ScrollContainer)
+		if host == null and dock_flyout.visible and group_id == String(dock_layout.container_info("right")["flyout_group"]):
+			strip = dock_flyout_tab_scroll
+		if strip != null:
+			dock_merge_outline.global_position = strip.get_global_rect().position
+			dock_merge_outline.size = strip.get_global_rect().size
+			dock_merge_outline.visible = true
+
+
 func _preview_dock_target(position: Vector2) -> void:
 	var hit: Dictionary = _dock_target_at(position)
 	if hit.is_empty() or not dock_drag.preview(hit["target"]):
-		dock_drop_hint.visible = false
+		_clear_drop_hints()
 		return
-	var rectangle: Rect2 = hit["rect"]
-	dock_drop_hint.global_position = rectangle.position
-	dock_drop_hint.size = rectangle.size
-	dock_drop_hint.visible = true
+	_clear_drop_hints()
+	_show_dock_drop_hint(hit, dock_drop_hint)
 
 
 func _dock_apply(source_kind: String, source_id: String, destination: Dictionary, focus_key: String = "") -> bool:
@@ -1527,7 +1918,8 @@ func _dock_arrange_action(action_id: int, group_id: String) -> void:
 						"group": existing["id"], "index": existing["panels"].size()}
 					break
 	if not destination.is_empty():
-		_dock_apply(source_kind, source_id, destination, "edge:" + panel_id)
+		_dock_apply(source_kind, source_id, destination,
+			"drag-group:" + group_id if source_kind == DrawingDockDrag.GROUP else "edge:" + panel_id)
 
 
 func _dock_keyboard_command(event: InputEventKey) -> bool:
@@ -1603,41 +1995,95 @@ func _make_dialog(mode: FileDialog.FileMode) -> FileDialog:
 ## Foreground and background are separately editable pigments, never a color-swap shortcut.
 ## PhotoCraft's distinct color targets inform the interaction; this remains a native Godot layout.
 func _build_color_controls(parent: VBoxContainer) -> void:
-	var swatches: HFlowContainer = HFlowContainer.new()
-	parent.add_child(swatches)
-	for role: String in ["Foreground", "Previous FG", "Background", "Previous BG"]:
+	# One shared view is reparented through dock, flyout and floating hosts.
+	# The owner's concept keeps edited FG/BG, swap and vertical recents on ONE
+	# compact row; no restore-previous swatches or extra Recent heading.
+	color_top_strip = HBoxContainer.new()
+	color_top_strip.name = "PigmentsAndRecent"
+	color_top_strip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	color_top_strip.add_theme_constant_override("separation", 5)
+	parent.add_child(color_top_strip)
+	var roles: HBoxContainer = HBoxContainer.new()
+	roles.name = "PigmentRoles"
+	roles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	roles.size_flags_stretch_ratio = 1.0
+	roles.add_theme_constant_override("separation", 1)
+	color_top_strip.add_child(roles)
+	for role: String in ["Foreground", "Swap", "Background"]:
 		var button: Button = Button.new()
-		button.custom_minimum_size = Vector2(46, 30) if role in ["Foreground", "Background"] else Vector2(34, 30)
-		button.tooltip_text = role + (" — select for editing" if role in ["Foreground", "Background"] else " — restore previous color")
-		button.pressed.connect(_color_swatch_pressed.bind(role))
-		swatches.add_child(button)
-		color_swatch_buttons.append(button)
-		match role:
-			"Foreground": foreground_button = button
-			"Previous FG": previous_foreground_button = button
-			"Background": background_button = button
-			"Previous BG": previous_background_button = button
-	var actions: HFlowContainer = HFlowContainer.new()
-	parent.add_child(actions)
-	var swap: Button = Button.new()
-	swap.text = "↔ Swap"
-	swap.tooltip_text = "Exchange the foreground brush and background pigments"
-	swap.pressed.connect(_swap_colors)
-	actions.add_child(swap)
+		button.focus_mode = Control.FOCUS_ALL
+		if role == "Swap":
+			button.name = "SwapPigments"
+			button.text = "⇄"
+			button.custom_minimum_size = Vector2(18, 52)
+			button.tooltip_text = "Swap foreground and background"
+			button.pressed.connect(_swap_colors)
+		else:
+			button.name = role + "Pigment"
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.custom_minimum_size = Vector2(32, 52)
+			button.tooltip_text = "Edit " + role.to_lower() + " color"
+			button.pressed.connect(_color_swatch_pressed.bind(role))
+			color_swatch_buttons.append(button)
+			if role == "Foreground":
+				foreground_button = button
+			else:
+				background_button = button
+		roles.add_child(button)
+	var recents: HBoxContainer = HBoxContainer.new()
+	recents.name = "RecentBars"
+	recents.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	recents.size_flags_stretch_ratio = 1.0
+	recents.add_theme_constant_override("separation", 2)
+	color_top_strip.add_child(recents)
+	for index: int in range(6):
+		var sample: Button = Button.new()
+		sample.name = "Recent_%d" % index
+		sample.custom_minimum_size = Vector2(10, 52)
+		sample.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		sample.focus_mode = Control.FOCUS_ALL
+		sample.tooltip_text = "Apply recent color to the edited role"
+		sample.pressed.connect(_use_recent_color.bind(index))
+		recents.add_child(sample)
+		color_recent_buttons.append(sample)
+		color_swatch_buttons.append(sample)
+	# The native picker remains inline and scrollable inside the same view.
+	color_picker_scroll = ScrollContainer.new()
+	color_picker_scroll.name = "InlinePickerViewport"
+	color_picker_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	color_picker_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	color_picker_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	color_picker_scroll.follow_focus = true
+	color_picker_scroll.gui_input.connect(_scroll_inline_picker_wheel)
+	parent.add_child(color_picker_scroll)
+	color_advanced = ColorPicker.new()
+	color_advanced.name = "InlineColorPicker"
+	color_advanced.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	color_advanced.focus_mode = Control.FOCUS_ALL
+	color_advanced.color_changed.connect(_on_picker_color_changed)
+	color_picker_scroll.add_child(color_advanced)
+	# Keep the exact canonical input below the native picker. It remains
+	# reachable by scrolling but no longer splits the owner's FG/BG/recents
+	# strip from the picker square.
+	var exact_row: HBoxContainer = HBoxContainer.new()
+	exact_row.name = "ExactColorEntry"
+	parent.add_child(exact_row)
 	var defaults: Button = Button.new()
-	defaults.text = "◩ Default"
-	defaults.tooltip_text = "Reset to black foreground and white background"
+	defaults.name = "DefaultPigments"
+	defaults.text = "◩"
+	defaults.custom_minimum_size.x = 28
+	defaults.tooltip_text = "Default black foreground / white background"
 	defaults.pressed.connect(_reset_colors)
-	actions.add_child(defaults)
-	color_role_label = Label.new()
-	parent.add_child(color_role_label)
+	exact_row.add_child(defaults)
 	color_hex = LineEdit.new()
 	color_hex.placeholder_text = "#RRGGBBAA"
-	color_hex.tooltip_text = "Edit the selected pigment as #RRGGBB or #RRGGBBAA"
+	color_hex.tooltip_text = "Edit selected pigment as #RRGGBB or #RRGGBBAA"
+	color_hex.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	color_hex.text_submitted.connect(func(_text: String) -> void: _commit_hex())
 	color_hex.focus_exited.connect(_commit_hex)
-	parent.add_child(color_hex)
+	exact_row.add_child(color_hex)
 	var rgba: GridContainer = GridContainer.new()
+	rgba.name = "ExactRGBA8"
 	rgba.columns = 2
 	parent.add_child(rgba)
 	for channel: String in ["R", "G", "B", "A"]:
@@ -1653,40 +2099,47 @@ func _build_color_controls(parent: VBoxContainer) -> void:
 		spin.value_changed.connect(_commit_rgb)
 		rgba.add_child(spin)
 		color_rgb.append(spin)
-	var recent_label: Label = Label.new()
-	recent_label.text = "Recent colors"
-	parent.add_child(recent_label)
-	var recents: HFlowContainer = HFlowContainer.new()
-	parent.add_child(recents)
-	for index: int in range(6):
-		var sample: Button = Button.new()
-		sample.custom_minimum_size = Vector2(28, 26)
-		sample.tooltip_text = "Use recent color for selected pigment"
-		sample.pressed.connect(_use_recent_color.bind(index))
-		recents.add_child(sample)
-		color_swatch_buttons.append(sample)
-	color_advanced_toggle = Button.new()
-	color_advanced_toggle.text = "Advanced picker ▸"
-	color_advanced_toggle.pressed.connect(_toggle_advanced_picker)
-	parent.add_child(color_advanced_toggle)
-	color_advanced = ColorPicker.new()
-	color_advanced.visible = false
-	color_advanced.custom_minimum_size.y = 190
-	color_advanced.color_changed.connect(_set_selected_color)
-	parent.add_child(color_advanced)
 	_refresh_color_controls()
+
+## The inner ScrollContainer owns horizontal overflow, but Godot's native
+## ColorPicker stops plain wheel events before the host sees them. Relay only
+## vertical wheel events to the current dock/flyout/floating ScrollContainer;
+## leave pointer clicks, focus and modifier gestures to the native picker.
+func _scroll_inline_picker_wheel(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	var wheel: InputEventMouseButton = event as InputEventMouseButton
+	if not wheel.pressed or wheel.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		return
+	if wheel.shift_pressed or wheel.ctrl_pressed or wheel.alt_pressed or wheel.meta_pressed:
+		return
+	var ancestor: Node = color_picker_scroll.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer:
+			var scroll: ScrollContainer = ancestor as ScrollContainer
+			if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+				var scrollbar: VScrollBar = scroll.get_v_scroll_bar()
+				var limit: float = maxf(0.0, scrollbar.max_value - scrollbar.page)
+				if limit > 0.0:
+					var step: int = maxi(24, roundi(scroll.size.y / 8.0 * maxf(wheel.factor, 1.0)))
+					scroll.scroll_vertical = clampi(scroll.scroll_vertical +
+						(-step if wheel.button_index == MOUSE_BUTTON_WHEEL_UP else step), 0, roundi(limit))
+					color_picker_scroll.accept_event()
+					return
+		ancestor = ancestor.get_parent()
 
 
 func _style_swatch(button: Button, value: Color, caption: String, selected: bool = false) -> void:
 	button.text = caption
 	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = value
+	# Show the actual RGB channels even for zero-alpha pigments. The native
+	# picker and RGBA tooltip expose opacity without losing hidden RGB identity.
+	style.bg_color = Color(value.r, value.g, value.b, 1.0)
 	style.set_border_width_all(2 if selected else 1)
 	style.border_color = Color(0.27, 0.65, 1.0) if selected else Color(0.35, 0.35, 0.35)
 	for state: String in ["normal", "hover", "pressed", "disabled", "focus"]:
 		button.add_theme_stylebox_override(state, style)
-	var shown: Color = Color(0.23, 0.23, 0.23).lerp(Color(value.r, value.g, value.b, 1.0), value.a)
-	var ink: Color = Color.BLACK if shown.get_luminance() > 0.6 else Color.WHITE
+	var ink: Color = Color.BLACK if Color(value.r, value.g, value.b, 1.0).get_luminance() > 0.6 else Color.WHITE
 	button.add_theme_color_override("font_color", ink)
 	button.add_theme_color_override("font_hover_color", ink)
 	button.add_theme_color_override("font_pressed_color", ink)
@@ -1701,53 +2154,103 @@ func _refresh_color_controls() -> void:
 		return
 	_updating_color_widgets = true
 	var selected: Color = _edited_color()
-	color_role_label.text = "Editing BG" if color_edit_background else "Editing FG"
-	color_role_label.tooltip_text = "Background is a secondary UI pigment, not the brush color" if color_edit_background else "Foreground supplies the brush color"
 	color_hex.text = "#" + selected.to_html(true).to_upper()
 	var channels: Array[int] = [roundi(selected.r * 255.0), roundi(selected.g * 255.0),
 		roundi(selected.b * 255.0), roundi(selected.a * 255.0)]
 	for index: int in range(color_rgb.size()):
 		color_rgb[index].set_value_no_signal(channels[index])
 	_style_swatch(foreground_button, active_color, "FG", not color_edit_background)
-	_style_swatch(previous_foreground_button, previous_foreground, "↶")
 	_style_swatch(background_button, color_background, "BG", color_edit_background)
-	_style_swatch(previous_background_button, previous_background, "↶")
-	for index: int in range(6):
-		var button: Button = color_swatch_buttons[index + 4]
-		button.disabled = index >= recent_colors.size()
-		if not button.disabled:
-			_style_swatch(button, recent_colors[index], "")
+	foreground_button.tooltip_text = "Edit foreground #" + active_color.to_html(true).to_upper()
+	background_button.tooltip_text = "Edit background #" + color_background.to_html(true).to_upper()
+	var visible_colors: Array[Color] = _visible_recent_colors()
+	for index: int in range(color_recent_buttons.size()):
+		var button: Button = color_recent_buttons[index]
+		button.visible = index < visible_colors.size()
+		if button.visible:
+			_style_swatch(button, visible_colors[index], "")
+			button.tooltip_text = "Apply #" + visible_colors[index].to_html(true).to_upper() + " to " + ("BG" if color_edit_background else "FG")
 	if color_advanced != null:
 		color_advanced.color = selected
 	_updating_color_widgets = false
 
 
+## An exact identity for display filtering and deduplication. RGBA is straight,
+## so even zero-alpha RGB remains meaningful and does not get premultiplied away.
+## Restore state before widgets and the brush canvas exist. Palette state is
+## deliberately separate from project artwork and Undo/Redo serialization.
+func _load_color_history() -> void:
+	if not preferences_persistence_enabled:
+		return
+	var restored: Dictionary = COLOR_HISTORY_SETTINGS.read_file(recent_colors_settings_path)
+	if restored.is_empty():
+		return
+	active_color = restored["foreground"]
+	color_background = restored["background"]
+	color_edit_background = restored["editing_background"]
+	recent_colors = restored["recent"]
+
+
+func _save_color_history() -> void:
+	if preferences_persistence_enabled and not _color_write_suspended:
+		COLOR_HISTORY_SETTINGS.save_file(recent_colors_settings_path, active_color,
+			color_background, color_edit_background, recent_colors)
+
+
+func _canonical_color(value: Color) -> Color:
+	return Color8(clampi(roundi(value.r * 255.0), 0, 255),
+		clampi(roundi(value.g * 255.0), 0, 255),
+		clampi(roundi(value.b * 255.0), 0, 255),
+		clampi(roundi(value.a * 255.0), 0, 255))
+
+
+func _visible_recent_colors() -> Array[Color]:
+	var available: Array[Color] = []
+	var used: Dictionary = {_pack_color(active_color): true, _pack_color(color_background): true}
+	for item: Color in recent_colors:
+		var key: int = _pack_color(item)
+		if not used.has(key):
+			available.append(item)
+			used[key] = true
+	return available
+
+
 func _remember_recent(value: Color) -> void:
-	recent_colors.erase(value)
-	recent_colors.push_front(value)
+	var canonical: Color = _canonical_color(value)
+	var key: int = _pack_color(canonical)
+	for index: int in range(recent_colors.size() - 1, -1, -1):
+		if _pack_color(recent_colors[index]) == key:
+			recent_colors.remove_at(index)
+	recent_colors.push_front(canonical)
 	if recent_colors.size() > 6:
 		recent_colors.resize(6)
 
 
-func _set_foreground(value: Color) -> void:
-	if _updating_color_widgets or active_color == value:
+func _set_foreground(value: Color, record_recent: bool = true) -> void:
+	var canonical: Color = _canonical_color(value)
+	if _updating_color_widgets or _pack_color(active_color) == _pack_color(canonical):
 		return
-	previous_foreground = active_color
-	_remember_recent(active_color)
-	active_color = value
+	if record_recent:
+		_remember_recent(active_color)
+	active_color = canonical
 	if canvas != null:
-		canvas.color_rgba = _pack_color(value)
+		canvas.color_rgba = _pack_color(canonical)
 	_refresh_color_controls()
+	if record_recent:
+		_save_color_history()
 
 
-func _set_background(value: Color) -> void:
-	if _updating_color_widgets or color_background == value:
+func _set_background(value: Color, record_recent: bool = true) -> void:
+	var canonical: Color = _canonical_color(value)
+	if _updating_color_widgets or _pack_color(color_background) == _pack_color(canonical):
 		return
-	previous_background = color_background
-	_remember_recent(color_background)
-	color_background = value
+	if record_recent:
+		_remember_recent(color_background)
+	color_background = canonical
 	# Background is a UI pigment, not a paint target or document operation.
 	_refresh_color_controls()
+	if record_recent:
+		_save_color_history()
 
 
 func _set_selected_color(value: Color) -> void:
@@ -1757,35 +2260,167 @@ func _set_selected_color(value: Color) -> void:
 		_set_foreground(value)
 
 
+func _on_picker_color_changed(value: Color) -> void:
+	if _color_edit_ignore_until_release or _updating_color_widgets:
+		return
+	if _color_edit_pending:
+		if _color_edit_background:
+			_set_background(value, false)
+		else:
+			_set_foreground(value, false)
+	else:
+		# The picker may also be changed by an accessibility action or script
+		# without a captured pointer/key event: a single signal is one edit.
+		_set_selected_color(value)
+
+
+func _begin_color_edit() -> void:
+	if _color_edit_pending:
+		return
+	_color_edit_pending = true
+	_color_edit_background = color_edit_background
+	_color_edit_original = _edited_color()
+
+
+func _finish_color_edit() -> void:
+	if not _color_edit_pending:
+		return
+	var ending: Color = color_background if _color_edit_background else active_color
+	_color_edit_pending = false
+	_color_edit_pointer_down = false
+	_color_edit_text = null
+	if _pack_color(ending) != _pack_color(_color_edit_original):
+		_remember_recent(_color_edit_original)
+		_refresh_color_controls()
+		_save_color_history()
+
+
+func _cancel_color_edit() -> void:
+	if not _color_edit_pending:
+		return
+	var original: Color = _color_edit_original
+	var background: bool = _color_edit_background
+	_color_edit_ignore_until_release = _color_edit_pointer_down
+	_color_edit_pending = false
+	_color_edit_pointer_down = false
+	_color_edit_text = null
+	if background:
+		_set_background(original, false)
+	else:
+		_set_foreground(original, false)
+	_refresh_color_controls()
+
+
+func _color_input_target(position: Vector2) -> bool:
+	if color_advanced != null and color_advanced.is_visible_in_tree() and color_advanced.get_global_rect().has_point(position):
+		return true
+	for spin: SpinBox in color_rgb:
+		if spin.is_visible_in_tree() and spin.get_global_rect().has_point(position):
+			return true
+	return false
+
+
+func _is_color_input_focus(control: Control) -> bool:
+	if control == null:
+		return false
+	if color_advanced != null and (control == color_advanced or color_advanced.is_ancestor_of(control)):
+		return true
+	for spin: SpinBox in color_rgb:
+		if control == spin or spin.is_ancestor_of(control):
+			return true
+	return false
+
+
+func _end_cancelled_color_pointer() -> void:
+	_color_edit_ignore_until_release = false
+	_color_edit_recover_on_press = false
+
+
+func _cancel_interrupted_color_pointer() -> void:
+	# The mouse release might never arrive. Roll back the live preview, keep
+	# rejecting stale native ColorPicker events, but let a fresh press recover.
+	_cancel_color_edit()
+	_color_edit_recover_on_press = true
+
+
+func _track_color_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var button: InputEventMouseButton = event as InputEventMouseButton
+		if button.button_index != MOUSE_BUTTON_LEFT:
+			return
+		if button.pressed:
+			if _color_edit_recover_on_press:
+				_end_cancelled_color_pointer()
+			if _color_edit_pending and not _color_edit_pointer_down:
+				_finish_color_edit()
+			if _color_input_target(button.position):
+				_begin_color_edit()
+				_color_edit_pointer_down = true
+		elif _color_edit_ignore_until_release:
+			call_deferred("_end_cancelled_color_pointer")
+		elif _color_edit_pointer_down:
+			# Native ColorPicker changes its value during GUI dispatch, after
+			# _input(). Finish after that last release-frame color_changed.
+			call_deferred("_finish_color_edit")
+	elif event is InputEventMouseMotion:
+		var motion: InputEventMouseMotion = event as InputEventMouseMotion
+		if _color_edit_pointer_down and not bool(motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+			_cancel_interrupted_color_pointer()
+	elif event is InputEventKey:
+		var key: InputEventKey = event as InputEventKey
+		var focused: Control = get_viewport().gui_get_focus_owner()
+		if key.pressed and key.keycode == KEY_ESCAPE and _color_edit_pending:
+			_cancel_color_edit()
+			get_viewport().set_input_as_handled()
+			return
+		if key.pressed and _is_color_input_focus(focused):
+			if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER or key.keycode == KEY_TAB:
+				call_deferred("_finish_color_edit")
+			elif not key.ctrl_pressed and not key.alt_pressed and not key.meta_pressed:
+				_begin_color_edit()
+				if focused is LineEdit and _color_edit_text != focused:
+					_color_edit_text = focused
+					if not focused.focus_exited.is_connected(_finish_color_edit):
+						focused.focus_exited.connect(_finish_color_edit)
+		elif not key.pressed and _color_edit_pending and not _color_edit_pointer_down and _color_edit_text == null:
+			call_deferred("_finish_color_edit")
+
+
 func _swap_colors() -> void:
+	_finish_color_edit()
+	_color_write_suspended = true
 	var former: Color = active_color
 	_set_foreground(color_background)
 	_set_background(former)
+	_color_write_suspended = false
 	_refresh_color_controls()
+	_save_color_history()
 
 
 func _reset_colors() -> void:
+	_finish_color_edit()
+	_color_write_suspended = true
 	_set_foreground(Color.BLACK)
 	_set_background(Color.WHITE)
+	_color_write_suspended = false
 	_refresh_color_controls()
+	_save_color_history()
 
 
 func _color_swatch_pressed(role: String) -> void:
+	_finish_color_edit()
 	match role:
 		"Foreground": color_edit_background = false
 		"Background": color_edit_background = true
-		"Previous FG":
-			color_edit_background = false
-			_set_foreground(previous_foreground)
-		"Previous BG":
-			color_edit_background = true
-			_set_background(previous_background)
 	_refresh_color_controls()
+	_save_color_history()
 
 
 func _use_recent_color(index: int) -> void:
-	if index >= 0 and index < recent_colors.size():
-		_set_selected_color(recent_colors[index])
+	_finish_color_edit()
+	var visible_colors: Array[Color] = _visible_recent_colors()
+	if index >= 0 and index < visible_colors.size():
+		_set_selected_color(visible_colors[index])
 
 
 ## Color.html_is_valid also permits bare/abbreviated hex; the Colors editor
@@ -1800,6 +2435,7 @@ func _valid_color_hex(value: String) -> bool:
 
 
 func _commit_hex() -> void:
+	_finish_color_edit()
 	if color_hex == null:
 		return
 	var value: String = color_hex.text.strip_edges()
@@ -1811,13 +2447,8 @@ func _commit_hex() -> void:
 func _commit_rgb(_value: float) -> void:
 	if _updating_color_widgets or color_rgb.size() != 4:
 		return
-	_set_selected_color(Color8(int(color_rgb[0].value), int(color_rgb[1].value),
+	_on_picker_color_changed(Color8(int(color_rgb[0].value), int(color_rgb[1].value),
 		int(color_rgb[2].value), int(color_rgb[3].value)))
-
-
-func _toggle_advanced_picker() -> void:
-	color_advanced.visible = not color_advanced.visible
-	color_advanced_toggle.text = "Advanced picker ▾" if color_advanced.visible else "Advanced picker ▸"
 
 
 func _refresh_history() -> void:
@@ -2814,17 +3445,23 @@ func _selected_brush_hardness() -> float:
 		BRUSH_SETTINGS.default_hardness(selected_brush_preset)))
 
 
+func _selected_brush_density() -> float:
+	return float(brush_density_overrides.get(selected_brush_preset,
+		BRUSH_SETTINGS.default_density(selected_brush_preset)))
+
+
 func _show_brush_settings() -> void:
 	if brush_panel != null:
 		brush_panel.display(selected_brush_preset, brush_width_value,
-			brush_opacity_value, _selected_brush_hardness())
+			brush_opacity_value, _selected_brush_hardness(), _selected_brush_density())
 
 
 func _save_workspace_preferences() -> void:
 	if preferences_persistence_enabled and _layout_booted:
 		WORKSPACE_PREFERENCES.save_file(preferences_settings_path, record_selection_history,
 			{"preset": selected_brush_preset, "width": brush_width_value,
-			"opacity": brush_opacity_value, "hardness": brush_hardness_overrides})
+			"opacity": brush_opacity_value, "hardness": brush_hardness_overrides,
+			"density": brush_density_overrides})
 
 
 func _select_brush_preset(preset: String) -> void:
@@ -2834,6 +3471,7 @@ func _select_brush_preset(preset: String) -> void:
 	if canvas != null:
 		canvas.brush_preset = preset
 		canvas.brush_hardness = _selected_brush_hardness()
+		canvas.brush_density = _selected_brush_density()
 	if brush_preset_control != null:
 		brush_preset_control.select(BRUSH_SETTINGS.PRESETS.find(preset))
 	_show_brush_settings()
@@ -2866,12 +3504,25 @@ func _set_brush_hardness(ratio: float) -> void:
 	_save_workspace_preferences()
 
 
+func _set_brush_density(dabs_per_radius: float) -> void:
+	if not is_finite(dabs_per_radius) or dabs_per_radius < BRUSH_SETTINGS.DENSITY_MIN \
+			or dabs_per_radius > BRUSH_SETTINGS.DENSITY_MAX:
+		return
+	brush_density_overrides[selected_brush_preset] = dabs_per_radius
+	if canvas != null:
+		canvas.brush_density = _selected_brush_density()
+	_show_brush_settings()
+	_save_workspace_preferences()
+
+
 func _reset_selected_brush() -> void:
 	brush_hardness_overrides.erase(selected_brush_preset)
+	brush_density_overrides.erase(selected_brush_preset)
 	_set_brush_width(3.0)
 	_set_brush_opacity(1.0)
 	if canvas != null:
 		canvas.brush_hardness = _selected_brush_hardness()
+		canvas.brush_density = _selected_brush_density()
 	_show_brush_settings()
 	_save_workspace_preferences()
 
@@ -2964,6 +3615,10 @@ func _commit_clipboard_edit(edit: DrawingEditSession,
 
 
 func _delete_selection() -> void:
+	# T-253 opt-in whole-command trace; the graphical witness separately
+	# measures input dispatch through the first updated OS framebuffer.
+	var trace_start_us: int = Time.get_ticks_usec() if OS.has_environment(
+		"DRAWING_T253_PROFILE") else 0
 	if not _can_persist_or_close("Delete Pixels"):
 		return
 	if canvas.has_floating_move() and not canvas.confirm_floating_move():
@@ -2975,6 +3630,7 @@ func _delete_selection() -> void:
 		_show_error(started.message)
 		return
 	_before_gesture = _capture_context()
+	var trace_begin_us: int = Time.get_ticks_usec() if trace_start_us > 0 else 0
 	var edit: DrawingEditSession = started.value as DrawingEditSession
 	var staged: DrawingResult = edit.clear_rect(canvas.selected, canvas.selection_mask)
 	if not staged.ok:
@@ -2982,7 +3638,14 @@ func _delete_selection() -> void:
 		_before_gesture = null
 		_show_error(staged.message)
 		return
+	var trace_stage_us: int = Time.get_ticks_usec() if trace_start_us > 0 else 0
 	_commit_clipboard_edit(edit)
+	if trace_start_us > 0:
+		var finished_us: int = Time.get_ticks_usec()
+		print("T253_DELETE_PHASE: preflight_us=%d stage_us=%d commit_ui_us=%d total_us=%d tiles=%d" % [
+			trace_begin_us - trace_start_us, trace_stage_us - trace_begin_us,
+			finished_us - trace_stage_us, finished_us - trace_start_us,
+			current_document().tile_keys(current_layer()).size()])
 
 
 func _cut_selection() -> void:
@@ -3056,6 +3719,7 @@ func _load_preferences() -> void:
 			brush_width_value = float(brush["width"])
 			brush_opacity_value = float(brush["opacity"])
 			brush_hardness_overrides = brush["hardness"].duplicate(true)
+			brush_density_overrides = brush.get("density", {}).duplicate(true)
 
 
 func _toggle_selection_history() -> void:
@@ -3089,6 +3753,7 @@ func _toggle_dock() -> void:
 		dock_split.split_offset = maxi(0, int(dock_split.size.x) - (48 if not minimized else _expanded_dock_width))
 		if minimized:
 			call_deferred("_restore_expanded_scroll")
+		_layout_dock_toggle()
 		_schedule_layout_save()
 
 
@@ -3761,6 +4426,7 @@ func _apply_saved_dock_geometry() -> void:
 	var usable: int = maxi(160, roundi(dock_split.size.x) - 180)
 	var width: int = 48 if minimized else mini(_expanded_dock_width, usable)
 	dock_split.split_offset = maxi(0, int(dock_split.size.x) - width)
+	_layout_dock_toggle()
 	if not minimized:
 		inspector.scroll_vertical = _expanded_scroll
 

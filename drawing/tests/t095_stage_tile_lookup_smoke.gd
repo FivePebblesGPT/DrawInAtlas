@@ -24,6 +24,32 @@ func snapshot(doc: DrawingDocument, session: DrawingEditSession = null) -> Packe
 	check(result.ok, "source/preview rendering")
 	return result.value.get_data() if result.ok else PackedByteArray()
 
+## Validate the sparse independent pixel oracle against either legacy maps
+## (unsupported tiny synthetic strides) or the native canonical tile bytes.
+func matches_history_oracle(delta: DrawingDelta, before: Dictionary[String, int],
+		after: Dictionary[String, int], stride: int) -> bool:
+	if delta.tile_stride == 0:
+		return delta.before == before and delta.after == after
+	if delta.tile_stride != stride or delta.native_history_token <= 0 \
+			or not delta.before.is_empty() or not delta.after.is_empty():
+		return false
+	for coordinate: String in after:
+		var parts: PackedStringArray = coordinate.split(",")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		var key: String = DrawingDocument.TILES.tile_key64(x, y, stride)
+		var point: Vector2i = DrawingDocument.TILES.local_offset64(x, y, stride)
+		if not delta.before_tiles.has(key) or not delta.after_tiles.has(key):
+			return false
+		var previous: PackedByteArray = delta.before_tiles[key]
+		var updated: PackedByteArray = delta.after_tiles[key]
+		var offset: int = (point.y * stride + point.x) * 4
+		if (0 if previous.is_empty() else previous.decode_u32(offset)) != before[coordinate] \
+				or (0 if updated.is_empty() else updated.decode_u32(offset)) != after[coordinate]:
+			return false
+	return true
+
+
 func run() -> void:
 	for stride: int in STRIDES:
 		var doc: DrawingDocument = DrawingDocument.new("tile-stage-%d" % stride, stride)
@@ -80,9 +106,9 @@ func run() -> void:
 		var committed: DrawingResult = edit.commit()
 		check(committed.ok, "commit succeeds stride %d" % stride)
 		if committed.ok:
-			check(committed.delta.before == expected_before and
-				committed.delta.after == expected_after,
-				"canonical history exactly matches original pixel reads stride %d" % stride)
+			check(matches_history_oracle(committed.delta, expected_before,
+				expected_after, stride),
+				"canonical native/legacy history matches original pixel reads stride %d" % stride)
 		check(snapshot(doc) == preview, "preview matches commit stride %d" % stride)
 		check(doc.undo().ok and snapshot(doc) == original,
 			"Undo restores exact seeded bytes stride %d" % stride)

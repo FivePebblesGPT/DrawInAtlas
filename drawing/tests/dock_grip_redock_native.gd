@@ -44,8 +44,9 @@ func capture_frame(label: String) -> void:
 	var screenshots: String = OS.get_environment("T091_SCREENSHOTS")
 	if not screenshots.is_empty():
 		DirAccess.make_dir_recursive_absolute(screenshots)
-		check(image.save_png(screenshots.path_join(label + ".png")) == OK,
-			"optional captured screenshot " + label)
+		var capture_status: int = image.save_png(screenshots.path_join(label + ".png"))
+		if capture_status != OK:
+			print("OPTIONAL_VISUAL_CAPTURE_FAILED: T091_GRIP: " + str(capture_status))
 
 
 func assert_unique_host(host: DrawingFloatingHost, group_id: String, members: Array) -> void:

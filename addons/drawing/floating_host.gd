@@ -32,6 +32,10 @@ var _candidate_kind: String = ""
 var _candidate_id: String = ""
 var _candidate_start: Vector2
 var _suppress_release: bool = false
+var _panel_menu: PopupMenu
+var _group_menu: PopupMenu
+var _menu_panel_id: String = ""
+var _menu_group_id: String = ""
 
 
 func setup(id: String, state: DrawingDockLayout, planner: DrawingDockDrag,
@@ -72,6 +76,23 @@ func _ready() -> void:
 	hide_button.focus_mode = Control.FOCUS_ALL
 	hide_button.pressed.connect(func() -> void: hide_requested.emit(host_id))
 	_header.add_child(hide_button)
+	# Context commands are available from icon RMB/Shift+F10, not permanent
+	# text buttons. Keep the popups outside the disposable tab-strip subtree.
+	_panel_menu = PopupMenu.new()
+	_panel_menu.name = "FloatingPanelContextMenu"
+	_panel_menu.add_item("Move panel left", 0)
+	_panel_menu.add_item("Move panel right", 1)
+	_panel_menu.add_separator()
+	_panel_menu.add_item("Split into new floating group", 2)
+	_panel_menu.add_item("Dock this panel", 3)
+	_panel_menu.add_item("Dock whole group", 4)
+	_panel_menu.id_pressed.connect(_floating_panel_menu_action)
+	add_child(_panel_menu)
+	_group_menu = PopupMenu.new()
+	_group_menu.name = "FloatingGroupContextMenu"
+	_group_menu.add_item("Dock whole group", 0)
+	_group_menu.id_pressed.connect(_floating_group_menu_action)
+	add_child(_group_menu)
 	_scroll = ScrollContainer.new()
 	_scroll.name = "FloatingScroll"
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -154,6 +175,12 @@ func _frontmost_at(point: Vector2) -> bool:
 func render() -> void:
 	if layout == null or _body == null:
 		return
+	var previous_focus: Control = get_viewport().gui_get_focus_owner()
+	var focused_tab_id: String = ""
+	for panel_id: String in tab_buttons:
+		if tab_buttons[panel_id] == previous_focus:
+			focused_tab_id = panel_id
+			break
 	# A dock refresh can be requested several times before the next frame.
 	# queue_free() alone leaves old tab strips and group chrome in layout until
 	# the frame ends. Detach immediately, then delete; never free panel views.
@@ -198,12 +225,20 @@ func render() -> void:
 	for panel_id: String in members:
 		var tab: Button = Button.new()
 		tab.name = "Tab_" + panel_id
-		tab.text = panel_id.capitalize()
-		tab.tooltip_text = "Floating tab " + panel_id + "; drag to redock or reorder"
-		tab.custom_minimum_size.y = 32
+		# The same registered panel icon is used in the dock, rail and flyout.
+		# Active floating tabs never collapse or dismiss their host on click.
+		tab.icon = DrawingDockIcons.for_panel(panel_id)
+		tab.expand_icon = true
+		tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tab.custom_minimum_size = Vector2(42, 42)
+		tab.tooltip_text = panel_id.capitalize() + " panel; drag to reorder or redock; Ctrl+Alt+Left/Right to reorder"
 		tab.focus_mode = Control.FOCUS_ALL
 		tab.toggle_mode = true
 		tab.button_pressed = group["active"] == panel_id
+		for property: Dictionary in tab.get_property_list():
+			if property["name"] == "accessibility_name":
+				tab.set("accessibility_name", panel_id.capitalize() + " panel")
+				break
 		tab.pressed.connect(_select_panel.bind(panel_id))
 		row.add_child(tab)
 		tab_buttons[panel_id] = tab
@@ -218,6 +253,15 @@ func render() -> void:
 	if views.has(group["active"]):
 		var panel_view: Control = views[group["active"]]
 		panel_view.reparent(frame)
+	if tab_buttons.has(focused_tab_id):
+		call_deferred("_restore_tab_focus", focused_tab_id)
+
+
+func _restore_tab_focus(panel_id: String) -> void:
+	var tab: Button = tab_buttons.get(panel_id) as Button
+	# Do not steal focus if another control took it after the re-render.
+	if tab != null and tab.is_visible_in_tree() and get_viewport().gui_get_focus_owner() == null:
+		tab.grab_focus()
 
 
 func _select_panel(panel_id: String) -> void:
@@ -233,12 +277,14 @@ func _toggle_collapse(group_id: String) -> void:
 
 ## Accessible commands are scoped to one host/group. Splitting a floating tab
 ## creates a *new host*, never a nested second group in this container.
-func _arrange(action: int, group_id: String) -> void:
+func _arrange(action: int, group_id: String, requested_panel: String = "") -> void:
 	var group: Dictionary = layout.group_info(group_id)
-	if group.is_empty():
+	if group.is_empty() or layout.owner_of(String(group["active"])) != host_id:
 		return
-	var panel_id: String = group["active"]
+	var panel_id: String = String(group["active"]) if requested_panel.is_empty() else requested_panel
 	var panel_index: int = group["panels"].find(panel_id)
+	if panel_index < 0:
+		return
 	match action:
 		0:
 			if panel_index > 0:
@@ -269,6 +315,74 @@ func _arrange(action: int, group_id: String) -> void:
 					return
 
 
+func _show_floating_panel_menu(panel_id: String, point: Vector2) -> void:
+	if layout.owner_of(panel_id) != host_id:
+		return
+	var group_id: String = layout.group_of(panel_id)
+	var group: Dictionary = layout.group_info(group_id)
+	if group.is_empty():
+		return
+	_menu_panel_id = panel_id
+	var index: int = group["panels"].find(panel_id)
+	_panel_menu.set_item_disabled(_panel_menu.get_item_index(0), index <= 0)
+	_panel_menu.set_item_disabled(_panel_menu.get_item_index(1), index >= group["panels"].size() - 1)
+	_panel_menu.set_item_disabled(_panel_menu.get_item_index(2), group["panels"].size() <= 1)
+	_panel_menu.position = Vector2i(point.round())
+	_panel_menu.popup()
+
+
+func _show_floating_group_menu(group_id: String, point: Vector2) -> void:
+	var info: Dictionary = layout.container_info(host_id)
+	if info.is_empty() or (info["groups"] as Array).size() != 1 or \
+		String(info["groups"][0]["id"]) != group_id:
+		return
+	_menu_group_id = group_id
+	_group_menu.position = Vector2i(point.round())
+	_group_menu.popup()
+
+
+func _floating_panel_menu_action(action_id: int) -> void:
+	var panel_id: String = _menu_panel_id
+	if layout.owner_of(panel_id) != host_id:
+		return # A delayed popup callback must not act on a redocked tab.
+	var group_id: String = layout.group_of(panel_id)
+	if action_id >= 0 and action_id <= 4:
+		_arrange(action_id, group_id, panel_id)
+
+
+func _floating_group_menu_action(action_id: int) -> void:
+	if action_id == 0:
+		var group: Dictionary = layout.group_info(_menu_group_id)
+		if not group.is_empty() and layout.owner_of(String(group["active"])) == host_id:
+			_arrange(4, _menu_group_id)
+
+
+func _visible_floating_tab_at(point: Vector2) -> String:
+	# Godot's global Button rect is not clipped by the horizontal ScrollContainer.
+	# A tab hidden under the grip/close must never get a context command.
+	for strip: ScrollContainer in tab_strips.values():
+		if not strip.is_visible_in_tree() or not strip.get_global_rect().has_point(point):
+			continue
+		for panel_id: String in tab_buttons:
+			var tab: Button = tab_buttons[panel_id] as Button
+			if tab.is_visible_in_tree() and tab.get_global_rect().has_point(point):
+				return panel_id
+	return ""
+
+
+func _show_focused_context() -> bool:
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	for panel_id: String in tab_buttons:
+		if tab_buttons[panel_id] == focused:
+			_show_floating_panel_menu(panel_id, focused.get_global_rect().get_center())
+			return true
+	for group_id: String in group_handles:
+		if group_handles[group_id] == focused:
+			_show_floating_group_menu(group_id, focused.get_global_rect().get_center())
+			return true
+	return false
+
+
 func _apply(kind: String, source: String, target: Dictionary) -> bool:
 	var started: bool = drag.begin_panel(source) if kind == DrawingDockDrag.PANEL else drag.begin_group(source)
 	if not started or not drag.preview(target):
@@ -282,8 +396,26 @@ func _apply(kind: String, source: String, target: Dictionary) -> bool:
 	return true
 
 
+# A focus loss can eat the matching OS mouse-up. Roll back the floating
+# preview and pending tab transfer before the next input from this window.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_WINDOW_FOCUS_OUT and what != NOTIFICATION_APPLICATION_FOCUS_OUT:
+		return
+	if _gesture.is_empty() and _candidate_id.is_empty() and (drag == null or not drag.is_dragging() or not _owns_drag()):
+		return
+	_cancel_pointer_preview()
+
+
+func _cancel_pointer_preview() -> void:
+	if _gesture == "move" or _gesture == "resize":
+		set_host_rect(_frame_start)
+	_suppress_release = true
+	_clear_gesture()
+
+
 func _handle_press(event: InputEvent, kind: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_suppress_release = false # A new press supersedes an OS-lost release.
 		if kind == "move" and (event as InputEventMouseButton).shift_pressed and not group_handles.is_empty():
 			var group_id: String = group_handles.keys()[0]
 			_tab_press(event, DrawingDockDrag.GROUP, group_id)
@@ -297,6 +429,7 @@ func _handle_press(event: InputEvent, kind: String) -> void:
 
 func _tab_press(event: InputEvent, kind: String, source: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		_suppress_release = false
 		_candidate_kind = kind
 		_candidate_id = source
 		_candidate_start = event.global_position
@@ -306,10 +439,39 @@ func _tab_press(event: InputEvent, kind: String, source: String) -> void:
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
+	if event is InputEventKey and event.pressed and not event.echo and \
+		(event.keycode == KEY_MENU or (event.keycode == KEY_F10 and event.shift_pressed)):
+		if _gesture.is_empty() and _candidate_id.is_empty() and not drag.is_dragging() and \
+			_show_focused_context():
+			get_viewport().set_input_as_handled()
+		return
+	# The OS can lose a mouse-up without deactivating the window. A subsequent
+	# motion with the left bit cleared is authoritative evidence the gesture
+	# ended; roll back its preview rather than committing stale geometry on a
+	# later release. An idle sibling must not cancel another host's drag.
+	if event is InputEventMouseMotion and (event.button_mask & MOUSE_BUTTON_MASK_LEFT) == 0:
+		if not _gesture.is_empty() or not _candidate_id.is_empty() or \
+			(drag.is_dragging() and _owns_drag()):
+			_cancel_pointer_preview()
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if _gesture.is_empty() and _candidate_id.is_empty() and not drag.is_dragging() and \
+			_frontmost_at(event.global_position) and _hit_resize_edges(event.global_position) == Vector4i.ZERO:
+			var panel_id: String = _visible_floating_tab_at(event.global_position)
+			if not panel_id.is_empty():
+				_show_floating_panel_menu(panel_id, event.global_position)
+				get_viewport().set_input_as_handled()
+			else:
+				var grip: Button = _header.get_node_or_null("MoveHandle") as Button
+				if grip != null and grip.get_global_rect().has_point(event.global_position) and \
+					not group_handles.is_empty():
+					_show_floating_group_menu(String(group_handles.keys()[0]), event.global_position)
+					get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if not _gesture.is_empty() or not _candidate_id.is_empty() or (drag.is_dragging() and _owns_drag()):
-			_suppress_release = true
-			_clear_gesture()
+			_cancel_pointer_preview()
 			get_viewport().set_input_as_handled()
 		return
 	if event is InputEventKey and event.pressed and event.ctrl_pressed and event.alt_pressed and not event.echo:
@@ -318,22 +480,27 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		if _frontmost_at(event.global_position):
+			_suppress_release = false
 			raise_host()
 			# A prior target host may have seen a press without the matching
 			# release during a cross-host transfer. Never replay that stale tab.
 			_candidate_id = ""
 			_candidate_kind = ""
-			for panel_id: String in tab_buttons:
-				var tab: Control = tab_buttons[panel_id] as Control
-				if tab.get_global_rect().has_point(event.global_position):
-					_candidate_kind = DrawingDockDrag.PANEL
-					_candidate_id = panel_id
-					_candidate_start = event.global_position
-					# Godot 4.8 beta's forwarded GUI events may hit the
-					# wrong button in a scrolled strip. Route viewport hits
-					# by the actual visible tab rectangles instead.
-					get_viewport().set_input_as_handled()
-					break
+			# Godot reports a scrolled child's full rectangle even where the
+			# ScrollContainer clips it. Never let an invisible tab capture a
+			# click from the move grip or close button on either side.
+			var strip: ScrollContainer = tab_strips.values()[0] as ScrollContainer if not tab_strips.is_empty() else null
+			if strip != null and strip.is_visible_in_tree() and strip.get_global_rect().has_point(event.global_position):
+				for panel_id: String in tab_buttons:
+					var tab: Control = tab_buttons[panel_id] as Control
+					if tab.is_visible_in_tree() and tab.get_global_rect().has_point(event.global_position):
+						_candidate_kind = DrawingDockDrag.PANEL
+						_candidate_id = panel_id
+						_candidate_start = event.global_position
+						# Keep viewport-level tab dispatch for Godot 4.8 beta's
+						# scrolled GUI events, but only inside the visible strip.
+						get_viewport().set_input_as_handled()
+						break
 			var sides: Vector4i = _hit_resize_edges(event.global_position)
 			if sides != Vector4i.ZERO:
 				_gesture = "resize"
@@ -469,6 +636,10 @@ func _target_at(point: Vector2) -> Dictionary:
 	var group_id: String = groups[0]["id"]
 	var strip: ScrollContainer = tab_strips.get(group_id) as ScrollContainer
 	if strip == null:
+		return {}
+	# A panel icon cannot merge by merely passing over the floating body.
+	# Whole-group drags still accept the host as their target.
+	if drag.source_kind() == DrawingDockDrag.PANEL and not strip.get_global_rect().has_point(point):
 		return {}
 	var index: int = groups[0]["panels"].size()
 	var x: float = strip.get_global_rect().end.x - 3.0

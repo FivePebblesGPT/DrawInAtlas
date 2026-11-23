@@ -15,19 +15,22 @@ jobs:
         with:
           version: 4.8.0-beta3
           use-dotnet: false
+      - name: Install pinned Rust 1.99.1
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
       - name: Install Mesa software display
         run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
-      - name: Stage canonical Drawing files and import resources
+      - name: Compile required native Brush and import both Drawing and Atlas
         run: |
           set -euo pipefail
-          python3 tools/build_drawing_app.py --in-place
-          timeout --signal=TERM --kill-after=5s 240s godot --headless --editor --path drawing --import --quit
-      - name: Independent selection contour and move byte oracle
+          make build TOOLCHAIN=system
+      - name: Independent selection contour and Move byte oracle
         run: |
           set -euo pipefail
-          timeout --signal=TERM --kill-after=5s 150s godot --headless --audio-driver Dummy --path drawing \
+          timeout --signal=TERM --kill-after=5s 180s godot --headless --audio-driver Dummy --path drawing \
             --script res://tests/selection_large_smoke.gd 2>&1 | tee /tmp/t096-model.log
-          python3 tools/check_godot_model_log.py /tmp/t096-model.log --marker T096_MODEL_PASSED
+          python3 tools/check_t096_logs.py model /tmp/t096-model.log
       - name: Pointer-delivered marquee and Move software framebuffer
         run: |
           set -euo pipefail
@@ -35,13 +38,21 @@ jobs:
             godot --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
             --path drawing --script res://tests/selection_large_native.gd \
             2>&1 | tee /tmp/t096-native.log
-          python3 tools/check_godot_model_log.py /tmp/t096-native.log --marker T096_NATIVE_PASSED
+          python3 tools/check_t096_logs.py native /tmp/t096-native.log
+      - name: Atlas signed large Move, global native history and campaign Save/Open
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 150s godot --headless --audio-driver Dummy --path . \
+            --script res://tests/t268_atlas_large_move.gd \
+            2>&1 | tee /tmp/t268-atlas.log
+          python3 tools/check_t096_logs.py atlas /tmp/t268-atlas.log
       - name: Upload diagnostic logs (not physical/owner acceptance)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: t096-contour-source-and-software-move
+          name: t096-contour-native-move-atlas
           path: |
             /tmp/t096-model.log
             /tmp/t096-native.log
+            /tmp/t268-atlas.log
           if-no-files-found: warn

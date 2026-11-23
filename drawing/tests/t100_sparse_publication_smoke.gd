@@ -38,6 +38,38 @@ func read_pixel(doc: DrawingDocument, layer: String, point: Vector2i) -> int:
 	return tile.get_rgba(local.x, local.y) if tile != null else 0
 
 
+## Compare the native full-tile history against an independent pixel-space
+## oracle without materializing native history back into String-keyed maps.
+func native_delta_matches_pixel_oracle(native_delta: DrawingDelta,
+		pixel_delta: DrawingDelta, stride: int) -> bool:
+	if native_delta.tile_stride != stride or native_delta.native_history_token <= 0 \
+			or not native_delta.before.is_empty() or not native_delta.after.is_empty() \
+			or pixel_delta.tile_stride != 0 \
+			or pixel_delta.before.size() != pixel_delta.after.size():
+		return false
+	for coordinate: String in pixel_delta.after:
+		if not pixel_delta.before.has(coordinate):
+			return false
+		var parts: PackedStringArray = coordinate.split(",")
+		if parts.size() != 2:
+			return false
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		var key: String = DrawingDocument.TILES.tile_key64(x, y, stride)
+		var offset: Vector2i = DrawingDocument.TILES.local_offset64(x, y, stride)
+		if not native_delta.before_tiles.has(key) or not native_delta.after_tiles.has(key):
+			return false
+		var before: PackedByteArray = native_delta.before_tiles[key]
+		var after: PackedByteArray = native_delta.after_tiles[key]
+		var index: int = (offset.y * stride + offset.x) * 4
+		if (not before.is_empty() and before.decode_u32(index) != int(pixel_delta.before[coordinate])) \
+				or (before.is_empty() and int(pixel_delta.before[coordinate]) != 0) \
+				or (not after.is_empty() and after.decode_u32(index) != int(pixel_delta.after[coordinate])) \
+				or (after.is_empty() and int(pixel_delta.after[coordinate]) != 0):
+			return false
+	return true
+
+
 func seed_source(doc: DrawingDocument, layer: String) -> void:
 	var pixels: Dictionary[String, int] = {
 		"-1,-1": HIDDEN, "0,0": RED, "1,0": 0x6734ac11,
@@ -91,8 +123,9 @@ func signed_parity(stride: int) -> void:
 	check(result.ok and expected.ok, "signed and hidden-RGB tile + pixel publishers accept")
 	if not result.ok or not expected.ok:
 		return
-	check(result.delta.before == expected.delta.before and result.delta.after == expected.delta.after,
-		"canonical deltas match pixel-space oracle")
+	check(native_delta_matches_pixel_oracle(result.delta,
+		DrawingDelta.new(reference["layer"], before, after), stride),
+		"native tile history represents the same exact pixel-space changes")
 	check(result.regions.size() == expected.regions.size(), "same source dirty-region count")
 	for point: Vector2i in points:
 		check(read_pixel(doc, layer, point) == read_pixel(ref, reference["layer"], point),
@@ -161,8 +194,9 @@ func failure_atomicity() -> void:
 		"late failure leaves independent layer byte/identity unchanged")
 	patches["1,0"][0] = HIDDEN
 	var accepted: DrawingResult = doc._publish_tile_edit(layer, doc.revision, patches, sources)
-	check(accepted.ok and accepted.delta.after.size() == 2,
-		"valid retry after failure commits both source tiles")
+	check(accepted.ok and accepted.delta.tile_stride == 16 and
+		accepted.delta.after_tiles.size() == 2 and accepted.delta.native_history_token > 0,
+		"valid retry records both source tiles in native history")
 	check(doc.history_length() == history_before + 1 and doc.undo().ok and
 		read_pixel(doc, layer, Vector2i(-16, -16)) == 0 and doc.redo().ok and
 		read_pixel(doc, layer, Vector2i(-16, -16)) == RED,
@@ -221,12 +255,15 @@ func signed_mask_brush_and_cancellation() -> void:
 		check(fast_preview.ok and slow_preview.ok and
 			fast_preview.value.get_data() == slow_preview.value.get_data(),
 			"signed masked preview matches independent pixel publisher")
+		# The independent pixel publisher now acquires native authority too;
+		# snapshot its global pixel maps before commit as the oracle.
+		var pixel_oracle: DrawingDelta = DrawingDelta.new(reference["layer"],
+			slow_edit._before, slow_edit._after)
 		var fast_result: DrawingResult = fast_edit.commit()
 		var slow_result: DrawingResult = slow_edit.commit()
 		check(fast_result.ok and slow_result.ok and
-			fast_result.delta.before == slow_result.delta.before and
-			fast_result.delta.after == slow_result.delta.after,
-			"signed masked Brush/Eraser exact canonical history")
+			native_delta_matches_pixel_oracle(fast_result.delta, pixel_oracle, 30),
+			"signed masked Brush/Eraser native history matches pixel oracle")
 		var fast_source: DrawingResult = DrawingRenderer.render(doc, area,
 			origin.x, origin.y, 128 * 128)
 		var slow_source: DrawingResult = DrawingRenderer.render(ref, area,
@@ -282,8 +319,10 @@ func dense_full_red() -> void:
 	var commit_ms: float = float(Time.get_ticks_usec() - before_us) / 1000.0
 	var after_static: int = OS.get_static_memory_usage()
 	var after_peak: int = OS.get_static_memory_peak_usage()
-	check(result.ok and result.delta.after.size() == 262144 and
-		result.delta.before.size() == 262144, "all 262144 red pixels have canonical history")
+	check(result.ok and result.delta.tile_stride == 256 and
+		result.delta.after_tiles.size() == 4 and result.delta.before_tiles.size() == 4 and
+		result.delta.native_history_token > 0 and result.delta.after.is_empty(),
+		"all 262144 red pixels are represented by four native history tiles")
 	check(doc.revision == 2 and doc.history_length() == 1,
 		"full-512 publication commits atomically once")
 	for cy: int in range(2):
@@ -300,7 +339,7 @@ func dense_full_red() -> void:
 	check(doc.redo().ok and doc.tile_keys(layer).size() == 4,
 		"full red Redo restores four source chunks")
 	print("T100_SPARSE_PUBLICATION_RUN commit_cpu_ms=%.3f pixels=262144 " % commit_ms +
-		"canonical_delta_entries=524288 source_clone_rgba8_bytes=0 " +
+		"canonical_delta_tiles=4 source_clone_rgba8_bytes=0 " +
 		"static_before=%d static_after=%d peak_before=%d peak_after=%d" % [
 		begin_static, after_static, begin_peak, after_peak])
 	var threshold: String = OS.get_environment("T100_MAX_COMMIT_MS")

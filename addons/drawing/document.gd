@@ -5,6 +5,14 @@ extends RefCounted
 
 const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 const ROOT_ID: String = "root"
+## Native store cap; three full spans per touched tile cover source and replay buffers.
+const MAX_NATIVE_HISTORY_TRANSFER_BYTES: int = 256 * 1024 * 1024
+## Also bound direct external tile publication before lazy source resolution.
+## This is a conservative source/before/after envelope, not resident RSS.
+func _native_direct_transfer_within_budget(count: int) -> bool:
+	return count > 0 and count <= 128 and \
+		count * tile_stride * tile_stride * 4 * 3 <= MAX_NATIVE_HISTORY_TRANSFER_BYTES
+
 
 var id: String = ""
 var tile_stride: int = 256
@@ -26,7 +34,16 @@ var _display_changes: Array[Dictionary] = []
 var display_source_epoch: int = 0
 ## One local ordered timeline. A selection step carries the current content token.
 ## External Atlas-owned documents use the host timeline instead of this one.
-var external_history: bool = false
+## Read-only projection: all ownership changes must use set_external_history().
+## Plain and reflective writes to a getter-only property cannot skip its
+## checked revision/local-history fence (T-241).
+var _external_history: bool = false
+var external_history: bool:
+	get: return _external_history
+## Revision at which the host claimed an otherwise unowned timeline. The
+## document cannot prove that external commands were discarded, so switching
+## back is safe only if no canonical document revision occurred in that mode.
+var _external_history_anchor_revision: int = -1
 var record_selection_history: bool = false
 var _events: Array[Dictionary] = []
 var _cursor: int = 0
@@ -41,6 +58,10 @@ var _saved_untracked_revision: int = 0
 ## history in one checked rebase before the next native brush transaction.
 var _native_raster_store: Object
 var _native_source_identities: Dictionary[String, Variant] = {}
+## A GDScript-only EditSession can stage a command before Rust has begun an
+## edit. Keep only weak handles: abandoned sessions must not pin the document
+## or permanently prevent an otherwise pristine host/local history handoff.
+var _open_edit_sessions: Array[WeakRef] = []
 ## Reentrant lazy providers must never resolve the same key recursively.
 var _resolving_chunks: Dictionary[String, bool] = {}
 
@@ -774,11 +795,21 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if patches.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
+	# Fail before resolving a single pending/lazy source or copying full tiles.
+	var native_tile_publisher: bool = _native_raster_store != null \
+		or ClassDB.class_exists("DrawingNativeTiles")
+	if native_tile_publisher and not _native_direct_transfer_within_budget(patches.size()):
+		return DrawingResult.failure("NATIVE_TILES", "Direct tile edit exceeds native transfer budget")
 
-	var detached: Dictionary[String, DrawingRasterTile] = {}
-	var bounds: Dictionary[String, Array] = {}
-	var before: Dictionary[String, int] = {}
-	var after: Dictionary[String, int] = {}
+	# Validate and freeze the *entire* tile-local descriptor set before any
+	# lazy source callback. Otherwise an invalid later patch can run an earlier
+	# provider, and a reentrant provider can change the patch we eventually
+	# publish without changing the document revision.
+	var validated_patches: Dictionary[String, Dictionary] = {}
+	var validated_sources: Dictionary[String, Variant] = {}
+	# Sessions may hold verified but unchanged sources besides patched tiles.
+	# Preserve those entries while still detecting reentrant map mutations.
+	var frozen_session_sources: Dictionary[String, Variant] = session_sources.duplicate()
 	for tile_key: String in patches:
 		var components: PackedStringArray = tile_key.split(",")
 		if components.size() != 2 or not components[0].is_valid_int() \
@@ -788,34 +819,48 @@ func _publish_tile_edit(layer_id: String, expected: int,
 		var tile_y: int = int(components[1])
 		if tile_key != "%d,%d" % [tile_x, tile_y]:
 			return DrawingResult.failure("COORD", "Noncanonical storage tile coordinate")
-		# When Rust owns this document, direct/older tile sessions must obey
-		# the same projection as native publication. Keep pre-native historical
-		# signed-64-bit fixtures intact until the Legacy backend is retired.
-		# Validate before tile_x * stride or any lazy source callback.
-		if _native_raster_store != null \
+		if native_tile_publisher \
 				and not TILES.tile_coordinates_in_projection_range(tile_x, tile_y, tile_stride):
 			return DrawingResult.failure("COORD", "Storage tile outside safe signed projection bounds")
 		if not session_sources.has(tile_key):
 			return DrawingResult.failure("STALE_PIXEL", "Gesture lacks its verified source tile")
-		var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
-		if not resolved.ok:
-			return resolved
-		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
-		# A source replacement without the expected document revision is also
-		# unsafe. The session's preflight captured the authoritative tile.
-		if original != session_sources[tile_key]:
-			return DrawingResult.failure("STALE_PIXEL", "Source tile changed during gesture")
-		var source_pixels: Dictionary[int, int] = {}
-		if original != null:
-			source_pixels = original.sparse_pixels()
 		var patch: Dictionary = patches[tile_key]
-		var has_zero_replacements: bool = false
 		for local_index: int in patch:
 			if local_index < 0 or local_index >= tile_stride * tile_stride:
 				return DrawingResult.failure("COORD", "Invalid storage tile offset")
 			var replacement: int = int(patch[local_index])
 			if replacement < 0 or replacement > 0xffffffff:
 				return DrawingResult.failure("RGBA", "Invalid storage tile RGBA8")
+		validated_patches[tile_key] = patch.duplicate(true)
+		validated_sources[tile_key] = session_sources[tile_key]
+
+	var detached: Dictionary[String, DrawingRasterTile] = {}
+	var bounds: Dictionary[String, Array] = {}
+	var before: Dictionary[String, int] = {}
+	var after: Dictionary[String, int] = {}
+	var source_digests: Dictionary[String, String] = {}
+	for tile_key: String in validated_patches:
+		var components: PackedStringArray = tile_key.split(",")
+		var tile_x: int = int(components[0])
+		var tile_y: int = int(components[1])
+		var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
+		if not resolved.ok:
+			return resolved
+		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
+		if original != validated_sources[tile_key]:
+			return DrawingResult.failure("STALE_PIXEL", "Source tile changed during gesture")
+		var source_pixels: Dictionary[int, int] = {}
+		if original != null:
+			source_pixels = original.sparse_pixels()
+			# Only retain a canonical SHA-256 fingerprint. Holding a second
+			# sparse Dictionary per tile could exceed the transfer budget for
+			# many dense tiles, even though the RGBA8 envelope is bounded.
+			source_digests[tile_key] = DrawingRasterTile.digest_rgba8(
+				original.to_rgba8(), tile_stride)
+		var patch: Dictionary = validated_patches[tile_key]
+		var has_zero_replacements: bool = false
+		for local_index: int in patch:
+			var replacement: int = int(patch[local_index])
 			var local_x: int = local_index % tile_stride
 			var local_y: int = local_index / tile_stride
 			var x: int = tile_x * tile_stride + local_x
@@ -837,10 +882,6 @@ func _publish_tile_edit(layer_id: String, expected: int,
 				rect[2] = maxi(int(rect[2]), x)
 				rect[3] = maxi(int(rect[3]), y)
 		if not patch.is_empty():
-			# A complete tile-local patch is already validated. Merge nonzero
-			# replacements in native Dictionary code, rather than making one
-			# GDScript set_rgba call per pixel. Transparent-black erasures must
-			# remove sparse keys; hidden-RGB alpha-zero values stay as stored.
 			var candidate: DrawingRasterTile = original.detached_copy() if original != null \
 				else DrawingRasterTile.new(tile_stride)
 			if not has_zero_replacements:
@@ -855,8 +896,79 @@ func _publish_tile_edit(layer_id: String, expected: int,
 			detached[tile_key] = candidate
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
+	# The only reentrant boundary above is source resolution. A provider may
+	# change input maps or modify an already-authorized tile *in place*, which
+	# preserves its identity. Revalidate both before Rust commits any bytes.
+	if patches.size() != validated_patches.size() \
+			or session_sources != frozen_session_sources:
+		return DrawingResult.failure("STALE_PIXEL", "Tile patch descriptors changed during preflight")
+	for tile_key: String in validated_patches:
+		if not patches.has(tile_key) or patches[tile_key] != validated_patches[tile_key] \
+				or not session_sources.has(tile_key) \
+				or session_sources[tile_key] != validated_sources[tile_key]:
+			return DrawingResult.failure("STALE_PIXEL", "Tile patch descriptors changed during preflight")
+		var source: DrawingRasterTile = validated_sources[tile_key] as DrawingRasterTile
+		if source != null and (not source_digests.has(tile_key) \
+				or DrawingRasterTile.digest_rgba8(
+					source.to_rgba8(), tile_stride) != source_digests[tile_key]):
+			return DrawingResult.failure("STALE_PIXEL", "Tile source bytes changed during preflight")
 	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, true, session_sources)
+		detached, bounds, record_history, true, validated_sources, true, true)
+
+
+## Dense Delete uses the same fail-closed whole-tile validator and native
+## history envelope as a brush transaction, but with an external atomic Rust
+## adoption instead of per-pixel GDScript staging/history reconstruction.
+## Every lazy source and snapshot is validated before native mutation; only
+## the already-prepared document projection is installed afterward.
+func _publish_dense_clear_tiles(layer_id: String, expected: int,
+		images: Dictionary[String, PackedByteArray],
+		sources: Dictionary[String, Variant],
+		bounds: Dictionary[String, Rect2i]) -> DrawingResult:
+	if not _attached_native_revision_matches(expected):
+		return DrawingResult.failure("STALE_REVISION", "Attached native raster revision diverged")
+	var checked: DrawingResult = _publish_native_tile_edit(layer_id, expected,
+		expected + 1, images, sources, bounds, true, true)
+	if not checked.ok:
+		return checked
+	var native_store: Object = _native_raster_store
+	var provisional: bool = native_store == null
+	if provisional:
+		if not ClassDB.class_exists("DrawingNativeTiles"):
+			return DrawingResult.failure("NATIVE_TILES", "Required tile ABI unavailable")
+		native_store = ClassDB.instantiate("DrawingNativeTiles")
+		if native_store == null or int(native_store.call("tile_abi_version")) != 1 \
+				or not native_store.call("configure", tile_stride, expected):
+			return DrawingResult.failure("NATIVE_TILES", "Native clear bootstrap rejected")
+	if not native_store.call("set_layer_editable", layer_id, true):
+		return DrawingResult.failure("NATIVE_TILES", "Native clear layer rejected")
+	var descriptors: Array[Dictionary] = []
+	for key: String in checked.delta.before_tiles:
+		var coordinates: PackedStringArray = key.split(",")
+		var tile_x: int = int(coordinates[0])
+		var tile_y: int = int(coordinates[1])
+		var has_native: bool = bool(native_store.call("has_source", layer_id,
+			tile_x, tile_y, expected))
+		if has_native and not provisional \
+				and not _native_source_matches(layer_id, key, sources[key] as DrawingRasterTile):
+			return DrawingResult.failure("STALE_PIXEL", "Clear source lost native identity")
+		var old: PackedByteArray = checked.delta.before_tiles[key]
+		var next: PackedByteArray = checked.delta.after_tiles[key]
+		if provisional and not native_store.call("import_source", layer_id,
+				tile_x, tile_y, expected, old):
+			return DrawingResult.failure("NATIVE_TILES", "Native clear source import rejected")
+		descriptors.append({"tile_x": tile_x, "tile_y": tile_y,
+			"before": old, "after": next})
+	var adopted: Dictionary = native_store.call("adopt_external_edit",
+		layer_id, expected, descriptors)
+	if not bool(adopted.get("ok", false)) \
+			or int(adopted.get("revision", -1)) != expected + 1:
+		return DrawingResult.failure("NATIVE_TILES", str(adopted.get("error", "Native clear rejected")))
+	if provisional:
+		_native_raster_store = native_store
+		_native_source_identities.clear()
+	return _install_prepared_native_tile_edit(layer_id, expected, expected + 1,
+		checked, true, int(adopted.get("history_token", 0)))
 
 
 ## Publish detached whole-tile snapshots from a native brush transaction.
@@ -873,21 +985,24 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 	if not _nodes.has(layer_id) or _nodes[layer_id].kind != DrawingLayerNode.RASTER \
 			or not _editable(layer_id):
 		return DrawingResult.failure("LOCKED", "Edited raster layer became unavailable")
-	if images.is_empty() or images.size() > 128 or bounds.size() != images.size():
-		return DrawingResult.failure("NATIVE_TILES", "Invalid native tile publication count")
-	var prepared: Dictionary[String, DrawingRasterTile] = {}
-	var before_bytes: Dictionary[String, PackedByteArray] = {}
-	var after_bytes: Dictionary[String, PackedByteArray] = {}
-	var regions: Array[DrawingDirtyRegion] = []
+	if images.is_empty() or bounds.size() != images.size() \
+			or not _native_direct_transfer_within_budget(images.size()):
+		return DrawingResult.failure("NATIVE_TILES", "Native tile publication exceeds transfer bounds")
+	# Validate and freeze *every* caller-owned descriptor before resolving a
+	# lazy source. A later malformed tile must not execute an earlier source's
+	# callback; a reentrant callback must not replace a validated RGBA8 buffer.
+	var validated_images: Dictionary[String, PackedByteArray] = {}
+	var validated_bounds: Dictionary[String, Rect2i] = {}
+	var validated_sources: Dictionary[String, Variant] = {}
 	for key: String in images:
-		var components: PackedStringArray = key.split(",")
-		if components.size() != 2 or not components[0].is_valid_int() \
-				or not components[1].is_valid_int():
+		var parts: PackedStringArray = key.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() \
+				or not parts[1].is_valid_int():
 			return DrawingResult.failure("COORD", "Invalid native tile key")
-		var cx: int = int(components[0])
-		var cy: int = int(components[1])
-		if key != "%d,%d" % [cx, cy] \
-				or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
+		var tx: int = int(parts[0])
+		var ty: int = int(parts[1])
+		if key != "%d,%d" % [tx, ty] \
+				or not TILES.tile_coordinates_in_projection_range(tx, ty, tile_stride):
 			return DrawingResult.failure("COORD", "Native tile coordinate outside safe bounds")
 		if not sources.has(key) or not bounds.has(key):
 			return DrawingResult.failure("STALE_PIXEL", "Native tile lacks verified source or dirty bounds")
@@ -895,15 +1010,28 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 		if not dirty.has_area() or dirty.position.x < 0 or dirty.position.y < 0 \
 				or dirty.end.x > tile_stride or dirty.end.y > tile_stride:
 			return DrawingResult.failure("COORD", "Native tile dirty bounds invalid")
+		var bytes: PackedByteArray = images[key]
+		if bytes.size() != tile_stride * tile_stride * 4:
+			return DrawingResult.failure("RGBA", "Native RGBA8 tile length mismatch")
+		validated_images[key] = bytes.duplicate()
+		validated_bounds[key] = dirty
+		validated_sources[key] = sources[key]
+	var prepared: Dictionary[String, DrawingRasterTile] = {}
+	var before_bytes: Dictionary[String, PackedByteArray] = {}
+	var after_bytes: Dictionary[String, PackedByteArray] = {}
+	var regions: Array[DrawingDirtyRegion] = []
+	for key: String in validated_images:
+		var components: PackedStringArray = key.split(",")
+		var cx: int = int(components[0])
+		var cy: int = int(components[1])
+		var dirty: Rect2i = validated_bounds[key]
 		var resolved: DrawingResult = _resolve_chunk(layer_id, key)
 		if not resolved.ok:
 			return resolved
 		var original: DrawingRasterTile = resolved.value as DrawingRasterTile
-		if original != sources[key]:
+		if original != validated_sources[key]:
 			return DrawingResult.failure("STALE_PIXEL", "Native source identity changed")
-		var bytes: PackedByteArray = images[key]
-		if bytes.size() != tile_stride * tile_stride * 4:
-			return DrawingResult.failure("RGBA", "Native RGBA8 tile length mismatch")
+		var bytes: PackedByteArray = validated_images[key]
 		var candidate: DrawingRasterTile = DrawingRasterTile.from_rgba8(tile_stride, bytes)
 		var previous: PackedByteArray = original.to_rgba8() if original != null \
 			else PackedByteArray()
@@ -920,10 +1048,24 @@ func _publish_native_tile_edit(layer_id: String, expected: int,
 	# is the last point at which a full rejection can leave Rust untouched.
 	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id):
 		return DrawingResult.failure("STALE_REVISION", "Preflight source changed document authority")
+	if images.size() != validated_images.size() or bounds.size() != validated_bounds.size() \
+			or sources.size() != validated_sources.size():
+		return DrawingResult.failure("STALE_PIXEL", "Native publication inputs changed during preflight")
 	for key: String in prepared:
-		if _pending_tiles.has(layer_id + ":" + key) \
-				or _nodes[layer_id].tiles.get(key) != sources[key]:
-			return DrawingResult.failure("STALE_PIXEL", "Preflight source identity changed")
+		if not images.has(key) or images[key] != validated_images[key] \
+				or not bounds.has(key) or bounds[key] != validated_bounds[key] \
+				or not sources.has(key) or sources[key] != validated_sources[key] \
+				or _pending_tiles.has(layer_id + ":" + key) \
+				or _nodes[layer_id].tiles.get(key) != validated_sources[key]:
+			return DrawingResult.failure("STALE_PIXEL", "Native publication source or descriptor changed")
+		# A later source callback may mutate an earlier tile in place while
+		# preserving object identity and document revision. The previously
+		# snapshotted original must still match before the Rust commit.
+		var resident: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
+		var resident_bytes: PackedByteArray = resident.to_rgba8() if resident != null \
+			else PackedByteArray()
+		if resident_bytes != before_bytes[key]:
+			return DrawingResult.failure("STALE_PIXEL", "Native publication source bytes changed")
 	var result: DrawingResult = DrawingResult.success(null, native_revision)
 	result.regions = regions
 	result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
@@ -996,14 +1138,22 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if undo_action else delta.after_tiles
 	if expected.is_empty() or expected.size() != replacement.size() or expected.size() > 128:
 		return DrawingResult.failure("HISTORY_TARGET", "Invalid native history tile count")
-	var base_revision: int = revision
-	var source_node: DrawingLayerNode = _nodes[delta.layer_id]
-	var detached: Dictionary[String, DrawingRasterTile] = {}
-	var sources: Dictionary[String, Variant] = {}
+	# Reject an oversized history envelope *before* lazy source resolution and
+	# whole-tile snapshots. The same conservative bound applies in the Rust ABI.
+	if expected.size() * tile_stride * tile_stride * 4 * 3 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+		return DrawingResult.failure("HISTORY_TARGET", "Native history exceeds tile memory budget")
+	# Validate and detach the whole history payload before resolving any lazy
+	# source. Otherwise a bad later tile can invoke an earlier provider, or a
+	# provider can rewrite a later buffer before it is snapshotted.
+	var source_layer: String = delta.layer_id
+	var source_stride: int = delta.tile_stride
+	var source_token: int = delta.native_history_token
+	var frozen_keys: Array[String] = replacement.keys()
 	var original_bytes: Dictionary[String, PackedByteArray] = {}
 	var replacement_bytes: Dictionary[String, PackedByteArray] = {}
-	var regions: Array[DrawingDirtyRegion] = []
-	for key: String in replacement:
+	var coordinates_by_key: Dictionary[String, Vector2i] = {}
+	var full_length: int = tile_stride * tile_stride * 4
+	for key: String in frozen_keys:
 		if not expected.has(key):
 			return DrawingResult.failure("HISTORY_TARGET", "Native history snapshot missing")
 		var coordinates: PackedStringArray = key.split(",")
@@ -1015,20 +1165,36 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if key != "%d,%d" % [cx, cy] \
 				or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride):
 			return DrawingResult.failure("COORD", "Native history tile outside safe bounds")
-		# Take immutable preflight snapshots: a lazy provider can reenter and
-		# mutate either the document or its caller-owned delta dictionaries.
 		var before: PackedByteArray = expected[key].duplicate()
 		var after: PackedByteArray = replacement[key].duplicate()
-		var full_length: int = tile_stride * tile_stride * 4
 		if (not before.is_empty() and before.size() != full_length) \
 				or (not after.is_empty() and after.size() != full_length):
 			return DrawingResult.failure("RGBA", "Native history buffer malformed")
-		var resolved: DrawingResult = _resolve_chunk(delta.layer_id, key)
+		original_bytes[key] = before
+		replacement_bytes[key] = after
+		coordinates_by_key[key] = Vector2i(cx, cy)
+	# Fail before any lazy provider is invoked. Even a byte-identical out-of-
+	# order replay must not invalidate newer retained native history entries.
+	if source_token > 0 and _native_raster_store != null \
+			and _attached_native_revision_matches(revision) \
+			and not _native_raster_store.call("has_history_token", source_token,
+				revision, undo_action) \
+			and _native_raster_store.call("has_retained_history_token", source_token):
+		return DrawingResult.failure("HISTORY_ORDER", "Native history token is retained out of order")
+	var base_revision: int = revision
+	var source_node: DrawingLayerNode = _nodes[source_layer]
+	var detached: Dictionary[String, DrawingRasterTile] = {}
+	var sources: Dictionary[String, Variant] = {}
+	var regions: Array[DrawingDirtyRegion] = []
+	for key: String in frozen_keys:
+		var before: PackedByteArray = original_bytes[key]
+		var after: PackedByteArray = replacement_bytes[key]
+		var resolved: DrawingResult = _resolve_chunk(source_layer, key)
 		if not resolved.ok:
 			return resolved
-		if revision != base_revision or not _nodes.has(delta.layer_id) \
-				or not is_same(_nodes[delta.layer_id], source_node) \
-				or not _editable(delta.layer_id):
+		if revision != base_revision or not _nodes.has(source_layer) \
+				or not is_same(_nodes[source_layer], source_node) \
+				or not _editable(source_layer):
 			return DrawingResult.failure("STALE_REVISION", "History source changed during lazy load")
 		var source: DrawingRasterTile = resolved.value as DrawingRasterTile
 		var source_bytes: PackedByteArray = source.to_rgba8() if source != null \
@@ -1036,26 +1202,38 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 		if source_bytes != before and not (source_bytes.is_empty() and \
 				before.count(0) == before.size()):
 			return DrawingResult.failure("STALE_PIXEL", "Native history source differs")
-		original_bytes[key] = before
-		replacement_bytes[key] = after
 		sources[key] = source
 		if not after.is_empty():
 			detached[key] = DrawingRasterTile.from_rgba8(tile_stride, after)
-		regions.append(DrawingDirtyRegion.new(delta.layer_id,
-			cx * tile_stride, cy * tile_stride, tile_stride, tile_stride))
+		var tile: Vector2i = coordinates_by_key[key]
+		regions.append(DrawingDirtyRegion.new(source_layer,
+			tile.x * tile_stride, tile.y * tile_stride, tile_stride, tile_stride))
 	# All lazy callbacks have returned. Recheck the full source set before
 	# consuming an irreversible Rust history token or installing any tiles.
-	if revision != base_revision or not _nodes.has(delta.layer_id) \
-			or not is_same(_nodes[delta.layer_id], source_node) \
-			or not _editable(delta.layer_id):
+	if revision != base_revision or not _nodes.has(source_layer) \
+			or not is_same(_nodes[source_layer], source_node) \
+			or not _editable(source_layer):
 		return DrawingResult.failure("STALE_REVISION", "History replay lost document authority")
+	# Compare the *live* delta fields, not only the aliases retained above.
+	# The owner may replace a dictionary or change its layer/stride/token from
+	# inside a lazy callback, even when the frozen tile buffers remain valid.
+	var live_expected: Dictionary[String, PackedByteArray] = delta.after_tiles \
+		if undo_action else delta.before_tiles
+	var live_replacement: Dictionary[String, PackedByteArray] = delta.before_tiles \
+		if undo_action else delta.after_tiles
+	if delta.layer_id != source_layer or delta.tile_stride != source_stride \
+			or delta.native_history_token != source_token \
+			or live_expected.size() != original_bytes.size() \
+			or live_replacement.size() != replacement_bytes.size():
+		return DrawingResult.failure("STALE_PIXEL", "History descriptor changed during source loading")
 	for key: String in sources:
-		if _pending_tiles.has(delta.layer_id + ":" + key) \
-				or not is_same(_nodes[delta.layer_id].tiles.get(key), sources[key]) \
-				or expected.get(key) != original_bytes[key] \
-				or replacement.get(key) != replacement_bytes[key]:
+		if _pending_tiles.has(source_layer + ":" + key) \
+				or not is_same(_nodes[source_layer].tiles.get(key), sources[key]) \
+				or not live_expected.has(key) or not live_replacement.has(key) \
+				or live_expected[key] != original_bytes[key] \
+				or live_replacement[key] != replacement_bytes[key]:
 			return DrawingResult.failure("STALE_PIXEL", "History source identity or snapshot changed")
-		var resident: DrawingRasterTile = _nodes[delta.layer_id].tiles.get(key)
+		var resident: DrawingRasterTile = _nodes[source_layer].tiles.get(key)
 		var current: PackedByteArray = resident.to_rgba8() if resident != null \
 			else PackedByteArray()
 		var before: PackedByteArray = original_bytes[key]
@@ -1094,9 +1272,15 @@ func _replay_native_tile_delta(delta: DrawingDelta, undo_action: bool) -> Drawin
 				return DrawingResult.failure("NATIVE_HISTORY", "Native history source import rejected")
 	if not replay_store.call("set_layer_editable", delta.layer_id, true):
 		return DrawingResult.failure("NATIVE_HISTORY", "Detached replay layer rejected")
-	var live_token: bool = current_store and delta.native_history_token > 0 and \
-		replay_store.call("has_history_token", delta.native_history_token,
+	var live_token: bool = current_store and source_token > 0 and \
+		replay_store.call("has_history_token", source_token,
 			base_revision, undo_action)
+	# Detached replay invalidates Rust Undo/Redo. A retained token that is not
+	# the next event belongs to the live timeline and must fail without a
+	# fallback, even when the requested tiles are disjoint from newer edits.
+	if current_store and source_token > 0 and not live_token \
+			and replay_store.call("has_retained_history_token", source_token):
+		return DrawingResult.failure("HISTORY_ORDER", "Native history token is retained out of order")
 	var native_replay: Dictionary
 	if live_token:
 		native_replay = replay_store.call("replay_history_token",
@@ -1146,44 +1330,66 @@ func _publish_edit(layer_id: String, expected: int,
 		return DrawingResult.failure("LOCKED", "Edited layer became unavailable")
 	if after.is_empty():
 		return DrawingResult.failure("NO_CHANGE", "Gesture made no content changes")
+	# Validate and freeze the complete pixel-map request before any lazy source
+	# callback. In particular, a malformed *later* original/replacement cannot
+	# run an earlier provider, and reentrant providers cannot change the staged
+	# values or the eventual history delta without changing document revision.
+	var native_pixel_publisher: bool = _native_raster_store != null \
+		or (tile_stride >= 16 and tile_stride <= 2048 \
+		and ClassDB.class_exists("DrawingNativeTiles"))
+	var frozen_before: Dictionary[String, int] = before.duplicate()
+	var frozen_after: Dictionary[String, int] = after.duplicate()
+	var touched: Dictionary[String, bool] = {}
+	for coordinate: String in frozen_after:
+		var parts: PackedStringArray = coordinate.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() \
+				or not parts[1].is_valid_int():
+			return DrawingResult.failure("COORD", "Invalid pixel coordinate")
+		var x: int = int(parts[0])
+		var y: int = int(parts[1])
+		if coordinate != TILES.pixel_key64(x, y) \
+				or (native_pixel_publisher \
+				and not TILES.pixel_coordinates_in_projection_range(x, y)):
+			return DrawingResult.failure("COORD", "Invalid signed native pixel coordinate")
+		if not frozen_before.has(coordinate):
+			return DrawingResult.failure("STALE_PIXEL", "Gesture lacks original pixel")
+		if frozen_before[coordinate] < 0 or frozen_before[coordinate] > 0xffffffff \
+				or frozen_after[coordinate] < 0 or frozen_after[coordinate] > 0xffffffff:
+			return DrawingResult.failure("RGBA", "Invalid pixel-map RGBA8 value")
+		if native_pixel_publisher:
+			touched[TILES.tile_key64(x, y, tile_stride)] = true
+			if not _native_direct_transfer_within_budget(touched.size()):
+				return DrawingResult.failure("NATIVE_TILES", "Direct pixel edit exceeds native transfer budget")
 
 	var detached: Dictionary[String, DrawingRasterTile] = {}
 	var bounds: Dictionary[String, Array] = {}
-	# Publication validates every original before installing any detached tile.
-	# A source tile is immutable during the validation pass, barring a
-	# reentrant provider; revision/editability are checked again before install:
-	# resolve it once per touched tile, not once per changed pixel. Null is a
-	# valid resolved (unallocated) tile; failures are returned immediately.
 	var sources: Dictionary[String, Variant] = {}
-	for coordinate: String in after:
+	var source_digests: Dictionary[String, String] = {}
+	# Resolve each tile only once. Fingerprint canonical source bytes as soon
+	# as they are verified: object identity alone cannot detect in-place changes
+	# made to an earlier tile by a later provider.
+	for coordinate: String in frozen_after:
 		var components: PackedStringArray = coordinate.split(",")
-		if components.size() != 2 or not components[0].is_valid_int() \
-				or not components[1].is_valid_int():
-			return DrawingResult.failure("COORD", "Invalid pixel coordinate")
 		var x: int = int(components[0])
 		var y: int = int(components[1])
-		if coordinate != TILES.pixel_key64(x, y):
-			return DrawingResult.failure("COORD", "Noncanonical signed pixel coordinate")
-		# A native-attached document cannot accept an unprojectable direct
-		# pixel outside Rust's shared signed tile/history boundary. Old
-		# non-native direct sessions retain their historical 64-bit tests.
-		if _native_raster_store != null \
-				and not TILES.pixel_coordinates_in_projection_range(x, y):
-			return DrawingResult.failure("COORD", "Pixel outside safe signed projection bounds")
 		var tile_key: String = TILES.tile_key64(x, y, tile_stride)
 		if not sources.has(tile_key):
 			var resolved: DrawingResult = _resolve_chunk(layer_id, tile_key)
 			if not resolved.ok:
 				return resolved
 			sources[tile_key] = resolved.value
+			var source: DrawingRasterTile = resolved.value as DrawingRasterTile
+			if source != null:
+				source_digests[tile_key] = DrawingRasterTile.digest_rgba8(
+					source.to_rgba8(), tile_stride)
 		var existing: DrawingRasterTile = sources[tile_key] as DrawingRasterTile
 		var point: Vector2i = TILES.local_offset64(x, y, tile_stride)
 		var original: int = existing.get_rgba(point.x, point.y) if existing != null else 0
-		if original != before.get(coordinate, -1):
+		if original != frozen_before[coordinate]:
 			return DrawingResult.failure("STALE_PIXEL", "Source pixel changed during gesture")
 		if not detached.has(tile_key):
 			detached[tile_key] = existing.detached_copy() if existing != null else DrawingRasterTile.new(tile_stride)
-		detached[tile_key].set_rgba(point.x, point.y, after[coordinate])
+		detached[tile_key].set_rgba(point.x, point.y, frozen_after[coordinate])
 		if not bounds.has(tile_key):
 			bounds[tile_key] = [x, y, x, y]
 		else:
@@ -1193,8 +1399,15 @@ func _publish_edit(layer_id: String, expected: int,
 			rect[2] = maxi(int(rect[2]), x)
 			rect[3] = maxi(int(rect[3]), y)
 
-	return _install_prepared_edit(layer_id, expected, before, after,
-		detached, bounds, record_history, false, sources, track_unrecorded)
+	if before != frozen_before or after != frozen_after:
+		return DrawingResult.failure("STALE_PIXEL", "Pixel-map inputs changed during preflight")
+	for tile_key: String in source_digests:
+		var source: DrawingRasterTile = sources[tile_key] as DrawingRasterTile
+		if DrawingRasterTile.digest_rgba8(source.to_rgba8(), tile_stride) != source_digests[tile_key]:
+			return DrawingResult.failure("STALE_PIXEL", "Tile source bytes changed during preflight")
+	return _install_prepared_edit(layer_id, expected, frozen_before, frozen_after,
+		detached, bounds, record_history, false, sources, track_unrecorded,
+		native_pixel_publisher)
 
 
 ## Shared atomic installation, history and dirty-region publication for both
@@ -1205,7 +1418,8 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		bounds: Dictionary[String, Array], record_history: bool,
 		owned_history_maps: bool = false,
 		sources: Dictionary[String, Variant] = {},
-		track_unrecorded: bool = true) -> DrawingResult:
+		track_unrecorded: bool = true,
+		bootstrap_native: bool = false) -> DrawingResult:
 	# All source resolution must have finished before the native commit. Do not
 	# call a lazy provider after Rust accepts an external tile transaction.
 	if revision != expected or not _nodes.has(layer_id) or not _editable(layer_id) \
@@ -1223,25 +1437,35 @@ func _install_prepared_edit(layer_id: String, expected: int,
 	# Once Rust owns this document, even a non-historical direct raster edit
 	# must advance its canonical tiles in the same revision. Untracked edits
 	# invalidate native Undo tokens; they never invent a history event.
-	# The last preflight above proved an attached store is at exactly the
-	# document revision. Only a genuinely native-absent document uses the
-	# historical GDScript-only projection until T-150 retires that backend.
-	var adopt: bool = _native_raster_store != null
+	# First tile-local edits may attach a provisional native owner. It is never
+	# published to the document unless the Rust adoption succeeds; failed
+	# imports or edits leave canonical authority and history unchanged. Both
+	# direct pixel-map and tile-local publishers acquire Rust on first use.
+	var native_store: Object = _native_raster_store
+	var provisional_store: bool = false
+	if native_store == null and bootstrap_native and ClassDB.class_exists("DrawingNativeTiles"):
+		native_store = ClassDB.instantiate("DrawingNativeTiles")
+		if native_store == null or int(native_store.call("tile_abi_version")) != 1 \
+				or not native_store.call("configure", tile_stride, expected):
+			return DrawingResult.failure("NATIVE_TILES", "Native tile bootstrap rejected")
+		provisional_store = true
+	var adopt: bool = native_store != null
 	var originals: Dictionary[String, PackedByteArray] = {}
 	var replacements: Dictionary[String, PackedByteArray] = {}
 	var descriptors: Array[Dictionary] = []
 	if adopt:
-		if detached.size() > 128:
-			return DrawingResult.failure("NATIVE_TILES", "External raster transaction exceeds 128 tiles")
+		if not _native_direct_transfer_within_budget(detached.size()):
+			return DrawingResult.failure("NATIVE_TILES", "External raster transaction exceeds native transfer budget")
 		for key: String in detached:
 			var parts: PackedStringArray = key.split(",")
 			if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int() \
 					or key != "%d,%d" % [int(parts[0]), int(parts[1])]:
 				return DrawingResult.failure("COORD", "Invalid native external tile key")
 			var source: DrawingRasterTile = sources[key] as DrawingRasterTile
-			var has_native: bool = bool(_native_raster_store.call("has_source", layer_id,
+			var has_native: bool = bool(native_store.call("has_source", layer_id,
 				int(parts[0]), int(parts[1]), expected))
-			if has_native and not _native_source_matches(layer_id, key, source):
+			if has_native and not provisional_store \
+					and not _native_source_matches(layer_id, key, source):
 				return DrawingResult.failure("STALE_PIXEL", "External tile lost native source identity")
 			var from_bytes: PackedByteArray = source.to_rgba8() if source != null else PackedByteArray()
 			var to_bytes: PackedByteArray = detached[key].to_rgba8()
@@ -1254,17 +1478,29 @@ func _install_prepared_edit(layer_id: String, expected: int,
 		# validation that could reject the paired Godot projection.
 		result.delta = DrawingDelta.from_owned_tile_bytes(layer_id, tile_stride,
 			originals, replacements)
-		if not _native_raster_store.call("set_layer_editable", layer_id, true):
+		if not native_store.call("set_layer_editable", layer_id, true):
 			return DrawingResult.failure("NATIVE_TILES", "Native raster layer rejected")
+		if provisional_store:
+			# A previously loaded or unmodified tile already has source bytes in
+			# Godot. The fresh Rust store must authorize those *exact* originals
+			# before adopting their replacements; no live store is mutated here.
+			for descriptor: Dictionary in descriptors:
+				if not native_store.call("import_source", layer_id,
+						int(descriptor["tile_x"]), int(descriptor["tile_y"]),
+						expected, descriptor["before"]):
+					return DrawingResult.failure("NATIVE_TILES", "Native bootstrap source rejected")
 		# The call is failure-atomic on the Rust side. The document projection
 		# then installs only detached tiles, with no fallible source lookups.
 		var native_method: String = "adopt_external_edit" if record_history else "adopt_untracked_edit"
-		var accepted: Dictionary = _native_raster_store.call(native_method,
+		var accepted: Dictionary = native_store.call(native_method,
 			layer_id, expected, descriptors)
 		if not bool(accepted.get("ok", false)) or int(accepted.get("revision", -1)) != expected + 1:
 			return DrawingResult.failure("NATIVE_TILES", str(accepted.get("error", "Native adoption failed")))
 		if record_history:
 			result.delta.native_history_token = int(accepted.get("history_token", 0))
+		if provisional_store:
+			_native_raster_store = native_store
+			_native_source_identities.clear()
 	else:
 		result.delta = DrawingDelta.from_owned_maps(layer_id, before, after) if owned_history_maps \
 			else DrawingDelta.new(layer_id, before, after)
@@ -1318,12 +1554,47 @@ func display_changes_since(old_revision: int) -> Dictionary:
 	return {"full": false, "regions": regions}
 
 
+## Both document.begin_edit() and direct DrawingEditSession constructors
+## register their pending commands here, before any pixels or Rust edits exist.
+func _register_edit_session(session: DrawingEditSession) -> void:
+	_has_pending_edit_sessions()
+	_open_edit_sessions.append(weakref(session))
+
+
+## An open script session holds a command-owner reservation even if it has
+## not yet staged a pixel or attached Rust. Closed and freed sessions do not.
+func _has_pending_edit_sessions() -> bool:
+	var live: Array[WeakRef] = []
+	for holder: WeakRef in _open_edit_sessions:
+		var session: DrawingEditSession = holder.get_ref() as DrawingEditSession
+		if session != null and not session._closed:
+			live.append(holder)
+	_open_edit_sessions = live
+	return not live.is_empty()
+
+
 ## A host must select external ownership *before* it begins committing edits.
 ## Switching a document with existing local entries would silently split history.
 func set_external_history(enabled: bool) -> DrawingResult:
-	if enabled != external_history and not _events.is_empty():
+	if enabled == external_history:
+		return DrawingResult.success()
+	if _has_pending_edit_sessions():
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot switch history owner during an edit session")
+	# A native gesture may already have staged tiles without committing a
+	# document revision. Its eventual command owner must not change mid-edit.
+	if _native_raster_store != null and (not _native_raster_store.has_method("has_active_edit")
+			or bool(_native_raster_store.call("has_active_edit"))):
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot switch history owner during a native edit")
+	if not _events.is_empty():
 		return DrawingResult.failure("HISTORY_OWNED", "Cannot migrate an existing local history implicitly")
-	external_history = enabled
+	# Atlas commands are not stored in _events. Once a host-owned revision is
+	# committed, allowing a local takeover would orphan external Undo/Redo
+	# events and native tokens. Even undoing back to identical pixels advances
+	# the revision, and a repeated enable must not reset this ownership fence.
+	if external_history and revision != _external_history_anchor_revision:
+		return DrawingResult.failure("HISTORY_OWNED", "Cannot discard an active external history implicitly")
+	_external_history = enabled
+	_external_history_anchor_revision = revision if enabled else -1
 	return DrawingResult.success()
 
 
@@ -1570,7 +1841,7 @@ func _replay_pixel_delta_native(delta: DrawingDelta, undo_action: bool) -> Drawi
 	# Bound the detached bytes prepared in Godot *before* entering Rust. Three
 	# full spans per tile cover source, replacement and temporary native replay.
 	var bytes_per_tile: int = tile_stride * tile_stride * 4
-	var max_tiles: int = mini(128, (256 * 1024 * 1024) / (3 * bytes_per_tile))
+	var max_tiles: int = mini(128, MAX_NATIVE_HISTORY_TRANSFER_BYTES / (3 * bytes_per_tile))
 	for coordinate: String in replacement:
 		if not expected.has(coordinate):
 			return DrawingResult.failure("HISTORY_TARGET", "Legacy pixel history is incomplete")
@@ -1634,7 +1905,12 @@ func replay_delta(delta: DrawingDelta, undo_action: bool) -> DrawingResult:
 	var result: DrawingResult
 	if delta.tile_stride > 0:
 		result = _replay_native_tile_delta(delta, undo_action)
-	elif _native_raster_store != null:
+	elif _native_raster_store != null or (tile_stride >= 16 and tile_stride <= 2048
+			and ClassDB.class_exists("DrawingNativeTiles")):
+		# Even a detached legacy/Atlas pixel event must acquire Rust ownership
+		# when its storage stride is supported by the native tile ABI.
+		# Otherwise it advances Godot alone and the next native gesture has to
+		# invalidate the host timeline at a checked rebase boundary.
 		result = _replay_pixel_delta_native(delta, undo_action)
 	else:
 		result = _publish_edit(delta.layer_id, revision,

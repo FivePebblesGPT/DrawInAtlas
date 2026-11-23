@@ -117,10 +117,20 @@ func run() -> void:
 	check(pixel(canvas, Vector2(0.5, 260.5)).b < 0.4,
 		"Undo removes blue without changing committed red")
 	check(doc.redo().ok, "Redo source transaction")
-	canvas.queue_redraw()
-	await frames(3)
-	check(pixel(canvas, Vector2(0.5, 260.5)).b > 0.6,
-		"Redo restores blue source pixel")
+	# A redo invalidates the populated display cache. Cold composition is
+	# intentionally budgeted across several frames; three frames are not
+	# enough to guarantee that the preview-only tile has repopulated.
+	var redo_settled: bool = false
+	for _index: int in range(24):
+		canvas.queue_redraw()
+		await frames(2)
+		if int(canvas.last_frame_metrics.get("cold_tiles_deferred", -1)) == 0:
+			redo_settled = true
+			break
+	check(redo_settled, "Redo completes bounded cold display repopulation")
+	check(int(doc.read_pixel(layer, 0, 260).value) == 0xffdd2233
+		and pixel(canvas, Vector2(0.5, 260.5)).b > 0.6,
+		"Redo restores exact canonical source and visible framebuffer pixel")
 	print("T137_NATIVE_METRICS " + JSON.stringify({"first": first,
 		"frames": collected.size(), "final": canvas.last_frame_metrics}))
 	print("T137_NATIVE_PASSED checks=%d failures=%d" % [checks, failures])

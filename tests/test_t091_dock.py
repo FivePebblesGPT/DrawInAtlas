@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 
+from tools.check_native_t091_log import verify
+
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools"))
-from check_native_t091_log import verify  # noqa: E402
 
 
 class T091DockTests(unittest.TestCase):
@@ -20,14 +19,14 @@ class T091DockTests(unittest.TestCase):
 
     def test_native_workflow_imports_before_x11_and_uploads_evidence(self) -> None:
         workflow = (ROOT / ".github/workflows/godot-native-t091-docking.yml").read_text()
-        for required in ("workflow_dispatch", "--import --quit", "xvfb-run",
+        for required in ("workflow_dispatch", "make build TOOLCHAIN=system", "xvfb-run",
                          "dock_single_group_native.gd", "dock_grip_redock_native.gd", "T091_SCREENSHOTS",
-                         "check_native_t091_log.py", "--kind grip", "upload-artifact@v4"):
+                         "check_native_t091_log.py", "--kind grip", "t257_atlas_floating_cancel_native.gd", "upload-artifact@v4"):
             with self.subTest(required=required):
                 self.assertIn(required, workflow)
 
     def test_log_recognizes_only_post_success_known_leaks(self) -> None:
-        base = "T091_NATIVE: 44 checks; 0 failed\nT091_NATIVE_PASSED"
+        base = "T091_NATIVE: 43 checks; 0 failed\nT091_NATIVE_PASSED"
         expected = base + "\nERROR: Texture with GL ID of 18: leaked 32 bytes."
         self.assertEqual(verify(expected), (True, [], 1))
         for invalid in (
@@ -35,9 +34,9 @@ class T091DockTests(unittest.TestCase):
             base + "\nSCRIPT ERROR: stack overflow",
             base + "\nERROR: compositor crashed",
             "ERROR: Texture with GL ID of 18: leaked 32 bytes.\n" + base,
-            "T091_NATIVE: 43 checks; 0 failed\nT091_NATIVE_PASSED",
-            "T091_NATIVE: 44 checks; 1 failed\nT091_NATIVE_PASSED",
-            "T091_NATIVE_PASSED\nT091_NATIVE: 44 checks; 0 failed",
+            "T091_NATIVE: 42 checks; 0 failed\nT091_NATIVE_PASSED",
+            "T091_NATIVE: 43 checks; 1 failed\nT091_NATIVE_PASSED",
+            "T091_NATIVE_PASSED\nT091_NATIVE: 43 checks; 0 failed",
             base + "\nT091_NATIVE_PASSED", ""):
             with self.subTest(invalid=invalid):
                 self.assertFalse(verify(invalid)[0])

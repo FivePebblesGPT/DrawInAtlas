@@ -21,6 +21,89 @@ T-176 checked replay boundary. The T-168 raster-bearing park/retire path and
 native-absent operations are unchanged. This does not confer universal
 T-148 host-history authority. See [T-179 evidence](evidence/T-179-2026-11-16-semantic-removal.md).
 
+**Bounded native-history transport (T-229, 2026-11-22):** A
+`DrawingDocument` whole-tile Undo/Redo envelope is rejected with
+`HISTORY_TARGET` if `tile_count * stride * stride * 4 * 3` exceeds 256 MiB
+(the same conservative source/before/after span budget as the native store).
+This check precedes lazy source callbacks, detached tile construction and
+native token consumption. The `DrawingNativeTiles.replay_detached_history`
+and `replay_history_token` GDExtension entries independently enforce the
+same stride-dependent cap **before** converting `PackedByteArray` payloads
+into Rust `Vec<u8>`. The 128-tile identity limit is retained; at stride 2048,
+at most five tiles fit this envelope. This is a conservative transfer bound,
+not a claim about process RSS, fully resident mixed-document history, or
+completion of universal T-148 authority. [Execution evidence](evidence/T-229-2026-11-22-history-budget.md).
+
+**Stride-dependent direct-edit transfer bound (T-231, 2026-11-22):**
+With an attached store, `_publish_edit` (pixel maps) counts unique storage
+tile IDs and `_publish_tile_edit` checks patch tile count **before** lazy
+source reads. `_install_prepared_edit` rechecks the three-span envelope,
+`tile_count * stride² * 4 * 3 <= 256 MiB`, with at most 128 tiles before
+constructing full RGBA8 adoption descriptors. Both
+`DrawingNativeTiles.adopt_external_edit` and `adopt_untracked_edit` check
+the same bound **before** converting `PackedByteArray` into Rust `Vec`.
+Six 2048px tiles reject, 64px signed small edits still commit and retain
+byte-exact history/Save/Open. Non-native historical edit production is
+unchanged; aggregate resident memory and general native ownership are not
+claimed. [Execution evidence](evidence/T-231-2026-11-22-direct-budget.md).
+
+**First direct tile-local edit bootstrap (T-232, 2026-11-22):** When the
+Rust class is available but the document has no attached native store,
+`_publish_tile_edit` preflights the same bound and safe signed projection
+*before* resolving pending sources. After the source-identity validation,
+`_install_prepared_edit` configures a **provisional** `DrawingNativeTiles`
+store at the live document revision and imports only touched original tile
+bytes. Its `adopt_external_edit` (or `adopt_untracked_edit`) must succeed before
+the store is attached to the `DrawingDocument`. A failed preflight, source
+import or Rust adoption cannot install a partial native owner or any Godot
+projection. Successful recorded edits produce the same full-tile
+`DrawingDelta` with native token as existing attached edits; untracked
+edits never invent an Undo token. Public `request_chunk` produces a *copy*,
+not a valid session-owned source identity. The older global-pixel
+`_publish_edit` path still deliberately retains native-absent production;
+T-148 and T-149 remain open. [T-232 evidence](evidence/T-232-2026-11-22-tile-bootstrap.md).
+
+## Native Brush publication input preflight (T-234)
+
+Before `_publish_native_tile_edit` calls any lazy source provider, the
+Godot document validates a complete native output descriptor set: one to 128
+signed, canonical in-projection tiles, a conservative three-span transfer
+envelope no larger than 256 MiB, matching expected source identities and
+in-tile dirty rectangles, and exactly `stride * stride * 4` RGBA8 bytes for
+each tile. It freezes the incoming RGBA8 buffers and metadata, then checks
+that no lazy callback modified the caller-owned inputs before yielding a
+prepared document edit. Rejection publishes neither pixels nor document
+revision. This applies to the native Brush projection only; the separate
+Rust transaction's own authorization and memory limits still apply.
+[T-234 evidence](evidence/T-234-2026-11-22-publication-preflight.md).
+
+## Direct pixel-map input preflight (T-236)
+
+`DrawingDocument._publish_edit` validates *all* changed signed, canonical
+coordinates and their original/replacement RGBA8 values, and applies the
+128-tile/256 MiB native transfer envelope, **before** invoking any pending
+source callbacks. It stages immutable copies of caller-owned pixel maps and
+retains a SHA-256 fingerprint of each resolved source tile. Before Rust
+adoption it rechecks both input maps and original tile bytes; an in-place
+reentrant mutation cannot pass using only an unchanged `DrawingRasterTile`
+identity or document revision. Invalid edits publish no new document pixels,
+history, revision or native owner. A callback's unauthorized changes to its
+own source object are not rolled back. Historical synthetic strides outside
+Rust's 16–2048 ABI retain their existing non-native signed-coordinate oracle.
+[T-236 evidence](evidence/T-236-2026-11-22-pixel-map-preflight.md).
+
+## Pending native edit and history ownership (T-243, 2026-11-22)
+
+`DrawingNativeTiles.has_active_edit()` reports whether Rust currently retains
+an unfinished tile transaction. It is read-only and does not alter native FFI
+counters, revision, source, or Undo/Redo tokens. `DrawingDocument` uses it in
+`set_external_history()` to reject a non-idempotent local/host owner handoff
+before a pending edit commits. Idempotent calls stay allowed, and a cancelled
+edit frees the pristine history owner to transition. The document fails
+closed if an attached store lacks the expected probe. This fence covers
+attached native tile transactions, not arbitrary unrelated Atlas commands or
+GDScript-only sessions. [T-243 evidence](evidence/T-243-2026-11-22-active-history-handoff.md).
+
 ## Ownership, byte format and source identity
 
 - `DrawingNativeTiles` is a Godot `RefCounted` holding one Rust-authoritative `TileStore`; production constructs it once per `DrawingDocument` and retains it across gestures, with a checked external-revision rebase. Call `configure(storage_stride, initial_revision)` exactly once (`16 <= stride <= 2048`, `revision >= 0`). **Storage** tiles are not the Hokusai internal 64px tiles or the 128px display tile size; normal planned stride is **256**.
@@ -181,6 +264,7 @@ The new path uses **the same** `DrawingNativeBrush` object as T-147. In Godot `O
 | `tiles.adopt_untracked_edit` | Same bounded `layer, revision, tiles` descriptors as `adopt_external_edit` | `{ok, history_token:0, tiles, revision}` on success; atomically stores canonical source and advances revision without adding Undo. Clears obsolete native token stacks; GDScript records no local/host history entry. Malformed, stale, repeated, mismatched and active edits reject before mutating Rust canonical tiles |
 | `tiles.undo_edit`, `tiles.redo_edit` | — | `{ok,tiles,revision}`; direct native-only history transactions |
 | `tiles.has_history_token` | `history_token:int, expected_revision:int, undo:bool` | `bool`; side-effect-free history-top identity check before document timeline replay |
+| `tiles.has_retained_history_token` | `history_token:int` | `bool`; side-effect-free search of both retained native Undo/Redo stacks, regardless of top position. A retained token that is not the next directional event must **not** fall back to detached replay; an evicted/rebased token returns false. |
 | `tiles.replay_history_token` | `history_token:int, expected_revision:int, undo:bool` | `{ok,token,tiles,revision}`; checked native replay, rejects wrong token/stale revision with no mutation |
 | `tiles.advance_unreferenced_layers_revision` | `expected_revision:int, affected_raster_ids:PackedStringArray, discard_redo:bool` | `bool`; checked one-step structural revision **only** when 1–128 distinct affected raster IDs have no resident/authorized tile or Undo/Redo history. An authorized blank tile or active stroke rejects. Does not remove native pixels/history; rejected edits still require external rebase. |
 | `tiles.advance_parked_layers_revision` | `expected_revision:int, affected_raster_ids:PackedStringArray, restore:bool, discard_redo:bool` | `bool`; 1–128 distinct IDs (and at most 128 total parked), quiescent exact revision, all present/not parked on removal or all parked on restoration; requires at least one Rust-owned layer when parking, otherwise use the unreferenced metadata bridge. One-step revision preserves canonical RGBA8, authorizations and native Undo tokens; parked layers deny edit, import and replay while absent, unrelated layers remain paintable. Rejects stale/duplicate/active/overflow atomically. `discard_redo=true` only for new structural edits. |
@@ -227,6 +311,8 @@ Copy cannot bypass the Move-only source-retirement preflight from T-170.
 The checked export does not write Rust tiles, consume Undo tokens or solve
 arbitrarily reentrant distributed host transactions; native-absent exports
 remain supported until T-150. See [T-171 evidence](evidence/T-171-2026-11-16-native-export-fence.md).
+
+**T-239 host-history order fence (2026-11-22):** Tokenized Undo/Redo with a current native owner first checks `has_history_token(token, revision, direction)`; if false, it checks `has_retained_history_token(token)`. A retained but non-top token rejects with `HISTORY_ORDER` **before invoking lazy source providers**, and remains guarded after provider callbacks, rather than running `replay_detached_history` and clearing unrelated newer tokens. Missing/evicted tokens (including historical token-free deltas) still use the checked detached snapshot path. This does not give Rust ownership of Atlas's global command timeline; the host still chooses which snapshot to replay.
 
 **Versioning and lifetime:** The document's serialized `revision` is the one published global revision stamp. Native `TileStore.revision` is its transaction-checked mirror. Native Brush/Eraser gestures and eligible external pixel edits (through `_publish_edit`/`_publish_tile_edit`) each commit exactly one Rust transaction from `r` to `r+1` before the Godot document installs detached consumer tiles at `r+1`. For external raster edits, the document first resolves every source and checks tile-object identity; the Rust bridge verifies resident source **bytes** (or explicitly authorized new source), editability, bounds and memory, and either commits all tiles/history or none. `DrawingDelta.native_history_token` identifies a retained Rust entry on the one ordered timeline. Undo/Redo prevalidate the Godot projected source, then use matching live Rust tokens; older evicted/mixed events still have detached tile snapshots as a fallback. **Metadata bridge:** `advance_metadata_revision(expected_revision, discard_redo)` is a checked *single-step* `r → r+1` revision mirror for operations that leave raster source bytes and identities unchanged. It preserves canonical tiles, authorizations and Rust Undo tokens; a *new* metadata edit clears Rust redo to match Godot's branched history, while a metadata Undo/Redo advances the stamp without clearing redo. It rejects stale/overflow revisions or active strokes without side effects. GDScript then detaches a rejected or diverged store (retaining detached document history), rather than claiming synchronized native ownership. **Structural raster guard:** `advance_unreferenced_layers_revision` permits create/remove Undo/Redo and nested subtree delete/restore if all raster child IDs have **never entered** this Rust store; a resident/authorized tile (even blank), tokenized Undo *or* Redo, active edit, stale revision, repeated ID or more than 128 layers rejects atomically. Godot still advances its revision on rejection and later uses a checked external rebase. **Detached subtree import:** `DrawingDocument.import_subtree` now prebuilds detached nodes and remapped tile metadata before publication; copied raster layer IDs that are entirely new to Rust advance through the same bounded, checked `advance_unreferenced_layers_revision` guard. Semantic-only imports use `advance_metadata_revision`. This preserves unrelated native undo tokens and canonical authorized tiles without claiming that the transferred Godot pixels are already resident in Rust; the first stroke on an imported layer still performs explicit source import. Native parked ID collisions reject the import without changing the document. **T-169 import fence:** a rejected/stale/>128-layer native bridge now returns a typed failure **without publishing any Godot nodes, dirty tiles or revision**. It is not permission to commit only on the Godot side or silently discard native history later; direct removal uses the bounded retirement operation below after verifying native source parity. **Recorded native-owned subtree park/restore:** `advance_parked_layers_revision` holds resident bytes and tokens in a checked parked set across local structure Undo/Redo. Before park, Godot checks known imported source identities **and full RGBA8 parity with Rust**; before restore, detached saved tiles are compared with original sources. Only a byte-identical restore rebinds canonical source objects without reimport. Direct reads for save/debug are possible, but new native imports/Brush/history replay for parked layers fail; unrecorded removal intentionally does not park. **Text conversion guard:** `rasterize_text` prebuilds the text glyph RGBA8 projection before checked `advance_unreferenced_layers_revision` at the same stable layer ID. Undo/Redo of that text↔raster kind change uses the same guard with `discard_redo=false`. Rust preserves unrelated source/history only when the converted layer was never authorized or referenced by native Undo/Redo; it imports glyph tiles lazily on the first native Brush. A newly rendered text source at a **previously parked** ID now uses the checked `replace_parked_layers_revision` bridge to retire the obsolete source and its tokens while retaining unrelated Rust history; a currently owned unparked ID rejects instead of pretending to be unreferenced. Text-raster Undo/Redo of the original source still uses verified park/unpark. Native-ahead rejects before Godot publication, while already-behind stores retain the conservative rebase. The Godot text rasterizer still materializes glyph tiles; it is not a native glyph rasterizer. **Detached history replay bootstrap (2026-11-16):** When `DrawingDocument` has no attached `DrawingNativeTiles` or it is behind the document's current revision, history replay no longer publishes a Godot-only tile projection. The document first resolves and revalidates all lazy sources and exact detached RGBA8 snapshots. It then creates a **provisional** ABI-v1 tile store at `base_revision`, imports the 1–128 touched expected-source tiles (including explicit empty/zero source), enables the authorized layer, and sends the same bounded expected/replacement tile batch to Rust `replay_detached_history`. Only a successful Rust revision `base_revision + 1` replaces the attached store and invalidates previous `_native_source_identities`; Godot publishes its prebuilt display/save tiles afterward without further lazy callbacks. Failure to instantiate, import, or replay leaves the document and old store untouched. If Rust is **ahead** of the document, replay fails closed rather than replacing newer native authority. A current store still uses native token replay or checked in-sync detached replay. Newly attached native authority is **partial** until untouched layers are independently authorized on first use; the host still owns detached history snapshots, and no Rust history tokens are invented for them. This cold replay recovery is separate from the Brush hot path and does not transfer UI/history ownership.
 
@@ -305,12 +391,13 @@ This does not replace T-154 byte-checked Undo/Redo park/unpark or make
 GDScript text glyph rasterization a Rust operation. See
 [T-155 evidence](evidence/T-155-2026-11-16-reraster.md).
 
-## Historical pixel-map history replay after native attachment (T-156, 2026-11-16)
+## Historical pixel-map history replay and detached bootstrap (T-156/T-230)
 
 `DrawingDelta` events from pre-native ordinary raster work may carry only
 `before/after` pixel dictionaries (`tile_stride == 0`). When the document
-already has `DrawingNativeTiles`, `replay_delta` now converts those cold
-history events into bounded detached whole-tile RGBA8 images, then calls the
+has `DrawingNativeTiles` **or the GDExtension class is available to create
+one**, `replay_delta` converts those cold history events into bounded
+detached whole-tile RGBA8 images, then calls the
 **same** `_replay_native_tile_delta` and Rust `replay_detached_history` used
 by native snapshots. It never publishes a Godot-only raster revision while an
 attached Rust owner remains in sync; malformed/noncanonical signed pixel
@@ -323,10 +410,15 @@ invents new Rust Undo tokens outside the document/Atlas chronological owner.
 Detached native replay deliberately clears obsolete Rust tokens; an older
 pixel-map event remains a host-owned history snapshot. Its later Undo/Redo
 repeats the checked native replay, including when the next Hokusai event's
-Rust token has been invalidated. Without an attached native store, the
-historical direct-session pixel publisher remains outside this narrow bridge.
-General source producers, host history lifetime and final T-148 universal
-authority still require further integration. See [T-156 evidence](evidence/T-156-2026-11-16-legacy-pixel-native.md).
+Rust token has been invalidated. T-230 closes the **previously unattached**
+replay case: the preflighted native tile path creates a provisional native
+store and attaches it only on a successful revision. It does **not** convert
+the original per-pixel edit producer or serialize host history commands.
+When the native extension is intentionally unavailable the prior direct
+pixel replay remains in place until T-150. General source producers, host
+history lifetime and final T-148 universal authority still require further
+integration. See [T-156 evidence](evidence/T-156-2026-11-16-legacy-pixel-native.md)
+and [T-230 evidence](evidence/T-230-2026-11-22-detached-pixel-bootstrap.md).
 
 ## Native-owned text/raster history parking (T-154, 2026-11-16)
 
@@ -479,3 +571,43 @@ semantic text history remains usable. TEXT↔RASTER transitions still use the
 separate T-154 parking bridge, and host-owned detached history is not newly
 made native-authoritative by this change; see
 [T-178 evidence](evidence/T-178-2026-11-16-text-history.md).
+
+### Direct tile-patch whole-request preflight (T-235)
+
+`DrawingDocument._publish_tile_edit` validates the **entire** tile-local
+patch descriptor set before resolving any lazy source (canonical signed tile
+IDs, native projection range, local offsets, exact unsigned RGBA8 values,
+and verified session source entries). It freezes the requested changes and
+full source map; a provider cannot rewrite later patches or add source entries
+without triggering a pre-commit refusal. Canonical RGBA8 source fingerprints are
+compared again after all callbacks, since object identity alone cannot detect
+in-place edits to previously checked tiles. Valid extra source entries for
+unmodified tiles remain allowed. The rejection is before Rust's atomic
+external-edit adoption and does not claim to roll back side effects of a
+malicious/misbehaving provider itself. See T-235's fail-first evidence. This
+is not universal native raster production or detached host history ownership.
+
+### Brush publication source-byte reentrancy (T-238, 2026-11-22)
+
+`DrawingDocument._publish_native_tile_edit` already validates/fixes the
+complete output descriptor set (T-234), but later lazy provider callbacks
+may still mutate an *earlier* resident `DrawingRasterTile` in place without
+changing its reference or the document revision. After all providers return,
+the document now compares each live resident tile's full canonical RGBA8
+with the `before_bytes` already retained for its reversible delta, prior to
+returning a prepared publication. This catches transparent hidden-RGB changes
+and needs no second retained full-tile snapshot. An absent source remains an
+empty byte snapshot. A rejected `STALE_PIXEL` result never publishes the
+requested Brush pixels or consumes Rust history; a provider's own side effects
+are not rolled back. See [T-238 evidence](evidence/T-238-2026-11-22-brush-source-reentrancy.md).
+
+**T-240 FFI whole-batch payload preflight (2026-11-22):**
+The `DrawingNativeTiles` recorded/untracked `adopt_*`,
+`replay_detached_history`, and `replay_history_token` GDExtension methods
+first check the existing 128-tile and three-span 256 MiB transfer budget,
+then decode **all** descriptors into borrowed/refcounted `PackedByteArray`
+handles, rejecting malformed fields, duplicate signed IDs, and buffers other
+than empty or precisely `stride² × 4` bytes. Only after the entire array
+passes do these entry points copy buffers into Rust `Vec<u8>`; rejected
+malformed batches do not account earlier full-tile byte copies. Native
+revisions/history are unchanged on rejection. [T-240 evidence](evidence/T-240-2026-11-22-ffi-payload-preflight.md).
