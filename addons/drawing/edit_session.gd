@@ -26,6 +26,10 @@ var _covered_rows: Dictionary[int, Dictionary] = {}
 var _source_tiles: Dictionary[String, Variant] = {}
 ## Immutable session storage stride. -1 selects the general signed-divide path.
 var _stage_tile_shift: int = -1
+## The native pixel publisher cannot address document pixels beyond ±2^52.
+## Most sessions are at ordinary anchors: calculate this once so a hot Brush
+## scanline does not run a four-sided projection check for every covered pixel.
+var _check_native_pixel_projection: bool = false
 ## Hard Brush pixels arrive in spatial runs. A stable per-session tile-key
 ## cache avoids allocating the same "x,y" String for every covered pixel.
 ## Cache the *tile indices*, not the pixel offsets, so signed/irregular
@@ -209,6 +213,16 @@ func _init(target: DrawingDocument, layer: String, source_revision: int,
 	view_transform = transform
 	anchor_x = origin_x
 	anchor_y = origin_y
+	var native_publisher: bool = document._native_raster_store != null or (
+		document.tile_stride >= 16 and document.tile_stride <= 2048
+		and ClassDB.class_exists("DrawingNativeTiles"))
+	var projection_limit: int = DrawingDocument.TILES.MAX_PROJECTION_PIXEL_COORD
+	var maximum_local: int = 1073741823
+	_check_native_pixel_projection = native_publisher and (
+		anchor_x < -projection_limit + maximum_local
+		or anchor_x > projection_limit - maximum_local
+		or anchor_y < -projection_limit + maximum_local
+		or anchor_y > projection_limit - maximum_local)
 	# A script-only gesture must reserve its history owner even when created
 	# directly rather than through DrawingDocument.begin_edit(). The document
 	# holds only a weak handle and releases closed/abandoned sessions.
@@ -624,10 +638,22 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 		internal_brush: bool = false) -> DrawingResult:
 	if not internal_brush:
 		_stationary_dab_valid = false
-	if _clear_deferred:
-		_materialize_clear_preview()
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
+		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
+	if selection != null and not selection.allows(Vector2i(x, y)):
+		return _brush_stage_ok if internal_brush else DrawingResult.success()
+	# Reject globally unpublishable pixels before invoking a lazy provider or
+	# flattening a previously accepted deferred Brush/clear preview. This also
+	# covers one-pixel Brush calls, not just the public bulk-edit APIs.
+	if _check_native_pixel_projection and not DrawingDocument.TILES.pixel_coordinates_in_projection_range(
+			anchor_x + x, anchor_y + y):
+		return DrawingResult.failure("COORD_RANGE", "Pixel exceeds native document projection")
+	if _clear_deferred:
+		_materialize_clear_preview()
 	if internal_brush and _brush_tile_publish and not _hokusai_deferred:
 		return _stage_brush_tile(x, y, rgba, selection, once, blend, verified_source)
 	if not internal_brush:
@@ -637,12 +663,6 @@ func _stage(x: int, y: int, rgba: int, selection: DrawingSelection = null,
 	# covered pixel; only a session with native deferred edits needs a flush.
 	if _hokusai_deferred:
 		_materialize_hokusai_preview()
-	if rgba < 0 or rgba > 0xffffffff:
-		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
-	if x <= -1073741824 or x >= 1073741824 or y <= -1073741824 or y >= 1073741824:
-		return DrawingResult.failure("COORD_RANGE", "Gesture view-relative pixel exceeds safe bounds")
-	if selection != null and not selection.allows(Vector2i(x, y)):
-		return _brush_stage_ok if internal_brush else DrawingResult.success()
 	var global_x: int = anchor_x + x
 	var global_y: int = anchor_y + y
 	var covered_row: Dictionary = {}
