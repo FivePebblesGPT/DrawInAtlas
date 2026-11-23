@@ -790,6 +790,16 @@ func _stage_brush_tile(x: int, y: int, rgba: int, selection: DrawingSelection,
 	return _brush_stage_ok
 
 
+## A bulk operation must validate its *entire* candidate rectangle before
+## materializing deferred Brush/Erase history or invoking a lazy source loader.
+## Size/budget validation belongs to each caller and precedes this check.
+func _bulk_area_in_view_range(area: Rect2i) -> bool:
+	var last_x: int = int(area.position.x) + int(area.size.x) - 1
+	var last_y: int = int(area.position.y) + int(area.size.y) - 1
+	return area.position.x > -1073741824 and last_x < 1073741824 \
+		and area.position.y > -1073741824 and last_y < 1073741824
+
+
 ## Exact canonical bytes, optionally including nonzero RGB when alpha is zero.
 ## A region is always view-relative, and bounded before allocating/staging changes.
 func apply_region(area: Rect2i, rgba8: PackedByteArray,
@@ -800,6 +810,8 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 		return DrawingResult.failure("REGION_LIMIT", "Region is empty or over pixel budget")
 	if rgba8.size() != area.size.x * area.size.y * 4:
 		return DrawingResult.failure("RGBA", "Region bytes must be tightly packed RGBA8")
+	if not _bulk_area_in_view_range(area):
+		return DrawingResult.failure("COORD_RANGE", "Region exceeds safe view-relative pixel coordinates")
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -821,8 +833,14 @@ func apply_region(area: Rect2i, rgba8: PackedByteArray,
 
 func fill_rect(area: Rect2i, rgba: int, selection: DrawingSelection = null,
 		max_pixels: int = 1048576) -> DrawingResult:
+	if _closed:
+		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if area.size.x <= 0 or area.size.y <= 0 or area.size.x > max_pixels or area.size.y > max_pixels / area.size.x:
 		return DrawingResult.failure("REGION_LIMIT", "Rectangle is empty or over pixel budget")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
+	if not _bulk_area_in_view_range(area):
+		return DrawingResult.failure("COORD_RANGE", "Rectangle exceeds safe view-relative pixel coordinates")
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
@@ -1786,8 +1804,12 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 
 func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		selection: DrawingSelection = null, max_pixels: int = 1048576) -> DrawingResult:
+	if _closed:
+		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if polygon.size() < 3:
 		return DrawingResult.failure("SHAPE", "A filled polygon needs three vertices")
+	if rgba < 0 or rgba > 0xffffffff:
+		return DrawingResult.failure("RGBA", "RGBA8 must contain four channels")
 	var inverse: Transform2D = view_transform.affine_inverse()
 	var points: PackedVector2Array = PackedVector2Array()
 	for point: Vector2 in polygon:
@@ -1808,6 +1830,8 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		ceili(max_x) - floori(min_x), ceili(max_y) - floori(min_y))
 	if area.size.x <= 0 or area.size.y <= 0 or area.size.x > max_pixels or area.size.y > max_pixels / area.size.x:
 		return DrawingResult.failure("SHAPE_LIMIT", "Polygon exceeds candidate budget")
+	if not _bulk_area_in_view_range(area):
+		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds safe view-relative pixel coordinates")
 	_materialize_hokusai_preview()
 	# A failed mixed edit must restore the already accepted deferred Brush, not
 	# an empty pre-materialization snapshot. Materialize before rollback state.
