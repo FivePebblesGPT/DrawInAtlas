@@ -1,3 +1,11 @@
+**[T-284](Tickets/T-284.md) P1 validation Done (2026-11-23):**
+[deterministic T-124 queued Brush predecessor under native mouse-up drain](evidence/T-284-2026-11-23-queued-brush-backlog.md)
+uses 840 accepted input samples (more than the single synchronous release
+budget), prevents a null-session fault injector crash and passes four 78-check
+beta4 runs, real X11 20-check parity, and neighboring pending-edit checks.
+The older hosted beta3 T-124 failure is not evidence of a beta4 production
+regression; hosted CI and physical owner review remain unverified.
+
 **[T-283](Tickets/T-283.md) P1 validation Done (2026-11-23):**
 [T-137 native cold-preview/Redo fast-CI contract](evidence/T-283-2026-11-23-cold-preview-ci-contract.md)
 now matches the 19-check settled Redo witness and preserves strict fail-closed
@@ -428,6 +436,7 @@ Other feature/product tickets remain valid; no unrelated approval is assumed.
 | [T-278 · Repair T-068 source-tile cache native publication smoke](Tickets/T-278.md) | Done | **P1 validation:** [38/38 real native tile-cache reads/Undo/Redo and signed projection protection](evidence/T-278-2026-11-23-native-tile-cache.md); stationary-dab fixture repaired in T-279; axis-sweep remains red | [T-158](Tickets/T-158.md), [T-160](Tickets/T-160.md), [T-277](Tickets/T-277.md) |
 | [T-279 · Restore stationary-dab Geometry2D oracle on native tiles](Tickets/T-279.md) | Done | **P1 validation:** [112/112 signed native-geometry and full-region Undo/Redo checks](evidence/T-279-2026-11-23-dab-native-geometry.md); axis-sweep and hosted CI remain red | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
 | [T-280 · Restore native axis-sweep Geometry2D and complete-region Undo/Redo oracle](Tickets/T-280.md) | Done | **P1 validation:** [241/241 native axis, mask, committed RGBA8 and Unsafe-rejection checks](evidence/T-280-2026-11-23-axis-native-geometry.md); separate fill and hosted CI gates remain open | [T-277](Tickets/T-277.md), [T-278](Tickets/T-278.md) |
+| [T-284 · Make T-124 queued Brush CI backlog deterministic](Tickets/T-284.md) | Done | **P1 validation:** [840 input samples force deferred second gesture, 4 × 78/78 headless, 20/20 native X11, fail-closed short-path mutation](evidence/T-284-2026-11-23-queued-brush-backlog.md); hosted/owner T-085/T-250 gates remain open | [T-124](Tickets/T-124.md), [T-262](Tickets/T-262.md) |
 | [T-283 · Repair T-137 cold-preview fast-CI Redo contract](Tickets/T-283.md) | Done | **P1 validation:** [15/15 model, 19/19 X11 settled Redo, 153/153 T-086 neighbor, strict CI contracts](evidence/T-283-2026-11-23-cold-preview-ci-contract.md); owner/hosted/hardware gates open | [T-137](Tickets/T-137.md), [T-266](Tickets/T-266.md) |
 | [T-282 · Restore verified-source mixed fill staging on native tile history](Tickets/T-282.md) | Done | **P1 validation:** [36/36 native immutable-source fill, full-region commit/Undo/Redo, signed seam and mutation controls](evidence/T-282-2026-11-23-verified-stage.md); hosted CI/performance and owner gates remain open | [T-281](Tickets/T-281.md), [T-278](Tickets/T-278.md) |
 | [T-281 · Restore native lazy flood-fill tile-cache and full-region history witness](Tickets/T-281.md) | Done | **P1 validation:** [39/39 native lazy fill, signed seam, masked/unmasked Undo/Redo and mutation controls](evidence/T-281-2026-11-23-native-fill-cache.md); verified-stage and hosted CI remain open | [T-278](Tickets/T-278.md), [T-280](Tickets/T-280.md) |

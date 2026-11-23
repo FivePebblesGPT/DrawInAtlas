@@ -1,0 +1,116 @@
+Initialize godot-rust (API v4.7.stable.official, runtime v4.8.beta4.official, safeguards balanced)
+Godot Engine v4.8.beta4.official.b070e63b1 - https://godotengine.org
+WARNING: Started the engine as `root`/superuser. This is a security risk, and subsystems like audio may not work correctly.
+Set the environment variable `GODOT_SILENCE_ROOT_WARNING` to 1 to silence this warning.
+     at: setup2 (main/main.cpp:3626)
+
+WARNING: Drawing: Stroke still processing; Switch Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _activate (res://addons/drawing/workspace.gd:3005)
+         [3] _cycle_tab (res://addons/drawing/workspace.gd:3787)
+         [4] test_tab_switch_and_inactive_close (res://tests/t126_pending_tab_switch_smoke.gd:70)
+         [5] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [6] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Switch Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _activate (res://addons/drawing/workspace.gd:3005)
+         [3] test_tab_switch_and_inactive_close (res://tests/t126_pending_tab_switch_smoke.gd:76)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Switch Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _activate (res://addons/drawing/workspace.gd:3005)
+         [3] test_tab_switch_and_inactive_close (res://tests/t126_pending_tab_switch_smoke.gd:79)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Close Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _request_close_tab (res://addons/drawing/workspace.gd:2909)
+         [3] test_tab_switch_and_inactive_close (res://tests/t126_pending_tab_switch_smoke.gd:82)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Close Tab after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _close_index (res://addons/drawing/workspace.gd:2948)
+         [3] test_tab_switch_and_inactive_close (res://tests/t126_pending_tab_switch_smoke.gd:85)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Save and Close after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _save_and_close (res://addons/drawing/workspace.gd:2937)
+         [3] test_tab_switch_and_inactive_close (res://tests/t126_pending_tab_switch_smoke.gd:89)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; New after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] new_drawing (res://addons/drawing/workspace.gd:2591)
+         [3] test_document_creation_and_open (res://tests/t126_pending_tab_switch_smoke.gd:136)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; New Object after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] new_object (res://addons/drawing/workspace.gd:2626)
+         [3] test_document_creation_and_open (res://tests/t126_pending_tab_switch_smoke.gd:139)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Open after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _open_file (res://addons/drawing/workspace.gd:4340)
+         [3] test_document_creation_and_open (res://tests/t126_pending_tab_switch_smoke.gd:142)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Open after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _open_file (res://addons/drawing/workspace.gd:4340)
+         [3] test_document_creation_and_open (res://tests/t126_pending_tab_switch_smoke.gd:145)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Open Object after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] _open_object_file (res://addons/drawing/workspace.gd:2725)
+         [3] test_document_creation_and_open (res://tests/t126_pending_tab_switch_smoke.gd:148)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+WARNING: Drawing: Stroke still processing; Open Object after the stroke finishes
+     at: push_warning (core/variant/variant_utility.cpp:1034)
+     GDScript backtrace (most recent call first):
+         [0] _show_error (res://addons/drawing/workspace.gd:4383)
+         [1] _can_persist_or_close (res://addons/drawing/workspace.gd:2872)
+         [2] attach_object_session (res://addons/drawing/workspace.gd:2609)
+         [3] test_document_creation_and_open (res://tests/t126_pending_tab_switch_smoke.gd:153)
+         [4] new_app (res://tests/t126_pending_tab_switch_smoke.gd:29)
+         [5] frames (res://tests/t126_pending_tab_switch_smoke.gd:18)
+T126_TAB_SWITCH_PASSED checks=34 failures=0

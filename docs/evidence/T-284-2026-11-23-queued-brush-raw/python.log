@@ -1,0 +1,33 @@
+test_capture_is_bounded_and_not_a_second_uncommitted_edit (test_t124_queued_stroke_ci.QueuedStrokeContracts.test_capture_is_bounded_and_not_a_second_uncommitted_edit) ... ok
+test_control_oracles_are_real_godot_tests (test_t124_queued_stroke_ci.QueuedStrokeContracts.test_control_oracles_are_real_godot_tests) ... ok
+test_required_ci_uses_existing_check_and_strict_verifier (test_t124_queued_stroke_ci.QueuedStrokeContracts.test_required_ci_uses_existing_check_and_strict_verifier) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+test_all_persistence_and_close_entrypoints_refuse_pending_strokes (test_t125_pending_persistence.T125PendingPersistenceContracts.test_all_persistence_and_close_entrypoints_refuse_pending_strokes) ... ok
+test_existing_required_ci_step_checks_exact_marker_and_exit (test_t125_pending_persistence.T125PendingPersistenceContracts.test_existing_required_ci_step_checks_exact_marker_and_exit) ... ok
+test_regression_executes_real_document_and_publishing_workflows (test_t125_pending_persistence.T125PendingPersistenceContracts.test_regression_executes_real_document_and_publishing_workflows) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.005s
+
+OK
+test_entrypoints_guard_pending_transaction_before_mutating_tabs (test_t126_pending_tab_switch.PendingBrushTabSwitchContracts.test_entrypoints_guard_pending_transaction_before_mutating_tabs) ... ok
+test_real_godot_witness_and_fail_late_ci_are_strict (test_t126_pending_tab_switch.PendingBrushTabSwitchContracts.test_real_godot_witness_and_fail_late_ci_are_strict) ... ok
+test_tabbar_reentrancy_and_refusal_restore_selected_tab (test_t126_pending_tab_switch.PendingBrushTabSwitchContracts.test_tabbar_reentrancy_and_refusal_restore_selected_tab) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+OK
+test_all_history_entrypoints_guard_revision_before_undo_redo (test_t127_pending_history.PendingBrushHistoryContracts.test_all_history_entrypoints_guard_revision_before_undo_redo) ... ok
+test_keyboard_menu_and_history_buttons_share_guarded_callbacks (test_t127_pending_history.PendingBrushHistoryContracts.test_keyboard_menu_and_history_buttons_share_guarded_callbacks) ... ok
+test_native_history_witness_is_completion_safe (test_t127_pending_history.PendingBrushHistoryContracts.test_native_history_witness_is_completion_safe) ... ok
+test_real_document_queued_history_witness_and_strict_ci (test_t127_pending_history.PendingBrushHistoryContracts.test_real_document_queued_history_witness_and_strict_ci) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.002s
+
+OK
