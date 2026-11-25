@@ -1193,7 +1193,59 @@ impl TileStore {
         discard_redo: bool,
     ) -> Result<(), &'static str> {
         self.can_retire_layers(expected, layers)?;
+        self.retire_checked_layers(expected, layers, discard_redo);
+        Ok(())
+    }
+
+    // Permanent ancestor deletion invalidates applied removal events for
+    // absent descendants. Only this explicit path may retire parked IDs.
+    fn retire_orphaned_layers(
+        &mut self,
+        expected: u64,
+        live: &[String],
+        parked: &[(String, usize)],
+    ) -> Result<(), &'static str> {
+        if self.active.is_some() || self.revision != expected || expected >= i64::MAX as u64 {
+            return Err("Active edit, stale or overflowing orphan retirement");
+        }
+        if parked.is_empty() || live.len().saturating_add(parked.len()) > MAX_ACTIVE_TILES {
+            return Err("Invalid orphan retirement layer count");
+        }
+        let mut ids = HashSet::new();
+        for layer in live {
+            if layer.is_empty() || !ids.insert(layer.as_str()) || self.parked_layers.contains(layer)
+            {
+                return Err("Invalid live retirement layer");
+            }
+        }
+        for (layer, count) in parked {
+            if layer.is_empty()
+                || !ids.insert(layer.as_str())
+                || !self.parked_layers.contains(layer)
+                || self
+                    .authorized
+                    .iter()
+                    .filter(|id| id.layer == *layer)
+                    .count()
+                    != *count
+                || self.tiles.keys().filter(|id| id.layer == *layer).count() != *count
+                || self
+                    .tiles
+                    .keys()
+                    .any(|id| id.layer == *layer && !self.authorized.contains(id))
+            {
+                return Err("Invalid or incomplete parked retirement source");
+            }
+        }
+        let mut all = live.to_vec();
+        all.extend(parked.iter().map(|(layer, _)| layer.clone()));
+        self.retire_checked_layers(expected, &all, true);
+        Ok(())
+    }
+
+    fn retire_checked_layers(&mut self, expected: u64, layers: &[String], discard_redo: bool) {
         let ids: HashSet<&str> = layers.iter().map(String::as_str).collect();
+        self.parked_layers.retain(|id| !ids.contains(id.as_str()));
         self.tiles
             .retain(|tile, _| !ids.contains(tile.layer.as_str()));
         self.authorized
@@ -1221,7 +1273,6 @@ impl TileStore {
             });
         }
         self.revision = expected + 1;
-        Ok(())
     }
 
     /// A text raster may be undone to its semantic source and then re-rendered
@@ -1799,6 +1850,44 @@ impl DrawingNativeTiles {
         let ids: Vec<String> = layers.as_slice().iter().map(|id| id.to_string()).collect();
         self.store
             .retire_layers(expected as u64, &ids, discard_redo)
+            .is_ok()
+    }
+
+    /// Permanently retire live layers and explicitly orphaned parked sources.
+    #[func]
+    fn retire_orphaned_layers_revision(
+        &mut self,
+        expected: i64,
+        live: PackedStringArray,
+        parked: Array<VarDictionary>,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        if expected < 0
+            || parked.is_empty()
+            || live.len().saturating_add(parked.len()) > MAX_ACTIVE_TILES
+        {
+            return false;
+        }
+        let live: Vec<String> = live.as_slice().iter().map(|id| id.to_string()).collect();
+        let mut sources = Vec::with_capacity(parked.len());
+        for source in parked.iter_shared() {
+            let Some(layer) = source
+                .get("layer")
+                .and_then(|value| value.try_to::<GString>().ok())
+            else {
+                return false;
+            };
+            let Some(count) = source
+                .get("count")
+                .and_then(|value| value.try_to::<i64>().ok())
+                .and_then(|value| usize::try_from(value).ok())
+            else {
+                return false;
+            };
+            sources.push((layer.to_string(), count));
+        }
+        self.store
+            .retire_orphaned_layers(expected as u64, &live, &sources)
             .is_ok()
     }
 
@@ -2895,6 +2984,101 @@ mod tests {
         assert_eq!(store.revision, 2);
         assert!(store.transaction_matches(active, 2, "ink"));
         assert!(!store.discard_parked_source(2, "glyph", 1));
+    }
+
+    #[test]
+    fn orphan_retirement_is_atomic_and_preserves_other_tokens() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let token = store.begin("ink", 0, false).unwrap();
+        store
+            .stage(
+                token,
+                0,
+                0,
+                0,
+                &[1, 1],
+                false,
+                0xff123456,
+                false,
+                Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+            )
+            .unwrap();
+        store.commit(token, 0).unwrap();
+        let key = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let keep = store.tiles[&key].rgba.clone();
+        let mut retired = Vec::new();
+        for layer in ["child", "sibling", "live"] {
+            let id = TileId {
+                layer: layer.into(),
+                x: -2,
+                y: 0,
+            };
+            store
+                .publish_structural_source(
+                    layer,
+                    store.revision,
+                    vec![(id.clone(), vec![17; 16 * 16 * 4])],
+                )
+                .unwrap();
+            retired.push(id);
+        }
+        store
+            .advance_parked_layers(
+                store.revision,
+                &["child".into(), "sibling".into()],
+                false,
+                false,
+            )
+            .unwrap();
+        let rev = store.revision;
+        let used = store.bytes_used();
+        let live = ["live".into()];
+        assert!(
+            store
+                .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("sibling".into(), 0)])
+                .is_err()
+        );
+        assert!(
+            store
+                .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("live".into(), 1)])
+                .is_err()
+        );
+        assert!(
+            store
+                .retire_orphaned_layers(rev - 1, &live, &[("child".into(), 1)])
+                .is_err()
+        );
+        assert_eq!(store.bytes_used(), used);
+        assert_eq!(store.revision, rev);
+        assert_eq!(store.parked_layers.len(), 2);
+        let active = store.begin("ink", rev, false).unwrap();
+        assert!(
+            store
+                .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("sibling".into(), 1)])
+                .is_err()
+        );
+        assert!(store.transaction_matches(active, rev as i64, "ink"));
+        store.active = None;
+        store
+            .retire_orphaned_layers(rev, &live, &[("child".into(), 1), ("sibling".into(), 1)])
+            .unwrap();
+        assert_eq!(store.revision, rev + 1);
+        assert!(store.parked_layers.is_empty());
+        for id in retired {
+            assert!(!store.tiles.contains_key(&id));
+            assert!(!store.authorized.contains(&id));
+        }
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.tiles[&key].rgba, keep);
+        assert!(store.retains_history_token(token));
+        store.undo_or_redo(true).unwrap();
+        store.undo_or_redo(false).unwrap();
+        assert_eq!(store.tiles[&key].rgba, keep);
     }
 
     #[test]

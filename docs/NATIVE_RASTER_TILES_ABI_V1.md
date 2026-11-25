@@ -859,3 +859,27 @@ Only after successful reclamation may it remove matching projection identities.
 Corrupt/stale snapshots can leave unused sources resident; do not rebase or
 trust them to force reclamation. This is not general eviction of applied
 removed-layer snapshots or an external structural-history protocol.
+
+### T-324: permanent ancestor retirement of applied orphaned removals
+
+`retire_orphaned_layers_revision(expected_revision, live_layer_ids, parked_sources)`
+is a distinct irreversible operation for an abandoned *applied* structural
+removal, when its ancestor is permanently deleted. Each parked descriptor is
+`{"layer": String, "count": int}` giving the complete authorized/resident
+tile count (including blank authorizations). The combined list must contain
+1–128 distinct nonempty IDs with at least one parked source. Rust requires
+current revision, no active edit, live versus parked lifecycle, and exact
+parked source cardinality. No partial retirement occurs on failure. On
+success, retire both sets' canonical tiles, authorizations, park/editability
+entries and associated native history, invalidate native Redo and advance the
+revision once. Unrelated applied history and canonical RGBA8 remain unchanged.
+Ordinary `retire_layers_revision` still rejects parked IDs.
+
+The local command owner must prove affected snapshots are unreachable after
+ancestor deletion, their nodes are absent, their hierarchy and complete
+materialized sources match the native projection, and pending sparse sources
+are not resolved. It prepares surviving applied commands before native
+publication, drops the old redo tail (including abandoned structural source
+cleanup), and then installs the surviving history. This is not permission to
+evict reachable history or rewrite an external host timeline. See
+[T-324 evidence](evidence/T-324-2026-11-26-orphaned-subtree-reclamation.md).

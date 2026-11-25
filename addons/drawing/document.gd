@@ -303,7 +303,7 @@ func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary) 
 ## native history, but host-owned history is never rewritten here. Surviving
 ## cursor order/content tokens are retained. Installing this detached result
 ## after the native commit does not allocate or invoke external providers.
-func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
+func _prepare_retired_local_history(removed_ids: Array[String], orphaned: bool = false) -> Dictionary:
 	if external_history or _events.is_empty():
 		return {}
 	var removed: Dictionary[String, bool] = {}
@@ -312,7 +312,7 @@ func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
 	var retained: Array[Dictionary] = []
 	var states: Array[int] = [_content_states[0]]
 	var cursor: int = 0
-	for index: int in range(_events.size()):
+	for index: int in range(_cursor if orphaned else _events.size()):
 		var event: Dictionary = _events[index]
 		var affected: bool = false
 		match String(event.get("kind", "")):
@@ -322,6 +322,11 @@ func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
 				affected = removed.has(String(event["layer"]))
 			"structure":
 				affected = removed.has(String(event["id"]))
+				if orphaned:
+					# A surviving node's move cannot replay into a permanently
+					# deleted parent either. Preserve its independent paint.
+					for field: String in ["parent", "old_parent", "new_parent"]:
+						affected = affected or removed.has(String(event.get(field, "")))
 		if affected:
 			continue
 		retained.append(event)
@@ -329,6 +334,59 @@ func _prepare_retired_local_history(removed_ids: Array[String]) -> Dictionary:
 		if index < _cursor:
 			cursor += 1
 	return {"events": retained, "states": states, "cursor": cursor}
+
+
+## Applied removals are scanned newest-first: an absent parent can itself
+## belong to a later removed subtree. Never resolve pending sparse sources.
+## Only local permanent ancestor deletion can abandon these snapshots.
+func _plan_orphaned_removals(node_id: String) -> DrawingResult:
+	var removed: Array[String] = []
+	_gather_ids(node_id, removed)
+	var dead: Dictionary[String, bool] = {}
+	for identifier: String in removed:
+		dead[identifier] = true
+	var sources: Array[Dictionary] = []
+	for index: int in range(_cursor - 1, -1, -1):
+		var event: Dictionary = _events[index]
+		if event.get("kind") != "structure" or event.get("op") != "remove" or \
+				not dead.has(String(event.get("parent", ""))):
+			continue
+		var snapshots: Dictionary = event["nodes"]
+		var layers: Array[String] = []
+		for identifier: String in snapshots:
+			var snapshot: DrawingLayerNode = snapshots[identifier]
+			if snapshot == null or snapshot.id != identifier or _nodes.has(identifier) or dead.has(identifier):
+				return DrawingResult.failure("HISTORY_TARGET", "Orphan removal snapshot identity diverged")
+			dead[identifier] = true
+			removed.append(identifier)
+			if snapshot.kind == DrawingLayerNode.RASTER and \
+					bool(_native_raster_store.call("is_layer_parked", identifier)):
+				layers.append(identifier)
+		var checked: DrawingResult = _validate_retained_subtree_sources(event, layers, snapshots, true, true)
+		if not checked.ok:
+			return checked
+		# Any tracked source of an absent node must really be parked and
+		# included in the retirement batch. Never silently orphan live bytes.
+		for identity: String in _native_source_identities:
+			var owner: String = identity.get_slice(":", 0)
+			if snapshots.has(owner) and not layers.has(owner):
+				return DrawingResult.failure("STALE_SOURCE", "Orphan snapshot has an unparked native source")
+		if layers.is_empty():
+			continue
+		if not _native_tree_sources_match(snapshots, true):
+			return DrawingResult.failure("STALE_SOURCE", "Orphaned native snapshot differs")
+		for layer: String in layers:
+			var count: int = 0
+			for identity: String in _native_source_identities:
+				if identity.begins_with(layer + ":"):
+					count += 1
+			sources.append({"layer": layer, "count": count})
+			if sources.size() > 128:
+				return DrawingResult.failure("NATIVE_STRUCTURE", "Orphan retirement exceeds layer budget")
+	if sources.is_empty():
+		return DrawingResult.success({})
+	return DrawingResult.success({"sources": sources,
+		"history": _prepare_retired_local_history(removed, true)})
 
 
 func _native_source_matches(layer_id: String, key: String, tile: Variant) -> bool:
@@ -599,6 +657,15 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 			resident_nodes[identifier] = _nodes[identifier]
 		if not _native_tree_sources_match(resident_nodes, false):
 			return DrawingResult.failure("STALE_SOURCE", "Native raster subtree source changed")
+	# A permanently removed local ancestor can invalidate already-applied
+	# removal events for absent descendants. Retire those parked sources in
+	# the same native revision as the live subtree, never after partial erase.
+	var orphan_plan: Dictionary = {}
+	if not record_history and not external_history and _native_raster_store != null:
+		var planned: DrawingResult = _plan_orphaned_removals(node_id)
+		if not planned.ok:
+			return planned
+		orphan_plan = planned.value
 	var parked: bool = false
 	if not raster_layers.is_empty() and record_history and not external_history:
 		if _native_raster_store != null and _subtree_has_unowned_tiles(before["nodes"], raster_layers):
@@ -615,7 +682,24 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 	var retired: bool = false
 	var removed_ids: Array[String] = []
 	var retained_history: Dictionary = {}
-	if not parked and not raster_layers.is_empty() and (not record_history or external_history):
+	if not orphan_plan.is_empty():
+		if has_unpublished_edit() or not _attached_native_revision_matches(revision):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Orphan retirement owner is busy or stale")
+		var sources: Array[Dictionary] = orphan_plan["sources"]
+		if not bool(_native_raster_store.call("retire_orphaned_layers_revision", revision,
+				PackedStringArray(raster_layers), sources)):
+			return DrawingResult.failure("NATIVE_STRUCTURE", "Native orphan retirement rejected")
+		var retired_ids: Array[String] = raster_layers.duplicate()
+		for source: Dictionary in sources:
+			retired_ids.append(String(source["layer"]))
+		for identity: String in _native_source_identities.keys():
+			if retired_ids.has(identity.get_slice(":", 0)):
+				_native_source_identities.erase(identity)
+				_sparse_reloads.erase(identity)
+		revision += 1
+		retired = true
+		retained_history = orphan_plan["history"]
+	elif not parked and not raster_layers.is_empty() and (not record_history or external_history):
 		# External/transfer callers do not create a reversible tree event.
 		# Verify canonical source before permanently retiring these IDs.
 		_gather_ids(node_id, removed_ids)
@@ -626,7 +710,7 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 	# before erasing even one Godot node. The old post-mutation bridge could
 	# detach a busy/stale native store while leaving the local tree deleted.
 	var metadata_advanced: bool = false
-	if raster_layers.is_empty() and _native_raster_store != null:
+	if raster_layers.is_empty() and _native_raster_store != null and not retired:
 		var advanced: DrawingResult = _advance_checked_layer_metadata()
 		if not advanced.ok:
 			return advanced
@@ -643,6 +727,10 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		revision += 1
 	_erase_subtree(node_id)
 	if retired and not retained_history.is_empty():
+		if not orphan_plan.is_empty():
+			# The original redo tail may own other parked sources. Release it
+			# before replacing the local history projection with applied events.
+			_drop_history_redo()
 		_events = retained_history["events"]
 		_content_states = retained_history["states"]
 		_cursor = int(retained_history["cursor"])

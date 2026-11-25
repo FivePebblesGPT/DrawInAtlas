@@ -601,6 +601,9 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
+          # T-324: permanent ancestor retirement reclaims unreachable applied removal sources.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t324_orphaned_subtree_reclamation.gd 2>&1 | tee /tmp/godot-t324-orphaned-subtree-reclamation.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t324-orphaned-subtree-reclamation.log --marker T324_ORPHANED_SUBTREE_RECLAMATION_PASSED || ci_fail_marker 'T324 orphaned subtree reclamation rejected'
           # T-323: local abandoned conversion sources must release native glyph residency.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t323_parked_text_reclamation.gd 2>&1 | tee /tmp/godot-t323-parked-text-reclamation.log
           python3 tools/check_godot_model_log.py /tmp/godot-t323-parked-text-reclamation.log --marker T323_PARKED_TEXT_RECLAMATION_PASSED || ci_fail_marker 'T323 parked text reclamation rejected'
