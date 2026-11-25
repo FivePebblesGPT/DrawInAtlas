@@ -670,3 +670,22 @@ draft has its own store with no previous history. Sparse `open_manifest`
 remains lazy. The file's existing 128 MiB expanded raster limit bounds the
 new native source copy; actual process memory also includes Godot projection
 and codec buffers. See [T-315 evidence](evidence/T-315-2026-11-25-native-file-sources.md).
+
+
+### Physical sparse source admission (T-316)
+
+`DrawingBundleManifest.decode` opts the document into same-revision source
+admission on successful `_resolve_chunk`. Metadata-only Open still allocates
+no native store and invokes no raster provider. The existing reentrant
+revision/epoch/source checks and canonical digest validation precede
+`import_source`; first admission configures a provisional store and attaches
+it only on success. A rejected import keeps the pending descriptor, with no
+projection, edit, dirty marker or history event. Imports of unstaged IDs are
+allowed during a native stroke by the existing ABI. Native ownership now
+protects fetched bytes at Save/Copy even before first paint. When structural
+Undo restores a pending subtree, a subsequent Redo verifies any newly resolved
+source against the original digest and native authority, parks it, and only
+then promotes the event's pending descriptor to a detached resident snapshot.
+No ABI or sparse format version changes. The 256 MiB native aggregate cap
+also applies to read-only sparse admissions; no native eviction policy is yet
+implemented. See [T-316 evidence](evidence/T-316-2026-11-25-native-sparse-sources.md).

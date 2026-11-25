@@ -70,6 +70,9 @@ var _native_source_identities: Dictionary[String, Variant] = {}
 var _open_edit_sessions: Array[WeakRef] = []
 ## Reentrant lazy providers must never resolve the same key recursively.
 var _resolving_chunks: Dictionary[String, bool] = {}
+## Physical sparse manifests opt in to checked native admission at first read.
+## Portable decode instead adopts all validated sources as one provisional store.
+var _native_lazy_admission: bool = false
 
 
 ## Once Rust is attached, no direct raster publisher may fall back to a
@@ -769,10 +772,37 @@ func _resolve_chunk(layer_id: String, key: String) -> DrawingResult:
 		var decoded: DrawingRasterTile = DrawingRasterTile.from_rgba8(tile_stride, bytes)
 		if decoded == null:
 			return DrawingResult.failure("CORRUPT_TILE", "Invalid RGBA8 chunk " + lookup)
+		if _native_lazy_admission and tile_stride >= 16 and ClassDB.class_exists("DrawingNativeTiles"):
+			var admitted: DrawingResult = _admit_sparse_native_source(layer_id, key, decoded, bytes)
+			if not admitted.ok:
+				return admitted
 		_nodes[layer_id].tiles[key] = decoded
 		_pending_tiles.erase(lookup)
 	var resident: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
 	return DrawingResult.success(resident, revision)
+
+
+## Source admission is not an edit. All callbacks and digest checks have
+## completed, and import_source can safely admit an unstaged tile even during
+## a native stroke. A provisional owner is attached only after success.
+func _admit_sparse_native_source(layer_id: String, key: String,
+		tile: DrawingRasterTile, bytes: PackedByteArray) -> DrawingResult:
+	var store: Object = _native_raster_store
+	var provisional: bool = store == null
+	if provisional:
+		store = ClassDB.instantiate("DrawingNativeTiles")
+		if store == null or int(store.call("tile_abi_version")) != 1 or \
+				not bool(store.call("configure", tile_stride, revision)):
+			return DrawingResult.failure("NATIVE_SOURCE", "Cannot initialize sparse source owner")
+	elif not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Native sparse source revision diverged")
+	var coords: PackedStringArray = key.split(",")
+	if not bool(store.call("import_source", layer_id, int(coords[0]), int(coords[1]), revision, bytes)):
+		return DrawingResult.failure("NATIVE_SOURCE", "Native sparse source admission rejected " + layer_id + ":" + key)
+	if provisional:
+		_native_raster_store = store
+	_remember_native_source(layer_id, key, tile)
+	return DrawingResult.success(null, revision)
 
 
 func register_lazy_chunk(layer_id: String, cx: int, cy: int,
@@ -1724,6 +1754,31 @@ func _finish_structure(record_history: bool, event: Dictionary) -> void:
 		_mark_untracked_change()
 
 
+## A sparse read after undoing a removal can authorize a source that was
+## still pending when the event was recorded. Freeze only those newly loaded
+## tiles, checking the original digest and native identity. Redo publishes
+## this cache promotion to the event only after its native park succeeds.
+func _prepare_late_sparse_removal_sources(event: Dictionary) -> DrawingResult:
+	var promoted: Dictionary[String, DrawingRasterTile] = {}
+	for identity: String in event["pending"]:
+		var original: Dictionary = event["pending"][identity]
+		if _pending_tiles.has(identity):
+			if _pending_tiles[identity] != original:
+				return DrawingResult.failure("STALE_SOURCE", "Structural pending source changed")
+			continue
+		var layer_id: String = identity.get_slice(":", 0)
+		var key: String = identity.substr(layer_id.length() + 1)
+		if not _nodes.has(layer_id):
+			return DrawingResult.failure("STALE_SOURCE", "Structural pending layer disappeared")
+		var tile: DrawingRasterTile = _nodes[layer_id].tiles.get(key)
+		if tile == null or not tile.has_canonical_storage() or \
+				not _native_source_matches(layer_id, key, tile) or \
+				DrawingRasterTile.digest_rgba8(tile.to_rgba8(), tile_stride) != original["sha256"]:
+			return DrawingResult.failure("STALE_SOURCE", "Structural late sparse source changed")
+		promoted[identity] = tile.detached_copy()
+	return DrawingResult.success(promoted, revision)
+
+
 ## Structural replay is failure-atomic: all preconditions are checked before
 ## modifying the tree. Content events are undone first in chronological order.
 func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
@@ -1800,7 +1855,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 		if not raster_layers.is_empty() and _native_raster_store != null:
 			if not _attached_native_revision_matches(revision):
 				return DrawingResult.failure("STALE_REVISION", "Raster history native revision diverged")
-			if bool(event.get("native_parked", false)):
+			var promoted: Dictionary = {}
+			if _native_lazy_admission and op == "remove" and not restore:
+				var prepared: DrawingResult = _prepare_late_sparse_removal_sources(event)
+				if not prepared.ok:
+					return prepared
+				promoted = prepared.value
+			if bool(event.get("native_parked", false)) or not promoted.is_empty():
 				if restore and not _native_tree_sources_match(restored, true):
 					return DrawingResult.failure("STALE_PIXEL", "Structural snapshot differs from native source")
 				if not restore:
@@ -1811,6 +1872,13 @@ func _replay_structure(event: Dictionary, undo_action: bool) -> DrawingResult:
 						return DrawingResult.failure("STALE_PIXEL", "Structural source identity changed")
 				if not _advance_parked_structure_revision(raster_layers, restore, false):
 					return DrawingResult.failure("NATIVE_STRUCTURE", "Native parked raster history rejected")
+				for identity: String in promoted:
+					var owner: String = identity.get_slice(":", 0)
+					var key: String = identity.substr(owner.length() + 1)
+					(restored[owner] as DrawingLayerNode).tiles[key] = promoted[identity]
+					event["pending"].erase(identity)
+				if not promoted.is_empty():
+					event["native_parked"] = true
 				parked_replay = true
 			else:
 				if not bool(_native_raster_store.call("advance_unreferenced_layers_revision",

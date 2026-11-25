@@ -94,6 +94,11 @@ inside this package and the Atlas-owned `AtlasCampaignBundle` generation
 coordinator; see `docs/DRAWING_STORAGE_CONTRACT.md`. This paragraph describes
 the **logical** API, which remains usable without Atlas even though the host
 now implements portable multi-file saving.
+Physical `DrawingBundleManifest.decode()` now opts in to same-revision native
+source admission on first successful fetch (T-316). No pixel reads occur at
+Open. Portable `.drawing` decode still initializes all sources together
+(T-315). Sparse read-only admission consumes the native aggregate budget;
+rejection leaves the source pending, and native eviction remains future work.
 
 Undo/redo replays compact raster deltas for an independent document. Since
 T-054, `DrawingDocument` also owns an ordered local history with optional

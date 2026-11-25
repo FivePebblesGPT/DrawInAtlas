@@ -101,7 +101,11 @@ static func decode(bytes: PackedByteArray, loader: Callable) -> DrawingResult:
 				if str(signed) != coord[i]:
 					return DrawingResult.failure("COORD", "Noncanonical signed coordinate")
 				coord[i] = signed
-	return DrawingDocument.open_manifest(manifest, loader)
+	var opened: DrawingResult = DrawingDocument.open_manifest(manifest, loader)
+	if opened.ok:
+		var document: DrawingDocument = opened.value
+		document._native_lazy_admission = true
+	return opened
 
 
 static func _integer(value: Variant, low: int, high: int) -> bool:
