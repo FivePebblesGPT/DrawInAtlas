@@ -227,7 +227,7 @@ func render() -> void:
 		tab.name = "Tab_" + panel_id
 		# The same registered panel icon is used in the dock, rail and flyout.
 		# Active floating tabs never collapse or dismiss their host on click.
-		tab.icon = DrawingDockIcons.for_panel(panel_id)
+		DrawingDockIcons.apply_to(tab, panel_id)
 		tab.expand_icon = true
 		tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		tab.custom_minimum_size = Vector2(42, 42)

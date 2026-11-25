@@ -131,3 +131,5 @@ it with a temporarily clamped width. The T-091 test pair verifies this on
 Xvfb/Mesa; physical Linux/Windows and owner T-083 review are still unapproved.
 The older T-081/T-082 sections above remain historical engineering context,
 not acceptable descriptions of the current floating host.
+
+**T-312 filtering (2026-11-25):** registered and fallback panel icons explicitly use nearest-neighbor sampling on their icon-only Buttons in expanded dock, minimized rail, flyout and floating hosts. The artwork canvas, panel content, unrelated toolbar controls and global texture defaults are unchanged. [Native 100%/150% visual and input evidence](evidence/T-312-2026-11-25-panel-icon-filtering.md).

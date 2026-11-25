@@ -843,10 +843,6 @@ func _layout_dock_flyout() -> void:
 	dock_flyout.size = Vector2(width, maxf(100.0, canvas.size.y - 8.0))
 
 
-func _dock_icon(panel_id: String) -> Texture2D:
-	return DrawingDockIcons.for_panel(panel_id)
-
-
 ## The same half-circle belongs to the dock in both states. The minimized
 ## rail owns a real VBox slot; the expanded dock overlays its left gutter.
 func _make_dock_toggle() -> void:
@@ -906,7 +902,7 @@ func _layout_dock_toggle() -> void:
 func _panel_button(panel_id: String, rail_button: bool) -> Button:
 	var button: Button = Button.new()
 	button.name = ("Rail_" if rail_button else "Edge_") + panel_id
-	button.icon = _dock_icon(panel_id)
+	DrawingDockIcons.apply_to(button, panel_id)
 	button.expand_icon = true
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(42, 42)
@@ -932,7 +928,7 @@ func _panel_button(panel_id: String, rail_button: bool) -> Button:
 func _flyout_panel_button(panel_id: String, active: bool) -> Button:
 	var tab: Button = Button.new()
 	tab.name = "Tab_" + panel_id
-	tab.icon = _dock_icon(panel_id)
+	DrawingDockIcons.apply_to(tab, panel_id)
 	tab.expand_icon = true
 	tab.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tab.custom_minimum_size = Vector2(42, 42)
