@@ -503,9 +503,13 @@ impl DrawingNativeBrush {
         let Ok(mut brush) = hokusai::myb::from_str(&preset_text.to_string()) else {
             return error_result("Invalid Hokusai .myb preset");
         };
-        let r = (rgba & 255) as f32 / 255.0;
-        let g = ((rgba >> 8) & 255) as f32 / 255.0;
-        let b = ((rgba >> 16) & 255) as f32 / 255.0;
+        // The workspace supplies straight, encoded sRGB8. Hokusai 0.3's
+        // HSV settings feed its linear-light premultiplied dab surface directly.
+        // Decode RGB once here, then encode once in quantize_pixel_with_mode.
+        // Alpha remains linear and is applied by the canonical pigment stage.
+        let r = hokusai::color::srgb_to_linear((rgba & 255) as f32 / 255.0);
+        let g = hokusai::color::srgb_to_linear(((rgba >> 8) & 255) as f32 / 255.0);
+        let b = hokusai::color::srgb_to_linear(((rgba >> 16) & 255) as f32 / 255.0);
         let hsv = hokusai::color::rgb_to_hsv(r, g, b);
         brush.set(BrushSetting::ColorH, SettingValue::constant(hsv.h));
         brush.set(BrushSetting::ColorS, SettingValue::constant(hsv.s));

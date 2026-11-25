@@ -115,5 +115,6 @@ joypads/ignore_joypad_on_unfocused_application=true
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+viewport/hdr_2d=false
 textures/vram_compression/import_etc2_astc=true
 lights_and_shadows/multi_bounce_occlusion/enabled=true

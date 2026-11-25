@@ -2101,7 +2101,7 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 	return DrawingResult.success(_after.size())
 
 
-## Source-over in unpremultiplied 8-bit color. Unmodified destination bytes stay exact.
+## Source-over in straight encoded sRGB8, with linear alpha. Unmodified destination bytes stay exact.
 static func _blend(source: int, destination: int) -> int:
 	var source_alpha: int = (source >> 24) & 255
 	if source_alpha == 0:

@@ -1161,6 +1161,7 @@ fn clear_invisible_rgb(crop: &mut [u8]) {
     }
 }
 
+// Canonical encoded-sRGB8 source-over with linear alpha; not a linear-light blend.
 fn blend(source: u32, dest: u32) -> u32 {
     let a = ((source >> 24) & 255) as f64;
     if a == 0.0 {

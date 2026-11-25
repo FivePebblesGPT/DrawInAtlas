@@ -23,7 +23,7 @@ TY_VERSION = $(shell "$(PYTHON)" tools/toolchain.py pin ty)
 PYTHON_CHECKS = tools/toolchain.py tools/prepare_native_project.py tools/check_offline_toolchain.py tools/run_t185_profile.py tools/package_linux_export.py tests/test_t201_linux_native_package.py tests/test_t185_profile.py tests/test_t198_matched_callbacks.py tests/test_t199_canvas_draw_cadence.py tests/test_t217_pck_index.py tests/test_t218_pck_payload_integrity.py tests/test_t219_pck_resource_names.py tests/test_t220_pck_project_identity.py tests/t217_pck_fixture.py
 
 .PHONY: help doctor native stage-drawing import-drawing import-atlas drawing atlas build \
-        test test-graphical test-bucket test-shapes test-selection-menu test-raster-export test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache test-selection-native test-large-move test-layer-hierarchy test-floating-dock test-object-sources check lint format clean bundle bundle-check bundle-verify python-test
+        test test-graphical test-bucket test-shapes test-selection-menu test-raster-export test-srgb test-dock-toggle test-dock-flyout test-floating-tabs test-floating-context test-floating-cancel test-floating-focus test-floating-release test-dock-release test-document-tabs test-color-interruption test-live-stroke test-viewport-cache test-selection-native test-large-move test-layer-hierarchy test-floating-dock test-object-sources check lint format clean bundle bundle-check bundle-verify python-test
 
 help:
 	@printf '%s\n' 'make drawing [GODOT=/path] [TOOLCHAIN=system|bundle] [BUNDLE=/path/to.tar.zst]' \
@@ -133,6 +133,22 @@ test-raster-export: import-drawing import-atlas
 	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
 	    --path . --script res://tests/t305_atlas_export_native.gd 2>&1 | tee "$$log"; \
 	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T305_ATLAS_PASSED
+
+# T-306: independent encoded-sRGB swatches, import metadata, and actual software framebuffers.
+test-srgb: import-drawing import-atlas
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s $(WITH_TOOL) godot --headless --audio-driver Dummy --path drawing --script res://tests/t306_srgb_model.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T306_MODEL_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path drawing --script res://tests/t306_srgb_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T306_NATIVE_PASSED
+	@set -euo pipefail; log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	  timeout 120s xvfb-run -a --server-args='-screen 0 1600x1200x24' $(WITH_TOOL) godot \
+	    --display-driver x11 --rendering-method gl_compatibility --audio-driver Dummy \
+	    --path . --script res://tests/t306_atlas_srgb_native.gd 2>&1 | tee "$$log"; \
+	  "$(PYTHON)" tools/check_godot_model_log.py "$$log" --marker T306_ATLAS_PASSED
 
 # T-262: reproducible T-085 held-preview native CI witness after both imports.
 # Retain complete process logs during validation, then remove temporary files.

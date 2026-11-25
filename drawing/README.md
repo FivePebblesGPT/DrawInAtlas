@@ -31,6 +31,10 @@ On narrow windows, use the option-row chevrons, Shift+wheel or keyboard focus
 to reach controls that overflow. `make test-graphical` runs the moving-stroke
 tile-retention regression under Xvfb; this requires `xvfb-run` on the test host.
 
+## Artwork color space
+
+Drawing uses straight encoded sRGB RGBA8 for artwork and linear alpha. Brush pigment is decoded to linear RGB for Hokusai and encoded back to sRGB once; ordinary layer and edit source-over retains its established encoded-byte arithmetic. PNG export declares sRGB; JPEG and WebP export standard sRGB sample values without embedded ICC profiles. Arbitrary ICC profiles are not color-managed on import; convert non-sRGB source images to sRGB in an external color-managed editor first. See the [artwork color contract](../docs/DRAWING_COLOR_SPACE.md) for PNG gamma behavior, exact roundtrip boundaries and display limitations. `make test-srgb` checks actual native pigment and software framebuffer color.
+
 ## Export artwork
 
 Use **File > Export…** for PNG, WebP or JPEG. Choose the finite image frame first; the exporter composites visible layers within that frame, including signed coordinates. PNG and lossless WebP retain composite RGBA8; lossy WebP exposes quality and JPEG adds an opaque matte. Update encoded preview to see the decoded preview and actual byte size. Choose a destination independently of native Save; pending edits must be finished or cancelled first. The bounded exporter accepts up to 4096 pixels per side, 4,194,304 pixels total and 32 MiB encoded. `make test-raster-export` exercises codecs, native standalone and hosted export.

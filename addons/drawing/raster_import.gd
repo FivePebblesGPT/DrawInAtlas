@@ -3,7 +3,10 @@ extends RefCounted
 
 const TILES: Script = preload("res://addons/drawing/signed_tiles.gd")
 ## Import a source image into signed sparse tiles without a full-canvas allocation.
-## Each bounded edit-region request uses canonical straight RGBA8, even on partial edges.
+## Each bounded edit-region request uses canonical straight sRGB RGBA8, even on partial edges.
+## Decoded samples are assumed sRGB. PNG gAMA can be transformed by the codec
+## (gamma 2.2 approximation); arbitrary ICC profiles are not color-managed.
+## Convert non-sRGB artwork externally first for accurate color.
 
 
 ## Read and decode the same bounded byte snapshot. A second path-based decode

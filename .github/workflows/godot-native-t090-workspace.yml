@@ -54,6 +54,10 @@ jobs:
         run: |
           set -euo pipefail
           T305_SCREENSHOTS=/tmp/t090-screenshots make test-raster-export TOOLCHAIN=system 2>&1 | tee /tmp/t305-native.log
+      - name: Verify sRGB swatches, native Brush and actual framebuffers (T-306)
+        run: |
+          set -euo pipefail
+          T306_SCREENSHOTS=/tmp/t090-screenshots make test-srgb TOOLCHAIN=system 2>&1 | tee /tmp/t306-native.log
       - name: Upload software-only screenshots and diagnostic log
         if: always()
         uses: actions/upload-artifact@v4
@@ -65,5 +69,6 @@ jobs:
             /tmp/t303-native.log
             /tmp/t304-native.log
             /tmp/t305-native.log
+            /tmp/t306-native.log
             /tmp/t090-screenshots/
           if-no-files-found: warn
