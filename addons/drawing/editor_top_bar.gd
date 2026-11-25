@@ -14,6 +14,8 @@ var _entries: Array[Dictionary] = []
 var _more_actions: Array[Callable] = []
 # Map original menu/item coordinates to the corresponding More popup item.
 var _more_item_ids: Dictionary = {}
+# Each radio submenu has a stable native copy in the regular and overflow popups.
+var _radio_submenus: Dictionary = {}
 var _unused_options: Control
 var active_options: String = ""
 const OPTION_STEP: int = 96
@@ -37,6 +39,9 @@ func _ready() -> void:
 	more_menu.text = "More ▾"
 	more_menu.tooltip_text = "Additional application menus"
 	more_menu.focus_mode = Control.FOCUS_ALL
+	# A tall native overflow can be repositioned over its trigger. Opening on
+	# release avoids dispatching that same click to the first command.
+	more_menu.action_mode = BaseButton.ACTION_MODE_BUTTON_RELEASE
 	more_menu.visible = false
 	more_menu.get_popup().id_pressed.connect(_more_selected)
 	divider = VSeparator.new()
@@ -78,7 +83,7 @@ func _cue(glyph: String, direction: int) -> Button:
 	return button
 
 
-func add_menu_spec(title: String, labels: Array, handlers: Array) -> void:
+func add_menu_spec(title: String, labels: Array, handlers: Array, accelerators: Dictionary = {}) -> void:
 	assert(labels.size() == handlers.size())
 	var menu: MenuButton = MenuButton.new()
 	menu.text = title
@@ -88,8 +93,9 @@ func add_menu_spec(title: String, labels: Array, handlers: Array) -> void:
 	var popup: PopupMenu = menu.get_popup()
 	for index: int in range(labels.size()):
 		popup.add_item(labels[index], index)
+		_set_caption(popup, index, int(accelerators.get(index, 0)))
 	popup.id_pressed.connect(func(index: int) -> void:
-		if index >= 0 and index < handlers.size():
+		if index >= 0 and index < handlers.size() and handlers[index].is_valid():
 			handlers[index].call())
 	_menus.append(menu)
 	_entries.append({"title": title, "labels": labels, "handlers": handlers})
@@ -98,6 +104,53 @@ func add_menu_spec(title: String, labels: Array, handlers: Array) -> void:
 	else:
 		menu_region.move_child(more_menu, menu_region.get_child_count() - 1)
 	call_deferred("_refresh_layout")
+
+
+## Native accelerator column is presentation only: workspace/canvas retain
+## focus-aware key routing (including Delete/Enter/Escape in text fields).
+func _set_caption(popup: PopupMenu, index: int, accelerator: int) -> void:
+	if accelerator == 0:
+		return
+	popup.set_item_accelerator(index, accelerator as Key)
+	var foreground: Color = popup.get_theme_color("font_color")
+	# Keep the caption readable; a moderate opacity separates it from commands.
+	popup.add_theme_color_override("font_accelerator_color", Color(foreground, 0.72))
+	popup.set_item_shortcut_disabled(index, true)
+
+
+func add_radio_submenu(menu_name: String, index: int, labels: Array[String], handler: Callable) -> void:
+	for menu_index: int in range(_menus.size()):
+		if _menus[menu_index].text != menu_name:
+			continue
+		var original: PopupMenu = _menus[menu_index].get_popup()
+		var direct: PopupMenu = _make_radio_submenu(original, labels, handler)
+		var overflow: PopupMenu = _make_radio_submenu(more_menu.get_popup(), labels, handler)
+		original.set_item_submenu(index, String(direct.name))
+		_radio_submenus[Vector2i(menu_index, index)] = [direct, overflow]
+		return
+
+
+func _make_radio_submenu(parent: PopupMenu, labels: Array[String], handler: Callable) -> PopupMenu:
+	var submenu: PopupMenu = PopupMenu.new()
+	submenu.name = "RadioSubmenu%d" % parent.get_child_count()
+	parent.add_child(submenu)
+	for index: int in range(labels.size()):
+		submenu.add_radio_check_item(labels[index], index)
+	submenu.id_pressed.connect(func(index: int) -> void:
+		if index >= 0 and index < labels.size():
+			handler.call(labels[index]))
+	return submenu
+
+
+func set_radio_submenu_selected(menu_name: String, index: int, selected: int) -> void:
+	for menu_index: int in range(_menus.size()):
+		if _menus[menu_index].text != menu_name:
+			continue
+		var copies: Array = _radio_submenus.get(Vector2i(menu_index, index), [])
+		for popup: PopupMenu in copies:
+			for item: int in range(popup.item_count):
+				popup.set_item_checked(item, item == selected)
+		return
 
 
 func set_menu_checked(menu_name: String, index: int, enabled: bool) -> void:
@@ -203,6 +256,11 @@ func _refresh_layout() -> void:
 		for command: int in range(labels.size()):
 			var item_id: int = _more_actions.size()
 			more.add_item("%s › %s" % [spec["title"], labels[command]], item_id)
+			_set_caption(more, item_id, original.get_item_accelerator(command))
+			var copies: Array = _radio_submenus.get(Vector2i(index, command), [])
+			if not copies.is_empty():
+				var submenu: PopupMenu = copies[1]
+				more.set_item_submenu(item_id, String(submenu.name))
 			_more_actions.append(handlers[command])
 			_more_item_ids[Vector2i(index, command)] = item_id
 			# A narrow window must not lose the state of View/Window toggles.
@@ -215,7 +273,7 @@ func _refresh_layout() -> void:
 	call_deferred("_refresh_scroll_state")
 
 func _more_selected(index: int) -> void:
-	if index >= 0 and index < _more_actions.size():
+	if index >= 0 and index < _more_actions.size() and _more_actions[index].is_valid():
 		_more_actions[index].call()
 
 

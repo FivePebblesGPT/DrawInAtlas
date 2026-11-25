@@ -27,17 +27,17 @@ Object Assets. These requirements remain fixed regardless of final UX changes.
 
 **Current UI audit (T-063; source: `addons/drawing/workspace.gd` and
 `addons/drawing/editor_top_bar.gd`):** the shared shell now implements the
-fixed File/Edit/View/Image/Layers/Select/Window/Help menu order, context-sensitive
-Brush/Eraser/Bucket/Shapes/Select/Move/Text controls, horizontal tool-option scrolling with
+fixed File/Object/Edit/View/Image/Layers/Selection/Window/Help menu order, context-sensitive
+Brush/Eraser/Bucket/Shapes/Select controls, horizontal tool-option scrolling with
 chevrons/Shift+wheel, keyboard focus-to-view, reset on tool switch and a
 narrow-screen **More** menu. It uses a single top row, without duplicate
 quick-access toolbar, plus an eight-tool rail (**Brush, Eraser, Bucket, Shapes, Select, Move,
 Text, Pan**), document tabs, a resizable/hideable Colors/Layers/History dock,
 and a clipped status bar. T-302 adds the Bucket tolerance field and press-preview/release-commit workflow; see [Bucket workflow](BUCKET_WORKFLOW.md). T-303 adds Rectangle/Ellipse/Polygon, Fill/Stroke, FG/BG and contextual stroke width; see [Shapes workflow](POLYGON_WORKFLOW.md). The selection-history preference (OFF by default)
-is in the History dock, not a tool option. Unsupported options (opacity,
+is in Edit > Preferences, not a tool option. T-304 removes the exposed Snap toggle and duplicate Select/Move menu commands; Selection > Selection mode and the Select contextual dropdown share Replace/Add/Subtract/Intersect state. More preserves the submenu and key captions when Selection overflows. Unsupported options (opacity,
 feather and arbitrary transforms) are **not** displayed as working controls.
 
-**Visible shortcut labels:** File/Edit menus expose New `Ctrl+N`, Open
+**Visible shortcut labels:** T-304 uses a separate muted native accelerator column (including More), with focus-aware shortcut handling unchanged. File/Edit menus expose New `Ctrl+N`, Open
 `Ctrl+O`, Save `Ctrl+S`, Save As `Ctrl+Shift+S`, Undo `Ctrl+Z` and primary
 Redo `Ctrl+Y`; `Ctrl+Shift+Z` remains a supported redo alias. Native automation
 (`drawing/tests/compact_workspace_smoke.gd`) verifies Save As, narrow overflow,

@@ -183,11 +183,12 @@ func run() -> void:
 		check(more_popup.is_item_checkable(tabs_more_id) and
 			more_popup.is_item_checked(tabs_more_id) == app.show_document_tabs,
 			"native More popup mirrors the current document-tabs checkmark")
-		# The 560px test-only app width is below the standalone 800px minimum.
-		# The tall native popup can cover its own trigger on mouse release;
-		# verify the pointer-down opening and release after dispatch instead.
+		# More opens on release so a tall popup cannot execute an unrelated
+		# command on the opening mouse-up, even in a below-minimum window.
 		var more_target: Vector2 = top.more_menu.get_global_rect().get_center()
 		await pointer_at(more_target, true)
+		check(not more_popup.visible, "More does not open under the held trigger")
+		await pointer_at(more_target, false)
 		check(more_popup.visible, "real pointer opens the native More menu")
 		await screenshot("t090-more-checkmarks")
 		more_popup.id_pressed.emit(tabs_more_id)
@@ -195,7 +196,6 @@ func run() -> void:
 			"native More action updates tabs and its checked state")
 		app._toggle_document_tabs()
 		more_popup.hide()
-		await pointer_at(more_target, false)
 	if grid_more_id >= 0:
 		check(more_popup.is_item_checkable(grid_more_id) and
 			more_popup.is_item_checked(grid_more_id) == app.canvas.show_grid,

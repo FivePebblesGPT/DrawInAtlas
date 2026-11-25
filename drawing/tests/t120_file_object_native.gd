@@ -172,17 +172,7 @@ func run() -> void:
 	down.global_position = more_target
 	root.push_input(down, true)
 	await frames(3)
-	# At this intentionally below-minimum 300px window, the many-row popup
-	# can cover its trigger. Inspect on pointer-down and complete release only
-	# after the selected action closes the popup.
-	check(more.visible, "native pointer press opens More overflow")
-	await screenshot("object-in-more")
-	if source_id >= 0:
-		more.id_pressed.emit(source_id)
-		await frames(7)
-		check(app.asset_browser != null and app.asset_browser.index.root_path.is_empty(),
-			"overflow Object Browse dispatches same Asset Browser without implicit binding")
-	more.hide()
+	check(not more.visible, "held trigger cannot open tall overflow over its own release")
 	var up: InputEventMouseButton = InputEventMouseButton.new()
 	up.button_index = MOUSE_BUTTON_LEFT
 	up.position = more_target
@@ -190,6 +180,14 @@ func run() -> void:
 	up.pressed = false
 	root.push_input(up, true)
 	await frames(3)
+	check(more.visible, "native pointer release opens More overflow")
+	await screenshot("object-in-more")
+	if source_id >= 0:
+		more.id_pressed.emit(source_id)
+		await frames(7)
+		check(app.asset_browser != null and app.asset_browser.index.root_path.is_empty(),
+			"overflow Object Browse dispatches same Asset Browser without implicit binding")
+	more.hide()
 	root.size = Vector2i(1280, 800)
 	app.size = Vector2(1280, 800)
 	await frames(12)

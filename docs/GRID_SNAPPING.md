@@ -9,6 +9,8 @@
 - **Selection masks:** a grid cell/hex is an Atlas **selection or edit mask**, not a DrawingDocument, tile owner, or storage boundary. Restrict-edits uses the selected polygon only for applicable edits; no implicit clipping/rescaling is applied to existing pixels. Gesture preview, commitment and undo must use the same coordinate/mask rule; switching the presented D-level cannot secretly move the captured edit to another document.
 - **Independent controls:** **geometric zoom**, authored D-level presentation, derived previews and entrance navigation do **not** trigger a snap or edit. Pen/Eraser are not forcibly snapped by the legacy shape-tool toggle. Explicitly showing empty D1 leaves the grid and entrance hit-testing available but no D0 artwork; snapping does not fill it. Existing floor-link navigation is Atlas-owned and pending [[T-017]] usability review.
 
+**T-304 shared workspace correction (2026-11-25):** the standalone and Object Editor no longer expose a pixel-grid Snap toggle or restore a hidden snap flag on tab activation. View > Show grid and Grid spacing and origin remain visual/grid configuration commands; normal edits use unsnapped pixel coordinates. Canvas `snap_to_grid`, spacing/origin setters, `DrawingSnap`, and Atlas-owned snapping candidates remain available to explicit programmatic callers.
+
 ### Historical T-016 Inspector snapping behavior
 
 The detailed tool list and tests below remain the legacy Atlas inspector contract. They are a compatibility description, not evidence of a final Drawing-only or Atlas-unified snapping UX.

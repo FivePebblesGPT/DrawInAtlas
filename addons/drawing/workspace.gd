@@ -17,6 +17,7 @@ const ASSET_BROWSER_SCRIPT: Script = preload("res://addons/drawing/asset_browser
 const ROOT_HISTORY: Script = preload("res://addons/drawing/object_root_history.gd")
 const BRUSH_SETTINGS: Script = preload("res://addons/drawing/brush_settings.gd")
 const BRUSH_PANEL_SCRIPT: Script = preload("res://addons/drawing/brush_panel.gd")
+const SELECTION_MODES: Array[String] = ["Replace", "Add", "Subtract", "Intersect"]
 const ROW_EYE: int = 1
 const ROW_LOCK: int = 2
 # Keep a compact minimum independent of the active group. At normal desktop
@@ -74,7 +75,6 @@ var brush_width_value: float = 3.0
 var brush_opacity_value: float = 1.0
 var brush_hardness_overrides: Dictionary = {} # preset -> native hardness 0..1
 var brush_density_overrides: Dictionary = {} # preset -> native dabs / actual radius, 1..8
-var snap_toggle: CheckButton
 var grid_dialog: ConfirmationDialog
 var grid_fields: Array[SpinBox] = []
 var image_frame_dialog: ConfirmationDialog
@@ -240,23 +240,24 @@ func _build_interface() -> void:
 	root.add_child(top_bar)
 	# Ordinary documents and portable Object sources have independent commands.
 	# The same canonical workspace is embedded by standalone Drawing and Atlas.
-	top_bar.add_menu_spec("File", ["New  Ctrl+N", "Open…  Ctrl+O", "Save  Ctrl+S",
-		"Save As…  Ctrl+Shift+S", "Close Tab  Ctrl+W"],
+	top_bar.add_menu_spec("File", ["New", "Open…", "Save", "Save As…", "Close Tab"],
 		[Callable(self, "new_drawing"), Callable(self, "_ask_open"),
 		Callable(self, "_save"), Callable(self, "_ask_save"),
-		Callable(self, "_request_close_current")])
+		Callable(self, "_request_close_current")],
+		{0: KEY_MASK_CTRL | KEY_N, 1: KEY_MASK_CTRL | KEY_O, 2: KEY_MASK_CTRL | KEY_S,
+		3: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_S, 4: KEY_MASK_CTRL | KEY_W})
 	top_bar.add_menu_spec("Object", ["New Source", "Open Source…", "Rename Source…",
 		"Save Source As…", "Browse Sources…"],
 		[Callable(self, "new_object"), Callable(self, "_ask_open_object"),
 		Callable(self, "_ask_rename_object"), Callable(self, "_ask_save"),
 		Callable(self, "_show_asset_browser_empty")])
-	top_bar.add_menu_spec("Edit", ["Undo  Ctrl+Z", "Redo  Ctrl+Y",
-		"Preferences…", "Copy  Ctrl+C", "Cut  Ctrl+X",
-		"Paste  Ctrl+V", "Delete selected pixels  Del"],
+	top_bar.add_menu_spec("Edit", ["Undo", "Redo", "Preferences…", "Copy", "Cut", "Paste", "Delete selected pixels"],
 		[Callable(self, "_undo"), Callable(self, "_redo"),
 		Callable(self, "_show_preferences"), Callable(self, "_copy_selection"),
 		Callable(self, "_cut_selection"), Callable(self, "_paste_selection"),
-		Callable(self, "_delete_selection")])
+		Callable(self, "_delete_selection")],
+		{0: KEY_MASK_CTRL | KEY_Z, 1: KEY_MASK_CTRL | KEY_Y, 3: KEY_MASK_CTRL | KEY_C,
+		4: KEY_MASK_CTRL | KEY_X, 5: KEY_MASK_CTRL | KEY_V, 6: KEY_DELETE})
 	top_bar.add_menu_spec("View", ["Zoom in", "Zoom out", "Reset view",
 		"Show grid", "Grid spacing and origin…", "Pixel grid at high zoom"],
 		[func() -> void: _zoom(1.25), func() -> void: _zoom(0.8),
@@ -275,25 +276,22 @@ func _build_interface() -> void:
 		Callable(self, "_move_selected_layer").bind(-1),
 		Callable(self, "_move_selected_layer").bind(1),
 		Callable(self, "_indent_selected_layer"), Callable(self, "_outdent_selected_layer")])
-	top_bar.add_menu_spec("Select", ["Rectangle selection", "Move selected pixels",
-		"Drop moved pixels  Enter", "Cancel floating Move  Esc",
-		"Deselect  Ctrl+D", "Replace", "Add", "Subtract", "Intersect"],
-		[Callable(self, "_change_tool").bind("Select"),
-		Callable(self, "_change_tool").bind("Move"),
-		Callable(self, "_drop_floating_move"), Callable(self, "_cancel_floating_move"),
-		Callable(self, "_deselect"), Callable(self, "_set_selection_mode").bind("Replace"),
-		Callable(self, "_set_selection_mode").bind("Add"),
-		Callable(self, "_set_selection_mode").bind("Subtract"),
-		Callable(self, "_set_selection_mode").bind("Intersect")])
+	top_bar.add_menu_spec("Selection", ["Selection mode", "Drop moved pixels",
+		"Cancel floating Move", "Deselect"],
+		[Callable(), Callable(self, "_drop_floating_move"), Callable(self, "_cancel_floating_move"),
+		Callable(self, "_deselect")], {1: KEY_ENTER, 2: KEY_ESCAPE, 3: KEY_MASK_CTRL | KEY_D})
+	top_bar.add_radio_submenu("Selection", 0, SELECTION_MODES, Callable(self, "_set_selection_mode"))
+	top_bar.set_radio_submenu_selected("Selection", 0, 0)
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
-		"Show document tabs", "Next tab  Ctrl+Tab", "Previous tab  Ctrl+Shift+Tab",
+		"Show document tabs", "Next tab", "Previous tab",
 		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout",
 		"Asset Browser…"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
 		Callable(self, "_cycle_tab").bind(-1),
 		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts"),
-		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")])
+		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")],
+		{3: KEY_MASK_CTRL | KEY_TAB, 4: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_TAB})
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Help", ["About Drawing workspace"],
 		[Callable(self, "_show_about_workspace")])
@@ -369,18 +367,14 @@ func _build_interface() -> void:
 		if shape_width_control.editable or (event is InputEventMouseButton and (event.shift_pressed \
 				or event.button_index in [MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT])):
 			top_bar.consume_option_wheel(event, shape_width_control))
-	snap_toggle = CheckButton.new()
-	snap_toggle.text = "Snap (8 px)"
-	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
-	snap_toggle.toggled.connect(_set_snap_enabled)
 	selection_mode_control = OptionButton.new()
 	selection_mode_control.tooltip_text = "Marquee combine mode; select without changing document pixels"
-	for option: String in ["Replace", "Add", "Subtract", "Intersect"]:
+	for option: String in SELECTION_MODES:
 		selection_mode_control.add_item(option)
 	selection_mode_control.item_selected.connect(func(index: int) -> void:
 		_set_selection_mode(selection_mode_control.get_item_text(index)))
 	# Inactive options also need an owner before their tool is first selected.
-	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control, bucket_tolerance_control, shape_kind_control, shape_style_control, shape_color_control, shape_width_control]:
+	for option: Control in [brush_preset_control, width_spin, selection_mode_control, bucket_tolerance_control, shape_kind_control, shape_style_control, shape_color_control, shape_width_control]:
 		top_bar._unused_options.add_child(option)
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
@@ -3081,11 +3075,9 @@ func _activate(index: int) -> void:
 	canvas.asset_bounds = object_session.bounds if object_session != null else Rect2i()
 	canvas.image_bounds = tabs[index].get("frame", Rect2i()) as Rect2i
 	canvas.show_grid = bool(tabs[index].get("show_grid", false))
-	canvas.snap_to_grid = bool(tabs[index].get("snap", false))
+	canvas.snap_to_grid = false
 	canvas.grid_spacing = int(tabs[index].get("grid_spacing", 8))
 	canvas.grid_origin = tabs[index].get("grid_origin", Vector2i.ZERO) as Vector2i
-	snap_toggle.set_pressed_no_signal(canvas.snap_to_grid)
-	snap_toggle.text = "Snap (%d px)" % canvas.grid_spacing
 	top_bar.set_menu_checked("View", 3, canvas.show_grid)
 	canvas.camera = tabs[index].get("camera", Vector2.ZERO) as Vector2
 	canvas.zoom = float(tabs[index].get("zoom", 4.0))
@@ -3639,8 +3631,6 @@ func _refresh_tool_options() -> void:
 	if active_tool in ["Brush", "Eraser"]:
 		controls.append(brush_preset_control)
 		controls.append(width_spin)
-	if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]:
-		controls.append(snap_toggle)
 	if active_tool == "Bucket":
 		controls.append(bucket_tolerance_control)
 	if active_tool == "Shapes":
@@ -3651,13 +3641,13 @@ func _refresh_tool_options() -> void:
 
 
 func _set_selection_mode(mode: String) -> void:
-	if canvas.has_floating_move() and not canvas.confirm_floating_move():
-		return
-	canvas.selection_mode = mode
-	for index: int in range(selection_mode_control.item_count):
-		if selection_mode_control.get_item_text(index) == mode:
-			selection_mode_control.select(index)
-			break
+	# This configures the next marquee, never implicitly publishes a floating Move.
+	# Do not change the meaning of a rectangle already being dragged.
+	if mode in SELECTION_MODES and not canvas.selecting:
+		canvas.selection_mode = mode
+	var index: int = SELECTION_MODES.find(canvas.selection_mode)
+	selection_mode_control.select(index)
+	top_bar.set_radio_submenu_selected("Selection", 0, index)
 	_update_status()
 
 
@@ -3994,9 +3984,9 @@ func _update_status() -> void:
 	var guide: String = " | image %d×%d @ %d,%d" % [canvas.image_bounds.size.x,
 		canvas.image_bounds.size.y, canvas.image_bounds.position.x,
 		canvas.image_bounds.position.y] if canvas.image_bounds.has_area() else ""
-	var grid_info: String = " | grid %dpx @ %d,%d (%s, snap %s)" % [canvas.grid_spacing,
+	var grid_info: String = " | grid %dpx @ %d,%d (%s)" % [canvas.grid_spacing,
 		canvas.grid_origin.x, canvas.grid_origin.y,
-		"shown" if canvas.show_grid else "hidden", "on" if canvas.snap_to_grid else "off"]
+		"shown" if canvas.show_grid else "hidden"]
 	var tool_status: String = active_tool
 	if active_tool == "Shapes":
 		tool_status += " | Click vertices, Enter finish, Esc cancel" if canvas.shape_kind == "Polygon" else " | Drag, Esc cancel"
@@ -4008,14 +3998,6 @@ func _update_status() -> void:
 		status.text += " | Floating Move: Enter drop / Esc cancel"
 	status.tooltip_text = status.text
 	_refresh_history()
-
-
-func _set_snap_enabled(enabled: bool) -> void:
-	canvas.snap_to_grid = enabled
-	if active_tab >= 0:
-		tabs[active_tab]["snap"] = enabled
-	canvas.queue_redraw()
-	_update_status()
 
 
 func _toggle_grid() -> void:
@@ -4051,7 +4033,6 @@ func _apply_grid_settings() -> void:
 	canvas.grid_origin = Vector2i(int(grid_fields[1].value), int(grid_fields[2].value))
 	tabs[active_tab]["grid_spacing"] = canvas.grid_spacing
 	tabs[active_tab]["grid_origin"] = canvas.grid_origin
-	snap_toggle.text = "Snap (%d px)" % canvas.grid_spacing
 	canvas.queue_redraw()
 	_update_status()
 

@@ -21,7 +21,7 @@ jobs:
           toolchain: 1.99.1
           components: rustfmt
       - name: Install software-display dependencies
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libxtst6
       - name: Build mandatory native extension and import Drawing/Atlas consumers
         run: |
           set -euo pipefail
@@ -46,6 +46,10 @@ jobs:
           set -euo pipefail
           T303_SCREENSHOTS=/tmp/t090-screenshots T303_ATLAS_SCREENSHOT=/tmp/t090-screenshots/shapes-atlas.png \
             make test-shapes TOOLCHAIN=system 2>&1 | tee /tmp/t303-native.log
+      - name: Verify standalone and hosted native selection menus (T-304)
+        run: |
+          set -euo pipefail
+          T304_SCREENSHOTS=/tmp/t090-screenshots make test-selection-menu TOOLCHAIN=system 2>&1 | tee /tmp/t304-native.log
       - name: Upload software-only screenshots and diagnostic log
         if: always()
         uses: actions/upload-artifact@v4
@@ -55,5 +59,6 @@ jobs:
             /tmp/t090-native.log
             /tmp/t302-native.log
             /tmp/t303-native.log
+            /tmp/t304-native.log
             /tmp/t090-screenshots/
           if-no-files-found: warn

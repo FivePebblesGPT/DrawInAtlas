@@ -51,7 +51,7 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
             'top_bar.set_menu_checked("Window"', 1)[0]
         object_section = self.workspace.split('top_bar.add_menu_spec("Object"', 1)[1].split(
             'top_bar.add_menu_spec("Edit"', 1)[0]
-        for label in ("Close Tab  Ctrl+W", "Open…  Ctrl+O"):
+        for label in ("Close Tab", "Open…", "4: KEY_MASK_CTRL | KEY_W", "1: KEY_MASK_CTRL | KEY_O"):
             self.assertIn(label, file_section)
         for label in ("New Source", "Open Source…", "Rename Source…", "Save Source As…"):
             self.assertIn(label, object_section)
@@ -123,6 +123,7 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
             self.assertIn(term, model)
         native = (ROOT / "drawing/tests/responsive_workspace_native.gd").read_text()
         self.assertIn('await pointer_at(more_target, true)', native)
+        self.assertIn('await pointer_at(more_target, false)', native)
         workflow = (ROOT / ".github/workflows/godot-check.yml").read_text()
         self.assertIn("res://tests/topbar_overflow_smoke.gd", workflow)
         self.assertIn("--marker T090_OVERFLOW_PASSED", workflow)

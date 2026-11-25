@@ -36,9 +36,12 @@ func pointer(canvas: Control, point: Vector2i, pressed: bool) -> void:
 	var event: InputEventMouseButton = InputEventMouseButton.new()
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = pressed
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
 	event.position = canvas.global_position + canvas.pixel_to_position(
 		Vector2(point) + Vector2(0.5, 0.5))
 	event.global_position = event.position
+	root.warp_mouse(event.position)
+	await frames()
 	root.push_input(event, true)
 	await frames()
 
@@ -56,6 +59,7 @@ func run() -> void:
 	root.mode = Window.MODE_WINDOWED
 	var app: Control = load("res://main.tscn").instantiate()
 	app.layout_persistence_enabled = false
+	app.preferences_persistence_enabled = false
 	root.add_child(app)
 	await frames(8)
 	check(app.tabs.size() == 1, "one ordinary document at startup")
@@ -65,9 +69,23 @@ func run() -> void:
 	var doc: DrawingDocument = app.current_document()
 	var layer: String = app.current_layer()
 	var canvas: Control = app.canvas
+	# Use a swept native stroke rather than a stationary tiny dab (the
+	# native Hokusai preset does not guarantee coverage for the latter).
+	app.width_spin.value = 12
+	canvas.grab_focus()
 	var target: Vector2i = Vector2i(5, 6)
-	await pointer(canvas, target, true)
-	await pointer(canvas, target, false)
+	await pointer(canvas, target - Vector2i(6, 0), true)
+	var motion: InputEventMouseMotion = InputEventMouseMotion.new()
+	motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+	motion.position = canvas.global_position + canvas.pixel_to_position(Vector2(target) + Vector2(0.5, 0.5))
+	motion.global_position = motion.position
+	root.push_input(motion, true)
+	await frames()
+	await pointer(canvas, target + Vector2i(6, 0), false)
+	for i: int in range(120):
+		if not canvas.has_pending_stroke():
+			break
+		await frames()
 	var pixel: DrawingResult = doc.read_pixel(layer, target.x, target.y)
 	check(pixel.ok and int(pixel.value) != 0, "native pointer produces a committed stroke")
 	var painted: int = int(pixel.value) if pixel.ok else 0
