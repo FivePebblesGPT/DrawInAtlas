@@ -252,6 +252,9 @@ static func decode(payload: Dictionary) -> DrawingResult:
 			var checked: DrawingResult = document.request_chunk_at(record["id"], coords[0], coords[1])
 			if not checked.ok:
 				return checked
+	var adopted: DrawingResult = document._adopt_opened_raster_sources()
+	if not adopted.ok:
+		return adopted
 	return DrawingResult.success(document, document.revision)
 
 

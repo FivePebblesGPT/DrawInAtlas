@@ -86,3 +86,12 @@ change requires a new envelope version and reader.
   portability still require measurement.
 
 See [T-310 measurements and validation](evidence/T-310-2026-11-25-binary-drawing.md).
+
+**T-315 native source initialization:** Native-supported portable Open now
+adopts all validated referenced RGBA8 tiles into a provisional Rust store at
+the saved revision before returning the document. This does not change the
+format, dirty state or history; failed initialization rejects Open. Both
+binary and legacy Object-source files use this boundary. Sparse Atlas logical
+manifests remain lazy. The existing expanded-raster cap bounds the additional
+native copy, not total process RSS. T-310 timings above predate this change;
+see [T-315 evidence](evidence/T-315-2026-11-25-native-file-sources.md).

@@ -100,6 +100,50 @@ func _native_store_for_edit(expected: int) -> Object:
 	return _native_raster_store
 
 
+## Adopt a fully validated, newly opened portable document at its saved
+## revision. This is source initialization, not an edit or history event.
+## The provisional owner is invisible until every tile import succeeds.
+## Sparse campaign manifests still resolve sources lazily, independently.
+func _adopt_opened_raster_sources() -> DrawingResult:
+	if _native_raster_store != null or not _native_source_identities.is_empty() or \
+			revision != published_revision or is_dirty() or not _events.is_empty() or \
+			not _pending_tiles.is_empty() or not _dirty_tiles.is_empty() or has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_SOURCE", "Expected a clean, fully resolved portable document")
+	# Historical synthetic strides and native-free model fixtures retain the
+	# existing reader. Production Drawing requires the extension and stride.
+	if tile_stride < 16 or not ClassDB.class_exists("DrawingNativeTiles"):
+		return DrawingResult.success(null, revision)
+	var tile_count: int = 0
+	for node: DrawingLayerNode in _nodes.values():
+		tile_count += node.tiles.size()
+		if tile_count > 4096 or tile_count * tile_stride * tile_stride * 4 > MAX_NATIVE_HISTORY_TRANSFER_BYTES:
+			return DrawingResult.failure("NATIVE_SOURCE", "Opened raster exceeds native source budget")
+	if tile_count == 0:
+		return DrawingResult.success(null, revision)
+	var store: Object = ClassDB.instantiate("DrawingNativeTiles")
+	if store == null or int(store.call("tile_abi_version")) != 1 or \
+			not bool(store.call("configure", tile_stride, revision)):
+		return DrawingResult.failure("NATIVE_SOURCE", "Cannot initialize native portable source owner")
+	var identities: Dictionary[String, Variant] = {}
+	for node: DrawingLayerNode in _nodes.values():
+		for key: String in node.tiles:
+			var tile: DrawingRasterTile = node.tiles[key]
+			var coords: PackedStringArray = key.split(",")
+			if node.kind != DrawingLayerNode.RASTER or tile == null or tile.stride != tile_stride or \
+					not tile.has_canonical_storage() or coords.size() != 2 or \
+					not coords[0].is_valid_int() or not coords[1].is_valid_int():
+				return DrawingResult.failure("NATIVE_SOURCE", "Invalid opened raster source")
+			var cx: int = int(coords[0])
+			var cy: int = int(coords[1])
+			if key != "%d,%d" % [cx, cy] or not TILES.tile_coordinates_in_projection_range(cx, cy, tile_stride) or \
+					not bool(store.call("import_source", node.id, cx, cy, revision, tile.to_rgba8())):
+				return DrawingResult.failure("NATIVE_SOURCE", "Native opened tile rejected: " + node.id + ":" + key)
+			identities[node.id + ":" + key] = tile
+	_native_raster_store = store
+	_native_source_identities = identities
+	return DrawingResult.success(null, revision)
+
+
 ## Metadata-only mutation: preserve native raster ownership and Undo tokens
 ## across a document revision that leaves all raster source bytes unchanged.
 ## Native refuses active/stale transitions. If a reentrant caller has already

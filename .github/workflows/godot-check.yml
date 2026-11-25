@@ -153,6 +153,9 @@ jobs:
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t159_signed_replay_publication_bounds.gd 2>&1 | tee /tmp/godot-t159-signed-replay.log
           python3 tools/check_godot_model_log.py /tmp/godot-t159-signed-replay.log --marker T159_SIGNED_REPLAY_PASSED || ci_fail_marker 'T159 native signed replay rejected'
           grep -Fqx 'T159_SIGNED_REPLAY_PASSED checks=39 failures=0' /tmp/godot-t159-signed-replay.log || ci_fail_marker 'T159 signed replay assertion count changed'
+          # T-315: portable Open immediately authorizes every verified tile.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t315_native_file_sources.gd 2>&1 | tee /tmp/godot-t315-file-sources.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t315-file-sources.log --marker T315_NATIVE_FILE_PASSED || ci_fail_marker 'T315 portable native source bootstrap rejected'
           # T-230: even the first legacy-pixel Undo/Redo in a detached document
           # must bootstrap Rust ownership before advancing the host timeline.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t230_detached_pixel_bootstrap.gd 2>&1 | tee /tmp/godot-t230-pixel-bootstrap.log

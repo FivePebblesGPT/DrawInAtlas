@@ -114,16 +114,17 @@ func run() -> void:
 		check(opened.ok and opened.value != null, "saved source reopens")
 		if opened.ok:
 			var fresh: DrawingDocument = opened.value
-			check(fresh._native_raster_store == null, "portable Open starts unattached")
+			var opened_store: Object = fresh._native_raster_store
+			check(opened_store != null and source_matches(fresh, host_layer, "-1,0"), "portable Open authorizes exact native source")
 			var before_revision: int = fresh.revision
 			check(fresh.request_chunk(host_layer, "-1,0").ok,
 				"portable source can be materialized before editing")
 			var from_source: DrawingRasterTile = fresh._nodes[host_layer].tiles.get("-1,0")
 			var second: DrawingResult = fresh._publish_tile_edit(host_layer, fresh.revision,
 				{"-1,0": {62: VISIBLE}}, {"-1,0": from_source})
-			check(second.ok and fresh._native_raster_store != null and
+			check(second.ok and fresh._native_raster_store == opened_store and
 				fresh.revision == before_revision + 1 and source_matches(fresh, host_layer, "-1,0"),
-				"post-Open tile-local edit bootstraps from loaded source bytes")
+				"post-Open tile-local edit retains the loaded native owner")
 		DirAccess.remove_absolute(save_path)
 
 	var untracked_data: Dictionary = make_doc("t232-untracked")

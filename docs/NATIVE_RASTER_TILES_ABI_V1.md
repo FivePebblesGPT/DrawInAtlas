@@ -656,3 +656,17 @@ than empty or precisely `stride² × 4` bytes. Only after the entire array
 passes do these entry points copy buffers into Rust `Vec<u8>`; rejected
 malformed batches do not account earlier full-tile byte copies. Native
 revisions/history are unchanged on rejection. [T-240 evidence](evidence/T-240-2026-11-22-ffi-payload-preflight.md).
+
+### Portable Open source initialization (T-315)
+
+`DrawingFileIO.decode` validates and materializes every referenced source
+before calling `_adopt_opened_raster_sources`. This clean-document boundary
+configures a provisional `DrawingNativeTiles` at the saved revision and
+calls existing same-revision `import_source` for each signed RGBA8 tile. All
+imports must succeed before attaching the store and corresponding source
+identities. No metadata revision, native token or dirty state is created.
+Binary, JSON and portable Object readers share this path; a fresh Object
+draft has its own store with no previous history. Sparse `open_manifest`
+remains lazy. The file's existing 128 MiB expanded raster limit bounds the
+new native source copy; actual process memory also includes Godot projection
+and codec buffers. See [T-315 evidence](evidence/T-315-2026-11-25-native-file-sources.md).
