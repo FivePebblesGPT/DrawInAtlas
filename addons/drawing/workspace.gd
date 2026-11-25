@@ -63,6 +63,7 @@ var layers: Tree
 var status: Label
 var width_spin: SpinBox
 var brush_preset_control: OptionButton
+var bucket_tolerance_control: SpinBox
 var brush_panel: DrawingBrushPanel
 var selected_brush_preset: String = "hard"
 var brush_width_value: float = 3.0
@@ -314,6 +315,17 @@ func _build_interface() -> void:
 		_select_brush_preset(str(brush_preset_control.get_item_metadata(index))))
 	brush_preset_control.gui_input.connect(func(event: InputEvent) -> void:
 		top_bar.consume_option_wheel(event, brush_preset_control))
+	bucket_tolerance_control = SpinBox.new()
+	bucket_tolerance_control.name = "BucketTolerance"
+	bucket_tolerance_control.prefix = "Tolerance"
+	bucket_tolerance_control.suffix = "%"
+	bucket_tolerance_control.max_value = 100
+	bucket_tolerance_control.custom_minimum_size.x = 150
+	bucket_tolerance_control.tooltip_text = "Contiguous fill of the active layer; 0% matches exact RGBA8. Transparent space requires a finite frame or selection."
+	bucket_tolerance_control.value_changed.connect(func(value: float) -> void:
+		canvas.bucket_tolerance = value / 100.0)
+	bucket_tolerance_control.gui_input.connect(func(event: InputEvent) -> void:
+		top_bar.consume_option_wheel(event, bucket_tolerance_control))
 	snap_toggle = CheckButton.new()
 	snap_toggle.text = "Snap (8 px)"
 	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
@@ -325,7 +337,7 @@ func _build_interface() -> void:
 	selection_mode_control.item_selected.connect(func(index: int) -> void:
 		_set_selection_mode(selection_mode_control.get_item_text(index)))
 	# Inactive options also need an owner before their tool is first selected.
-	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control]:
+	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control, bucket_tolerance_control]:
 		top_bar._unused_options.add_child(option)
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
@@ -352,7 +364,7 @@ func _build_interface() -> void:
 	# Keep the tool rail compact; the SVGs are 16px and do not need 44px-wide buttons.
 	rail.custom_minimum_size.x = 42
 	edit_region.add_child(rail)
-	for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
+	for name: String in ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
 		button.name = name + "Tool"
 		button.icon = load("res://addons/drawing/icons/%s.svg" % name.to_lower()) as Texture2D
@@ -3583,6 +3595,8 @@ func _refresh_tool_options() -> void:
 		controls.append(width_spin)
 	if active_tool in ["Brush", "Eraser", "Select", "Move", "Text"]:
 		controls.append(snap_toggle)
+	if active_tool == "Bucket":
+		controls.append(bucket_tolerance_control)
 	if active_tool == "Select":
 		controls.append(selection_mode_control)
 	top_bar.set_tool_controls(active_tool, controls)
@@ -3889,7 +3903,7 @@ func _restore_context(context: DrawingHistoryContext) -> void:
 		canvas.layer_id = ""
 	canvas.set_selection_mask(context.selection_mask if context.selection_mask != null else
 		DrawingSelection.new(context.selected_rect, context.selected_rect.has_area()), false)
-	if context.editor_mode in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]:
+	if context.editor_mode in ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]:
 		_change_tool(context.editor_mode)
 	_last_selection_context = _capture_context()
 	_reveal_selected_layer()

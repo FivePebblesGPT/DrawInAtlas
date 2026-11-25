@@ -43,6 +43,9 @@ var tool: String = "Brush":
 		tool = value
 var color_rgba: int = 0xff202020
 var brush_width: float = 3.0
+var bucket_tolerance: float = 0.0
+var _bucket_capture: bool = false
+const BUCKET_LIMIT: int = 262144
 ## Every Brush/Eraser preset uses the required Hokusai native extension.
 var brush_preset: String = "hard"
 var brush_opacity: float = 1.0 # 0..1 multiplier of the preset native opaque base
@@ -390,6 +393,12 @@ func _ready() -> void:
 	# source raster tiles still use their one-to-one texture coordinates.
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	RenderingServer.frame_post_draw.connect(_on_frame_post_draw)
+
+
+func _notification(what: int) -> void:
+	if _bucket_capture and what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT,
+			NOTIFICATION_APPLICATION_FOCUS_OUT]:
+		cancel_gesture()
 
 
 func _exit_tree() -> void:
@@ -1254,7 +1263,7 @@ func _draw() -> void:
 	# The next callback revalidates document, epoch, revision, viewport and
 	# preview state afresh. Never spin forever on a failed render.
 	_cold_population_pending = int(metrics["cold_tiles_deferred"]) > 0 and not cold_failed
-	if session != null:
+	if session != null and not _bucket_capture:
 		# Capture per-gesture compositor/upload work before the next _draw
 		# replaces last_frame_metrics. This is CPU submission, not photon time.
 		_metrics["preview_frames"] = int(_metrics["preview_frames"]) + 1
@@ -1283,14 +1292,14 @@ func _draw() -> void:
 		var radius: float = maxf(1.0, brush_width * zoom * 0.5)
 		draw_arc(last_pointer_position, radius + 1.0, 0.0, TAU, 40, Color(0.05, 0.05, 0.05), 1.5)
 		draw_arc(last_pointer_position, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.9), 1.0)
-	if session != null and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
+	if session != null and not _bucket_capture and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
 	# Unlike the earlier draw_cpu_us field, this includes grid, selection and
 	# cursor overlays. Capture actual rendered preview frames only, not the
 	# post-commit idle redraw. Frame callbacks do not measure photons.
 	var frame_end_us: int = Time.get_ticks_usec()
 	last_frame_metrics["full_draw_cpu_us"] = frame_end_us - draw_start
-	if session != null:
+	if session != null and not _bucket_capture:
 		# Capture pending pointer age at the same instant as the draw phases.
 		# A queued waypoint and a partly interpolated target are distinct input
 		# samples; both count even when one was already dequeued for staging.
@@ -1534,7 +1543,9 @@ func _gui_input(event: InputEvent) -> void:
 		var button: InputEventMouseButton = event
 		last_pointer_position = button.position
 		pointer_known = true
-		cursor_moved.emit()
+		# Keep a rejected Bucket press diagnostic visible through mouse-up.
+		if not (tool == "Bucket" and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed and not _bucket_capture):
+			cursor_moved.emit()
 		if button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if button.pressed:
 				var before: Vector2 = (button.position - size * 0.5) / zoom + camera
@@ -1597,11 +1608,18 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		var motion: InputEventMouseMotion = event
+		if _bucket_capture and not bool(motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+			cancel_gesture()
+			return
 		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
 				and not get_global_rect().has_point(motion.position):
 			update_gesture(get_global_transform().affine_inverse() * motion.position)
 	elif event is InputEventMouseButton:
 		var button: InputEventMouseButton = event
+		if _bucket_capture and button.pressed and button.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+			cancel_gesture()
+			get_viewport().set_input_as_handled()
+			return
 		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
 				and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed \
 				and not get_global_rect().has_point(button.position):
@@ -1616,6 +1634,8 @@ func _process(_delta: float) -> void:
 		if document == null or document.revision != session.expected_revision:
 			cancel_gesture()
 			canvas_error.emit("Stroke cancelled because the document revision changed")
+			return
+		if _bucket_capture:
 			return
 		_drain_segments(MAX_SEGMENTS_PER_FRAME)
 		# After release, no live pointer-handler is waiting on this stroke.
@@ -1719,6 +1739,12 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 	gesture_start = Vector2i(floori(start_source.x), floori(start_source.y)) \
 		if source_override != null else position_to_pixel(position)
 	grab_focus()
+	if effective_tool == "Bucket":
+		if not _deferred_stroke.is_empty():
+			canvas_error.emit("Previous stroke is still queued; wait for its commit")
+			return
+		_start_bucket(gesture_start)
+		return
 	if effective_tool == "Text":
 		text_requested.emit(gesture_start)
 		return
@@ -1870,11 +1896,57 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 	_drain_segments(1)
 
 
+## Bucket owns a detached edit from press to release, but never enters the
+## Brush sample queue or its native stroke telemetry.
+func _start_bucket(seed: Vector2i) -> void:
+	var clip: Rect2i = image_bounds if clip_strokes_to_image_frame else Rect2i()
+	if clip.has_area() and not clip.has_point(seed):
+		return
+	if not clip.has_area() and selection_mask.enabled and not selection_mask.inverted:
+		clip = selection_mask.bounds
+	var opened: DrawingResult = document.begin_edit(layer_id, document.revision)
+	if not opened.ok:
+		canvas_error.emit(opened.message)
+		return
+	var edit: DrawingEditSession = opened.value as DrawingEditSession
+	var mask: DrawingSelection = selection_mask.detached_copy()
+	var staged: DrawingResult = edit.flood_fill(seed, color_rgba, mask, BUCKET_LIMIT,
+		bucket_tolerance, clip)
+	if not staged.ok or edit.change_count() == 0:
+		edit.cancel()
+		if not staged.ok and staged.code != "NO_CHANGE":
+			canvas_error.emit(staged.message)
+		return
+	session = edit
+	_stroke_selection = mask
+	_bucket_capture = true
+	_stroke_phase = StrokePhase.CAPTURING
+	dragging = true
+	gesture_started.emit()
+	queue_redraw()
+
+
+func _finish_bucket(position: Vector2) -> void:
+	if not Rect2(Vector2.ZERO, size).has_point(position) or document == null \
+			or document.revision != session.expected_revision \
+			or not _stroke_selection.same_as(selection_mask):
+		cancel_gesture()
+		return
+	var edit: DrawingEditSession = session
+	session = null
+	_bucket_capture = false
+	_stroke_selection = null
+	_stroke_phase = StrokePhase.IDLE
+	dragging = false
+	_publish(edit.commit())
+	queue_redraw()
+
+
 func update_gesture(position: Vector2) -> void:
 	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
 		_append_deferred_stroke(source_position(position))
 		return
-	if not dragging:
+	if not dragging or _bucket_capture:
 		return
 	var current: Vector2i = position_to_pixel(position)
 	if selecting:
@@ -1900,7 +1972,7 @@ func _enqueue_sample(position: Vector2) -> void:
 
 
 func _enqueue_sample_at_time(position: Vector2, received_us: int) -> void:
-	if session == null or _finish_requested:
+	if session == null or _finish_requested or _bucket_capture:
 		return
 	_samples.append(position)
 	_sample_times_us.append(received_us)
@@ -2315,6 +2387,7 @@ func _commit_stroke() -> void:
 ## Escape, stale revision and direct host changes discard the entire floating
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
+	_bucket_capture = false
 	_discard_deferred_stroke()
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
@@ -2456,6 +2529,9 @@ func _stage_move_preview(offset: Vector2i) -> void:
 
 func finish_gesture(position: Vector2, source_override: Variant = null,
 		received_us: int = 0) -> void:
+	if _bucket_capture:
+		_finish_bucket(position)
+		return
 	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
 		_append_deferred_stroke(source_position(position))
 		if not _deferred_stroke.is_empty():

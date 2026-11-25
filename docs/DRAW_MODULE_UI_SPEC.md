@@ -28,12 +28,12 @@ Object Assets. These requirements remain fixed regardless of final UX changes.
 **Current UI audit (T-063; source: `addons/drawing/workspace.gd` and
 `addons/drawing/editor_top_bar.gd`):** the shared shell now implements the
 fixed File/Edit/View/Image/Layers/Select/Window/Help menu order, context-sensitive
-Brush/Eraser/Select/Move/Text controls, horizontal tool-option scrolling with
+Brush/Eraser/Bucket/Select/Move/Text controls, horizontal tool-option scrolling with
 chevrons/Shift+wheel, keyboard focus-to-view, reset on tool switch and a
 narrow-screen **More** menu. It uses a single top row, without duplicate
-quick-access toolbar, plus a six-tool rail (**Brush, Eraser, Select, Move,
+quick-access toolbar, plus a seven-tool rail (**Brush, Eraser, Bucket, Select, Move,
 Text, Pan**), document tabs, a resizable/hideable Colors/Layers/History dock,
-and a clipped status bar. The selection-history preference (OFF by default)
+and a clipped status bar. T-302 adds the Bucket tolerance field and press-preview/release-commit workflow; see [Bucket workflow](BUCKET_WORKFLOW.md). The selection-history preference (OFF by default)
 is in the History dock, not a tool option. Unsupported options (opacity,
 feather and arbitrary transforms) are **not** displayed as working controls.
 

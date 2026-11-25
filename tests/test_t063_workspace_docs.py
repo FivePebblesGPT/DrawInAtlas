@@ -59,7 +59,7 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
             self.assertIn(term, WORKSPACE)
 
     def test_user_refinements_are_packaged_and_tested(self) -> None:
-        for name in ("brush", "eraser", "select", "move", "text", "pan"):
+        for name in ("brush", "eraser", "bucket", "select", "move", "text", "pan"):
             asset = ROOT / f"addons/drawing/icons/{name}.svg"
             self.assertTrue(asset.is_file(), name)
             self.assertIn('<svg xmlns="http://www.w3.org/2000/svg"', asset.read_text())
@@ -73,7 +73,7 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
                       (ROOT / "tools/build_drawing_app.py").read_text())
         self.assertIn('icons = PACKAGE / "icons"',
                       (ROOT / "tools/build_drawing_contract_consumer.py").read_text())
-        for witness in ('six tools share the icon rail', 'Ctrl+Shift+Tab cycles backward',
+        for witness in ('current tools share the icon rail', 'Ctrl+Shift+Tab cycles backward',
                         'keyboard focus brings History events into scroll viewport',
                         'hidden tabs still enforce unsaved document close prompt'):
             self.assertIn(witness, NATIVE)

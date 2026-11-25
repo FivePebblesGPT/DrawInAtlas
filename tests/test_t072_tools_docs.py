@@ -25,8 +25,8 @@ PAGES = {
     "SELECTION_AND_EDIT_MASKS.md": ("Select", "DrawingSelection", "T-019"),
     "TEXT_WORKFLOW.md": ("Text", "commit_text", "T-027"),
 }
-CANONICAL_UI = ("Brush", "Eraser", "Select", "Move", "Text", "Pan")
-PENDING = ("BUCKET_WORKFLOW.md", "LINE_WORKFLOW.md", "POLYGON_WORKFLOW.md", "WALL_PATHS_WORKFLOW.md")
+CANONICAL_UI = ("Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan")
+PENDING = ("LINE_WORKFLOW.md", "POLYGON_WORKFLOW.md", "WALL_PATHS_WORKFLOW.md")
 
 
 def source(filename: str) -> str:
@@ -54,16 +54,16 @@ class ToolWorkflowDocsTests(unittest.TestCase):
 
     def test_canonical_tool_palette_matches_documented_availability(self) -> None:
         workspace = source("addons/drawing/workspace.gd")
-        self.assertIn('for name: String in ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]', workspace)
+        self.assertIn('for name: String in ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]', workspace)
         for name, content in self.pages.items():
             before = content.split("## Historical", 1)[0]
             with self.subTest(page=name):
-                self.assertIn("**Brush, Eraser, Select, Move, Text, Pan**", before)
+                self.assertIn("**Brush, Eraser, Bucket, Select, Move, Text, Pan**", before)
         for name in PENDING:
             before = self.pages[name].split("## Historical", 1)[0]
             self.assertRegex(before, r"(?i)(NOT shipped|Not shipped)")
             self.assertIn("Ready", before)
-        self.assertNotIn('"Bucket"', workspace.split('for name: String in [', 1)[1].split(']:', 1)[0])
+        self.assertIn("T-302", self.pages["BUCKET_WORKFLOW.md"].split("## Historical", 1)[0])
 
     def test_pending_tool_tickets_are_not_marked_completed(self) -> None:
         gate_errors: list[str] = []
@@ -71,13 +71,13 @@ class ToolWorkflowDocsTests(unittest.TestCase):
         self.assertEqual(gate_errors, [])
         self.assertIsNotNone(gate)
         self.assertTrue(gate.manual_review)
-        for ticket_id in (*[PAGES[name][2] for name in PENDING], "T-027"):
+        for ticket_id in (*[PAGES[name][2] for name in PENDING], "T-023", "T-027"):
             with self.subTest(ticket=ticket_id):
                 errors: list[str] = []
                 item = parse_ticket(DOCS / f"Tickets/{ticket_id}.md", errors)
                 self.assertEqual(errors, [])
                 self.assertIsNotNone(item)
-                # The tools remain unshipped, but a legitimate new manual
+                # Atlas product acceptance remains open, and a legitimate new manual
                 # prerequisite can move them from Ready to Blocked.
                 self.assertNotIn(item.status, {"Done", "Archived"})
                 self.assertIn("T-250", item.dependencies)

@@ -82,9 +82,9 @@ func run() -> void:
 		names.append((menu as MenuButton).text)
 	check(names == ["File", "Object", "Edit", "View", "Image", "Layers", "Select", "Window", "Help"],
 		"exact nine fixed menu names in intended order")
-	var tool_names: Array[String] = ["Brush", "Eraser", "Select", "Move", "Text", "Pan"]
-	check(app.tool_buttons.size() == 6 and app.dock_split.get_child_count() == 2,
-		"six tools share the icon rail and resizable workspace")
+	var tool_names: Array[String] = ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]
+	check(app.tool_buttons.size() == tool_names.size() and app.dock_split.get_child_count() == 2,
+		"current tools share the icon rail and resizable workspace")
 	for name: String in tool_names:
 		var button: Button = app.tool_buttons[name]
 		check(button.tooltip_text.contains(name) and button.focus_mode == Control.FOCUS_ALL,

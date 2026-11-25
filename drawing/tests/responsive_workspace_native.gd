@@ -111,7 +111,7 @@ func run() -> void:
 	root.add_child(app)
 	await frames(10)
 	await screenshot("t090-tool-rail")
-	for name: String in ["Eraser", "Select", "Move", "Text", "Pan", "Brush"]:
+	for name: String in ["Eraser", "Bucket", "Select", "Move", "Text", "Pan", "Brush"]:
 		var button: Button = app.tool_buttons[name]
 		await click_at(button.get_global_rect().get_center())
 		check(app.active_tool == name and button.button_pressed,

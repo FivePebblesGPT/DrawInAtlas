@@ -1979,11 +1979,33 @@ func _fill_source_pixel(point: Vector2i) -> DrawingResult:
 		posmod(global_y, stride)))
 
 
-## Four-connected fill of existing pixels; never expands into implicit blank space.
+## Exact RGBA8 at zero tolerance; otherwise compare premultiplied channels
+## and alpha against the original seed, never against the evolving frontier.
+static func _fill_matches(candidate: int, seed: int, tolerance: float) -> bool:
+	if candidate == seed:
+		return true
+	if tolerance == 0.0:
+		return false
+	var ca: float = float((candidate >> 24) & 255) / 255.0
+	var sa: float = float((seed >> 24) & 255) / 255.0
+	if absf(ca - sa) > tolerance + 0.0000001:
+		return false
+	for shift: int in [0, 8, 16]:
+		if absf(float((candidate >> shift) & 255) * ca -
+				float((seed >> shift) & 255) * sa) > tolerance * 255.0 + 0.00001:
+			return false
+	return true
+
+
+## Four-connected fill. The historical default only visits stored nonzero
+## RGBA8. An explicit finite clip authorizes transparent space inside it.
 func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
-		limit: int = 262144) -> DrawingResult:
+		limit: int = 262144, tolerance: float = 0.0,
+		clip: Rect2i = Rect2i()) -> DrawingResult:
 	if limit <= 0 or _closed:
 		return DrawingResult.failure("FILL_LIMIT", "Invalid flood fill budget/session")
+	if not is_finite(tolerance) or tolerance < 0.0 or tolerance > 1.0:
+		return DrawingResult.failure("FILL_TOLERANCE", "Invalid fill tolerance")
 	# Match _stage's accepted view-relative pixel and color ranges *before*
 	# asking a lazy source provider for data. A provider is arbitrary external
 	# code and must not be invoked for an edit that can never be published.
@@ -2003,14 +2025,14 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 		return DrawingResult.failure("COORD_RANGE", "Fill seed exceeds native projection")
 	# A masked-out seed cannot expand the fill frontier. Reject it before
 	# resolving an arbitrary lazy source or flattening an accepted Brush.
-	if selection != null and not selection.allows(seed):
+	if (clip.has_area() and not clip.has_point(seed)) or (selection != null and not selection.allows(seed)):
 		return DrawingResult.success(change_count())
 	var original: DrawingResult = _fill_source_pixel(seed)
 	if not original.ok:
 		return original
-	if int(original.value) == 0:
+	if int(original.value) == 0 and not clip.has_area():
 		return DrawingResult.failure("BLANK_SEED", "Fill begins in unallocated transparent space")
-	if original.value == rgba:
+	if original.value == rgba and tolerance == 0.0:
 		return DrawingResult.failure("NO_CHANGE", "Target color is already present")
 	var frontier: Array[Vector2i] = [seed]
 	# Mark a point when queued, rather than when popped. Dense regions would
@@ -2040,7 +2062,8 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			_after = old_after
 			_rebuild_preview_tiles()
 			return current
-		if int(current.value) == 0 or current.value != original.value:
+		if (int(current.value) == 0 and not clip.has_area()) or not _fill_matches(
+				int(current.value), int(original.value), tolerance):
 			continue
 		var staged: DrawingResult = _stage(point.x, point.y, rgba, selection,
 			false, false, int(current.value))
@@ -2051,6 +2074,8 @@ func flood_fill(seed: Vector2i, rgba: int, selection: DrawingSelection = null,
 			return staged
 		for offset: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 			var next: Vector2i = point + offset
+			if clip.has_area() and not clip.has_point(next):
+				continue
 			# _stage() cannot publish beyond the signed view-relative range.
 			# Do not inspect an unpublishable neighbor's arbitrary lazy source:
 			# it can contain the same color and make an otherwise legal edge
