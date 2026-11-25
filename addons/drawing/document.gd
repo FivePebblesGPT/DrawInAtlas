@@ -2332,9 +2332,23 @@ func _release_abandoned_raster_creation(event: Dictionary) -> void:
 		_sparse_reloads.erase(identity)
 
 
+## Only the command owner may abandon an event permanently. Tokens are unique
+## across native stores; do not clear a whole stack or replay a detached delta.
+## Rust checks the revision itself; avoid scanning the store's memory stats
+## on every retired event. A stale or detached token cannot affect its owner.
+func _release_discarded_history_delta(delta: DrawingDelta, applied: bool) -> void:
+	if delta == null or delta.native_history_token <= 0 or _native_raster_store == null:
+		return
+	_native_raster_store.call("forget_history_token", revision, delta.layer_id,
+		delta.native_history_token, applied)
+
+
 func _drop_history_redo() -> void:
 	for index: int in range(_cursor, _events.size()):
-		_release_abandoned_raster_creation(_events[index])
+		var event: Dictionary = _events[index]
+		_release_abandoned_raster_creation(event)
+		if event.get("kind") == "content":
+			_release_discarded_history_delta(event["delta"] as DrawingDelta, false)
 	_events.resize(_cursor)
 	_content_states.resize(_cursor + 1)
 

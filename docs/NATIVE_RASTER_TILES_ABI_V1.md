@@ -819,3 +819,24 @@ is unaffected. Rejected reclamation does not change canonical data; the host
 must not erase its source identities unless the native call succeeds. This
 is not general history eviction or an external host timeline protocol.
 See [T-321 evidence](evidence/T-321-2026-11-25-raster-creation-history.md).
+
+
+### T-322: command-owner history reclamation
+
+`forget_history_token(expected_revision, layer, token, applied)` releases one
+exact history event from the native Undo stack (`applied=true`) or Redo stack
+(`applied=false`). Tokens are globally allocated by the process and must match
+both the named layer and stack at the exact native content revision. A stale
+revision, wrong stack/layer, nonpositive or unknown token returns false and
+retains every event. No source bytes, authorization, parking, generation,
+revision or active edit are modified. This is not a general history mutation
+API: the command owner invokes it only for an irreversibly discarded event.
+
+Local redo truncation releases its content tokens (including selection-only
+branches); Atlas's reserved timeline releases Drawing command tokens across
+all affected documents on redo truncation and both applied/undone events on
+explicit reset. Already detached/cleared tokens are harmless no-ops. Reset and
+branching use stack-tail order in the ordinary case. A stale attached native
+store deliberately remains untouched; reclamation does not silently rebase it.
+Parked structural sources and their structural snapshots retain the separate
+lifecycle rules documented above. See [T-322 evidence](evidence/T-322-2026-11-26-history-reclamation.md).

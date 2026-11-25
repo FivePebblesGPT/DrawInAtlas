@@ -1373,6 +1373,34 @@ impl TileStore {
         Ok(())
     }
 
+    /// The command owner has permanently discarded this event. Reclaim only
+    /// its exact globally unique token on the specified stack. This is not an
+    /// edit: canonical source, revisions and pending transactions stay intact.
+    fn forget_history_token(
+        &mut self,
+        expected: u64,
+        layer: &str,
+        token: i64,
+        applied: bool,
+    ) -> bool {
+        if expected != self.revision || token <= 0 || layer.is_empty() {
+            return false;
+        }
+        let stack = if applied {
+            &mut self.undo
+        } else {
+            &mut self.redo
+        };
+        let Some(index) = stack
+            .iter()
+            .rposition(|event| event.token == token && event.layer == layer)
+        else {
+            return false;
+        };
+        stack.remove(index);
+        true
+    }
+
     // Do not treat a retained but out-of-order token as detached. Detached
     // replay discards the native history timeline, even for disjoint tiles.
     fn retains_history_token(&self, token: i64) -> bool {
@@ -2062,6 +2090,24 @@ impl DrawingNativeTiles {
         self.store.retains_history_token(transaction)
     }
 
+    /// Reclaim exactly one abandoned host-owned history event without changing
+    /// the content revision or dropping any other token.
+    #[func]
+    fn forget_history_token(
+        &mut self,
+        expected_revision: i64,
+        layer: GString,
+        token: i64,
+        applied: bool,
+    ) -> bool {
+        self.store.ffi_calls += 1;
+        let Ok(expected) = u64::try_from(expected_revision) else {
+            return false;
+        };
+        self.store
+            .forget_history_token(expected, &layer.to_string(), token, applied)
+    }
+
     /// Validate every packed descriptor before cloning *any* RGBA8 buffer.
     /// A malformed later entry must not allocate earlier full-tile spans.
     /// Empty byte arrays denote absent/transparent tiles in the v1 ABI.
@@ -2710,6 +2756,65 @@ mod tests {
         };
         store.import(id, store.revision, &[]).unwrap();
     }
+    #[test]
+    fn discarded_history_tokens_release_only_the_requested_event() {
+        let mut store = initialized(16);
+        blank(&mut store, 0, 0);
+        let key = TileId {
+            layer: "ink".into(),
+            x: 0,
+            y: 0,
+        };
+        let mut tokens = Vec::new();
+        for x in 0..3 {
+            let rev = store.revision;
+            let token = store.begin("ink", rev, false).unwrap();
+            store
+                .stage(
+                    token,
+                    rev,
+                    0,
+                    0,
+                    &[x, 1],
+                    false,
+                    0xff335577,
+                    false,
+                    Rect2i::new(Vector2i::ZERO, Vector2i::ZERO),
+                )
+                .unwrap();
+            store.commit(token, rev).unwrap();
+            tokens.push(token);
+        }
+        store.undo_or_redo(true).unwrap();
+        store.undo_or_redo(true).unwrap();
+        let rev = store.revision;
+        let bytes = store.read(&key, false).unwrap().rgba.clone();
+        let active = store.begin("ink", rev, false).unwrap();
+        let used = store.bytes_used();
+        assert!(!store.forget_history_token(rev - 1, "ink", tokens[2], false));
+        assert!(!store.forget_history_token(rev, "other", tokens[2], false));
+        assert!(!store.forget_history_token(rev, "ink", tokens[2], true));
+        assert!(!store.forget_history_token(rev, "ink", 0, false));
+        assert_eq!(store.bytes_used(), used);
+        assert!(store.forget_history_token(rev, "ink", tokens[2], false));
+        assert!(!store.retains_history_token(tokens[2]));
+        assert!(!store.forget_history_token(rev, "ink", tokens[2], false));
+        assert!(store.retains_history_token(tokens[0]));
+        assert!(store.retains_history_token(tokens[1]));
+        assert!(store.bytes_used() < used);
+        assert_eq!(store.revision, rev);
+        assert!(store.transaction_matches(active, i64::try_from(rev).unwrap(), "ink"));
+        assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+        assert!(store.forget_history_token(rev, "ink", tokens[0], true));
+        assert!(!store.retains_history_token(tokens[0]));
+        store.active = None;
+        assert!(store.history_matches(tokens[1], false));
+        store.undo_or_redo(false).unwrap();
+        assert!(store.history_matches(tokens[1], true));
+        store.undo_or_redo(true).unwrap();
+        assert_eq!(store.read(&key, false).unwrap().rgba, bytes);
+    }
+
     #[test]
     fn grouped_pigment_runs_match_per_pixel_reference_with_signed_revisits() {
         // Run across positive/signed tile boundaries, revisit a prior tile,
