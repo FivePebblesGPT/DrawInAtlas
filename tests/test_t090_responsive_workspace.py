@@ -57,8 +57,14 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
             self.assertIn(label, object_section)
             self.assertNotIn(label, file_section)
             self.assertNotIn(label, window_section)
-        for label in ("Reset workspace layout", "Show document tabs", "Asset Browser"):
+        for label in ("Reset workspace layout", "Show document tabs"):
             self.assertIn(label, window_section)
+        # T-309 registers panel commands dynamically, including the lazy
+        # Asset Browser; the native witness exercises actual popup recovery.
+        self.assertIn('set_checkable_menu_section("Window", "Panels"', self.workspace)
+        self.assertIn('ids.append("asset_browser")', self.workspace)
+        self.assertIn('handlers.append(_reveal_workspace_panel.bind(panel_id))', self.workspace)
+        self.assertNotIn("Float selected dock group", window_section)
         self.assertIn("KEY_N: new_drawing()", self.workspace)
 
     def test_per_tab_close_keeps_unsaved_guard(self) -> None:
@@ -137,6 +143,18 @@ class ResponsiveDrawingWorkspaceTests(unittest.TestCase):
                         workflow.index("res://tests/responsive_workspace_native.gd"))
         self.assertIn("--audio-driver Dummy", workflow)
         self.assertIn("tools/check_native_t090_log.py", workflow)
+
+    def test_individual_panel_native_witness_is_required(self) -> None:
+        makefile = (ROOT / "Makefile").read_text()
+        workflow = (ROOT / ".github/workflows/godot-native-t090-workspace.yml").read_text()
+        target = "test-window-panels: import-drawing import-atlas"
+        block = makefile.split(target + "\n", 1)[1].split("\n# ", 1)[0]
+        self.assertEqual(block.count("set -euo pipefail"), 2)
+        for term in ("t309_window_panels_native.gd", "t309_atlas_window_panels_native.gd",
+                     "--marker T309_NATIVE_PASSED", "--marker T309_ATLAS_PASSED"):
+            self.assertIn(term, block)
+        self.assertIn("make test-window-panels TOOLCHAIN=system", workflow)
+        self.assertIn("/tmp/t309-native.log", workflow)
 
     def test_native_log_verifier_fails_closed(self) -> None:
         good = "T090_NATIVE: 36 checks; 0 failed\nT090_NATIVE_PASSED: 36 checks\n"

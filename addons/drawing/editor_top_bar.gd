@@ -98,12 +98,45 @@ func add_menu_spec(title: String, labels: Array, handlers: Array, accelerators: 
 		if index >= 0 and index < handlers.size() and handlers[index].is_valid():
 			handlers[index].call())
 	_menus.append(menu)
-	_entries.append({"title": title, "labels": labels, "handlers": handlers})
+	_entries.append({"title": title, "labels": labels, "handlers": handlers, "static_count": labels.size()})
 	if more_menu.get_parent() == null:
 		menu_region.add_child(more_menu)
 	else:
 		menu_region.move_child(more_menu, menu_region.get_child_count() - 1)
 	call_deferred("_refresh_layout")
+
+
+## Registered workspace panels may arrive after the static commands are built.
+## Keep stable command indices and both native menu presentations synchronized.
+func set_checkable_menu_section(menu_name: String, section_name: String, labels: Array[String], handlers: Array[Callable]) -> int:
+	assert(labels.size() == handlers.size())
+	for menu_index: int in range(_menus.size()):
+		if _menus[menu_index].text != menu_name:
+			continue
+		var spec: Dictionary = _entries[menu_index]
+		var static_count: int = spec["static_count"]
+		var first: int = static_count + 1
+		var existing_labels: Array = spec["labels"]
+		var existing_handlers: Array = spec["handlers"]
+		if existing_labels.size() >= first and existing_labels[static_count] == section_name and \
+				existing_labels.slice(first) == labels and existing_handlers.slice(first) == handlers:
+			return first
+		var popup: PopupMenu = _menus[menu_index].get_popup()
+		while popup.item_count > static_count:
+			popup.remove_item(popup.item_count - 1)
+		existing_labels.resize(static_count)
+		existing_handlers.resize(static_count)
+		popup.add_separator(section_name, static_count)
+		existing_labels.append(section_name)
+		existing_handlers.append(Callable())
+		for index: int in range(labels.size()):
+			popup.add_check_item(labels[index], first + index)
+			popup.set_item_tooltip(first + index, "Reveal %s in its existing group; checked means available" % labels[index])
+			existing_labels.append(labels[index])
+			existing_handlers.append(handlers[index])
+		_refresh_layout()
+		return first
+	return -1
 
 
 ## Native accelerator column is presentation only: workspace/canvas retain
@@ -255,7 +288,12 @@ func _refresh_layout() -> void:
 		var original: PopupMenu = _menus[index].get_popup()
 		for command: int in range(labels.size()):
 			var item_id: int = _more_actions.size()
-			more.add_item("%s › %s" % [spec["title"], labels[command]], item_id)
+			var label: String = "%s › %s" % [spec["title"], labels[command]]
+			if original.is_item_separator(command):
+				more.add_separator(label, item_id)
+			else:
+				more.add_item(label, item_id)
+			more.set_item_tooltip(item_id, original.get_item_tooltip(command))
 			_set_caption(more, item_id, original.get_item_accelerator(command))
 			var copies: Array = _radio_submenus.get(Vector2i(index, command), [])
 			if not copies.is_empty():

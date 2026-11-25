@@ -302,13 +302,12 @@ func _build_interface() -> void:
 	top_bar.set_radio_submenu_selected("Selection", 0, 0)
 	top_bar.add_menu_spec("Window", ["Minimize/expand panel dock", "Reset panel width",
 		"Show document tabs", "Next tab", "Previous tab",
-		"Float selected dock group", "Show hidden floating panels", "Reset workspace layout",
-		"Asset Browser…"],
+		"Show hidden floating panels", "Reset workspace layout"],
 		[Callable(self, "_toggle_dock"), Callable(self, "_reset_dock_width"),
 		Callable(self, "_toggle_document_tabs"), Callable(self, "_cycle_tab").bind(1),
 		Callable(self, "_cycle_tab").bind(-1),
-		Callable(self, "_float_selected_dock_group"), Callable(self, "show_hidden_floating_hosts"),
-		Callable(self, "reset_workspace_layout"), Callable(self, "_ask_asset_browser")],
+		Callable(self, "show_hidden_floating_hosts"),
+		Callable(self, "reset_workspace_layout")],
 		{3: KEY_MASK_CTRL | KEY_TAB, 4: KEY_MASK_CTRL | KEY_MASK_SHIFT | KEY_TAB})
 	top_bar.set_menu_checked("Window", 2, show_document_tabs)
 	top_bar.add_menu_spec("Text", ["Text Options", "Edit selected text", "Apply text", "Cancel text", "Style", "Alignment", "Increase size", "Decrease size"],
@@ -1235,10 +1234,10 @@ func _render_dock(focus_key: String = "") -> void:
 		if not flyout_group_id.is_empty():
 			var group: Dictionary = dock_layout.group_info(flyout_group_id)
 			for panel_id: String in group["panels"]:
-				if not dock_views.has(panel_id):
+				if not dock_views.has(panel_id) or not dock_layout.is_panel_visible(panel_id):
 					continue
 				dock_flyout_tabs.add_child(_flyout_panel_button(panel_id, panel_id == String(group["active"])))
-			if dock_views.has(String(group["active"])):
+			if dock_views.has(String(group["active"])) and dock_layout.is_panel_visible(String(group["active"])):
 				(dock_views[String(group["active"])] as Control).reparent(dock_flyout_body)
 	inspector.custom_minimum_size.x = 48 if minimized else EXPANDED_DOCK_MIN_WIDTH
 	dock_panels.visible = not minimized
@@ -1253,6 +1252,7 @@ func _render_dock(focus_key: String = "") -> void:
 	_layout_dock_toggle()
 	_layout_dock_flyout()
 	_render_floating_hosts()
+	_sync_window_panels()
 	if not focus_key.is_empty():
 		call_deferred("_restore_dock_focus", focus_key)
 	_schedule_layout_save()
@@ -1323,6 +1323,7 @@ func hide_floating_host(host_id: String) -> void:
 	var host: DrawingFloatingHost = floating_hosts.get(host_id) as DrawingFloatingHost
 	if host != null:
 		host.hide()
+		_sync_window_panels()
 		_schedule_layout_save()
 
 
@@ -1332,33 +1333,82 @@ func show_floating_host(host_id: String) -> void:
 		host.show()
 		host.clamp_to_client()
 		host.raise_host()
+		_sync_window_panels()
 		_schedule_layout_save()
 
 
 func show_hidden_floating_hosts() -> void:
-	# Window menu recovery: hiding never changes group ownership or view state.
+	# Explicit bulk recovery is retained, but individual menu commands never
+	# call it. Preserve host/group ownership and restore all floating tabs.
 	for host_id: String in floating_hosts:
+		for group: Dictionary in dock_layout.container_info(host_id)["groups"]:
+			for panel_id: String in group["panels"]:
+				dock_layout.set_panel_visible(panel_id, true)
 		show_floating_host(host_id)
+	_render_dock()
 
 
-func _float_selected_dock_group() -> void:
-	var focus: Control = get_viewport().gui_get_focus_owner()
-	var group_id: String = ""
-	for panel_id: String in dock_tab_buttons:
-		if focus == dock_tab_buttons[panel_id]:
-			group_id = dock_layout.group_of(panel_id)
-	for panel_id: String in dock_rail_buttons:
-		if focus == dock_rail_buttons[panel_id]:
-			group_id = dock_layout.group_of(panel_id)
-	for id: String in dock_group_handles:
-		if focus == dock_group_handles[id]:
-			group_id = id
-	if group_id.is_empty():
-		var groups: Array = dock_layout.container_info("right")["groups"]
-		if not groups.is_empty():
-			group_id = groups[0]["id"]
-	if not group_id.is_empty():
-		float_group(group_id)
+func _sync_window_panels() -> void:
+	var ids: Array[String] = []
+	for panel_id: String in dock_views:
+		ids.append(panel_id)
+	# The browser is lazily created, but is always discoverable in Window.
+	if not ids.has("asset_browser"):
+		ids.append("asset_browser")
+	var labels: Array[String] = []
+	var handlers: Array[Callable] = []
+	for panel_id: String in ids:
+		labels.append(panel_id.capitalize())
+		handlers.append(_reveal_workspace_panel.bind(panel_id))
+	var first: int = top_bar.set_checkable_menu_section("Window", "Panels", labels, handlers)
+	if first < 0:
+		return
+	for index: int in range(ids.size()):
+		var panel_id: String = ids[index]
+		var owner: String = dock_layout.owner_of(panel_id)
+		var available: bool = dock_layout.is_panel_visible(panel_id)
+		if floating_hosts.has(owner):
+			available = available and (floating_hosts[owner] as Control).visible
+		top_bar.set_menu_checked("Window", first + index, available)
+
+
+## Checked entries indicate available tabs, not that every tab body is drawn.
+## Selecting an entry always reveals/focuses it; only the host close hides it.
+func _reveal_workspace_panel(panel_id: String, expand_dock: bool = false) -> void:
+	if panel_id == "asset_browser" and not _ensure_asset_browser():
+		return
+	var owner: String = dock_layout.owner_of(panel_id)
+	var group_id: String = dock_layout.group_of(panel_id)
+	if owner.is_empty() or group_id.is_empty():
+		return
+	var host: DrawingFloatingHost = floating_hosts.get(owner) as DrawingFloatingHost
+	if host != null and not host.visible:
+		# A closed host can contain several previously available tabs. Restore
+		# only the requested tab without moving any of the hidden peers.
+		for peer_id: String in dock_layout.group_info(group_id)["panels"]:
+			dock_layout.set_panel_visible(peer_id, peer_id == panel_id)
+	dock_layout.set_panel_visible(panel_id, true)
+	dock_layout.select_panel(panel_id)
+	dock_layout.set_group_collapsed(group_id, false)
+	if host != null:
+		show_floating_host(owner)
+	elif owner == "right":
+		if expand_dock and bool(dock_layout.container_info("right")["minimized"]):
+			_toggle_dock()
+		var state: Dictionary = dock_layout.container_info("right")
+		if bool(state["minimized"]) and state["flyout_group"] != group_id:
+			dock_layout.activate_from_rail("right", panel_id)
+	_render_dock()
+	if owner == "right":
+		call_deferred("_scroll_workspace_panel", panel_id)
+
+
+func _scroll_workspace_panel(panel_id: String) -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var panel: Control = dock_views.get(panel_id) as Control
+	if panel != null and panel.is_visible_in_tree() and inspector.is_ancestor_of(panel):
+		inspector.ensure_control_visible(panel)
 
 
 func _clamp_floating_hosts() -> void:
@@ -1369,6 +1419,10 @@ func _clamp_floating_hosts() -> void:
 func _render_floating_hosts() -> void:
 	for host: DrawingFloatingHost in floating_hosts.values():
 		host.render()
+		# A drag can move the last available tab out of a partially restored
+		# group. Keep the hidden peers in their owner without empty chrome.
+		if dock_layout.rail_icons(host.host_id).is_empty():
+			host.hide()
 
 
 ## Drag/drop uses a single model transaction. The UI never mutates group arrays.
@@ -2759,11 +2813,6 @@ func new_object() -> void:
 	_update_status()
 
 
-func _ask_asset_browser() -> void:
-	# Existing Window command remains a shortcut to the discoverable browser.
-	_show_asset_browser_empty()
-
-
 func _ensure_asset_browser() -> bool:
 	if asset_browser != null:
 		return true
@@ -2785,7 +2834,7 @@ func _ensure_asset_browser() -> bool:
 
 func _show_asset_browser_empty() -> void:
 	if _ensure_asset_browser():
-		_render_dock()
+		_reveal_workspace_panel("asset_browser")
 		call_deferred("_reveal_asset_browser")
 		# The browser owns the explanation and root-chooser buttons. No file is
 		# scanned and no previously remembered Atlas project is silently opened.
@@ -2826,7 +2875,7 @@ func show_asset_browser(objects_root: String) -> bool:
 	if not _ensure_asset_browser():
 		return false
 	var result: DrawingResult = asset_browser.set_objects_root(objects_root)
-	_render_dock()
+	_reveal_workspace_panel("asset_browser")
 	if result.ok:
 		call_deferred("_reveal_asset_browser")
 	if not result.ok:
@@ -3663,27 +3712,12 @@ func _set_text_controls_active(active: bool) -> void:
 
 
 func _show_text_options() -> void:
-	var group: String = dock_layout.group_of("text_options")
-	var owner: String = dock_layout.owner_of("text_options")
-	dock_layout.set_panel_visible("text_options", true)
-	dock_layout.select_panel("text_options")
-	dock_layout.set_group_collapsed(group, false)
-	if owner == "right":
-		# A minimized flyout overlays the canvas; expand to make both visible.
-		dock_layout.set_minimized("right", false)
-	elif floating_hosts.has(owner):
-		(floating_hosts[owner] as Control).show()
-	_render_dock()
-	if owner == "right":
-		call_deferred("_scroll_text_panel")
+	# Text authoring keeps the preview canvas visible beside the controls.
+	_reveal_workspace_panel("text_options", true)
 
 
 func _scroll_text_panel() -> void:
-	# Reparented dock groups settle their container sizes on the next frame.
-	await get_tree().process_frame
-	await get_tree().process_frame
-	if text_panel.is_visible_in_tree() and inspector.is_ancestor_of(text_panel):
-		inspector.ensure_control_visible(text_panel)
+	await _scroll_workspace_panel("text_options")
 
 
 func _edit_selected_text() -> void:
@@ -4951,6 +4985,15 @@ func _restore_workspace_layout() -> void:
 	if layout_persistence_enabled:
 		var stored: Dictionary = DrawingDockPersistence.read_file(layout_settings_path)
 		if not stored.is_empty():
+			# Recreate a previously registered browser without authorizing or
+			# scanning any catalog. Its panel placement is a UI preference.
+			var saved_layout: Variant = stored.get("layout")
+			if saved_layout is Dictionary and saved_layout.get("panels") is Array:
+				for entry: Variant in saved_layout["panels"]:
+					if entry is Dictionary and entry.get("id") == "asset_browser" and asset_browser == null:
+						if _ensure_asset_browser():
+							dock_layout.set_panel_visible("asset_browser", false)
+						break
 			var restored: Dictionary = DrawingDockPersistence.recover(stored, dock_layout, layout_panel_aliases)
 			if not restored.is_empty() and dock_layout.restore(restored["layout"]):
 				layout_recovery_status = "repaired" if restored["recovered"] else "loaded"
@@ -4975,6 +5018,7 @@ func _restore_workspace_layout() -> void:
 				_render_dock()
 		elif FileAccess.file_exists(layout_settings_path):
 			layout_recovery_status = "invalid"
+	_sync_window_panels()
 	_layout_booted = true
 	call_deferred("_apply_saved_dock_geometry")
 
