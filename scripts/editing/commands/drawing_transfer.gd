@@ -1,6 +1,7 @@
 class_name AtlasDrawingTransfer
 extends AtlasEditCommand
 ## One global history step transfers a detached Drawing layer/group tree.
+## The timeline alone abandons unrelated Redo; replay must retain it.
 ## Documents are required to use Atlas-owned history. Different density needs
 ## a separate, explicitly approved resampling transaction (T-061).
 
@@ -73,14 +74,14 @@ func apply(_campaign: AtlasCampaign) -> bool:
 		return false
 	var inserted: DrawingResult = target.import_subtree(
 		_inserted_snapshot if not _inserted_snapshot.is_empty() else _snapshot,
-		target_parent_id, not _inserted_snapshot.is_empty() or not copied)
+		target_parent_id, not _inserted_snapshot.is_empty() or not copied, true)
 	if not inserted.ok:
 		return false
 	var new_id: String = String(inserted.value)
 	if not copied:
-		var removed: DrawingResult = source.remove_subtree(source_node_id)
+		var removed: DrawingResult = source.remove_subtree(source_node_id, false, true)
 		if not removed.ok:
-			target.remove_subtree(new_id)
+			target.remove_subtree(new_id, false, true)
 			_target_revision = target.revision
 			return false
 	if _inserted_snapshot.is_empty():
@@ -88,9 +89,9 @@ func apply(_campaign: AtlasCampaign) -> bool:
 		if not exported.ok:
 			# An unexpected bad chunk must not leave a half-moved tree.
 			if not copied:
-				source.import_subtree(_snapshot, source_parent_id, true)
-				source.reorder(source_node_id, source_parent_id, source_index)
-			target.remove_subtree(new_id)
+				source.import_subtree(_snapshot, source_parent_id, true, true)
+				source.reorder(source_node_id, source_parent_id, source_index, false, true)
+			target.remove_subtree(new_id, false, true)
 			_source_revision = source.revision
 			_target_revision = target.revision
 			return false
@@ -113,18 +114,18 @@ func revert(_campaign: AtlasCampaign) -> bool:
 	if not target.preflight_unrecorded_subtree_removal(target_node_id).ok:
 		return false
 	if not copied:
-		var restored: DrawingResult = source.import_subtree(_snapshot, source_parent_id, true)
+		var restored: DrawingResult = source.import_subtree(_snapshot, source_parent_id, true, true)
 		if not restored.ok:
 			return false
 		# Restore original sibling position, not just the layer identity.
-		var reordered: DrawingResult = source.reorder(source_node_id, source_parent_id, source_index)
+		var reordered: DrawingResult = source.reorder(source_node_id, source_parent_id, source_index, false, true)
 		if not reordered.ok:
-			source.remove_subtree(source_node_id)
+			source.remove_subtree(source_node_id, false, true)
 			return false
-	var removed: DrawingResult = target.remove_subtree(target_node_id)
+	var removed: DrawingResult = target.remove_subtree(target_node_id, false, true)
 	if not removed.ok:
 		if not copied:
-			source.remove_subtree(source_node_id)
+			source.remove_subtree(source_node_id, false, true)
 		return false
 	_applied = false
 	_source_revision = source.revision

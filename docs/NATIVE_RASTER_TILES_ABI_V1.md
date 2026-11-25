@@ -883,3 +883,17 @@ publication, drops the old redo tail (including abandoned structural source
 cleanup), and then installs the surviving history. This is not permission to
 evict reachable history or rewrite an external host timeline. See
 [T-324 evidence](evidence/T-324-2026-11-26-orphaned-subtree-reclamation.md).
+
+
+### T-325: external structural command replay and Redo ownership
+
+Atlas Move/Copy uses the existing `publish_subtree_history_source_revision`
+with `park=false`, `retire_layers_revision` with `discard_redo=false`, and
+metadata revision with `discard_redo=false`. Drawing's opt-in host replay
+policy requires external ownership, a quiescent document (including pending
+script sessions) and a matching native revision. Unrelated native Redo must
+survive structural replay; only the host's actual branch/reset abandons its
+command tokens (T-322). Direct local structural edits retain the ordinary
+branching policy. Retirement still drops tokens for the named layer(s);
+affected transfer replay uses detached source snapshots. No ABI addition or
+cross-document transaction guarantee. See [T-325 evidence](evidence/T-325-2026-11-26-transfer-redo-ownership.md).

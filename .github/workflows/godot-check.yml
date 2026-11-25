@@ -601,6 +601,9 @@ jobs:
         shell: bash
         run: |
           source tools/ci_fail_late.sh
+          # T-325: structural host replay preserves unrelated raster Redo.
+          timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path . --script res://tests/t325_transfer_redo_ownership.gd 2>&1 | tee /tmp/godot-t325-transfer-redo-ownership.log
+          python3 tools/check_godot_model_log.py /tmp/godot-t325-transfer-redo-ownership.log --marker T325_TRANSFER_REDO_OWNERSHIP_PASSED || ci_fail_marker 'T325 transfer Redo ownership rejected'
           # T-324: permanent ancestor retirement reclaims unreachable applied removal sources.
           timeout --signal=TERM --kill-after=5s 120s godot --headless --audio-driver Dummy --path drawing --script res://tests/t324_orphaned_subtree_reclamation.gd 2>&1 | tee /tmp/godot-t324-orphaned-subtree-reclamation.log
           python3 tools/check_godot_model_log.py /tmp/godot-t324-orphaned-subtree-reclamation.log --marker T324_ORPHANED_SUBTREE_RECLAMATION_PASSED || ci_fail_marker 'T324 orphaned subtree reclamation rejected'

@@ -282,13 +282,14 @@ func _advance_parked_structure_revision(layers: Array[String], restore: bool,
 ## only those layers; unrelated canonical tiles and tokens remain live.
 ## Rejecting retirement leaves both stores untouched and uses the ordinary
 ## later checked rebase. This is deliberately not the recorded park path.
-func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary) -> bool:
+func _retire_unrecorded_raster_layers(layers: Array[String], nodes: Dictionary,
+		discard_redo: bool = true) -> bool:
 	if _native_raster_store == null or layers.is_empty() \
 			or not _native_tree_sources_match(nodes, false):
 		return false
 	var previous: int = revision
 	if not bool(_native_raster_store.call("retire_layers_revision",
-			previous, PackedStringArray(layers), true)):
+			previous, PackedStringArray(layers), discard_redo)):
 		return false
 	for layer_id: String in layers:
 		for identity: String in _native_source_identities.keys():
@@ -543,8 +544,24 @@ func _editable(node_id: String) -> bool:
 	return true
 
 
+## External structural commands are part of the existing host timeline.
+## Their caller owns branch disposal; local commands keep the default policy.
+func _preflight_host_structure() -> DrawingResult:
+	if not external_history:
+		return DrawingResult.failure("HISTORY_OWNED", "Only an external command owner may preserve host Redo")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Unpublished edit prevents host structural replay")
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Host structural native revision diverged")
+	return DrawingResult.success(null, revision)
+
+
 func reorder(node_id: String, new_parent: String, new_index: int,
-		record_history: bool = false) -> DrawingResult:
+		record_history: bool = false, preserve_host_redo: bool = false) -> DrawingResult:
+	if preserve_host_redo:
+		var owner: DrawingResult = _preflight_host_structure()
+		if not owner.ok:
+			return owner
 	if not _nodes.has(node_id) or node_id == ROOT_ID or not _nodes.has(new_parent):
 		return DrawingResult.failure("LAYER", "Missing layer or group")
 	if _nodes[new_parent].kind != DrawingLayerNode.GROUP or not _editable(node_id) or not _editable(new_parent):
@@ -561,7 +578,7 @@ func reorder(node_id: String, new_parent: String, new_index: int,
 		(1 if current_parent == new_parent else 0))
 	if current_parent == new_parent and target_index == old_index:
 		return DrawingResult.success(null, revision)
-	var advanced: DrawingResult = _advance_checked_layer_metadata()
+	var advanced: DrawingResult = _advance_checked_layer_metadata(not preserve_host_redo)
 	if not advanced.ok:
 		return advanced
 	original.erase(node_id)
@@ -586,12 +603,14 @@ func can_remove_subtree(node_id: String) -> bool:
 func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
 	if not can_remove_subtree(node_id):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
+	if has_unpublished_edit():
+		return DrawingResult.failure("NATIVE_STRUCTURE", "Unpublished edit prevents subtree transfer")
+	if not _attached_native_revision_matches(revision):
+		return DrawingResult.failure("STALE_REVISION", "Native source revision diverged before transfer")
 	var rasters: Array[String] = []
 	_subtree_raster_ids(node_id, rasters)
 	if _native_raster_store == null or rasters.is_empty():
 		return DrawingResult.success(null, revision)
-	if not _attached_native_revision_matches(revision):
-		return DrawingResult.failure("STALE_REVISION", "Native source revision diverged before transfer")
 	var ids: Array[String] = []
 	_gather_ids(node_id, ids)
 	var nodes: Dictionary = {}
@@ -605,7 +624,12 @@ func preflight_unrecorded_subtree_removal(node_id: String) -> DrawingResult:
 	return DrawingResult.success(null, revision)
 
 
-func remove_subtree(node_id: String, record_history: bool = false) -> DrawingResult:
+func remove_subtree(node_id: String, record_history: bool = false,
+		preserve_host_redo: bool = false) -> DrawingResult:
+	if preserve_host_redo:
+		var owner: DrawingResult = _preflight_host_structure()
+		if not owner.ok:
+			return owner
 	if not can_remove_subtree(node_id):
 		return DrawingResult.failure("LAYER", "Missing, root or inaccessible layer")
 	# The local editor cannot delete locked/hidden descendants indirectly via
@@ -705,13 +729,13 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		_gather_ids(node_id, removed_ids)
 		if _native_raster_store != null:
 			retained_history = _prepare_retired_local_history(removed_ids)
-		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes)
+		retired = _retire_unrecorded_raster_layers(raster_layers, resident_nodes, not preserve_host_redo)
 	# Semantic-only subtree deletion must acquire Rust metadata authority
 	# before erasing even one Godot node. The old post-mutation bridge could
 	# detach a busy/stale native store while leaving the local tree deleted.
 	var metadata_advanced: bool = false
 	if raster_layers.is_empty() and _native_raster_store != null and not retired:
-		var advanced: DrawingResult = _advance_checked_layer_metadata()
+		var advanced: DrawingResult = _advance_checked_layer_metadata(not preserve_host_redo)
 		if not advanced.ok:
 			return advanced
 		metadata_advanced = true
@@ -721,7 +745,7 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 		# but Rust must prove it has neither source nor history references.
 		# This is the last fallible step before deterministic Godot erasure.
 		unreferenced = bool(_native_raster_store.call("advance_unreferenced_layers_revision",
-			revision, PackedStringArray(raster_layers), true))
+			revision, PackedStringArray(raster_layers), not preserve_host_redo))
 		if not unreferenced:
 			return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster subtree removal rejected")
 		revision += 1
@@ -737,9 +761,9 @@ func remove_subtree(node_id: String, record_history: bool = false) -> DrawingRes
 	if parked or retired or unreferenced or metadata_advanced:
 		pass # Rust and document revisions advanced before the deterministic erase.
 	elif not raster_layers.is_empty():
-		_advance_raster_structure_revision(raster_layers)
+		_advance_raster_structure_revision(raster_layers, not preserve_host_redo)
 	else:
-		_advance_nonraster_revision()
+		_advance_nonraster_revision(not preserve_host_redo)
 	_finish_structure(record_history, before)
 	return DrawingResult.success(null, revision)
 
@@ -3124,7 +3148,12 @@ func _validate_snapshot_tree(node_id: String, nodes: Dictionary,
 	return true
 
 
-func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool = false) -> DrawingResult:
+func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool = false,
+		preserve_host_redo: bool = false) -> DrawingResult:
+	if preserve_host_redo:
+		var owner: DrawingResult = _preflight_host_structure()
+		if not owner.ok:
+			return owner
 	if not _nodes.has(parent_id) or _nodes[parent_id].kind != DrawingLayerNode.GROUP or not _editable(parent_id):
 		return DrawingResult.failure("PARENT", "Missing or inaccessible destination group")
 	var original_nodes: Variant = snapshot.get("nodes")
@@ -3212,7 +3241,7 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 		# Semantic-only detached imports must obey the same fail-closed native
 		# revision boundary as public object/text edits. The old post-mutation
 		# bridge advanced Godot and dropped the Rust attachment on rejection.
-		var metadata: DrawingResult = _advance_checked_layer_metadata()
+		var metadata: DrawingResult = _advance_checked_layer_metadata(not preserve_host_redo)
 		if not metadata.ok:
 			return metadata
 	else:
@@ -3230,7 +3259,10 @@ func import_subtree(snapshot: Dictionary, parent_id: String, preserve_ids: bool 
 				for key: String in prepared[layer].tiles:
 					var coords: PackedStringArray = key.split(",")
 					descriptors.append({"layer": layer, "tile_x": int(coords[0]), "tile_y": int(coords[1]), "bytes": prepared[layer].tiles[key].to_rgba8()})
-			if not bool(store.call("publish_subtree_revision", revision, PackedStringArray(imported_rasters), descriptors)):
+			var published: bool = bool(store.call("publish_subtree_history_source_revision",
+				revision, PackedStringArray(imported_rasters), descriptors, false)) if preserve_host_redo else \
+				bool(store.call("publish_subtree_revision", revision, PackedStringArray(imported_rasters), descriptors))
+			if not published:
 				return DrawingResult.failure("NATIVE_STRUCTURE", "Native raster import was rejected")
 			if provisional:
 				_native_raster_store = store
