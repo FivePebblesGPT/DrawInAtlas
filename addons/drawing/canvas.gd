@@ -46,6 +46,35 @@ var brush_width: float = 3.0
 var bucket_tolerance: float = 0.0
 var _bucket_capture: bool = false
 const BUCKET_LIMIT: int = 262144
+const SHAPE_LIMIT: int = 262144
+const MAX_SHAPE_VERTICES: int = 64
+var shape_kind: String = "Rectangle":
+	set(value):
+		if _shape_capture and value != shape_kind:
+			cancel_gesture()
+		shape_kind = value
+var shape_style: String = "Fill":
+	set(value):
+		if _shape_capture and value != shape_style:
+			cancel_gesture()
+		shape_style = value
+var shape_width: float = 1.0:
+	set(value):
+		if _shape_capture and value != shape_width:
+			cancel_gesture()
+		shape_width = value
+var shape_use_background: bool = false:
+	set(value):
+		if _shape_capture and value != shape_use_background:
+			cancel_gesture()
+		shape_use_background = value
+var background_rgba: int = 0xffffffff
+var _shape_capture: bool = false
+var _shape_settings: Dictionary = {}
+var _shape_vertices: PackedVector2Array = PackedVector2Array()
+var _shape_end: Vector2i
+var _shape_target: Vector2i
+var _shape_valid: bool = false
 ## Every Brush/Eraser preset uses the required Hokusai native extension.
 var brush_preset: String = "hard"
 var brush_opacity: float = 1.0 # 0..1 multiplier of the preset native opaque base
@@ -396,7 +425,7 @@ func _ready() -> void:
 
 
 func _notification(what: int) -> void:
-	if _bucket_capture and what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT,
+	if (_bucket_capture or _shape_capture) and what in [NOTIFICATION_WM_WINDOW_FOCUS_OUT,
 			NOTIFICATION_APPLICATION_FOCUS_OUT]:
 		cancel_gesture()
 
@@ -1263,7 +1292,7 @@ func _draw() -> void:
 	# The next callback revalidates document, epoch, revision, viewport and
 	# preview state afresh. Never spin forever on a failed render.
 	_cold_population_pending = int(metrics["cold_tiles_deferred"]) > 0 and not cold_failed
-	if session != null and not _bucket_capture:
+	if session != null and not _bucket_capture and not _shape_capture:
 		# Capture per-gesture compositor/upload work before the next _draw
 		# replaces last_frame_metrics. This is CPU submission, not photon time.
 		_metrics["preview_frames"] = int(_metrics["preview_frames"]) + 1
@@ -1285,6 +1314,16 @@ func _draw() -> void:
 	var outline_started_us: int = Time.get_ticks_usec()
 	_draw_selection_outline()
 	last_frame_metrics["selection_outline_cpu_us"] = Time.get_ticks_usec() - outline_started_us
+	if _shape_capture and _shape_settings["kind"] == "Polygon":
+		for i: int in range(_shape_vertices.size()):
+			var vertex: Vector2 = pixel_to_position(_shape_vertices[i])
+			if i > 0:
+				draw_line(pixel_to_position(_shape_vertices[i - 1]), vertex, Color(0.3, 0.75, 1.0), 1.5)
+			draw_circle(vertex, 3.0, Color(0.3, 0.75, 1.0))
+		if _shape_valid:
+			draw_line(pixel_to_position(_shape_vertices[-1]), pixel_to_position(_shape_vertices[0]), Color(0.3, 0.75, 1.0, 0.8), 1.0)
+		if pointer_known and not _shape_vertices.is_empty():
+			draw_line(pixel_to_position(_shape_vertices[-1]), last_pointer_position, Color(0.3, 0.75, 1.0, 0.6), 1.0)
 	if selecting and _marquee_dragged:
 		draw_rect(Rect2(pixel_to_position(Vector2(_marquee.position)),
 			Vector2(_marquee.size) * zoom), Color(0.95, 0.8, 0.24), false, 2.0)
@@ -1292,14 +1331,14 @@ func _draw() -> void:
 		var radius: float = maxf(1.0, brush_width * zoom * 0.5)
 		draw_arc(last_pointer_position, radius + 1.0, 0.0, TAU, 40, Color(0.05, 0.05, 0.05), 1.5)
 		draw_arc(last_pointer_position, radius, 0.0, TAU, 40, Color(1, 1, 1, 0.9), 1.0)
-	if session != null and not _bucket_capture and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
+	if session != null and not _bucket_capture and not _shape_capture and session.change_count() > 0 and int(_metrics.get("first_preview_submit_us", 0)) == 0:
 		_metrics["first_preview_submit_us"] = Time.get_ticks_usec()
 	# Unlike the earlier draw_cpu_us field, this includes grid, selection and
 	# cursor overlays. Capture actual rendered preview frames only, not the
 	# post-commit idle redraw. Frame callbacks do not measure photons.
 	var frame_end_us: int = Time.get_ticks_usec()
 	last_frame_metrics["full_draw_cpu_us"] = frame_end_us - draw_start
-	if session != null and not _bucket_capture:
+	if session != null and not _bucket_capture and not _shape_capture:
 		# Capture pending pointer age at the same instant as the draw phases.
 		# A queued waypoint and a partly interpolated target are distinct input
 		# samples; both count even when one was already dequeued for staging.
@@ -1543,8 +1582,8 @@ func _gui_input(event: InputEvent) -> void:
 		var button: InputEventMouseButton = event
 		last_pointer_position = button.position
 		pointer_known = true
-		# Keep a rejected Bucket press diagnostic visible through mouse-up.
-		if not (tool == "Bucket" and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed and not _bucket_capture):
+		# Keep rejected discrete-paint diagnostics visible through mouse-up.
+		if not (tool in ["Bucket", "Shapes"] and button.button_index == MOUSE_BUTTON_LEFT and not button.pressed and not _bucket_capture and not _shape_capture):
 			cursor_moved.emit()
 		if button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			if button.pressed:
@@ -1582,7 +1621,7 @@ func _gui_input(event: InputEvent) -> void:
 		elif dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"])):
 			update_gesture(motion.position)
 		cursor_moved.emit()
-		if tool in ["Brush", "Eraser"]:
+		if tool in ["Brush", "Eraser", "Shapes"]:
 			queue_redraw()
 		accept_event()
 
@@ -1602,13 +1641,25 @@ func _input(event: InputEvent) -> void:
 				and (dragging or session != null or has_focus()):
 			cancel_gesture()
 			get_viewport().set_input_as_handled()
+		elif key.pressed and not key.echo and key.keycode == KEY_BACKSPACE \
+				and _shape_capture and _shape_settings["kind"] == "Polygon" and has_focus():
+			if _shape_vertices.size() <= 1:
+				cancel_gesture()
+			else:
+				_shape_vertices.remove_at(_shape_vertices.size() - 1)
+				_stage_shape(_shape_vertices)
+			get_viewport().set_input_as_handled()
+		elif key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER] \
+				and _shape_capture and _shape_settings["kind"] == "Polygon" and has_focus():
+			_finish_shape()
+			get_viewport().set_input_as_handled()
 		elif key.pressed and not key.echo and key.keycode in [KEY_ENTER, KEY_KP_ENTER] \
 				and _floating_active and not dragging and has_focus():
 			confirm_floating_move()
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion:
 		var motion: InputEventMouseMotion = event
-		if _bucket_capture and not bool(motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
+		if (_bucket_capture or (_shape_capture and dragging)) and not bool(motion.button_mask & MOUSE_BUTTON_MASK_LEFT):
 			cancel_gesture()
 			return
 		if (dragging or (not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]))) \
@@ -1616,7 +1667,7 @@ func _input(event: InputEvent) -> void:
 			update_gesture(get_global_transform().affine_inverse() * motion.position)
 	elif event is InputEventMouseButton:
 		var button: InputEventMouseButton = event
-		if _bucket_capture and button.pressed and button.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+		if (_bucket_capture or _shape_capture) and button.pressed and button.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
 			cancel_gesture()
 			get_viewport().set_input_as_handled()
 			return
@@ -1634,6 +1685,12 @@ func _process(_delta: float) -> void:
 		if document == null or document.revision != session.expected_revision:
 			cancel_gesture()
 			canvas_error.emit("Stroke cancelled because the document revision changed")
+			return
+		if _shape_capture:
+			# Coalesce pointer motion. Never stage several full shape drafts in
+			# one frame; release still stages the exact final source coordinate.
+			if dragging and _shape_end != _shape_target:
+				_update_drag_shape(_shape_target)
 			return
 		if _bucket_capture:
 			return
@@ -1725,6 +1782,10 @@ func _promote_deferred_stroke() -> void:
 
 func start_gesture(position: Vector2, source_override: Variant = null,
 		configuration: Dictionary = {}) -> void:
+	if _shape_capture and _shape_settings["kind"] == "Polygon":
+		grab_focus()
+		_add_shape_vertex(position_to_pixel(position))
+		return
 	if session != null:
 		if _stroke_phase == StrokePhase.DRAINING and tool in ["Brush", "Eraser"]:
 			_capture_deferred_stroke(position)
@@ -1739,6 +1800,12 @@ func start_gesture(position: Vector2, source_override: Variant = null,
 	gesture_start = Vector2i(floori(start_source.x), floori(start_source.y)) \
 		if source_override != null else position_to_pixel(position)
 	grab_focus()
+	if effective_tool == "Shapes":
+		if not _deferred_stroke.is_empty():
+			canvas_error.emit("Previous stroke is still queued; wait for its commit")
+			return
+		_start_shape(gesture_start)
+		return
 	if effective_tool == "Bucket":
 		if not _deferred_stroke.is_empty():
 			canvas_error.emit("Previous stroke is still queued; wait for its commit")
@@ -1942,7 +2009,188 @@ func _finish_bucket(position: Vector2) -> void:
 	queue_redraw()
 
 
+## Geometry only: all pixels, preview tiles and history are produced by the
+## canonical edit session. Replacing a draft never publishes its prior shape.
+func _start_shape(seed: Vector2i) -> void:
+	if shape_kind not in ["Rectangle", "Ellipse", "Polygon"] or shape_style not in ["Fill", "Stroke"] \
+			or not is_finite(shape_width) or shape_width < 1.0 or shape_width > 96.0:
+		canvas_error.emit("Invalid shape settings")
+		return
+	var opened: DrawingResult = document.begin_edit(layer_id, document.revision)
+	if not opened.ok:
+		canvas_error.emit(opened.message)
+		return
+	session = opened.value as DrawingEditSession
+	_shape_capture = true
+	_shape_settings = {"kind": shape_kind, "style": shape_style, "width": shape_width,
+		"rgba": background_rgba if shape_use_background else color_rgba,
+		"clip": image_bounds if clip_strokes_to_image_frame else Rect2i()}
+	_shape_vertices = PackedVector2Array([Vector2(seed) + Vector2(0.5, 0.5)])
+	_shape_end = seed
+	_shape_target = seed
+	_shape_valid = false
+	_stroke_selection = selection_mask.detached_copy()
+	_stroke_phase = StrokePhase.CAPTURING
+	dragging = shape_kind != "Polygon"
+	gesture_started.emit()
+	queue_redraw()
+
+
+func _clear_shape_state() -> void:
+	_shape_capture = false
+	_shape_valid = false
+	_shape_settings.clear()
+	_shape_vertices.clear()
+
+
+func _add_shape_vertex(pixel: Vector2i) -> void:
+	var vertex: Vector2 = Vector2(pixel) + Vector2(0.5, 0.5)
+	if _shape_vertices.size() >= 3 and vertex.distance_to(_shape_vertices[0]) * zoom <= 8.0:
+		_finish_shape()
+		return
+	if _shape_vertices.has(vertex):
+		return
+	if _shape_vertices.size() >= MAX_SHAPE_VERTICES:
+		canvas_error.emit("Polygon vertex limit reached; finish or cancel the draft")
+		return
+	_shape_vertices.append(vertex)
+	_stage_shape(_shape_vertices)
+
+
+func _update_drag_shape(end: Vector2i) -> void:
+	if end == _shape_end:
+		return
+	_shape_end = end
+	var points: PackedVector2Array = PackedVector2Array()
+	if end.x != gesture_start.x and end.y != gesture_start.y:
+		var first: Vector2 = Vector2(gesture_start.min(end))
+		var last: Vector2 = Vector2(gesture_start.max(end)) + Vector2.ONE
+		# Fill covers the inclusive drag rectangle. A one-pixel outline is
+		# centered on its outermost pixel centers, not between adjacent rows.
+		if _shape_settings["style"] == "Stroke":
+			first += Vector2(0.5, 0.5)
+			last -= Vector2(0.5, 0.5)
+		if _shape_settings["kind"] == "Ellipse":
+			var radius: Vector2 = (last - first) * 0.5
+			var center: Vector2 = first + radius
+			# A bounded polygonal approximation, using more segments as the radius grows.
+			var segments: int = clampi(ceili(TAU * sqrt(maxf(radius.x, radius.y))), 16, 128)
+			# Multiples of four retain the exact cardinal bounds.
+			segments = ceili(segments / 4.0) * 4
+			for i: int in range(segments):
+				var angle: float = TAU * i / segments
+				points.append(center + Vector2(cos(angle), sin(angle)) * radius)
+		else:
+			points = PackedVector2Array([first, Vector2(last.x, first.y), last, Vector2(first.x, last.y)])
+	_stage_shape(points)
+
+
+func _valid_shape_polygon(points: PackedVector2Array) -> bool:
+	if points.size() < 3:
+		return false
+	# Triangulation can accept a collinear contour; prove nonzero signed area
+	# independently, using coordinates relative to the first vertex.
+	var twice_area: float = 0.0
+	for i: int in range(1, points.size() - 1):
+		twice_area += (points[i] - points[0]).cross(points[i + 1] - points[0])
+	if is_zero_approx(twice_area) or Geometry2D.triangulate_polygon(points).is_empty():
+		return false
+	if _shape_settings["kind"] != "Polygon":
+		return true
+	for i: int in range(points.size()):
+		var previous: Vector2 = points[(i + points.size() - 1) % points.size()]
+		var current: Vector2 = points[i]
+		var next: Vector2 = points[(i + 1) % points.size()]
+		# Backtracking along an adjacent edge is not a simple polygon.
+		if is_zero_approx((previous - current).cross(next - current)) \
+				and (previous - current).dot(next - current) > 0.0:
+			return false
+		for j: int in range(i + 2, points.size()):
+			if i == 0 and j == points.size() - 1:
+				continue
+			var a: Vector2 = points[j]
+			var b: Vector2 = points[(j + 1) % points.size()]
+			if Geometry2D.segment_intersects_segment(current, next, a, b) != null:
+				return false
+			# Godot's segment intersection can omit collinear overlap. Detect
+			# a vertex on a nonadjacent edge, including a T-junction.
+			if _shape_point_on_edge(a, current, next) or _shape_point_on_edge(b, current, next) \
+					or _shape_point_on_edge(current, a, b) or _shape_point_on_edge(next, a, b):
+				return false
+	return true
+
+
+func _shape_point_on_edge(point: Vector2, a: Vector2, b: Vector2) -> bool:
+	return is_zero_approx((point - a).cross(b - a)) and (point - a).dot(point - b) <= 0.0
+
+
+func _stage_shape(points: PackedVector2Array) -> void:
+	var revision: int = session.expected_revision
+	session.cancel()
+	var opened: DrawingResult = document.begin_edit(layer_id, revision)
+	if not opened.ok or not _stroke_selection.same_as(selection_mask):
+		cancel_gesture()
+		canvas_error.emit("Shape cancelled because its source changed")
+		return
+	session = opened.value as DrawingEditSession
+	_shape_valid = _valid_shape_polygon(points)
+	queue_redraw()
+	if not _shape_valid:
+		return
+	var bounds: Rect2 = Rect2(points[0], Vector2.ZERO)
+	for vertex: Vector2 in points:
+		bounds = bounds.expand(vertex)
+	var stroke: bool = _shape_settings["style"] == "Stroke"
+	var width: float = float(_shape_settings["width"])
+	if not is_finite(width) or width < 1.0 or width > 96.0:
+		cancel_gesture()
+		canvas_error.emit("Invalid shape stroke width")
+		return
+	if stroke:
+		bounds = bounds.grow(width * 0.5 + 1.0)
+	var extent: Vector2 = bounds.end.ceil() - bounds.position.floor()
+	if extent.x * extent.y > SHAPE_LIMIT:
+		cancel_gesture()
+		canvas_error.emit("Shape exceeds candidate pixel budget")
+		return
+	var rgba: int = int(_shape_settings["rgba"])
+	var clip: Rect2i = _shape_settings["clip"]
+	var result: DrawingResult
+	if stroke:
+		var outline: PackedVector2Array = points.duplicate()
+		outline.append(points[0])
+		result = session.paint_path(outline, rgba, width, false, _stroke_selection, SHAPE_LIMIT, clip)
+	else:
+		result = session.paint_polygon(points, rgba, _stroke_selection, SHAPE_LIMIT, clip, true)
+	if not result.ok:
+		cancel_gesture()
+		canvas_error.emit(result.message)
+
+
+func _finish_shape() -> void:
+	if not _shape_valid or document == null or document.revision != session.expected_revision \
+			or not _stroke_selection.same_as(selection_mask):
+		cancel_gesture()
+		canvas_error.emit("Shape is incomplete, invalid or its source changed")
+		return
+	var edit: DrawingEditSession = session
+	session = null
+	_clear_shape_state()
+	_stroke_selection = null
+	_stroke_phase = StrokePhase.IDLE
+	dragging = false
+	if edit.change_count() > 0:
+		_publish(edit.commit())
+	else:
+		edit.cancel()
+	queue_redraw()
+
+
 func update_gesture(position: Vector2) -> void:
+	if _shape_capture:
+		if dragging:
+			_shape_target = position_to_pixel(position)
+		return
 	if not _deferred_stroke.is_empty() and bool(_deferred_stroke["capturing"]):
 		_append_deferred_stroke(source_position(position))
 		return
@@ -1972,7 +2220,7 @@ func _enqueue_sample(position: Vector2) -> void:
 
 
 func _enqueue_sample_at_time(position: Vector2, received_us: int) -> void:
-	if session == null or _finish_requested or _bucket_capture:
+	if session == null or _finish_requested or _bucket_capture or _shape_capture:
 		return
 	_samples.append(position)
 	_sample_times_us.append(received_us)
@@ -2388,6 +2636,7 @@ func _commit_stroke() -> void:
 ## transaction, even after several drags. No source/history publication.
 func cancel_gesture() -> void:
 	_bucket_capture = false
+	_clear_shape_state()
 	_discard_deferred_stroke()
 	_unsubmitted_preview_stage_us = 0
 	_unsubmitted_preview_input_us = 0
@@ -2529,6 +2778,15 @@ func _stage_move_preview(offset: Vector2i) -> void:
 
 func finish_gesture(position: Vector2, source_override: Variant = null,
 		received_us: int = 0) -> void:
+	if _shape_capture:
+		if dragging:
+			if not Rect2(Vector2.ZERO, size).has_point(position):
+				cancel_gesture()
+				return
+			_update_drag_shape(position_to_pixel(position))
+			if _shape_capture:
+				_finish_shape()
+		return
 	if _bucket_capture:
 		_finish_bucket(position)
 		return

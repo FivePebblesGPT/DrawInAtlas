@@ -64,6 +64,10 @@ var status: Label
 var width_spin: SpinBox
 var brush_preset_control: OptionButton
 var bucket_tolerance_control: SpinBox
+var shape_kind_control: OptionButton
+var shape_style_control: OptionButton
+var shape_color_control: OptionButton
+var shape_width_control: SpinBox
 var brush_panel: DrawingBrushPanel
 var selected_brush_preset: String = "hard"
 var brush_width_value: float = 3.0
@@ -326,6 +330,45 @@ func _build_interface() -> void:
 		canvas.bucket_tolerance = value / 100.0)
 	bucket_tolerance_control.gui_input.connect(func(event: InputEvent) -> void:
 		top_bar.consume_option_wheel(event, bucket_tolerance_control))
+	shape_kind_control = OptionButton.new()
+	shape_kind_control.name = "ShapeKind"
+	shape_kind_control.tooltip_text = "Rectangle/Ellipse: drag. Polygon: click vertices; Enter or click the first vertex to finish. Backspace removes a vertex. Escape cancels."
+	for kind: String in ["Rectangle", "Ellipse", "Polygon"]:
+		shape_kind_control.add_item(kind)
+	shape_kind_control.item_selected.connect(func(index: int) -> void:
+		canvas.shape_kind = shape_kind_control.get_item_text(index)
+		_update_status())
+	shape_style_control = OptionButton.new()
+	shape_style_control.name = "ShapeStyle"
+	shape_style_control.tooltip_text = "Fill the interior or draw a closed outline"
+	for style: String in ["Fill", "Stroke"]:
+		shape_style_control.add_item(style)
+	shape_style_control.item_selected.connect(func(index: int) -> void:
+		canvas.shape_style = shape_style_control.get_item_text(index)
+		shape_width_control.editable = index == 1)
+	shape_color_control = OptionButton.new()
+	shape_color_control.name = "ShapeColor"
+	shape_color_control.tooltip_text = "Pigment for the current fill or stroke (captured when the shape starts)"
+	shape_color_control.add_item("FG color")
+	shape_color_control.add_item("BG color")
+	shape_color_control.item_selected.connect(func(index: int) -> void:
+		canvas.shape_use_background = index == 1)
+	shape_width_control = SpinBox.new()
+	shape_width_control.name = "ShapeWidth"
+	shape_width_control.prefix = "Width"
+	shape_width_control.suffix = "px"
+	shape_width_control.min_value = 1
+	shape_width_control.max_value = 96
+	shape_width_control.value = 1
+	shape_width_control.editable = false
+	shape_width_control.custom_minimum_size.x = 120
+	shape_width_control.tooltip_text = "Shape stroke width in artwork pixels"
+	shape_width_control.value_changed.connect(func(value: float) -> void:
+		canvas.shape_width = value)
+	shape_width_control.gui_input.connect(func(event: InputEvent) -> void:
+		if shape_width_control.editable or (event is InputEventMouseButton and (event.shift_pressed \
+				or event.button_index in [MOUSE_BUTTON_WHEEL_LEFT, MOUSE_BUTTON_WHEEL_RIGHT])):
+			top_bar.consume_option_wheel(event, shape_width_control))
 	snap_toggle = CheckButton.new()
 	snap_toggle.text = "Snap (8 px)"
 	snap_toggle.tooltip_text = "Snap only Drawing edit tools; grid visibility is separate (View menu)"
@@ -337,7 +380,7 @@ func _build_interface() -> void:
 	selection_mode_control.item_selected.connect(func(index: int) -> void:
 		_set_selection_mode(selection_mode_control.get_item_text(index)))
 	# Inactive options also need an owner before their tool is first selected.
-	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control, bucket_tolerance_control]:
+	for option: Control in [brush_preset_control, width_spin, snap_toggle, selection_mode_control, bucket_tolerance_control, shape_kind_control, shape_style_control, shape_color_control, shape_width_control]:
 		top_bar._unused_options.add_child(option)
 	_refresh_tool_options()
 	tabs_line = HBoxContainer.new()
@@ -364,7 +407,7 @@ func _build_interface() -> void:
 	# Keep the tool rail compact; the SVGs are 16px and do not need 44px-wide buttons.
 	rail.custom_minimum_size.x = 42
 	edit_region.add_child(rail)
-	for name: String in ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]:
+	for name: String in ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]:
 		var button: Button = Button.new()
 		button.name = name + "Tool"
 		button.icon = load("res://addons/drawing/icons/%s.svg" % name.to_lower()) as Texture2D
@@ -411,6 +454,7 @@ func _build_interface() -> void:
 			_update_status())
 	editor_column.add_child(canvas)
 	canvas.color_rgba = _pack_color(active_color)
+	canvas.background_rgba = _pack_color(color_background)
 	canvas.brush_width = brush_width_value
 	canvas.brush_preset = selected_brush_preset
 	canvas.brush_opacity = brush_opacity_value
@@ -2306,7 +2350,9 @@ func _set_background(value: Color, record_recent: bool = true) -> void:
 	if record_recent:
 		_remember_recent(color_background)
 	color_background = canonical
-	# Background is a UI pigment, not a paint target or document operation.
+	if canvas != null:
+		canvas.background_rgba = _pack_color(canonical)
+	# Background remains a UI pigment; changing it does not edit the document.
 	_refresh_color_controls()
 	if record_recent:
 		_save_color_history()
@@ -3597,6 +3643,8 @@ func _refresh_tool_options() -> void:
 		controls.append(snap_toggle)
 	if active_tool == "Bucket":
 		controls.append(bucket_tolerance_control)
+	if active_tool == "Shapes":
+		controls.append_array([shape_kind_control, shape_style_control, shape_color_control, shape_width_control])
 	if active_tool == "Select":
 		controls.append(selection_mode_control)
 	top_bar.set_tool_controls(active_tool, controls)
@@ -3903,7 +3951,7 @@ func _restore_context(context: DrawingHistoryContext) -> void:
 		canvas.layer_id = ""
 	canvas.set_selection_mask(context.selection_mask if context.selection_mask != null else
 		DrawingSelection.new(context.selected_rect, context.selected_rect.has_area()), false)
-	if context.editor_mode in ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]:
+	if context.editor_mode in ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]:
 		_change_tool(context.editor_mode)
 	_last_selection_context = _capture_context()
 	_reveal_selected_layer()
@@ -3949,8 +3997,11 @@ func _update_status() -> void:
 	var grid_info: String = " | grid %dpx @ %d,%d (%s, snap %s)" % [canvas.grid_spacing,
 		canvas.grid_origin.x, canvas.grid_origin.y,
 		"shown" if canvas.show_grid else "hidden", "on" if canvas.snap_to_grid else "off"]
+	var tool_status: String = active_tool
+	if active_tool == "Shapes":
+		tool_status += " | Click vertices, Enter finish, Esc cancel" if canvas.shape_kind == "Polygon" else " | Drag, Esc cancel"
 	status.text = "%s | %s%s | cursor %d,%d | view %d×%d px | zoom %.0f%%%s%s | history %d/%d | %s" % [
-		tab_identity, source, active_tool, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
+		tab_identity, source, tool_status, cursor.x, cursor.y, canvas_pixels.x, canvas_pixels.y,
 		canvas.zoom * 100.0, guide, grid_info, document.history_position(),
 		document.history_length(), "Unsaved changes" if dirty else "Saved"]
 	if canvas.has_floating_move():

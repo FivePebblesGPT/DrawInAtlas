@@ -224,8 +224,14 @@ func _refresh_scroll_state() -> void:
 		return
 	var bar: HScrollBar = options_scroll.get_h_scroll_bar()
 	var overflow: bool = options_region.size.x > options_scroll.size.x + 1.0
+	# A resize signal can run inside HBoxContainer's current sort pass.
+	# Visibility changes during that pass otherwise leave a newly shown cue
+	# outside the client until another unrelated resize.
+	var layout_changed: bool = left_cue.visible != overflow or right_cue.visible != overflow
 	left_cue.visible = overflow
 	right_cue.visible = overflow
+	if layout_changed:
+		queue_sort.call_deferred()
 	left_cue.disabled = not overflow or options_scroll.scroll_horizontal <= 0
 	right_cue.disabled = not overflow or options_scroll.scroll_horizontal >= int(maxf(0.0, bar.max_value - bar.page))
 

@@ -1902,8 +1902,11 @@ func _paint_axis_segment(start: Vector2, finish: Vector2, left: int, top: int,
 	return DrawingResult.success()
 
 
+## Preserve historical exact-replacement callers. Interactive Shapes opts into
+## the same source-over RGBA8 blend used by the canonical swept outline path.
 func paint_polygon(polygon: PackedVector2Array, rgba: int,
-		selection: DrawingSelection = null, max_pixels: int = 1048576) -> DrawingResult:
+		selection: DrawingSelection = null, max_pixels: int = 1048576,
+		clip_bounds: Rect2i = Rect2i(), blend: bool = false) -> DrawingResult:
 	if _closed:
 		return DrawingResult.failure("CLOSED", "Gesture is already finished")
 	if polygon.size() < 3:
@@ -1934,6 +1937,10 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds safe view-relative pixel coordinates")
 	if not _bulk_area_in_native_projection(area):
 		return DrawingResult.failure("COORD_RANGE", "Polygon exceeds native document projection")
+	if clip_bounds.has_area():
+		area = area.intersection(clip_bounds)
+		if not area.has_area():
+			return DrawingResult.success(change_count())
 	if _bulk_selection_excludes_area(area, selection):
 		return DrawingResult.success(change_count())
 	if _polygon_selection_excludes_pixels(area, points, selection):
@@ -1948,7 +1955,7 @@ func paint_polygon(polygon: PackedVector2Array, rgba: int,
 		for x: int in range(area.position.x, area.end.x):
 			if not Geometry2D.is_point_in_polygon(Vector2(x + 0.5, y + 0.5), points):
 				continue
-			var result: DrawingResult = _stage(x, y, rgba, selection)
+			var result: DrawingResult = _stage(x, y, rgba, selection, false, blend)
 			if not result.ok:
 				_before = old_before
 				_after = old_after

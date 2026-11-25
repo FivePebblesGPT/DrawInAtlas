@@ -59,7 +59,7 @@ class CompactDrawingWorkspaceContractTests(unittest.TestCase):
             self.assertIn(term, WORKSPACE)
 
     def test_user_refinements_are_packaged_and_tested(self) -> None:
-        for name in ("brush", "eraser", "bucket", "select", "move", "text", "pan"):
+        for name in ("brush", "eraser", "bucket", "shapes", "select", "move", "text", "pan"):
             asset = ROOT / f"addons/drawing/icons/{name}.svg"
             self.assertTrue(asset.is_file(), name)
             self.assertIn('<svg xmlns="http://www.w3.org/2000/svg"', asset.read_text())

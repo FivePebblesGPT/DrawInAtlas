@@ -25,7 +25,7 @@ PAGES = {
     "SELECTION_AND_EDIT_MASKS.md": ("Select", "DrawingSelection", "T-019"),
     "TEXT_WORKFLOW.md": ("Text", "commit_text", "T-027"),
 }
-CANONICAL_UI = ("Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan")
+CANONICAL_UI = ("Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan")
 PENDING = ("LINE_WORKFLOW.md", "POLYGON_WORKFLOW.md", "WALL_PATHS_WORKFLOW.md")
 
 
@@ -54,11 +54,11 @@ class ToolWorkflowDocsTests(unittest.TestCase):
 
     def test_canonical_tool_palette_matches_documented_availability(self) -> None:
         workspace = source("addons/drawing/workspace.gd")
-        self.assertIn('for name: String in ["Brush", "Eraser", "Bucket", "Select", "Move", "Text", "Pan"]', workspace)
+        self.assertIn('for name: String in ["Brush", "Eraser", "Bucket", "Shapes", "Select", "Move", "Text", "Pan"]', workspace)
         for name, content in self.pages.items():
             before = content.split("## Historical", 1)[0]
             with self.subTest(page=name):
-                self.assertIn("**Brush, Eraser, Bucket, Select, Move, Text, Pan**", before)
+                self.assertIn("**Brush, Eraser, Bucket, Shapes, Select, Move, Text, Pan**", before)
         for name in PENDING:
             before = self.pages[name].split("## Historical", 1)[0]
             self.assertRegex(before, r"(?i)(NOT shipped|Not shipped)")
